@@ -1,25 +1,32 @@
-# 02_phase_plan.md
-# フェーズ別 スケジュール（4週間）
+# 02_phase_plan.md  
+Ultra AutoTrade – フェーズ計画（DoD 追加版）
 
-## Week 1：基礎準備
-- オンライン作業環境の準備
-- Notion連携設定
-- Aave接続テスト
-- AI判定の準備
+---
 
-## Week 2：AI判断 → ロボット連携
-- Notionからニュース取得
-- AIで要約＋判定
-- OctoBotにシグナル連携
-- 最低限のPoC完成
+# Week1：Notion → AI → OctoBot → Aave（基本連携）
 
-## Week 3：Aave自動運用 & 自動化
-- BUY/SELL/HOLDでAaveを操作
-- 自動バックアップ
-- 24時間監視
-- LINE通知
+### ✔ 完了条件（Definition of Done）
+- Notion APIで最低1件取得  
+- AI APIレスポンス < 5秒  
+- BUY/SELL/HOLD の基本判定成功  
+- OctoBot へシグナル送信成功  
+- Aaveテストネットで deposit/withdraw 成功  
 
-## Week 4：レポート生成 & 管理画面
-- 日次レポート自動生成
-- 管理画面作成
-- 全体の調整・安定化
+---
+
+# Week1.5：シミュレーション・バックテスト
+
+### ✔ 完了条件
+- 過去ニュース10件で精度80%以上  
+- 誤判定の原因メモ  
+- しきい値最適化の反映  
+
+---
+
+# Week2：自動化・安定化
+
+### ✔ 完了条件
+- 監視＆アラート動作確認  
+- レポート自動生成成功  
+- 全フロー成功率95%以上  
+

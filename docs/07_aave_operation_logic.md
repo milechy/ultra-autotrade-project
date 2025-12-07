@@ -1,18 +1,42 @@
-# 07_aave_operation_logic.md
-# Aave自動運用ロジック
+# 07_aave_operation_logic.md  
+Ultra AutoTrade – Aave運用ロジック（リスク管理追加）
 
-## BUY時
-- 預け入れ比率を増やす
-- 少額の追加depositを実行
+---
 
-## SELL時
-- 一部引き出し
-- 安全性チェック（ヘルスファクター）
+# 1. 基本行動
 
-## HOLD時
-- 何も変更しない
+BUY → deposit  
+SELL → withdraw  
+HOLD → 何もしない  
 
-## 重要パラメータ
-- deposit_amount
-- withdraw_amount
-- safety_threshold
+---
+
+# 2. リスク管理（重要）
+
+## 2.1 Health Factor
+```
+HF < 1.8 → 警告  
+HF < 1.6 → 運用停止 + 通知  
+```
+
+## 2.2 投資上限
+```
+1回の投資額：総資金の10%  
+1日の投資上限：総資金の30%
+```
+
+## 2.3 自動停止条件
+- ガスエラー2回連続  
+- Aave応答なし3回  
+- 資産変動 > 20%/日  
+
+---
+
+# 3. ガス管理
+- ガス高騰時は自動待機  
+- 5分後に再実行  
+
+---
+
+# 4. 連続トレード制限
+- 10分以内の連続取引は禁止  
