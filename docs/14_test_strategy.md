@@ -14,8 +14,20 @@ Notion → AI → OctoBot → Aave のフローが
 - Unit Test（モジュール単体）
 - Integration Test（2つ以上の連携）
 - Scenario Test（連続動作）
-- E2E Test（テストネットでの本番模倣）
-- Regression Test（変更の影響がないか）
+...
+
+## 2.1 Unit Test 詳細（AI 周り）
+
+- `backend/tests/test_ai_service.py`  
+  - 入力ニュース文（ポジティブ / ネガティブ / 中立）に対して、  
+    `TradeAction` が BUY / SELL / HOLD の期待値どおりになるかを確認。
+  - 信頼度スコアが 0〜100 の範囲に収まることを確認。
+
+- `backend/tests/test_ai_router.py`  
+  - `/ai/analyze` エンドポイントの正常系（200）レスポンスを確認。  
+    - モックした `AIService.analyze_items` が返す `AIAnalysisResult` がそのままレスポンスに反映されること。
+  - `AIService.analyze_items` が予期しない例外を投げた場合、  
+    ステータスコードが 500 系になることを確認。
 
 ---
 
