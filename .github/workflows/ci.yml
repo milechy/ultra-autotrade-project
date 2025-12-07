@@ -64,8 +64,8 @@ jobs:
 
   frontend-tests:
     name: Frontend tests (Node) - optional
-    if: hashFiles('frontend/package.json') != ''
     runs-on: ubuntu-latest
+    if: ${{ exists('frontend/package.json') }}
     defaults:
       run:
         working-directory: frontend
