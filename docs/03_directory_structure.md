@@ -4,15 +4,24 @@
 project root/
 ├── backend/
 │ ├── app/
-│ │ ├── main.py
-│ │ ├── ai/
-│ │ ├── notion/
-│ │ ├── bots/
-│ │ ├── aave/
-│ │ ├── automation/
+│ │ ├── main.py                 # FastAPIエントリーポイント
+│ │ ├── ai/                     # AI解析ロジック（Phase2以降）
+│ │ ├── notion/                 # Notion連携モジュール（Phase1）
+│ │ │ ├── __init__.py          # Notion連携パッケージマーカー
+│ │ │ ├── config.py            # Notion API設定（環境変数読み取り）
+│ │ │ ├── client.py            # Notion APIクライアント（HTTP通信）
+│ │ │ ├── service.py           # Notionレコード取得・内部モデル変換サービス層
+│ │ │ ├── schemas.py           # NotionNewsItem / NotionIngestResponse スキーマ
+│ │ │ └── router.py            # /notion/ingest エンドポイント定義
+│ │ ├── bots/                  # OctoBot連携（別フェーズ）
+│ │ ├── aave/                  # Aave運用ロジック（別フェーズ）
+│ │ ├── automation/            # 自動実行・スケジューラ関連
 │ │ └── utils/
+│ │     └── config.py          # 共通環境変数ユーティリティ（get_env など）
 │ ├── tests/
-│ └── requirements.txt
+│ │ ├── test_notion_client.py  # Notion APIクライアントのユニットテスト
+│ │ └── test_notion_router.py  # /notion/ingest APIのテスト
+│ └── requirements.txt         # backend依存パッケージ一覧
 │
 ├── frontend/
 │ ├── pages/
