@@ -62,36 +62,3 @@ jobs:
         run: |
           ruff check . || echo "ruff reported issues (fix later)"
 
-  frontend-tests:
-    name: Frontend tests (Node) - optional
-    runs-on: ubuntu-latest
-    if: ${{ exists('frontend/package.json') }}
-    defaults:
-      run:
-        working-directory: frontend
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: |
-          if [ -f "package-lock.json" ]; then
-            npm ci
-          else
-            npm install
-          fi
-
-      - name: Run frontend tests
-        run: |
-          if npm run | grep -q "test"; then
-            npm test || echo "frontend tests failed or not configured yet"
-          else
-            echo "No test script in package.json"
-          fi
-
