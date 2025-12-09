@@ -136,6 +136,35 @@ Notion → AI → OctoBot → Aave のフローが
 - 外部 API（Notion / OctoBot / Aave / 価格フィードなど）は **すべて Mock**。  
 - 時系列処理は固定日時を使用し、同じテストが何度実行されても同じ結果になるようにする。
 
+## 3.4 Aave 運用ロジックのテスト
+
+### ユニットテスト（`test_aave_service.py`）
+
+- FakeAaveClient を用意し、Aave 実ネットワークには一切アクセスしない
+- 検証項目：
+  - BUY かつ条件安全 → `DEPOSIT` が 1 回実行される
+  - SELL → `WITHDRAW` が 1 回実行される
+  - HOLD → クライアント呼び出し無し（NOOP）
+  - ヘルスファクター < 閾値 → BUY は NOOP
+  - クールダウン時間内の連続トレード → 2 回目以降は NOOP
+  - 負の金額 → ValueError を投げる
+
+### API テスト（`test_aave_router.py`）
+
+- FastAPI の `TestClient` を使い `/aave/rebalance` を直接叩く
+- AaveService は dependency override でダミー実装に差し替え
+- 検証項目：
+  - 正常系：200 + `operation=DEPOSIT` など
+  - amount が負数 → 422（Pydantic バリデーション）
+  - サービス層が ValueError → 400
+  - 予期しない例外 → 500
+
+### 統合テストの雛形（`test_flow_with_aave_stub.py`）
+
+- 現時点では `pytest.mark.skip` としてプレースホルダのみ実装
+- 将来的に Notion → AI → OctoBot → Aave のフローをすべてモックで接続し、
+  「1件のニュースから Aave まで到達する」シナリオを増やす予定
+
 ---
 
 # 4. Integration Test

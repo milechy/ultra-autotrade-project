@@ -30,10 +30,16 @@ project root/
 │   │   │   ├── service.py          # AIAnalysisResult → シグナル生成・送信ロジック
 │   │   │   └── router.py           # POST /octobot/signal エンドポイント
 │   │   ├── aave/                   # Aave 運用ロジック（別フェーズで実装）
+│   │   │   ├── __init__.py         # Aave パッケージマーカー
+│   │   │   ├── config.py           # Aave 設定（環境変数ラッパー、最大ポジション/クールダウンなど）
+│   │   │   ├── client.py           # Aave クライアント（DummyAaveClient など）
+│   │   │   ├── service.py          # TradeAction → AaveOperation 変換サービス層
+│   │   │   ├── schemas.py          # AaveRebalanceRequest/Response, AaveOperationResult など
+│   │   │   ├── router.py           # /aave/rebalance エンドポイント定義
 │   │   ├── automation/             # 自動実行・スケジューラ関連（将来拡張）
 │   │   └── utils/
 │   │       ├── __init__.py         # 共通ユーティリティパッケージマーカー
-│   │       └── config.py           # 共通環境変数ユーティリティ（get_env など）
+│   │       └── config.py           # /aave/rebalance エンドポイント定義
 │   ├── tests/
 │   │   ├── conftest.py             # テスト共通設定（app インポート・環境変数など）
 │   │   ├── test_notion_client.py   # Notion API クライアントのユニットテスト
@@ -43,7 +49,11 @@ project root/
 │   │   ├── test_octobot_client.py  # OctoBotクライアントのユニットテスト
 │   │   ├── test_octobot_service.py # OctoBotサービス（安全弁・レート制限）のテスト
 │   │   ├── test_octobot_router.py  # /octobot/signal API のテスト
-│   │   └── test_smoke.py           # バックエンド全体のスモークテスト
+│   │   ├── test_smoke.py           # バックエンド全体のスモークテスト
+│   │   ├── test_aave_service.py    # AaveService のユニットテスト（Dummy/Fake クライアント）
+│   │   ├── test_aave_router.py     # /aave/rebalance の API テスト
+│   │   ├── test_flow_with_aave_stub.py # AI → OctoBot → Aave 統合テストの雛形（現状 skip）
+│   │   └── test_ai_service.py      # ...
 │   └── requirements.txt            # backend 依存パッケージ一覧
 │
 ├── frontend/

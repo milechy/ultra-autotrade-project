@@ -178,7 +178,89 @@ count と signals.length が一致しない場合、400 Bad Request。
 - 500: サーバ内部エラー（OctoBot APIのエラーなど詳細はログで追跡）。
 
 ### 4. /aave/rebalance
-BUY/SELL/HOLDに応じて資産操作。
+AI または OctoBot シグナルからの `BUY/SELL/HOLD` アクションを受け取り、  
+Aave 上のポジションを `deposit/withdraw/NOOP` で調整する。
+
+- Method: POST
+- Path: `/aave/rebalance`
+- 認証: （Phase4 時点では未実装 / 今後追加予定）
+- 用途:
+  - BUY → deposit
+  - SELL → withdraw
+  - HOLD → 何もしない（NOOP）
+  - リスク制御（ヘルスファクター・最大ポジション・クールダウン）を満たさない場合は NOOP
+
+#### Request Body: `AaveRebalanceRequest`
+
+```json
+{
+  "action": "BUY" | "SELL" | "HOLD",
+  "amount": "10.0",
+  "asset_symbol": "USDC",   // 省略時は設定のデフォルト資産（例: USDC）
+  "dry_run": false          // true の場合は実トランザクション送信無し
+}
+
+- action: TradeAction と同じ意味（BUY/SELL/HOLD）
+- amount: 0 より大きい数値。上限はサーバ側で AAVE_MAX_SINGLE_TRADE_USD にクリップされる
+- asset_symbol: 任意。省略時は AAVE_DEFAULT_ASSET_SYMBOL
+- dry_run: true の場合、Aave には送信せず「実行した場合の結果」を返す
+
+Response Body: AaveRebalanceResponse
+{
+  "result": {
+    "operation": "DEPOSIT" | "WITHDRAW" | "NOOP",
+    "status": "success" | "skipped" | "error",
+    "asset_symbol": "USDC",
+    "amount": "10.0",
+    "tx_hash": "0x....",          // NOOP と dry_run では null
+    "message": "human readable",
+    "before_health_factor": "2.0",
+    "after_health_factor": "2.0"
+  }
+}
+
+エラーレスポンス
+- 400: amount <= 0 など、入力値の異常
+- 422: Pydantic でのバリデーションエラー
+- 500: サービス層の予期しない例外
+
+
+---
+
+### 3. `docs/07_aave_operation_logic.md`
+
+**更新対象セクション案**
+
+- `# 1. 基本行動` の後に **「3. Phase4 実装ルール」** を追加
+
+**修正案テキスト（追記）**
+
+```md
+# 3. Phase4 実装ルール（/aave/rebalance）
+
+Phase4 では、Aave 運用ロジックを以下のルールで実装した：
+
+- BUY → 基本は `DEPOSIT`
+  - ただし、以下の条件のいずれかに該当する場合は **NOOP（skipped）**
+    - ヘルスファクター < `AAVE_MIN_HEALTH_FACTOR`（デフォルト 1.6）
+    - 10分以内にすでにトレードが行われている（クールダウンルール）
+- SELL → `WITHDRAW`
+  - withdraw は「ポジションを減らす」方向なので、BUY より優先的に許可
+- HOLD → 常に `NOOP`
+- 不正な action 値（BUY/SELL/HOLD 以外）はログを残して `NOOP`
+
+### 金額制御
+
+- リクエストの `amount` が 0 以下の場合は 400 エラー
+- `amount > AAVE_MAX_SINGLE_TRADE_USD` の場合は、
+  `AAVE_MAX_SINGLE_TRADE_USD`（デフォルト 100 USD）にクリップして実行する
+
+### クライアントエラー時のポリシー
+
+- Aave クライアントがエラーを返した場合：
+  - `status = "error"` として結果を返す
+  - 実際のポジションは **変更しない**（amount=0 として扱う）
+  - 「ポジションを増やさない」を最優先とし、自動リトライは別レイヤー（監視・運用）で判断する
 
 ### 5. /report/daily
 日次レポート生成。
