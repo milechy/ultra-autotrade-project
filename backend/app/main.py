@@ -18,6 +18,7 @@ from fastapi import FastAPI
 
 from app.ai.router import router as ai_router
 from app.notion.router import router as notion_router
+from app.bots.router import router as octobot_router
 
 def create_app() -> FastAPI:
     """
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     # ルーター登録
     app.include_router(notion_router)
     app.include_router(ai_router)
+    app.include_router(octobot_router)
 
     @app.get("/health", tags=["health"])
     def health_check() -> dict:
