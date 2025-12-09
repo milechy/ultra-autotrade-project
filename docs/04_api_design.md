@@ -134,7 +134,48 @@ project root/
 │ │ │ └── router.py             # /notion/ingest エンドポイント定義
 
 ### 3. /octobot/signal
-AIの判定をOctoBotに送る。
+
+AI が出した判定結果（AIAnalysisResult相当）をもとに、OctoBot 外部シグナルAPIへ送るための窓口。
+
+- Method: `POST`
+- Path: `/octobot/signal`
+
+#### 3.1 Request
+
+```json
+{
+  "signals": [
+    {
+      "id": "string",              // シグナルの一意なID（NotionレコードIDなど）
+      "url": "string | null",      // ニュースURL（任意）
+      "action": "BUY | SELL | HOLD",
+      "confidence": 85,            // 0〜100
+      "reason": "string",          // なぜそのアクションになったか
+      "timestamp": "2025-01-01T00:00:00Z"
+    }
+  ],
+  "count": 1                        // signals配列の件数（整合チェック用）
+}
+count と signals.length が一致しない場合、400 Bad Request。
+
+3.2 Response
+
+{
+  "success_count": 1,              // OctoBotヘの送信成功件数
+  "skipped_count": 0,              // 安全弁によりスキップされた件数
+  "failed_count": 0,               // 送信エラー件数
+  "details": [
+    {
+      "id": "string",
+      "status": "sent | skipped | failed",
+      "message": "string | null"   // エラー内容やスキップ理由
+    }
+  ]
+}
+
+- 200: リクエスト自体は正常に処理された（success/skipped/failed の内訳は details 参照）。
+- 400: count と signals.length が不整合など、クライアント入力エラー。
+- 500: サーバ内部エラー（OctoBot APIのエラーなど詳細はログで追跡）。
 
 ### 4. /aave/rebalance
 BUY/SELL/HOLDに応じて資産操作。
