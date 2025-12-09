@@ -10,42 +10,33 @@ Phase2 で追加された責務:
 - /ai/analyze エンドポイントを公開する
 """
 
-from fastapi import FastAPI
-
 # backend/app/main.py
 
 from fastapi import FastAPI
 
 from app.ai.router import router as ai_router
-from app.notion.router import router as notion_router
 from app.bots.router import router as octobot_router
+from app.notion.router import router as notion_router  # ★ 復活
+from app.aave.router import router as aave_router      # ★ Phase4 で追加
+
 
 def create_app() -> FastAPI:
-    """
-    FastAPI アプリケーションファクトリ。
+    app = FastAPI(
+        title="Ultra AutoTrade API",
+        version="0.1.0",
+    )
 
-    - Notion 連携エンドポイント (/notion/ingest)
-    - AI 解析エンドポイント (/ai/analyze)
-    - ヘルスチェックエンドポイント (/health)
-    """
-    app = FastAPI(title="Ultra AutoTrade Backend")
-
-    # ルーター登録
-    app.include_router(notion_router)
-    app.include_router(ai_router)
-    app.include_router(octobot_router)
+    # --- ルーター登録 ---
+    app.include_router(notion_router)   # Notion (Phase1)
+    app.include_router(ai_router)       # AI (Phase2)
+    app.include_router(octobot_router)  # OctoBot (Phase3)
+    app.include_router(aave_router)     # Aave (Phase4)
 
     @app.get("/health", tags=["health"])
     def health_check() -> dict:
-        """
-        簡易ヘルスチェックエンドポイント。
-        モニタリングや動作確認用。
-        """
         return {"status": "ok"}
 
     return app
 
 
-# uvicorn 実行時のエントリーポイント
 app = create_app()
-
