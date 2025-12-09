@@ -1,0 +1,9 @@
+# macOS
+.DS_Store
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Phase seed zip files
+phase*_seed_files.zip
