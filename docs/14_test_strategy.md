@@ -181,6 +181,30 @@ Notion → AI → OctoBot → Aave のフローが
 - `backend/tests/test_automation_reporting_notifications.py`  
   - `ReportingService.build_notification_message` が  
     サマリ内容に応じて NotificationSeverity / タイトル / 本文を正しく構築すること。
+- `backend/tests/test_notifications_service.py`  
+  - `LoggingNotificationSender` が severity に応じて適切なログレベルを使うこと。  
+  - `CompositeNotificationService` が複数 Sender へファンアウトすること。
+- `backend/tests/test_automation_reporting_notifications.py`  
+  - `ReportingService.build_notification_message` が  
+    サマリ内容に応じて NotificationSeverity / タイトル / 本文を正しく構築すること。
+
+- `backend/tests/test_automation_backup_service.py`  
+  - `BackupService` が複数のバックアップハンドラを順に実行し、  
+    成功件数の集約と `SUCCESS / PARTIAL / FAILURE` 判定を正しく行うこと。  
+  - 1つのハンドラが例外を投げても、他のハンドラの実行が継続されること。
+
+- `backend/tests/test_automation_emergency_report_service.py`  
+  - `EmergencyReportService.build_emergency_report` が  
+    `AutomationReportSummary` と `MonitoringEvent[]` から人間向けレポートを生成できること。  
+  - EMERGENCY あり / イベントゼロ / notes ありなどのパターンで、  
+    レポート本文に必要な情報（期間・イベント数・重要イベント・ノート）が含まれていること。
+
+- `backend/tests/test_automation_jobs.py`  
+  - `run_daily_jobs` / `run_weekly_jobs` が  
+    `ReportingService.generate_summary_report` → `build_notification_message` → `NotificationService.send`  
+    の流れを1回ずつ実行すること。  
+  - `run_backup_only` が渡された `BackupService` の `run_backup()` を1回実行すること。  
+  - `run_backup=True` オプション時に、日次/週次ジョブからバックアップが起動されること。
 
 ---
 
