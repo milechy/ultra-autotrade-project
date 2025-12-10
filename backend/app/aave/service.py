@@ -17,6 +17,10 @@ from typing import List, Optional
 
 from app.ai.schemas import TradeAction
 
+from app.automation.state import get_monitoring_service
+from app.automation.monitoring_service import MonitoringService
+from app.automation.schemas import AlertLevel, ComponentType
+
 from .client import AaveClient, AaveClientError, get_default_aave_client
 from .config import AaveSettings, get_aave_settings
 from .schemas import (
@@ -53,9 +57,13 @@ class AaveService:
         self,
         client: AaveClient | None = None,
         settings: AaveSettings | None = None,
+        monitoring_service: Optional[MonitoringService] | None = None,
     ) -> None:
         self._client: AaveClient = client or get_default_aave_client()
         self._settings: AaveSettings = settings or get_aave_settings()
+
+        # 監視・緊急停止ロジック
+        self._monitoring: MonitoringService = monitoring_service or get_monitoring_service()
 
         # 直近のトレード時刻を記録する（単純なリストで十分）
         self._recent_actions: List[datetime] = []
@@ -162,9 +170,31 @@ class AaveService:
         :param asset_symbol: 対象トークン。None の場合は設定値のデフォルトを使用。
         :param dry_run: True の場合は実際のトランザクションを送信しない。
         """
+        # まず入力バリデーションを行う（負の金額などはここで ValueError）
         normalized_amount = self._normalize_amount(amount)
+
         token = asset_symbol or self._settings.default_asset_symbol
         now = self._now()
+
+        # 監視ロジック側で緊急停止中の場合は、ポジションを増やさない
+        if (
+            hasattr(self, "_monitoring")
+            and self._monitoring is not None
+            and not self._monitoring.is_trading_allowed()
+        ):
+            logger.warning(
+                "Trading is paused by MonitoringService emergency stop. Forcing NOOP."
+            )
+            return AaveOperationResult(
+                operation=AaveOperationType.NOOP,
+                status=AaveOperationStatus.SKIPPED,
+                asset_symbol=token,
+                amount=Decimal("0"),
+                tx_hash=None,
+                message="Trading is paused by emergency mode. No Aave operation executed.",
+                before_health_factor=None,
+                after_health_factor=None,
+            )
 
         # ヘルスファクター取得（失敗してもエラーにはせず、None として扱う）
         before_hf: Optional[Decimal]
@@ -173,6 +203,25 @@ class AaveService:
         except AaveClientError as exc:
             logger.error("Failed to fetch health factor: %s", exc)
             before_hf = None
+
+        # 取得したヘルスファクターを監視ロジックへ連携
+        if hasattr(self, "_monitoring") and self._monitoring is not None:
+            hf_status = self._monitoring.record_health_factor(before_hf, at=now)
+            # 緊急停止レベルまで悪化している場合、BUY は NOOP として扱う
+            if hf_status.is_emergency and action == TradeAction.BUY:
+                logger.warning(
+                    "Emergency stop triggered by health factor. Skipping BUY and returning NOOP."
+                )
+                return AaveOperationResult(
+                    operation=AaveOperationType.NOOP,
+                    status=AaveOperationStatus.SKIPPED,
+                    asset_symbol=token,
+                    amount=Decimal("0"),
+                    tx_hash=None,
+                    message="Emergency stop: BUY skipped because health factor is too low.",
+                    before_health_factor=before_hf,
+                    after_health_factor=before_hf,
+                )
 
         operation = self._decide_operation(action, now, before_hf)
 

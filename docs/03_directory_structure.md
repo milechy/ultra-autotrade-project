@@ -36,7 +36,17 @@ project root/
 │   │   │   ├── service.py          # TradeAction → AaveOperation 変換サービス層
 │   │   │   ├── schemas.py          # AaveRebalanceRequest/Response, AaveOperationResult など
 │   │   │   ├── router.py           # /aave/rebalance エンドポイント定義
-│   │   ├── automation/             # 自動実行・スケジューラ関連（将来拡張）
+│   │   ├── automation/             # 自動化・監視・レポート用モジュール（Phase5）
+│   │   │   ├── __init__.py         # automation パッケージマーカー
+│   │   │   ├── schemas.py          # MonitoringEvent / AutomationStatus / 
+│   │   │   ├── monitoring_service.py # 死活監視・緊急停止ロジック本体
+│   │   │   ├── reporting_service.py # 日次/週次サマリーレポート集計ロジック
+│   │   │   └── state.py            # MonitoringService の共有インスタンス管理
+│   │   ├── notifications/             # 通知レイヤ（Phase5: インターフェースのみ）
+│   │   │   ├── __init__.py         # notifications パッケージマーカー
+│   │   │   ├── schemas.py          # NotificationMessage / NotificationChannel / Severity など 
+│   │   │   ├── service.py.         # NotificationSender / CompositeNotificationService 実装
+│   │   │   └── factory.py          # get_notification_service() ファクトリ
 │   │   └── utils/
 │   │       ├── __init__.py         # 共通ユーティリティパッケージマーカー
 │   │       └── config.py           # /aave/rebalance エンドポイント定義
@@ -53,7 +63,11 @@ project root/
 │   │   ├── test_aave_service.py    # AaveService のユニットテスト（Dummy/Fake クライアント）
 │   │   ├── test_aave_router.py     # /aave/rebalance の API テスト
 │   │   ├── test_flow_with_aave_stub.py # AI → OctoBot → Aave 統合テストの雛形（現状 skip）
-│   │   └── test_ai_service.py      # ...
+│   │   ├── test_automation_monitoring.py # MonitoringService と AaveService 連携テスト
+│   │   ├── test_automation_emergency_integration.py # サマリーレポート集計ロジックのテスト
+│   │   ├── test_automation_reporting.py # 通知サービス（Logging/Composite）のテスト
+│   │   ├── test_notifications_service.py # AI → OctoBot → Aave 統合テストの雛形（現状 skip）
+│   │   └── test_automation_reporting_notifications.py # レポート→通知メッセージ変換のテスト
 │   └── requirements.txt            # backend 依存パッケージ一覧
 │
 ├── frontend/

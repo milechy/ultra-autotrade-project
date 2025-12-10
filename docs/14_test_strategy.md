@@ -165,6 +165,23 @@ Notion → AI → OctoBot → Aave のフローが
 - 将来的に Notion → AI → OctoBot → Aave のフローをすべてモックで接続し、
   「1件のニュースから Aave まで到達する」シナリオを増やす予定
 
+### 監視・自動化まわりのテスト（Phase5）
+
+- `backend/tests/test_automation_monitoring.py`  
+  - `MonitoringService` 単体のしきい値判定（応答時間 / ヘルスファクター / 価格変動）。
+- `backend/tests/test_automation_emergency_integration.py`  
+  - 緊急停止フラグが立っている状態で、`AaveService.execute_rebalance` が  
+    ポジションを増やさない（NOOP になる）ことを確認。
+- `backend/tests/test_automation_reporting.py`  
+  - 直近のイベント／ヘルスファクター履歴から、  
+    `AutomationReportSummary` が日次 / 週次で正しく集計されることを確認。
+- `backend/tests/test_notifications_service.py`  
+  - `LoggingNotificationSender` が severity に応じて適切なログレベルを使うこと。  
+  - `CompositeNotificationService` が複数 Sender へファンアウトすること。
+- `backend/tests/test_automation_reporting_notifications.py`  
+  - `ReportingService.build_notification_message` が  
+    サマリ内容に応じて NotificationSeverity / タイトル / 本文を正しく構築すること。
+
 ---
 
 # 4. Integration Test
