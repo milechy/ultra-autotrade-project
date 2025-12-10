@@ -25,6 +25,31 @@ Ultra AutoTrade – セキュリティ設計書（完全版）
 APP_ENV=dev | prod
 ```
 
+## 1.3 Aave 関連環境変数
+
+- `AAVE_NETWORK`
+- `AAVE_DEFAULT_ASSET_SYMBOL`
+- `AAVE_MAX_SINGLE_TRADE_USD`
+- `AAVE_MIN_HEALTH_FACTOR`
+- `AAVE_TRADE_COOLDOWN_SECONDS`
+
+### 方針
+
+- すべて環境変数から読み取るが、Phase4 時点では **必須にはしない**
+- 未設定の場合は Aave モジュール側で安全なデフォルト値を採用する：
+  - `AAVE_NETWORK`: `"sepolia"`
+  - `AAVE_DEFAULT_ASSET_SYMBOL`: `"USDC"`
+  - `AAVE_MAX_SINGLE_TRADE_USD`: `"100.0"`
+  - `AAVE_MIN_HEALTH_FACTOR`: `"1.6"`
+  - `AAVE_TRADE_COOLDOWN_SECONDS`: `600`（10分）
+- 本番環境では `.env` ではなくインフラ側のシークレット管理に移行すること
+
+## 4.x Aave 機能のフェイルセーフ
+
+- Aave 関連設定が不正値の場合、アプリケーション起動時に例外で気づけるようにする
+- ランタイムエラー時は「ポジションを増やさない」挙動（NOOP or ERROR）を優先
+- Aave 機能が無効でも、Notion / AI / OctoBot 部分は単体で動作できるように分離する
+
 ---
 
 # 2. 秘密鍵の保護（Aave運用）
