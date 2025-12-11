@@ -1,0 +1,41 @@
+# infra/systemd/ultra-autotrade-backend-production.service
+[Unit]
+Description=Ultra AutoTrade Backend (production)
+After=network.target
+
+[Service]
+Type=simple
+
+# 実行ユーザ（必要に応じて変更）
+User=ultra
+Group=ultra
+
+# プロジェクトの backend ディレクトリ
+# 例: /opt/ultra-autotrade/backend
+WorkingDirectory=/opt/ultra-autotrade/backend
+
+# 本番環境の環境変数定義ファイル
+# 実際のパスはインフラ設計に合わせて修正してよい
+EnvironmentFile=/opt/ultra-autotrade/backend/.env.production
+
+# Python 仮想環境上の uvicorn を指定
+# 例: /opt/ultra-autotrade/venv/bin/uvicorn
+ExecStart=/opt/ultra-autotrade/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# 異常終了時に自動再起動
+Restart=on-failure
+RestartSec=5
+
+# 標準出力/エラーは journal 経由で管理
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+
+有効化の想定コマンド（メモ）
+
+sudo cp infra/systemd/ultra-autotrade-backend-production.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable ultra-autotrade-backend-production
+sudo systemctl start ultra-autotrade-backend-production
