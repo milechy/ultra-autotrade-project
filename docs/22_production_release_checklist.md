@@ -63,6 +63,12 @@ Ultra AutoTrade – Production リリース前チェックリスト
 - [ ] リリース直後の 1〜2 時間、ログと監視アラートを継続的に確認した
 - [ ] 不審なトレード・シグナル・API アクセスがないことを確認した
 - [ ] Aave ポジションの状態（残高 / Health Factor 等）に異常がない
+- [ ] リリース直後〜数時間の間、`docs/08_automation_rules.md` で定義された
+      主要メトリクス（レスポンスタイム / エラー率 / ヘルスファクター / 緊急停止フラグなど）を確認した
+- [ ] 緊急停止フラグが ON になった場合、メトリクス `emergency_stop_flag` および
+      EMERGENCY レベルの MonitoringEvent が期待どおりに記録されていることを確認した
+- [ ] `scripts/monitor.sh daily` / `scripts/monitor.sh weekly` が予定どおり動作し、
+      monitor 系ログにエラーが出ていないことを確認した
 
 問題が発生した場合：
 

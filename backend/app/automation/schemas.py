@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import List, Optional
+from typing import Dict, List, Optional  # ★ List を追加
 
 from pydantic import BaseModel, Field
 
@@ -48,6 +48,35 @@ class ComponentType(str, Enum):
     REPORT = "report"
 
 
+class MetricPoint(BaseModel):
+    """単一メトリクスのスナップショット。
+
+    docs/08_automation_rules.md の「6. 監視メトリクス一覧」で定義した
+    メトリクスID（例: backend_http_latency_p95_ms）と、その値を表現する。
+    """
+
+    metric_id: str = Field(
+        ...,
+        description="メトリクスの論理ID（例: backend_http_latency_p95_ms）",
+    )
+    value: Decimal = Field(
+        ...,
+        description="測定値。Decimal として扱うことで HF などと整合性を保つ。",
+    )
+    unit: Optional[str] = Field(
+        None,
+        description="単位（例: s, ms, percent, ratio）。不要な場合は None。",
+    )
+    labels: Dict[str, str] = Field(
+        default_factory=dict,
+        description="component, endpoint などのラベル情報",
+    )
+    recorded_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        description="メトリクスが記録されたUTC時刻",
+    )
+
+
 class MonitoringEvent(BaseModel):
     """
     監視イベント 1件分。
@@ -60,6 +89,10 @@ class MonitoringEvent(BaseModel):
     level: AlertLevel = Field(..., description="イベントの重要度")
     code: str = Field(..., description="機械可読なイベントコード（例: LATENCY_SLOW, HF_BELOW_16）")
     message: str = Field(..., description="人間向けのメッセージ（センシティブ情報は含めないこと）")
+    metric: Optional[MetricPoint] = Field(
+        default=None,
+        description="しきい値判定の原因となったメトリクス情報（あれば）",
+    )
 
 
 class LatencyRecord(BaseModel):

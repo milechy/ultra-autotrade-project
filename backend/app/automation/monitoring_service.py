@@ -28,6 +28,7 @@ from .schemas import (
     ComponentType,
     HealthFactorStatus,
     LatencyRecord,
+    MetricPoint,
     MonitoringEvent,
     TradeActivityRecord,
 )
@@ -157,6 +158,14 @@ class MonitoringService:
                 code="LATENCY_ALERT",
                 message=f"Latency {seconds:.1f}s exceeds alert threshold.",
             )
+            # メトリクス情報を添付
+            event.metric = MetricPoint(
+                metric_id=f"latency_{component.name.lower()}_s",
+                value=Decimal(str(seconds)),
+                unit="s",
+                labels={"component": component.name},
+                recorded_at=now,
+            )
             return self._append_event(event)
 
         if seconds > self._latency_warning_threshold_s:
@@ -166,6 +175,14 @@ class MonitoringService:
                 level=AlertLevel.WARNING,
                 code="LATENCY_WARNING",
                 message=f"Latency {seconds:.1f}s exceeds warning threshold.",
+            )
+            # メトリクス情報を添付
+            event.metric = MetricPoint(
+                metric_id=f"latency_{component.name.lower()}_s",
+                value=Decimal(str(seconds)),
+                unit="s",
+                labels={"component": component.name},
+                recorded_at=now,
             )
             return self._append_event(event)
 
@@ -237,6 +254,14 @@ class MonitoringService:
                 code="HF_BELOW_EMERGENCY",
                 message=self._emergency_reason,
             )
+            # メトリクス情報を添付
+            event.metric = MetricPoint(
+                metric_id="aave_health_factor_current",
+                value=value,
+                unit="ratio",
+                labels={"component": "AAVE"},
+                recorded_at=now,
+            )
             self._append_event(event)
         elif value < self._hf_warning_threshold:
             level = AlertLevel.WARNING
@@ -249,6 +274,14 @@ class MonitoringService:
                     f"health factor {value} below warning threshold "
                     f"{self._hf_warning_threshold}"
                 ),
+            )
+            # メトリクス情報を添付
+            event.metric = MetricPoint(
+                metric_id="aave_health_factor_current",
+                value=value,
+                unit="ratio",
+                labels={"component": "AAVE"},
+                recorded_at=now,
             )
             self._append_event(event)
 
@@ -284,6 +317,14 @@ class MonitoringService:
                     f"24h price change {percent_change:.1f}% exceeds "
                     f"alert threshold {self._price_change_alert_threshold_pct:.1f}%."
                 ),
+            )
+            # メトリクス情報を添付
+            event.metric = MetricPoint(
+                metric_id="portfolio_value_change_1d_pct",
+                value=Decimal(str(percent_change)),
+                unit="percent",
+                labels={"window": "24h"},
+                recorded_at=now,
             )
             return self._append_event(event)
 

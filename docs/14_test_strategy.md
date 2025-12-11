@@ -206,6 +206,20 @@ Notion → AI → OctoBot → Aave のフローが
   - `run_backup_only` が渡された `BackupService` の `run_backup()` を1回実行すること。  
   - `run_backup=True` オプション時に、日次/週次ジョブからバックアップが起動されること。
 
+- `backend/tests/test_automation_monitoring.py`
+  - しきい値判定に加え、`MonitoringEvent` にメトリクス情報が正しく含まれることを確認する：
+    - `metric_id`（例：`backend_http_latency_p95_ms`, `aave_health_factor_current` など）
+    - `metric_value`（数値）
+    - `metric_unit`（`ms` / `percent` / `ratio` など）
+    - 対象コンポーネントやタグ（例：`component=backend`, `component=aave`）
+  - `docs/08_automation_rules.md` の「6. 監視メトリクス一覧」で定義された主要メトリクスについて、
+    閾値境界前後のケース（正常 / WARNING / ALERT / EMERGENCY）をユニットテストでカバーする。
+
+- `backend/tests/test_automation_reporting.py`
+  - 日次 / 週次サマリーレポートに、メトリクスサマリ（例：平均ヘルスファクター、期間内のエラー件数など）が
+    含まれることを確認する。
+  - EMERGENCY に至った場合は、どのメトリクスが閾値を超えたかがレポート本文に反映されることを確認する。
+
 ---
 
 # 4. Integration Test

@@ -132,6 +132,26 @@ staging 環境（`docs/17_staging_environment_config.md`）との差分ポリシ
   - 具体的な変数名は backend 実装・`05_ai_judgement_rules.md` で使用されているものに合わせる
   - 例として `OPENAI_API_KEY` 等が考えられるが、**実際の変数名はコード側を必ず確認すること**
 
+### 3.7 メトリクス・監視しきい値関連
+
+本番環境では、監視・アラートが直接資金リスクに影響するため、  
+staging よりも慎重な値を設定する。
+
+| 変数名                    | 必須 | 説明                                                   | Production 例                               |
+|--------------------------|------|--------------------------------------------------------|--------------------------------------------|
+| `MONITOR_HEALTHCHECK_URL`| 必須 | HTTP ヘルスチェック対象の URL                         | `https://backend.example.com/health`       |
+| `MONITOR_WARN_MS`        | 任意 | レイテンシ警告しきい値（ミリ秒）                       | `1000`                                     |
+| `MONITOR_ALERT_MS`       | 任意 | レイテンシアラートしきい値（ミリ秒）                   | `30000`                                    |
+| `METRICS_LOG_DIR`        | 任意 | メトリクス用ログファイル配置ディレクトリ               | `/var/log/ultra`                           |
+| `MONITOR_NOTIFY_CHANNEL` | 任意 | 監視アラート送信先（本番用通知チャネル名、または種別） | `production-monitoring`                    |
+
+運用ポリシー：
+
+- 本番通知チャネルは staging と共有せず、**本番運用専用のチャネル** を利用する。
+- `docs/08_automation_rules.md` で定義された閾値と矛盾しない設定とすること。
+- しきい値を変更する際は、`docs/19_operations_runbook.md` の  
+  「10. メトリクスレビューと改善サイクル」に従い、理由と日時を記録する。
+
 ---
 
 ## 4. Staging との比較・差分ポリシー
