@@ -97,6 +97,105 @@ Phase7 時点では **staging 環境** を対象とし、
 > メトリクス定義の詳細は `docs/08_automation_rules.md` の  
 > 「6. 監視メトリクス一覧」を参照。
 
+### 2.4 ダッシュボードの見方（AutomationStatus / DashboardSnapshot）
+
+Phase10 では、監視ダッシュボードは次の 2 種類の情報を前提とする：
+
+1. **自動運用ステータス（AutomationStatus）**
+   - 代表的な項目：
+     - `is_trading_paused`  
+       - `True` → 「緊急停止中」として扱う（新規トレードはブロックされる想定）
+       - `False` → 通常運用中
+     - `last_health_factor`  
+       - 現在の Aave Health Factor。`1.8` / `1.6` を基準に安全度を判断する。
+     - `last_price_change_24h`  
+       - ポートフォリオの 24 時間変動率（%）。絶対値が 20% を超える場合は注意。
+     - `last_event_level`  
+       - 直近の `MonitoringEvent.level`（info / warning / alert / critical / emergency）。
+       - 「今どれくらい危険な状態なのか」を一目で把握する指標。
+     - `emergency_reason`  
+       - 緊急停止中の場合、その理由（例: "health factor 1.55 below emergency threshold 1.6"）。
+
+2. **メトリクス集計（DashboardSnapshot.metric_aggregates）**
+   - 直近 `lookback` 期間（例: 過去 1 時間）におけるメトリクスの集計結果。
+   - 各メトリクスについて、少なくとも以下を確認できる：
+     - `count`（期間内のサンプル数）
+     - `min` / `max` / `avg` / `last`
+   - 運用者は、次の観点でざっと見る：
+     - 値が `docs/08_automation_rules.md` で定義された閾値に近づいていないか
+     - 「普段と比べて明らかにおかしい」時間帯がないか
+     - WARNING / ALERT / EMERGENCY 相当のスパイクが出ていないか
+
+> ポイント：  
+> - まず `AutomationStatus` で「今この瞬間の全体状態」を把握し、  
+>   続いて `DashboardSnapshot.metric_aggregates` で「直近の傾向」を確認する。
+
+### 2.5 アラート受信時の確認順序（ダッシュボード活用）
+
+通知チャネル（LINE / Slack 等）でアラートを受信したら、  
+ダッシュボード上では次の順序で確認することを推奨する。
+
+1. **アラートレベルと対象メトリクスの確認**
+   - 通知メッセージ内の `MonitoringEvent.level` と `code` / `message` を確認する。
+   - 緊急度イメージ：
+     - INFO: 情報
+     - WARNING: 要注意（しきい値に近づいている）
+     - ALERT: 明確な異常（要対応）
+     - CRITICAL / EMERGENCY: Aave ポジション喪失リスクやトレード暴走など、即時対応レベル
+   - どのメトリクス（`metric_id`）が原因かを確認する  
+     （例: `aave_health_factor_current`, `portfolio_value_change_1d_pct`, `latency_system_s` など）。
+
+2. **AutomationStatus の確認**
+   - `is_trading_paused` が `True` になっていないか。
+   - `last_health_factor` / `last_price_change_24h` の値が、閾値（1.8 / 1.6 / ±20%/日）に対してどの位置か。
+   - `last_event_level` が EMERGENCY に張り付いていないか。
+   - `emergency_reason` に、具体的な発火理由が記録されているか。
+
+3. **DashboardSnapshot の確認**
+   - アラート対象メトリクスの `min` / `max` / `avg` / `last` を確認し、
+     - 「一時的なスパイク」なのか
+     - 「期間全体で高止まりしている」のか
+     を切り分ける。
+   - 関連メトリクス（例: レイテンシ悪化とエラー率増加が同時に起きていないか）も合わせて見る。
+
+4. **Runbook との対応付け**
+   - Aave リスク系のアラートであれば、「3. Aave運用監視」「4. 緊急停止フラグの運用」を参照。
+   - バックアップやジョブ失敗系であれば、「2. 日常運用フロー」「4.5.1 緊急停止フラグ ON 時に止まるもの / 止まらないもの」を参照。
+   - 必要に応じて `15_rollback_procedures.md` を確認し、ロールバックの要否を検討する。
+
+### 2.6 緊急停止解除前チェックリスト（ダッシュボード観点）
+
+`4.4 OFF にするまでのチェックリスト（簡易）`を満たした上で、  
+**ダッシュボード上でも次の項目を確認してから緊急停止を解除** する。
+
+1. **Aave リスクの安定化**
+   - `aave_health_factor_current` の `last` が十分に安全レンジ（目安: `>= 1.8`）に戻っている。
+   - `aave_health_factor_min` の `min` も、直近の期間で危険水準（< 1.6）を記録していない。
+   - ヘルスファクターに関する EMERGENCY / ALERT イベントが、直近では発生していない。
+
+2. **資産変動の落ち着き**
+   - `portfolio_value_change_1d_pct` の `last` が ±20% 以内に収まっている。
+   - 異常なスパイクが連続していないことを、期間内の `min` / `max` で確認する。
+
+3. **レイテンシ / エラー率の収束**
+   - レイテンシ系メトリクス（例: `backend_http_latency_p95_ms` 相当）の `avg` / `max` が
+     通常レンジ（数秒〜数十秒以内）に戻っている。
+   - HTTP エラー率（`backend_http_error_rate_1m` 等）が、通常値（< 1%）に近い水準で安定している。
+
+4. **緊急停止フラグまわりの整合性**
+   - `emergency_stop_flag` が ON のままになっている理由が、`emergency_reason` として明確に把握できている。
+   - `emergency_event_count_24h` が異常に多い場合は、原因調査・再発防止策が検討済みである。
+
+5. **ジョブ・バックアップ系の健全性**
+   - `automation_job_failure_count_24h` が 0、または許容範囲内に収まっている。
+   - バックアップ / 監視ジョブが正常に完走していることをログで確認している。
+
+> 原則：  
+> - 「ダッシュボード上のメトリクスが正常レンジに戻っている」ことを確認しない限り、  
+>   緊急停止フラグを安易に OFF にしない。  
+> - OFF にする場合は、最低でも 2 名以上で状態を確認し、  
+>   必要に応じて運用メモに解除理由と時刻を記録する。
+
 ---
 
 ## 3. 異常検知時の基本フロー

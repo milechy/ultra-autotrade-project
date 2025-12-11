@@ -170,7 +170,72 @@ class AutomationStatus(BaseModel):
 # レポート用スキーマ
 # ---------------------------------------------------------------------------
 
+class MetricAggregate(BaseModel):
+    """
+    単一メトリクスIDに対する集計値。
 
+    - MonitoringEvent.metric やヘルスファクター履歴から集計される
+    - ダッシュボードやレポートの「パネル1つぶん」に対応するイメージ
+    """
+
+    metric_id: str = Field(
+        ...,
+        description="集計対象のメトリクスID（例: latency_system_s, portfolio_value_change_1d_pct）",
+    )
+    unit: Optional[str] = Field(
+        None,
+        description="メトリクスの単位（例: s, percent, ratio）。未設定の場合は None。",
+    )
+    count: int = Field(
+        ...,
+        description="対象期間中に観測されたサンプル数。",
+    )
+    min: Optional[Decimal] = Field(
+        None,
+        description="対象期間中に観測された最小値（観測がなければ None）。",
+    )
+    max: Optional[Decimal] = Field(
+        None,
+        description="対象期間中に観測された最大値（観測がなければ None）。",
+    )
+    avg: Optional[Decimal] = Field(
+        None,
+        description="対象期間中の平均値（観測がなければ None）。",
+    )
+    last: Optional[Decimal] = Field(
+        None,
+        description="対象期間中に最後に観測された値（観測がなければ None）。",
+    )
+
+
+class DashboardSnapshot(BaseModel):
+    """
+    ダッシュボード向けのスナップショット。
+
+    MonitoringService の現在ステータスと、
+    直近一定期間のメトリクス集計結果をひとまとめにしたもの。
+    """
+
+    generated_at: datetime = Field(
+        ...,
+        description="スナップショット生成時刻（UTC推奨）。",
+    )
+    period_start: datetime = Field(
+        ...,
+        description="このスナップショットが集計対象とする期間の開始時刻。",
+    )
+    period_end: datetime = Field(
+        ...,
+        description="このスナップショットが集計対象とする期間の終了時刻。",
+    )
+    status: AutomationStatus = Field(
+        ...,
+        description="現在の自動運用ステータス（緊急停止フラグや直近イベントなど）。",
+    )
+    metric_aggregates: Dict[str, MetricAggregate] = Field(
+        default_factory=dict,
+        description="メトリクスIDごとの集計結果。キーは metric_id。",
+    )
 class ReportPeriod(str, Enum):
     """
     レポート対象期間の種別。
@@ -217,6 +282,14 @@ class AutomationReportSummary(BaseModel):
     last_health_factor: Optional[Decimal] = Field(
         None,
         description="対象期間中に最後に観測されたヘルスファクター（観測がなければ None）。",
+    )
+
+    metric_aggregates: Dict[str, MetricAggregate] = Field(
+        default_factory=dict,
+        description=(
+            "対象期間中に観測されたメトリクスごとの集計結果。"
+            "キーは metric_id。ダッシュボードや外部可観測性ツールから再利用しやすい形式。"
+        ),
     )
 
     notes: Optional[str] = Field(

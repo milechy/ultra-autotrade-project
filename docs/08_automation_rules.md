@@ -210,5 +210,62 @@ cron の具体的な書式（`crontab -e` に書く 1 行ごとの設定例）�
 > の順で情報が伝播する想定とし、  
 > 閾値ロジックは **本ドキュメントと Runbook の両方** に明示しておく。
 
+## 6.3 ダッシュボード / レポートとの対応（Phase10）
 
----
+本節で定義したメトリクスは、Phase10 で実装された  
+`MonitoringService` / `ReportingService` / `DashboardSnapshot` により、次のように扱われる。
+
+### 6.3.1 データの流れ（概念）
+
+1. **MonitoringService**
+   - 各種 `record_*` メソッドが、しきい値判定と同時に `MonitoringEvent` を発行する。
+   - 関連するメトリクスは `MonitoringEvent.metric`（`MetricPoint`）として添付される。
+     - 例：
+       - レイテンシ: `metric_id=latency_{component}_s`（秒単位）
+       - ヘルスファクター: `metric_id=aave_health_factor_current`
+       - 資産変動率: `metric_id=portfolio_value_change_1d_pct`
+
+2. **ReportingService**
+   - 日次 / 週次の監視レポート生成時に、一定期間内の `MonitoringEvent.metric` を集計し、
+     `AutomationReportSummary.metric_aggregates` にまとめる。
+   - これにより、レポート本文では「どのメトリクスが閾値を超えたか」を説明しつつ、  
+     サマリ部分では集計値（平均・最大など）を確認できる。
+
+3. **DashboardSnapshot（MonitoringService.build_dashboard_snapshot）**
+   - ダッシュボード向けには、直近 `lookback` 期間（例: 1 時間）に限定してメトリクスを集計し、
+     `DashboardSnapshot.metric_aggregates` に格納する。
+   - 各エントリは `MetricAggregate` として管理され、少なくとも次の情報を持つ：
+     - `metric_id`
+     - `unit`
+     - `count`（期間内のサンプル数）
+     - `min` / `max` / `avg` / `last`（いずれも `Decimal` または `None`）
+
+### 6.3.2 メトリクス定義との関係
+
+- 本ドキュメントの「6.1 メトリクス一覧（論理定義）」は、  
+  **「運用者が見るべき論理メトリクス」** を定義している。
+- `MetricPoint.metric_id` および `MetricAggregate.metric_id` は、  
+  原則としてこの論理メトリクス ID と整合するように設計するが、
+  必要に応じて次のようなパターンも許容する：
+  - ダッシュボード上の論理メトリクスを、複数の raw メトリクス（例: `latency_system_s`）から算出する。
+  - 実装上は秒単位 (`*_s`) を記録し、ダッシュボード側でミリ秒換算して表示する。
+
+> 方針：  
+> - 閾値判定・緊急停止は `MonitoringService` 側の実装（`record_health_factor` / `record_price_change_24h` など）を唯一の基準とする。  
+> - ダッシュボードやレポートは、その結果を「可視化するだけ」であり、  
+>   追加で独自の判定ロジックを持たないこと。
+
+### 6.3.3 ダッシュボード構成時の注意
+
+- ダッシュボードの各パネルは、可能な限り `metric_id` ベースで定義し、
+  本節および「6.1 メトリクス一覧（論理定義）」に矛盾しないようにする。
+- 代表的な対応イメージ：
+  - Aave リスク系パネル
+    - `DashboardSnapshot.metric_aggregates["aave_health_factor_current"]` の `last` / `min` を表示
+  - 資産変動率パネル
+    - `DashboardSnapshot.metric_aggregates["portfolio_value_change_1d_pct"]` の `last` を表示
+  - レイテンシ系パネル
+    - `latency_*` 系メトリクスの `avg` / `max` から、`backend_http_latency_p95_ms` 相当の指標を算出して表示
+
+> 実際のダッシュボードツール（Grafana / CloudWatch 等）はプロジェクト外の前提とし、  
+> ここでは **「どのメトリクスを、どのように見ればよいか」** のルールのみを定義する。

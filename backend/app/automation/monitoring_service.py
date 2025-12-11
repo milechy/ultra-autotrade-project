@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections import deque
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Deque, List, Optional, Sequence
+from typing import Deque, Dict, List, Optional, Sequence  # ← Deque を追加
 
 from .schemas import (
     AlertLevel,
@@ -31,6 +31,8 @@ from .schemas import (
     MetricPoint,
     MonitoringEvent,
     TradeActivityRecord,
+    DashboardSnapshot,   # ← 追加
+    MetricAggregate,     # ← 追加
 )
 
 _HEALTH_FACTOR_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -440,4 +442,79 @@ class MonitoringService:
             last_event_level=self._last_event_level,
             emergency_reason=self._emergency_reason,
             recent_events=list(self._events),
+        )
+
+    def build_dashboard_snapshot(
+        self,
+        *,
+        lookback: timedelta = timedelta(hours=1),
+        now: Optional[datetime] = None,
+    ) -> DashboardSnapshot:
+        """
+        監視ダッシュボード向けのスナップショットを生成する。
+
+        - 現在の AutomationStatus
+        - 直近 lookback 期間に発生したメトリクスの集計結果
+
+        をひとまとめにして返す。
+
+        docs/08_automation_rules.md の「6. 監視メトリクス一覧」で定義された
+        メトリクスID（latency_*, portfolio_value_change_1d_pct, aave_health_factor_current など）を
+        前提にしており、新たなメトリクス種別は追加しない。
+        """
+        now_norm = self._now(now)
+        period_start = now_norm - lookback
+
+        events = self.get_events_in_range(period_start, now_norm)
+
+        # メトリクスごとの値を集計
+        metric_values: Dict[str, List[Decimal]] = {}
+        metric_last: Dict[str, Decimal] = {}
+        metric_units: Dict[str, Optional[str]] = {}
+
+        for event in events:
+            metric = event.metric
+            if metric is None:
+                continue
+
+            mid = metric.metric_id
+            value = metric.value
+
+            metric_values.setdefault(mid, []).append(value)
+            metric_last[mid] = value
+            if mid not in metric_units or metric_units[mid] is None:
+                metric_units[mid] = metric.unit
+
+        metric_aggregates: Dict[str, MetricAggregate] = {}
+        for mid, values in metric_values.items():
+            count = len(values)
+            min_v: Optional[Decimal] = min(values) if values else None
+            max_v: Optional[Decimal] = max(values) if values else None
+            last_v: Optional[Decimal] = metric_last.get(mid)
+
+            if values:
+                total = sum(values, Decimal("0"))
+                avg_v: Optional[Decimal] = (
+                    total / Decimal(count) if count > 0 else None
+                )
+            else:
+                avg_v = None
+
+            metric_aggregates[mid] = MetricAggregate(
+                metric_id=mid,
+                unit=metric_units.get(mid),
+                count=count,
+                min=min_v,
+                max=max_v,
+                avg=avg_v,
+                last=last_v,
+            )
+
+        status = self.get_status()
+        return DashboardSnapshot(
+            generated_at=now_norm,
+            period_start=period_start,
+            period_end=now_norm,
+            status=status,
+            metric_aggregates=metric_aggregates,
         )

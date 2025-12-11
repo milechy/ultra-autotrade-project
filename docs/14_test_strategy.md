@@ -220,6 +220,32 @@ Notion → AI → OctoBot → Aave のフローが
     含まれることを確認する。
   - EMERGENCY に至った場合は、どのメトリクスが閾値を超えたかがレポート本文に反映されることを確認する。
 
+- `backend/tests/test_automation_reporting.py`
+  - 日次 / 週次サマリーレポートに、メトリクスサマリ（例：平均ヘルスファクター、期間内のエラー件数など）が
+    含まれることを確認する。
+  - EMERGENCY に至った場合は、どのメトリクスが閾値を超えたかがレポート本文に反映されることを確認する。
+
+- `backend/tests/test_automation_reporting.py`
+  - 日次 / 週次サマリーレポートに、メトリクスサマリ（例：平均ヘルスファクター、期間内のエラー件数など）が
+    含まれることを確認する。
+  - EMERGENCY に至った場合は、どのメトリクスが閾値を超えたかがレポート本文に反映されることを確認する。
+  - Phase10 では、`AutomationReportSummary.metric_aggregates` に対して、
+    `latency_*` や `portfolio_value_change_1d_pct`、`aave_health_factor_current` などの代表的メトリクスが
+    正しく集計されていることを確認するテストを追加する。
+
+- `backend/tests/test_automation_dashboard_view.py`
+  - `MonitoringService.build_dashboard_snapshot` により、ダッシュボード向けスナップショット
+    （`DashboardSnapshot`）が期待どおりに構成されることを確認する：
+    - `generated_at` / `period_start` / `period_end` が、テストで固定した現在時刻と `lookback` に整合している。
+    - 対象期間内の `MonitoringEvent.metric` から、`metric_aggregates` に `count` / `min` / `max` / `avg` / `last` が
+      正しく集計されている（範囲外のイベントは含まれない）。
+    - `AutomationStatus` の情報（`is_trading_paused` / `last_health_factor` /
+      `last_price_change_24h` / `last_event_level` / `emergency_reason` など）が、
+      `DashboardSnapshot.status` にそのまま反映されている。
+  - ダッシュボード UI 自体はツール依存であるため、本プロジェクトでは
+    「バックエンドが提供するスナップショット構造」が契約となる。
+    ツール変更時も、このテスト群が通っている限り、ダッシュボードに必要な情報は提供されているとみなす。
+
 ---
 
 # 4. Integration Test

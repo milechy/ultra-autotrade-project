@@ -19,18 +19,86 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional
 
+from pydantic import BaseModel
+
 from .monitoring_service import MonitoringService
 from .schemas import (
     AlertLevel,
     AutomationReportSummary,
+    MetricAggregate,
     ReportPeriod,
 )
+
 from .state import get_monitoring_service
 from app.notifications.schemas import (
     NotificationChannel,
     NotificationMessage,
     NotificationSeverity,
 )
+
+class MetricsSummary(BaseModel):
+    """単純なメトリクスサマリ（最小限）。"""
+
+    period_start: datetime
+    period_end: datetime
+    # metric_id -> (min, max, avg, count)
+    stats: Dict[str, Dict[str, float]]
+
+
+def build_metrics_summary(
+    events: Iterable[MonitoringEvent],
+    *,
+    now: datetime | None = None,
+    period: timedelta = timedelta(days=1),
+) -> MetricsSummary:
+    """MonitoringEvent 群からメトリクスサマリを構築する。
+
+    - metric が None のイベントは無視する
+    - metric_id ごとに min/max/avg/count を算出する
+    """
+
+    now = now or datetime.utcnow()
+    period_start = now - period
+
+    sums: Dict[str, float] = defaultdict(float)
+    mins: Dict[str, float] = {}
+    maxs: Dict[str, float] = {}
+    counts: Dict[str, int] = defaultdict(int)
+
+    for event in events:
+        if event.metric is None:
+            continue
+
+        metric: MetricPoint = event.metric
+        if metric.recorded_at < period_start or metric.recorded_at > now:
+            continue
+
+        mid = metric.metric_id
+        val = metric.value
+
+        sums[mid] += val
+        counts[mid] += 1
+
+        if mid not in mins or val < mins[mid]:
+            mins[mid] = val
+        if mid not in maxs or val > maxs[mid]:
+            maxs[mid] = val
+
+    stats: Dict[str, Dict[str, float]] = {}
+    for mid, total in sums.items():
+        cnt = counts[mid]
+        stats[mid] = {
+            "min": mins[mid],
+            "max": maxs[mid],
+            "avg": total / cnt if cnt else 0.0,
+            "count": float(cnt),
+        }
+
+    return MetricsSummary(
+        period_start=period_start,
+        period_end=now,
+        stats=stats,
+    )
 
 class ReportingService:
     """
@@ -103,7 +171,50 @@ class ReportingService:
 
         emergency_occurred = level_counts.get(AlertLevel.EMERGENCY, 0) > 0
 
-        # 2. ヘルスファクターの集計
+        # 2. メトリクスの集計（ダッシュボード / レポート向け）
+        metric_values: Dict[str, List[Decimal]] = {}
+        metric_last: Dict[str, Decimal] = {}
+        metric_units: Dict[str, Optional[str]] = {}
+
+        for event in events:
+            metric = event.metric
+            if metric is None:
+                continue
+
+            mid = metric.metric_id
+            value = metric.value
+
+            metric_values.setdefault(mid, []).append(value)
+            metric_last[mid] = value
+            if mid not in metric_units or metric_units[mid] is None:
+                metric_units[mid] = metric.unit
+
+        metric_aggregates: Dict[str, MetricAggregate] = {}
+        for mid, values in metric_values.items():
+            count = len(values)
+            min_v: Optional[Decimal] = min(values) if values else None
+            max_v: Optional[Decimal] = max(values) if values else None
+            last_v: Optional[Decimal] = metric_last.get(mid)
+
+            if values:
+                total = sum(values, Decimal("0"))
+                avg_v: Optional[Decimal] = (
+                    total / Decimal(count) if count > 0 else None
+                )
+            else:
+                avg_v = None
+
+            metric_aggregates[mid] = MetricAggregate(
+                metric_id=mid,
+                unit=metric_units.get(mid),
+                count=count,
+                min=min_v,
+                max=max_v,
+                avg=avg_v,
+                last=last_v,
+            )
+
+        # 3. ヘルスファクターの集計
         hf_history = self._monitoring.get_health_factor_history(from_ts, to_ts)
         hf_values: List[Decimal] = [
             value for _, value in hf_history if value is not None
@@ -113,12 +224,27 @@ class ReportingService:
             min_hf = min(hf_values)
             max_hf = max(hf_values)
             last_hf = hf_values[-1]
+
+            # HF のメトリクスも metric_aggregates に反映しておく
+            total_hf = sum(hf_values, Decimal("0"))
+            avg_hf: Optional[Decimal] = (
+                total_hf / Decimal(len(hf_values)) if hf_values else None
+            )
+            metric_aggregates["aave_health_factor_current"] = MetricAggregate(
+                metric_id="aave_health_factor_current",
+                unit="ratio",
+                count=len(hf_values),
+                min=min_hf,
+                max=max_hf,
+                avg=avg_hf,
+                last=last_hf,
+            )
         else:
             min_hf = None
             max_hf = None
             last_hf = None
 
-        # 3. 簡易ノート（人間向けの一言コメント）
+        # 4. 簡易ノート（人間向けの一言コメント）
         notes: Optional[str] = None
         if emergency_occurred:
             notes = "Emergency events occurred during this period."
@@ -139,6 +265,7 @@ class ReportingService:
             min_health_factor=min_hf,
             max_health_factor=max_hf,
             last_health_factor=last_hf,
+            metric_aggregates=metric_aggregates,
             notes=notes,
         )
 
