@@ -30,3 +30,8 @@ Ultra AutoTrade – フェーズ計画（DoD 追加版）
 - レポート自動生成成功  
 - 全フロー成功率95%以上  
 
+※ 実装マッピング（Phase5）  
+- 監視＆アラート: `MonitoringService` + Aave/OctoBot 連携  
+- レポート自動生成: `ReportingService` による日次/週次サマリー  
+- 通知インターフェース: `notifications/*` で NotificationMessage / Sender 抽象化  
+- 緊急停止時の安全動作: Aave 側での NOOP 保証（ヘルスファクター/緊急停止フラグ連携）
