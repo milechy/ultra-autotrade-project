@@ -1,0 +1,297 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Trading Paused (is_trading_paused)",
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "UltraAutoTrade-HTTP"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "/api/automation/status",
+          "parser": "backend",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "is_trading_paused",
+              "text": "is_trading_paused",
+              "type": "boolean"
+            }
+          ],
+          "format": "table"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "false": {
+                  "text": "RUNNING"
+                },
+                "true": {
+                  "text": "PAUSED"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Last Health Factor",
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "UltraAutoTrade-HTTP"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "/api/automation/status",
+          "parser": "backend",
+          "columns": [
+            {
+              "selector": "last_health_factor",
+              "text": "last_health_factor",
+              "type": "number"
+            }
+          ],
+          "format": "table"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Portfolio Change 24h (%)",
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "UltraAutoTrade-HTTP"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "/api/automation/status",
+          "parser": "backend",
+          "columns": [
+            {
+              "selector": "last_price_change_24h",
+              "text": "last_price_change_24h",
+              "type": "number"
+            }
+          ],
+          "format": "table"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Last Event Level",
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "UltraAutoTrade-HTTP"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "/api/automation/status",
+          "parser": "backend",
+          "columns": [
+            {
+              "selector": "last_event_level",
+              "text": "last_event_level",
+              "type": "string"
+            }
+          ],
+          "format": "table"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      }
+    },
+    {
+      "type": "table",
+      "title": "DashboardSnapshot aggregates (table)",
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "UltraAutoTrade-HTTP"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "/api/automation/dashboard?lookback_hours=6",
+          "parser": "backend",
+          "root_selector": "aggregates",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      }
+    },
+    {
+      "type": "text",
+      "title": "Latest Report (raw JSON)",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "This panel is a placeholder. Configure an Infinity JSON query to `/api/automation/reports/latest` and display highlights/metrics as needed. Keep contract-safe (no backend changes)."
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "ultra-autotrade",
+    "automation"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "Ultra AutoTrade - Automation Ops",
+  "version": 1
+}

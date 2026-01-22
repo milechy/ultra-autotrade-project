@@ -1,0 +1,15 @@
+apiVersion: 1
+
+datasources:
+  - name: UltraAutoTrade-HTTP
+    type: yesoreyeram-infinity-datasource
+    access: proxy
+    isDefault: true
+    editable: true
+    jsonData:
+      # Base URL for the backend (FastAPI).
+      # Update this in your environment or via Grafana UI if needed.
+      # Example: http://backend:8000
+      url: http://localhost:8000
+      # Optional: set a reasonable timeout
+      timeoutInSeconds: 30

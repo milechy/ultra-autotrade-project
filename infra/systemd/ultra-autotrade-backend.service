@@ -1,0 +1,33 @@
+[Unit]
+Description=Ultra AutoTrade Backend (staging)
+After=network.target
+
+[Service]
+Type=simple
+
+# 実行ユーザ（必要に応じて変更）
+User=ultra
+Group=ultra
+
+# プロジェクトの backend ディレクトリ
+# 例: /opt/ultra-autotrade/backend
+WorkingDirectory=/opt/ultra-autotrade/backend
+
+# 環境変数定義ファイル
+# 13_security_design.md の方針に従い、/etc/ultra-autotrade/backend.env を利用
+EnvironmentFile=/etc/ultra-autotrade/backend.env
+
+# Python 仮想環境上の uvicorn を指定
+# 例: /opt/ultra-autotrade/venv/bin/uvicorn
+ExecStart=/opt/ultra-autotrade/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# 異常終了時に自動再起動
+Restart=on-failure
+RestartSec=5
+
+# 標準出力/エラーは journal 経由で管理
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

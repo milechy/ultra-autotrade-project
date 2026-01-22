@@ -1,0 +1,58 @@
+{
+    "config": {
+        "crypto-currencies": {
+            "Bitcoin": {
+                "enabled": true,
+                "pairs": [
+                    "BTC/USDT"
+                ]
+            },
+            "Ethereum": {
+                "enabled": true,
+                "pairs": [
+                    "ETH/BTC",
+                    "ETH/USDT"
+                ]
+            }
+        },
+        "exchanges": {
+            "binance": {
+                "enabled": true
+            }
+        },
+        "trader": {
+            "enabled": false,
+            "load-trade-history": false
+        },
+        "trader-simulator": {
+            "enabled": true,
+            "fees": {
+                "maker": 0.1,
+                "taker": 0.1
+            },
+            "starting-portfolio": {
+                "BTC": 10,
+                "USDT": 1000
+            }
+        },
+        "trading": {
+            "reference-market": "USDT",
+            "risk": 0.5
+        }
+    },
+    "profile": {
+        "auto_update": false,
+        "avatar": "default_profile.png",
+        "complexity": 1,
+        "description": "SignalTrading is adapted to liquid and relatively flat markets. It will try to find reversals and trade them.",
+        "extra_backtesting_time_frames": [],
+        "id": "signal_trading",
+        "imported": false,
+        "name": "Signal Trading",
+        "origin_url": null,
+        "read_only": true,
+        "risk": 3,
+        "slug": "",
+        "type": "live"
+    }
+}

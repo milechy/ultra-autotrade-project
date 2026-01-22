@@ -1,0 +1,57 @@
+{
+    "accepted_terms": true,
+    "backtesting": {
+        "files": []
+    },
+    "community": {
+        "local_data_identifier": "089ff082b20aa81395b7e5ce0f83ce20d133837d480eb682c4348406864f2d7c",
+        "supabase.auth.token": ""
+    },
+    "distribution": "default",
+    "exchanges": {
+        "binance": {
+            "api-key": "your-api-key-here",
+            "api-password": "your-api-password-here",
+            "api-secret": "your-api-secret-here",
+            "enabled": true,
+            "exchange-type": "spot"
+        }
+    },
+    "notification": {
+        "global-info": true,
+        "notification-type": [
+            "web"
+        ],
+        "other": true,
+        "price-alerts": true,
+        "trades": true,
+        "trading-script-alerts": true
+    },
+    "profile": "tradingview_trading",
+    "services": {
+        "trading-view": {
+            "require-token": false,
+            "token": "9dffbf57e299662c17f0f3eecbc11dfffc35cab9f2df3835ddc8a600"
+        },
+        "web": {
+            "auto-open-in-web-browser": true,
+            "password": "",
+            "require-password": false
+        },
+        "webhook": {
+            "enable-ngrok": false,
+            "enable-octobot-webhook": false,
+            "enable_ngrok": false,
+            "ngrok-domain": "",
+            "ngrok-token": "",
+            "webhook-host": "0.0.0.0",
+            "webhook-port": 9000,
+            "webhook-server-ip": "0.0.0.0",
+            "webhook-server-port": 9000,
+            "webhook_host": "0.0.0.0",
+            "webhook_port": 9000,
+            "webhook_server_ip": "0.0.0.0",
+            "webhook_server_port": 9000
+        }
+    }
+}

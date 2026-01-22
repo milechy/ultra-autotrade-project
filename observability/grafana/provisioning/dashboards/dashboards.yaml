@@ -1,0 +1,9 @@
+apiVersion: 1
+
+providers:
+  - name: 'Ultra AutoTrade'
+    folder: 'Ultra AutoTrade'
+    type: file
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards

@@ -1,0 +1,23 @@
+# Ruff 設定（backend/ruff.toml）
+
+# 対象Pythonバージョン
+target-version = "py311"
+
+# プロジェクト全体の設定
+line-length = 100
+exclude = [
+    "__pycache__",
+    ".venv",
+]
+
+# リント（エラーチェック）設定
+[lint]
+# 有効にするルールグループ
+# E: PEP8系エラー, F: バグ系, I: import整形
+select = ["E", "F", "I"]
+
+# とりあえずうるさいやつは無視
+ignore = [
+    "E501",  # 行が長い警告はとりあえず無視
+]
+

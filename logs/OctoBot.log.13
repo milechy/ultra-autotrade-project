@@ -1,0 +1,391 @@
+2026-01-08 06:31:08 INFO   OctoBot Launcher     cli.py:320      Version : 2.0.16
+2026-01-08 06:31:08 INFO   OctoBot Launcher     cli.py:106      Running self-hosted OctoBot on Linux:6.12.54-linuxkit:aarch64 with binary [Python 3.10.19]
+2026-01-08 06:31:08 DEBUG  sentry_tracker       logging_util.py:183      Error tracker disabled
+2026-01-08 06:31:08 INFO   OctoBot Launcher     cli.py:123      Loading config files...
+2026-01-08 06:31:08 INFO   OctoBot Launcher     cli.py:127      No configuration found creating default configuration...
+2026-01-08 06:31:08 INFO   OctoBot Launcher     cli.py:87       *** Disclaimer ***
+2026-01-08 06:31:08 INFO   OctoBot Launcher     cli.py:89       Do not risk money which you are afraid to lose. USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.
+2026-01-08 06:31:08 INFO   OctoBot Launcher     cli.py:89       Always start by running a trading bot in simulation mode and do not engage money before you understand how it works and what profit/loss you should expect.
+2026-01-08 06:31:08 INFO   OctoBot Launcher     cli.py:89       Do not hesitate to read the source code and understand the mechanism of this bot.
+2026-01-08 06:31:08 INFO   OctoBot Launcher     cli.py:90       ... Disclaimer ...
+2026-01-08 06:31:08 DEBUG  IdentifiersProvider  logging_util.py:183      Using Production Community environment.
+2026-01-08 06:31:08 INFO   OctoBot Launcher     cli.py:235      No authenticated community account
+2026-01-08 06:31:08 INFO   OctoBot Launcher     cli.py:304      OctoBot tentacles can't be found. Installing default tentacles ...
+2026-01-08 06:31:10 INFO   tentacles_fetching   logging_util.py:192      Tentacles package downloaded_temp_tentacles: last_modified: Mon, 29 Dec 2025 16:48:04 GMT, file_hash: 0000a4e981194c72a8b178acb00e6e1fedf36f42a20af8dc88432190f9a3a531
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [1/132] installed sell_all_currencies_action tentacle [type: Automation.actions, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [2/132] installed send_notification_action tentacle [type: Automation.actions, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [3/132] installed cancel_open_order_action tentacle [type: Automation.actions, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [4/132] installed stop_trading_action tentacle [type: Automation.actions, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [5/132] installed period_check_event tentacle [type: Automation.trigger_events, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [6/132] installed price_threshold_event tentacle [type: Automation.trigger_events, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [7/132] installed profitability_threshold_event tentacle [type: Automation.trigger_events, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [8/132] installed no_condition_condition tentacle [type: Automation.conditions, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [9/132] installed scripted_condition tentacle [type: Automation.conditions, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [10/132] installed gateio tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [11/132] installed ndax tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [12/132] installed bitmex tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [13/132] installed binance tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [14/132] installed hollaex_autofilled_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [15/132] installed okcoin tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [16/132] installed hitbtc tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [17/132] installed bitmart_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [18/132] installed mexc tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [19/132] installed bithumb tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [20/132] installed gateio_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [21/132] installed okxus tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [22/132] installed okx tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [23/132] installed bitget tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [24/132] installed kraken tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [25/132] installed bitstamp tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [26/132] installed phemex_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [27/132] installed binanceus_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [28/132] installed htx_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [29/132] installed coinbase_pro tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [30/132] installed binanceus tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [31/132] installed phemex tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [32/132] installed cryptocom_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [33/132] installed ascendex_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [34/132] installed hyperliquid tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [35/132] installed cryptocom tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [36/132] installed coinex_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [37/132] installed polymarket_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [38/132] installed bingx_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [39/132] installed kucoin tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [40/132] installed coinbase_pro_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [41/132] installed bitfinex_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [42/132] installed okxus_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [43/132] installed myokx tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [44/132] installed coinbase tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [45/132] installed hollaex tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [46/132] installed coinex tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [47/132] installed polymarket tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [48/132] installed poloniex tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [49/132] installed bybit_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [50/132] installed huobi tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [51/132] installed bitfinex tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [52/132] installed bitso tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [53/132] installed hollaex_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [54/132] installed bingx tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [55/132] installed kraken_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [56/132] installed kucoin_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [57/132] installed bitget_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [58/132] installed bitmart tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [59/132] installed hollaex_autofilled tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [60/132] installed okx_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [61/132] installed huobi_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [62/132] installed binance_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [63/132] installed coinbase_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [64/132] installed ascendex tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [65/132] installed mexc_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [66/132] installed wavesexchange tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [67/132] installed upbitexchange tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [68/132] installed htx tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [69/132] installed configurable_default_ccxt_rest tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [70/132] installed bybit tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [71/132] installed hyperliquid_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [72/132] installed myokx_websocket_feed tentacle [type: Trading.Exchange, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [73/132] installed trading_view_signals_trading_mode tentacle [type: Trading.Mode, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [74/132] installed signal_trading_mode tentacle [type: Trading.Mode, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [75/132] installed arbitrage_trading_mode tentacle [type: Trading.Mode, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [76/132] installed index_trading_mode tentacle [type: Trading.Mode, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [77/132] installed dip_analyser_trading_mode tentacle [type: Trading.Mode, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [78/132] installed staggered_orders_trading_mode tentacle [type: Trading.Mode, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [79/132] installed remote_trading_signals_trading_mode tentacle [type: Trading.Mode, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [80/132] installed market_making_trading_mode tentacle [type: Trading.Mode, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [81/132] installed daily_trading_mode tentacle [type: Trading.Mode, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [82/132] installed grid_trading_mode tentacle [type: Trading.Mode, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [83/132] installed dca_trading_mode tentacle [type: Trading.Mode, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [84/132] installed scripting_library tentacle [type: Meta.Keywords, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [85/132] installed exchange_operators tentacle [type: Meta.DSL_operators, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [86/132] installed python_std_operators tentacle [type: Meta.DSL_operators, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [87/132] installed ta_operators tentacle [type: Meta.DSL_operators, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [88/132] installed mixed_strategies_evaluator tentacle [type: Evaluator.Strategies, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [89/132] installed blank_strategy_evaluator tentacle [type: Evaluator.Strategies, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [90/132] installed instant_fluctuations_evaluator tentacle [type: Evaluator.RealTime, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [91/132] installed overall_state_analysis tentacle [type: Evaluator.Util, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [92/132] installed text_analysis tentacle [type: Evaluator.Util, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [93/132] installed pattern_analysis tentacle [type: Evaluator.Util, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [94/132] installed candles_util tentacle [type: Evaluator.Util, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [95/132] installed trend_analysis tentacle [type: Evaluator.Util, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [96/132] installed statistics_analysis tentacle [type: Evaluator.Util, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [97/132] installed volatility_evaluator tentacle [type: Evaluator.TA, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [98/132] installed momentum_evaluator tentacle [type: Evaluator.TA, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [99/132] installed ai_evaluator tentacle [type: Evaluator.TA, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [100/132] installed trend_evaluator tentacle [type: Evaluator.TA, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [101/132] installed news_evaluator tentacle [type: Evaluator.Social, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [102/132] installed forum_evaluator tentacle [type: Evaluator.Social, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [103/132] installed trends_evaluator tentacle [type: Evaluator.Social, version: 1.2.0]
+2026-01-08 06:31:10 INFO   InstallWorker        logging_util.py:192      [104/132] installed signal_evaluator tentacle [type: Evaluator.Social, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [105/132] installed web_interface tentacle [type: Services.Interfaces, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [106/132] installed telegram_bot_interface tentacle [type: Services.Interfaces, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [107/132] installed telegram_service_feed tentacle [type: Services.Services_feeds, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [108/132] installed trading_view_service_feed tentacle [type: Services.Services_feeds, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [109/132] installed twitter_service_feed tentacle [type: Services.Services_feeds, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [110/132] installed reddit_service_feed tentacle [type: Services.Services_feeds, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [111/132] installed telegram_api_service_feed tentacle [type: Services.Services_feeds, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [112/132] installed google_service_feed tentacle [type: Services.Services_feeds, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [113/132] installed twitter_notifier tentacle [type: Services.Notifiers, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [114/132] installed telegram_notifier tentacle [type: Services.Notifiers, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [115/132] installed web_notifier tentacle [type: Services.Notifiers, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [116/132] installed webhook_service tentacle [type: Services.Services_bases, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [117/132] installed trading_view_service tentacle [type: Services.Services_bases, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [118/132] installed web_service tentacle [type: Services.Services_bases, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [119/132] installed reddit_service tentacle [type: Services.Services_bases, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [120/132] installed gpt_service tentacle [type: Services.Services_bases, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [121/132] installed telegram_service tentacle [type: Services.Services_bases, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [122/132] installed twitter_service tentacle [type: Services.Services_bases, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [123/132] installed google_service tentacle [type: Services.Services_bases, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [124/132] installed telegram_api_service tentacle [type: Services.Services_bases, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [125/132] installed legacy_data_converter tentacle [type: Backtesting.converters.exchanges, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [126/132] installed exchange_bot_snapshot_data_collector tentacle [type: Backtesting.collectors.exchanges, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [127/132] installed exchange_live_collector tentacle [type: Backtesting.collectors.exchanges, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [128/132] installed exchange_history_collector tentacle [type: Backtesting.collectors.exchanges, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [129/132] installed generic_exchange_importer tentacle [type: Backtesting.importers.exchanges, version: 1.2.0]
+2026-01-08 06:31:11 INFO   tentacles_fetching   logging_util.py:192      Tentacles package downloaded_requirements_temp_tentacles: last_modified: Mon, 29 Dec 2025 16:48:04 GMT, file_hash: 0000a4e981194c72a8b178acb00e6e1fedf36f42a20af8dc88432190f9a3a531
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [130/132] installed blank_trading_mode tentacle [type: Trading.Mode, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [131/132] installed move_signals_strategy_evaluator tentacle [type: Evaluator.Strategies, version: 1.2.0]
+2026-01-08 06:31:11 INFO   InstallWorker        logging_util.py:192      [132/132] installed dip_analyser_strategy_evaluator tentacle [type: Evaluator.Strategies, version: 1.2.0]
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating simple_dca profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated Simple DCA (simple_dca) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating trailing_grid_trading profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated Trailing Grid Trading (trailing_grid_trading) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating signal_trading profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated Signal Trading (signal_trading) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating smart_dca profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated Smart DCA (smart_dca) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating tradingview_trading profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated TradingView Signals Trading (tradingview_trading) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating gpt_trading profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated GPT Trading (gpt_trading) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating daily_trading profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated DailyTrading (daily_trading) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating copy_trading profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated Copy Trading (copy_trading) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating index_trading profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated Index trading (index_trading) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating grid_trading profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated Grid Trading (grid_trading) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating staggered_orders_trading profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated Staggered Orders Trading (staggered_orders_trading) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating non-trading profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated Non-Trading (non-trading) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating dip_analyser profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated Dip Analyser (dip_analyser) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating arbitrage_trading profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated Arbitrage Trading (arbitrage_trading) profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updating market_making profile.
+2026-01-08 06:31:11 INFO   ProfileSharing       logging_util.py:192      Updated Market making (market_making) profile.
+2026-01-08 06:31:12 INFO   InstallWorker        logging_util.py:192       *** All tentacles from 'https://tentacles.octobot.online/officials/packages/full/base/2.0.16/any_platform.zip' have been successfully processed ***
+2026-01-08 06:31:12 INFO   telethon.crypto.aes  aes.py:23       libssl detected, it will be used for encryption
+2026-01-08 06:31:13 INFO   Configuration        logging_util.py:192      Using Non-Trading profile.
+2026-01-08 06:31:13 DEBUG  OctoBotChannel       logging_util.py:183      Consumer started for subject: * action: * [OctoBotChannelConsumer with callback: octobot_channel_callback]
+2026-01-08 06:31:13 DEBUG  OctoBotChannel       logging_util.py:183      Consumer started for subject: * action: ['exchange'] [OctoBotChannelConsumer with callback: octobot_channel_callback]
+2026-01-08 06:31:13 DEBUG  OctoBotChannel       logging_util.py:183      Consumer started for subject: * action: ['evaluator'] [OctoBotChannelConsumer with callback: octobot_channel_callback]
+2026-01-08 06:31:13 DEBUG  OctoBotChannel       logging_util.py:183      Consumer started for subject: * action: ['interface', 'notification', 'service_feed', 'start_service_feed', 'exchange_registration'] [OctoBotChannelConsumer with callback: octobot_channel_callback]
+2026-01-08 06:31:13 INFO   OctoBot              logging_util.py:192      Starting OctoBot with simulated trader on binance[spot] trading BTC/USDT with BlankTradingMode and using bot_id: 430c773d-eb54-492c-85bc-fb98e84a61e6
+2026-01-08 06:31:13 DEBUG  CommunityAuthentication logging_util.py:183      Refreshing user session
+2026-01-08 06:31:13 INFO   CommunityAuthentication logging_util.py:192      Login aborted: no authenticated session: No error code
+2026-01-08 06:31:13 DEBUG  OctoBotChannel       logging_util.py:183      Consumer started for subject: ['notification', 'error'] action: * [OctoBotChannelConsumer with callback: octobot_channel_callback]
+2026-01-08 06:31:13 DEBUG  EvaluatorProducer    logging_util.py:183      Pausing...
+2026-01-08 06:31:13 DEBUG  MatrixChannel        logging_util.py:183      Consumer started for : [matrix_id=*, cryptocurrency=*, symbol=*, time_frame=*, evaluator_name=*, exchange_name=*, evaluator_type=*]
+2026-01-08 06:31:13 DEBUG  ExchangeProducer     logging_util.py:183      Pausing...
+2026-01-08 06:31:13 DEBUG  ServiceFeedProducer  logging_util.py:183      Pausing...
+2026-01-08 06:31:13 DEBUG  InterfaceProducer    logging_util.py:183      Pausing...
+2026-01-08 06:31:13 DEBUG  SystemResourcesWatcher logging_util.py:183      Starting system resources watcher
+2026-01-08 06:31:13 DEBUG  ProfileSynchronizer  logging_util.py:183      Profile synch loop disabled
+2026-01-08 06:31:13 INFO   CCXTConnector[binance] logging_util.py:192      Creating unauthenticated binance SPOT exchange with ccxt in version 4.5.28
+2026-01-08 06:31:13 INFO   CCXTConnector[binance] logging_util.py:192      Loading binance spot exchange markets (reload=False authenticated_cache=False)
+2026-01-08 06:31:13 INFO   WebService           logging_util.py:192      Interface successfully initialized and accessible at: http://172.17.0.2:5001.
+2026-01-08 06:31:13 DEBUG  NotificationChannelProducer logging_util.py:183      Pausing...
+2026-01-08 06:31:13 DEBUG  NotificationChannelProducer logging_util.py:183      Resuming...
+2026-01-08 06:31:13 DEBUG  WebNotifier          logging_util.py:183      Registered as notification consumer
+2026-01-08 06:31:13 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = service_feed || DATA = {'instance': <tentacles.Services.Services_feeds.telegram_service_feed.telegram_feed.TelegramServiceFeed object at 0xffff68659420>} 
+2026-01-08 06:31:13 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = service_feed || DATA = {'instance': <tentacles.Services.Services_feeds.trading_view_service_feed.trading_view_feed.TradingViewServiceFeed object at 0xffff68659000>} 
+2026-01-08 06:31:13 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = service_feed || DATA = {'instance': <tentacles.Services.Services_feeds.reddit_service_feed.reddit_feed.RedditServiceFeed object at 0xffff68658e80>} 
+2026-01-08 06:31:13 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = service_feed || DATA = {'instance': <tentacles.Services.Services_feeds.telegram_api_service_feed.telegram_api_feed.TelegramApiServiceFeed object at 0xffff68658d00>} 
+2026-01-08 06:31:13 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = service_feed || DATA = {'instance': <tentacles.Services.Services_feeds.google_service_feed.google_feed.GoogleServiceFeed object at 0xffff6865a140>} 
+2026-01-08 06:31:13 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = interface || DATA = {'instance': <tentacles.Services.Interfaces.web_interface.web.WebInterface object at 0xffff68989e70>} 
+2026-01-08 06:31:13 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = notification || DATA = {'instance': <tentacles.Services.Notifiers.web_notifier.web.WebNotifier object at 0xffff689890f0>} 
+2026-01-08 06:31:13 DEBUG  WebNotifier          logging_util.py:183      Publishing notification: [Notification] title: , text: OctoBot 2.0.16 is starting ..., level: NotificationLevel.INFO, markdown_format: ITALIC, category: global-info, linked_notification: None
+2026-01-08 06:31:14 INFO   CCXTConnector[binance] logging_util.py:192      Loaded 4169 [binance] markets
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for . Untriggered children: ['binance']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for . Untriggered children: ['binance']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|orders. Untriggered children: ['BTC/USDT']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|orders. Untriggered children: ['BTC/USDT']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders', 'trades']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders', 'trades']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|trades. Untriggered children: ['BTC/USDT']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|trades. Untriggered children: ['BTC/USDT']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders', 'trades', 'candles']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders', 'trades', 'candles']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles. Untriggered children: ['BTC/USDT']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles. Untriggered children: ['BTC/USDT']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles|BTC/USDT. Untriggered children: ['1h']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles|BTC/USDT. Untriggered children: ['1h']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles|BTC/USDT. Untriggered children: ['1h', '1m']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles|BTC/USDT. Untriggered children: ['1h', '1m']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders', 'trades', 'candles', 'price']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders', 'trades', 'candles', 'price']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|price. Untriggered children: ['BTC/USDT']
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|price. Untriggered children: ['BTC/USDT']
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is handling trades
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling l1_book
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling l2_book
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling l3_book
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling book_delta
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling book_ticker
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling open_interest
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling mini_ticker
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is handling ticker
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling funding
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling mark_price
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling volume
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling liquidations
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling futures_index
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is handling candle
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is handling kline
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling position
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling portfolio
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling trade
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling orders
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling create_order
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling cancel_order
+2026-01-08 06:31:15 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling ledger
+2026-01-08 06:31:15 INFO   WebSocket - binance  logging_util.py:192      Creating unauthenticated binance SPOT exchange with ccxt in version 4.5.28
+2026-01-08 06:31:15 INFO   ExchangeManager      logging_util.py:192      DefaultWebSocketExchange connecting to Binance
+2026-01-08 06:31:15 INFO   WebSocket - binance  logging_util.py:192      Loading binance websocket exchange markets
+2026-01-08 06:31:15 DEBUG  ExchangeManager      logging_util.py:183      binance OHLCV channel is updated by websocket feed
+2026-01-08 06:31:15 DEBUG  ExchangeManager      logging_util.py:183      binance OrderBook channel is updated by OrderBookUpdater
+2026-01-08 06:31:15 DEBUG  OrderBookUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:31:15 DEBUG  ExchangeManager      logging_util.py:183      binance RecentTrade channel is updated by websocket feed
+2026-01-08 06:31:15 DEBUG  ExchangeManager      logging_util.py:183      binance Ticker channel is updated by websocket feed
+2026-01-08 06:31:15 DEBUG  ExchangeManager      logging_util.py:183      binance Ticker channel is updated by TickerUpdater
+2026-01-08 06:31:15 DEBUG  TickerUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:31:15 DEBUG  ExchangeManager      logging_util.py:183      binance Kline channel is updated by websocket feed
+2026-01-08 06:31:15 DEBUG  ExchangeManager      logging_util.py:183      binance MarkPrice channel is updated by MarkPriceUpdater
+2026-01-08 06:31:15 DEBUG  MarkPriceUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:31:15 DEBUG  ExchangeManager      logging_util.py:183      binance Funding channel is updated by FundingUpdater
+2026-01-08 06:31:15 DEBUG  FundingUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:31:15 DEBUG  ExchangeManager      logging_util.py:183      binance Orders channel is updated by OrdersUpdaterSimulator
+2026-01-08 06:31:15 DEBUG  OrdersUpdaterSimulator[binance] logging_util.py:183      Pausing...
+2026-01-08 06:31:15 DEBUG  ExchangeManager      logging_util.py:183      binance BalanceProfitability channel is updated by BalanceProfitabilityUpdater
+2026-01-08 06:31:15 DEBUG  BalanceProfitabilityUpdater logging_util.py:183      Pausing...
+2026-01-08 06:31:15 DEBUG  ExchangeManager      logging_util.py:183      binance Positions channel is updated by PositionsUpdaterSimulator
+2026-01-08 06:31:15 DEBUG  PositionsUpdaterSimulator[binance] logging_util.py:183      Pausing...
+2026-01-08 06:31:15 DEBUG  TradesChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: wrapper
+2026-01-08 06:31:15 DEBUG  OrdersChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: _live_callback
+2026-01-08 06:31:15 DEBUG  OrdersUpdaterSimulator[binance] logging_util.py:183      Resuming...
+2026-01-08 06:31:15 DEBUG  SpotPortfolio[binance] logging_util.py:183      Portfolio updated | Current Portfolio : {'USDT': {'available': 10000.0, 'total': 10000.0}}
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|balance
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['profitability', 'orders', 'trades', 'candles', 'price']
+2026-01-08 06:31:15 DEBUG  PortfolioManager     logging_util.py:183      Current Portfolio : {'USDT': SpotAsset: USDT | Available: 10000.0 | Total: 10000.0}
+2026-01-08 06:31:15 DEBUG  TradesManager        logging_util.py:183      Loading 0 binance historical trades ...
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|trades|BTC/USDT
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|trades
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['profitability', 'orders', 'candles', 'price']
+2026-01-08 06:31:15 DEBUG  TraderSimulator[binance] logging_util.py:183      Enabled on binance
+2026-01-08 06:31:15 DEBUG  DocumentDatabase with adaptor: TinyDBAdaptor [user/data/live/live_1/run_data.json] logging_util.py:183      flushing database
+2026-01-08 06:31:15 DEBUG  BlankTradingMode     logging_util.py:183      Using config: {'default_config': ['BlankStrategyEvaluator'], 'required_strategies': ['BlankStrategyEvaluator']}
+2026-01-08 06:31:15 DEBUG  TradingModeFactory[binance] logging_util.py:183      BlankTradingMode started for [cryptocurrency=*, symbol=*, time_frame=*]
+2026-01-08 06:31:15 DEBUG  OrderBookUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:31:15 DEBUG  TickerUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:31:15 DEBUG  MarkPriceUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:31:15 DEBUG  FundingUpdater[binance] logging_util.py:183      Ignoring updater start as funding can be found in different sources
+2026-01-08 06:31:15 DEBUG  RecentTradeChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: ignore_recent_trades_update
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|orders|BTC/USDT
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|orders
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['profitability', 'candles', 'price']
+2026-01-08 06:31:15 DEBUG  BalanceChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: handle_balance_update
+2026-01-08 06:31:15 DEBUG  MarkPriceChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: handle_mark_price_update
+2026-01-08 06:31:15 DEBUG  MarkPriceUpdater[binance] logging_util.py:183      Resuming...
+2026-01-08 06:31:15 DEBUG  ExchangeProducer     logging_util.py:183      Exchange(s) created
+2026-01-08 06:31:15 DEBUG  OHLCVChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: ohlcv_callback
+2026-01-08 06:31:15 DEBUG  BalanceChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: balance_callback
+2026-01-08 06:31:15 DEBUG  TradesChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: trades_callback
+2026-01-08 06:31:15 DEBUG  LiquidationsChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: liquidations_callback
+2026-01-08 06:31:15 DEBUG  PositionsChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: positions_callback
+2026-01-08 06:31:15 DEBUG  PositionsUpdaterSimulator[binance] logging_util.py:183      Resuming...
+2026-01-08 06:31:15 DEBUG  OrdersChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: orders_callback
+2026-01-08 06:31:15 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = exchange || DATA = {'exchange_id': '680e1726-a727-4bee-b99c-55b8aad1b97b'} 
+2026-01-08 06:31:15 DEBUG  RecentTradeChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: handle_recent_trades_update
+2026-01-08 06:31:15 DEBUG  TickerChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: handle_ticker_update
+2026-01-08 06:31:15 DEBUG  TickerUpdater[binance] logging_util.py:183      Resuming...
+2026-01-08 06:31:15 DEBUG  DocumentDatabase with adaptor: TinyDBAdaptor [user/data/live/live_1/run_data.json] logging_util.py:183      flushing database
+2026-01-08 06:31:15 DEBUG  BlankStrategyEvaluator logging_util.py:183      Using config: {'required_time_frames': ['1h'], 'required_evaluators': ['*'], 'required_candles_count': 200, 'default_config': []}
+2026-01-08 06:31:15 DEBUG  MatrixChannel        logging_util.py:183      Consumer started for : [matrix_id=*, cryptocurrency=*, symbol=*, time_frame=*, evaluator_name=*, exchange_name=binance, evaluator_type=*]
+2026-01-08 06:31:15 DEBUG  BlankStrategyEvaluator logging_util.py:183      Evaluator started
+2026-01-08 06:31:15 DEBUG  TradesChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: _web_trades_callback
+2026-01-08 06:31:15 DEBUG  OrdersChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: _web_orders_callback
+2026-01-08 06:31:15 DEBUG  OHLCVChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: _web_ohlcv_empty_callback
+2026-01-08 06:31:15 DEBUG  OrdersChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: _order_notification_callback
+2026-01-08 06:31:15 DEBUG  TickerUpdater[binance] logging_util.py:183      Ticker update loop disabled: update is managed by websocket. Updater remains available for forced updates.
+2026-01-08 06:31:15 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = evaluator || DATA = {'matrix_id': 'e933c262-77c5-47ec-ac6d-c5000619965b'} 
+2026-01-08 06:31:15 DEBUG  DocumentDatabase with adaptor: TinyDBAdaptor [user/data/live/live_1/run_data.json] logging_util.py:183      flushing database
+2026-01-08 06:31:15 DEBUG  Automation           logging_util.py:183      No automation to start
+2026-01-08 06:31:15 INFO   ServiceFactory       logging_util.py:192      TelegramService can't be initialized: Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/telegram for more details.
+2026-01-08 06:31:15 DEBUG  TelegramServiceFeed  logging_util.py:183      Impossible to start TelegramServiceFeed: required service TelegramService is not available (Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/telegram for more details.).
+2026-01-08 06:31:15 DEBUG  OctoBotChannelServiceConsumer logging_util.py:183      Impossible to start TelegramServiceFeed: missing service(s) configuration.
+2026-01-08 06:31:15 INFO   ServiceFactory       logging_util.py:192      WebHookService can't be initialized: Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/tradingview/using-a-webhook for more details.
+2026-01-08 06:31:15 DEBUG  TradingViewServiceFeed logging_util.py:183      Impossible to start TradingViewServiceFeed: required service WebHookService is not available (Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/tradingview/using-a-webhook for more details.).
+2026-01-08 06:31:15 DEBUG  OctoBotChannelServiceConsumer logging_util.py:183      Impossible to start TradingViewServiceFeed: missing service(s) configuration.
+2026-01-08 06:31:15 INFO   ServiceFactory       logging_util.py:192      RedditService can't be initialized: Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/reddit for more details.
+2026-01-08 06:31:15 DEBUG  RedditServiceFeed    logging_util.py:183      Impossible to start RedditServiceFeed: required service RedditService is not available (Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/reddit for more details.).
+2026-01-08 06:31:15 DEBUG  OctoBotChannelServiceConsumer logging_util.py:183      Impossible to start RedditServiceFeed: missing service(s) configuration.
+2026-01-08 06:31:15 INFO   ServiceFactory       logging_util.py:192      TelegramApiService can't be initialized: Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/telegram/telegram-api for more details.
+2026-01-08 06:31:15 DEBUG  TelegramApiServiceFeed logging_util.py:183      Impossible to start TelegramApiServiceFeed: required service TelegramApiService is not available (Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/telegram/telegram-api for more details.).
+2026-01-08 06:31:15 DEBUG  OctoBotChannelServiceConsumer logging_util.py:183      Impossible to start TelegramApiServiceFeed: missing service(s) configuration.
+2026-01-08 06:31:15 INFO   GoogleServiceFeed    logging_util.py:192      Initializing feed reception ...
+2026-01-08 06:31:15 INFO   GoogleServiceFeed    logging_util.py:192      Nothing to monitor, feed is closing.
+2026-01-08 06:31:15 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = start_service_feed || DATA = {'successful_operation': False} 
+2026-01-08 06:31:15 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = start_service_feed || DATA = {'successful_operation': False} 
+2026-01-08 06:31:15 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = start_service_feed || DATA = {'successful_operation': False} 
+2026-01-08 06:31:15 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = start_service_feed || DATA = {'successful_operation': False} 
+2026-01-08 06:31:15 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = start_service_feed || DATA = {'successful_operation': True} 
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|candles|BTC/USDT|1h
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles|BTC/USDT. Untriggered children: ['1m']
+2026-01-08 06:31:15 DEBUG  OHLCVUpdater[binance] logging_util.py:183      Candle history loaded for BTC/USDT on TimeFrames.ONE_HOUR
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|price|BTC/USDT
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|price
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['profitability', 'candles']
+2026-01-08 06:31:15 DEBUG  ValueConverter[binance] logging_util.py:183      Initialized last price for BTC/USDT
+2026-01-08 06:31:15 DEBUG  SystemResourcesWatcher logging_util.py:183      Used system resources: 15.1% CPU, 2.227 GB in RAM (31.5% of total including 0.273268736 GB from this process). 
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|candles|BTC/USDT|1m
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|candles|BTC/USDT
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|candles
+2026-01-08 06:31:15 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['profitability']
+2026-01-08 06:31:15 DEBUG  OHLCVUpdater[binance] logging_util.py:183      Candle history loaded for BTC/USDT on TimeFrames.ONE_MINUTE
+2026-01-08 06:31:15 DEBUG  OHLCVUpdater[binance] logging_util.py:183      Pushing completed initialization candles
+2026-01-08 06:31:15 DEBUG  OHLCVUpdater[binance] logging_util.py:183      Candle history initial fetch completed
+2026-01-08 06:31:15 DEBUG  DocumentDatabase with adaptor: TinyDBAdaptor [user/data/live/live_1/run_data.json] logging_util.py:183      flushing database
+2026-01-08 06:31:15 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1h || CANDLE = [1767848400, 91022.74, 91188.0, 90786.14, 90829.58, 295.83835]
+2026-01-08 06:31:15 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767853800, 90276.86, 90326.23, 90276.86, 90326.23, 15.30185]
+2026-01-08 06:31:16 DEBUG  WebSocket - binance  logging_util.py:183      Subscribing to candle with {'timeframe': '1h', 'since': 1767852000000, 'symbol': 'BTC/USDT'} (0 total feeds)
+2026-01-08 06:31:16 DEBUG  WebSocket - binance  logging_util.py:183      Subscribed to candle for BTC/USDT on 1h
+2026-01-08 06:31:16 DEBUG  WebSocket - binance  logging_util.py:183      Subscribing to candle with {'timeframe': '1m', 'since': 1767853860000, 'symbol': 'BTC/USDT'} (1 total feeds)
+2026-01-08 06:31:16 DEBUG  WebSocket - binance  logging_util.py:183      Subscribed to candle for BTC/USDT on 1m
+2026-01-08 06:31:16 DEBUG  WebSocket - binance  logging_util.py:183      No new feed to subscribe to on candle (inputs: on 1m)
+2026-01-08 06:31:16 DEBUG  WebSocket - binance  logging_util.py:183      No new feed to subscribe to on kline (inputs: on 1m)
+2026-01-08 06:31:18 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|profitability
+2026-01-08 06:31:18 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance
+2026-01-08 06:31:23 DEBUG  DocumentDatabase with adaptor: TinyDBAdaptor [user/data/live/live_1/binance/portfolio_value_spot_trader-simulator.json] logging_util.py:183      flushing database
+2026-01-08 06:31:28 DEBUG  CommunityAuthentication logging_util.py:183      Skipping retried_failed_supabase_request_wrapper update: no user selected bot.
+2026-01-08 06:32:02 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767853860, 90326.23, 90382.62, 90308.14, 90308.15, 15.03941]
+2026-01-08 06:33:02 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767853920, 90308.15, 90308.15, 90289.56, 90299.99, 10.48609]
+2026-01-08 06:34:02 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767853980, 90299.99, 90323.66, 90299.98, 90311.7, 7.22299]
+2026-01-08 06:35:02 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767854040, 90311.7, 90334.76, 90302.65, 90318.64, 22.50323]
+2026-01-08 06:35:36 DEBUG  octobot_commons.aiohttp_util logging_util.py:183      Using certifi configured aiohttp connector.
+2026-01-08 06:36:02 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767854100, 90318.65, 90329.11, 90288.45, 90288.46, 9.81103]
+2026-01-08 06:37:02 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767854160, 90288.45, 90288.46, 90219.69, 90258.74, 15.35204]
+2026-01-08 06:38:00 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767854220, 90258.74, 90370.89, 90258.73, 90370.89, 10.96794]
+2026-01-08 06:39:02 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767854280, 90370.89, 90419.98, 90370.89, 90397.75, 30.87575]
+2026-01-08 06:40:02 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767854340, 90397.75, 90404.43, 90376.58, 90391.28, 6.13665]
+2026-01-08 06:40:28 INFO   Configuration        logging_util.py:192      Using TradingView Signals Trading profile.
+2026-01-08 06:41:02 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767854400, 90391.27, 90391.28, 90344.25, 90363.06, 12.7383]
+2026-01-08 06:41:16 DEBUG  SystemResourcesWatcher logging_util.py:183      Used system resources: 2.4% CPU, 3.05 GB in RAM (41.6% of total including 0.665821184 GB from this process). 
+2026-01-08 06:42:02 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767854460, 90363.06, 90404.33, 90354.01, 90395.27, 8.13]

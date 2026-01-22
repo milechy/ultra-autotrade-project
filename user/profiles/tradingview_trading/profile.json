@@ -1,0 +1,58 @@
+{
+    "config": {
+        "crypto-currencies": {
+            "Bitcoin": {
+                "enabled": true,
+                "pairs": [
+                    "BTC/USDT"
+                ]
+            },
+            "Ethereum": {
+                "enabled": true,
+                "pairs": [
+                    "ETH/USDT"
+                ]
+            }
+        },
+        "exchanges": {
+            "binance": {
+                "enabled": true,
+                "exchange-type": "spot"
+            }
+        },
+        "trader": {
+            "enabled": false,
+            "load-trade-history": false
+        },
+        "trader-simulator": {
+            "enabled": true,
+            "fees": {
+                "maker": 0.1,
+                "taker": 0.1
+            },
+            "starting-portfolio": {
+                "BTC": 10,
+                "USDT": 1000
+            }
+        },
+        "trading": {
+            "reference-market": "USDT",
+            "risk": 0.5
+        }
+    },
+    "profile": {
+        "auto_update": false,
+        "avatar": "default_profile.png",
+        "complexity": 3,
+        "description": "TradingViewSignalsTrading is a profile configured to react on signals from tradingview.com. It requires to setup a trading view pro account and a webhook service. See how to configure your OctoBot for TradingView on https://www.octobot.cloud/guides/octobot-interfaces/tradingview",
+        "extra_backtesting_time_frames": [],
+        "id": "tradingview_trading",
+        "imported": false,
+        "name": "TradingView Signals Trading",
+        "origin_url": null,
+        "read_only": true,
+        "risk": 2,
+        "slug": "",
+        "type": "live"
+    }
+}

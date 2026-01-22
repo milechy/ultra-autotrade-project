@@ -1,0 +1,245 @@
+2026-01-08 06:42:35 INFO   OctoBot Launcher     cli.py:320      Version : 2.0.16
+2026-01-08 06:42:35 INFO   OctoBot Launcher     cli.py:106      Running self-hosted OctoBot on Linux:6.12.54-linuxkit:aarch64 with binary [Python 3.10.19]
+2026-01-08 06:42:35 DEBUG  sentry_tracker       logging_util.py:183      Error tracker disabled
+2026-01-08 06:42:35 INFO   OctoBot Launcher     cli.py:123      Loading config files...
+2026-01-08 06:42:35 INFO   Configuration        logging_util.py:192      Using TradingView Signals Trading profile.
+2026-01-08 06:42:35 INFO   OctoBot Launcher     cli.py:92       Disclaimer accepted by user.
+2026-01-08 06:42:35 DEBUG  IdentifiersProvider  logging_util.py:183      Using Production Community environment.
+2026-01-08 06:42:36 INFO   OctoBot Launcher     cli.py:235      No authenticated community account
+2026-01-08 06:42:36 INFO   telethon.crypto.aes  aes.py:23       libssl detected, it will be used for encryption
+2026-01-08 06:42:36 DEBUG  Commands             logging_util.py:183      OctoBot tentacles are up to date.
+2026-01-08 06:42:36 DEBUG  OctoBotChannel       logging_util.py:183      Consumer started for subject: * action: * [OctoBotChannelConsumer with callback: octobot_channel_callback]
+2026-01-08 06:42:36 DEBUG  OctoBotChannel       logging_util.py:183      Consumer started for subject: * action: ['exchange'] [OctoBotChannelConsumer with callback: octobot_channel_callback]
+2026-01-08 06:42:36 DEBUG  OctoBotChannel       logging_util.py:183      Consumer started for subject: * action: ['evaluator'] [OctoBotChannelConsumer with callback: octobot_channel_callback]
+2026-01-08 06:42:36 DEBUG  OctoBotChannel       logging_util.py:183      Consumer started for subject: * action: ['interface', 'notification', 'service_feed', 'start_service_feed', 'exchange_registration'] [OctoBotChannelConsumer with callback: octobot_channel_callback]
+2026-01-08 06:42:36 INFO   OctoBot              logging_util.py:192      Starting OctoBot with simulated trader on binance[spot] trading BTC/USDT, ETH/USDT with TradingViewSignalsTradingMode and using bot_id: c84472dd-c983-4729-a8c4-77d9202cae0d
+2026-01-08 06:42:36 DEBUG  CommunityAuthentication logging_util.py:183      Refreshing user session
+2026-01-08 06:42:36 INFO   CommunityAuthentication logging_util.py:192      Login aborted: no authenticated session: No error code
+2026-01-08 06:42:37 DEBUG  OctoBotChannel       logging_util.py:183      Consumer started for subject: ['notification', 'error'] action: * [OctoBotChannelConsumer with callback: octobot_channel_callback]
+2026-01-08 06:42:37 DEBUG  EvaluatorProducer    logging_util.py:183      Pausing...
+2026-01-08 06:42:37 DEBUG  MatrixChannel        logging_util.py:183      Consumer started for : [matrix_id=*, cryptocurrency=*, symbol=*, time_frame=*, evaluator_name=*, exchange_name=*, evaluator_type=*]
+2026-01-08 06:42:37 DEBUG  ExchangeProducer     logging_util.py:183      Pausing...
+2026-01-08 06:42:37 DEBUG  ServiceFeedProducer  logging_util.py:183      Pausing...
+2026-01-08 06:42:37 DEBUG  InterfaceProducer    logging_util.py:183      Pausing...
+2026-01-08 06:42:37 DEBUG  SystemResourcesWatcher logging_util.py:183      Starting system resources watcher
+2026-01-08 06:42:37 DEBUG  ProfileSynchronizer  logging_util.py:183      Profile synch loop disabled
+2026-01-08 06:42:37 INFO   CCXTConnector[binance] logging_util.py:192      Creating unauthenticated binance SPOT exchange with ccxt in version 4.5.28
+2026-01-08 06:42:37 INFO   CCXTConnector[binance] logging_util.py:192      Loading binance spot exchange markets (reload=False authenticated_cache=False)
+2026-01-08 06:42:37 INFO   WebService           logging_util.py:192      Interface successfully initialized and accessible at: http://172.17.0.2:5001.
+2026-01-08 06:42:37 DEBUG  NotificationChannelProducer logging_util.py:183      Pausing...
+2026-01-08 06:42:37 DEBUG  NotificationChannelProducer logging_util.py:183      Resuming...
+2026-01-08 06:42:37 DEBUG  WebNotifier          logging_util.py:183      Registered as notification consumer
+2026-01-08 06:42:37 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = service_feed || DATA = {'instance': <tentacles.Services.Services_feeds.telegram_service_feed.telegram_feed.TelegramServiceFeed object at 0xffff65169de0>} 
+2026-01-08 06:42:37 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = service_feed || DATA = {'instance': <tentacles.Services.Services_feeds.trading_view_service_feed.trading_view_feed.TradingViewServiceFeed object at 0xffff6516a230>} 
+2026-01-08 06:42:37 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = service_feed || DATA = {'instance': <tentacles.Services.Services_feeds.reddit_service_feed.reddit_feed.RedditServiceFeed object at 0xffff6516a3b0>} 
+2026-01-08 06:42:37 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = service_feed || DATA = {'instance': <tentacles.Services.Services_feeds.telegram_api_service_feed.telegram_api_feed.TelegramApiServiceFeed object at 0xffff6516a530>} 
+2026-01-08 06:42:37 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = service_feed || DATA = {'instance': <tentacles.Services.Services_feeds.google_service_feed.google_feed.GoogleServiceFeed object at 0xffff6516a6b0>} 
+2026-01-08 06:42:37 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = interface || DATA = {'instance': <tentacles.Services.Interfaces.web_interface.web.WebInterface object at 0xffff65168fa0>} 
+2026-01-08 06:42:37 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = notification || DATA = {'instance': <tentacles.Services.Notifiers.web_notifier.web.WebNotifier object at 0xffff65169120>} 
+2026-01-08 06:42:37 DEBUG  WebNotifier          logging_util.py:183      Publishing notification: [Notification] title: , text: OctoBot 2.0.16 is starting ..., level: NotificationLevel.INFO, markdown_format: ITALIC, category: global-info, linked_notification: None
+2026-01-08 06:42:38 INFO   CCXTConnector[binance] logging_util.py:192      Loaded 4169 [binance] markets
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for . Untriggered children: ['binance']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for . Untriggered children: ['binance']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|orders. Untriggered children: ['BTC/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|orders. Untriggered children: ['BTC/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|orders. Untriggered children: ['BTC/USDT', 'ETH/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|orders. Untriggered children: ['BTC/USDT', 'ETH/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders', 'trades']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders', 'trades']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|trades. Untriggered children: ['BTC/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|trades. Untriggered children: ['BTC/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|trades. Untriggered children: ['BTC/USDT', 'ETH/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|trades. Untriggered children: ['BTC/USDT', 'ETH/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders', 'trades', 'candles']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders', 'trades', 'candles']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles. Untriggered children: ['BTC/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles. Untriggered children: ['BTC/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles|BTC/USDT. Untriggered children: ['1m']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles|BTC/USDT. Untriggered children: ['1m']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles. Untriggered children: ['BTC/USDT', 'ETH/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles. Untriggered children: ['BTC/USDT', 'ETH/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles|ETH/USDT. Untriggered children: ['1m']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles|ETH/USDT. Untriggered children: ['1m']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders', 'trades', 'candles', 'price']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['balance', 'profitability', 'orders', 'trades', 'candles', 'price']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|price. Untriggered children: ['BTC/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|price. Untriggered children: ['BTC/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|price. Untriggered children: ['BTC/USDT', 'ETH/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|price. Untriggered children: ['BTC/USDT', 'ETH/USDT']
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is handling trades
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling l1_book
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling l2_book
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling l3_book
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling book_delta
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling book_ticker
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling open_interest
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling mini_ticker
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is handling ticker
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling funding
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling mark_price
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling volume
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling liquidations
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling futures_index
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is handling candle
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is handling kline
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling position
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling portfolio
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling trade
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling orders
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling create_order
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling cancel_order
+2026-01-08 06:42:39 DEBUG  WebSocket - DefaultWebSocketExchange logging_util.py:183      binance's websocket is not handling ledger
+2026-01-08 06:42:39 INFO   WebSocket - binance  logging_util.py:192      Creating unauthenticated binance SPOT exchange with ccxt in version 4.5.28
+2026-01-08 06:42:39 INFO   WebSocket - binance  logging_util.py:192      Loading binance websocket exchange markets
+2026-01-08 06:42:39 INFO   ExchangeManager      logging_util.py:192      DefaultWebSocketExchange connecting to Binance
+2026-01-08 06:42:39 DEBUG  ExchangeManager      logging_util.py:183      binance OHLCV channel is updated by websocket feed
+2026-01-08 06:42:39 DEBUG  ExchangeManager      logging_util.py:183      binance OrderBook channel is updated by OrderBookUpdater
+2026-01-08 06:42:39 DEBUG  OrderBookUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:42:39 DEBUG  ExchangeManager      logging_util.py:183      binance RecentTrade channel is updated by websocket feed
+2026-01-08 06:42:39 DEBUG  ExchangeManager      logging_util.py:183      binance Ticker channel is updated by websocket feed
+2026-01-08 06:42:39 DEBUG  ExchangeManager      logging_util.py:183      binance Ticker channel is updated by TickerUpdater
+2026-01-08 06:42:39 DEBUG  TickerUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:42:39 DEBUG  ExchangeManager      logging_util.py:183      binance Kline channel is updated by websocket feed
+2026-01-08 06:42:39 DEBUG  ExchangeManager      logging_util.py:183      binance MarkPrice channel is updated by MarkPriceUpdater
+2026-01-08 06:42:39 DEBUG  MarkPriceUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:42:39 DEBUG  ExchangeManager      logging_util.py:183      binance Funding channel is updated by FundingUpdater
+2026-01-08 06:42:39 DEBUG  FundingUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:42:39 DEBUG  ExchangeManager      logging_util.py:183      binance Orders channel is updated by OrdersUpdaterSimulator
+2026-01-08 06:42:39 DEBUG  OrdersUpdaterSimulator[binance] logging_util.py:183      Pausing...
+2026-01-08 06:42:39 DEBUG  ExchangeManager      logging_util.py:183      binance BalanceProfitability channel is updated by BalanceProfitabilityUpdater
+2026-01-08 06:42:39 DEBUG  BalanceProfitabilityUpdater logging_util.py:183      Pausing...
+2026-01-08 06:42:39 DEBUG  ExchangeManager      logging_util.py:183      binance Positions channel is updated by PositionsUpdaterSimulator
+2026-01-08 06:42:39 DEBUG  PositionsUpdaterSimulator[binance] logging_util.py:183      Pausing...
+2026-01-08 06:42:39 DEBUG  TradesChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: wrapper
+2026-01-08 06:42:39 DEBUG  OrdersChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: _live_callback
+2026-01-08 06:42:39 DEBUG  OrdersUpdaterSimulator[binance] logging_util.py:183      Resuming...
+2026-01-08 06:42:39 DEBUG  SpotPortfolio[binance] logging_util.py:183      Portfolio updated | Current Portfolio : {'USDT': {'available': 10000.0, 'total': 10000.0}}
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|balance
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['profitability', 'orders', 'trades', 'candles', 'price']
+2026-01-08 06:42:39 DEBUG  PortfolioManager     logging_util.py:183      Current Portfolio : {'USDT': SpotAsset: USDT | Available: 10000.0 | Total: 10000.0}
+2026-01-08 06:42:39 DEBUG  TradesManager        logging_util.py:183      Loading 0 binance historical trades ...
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|trades|BTC/USDT
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|trades. Untriggered children: ['ETH/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|trades|ETH/USDT
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|trades
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['profitability', 'orders', 'candles', 'price']
+2026-01-08 06:42:39 DEBUG  TraderSimulator[binance] logging_util.py:183      Enabled on binance
+2026-01-08 06:42:39 DEBUG  DocumentDatabase with adaptor: TinyDBAdaptor [user/data/live/live_1/run_data.json] logging_util.py:183      flushing database
+2026-01-08 06:42:39 DEBUG  TradingViewSignalsTradingMode logging_util.py:183      Using config: {'close_to_current_price_difference': 0.02, 'required_strategies': [], 'use_market_orders': True, 'use_maximum_size_orders': True, 'cancel_previous_orders': True}
+2026-01-08 06:42:39 DEBUG  TradingViewSignalsModeProducer logging_util.py:183      Pausing...
+2026-01-08 06:42:39 DEBUG  ModeChannel[binance] logging_util.py:183      Consumer started for : [trading_mode_name=TradingViewSignalsTradingMode, state=*, cryptocurrency=*, symbol=BTC/USDT, time_frame=*]
+2026-01-08 06:42:39 DEBUG  TradingModeFactory[binance] logging_util.py:183      TradingViewSignalsTradingMode started for [cryptocurrency=*, symbol=BTC/USDT, time_frame=*]
+2026-01-08 06:42:39 DEBUG  DocumentDatabase with adaptor: TinyDBAdaptor [user/data/live/live_1/run_data.json] logging_util.py:183      flushing database
+2026-01-08 06:42:39 DEBUG  TradingViewSignalsTradingMode logging_util.py:183      Using config: {'close_to_current_price_difference': 0.02, 'required_strategies': [], 'use_market_orders': True, 'use_maximum_size_orders': True, 'cancel_previous_orders': True}
+2026-01-08 06:42:39 DEBUG  TradingViewSignalsModeProducer logging_util.py:183      Pausing...
+2026-01-08 06:42:39 DEBUG  ModeChannel[binance] logging_util.py:183      Consumer started for : [trading_mode_name=TradingViewSignalsTradingMode, state=*, cryptocurrency=*, symbol=ETH/USDT, time_frame=*]
+2026-01-08 06:42:39 DEBUG  TradingModeFactory[binance] logging_util.py:183      TradingViewSignalsTradingMode started for [cryptocurrency=*, symbol=ETH/USDT, time_frame=*]
+2026-01-08 06:42:39 DEBUG  OrderBookUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:42:39 DEBUG  TickerUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:42:39 DEBUG  MarkPriceUpdater[binance] logging_util.py:183      Pausing...
+2026-01-08 06:42:39 DEBUG  FundingUpdater[binance] logging_util.py:183      Ignoring updater start as funding can be found in different sources
+2026-01-08 06:42:39 DEBUG  RecentTradeChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: ignore_recent_trades_update
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|orders|BTC/USDT
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|orders. Untriggered children: ['ETH/USDT']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|orders|ETH/USDT
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|orders
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['profitability', 'candles', 'price']
+2026-01-08 06:42:39 DEBUG  BalanceChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: handle_balance_update
+2026-01-08 06:42:39 DEBUG  MarkPriceChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: handle_mark_price_update
+2026-01-08 06:42:39 DEBUG  MarkPriceUpdater[binance] logging_util.py:183      Resuming...
+2026-01-08 06:42:39 DEBUG  TradingViewSignalsModeProducer logging_util.py:183      Trading mode [binance] start complete. 1/2: Now waiting for orders (for ['BTC/USDT', 'ETH/USDT']) full initialisation.
+2026-01-08 06:42:39 DEBUG  TradingViewSignalsModeProducer logging_util.py:183      Trading mode [binance] start complete. 1/2: Now waiting for orders (for ['BTC/USDT', 'ETH/USDT']) full initialisation.
+2026-01-08 06:42:39 DEBUG  ExchangeProducer     logging_util.py:183      Exchange(s) created
+2026-01-08 06:42:39 DEBUG  OHLCVChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: ohlcv_callback
+2026-01-08 06:42:39 DEBUG  BalanceChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: balance_callback
+2026-01-08 06:42:39 DEBUG  TradesChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: trades_callback
+2026-01-08 06:42:39 DEBUG  LiquidationsChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: liquidations_callback
+2026-01-08 06:42:39 DEBUG  PositionsChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: positions_callback
+2026-01-08 06:42:39 DEBUG  PositionsUpdaterSimulator[binance] logging_util.py:183      Resuming...
+2026-01-08 06:42:39 DEBUG  OrdersChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: orders_callback
+2026-01-08 06:42:39 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = exchange || DATA = {'exchange_id': '1854e17f-4038-49bb-b53e-4e9cfb25ffd0'} 
+2026-01-08 06:42:39 DEBUG  RecentTradeChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: handle_recent_trades_update
+2026-01-08 06:42:39 DEBUG  TickerChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: handle_ticker_update
+2026-01-08 06:42:39 DEBUG  TickerUpdater[binance] logging_util.py:183      Resuming...
+2026-01-08 06:42:39 INFO   EvaluatorsFactory    logging_util.py:192      No evaluator to create for binance: no activated evaluator strategy.
+2026-01-08 06:42:39 DEBUG  TradesChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: _web_trades_callback
+2026-01-08 06:42:39 DEBUG  OrdersChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: _web_orders_callback
+2026-01-08 06:42:39 DEBUG  OHLCVChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: _web_ohlcv_empty_callback
+2026-01-08 06:42:39 DEBUG  OrdersChannel[binance] logging_util.py:183      Consumer started for symbol *: ExchangeChannelConsumer with callback: _order_notification_callback
+2026-01-08 06:42:39 DEBUG  TickerUpdater[binance] logging_util.py:183      Ticker update loop disabled: update is managed by websocket. Updater remains available for forced updates.
+2026-01-08 06:42:39 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = evaluator || DATA = {'matrix_id': 'a162b777-b38e-49d5-a3dc-d7f61fd2a767'} 
+2026-01-08 06:42:39 DEBUG  TradingViewSignalsModeProducer logging_util.py:183      Trading mode [binance] start complete. 2/2: Now waiting for ['balance'] full initialisation.
+2026-01-08 06:42:39 DEBUG  TradingViewSignalsModeProducer logging_util.py:183      Trading mode requirements init complete: orders initialisation completed.
+2026-01-08 06:42:39 DEBUG  TradingViewSignalsModeProducer logging_util.py:183      Ready to trade on binance, symbol: BTC/USDT
+2026-01-08 06:42:39 DEBUG  TradingViewSignalsModeProducer logging_util.py:183      Trading mode [binance] start complete. 2/2: Now waiting for ['balance'] full initialisation.
+2026-01-08 06:42:39 DEBUG  TradingViewSignalsModeProducer logging_util.py:183      Trading mode requirements init complete: orders initialisation completed.
+2026-01-08 06:42:39 DEBUG  TradingViewSignalsModeProducer logging_util.py:183      Ready to trade on binance, symbol: ETH/USDT
+2026-01-08 06:42:39 DEBUG  DocumentDatabase with adaptor: TinyDBAdaptor [user/data/live/live_1/run_data.json] logging_util.py:183      flushing database
+2026-01-08 06:42:39 DEBUG  Automation           logging_util.py:183      No automation to start
+2026-01-08 06:42:39 INFO   ServiceFactory       logging_util.py:192      TelegramService can't be initialized: Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/telegram for more details.
+2026-01-08 06:42:39 DEBUG  TelegramServiceFeed  logging_util.py:183      Impossible to start TelegramServiceFeed: required service TelegramService is not available (Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/telegram for more details.).
+2026-01-08 06:42:39 DEBUG  OctoBotChannelServiceConsumer logging_util.py:183      Impossible to start TelegramServiceFeed: missing service(s) configuration.
+2026-01-08 06:42:39 INFO   ServiceFactory       logging_util.py:192      WebHookService can't be initialized: Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/tradingview/using-a-webhook for more details.
+2026-01-08 06:42:39 DEBUG  TradingViewServiceFeed logging_util.py:183      Impossible to start TradingViewServiceFeed: required service WebHookService is not available (Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/tradingview/using-a-webhook for more details.).
+2026-01-08 06:42:39 DEBUG  OctoBotChannelServiceConsumer logging_util.py:183      Impossible to start TradingViewServiceFeed: missing service(s) configuration.
+2026-01-08 06:42:39 INFO   ServiceFactory       logging_util.py:192      RedditService can't be initialized: Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/reddit for more details.
+2026-01-08 06:42:39 DEBUG  RedditServiceFeed    logging_util.py:183      Impossible to start RedditServiceFeed: required service RedditService is not available (Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/reddit for more details.).
+2026-01-08 06:42:39 DEBUG  OctoBotChannelServiceConsumer logging_util.py:183      Impossible to start RedditServiceFeed: missing service(s) configuration.
+2026-01-08 06:42:39 INFO   ServiceFactory       logging_util.py:192      TelegramApiService can't be initialized: Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/telegram/telegram-api for more details.
+2026-01-08 06:42:39 DEBUG  TelegramApiServiceFeed logging_util.py:183      Impossible to start TelegramApiServiceFeed: required service TelegramApiService is not available (Invalid configuration, visit https://www.octobot.cloud/en/guides/octobot-interfaces/telegram/telegram-api for more details.).
+2026-01-08 06:42:39 DEBUG  OctoBotChannelServiceConsumer logging_util.py:183      Impossible to start TelegramApiServiceFeed: missing service(s) configuration.
+2026-01-08 06:42:39 INFO   GoogleServiceFeed    logging_util.py:192      Initializing feed reception ...
+2026-01-08 06:42:39 INFO   GoogleServiceFeed    logging_util.py:192      Nothing to monitor, feed is closing.
+2026-01-08 06:42:39 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = start_service_feed || DATA = {'successful_operation': False} 
+2026-01-08 06:42:39 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = start_service_feed || DATA = {'successful_operation': False} 
+2026-01-08 06:42:39 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = start_service_feed || DATA = {'successful_operation': False} 
+2026-01-08 06:42:39 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = start_service_feed || DATA = {'successful_operation': False} 
+2026-01-08 06:42:39 DEBUG  OctoBot Channel      logging_util.py:183      OCTOBOT_CHANNEL : SUBJECT = notification || ACTION = start_service_feed || DATA = {'successful_operation': True} 
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles|BTC/USDT. Untriggered children: ['1m']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles|BTC/USDT. Untriggered children: ['1m']
+2026-01-08 06:42:39 DEBUG  OHLCVUpdater[binance] logging_util.py:183      Candle history loaded for BTC/USDT on TimeFrames.ONE_HOUR
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|price|BTC/USDT
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|price. Untriggered children: ['ETH/USDT']
+2026-01-08 06:42:39 DEBUG  ValueConverter[binance] logging_util.py:183      Initialized last price for BTC/USDT
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles|ETH/USDT. Untriggered children: ['1m']
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles|ETH/USDT. Untriggered children: ['1m']
+2026-01-08 06:42:39 DEBUG  OHLCVUpdater[binance] logging_util.py:183      Candle history loaded for ETH/USDT on TimeFrames.ONE_HOUR
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|price|ETH/USDT
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|price
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['profitability', 'candles']
+2026-01-08 06:42:39 DEBUG  ValueConverter[binance] logging_util.py:183      Initialized last price for ETH/USDT
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|candles|BTC/USDT|1m
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|candles|BTC/USDT
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance|candles. Untriggered children: ['ETH/USDT']
+2026-01-08 06:42:39 DEBUG  OHLCVUpdater[binance] logging_util.py:183      Candle history loaded for BTC/USDT on TimeFrames.ONE_MINUTE
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|candles|ETH/USDT|1m
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|candles|ETH/USDT
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|candles
+2026-01-08 06:42:39 DEBUG  EventTreeNode        logging_util.py:183      Waiting children trigger for binance. Untriggered children: ['profitability']
+2026-01-08 06:42:39 DEBUG  OHLCVUpdater[binance] logging_util.py:183      Candle history loaded for ETH/USDT on TimeFrames.ONE_MINUTE
+2026-01-08 06:42:39 DEBUG  OHLCVUpdater[binance] logging_util.py:183      Pushing completed initialization candles
+2026-01-08 06:42:39 DEBUG  OHLCVUpdater[binance] logging_util.py:183      Candle history initial fetch completed
+2026-01-08 06:42:39 DEBUG  DocumentDatabase with adaptor: TinyDBAdaptor [user/data/live/live_1/run_data.json] logging_util.py:183      flushing database
+2026-01-08 06:42:39 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1h || CANDLE = [1767848400, 91022.74, 91188.0, 90786.14, 90829.58, 295.83835]
+2026-01-08 06:42:39 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = ETH || SYMBOL = ETH/USDT || TIME FRAME = 1h || CANDLE = [1767848400, 3154.02, 3161.24, 3142.22, 3143.63, 5561.9706]
+2026-01-08 06:42:39 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767854460, 90363.06, 90404.33, 90354.01, 90395.27, 8.13]
+2026-01-08 06:42:39 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = ETH || SYMBOL = ETH/USDT || TIME FRAME = 1m || CANDLE = [1767854460, 3121.25, 3123.14, 3121.24, 3123.13, 106.2142]
+2026-01-08 06:42:39 DEBUG  SystemResourcesWatcher logging_util.py:183      Used system resources: 8.4% CPU, 2.664 GB in RAM (36.9% of total including 0.262787072 GB from this process). 
+2026-01-08 06:42:40 DEBUG  WebSocket - binance  logging_util.py:183      Subscribing to candle with {'timeframe': '1h', 'since': 1767852000000, 'symbol': 'BTC/USDT'} (0 total feeds)
+2026-01-08 06:42:40 DEBUG  WebSocket - binance  logging_util.py:183      Subscribing to candle with {'timeframe': '1h', 'since': 1767852000000, 'symbol': 'ETH/USDT'} (1 total feeds)
+2026-01-08 06:42:40 DEBUG  WebSocket - binance  logging_util.py:183      Subscribed to candle for BTC/USDT, ETH/USDT on 1h
+2026-01-08 06:42:40 DEBUG  WebSocket - binance  logging_util.py:183      Subscribing to candle with {'timeframe': '1m', 'since': 1767854520000, 'symbol': 'BTC/USDT'} (2 total feeds)
+2026-01-08 06:42:40 DEBUG  WebSocket - binance  logging_util.py:183      Subscribing to candle with {'timeframe': '1m', 'since': 1767854520000, 'symbol': 'ETH/USDT'} (3 total feeds)
+2026-01-08 06:42:40 DEBUG  WebSocket - binance  logging_util.py:183      Subscribed to candle for BTC/USDT, ETH/USDT on 1m
+2026-01-08 06:42:40 DEBUG  WebSocket - binance  logging_util.py:183      No new feed to subscribe to on candle (inputs: on 1m)
+2026-01-08 06:42:40 DEBUG  WebSocket - binance  logging_util.py:183      No new feed to subscribe to on kline (inputs: on 1m)
+2026-01-08 06:42:42 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance|profitability
+2026-01-08 06:42:42 DEBUG  EventTreeNode        logging_util.py:183      Event triggered for binance
+2026-01-08 06:43:02 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = BTC || SYMBOL = BTC/USDT || TIME FRAME = 1m || CANDLE = [1767854520, 90395.27, 90395.28, 90395.27, 90395.28, 5.90754]
+2026-01-08 06:43:02 DEBUG  OctoBot Channel      logging_util.py:183      OHLCV : EXCHANGE = binance || CRYPTOCURRENCY = ETH || SYMBOL = ETH/USDT || TIME FRAME = 1m || CANDLE = [1767854520, 3123.13, 3123.66, 3122.86, 3123.66, 74.6077]
