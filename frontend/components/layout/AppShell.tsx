@@ -1,7 +1,17 @@
 import Link from "next/link";
+import { useRouter } from "next/router";
 import React from "react";
+import { useAuth } from "../../lib/auth";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  const { user, logout, isLoading } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/login");
+  };
+
   return (
     <div style={{ fontFamily: "system-ui", color: "#111" }}>
       <header style={headerStyle}>
@@ -12,9 +22,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
             <span style={{ color: "#666", fontSize: 12 }}>Operations</span>
           </div>
-          <nav style={{ display: "flex", gap: 12, fontSize: 14 }}>
+          <nav style={{ display: "flex", gap: 12, fontSize: 14, alignItems: "center" }}>
             <Link href="/dashboard/automation" style={navLinkStyle}>Automation</Link>
             <Link href="/dashboard/reports" style={navLinkStyle}>Reports</Link>
+            {!isLoading && user && (
+              <>
+                <span style={{ color: "#999" }}>|</span>
+                <Link href="/settings/account" style={navLinkStyle}>Settings</Link>
+                {user.role === "admin" && (
+                  <Link href="/settings/users" style={navLinkStyle}>Users</Link>
+                )}
+                <span style={{ color: "#666", fontSize: 12 }}>{user.username}</span>
+                <button onClick={handleLogout} style={logoutButtonStyle}>Logout</button>
+              </>
+            )}
+            {!isLoading && !user && (
+              <Link href="/login" style={navLinkStyle}>Login</Link>
+            )}
           </nav>
         </div>
       </header>
@@ -40,4 +64,14 @@ const headerStyle: React.CSSProperties = {
 const navLinkStyle: React.CSSProperties = {
   textDecoration: "none",
   color: "#333",
+};
+
+const logoutButtonStyle: React.CSSProperties = {
+  background: "none",
+  border: "1px solid #ddd",
+  borderRadius: 6,
+  padding: "4px 10px",
+  fontSize: 12,
+  cursor: "pointer",
+  color: "#666",
 };

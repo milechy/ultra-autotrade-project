@@ -21,9 +21,96 @@ export async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
   const url = base ? `${base}${path}` : path;
 
   const res = await fetch(url, {
-    method: "GET",
-    headers: { "Accept": "application/json" },
     ...init,
+    method: "GET",
+    headers: { "Accept": "application/json", ...init?.headers },
+  });
+
+  const text = await res.text();
+  const body = text ? safeJsonParse(text) : undefined;
+
+  if (!res.ok) {
+    const msg =
+      typeof body === "object" && body && "detail" in (body as any)
+        ? String((body as any).detail)
+        : `HTTP ${res.status}`;
+    throw { status: res.status, message: msg, detail: body } as HttpError;
+  }
+  return body as T;
+}
+
+export async function postJson<T>(
+  path: string,
+  data: unknown,
+  init?: RequestInit
+): Promise<T> {
+  const base = getBaseUrl();
+  const url = base ? `${base}${path}` : path;
+
+  const res = await fetch(url, {
+    ...init,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      ...init?.headers,
+    },
+    body: JSON.stringify(data),
+  });
+
+  const text = await res.text();
+  const body = text ? safeJsonParse(text) : undefined;
+
+  if (!res.ok) {
+    const msg =
+      typeof body === "object" && body && "detail" in (body as any)
+        ? String((body as any).detail)
+        : `HTTP ${res.status}`;
+    throw { status: res.status, message: msg, detail: body } as HttpError;
+  }
+  return body as T;
+}
+
+export async function putJson<T>(
+  path: string,
+  data: unknown,
+  init?: RequestInit
+): Promise<T> {
+  const base = getBaseUrl();
+  const url = base ? `${base}${path}` : path;
+
+  const res = await fetch(url, {
+    ...init,
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      ...init?.headers,
+    },
+    body: JSON.stringify(data),
+  });
+
+  const text = await res.text();
+  const body = text ? safeJsonParse(text) : undefined;
+
+  if (!res.ok) {
+    const msg =
+      typeof body === "object" && body && "detail" in (body as any)
+        ? String((body as any).detail)
+        : `HTTP ${res.status}`;
+    throw { status: res.status, message: msg, detail: body } as HttpError;
+  }
+  return body as T;
+}
+
+export async function deleteJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const base = getBaseUrl();
+  const url = base ? `${base}${path}` : path;
+
+  const res = await fetch(url, {
+    ...init,
+    method: "DELETE",
+    headers: { "Accept": "application/json", ...init?.headers },
   });
 
   const text = await res.text();
