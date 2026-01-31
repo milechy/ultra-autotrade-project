@@ -41,7 +41,14 @@ def _make_settings() -> AaveSettings:
         default_asset_symbol="USDC",
         max_single_trade_usd=Decimal("100"),
         min_health_factor=Decimal("1.6"),
+        warn_health_factor=Decimal("1.8"),
         trade_cooldown_seconds=600,
+        rpc_url=None,
+        private_key=None,
+        operation_mode="NORMAL",
+        state_file_path="/tmp/test_state.json",
+        state_stale_threshold_seconds=300,
+        pool_addresses_provider="0x0000000000000000000000000000000000000000",
     )
 
 

@@ -5,8 +5,10 @@ Aave 操作用の Pydantic スキーマ定義。
 
 - /aave/rebalance のリクエスト / レスポンス
 - 内部で利用する AaveOperationResult など
+- システム状態管理用の AaveSystemState
 """
 
+from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Optional
@@ -14,6 +16,69 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from app.ai.schemas import TradeAction
+
+
+# ===== システム状態管理用 =====
+
+
+class AaveOperationMode(str, Enum):
+    """
+    Aave 運用の動作モード。
+
+    - NORMAL: 通常運用（deposit/withdraw 両方可能）
+    - SAFE_MODE: 安全モード（withdraw のみ、deposit 不可）
+    - HARD_STOP: 完全停止（手動操作のみ）
+    """
+
+    NORMAL = "normal"
+    SAFE_MODE = "safe_mode"
+    HARD_STOP = "hard_stop"
+
+
+class AaveSystemState(BaseModel):
+    """
+    システム状態ファイル（state.json）のスキーマ。
+
+    backend と nginx 間で共有し、緊急停止や動作モードを管理する。
+    """
+
+    emergency_stop: bool = Field(
+        ...,
+        description="緊急停止フラグ。True の場合は全操作を停止。",
+    )
+    mode: AaveOperationMode = Field(
+        ...,
+        description="現在の動作モード。",
+    )
+    health_factor: Optional[Decimal] = Field(
+        None,
+        description="最後に取得したヘルスファクター。",
+    )
+    last_update: datetime = Field(
+        ...,
+        description="状態の最終更新日時（ISO 8601形式）。",
+    )
+    reason: Optional[str] = Field(
+        None,
+        description="現在のモード/停止状態の理由。",
+    )
+    circuit_closed: bool = Field(
+        ...,
+        description="Circuit Breaker の状態。True=閉（動作可）、False=開（停止）。",
+    )
+    stale_threshold_seconds: int = Field(
+        300,
+        description="状態が古いとみなす閾値（秒）。",
+    )
+
+    class Config:
+        json_encoders = {
+            Decimal: lambda v: str(v),
+            datetime: lambda v: v.isoformat(),
+        }
+
+
+# ===== Aave 操作用 =====
 
 
 class AaveOperationType(str, Enum):

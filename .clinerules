@@ -1,0 +1,122 @@
+# Ultra AutoTrade - Claude Code 設定
+# Based on: https://www.anthropic.com/engineering/claude-code-best-practices
+# Settings: https://code.claude.com/docs/en/settings
+version: "1.0"
+
+# デフォルトモード
+defaultMode: plan
+
+# Plan モード
+planMode:
+  enabled: true
+  autoApprove: false
+  showDiff: true
+  explainChanges: true  # Best Practice: 変更理由を明示
+
+# Subagents
+subagents:
+  enabled: true
+  maxConcurrent: 2
+  agents:
+    - name: "backend-dev"
+      focus: "backend/**/*.py"
+      skills: [ultra-autotrade-context, aave-development, state-management]
+      constraints:
+        - "Always reference docs/ before implementation"
+        - "Fail-closed design for all error paths"
+
+    - name: "test-dev"
+      focus: "backend/tests/**/*.py"
+      skills: [ultra-autotrade-context]
+      constraints:
+        - "Never break existing tests"
+        - "Use pytest.mark.integration for live RPC tests"
+
+    - name: "docs-dev"
+      focus: "docs/**/*.md"
+      skills: [ultra-autotrade-context]
+      constraints:
+        - "Keep docs/ as single source of truth"
+
+# ファイル別ルール
+rules:
+  # 高リスク領域: 必ず Plan モード + テスト必須
+  - pattern: "backend/app/aave/**/*.py"
+    mode: plan
+    requireTests: true
+    reviewRequired: true
+    rationale: "Aave handles real funds in production"
+
+  - pattern: "backend/app/automation/**/*.py"
+    mode: plan
+    requireTests: true
+    reviewRequired: true
+    rationale: "Automation affects system safety"
+
+  # 中リスク領域: Plan モード推奨
+  - pattern: "backend/app/bots/**/*.py"
+    mode: plan
+    requireTests: true
+
+  # 低リスク領域: 直接編集OK
+  - pattern: "backend/tests/**/*.py"
+    mode: edit
+
+  - pattern: "docs/**/*.md"
+    mode: edit
+
+  # 設定ファイル: 必ずレビュー
+  - pattern: ".env*"
+    mode: plan
+    reviewRequired: true
+    rationale: "Contains secrets"
+
+# Best Practice: ファイルサイズ制限
+fileSizeLimit:
+  warn: 500      # 500行で警告
+  error: 1000    # 1000行でエラー
+
+# Best Practice: インクリメンタル開発
+incrementalDevelopment:
+  enabled: true
+  maxChangesPerCommit: 5  # 1コミットあたり最大5ファイル
+  preferSmallPRs: true
+
+# Custom Instructions
+customInstructions: |
+  # Ultra AutoTrade 開発ルール
+
+  ## Best Practices from Anthropic
+  1. Start small, iterate: 大きな変更は小さく分割
+  2. Explicit is better: 暗黙の動作を避ける
+  3. Trust but verify: コード生成後は必ず動作確認
+
+  ## プロジェクト固有ルール
+  1. Aave関連: 必ずdry_run対応
+  2. state.json: fail-closed設計
+  3. 実装前にdocs/参照
+  4. テスト: 既存を壊さない
+
+  ## 禁止事項
+  - .env.stagingコミット
+  - 本番ウォレット使用
+  - emergency_stop無効化
+  - Silent error hiding (過度なtry-except)
+
+  ## Code Style
+  - Error handling: Let errors surface clearly
+  - Logging: Detailed but don't hide failures
+  - Type hints: Always use for public APIs
+  - Docstrings: Follow Google style
+
+  ## Testing Strategy
+  - Unit: Mock external dependencies
+  - Integration: Use @pytest.mark.integration
+  - E2E: Only in staging environment
+
+# Memory persistence (設定ファイルで永続化済み)
+# ~/.claude/settings.json: {"cleanupPeriodDays": 99999}
+
+# MCP
+mcp:
+  enabled: false  # 将来有効化

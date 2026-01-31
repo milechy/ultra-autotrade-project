@@ -1,0 +1,6161 @@
+=== DEEP PROJECT ANALYSIS ===
+
+## Python Files
+./backend/tests/test_automation_reporting_notifications.py
+./backend/tests/conftest.py
+./backend/tests/test_notion_router.py
+./backend/tests/test_automation_dashboard_api.py
+./backend/tests/test_smoke.py
+./backend/tests/test_aave_router.py
+./backend/tests/test_octobot_router.py
+./backend/tests/test_automation_jobs.py
+./backend/tests/test_automation_emergency_report_service.py
+./backend/tests/test_octobot_client.py
+./backend/tests/test_automation_dashboard_view.py
+./backend/tests/test_automation_monitoring.py
+./backend/tests/test_ai_router.py
+./backend/tests/test_ai_service.py
+./backend/tests/test_automation_reporting.py
+./backend/tests/test_flow_with_aave_stub.py
+./backend/tests/test_octobot_service.py
+./backend/tests/test_automation_backup_service.py
+./backend/tests/test_aave_service.py
+./backend/tests/test_notifications_service.py
+./backend/tests/test_notion_client.py
+./backend/tests/test_automation_emergency_integration.py
+./backend/app/bots/client.py
+./backend/app/bots/config.py
+./backend/app/bots/schemas.py
+./backend/app/bots/service.py
+./backend/app/bots/router.py
+./backend/app/bots/__init__.py
+./backend/app/api/automation_dashboard.py
+./backend/app/api/automation_reports.py
+./backend/app/api/__init__.py
+./backend/app/notion/client.py
+./backend/app/notion/config.py
+./backend/app/notion/schemas.py
+./backend/app/notion/service.py
+./backend/app/notion/router.py
+./backend/app/notion/__init__.py
+./backend/app/main.py
+./backend/app/ai/schemas.py
+./backend/app/ai/service.py
+./backend/app/ai/router.py
+./backend/app/ai/__init__.py
+./backend/app/notifications/factory.py
+./backend/app/notifications/schemas.py
+./backend/app/notifications/service.py
+./backend/app/notifications/__init__.py
+./backend/app/aave/client.py
+./backend/app/aave/config.py
+./backend/app/aave/schemas.py
+./backend/app/aave/service.py
+./backend/app/aave/router.py
+./backend/app/automation/state.py
+./backend/app/automation/reporting_service.py
+./backend/app/automation/emergency_report_service.py
+./backend/app/automation/schemas.py
+./backend/app/automation/jobs.py
+./backend/app/automation/monitoring_service.py
+./backend/app/automation/backup_service.py
+./backend/app/automation/__init__.py
+./backend/app/utils/config.py
+./backend/app/utils/__init__.py
+./backend/app/app/api/__init__.py
+./backend/app/app/__init__.py
+./backend/app/__init__.py
+./tentacles/profiles/__init__.py
+./tentacles/Backtesting/converters/exchanges/legacy_data_converter/legacy_converter.py
+./tentacles/Backtesting/converters/exchanges/legacy_data_converter/__init__.py
+./tentacles/Backtesting/converters/exchanges/__init__.py
+./tentacles/Backtesting/converters/__init__.py
+./tentacles/Backtesting/importers/exchanges/generic_exchange_importer/generic_exchange_importer.py
+./tentacles/Backtesting/importers/exchanges/generic_exchange_importer/__init__.py
+./tentacles/Backtesting/importers/exchanges/__init__.py
+./tentacles/Backtesting/importers/__init__.py
+./tentacles/Backtesting/__init__.py
+./tentacles/Backtesting/collectors/exchanges/exchange_history_collector/tests/test_history_collector.py
+./tentacles/Backtesting/collectors/exchanges/exchange_history_collector/tests/__init__.py
+./tentacles/Backtesting/collectors/exchanges/exchange_history_collector/history_collector.py
+./tentacles/Backtesting/collectors/exchanges/exchange_history_collector/__init__.py
+./tentacles/Backtesting/collectors/exchanges/exchange_live_collector/live_collector.py
+./tentacles/Backtesting/collectors/exchanges/exchange_live_collector/__init__.py
+./tentacles/Backtesting/collectors/exchanges/exchange_bot_snapshot_data_collector/bot_snapshot_with_history_collector.py
+./tentacles/Backtesting/collectors/exchanges/exchange_bot_snapshot_data_collector/__init__.py
+./tentacles/Backtesting/collectors/exchanges/__init__.py
+./tentacles/Backtesting/collectors/__init__.py
+./tentacles/Services/Notifiers/telegram_notifier/telegram.py
+./tentacles/Services/Notifiers/telegram_notifier/__init__.py
+./tentacles/Services/Notifiers/web_notifier/web.py
+./tentacles/Services/Notifiers/web_notifier/__init__.py
+./tentacles/Services/Notifiers/twitter_notifier/__init__.py
+./tentacles/Services/Notifiers/twitter_notifier/twitter.py
+./tentacles/Services/Notifiers/__init__.py
+./tentacles/Services/Services_bases/webhook_service/webhook.py
+./tentacles/Services/Services_bases/webhook_service/__init__.py
+./tentacles/Services/Services_bases/telegram_service/telegram.py
+./tentacles/Services/Services_bases/telegram_service/__init__.py
+./tentacles/Services/Services_bases/reddit_service/reddit.py
+./tentacles/Services/Services_bases/reddit_service/__init__.py
+./tentacles/Services/Services_bases/trading_view_service/trading_view.py
+./tentacles/Services/Services_bases/trading_view_service/__init__.py
+./tentacles/Services/Services_bases/gpt_service/gpt.py
+./tentacles/Services/Services_bases/gpt_service/__init__.py
+./tentacles/Services/Services_bases/web_service/web.py
+./tentacles/Services/Services_bases/web_service/__init__.py
+./tentacles/Services/Services_bases/telegram_api_service/telegram_api.py
+./tentacles/Services/Services_bases/telegram_api_service/__init__.py
+./tentacles/Services/Services_bases/google_service/google.py
+./tentacles/Services/Services_bases/google_service/__init__.py
+./tentacles/Services/Services_bases/twitter_service/__init__.py
+./tentacles/Services/Services_bases/twitter_service/twitter.py
+./tentacles/Services/Services_bases/__init__.py
+./tentacles/Services/Interfaces/web_interface/plugins/plugin_management.py
+./tentacles/Services/Interfaces/web_interface/plugins/abstract_plugin.py
+./tentacles/Services/Interfaces/web_interface/plugins/__init__.py
+./tentacles/Services/Interfaces/web_interface/web.py
+./tentacles/Services/Interfaces/web_interface/constants.py
+./tentacles/Services/Interfaces/web_interface/models/dashboard.py
+./tentacles/Services/Interfaces/web_interface/models/dsl.py
+./tentacles/Services/Interfaces/web_interface/models/trading.py
+./tentacles/Services/Interfaces/web_interface/models/backtesting.py
+./tentacles/Services/Interfaces/web_interface/models/profiles.py
+./tentacles/Services/Interfaces/web_interface/models/distributions/market_making/__init__.py
+./tentacles/Services/Interfaces/web_interface/models/distributions/market_making/configuration.py
+./tentacles/Services/Interfaces/web_interface/models/distributions/__init__.py
+./tentacles/Services/Interfaces/web_interface/models/interface_settings.py
+./tentacles/Services/Interfaces/web_interface/models/medias.py
+./tentacles/Services/Interfaces/web_interface/models/strategy_optimizer.py
+./tentacles/Services/Interfaces/web_interface/models/community.py
+./tentacles/Services/Interfaces/web_interface/models/web_interface_tab.py
+./tentacles/Services/Interfaces/web_interface/models/tentacles.py
+./tentacles/Services/Interfaces/web_interface/models/commands.py
+./tentacles/Services/Interfaces/web_interface/models/__init__.py
+./tentacles/Services/Interfaces/web_interface/models/logs.py
+./tentacles/Services/Interfaces/web_interface/models/json_schemas.py
+./tentacles/Services/Interfaces/web_interface/models/configuration.py
+./tentacles/Services/Interfaces/web_interface/api/dsl.py
+./tentacles/Services/Interfaces/web_interface/api/user_commands.py
+./tentacles/Services/Interfaces/web_interface/api/trading.py
+./tentacles/Services/Interfaces/web_interface/api/metadata.py
+./tentacles/Services/Interfaces/web_interface/api/webhook.py
+./tentacles/Services/Interfaces/web_interface/api/config.py
+./tentacles/Services/Interfaces/web_interface/api/exchanges.py
+./tentacles/Services/Interfaces/web_interface/api/tentacles_packages.py
+./tentacles/Services/Interfaces/web_interface/api/feedback.py
+./tentacles/Services/Interfaces/web_interface/api/__init__.py
+./tentacles/Services/Interfaces/web_interface/api/bots.py
+./tentacles/Services/Interfaces/web_interface/tests/plugin_tester.py
+./tentacles/Services/Interfaces/web_interface/tests/distributions/test_default.py
+./tentacles/Services/Interfaces/web_interface/tests/distributions/__init__.py
+./tentacles/Services/Interfaces/web_interface/tests/distributions/test_market_making.py
+./tentacles/Services/Interfaces/web_interface/tests/distribution_tester.py
+./tentacles/Services/Interfaces/web_interface/tests/__init__.py
+./tentacles/Services/Interfaces/web_interface/util/browser_util.py
+./tentacles/Services/Interfaces/web_interface/util/flask_util.py
+./tentacles/Services/Interfaces/web_interface/util/__init__.py
+./tentacles/Services/Interfaces/web_interface/websockets/dashboard.py
+./tentacles/Services/Interfaces/web_interface/websockets/data_collector.py
+./tentacles/Services/Interfaces/web_interface/websockets/backtesting.py
+./tentacles/Services/Interfaces/web_interface/websockets/strategy_optimizer.py
+./tentacles/Services/Interfaces/web_interface/websockets/abstract_websocket_namespace_notifier.py
+./tentacles/Services/Interfaces/web_interface/websockets/notifications.py
+./tentacles/Services/Interfaces/web_interface/websockets/__init__.py
+./tentacles/Services/Interfaces/web_interface/login/open_source_package_required.py
+./tentacles/Services/Interfaces/web_interface/login/user.py
+./tentacles/Services/Interfaces/web_interface/login/web_login_manager.py
+./tentacles/Services/Interfaces/web_interface/login/__init__.py
+./tentacles/Services/Interfaces/web_interface/controllers/dashboard.py
+./tentacles/Services/Interfaces/web_interface/controllers/robots.py
+./tentacles/Services/Interfaces/web_interface/controllers/welcome.py
+./tentacles/Services/Interfaces/web_interface/controllers/about.py
+./tentacles/Services/Interfaces/web_interface/controllers/dsl.py
+./tentacles/Services/Interfaces/web_interface/controllers/trading.py
+./tentacles/Services/Interfaces/web_interface/controllers/automation.py
+./tentacles/Services/Interfaces/web_interface/controllers/backtesting.py
+./tentacles/Services/Interfaces/web_interface/controllers/profiles.py
+./tentacles/Services/Interfaces/web_interface/controllers/distributions/market_making/dashboard.py
+./tentacles/Services/Interfaces/web_interface/controllers/distributions/market_making/cloud.py
+./tentacles/Services/Interfaces/web_interface/controllers/distributions/market_making/__init__.py
+./tentacles/Services/Interfaces/web_interface/controllers/distributions/market_making/configuration.py
+./tentacles/Services/Interfaces/web_interface/controllers/distributions/__init__.py
+./tentacles/Services/Interfaces/web_interface/controllers/interface_settings.py
+./tentacles/Services/Interfaces/web_interface/controllers/medias.py
+./tentacles/Services/Interfaces/web_interface/controllers/portfolio.py
+./tentacles/Services/Interfaces/web_interface/controllers/community.py
+./tentacles/Services/Interfaces/web_interface/controllers/octobot_help.py
+./tentacles/Services/Interfaces/web_interface/controllers/community_authentication.py
+./tentacles/Services/Interfaces/web_interface/controllers/reboot.py
+./tentacles/Services/Interfaces/web_interface/controllers/tentacles_config.py
+./tentacles/Services/Interfaces/web_interface/controllers/home.py
+./tentacles/Services/Interfaces/web_interface/controllers/terms.py
+./tentacles/Services/Interfaces/web_interface/controllers/commands.py
+./tentacles/Services/Interfaces/web_interface/controllers/octobot_authentication.py
+./tentacles/Services/Interfaces/web_interface/controllers/__init__.py
+./tentacles/Services/Interfaces/web_interface/controllers/logs.py
+./tentacles/Services/Interfaces/web_interface/controllers/errors.py
+./tentacles/Services/Interfaces/web_interface/controllers/configuration.py
+./tentacles/Services/Interfaces/web_interface/flask_util/browsing_data_provider.py
+./tentacles/Services/Interfaces/web_interface/flask_util/file_services.py
+./tentacles/Services/Interfaces/web_interface/flask_util/template_filters.py
+./tentacles/Services/Interfaces/web_interface/flask_util/context_processor.py
+./tentacles/Services/Interfaces/web_interface/flask_util/content_types_management.py
+./tentacles/Services/Interfaces/web_interface/flask_util/cors.py
+./tentacles/Services/Interfaces/web_interface/flask_util/json_provider.py
+./tentacles/Services/Interfaces/web_interface/flask_util/__init__.py
+./tentacles/Services/Interfaces/web_interface/security.py
+./tentacles/Services/Interfaces/web_interface/advanced_controllers/tentacles_management.py
+./tentacles/Services/Interfaces/web_interface/advanced_controllers/matrix.py
+./tentacles/Services/Interfaces/web_interface/advanced_controllers/strategy_optimizer.py
+./tentacles/Services/Interfaces/web_interface/advanced_controllers/home.py
+./tentacles/Services/Interfaces/web_interface/advanced_controllers/__init__.py
+./tentacles/Services/Interfaces/web_interface/advanced_controllers/configuration.py
+./tentacles/Services/Interfaces/web_interface/enums.py
+./tentacles/Services/Interfaces/web_interface/__init__.py
+./tentacles/Services/Interfaces/web_interface/errors.py
+./tentacles/Services/Interfaces/telegram_bot_interface/tests/test_bot_interface.py
+./tentacles/Services/Interfaces/telegram_bot_interface/telegram_bot.py
+./tentacles/Services/Interfaces/telegram_bot_interface/__init__.py
+./tentacles/Services/Interfaces/__init__.py
+./tentacles/Services/Services_feeds/google_service_feed/google_feed.py
+./tentacles/Services/Services_feeds/google_service_feed/__init__.py
+./tentacles/Services/Services_feeds/twitter_service_feed/twitter_feed.py
+./tentacles/Services/Services_feeds/twitter_service_feed/__init__.py
+./tentacles/Services/Services_feeds/telegram_api_service_feed/telegram_api_feed.py
+./tentacles/Services/Services_feeds/telegram_api_service_feed/__init__.py
+./tentacles/Services/Services_feeds/telegram_service_feed/telegram_feed.py
+./tentacles/Services/Services_feeds/telegram_service_feed/__init__.py
+./tentacles/Services/Services_feeds/reddit_service_feed/reddit_feed.py
+./tentacles/Services/Services_feeds/reddit_service_feed/__init__.py
+./tentacles/Services/Services_feeds/trading_view_service_feed/trading_view_feed.py
+./tentacles/Services/Services_feeds/trading_view_service_feed/__init__.py
+./tentacles/Services/Services_feeds/__init__.py
+./tentacles/Services/__init__.py
+./tentacles/Trading/Exchange/htx/htx_exchange.py
+./tentacles/Trading/Exchange/htx/__init__.py
+./tentacles/Trading/Exchange/binance_websocket_feed/tests/__init__.py
+./tentacles/Trading/Exchange/binance_websocket_feed/tests/test_unauthenticated_mocked_feeds.py
+./tentacles/Trading/Exchange/binance_websocket_feed/binance_websocket.py
+./tentacles/Trading/Exchange/binance_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/poloniex/tests/__init__.py
+./tentacles/Trading/Exchange/poloniex/poloniex_exchange.py
+./tentacles/Trading/Exchange/poloniex/__init__.py
+./tentacles/Trading/Exchange/bitso/tests/__init__.py
+./tentacles/Trading/Exchange/bitso/bitso_exchange.py
+./tentacles/Trading/Exchange/bitso/__init__.py
+./tentacles/Trading/Exchange/hyperliquid_websocket_feed/hyperliquid_websocket.py
+./tentacles/Trading/Exchange/hyperliquid_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/hollaex_autofilled_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/hollaex_autofilled_websocket_feed/hollaex_autofilled_websocket.py
+./tentacles/Trading/Exchange/bitstamp/bitstamp_exchange.py
+./tentacles/Trading/Exchange/bitstamp/tests/__init__.py
+./tentacles/Trading/Exchange/bitstamp/__init__.py
+./tentacles/Trading/Exchange/mexc_websocket_feed/mexc_websocket.py
+./tentacles/Trading/Exchange/mexc_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/coinbase_pro/coinbase_pro_exchange.py
+./tentacles/Trading/Exchange/coinbase_pro/__init__.py
+./tentacles/Trading/Exchange/huobi_websocket_feed/huobi_websocket.py
+./tentacles/Trading/Exchange/huobi_websocket_feed/tests/__init__.py
+./tentacles/Trading/Exchange/huobi_websocket_feed/tests/test_unauthenticated_mocked_feeds.py
+./tentacles/Trading/Exchange/huobi_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/hollaex_websocket_feed/hollaex_websocket.py
+./tentacles/Trading/Exchange/hollaex_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/polymarket_websocket_feed/polymarket_websocket.py
+./tentacles/Trading/Exchange/polymarket_websocket_feed/tests/__init__.py
+./tentacles/Trading/Exchange/polymarket_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/bitmex/tests/__init__.py
+./tentacles/Trading/Exchange/bitmex/bitmex_exchange.py
+./tentacles/Trading/Exchange/bitmex/__init__.py
+./tentacles/Trading/Exchange/kraken_websocket_feed/tests/__init__.py
+./tentacles/Trading/Exchange/kraken_websocket_feed/tests/test_unauthenticated_mocked_feeds.py
+./tentacles/Trading/Exchange/kraken_websocket_feed/kraken_websocket.py
+./tentacles/Trading/Exchange/kraken_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/okxus_websocket_feed/okxus_websocket.py
+./tentacles/Trading/Exchange/okxus_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/kraken/tests/__init__.py
+./tentacles/Trading/Exchange/kraken/kraken_exchange.py
+./tentacles/Trading/Exchange/kraken/__init__.py
+./tentacles/Trading/Exchange/coinex/coinex_exchange.py
+./tentacles/Trading/Exchange/coinex/__init__.py
+./tentacles/Trading/Exchange/okcoin/tests/__init__.py
+./tentacles/Trading/Exchange/okcoin/okcoin_exchange.py
+./tentacles/Trading/Exchange/okcoin/__init__.py
+./tentacles/Trading/Exchange/hitbtc/tests/__init__.py
+./tentacles/Trading/Exchange/hitbtc/hitbtc_exchange.py
+./tentacles/Trading/Exchange/hitbtc/__init__.py
+./tentacles/Trading/Exchange/binance/tests/test_sandbox.py
+./tentacles/Trading/Exchange/binance/tests/__init__.py
+./tentacles/Trading/Exchange/binance/binance_exchange.py
+./tentacles/Trading/Exchange/binance/__init__.py
+./tentacles/Trading/Exchange/cryptocom/cryptocom_exchange.py
+./tentacles/Trading/Exchange/cryptocom/__init__.py
+./tentacles/Trading/Exchange/kucoin_websocket_feed/tests/__init__.py
+./tentacles/Trading/Exchange/kucoin_websocket_feed/tests/test_unauthenticated_mocked_feeds.py
+./tentacles/Trading/Exchange/kucoin_websocket_feed/kucoin_websocket.py
+./tentacles/Trading/Exchange/kucoin_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/okx_websocket_feed/tests/__init__.py
+./tentacles/Trading/Exchange/okx_websocket_feed/tests/test_unauthenticated_mocked_feeds.py
+./tentacles/Trading/Exchange/okx_websocket_feed/okx_websocket.py
+./tentacles/Trading/Exchange/okx_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/upbitexchange/tests/__init__.py
+./tentacles/Trading/Exchange/upbitexchange/upbit_exchange.py
+./tentacles/Trading/Exchange/upbitexchange/__init__.py
+./tentacles/Trading/Exchange/bithumb/tests/__init__.py
+./tentacles/Trading/Exchange/bithumb/bithumb_exchange.py
+./tentacles/Trading/Exchange/bithumb/__init__.py
+./tentacles/Trading/Exchange/coinbase_websocket_feed/coinbase_websocket.py
+./tentacles/Trading/Exchange/coinbase_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/bybit_websocket_feed/bybit_websocket.py
+./tentacles/Trading/Exchange/bybit_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/gateio/gateio_exchange.py
+./tentacles/Trading/Exchange/gateio/__init__.py
+./tentacles/Trading/Exchange/hollaex_autofilled/tests/__init__.py
+./tentacles/Trading/Exchange/hollaex_autofilled/hollaex_autofilled_exchange.py
+./tentacles/Trading/Exchange/hollaex_autofilled/__init__.py
+./tentacles/Trading/Exchange/okx/tests/__init__.py
+./tentacles/Trading/Exchange/okx/__init__.py
+./tentacles/Trading/Exchange/okx/okx_exchange.py
+./tentacles/Trading/Exchange/mexc/mexc_exchange.py
+./tentacles/Trading/Exchange/mexc/__init__.py
+./tentacles/Trading/Exchange/bingx_websocket_feed/bingx_websocket.py
+./tentacles/Trading/Exchange/bingx_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/polymarket/tests/__init__.py
+./tentacles/Trading/Exchange/polymarket/script/download.py
+./tentacles/Trading/Exchange/polymarket/script/__init__.py
+./tentacles/Trading/Exchange/polymarket/polymarket_exchange.py
+./tentacles/Trading/Exchange/polymarket/ccxt/polymarket_async.py
+./tentacles/Trading/Exchange/polymarket/ccxt/polymarket_abstract.py
+./tentacles/Trading/Exchange/polymarket/ccxt/polymarket_pro.py
+./tentacles/Trading/Exchange/polymarket/ccxt/__init__.py
+./tentacles/Trading/Exchange/polymarket/ccxt/polymarket_sync.py
+./tentacles/Trading/Exchange/polymarket/__init__.py
+./tentacles/Trading/Exchange/coinbase_pro_websocket_feed/tests/__init__.py
+./tentacles/Trading/Exchange/coinbase_pro_websocket_feed/tests/test_unauthenticated_mocked_feeds.py
+./tentacles/Trading/Exchange/coinbase_pro_websocket_feed/coinbase_pro_websocket.py
+./tentacles/Trading/Exchange/coinbase_pro_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/myokx/__init__.py
+./tentacles/Trading/Exchange/myokx/myokx_exchange.py
+./tentacles/Trading/Exchange/cryptocom_websocket_feed/cryptocom_websocket.py
+./tentacles/Trading/Exchange/cryptocom_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/bingx/bingx_exchange.py
+./tentacles/Trading/Exchange/bingx/tests/__init__.py
+./tentacles/Trading/Exchange/bingx/__init__.py
+./tentacles/Trading/Exchange/okxus/okxus_exchange.py
+./tentacles/Trading/Exchange/okxus/__init__.py
+./tentacles/Trading/Exchange/myokx_websocket_feed/myokx_websocket.py
+./tentacles/Trading/Exchange/myokx_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/coinex_websocket_feed/coinex_websocket.py
+./tentacles/Trading/Exchange/coinex_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/kucoin/kucoin_exchange.py
+./tentacles/Trading/Exchange/kucoin/__init__.py
+./tentacles/Trading/Exchange/wavesexchange/tests/__init__.py
+./tentacles/Trading/Exchange/wavesexchange/wavesexchange_exchange.py
+./tentacles/Trading/Exchange/wavesexchange/__init__.py
+./tentacles/Trading/Exchange/phemex_websocket_feed/tests/__init__.py
+./tentacles/Trading/Exchange/phemex_websocket_feed/phemex_websocket.py
+./tentacles/Trading/Exchange/phemex_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/bitmart_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/bitmart_websocket_feed/bitmart_websocket.py
+./tentacles/Trading/Exchange/bitget_websocket_feed/bitget_websocket.py
+./tentacles/Trading/Exchange/bitget_websocket_feed/tests/__init__.py
+./tentacles/Trading/Exchange/bitget_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/gateio_websocket_feed/tests/__init__.py
+./tentacles/Trading/Exchange/gateio_websocket_feed/tests/test_unauthenticated_mocked_feeds.py
+./tentacles/Trading/Exchange/gateio_websocket_feed/gateio_websocket.py
+./tentacles/Trading/Exchange/gateio_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/ascendex/__init__.py
+./tentacles/Trading/Exchange/ascendex/ascendex_exchange.py
+./tentacles/Trading/Exchange/ndax/tests/__init__.py
+./tentacles/Trading/Exchange/ndax/ndax_exchange.py
+./tentacles/Trading/Exchange/ndax/__init__.py
+./tentacles/Trading/Exchange/bitfinex/bitfinex_exchange.py
+./tentacles/Trading/Exchange/bitfinex/__init__.py
+./tentacles/Trading/Exchange/bitmart/bitmart_exchange.py
+./tentacles/Trading/Exchange/bitmart/__init__.py
+./tentacles/Trading/Exchange/hollaex/tests/__init__.py
+./tentacles/Trading/Exchange/hollaex/__init__.py
+./tentacles/Trading/Exchange/hollaex/hollaex_exchange.py
+./tentacles/Trading/Exchange/binanceus/tests/__init__.py
+./tentacles/Trading/Exchange/binanceus/binanceus_exchange.py
+./tentacles/Trading/Exchange/binanceus/__init__.py
+./tentacles/Trading/Exchange/ascendex_websocket_feed/tests/__init__.py
+./tentacles/Trading/Exchange/ascendex_websocket_feed/tests/test_unauthenticated_mocked_feeds.py
+./tentacles/Trading/Exchange/ascendex_websocket_feed/ascendex_websocket.py
+./tentacles/Trading/Exchange/ascendex_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/bitget/tests/__init__.py
+./tentacles/Trading/Exchange/bitget/__init__.py
+./tentacles/Trading/Exchange/bitget/bitget_exchange.py
+./tentacles/Trading/Exchange/__init__.py
+./tentacles/Trading/Exchange/coinbase/coinbase_exchange.py
+./tentacles/Trading/Exchange/coinbase/__init__.py
+./tentacles/Trading/Exchange/phemex/tests/__init__.py
+./tentacles/Trading/Exchange/phemex/__init__.py
+./tentacles/Trading/Exchange/phemex/phemex_exchange.py
+./tentacles/Trading/Exchange/binanceus_websocket_feed/tests/__init__.py
+./tentacles/Trading/Exchange/binanceus_websocket_feed/tests/test_unauthenticated_mocked_feeds.py
+./tentacles/Trading/Exchange/binanceus_websocket_feed/binanceus_websocket.py
+./tentacles/Trading/Exchange/binanceus_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/hyperliquid/hyperliquid_exchange.py
+./tentacles/Trading/Exchange/hyperliquid/tests/__init__.py
+./tentacles/Trading/Exchange/hyperliquid/__init__.py
+./tentacles/Trading/Exchange/huobi/huobi_exchange.py
+./tentacles/Trading/Exchange/huobi/__init__.py
+./tentacles/Trading/Exchange/configurable_default_ccxt_rest/__init__.py
+./tentacles/Trading/Exchange/configurable_default_ccxt_rest/configurable_default_rest_ccxt_exchange.py
+./tentacles/Trading/Exchange/htx_websocket_feed/htx_websocket.py
+./tentacles/Trading/Exchange/htx_websocket_feed/__init__.py
+./tentacles/Trading/Exchange/bybit/tests/__init__.py
+./tentacles/Trading/Exchange/bybit/bybit_exchange.py
+./tentacles/Trading/Exchange/bybit/__init__.py
+./tentacles/Trading/Exchange/bitfinex_websocket_feed/bitfinex_websocket.py
+./tentacles/Trading/Exchange/bitfinex_websocket_feed/tests/__init__.py
+./tentacles/Trading/Exchange/bitfinex_websocket_feed/tests/test_unauthenticated_mocked_feeds.py
+./tentacles/Trading/Exchange/bitfinex_websocket_feed/__init__.py
+./tentacles/Trading/Mode/dip_analyser_trading_mode/tests/__init__.py
+./tentacles/Trading/Mode/dip_analyser_trading_mode/tests/test_dip_analyser_trading_mode.py
+./tentacles/Trading/Mode/dip_analyser_trading_mode/dip_analyser_trading.py
+./tentacles/Trading/Mode/dip_analyser_trading_mode/__init__.py
+./tentacles/Trading/Mode/blank_trading_mode/blank_trading.py
+./tentacles/Trading/Mode/blank_trading_mode/__init__.py
+./tentacles/Trading/Mode/market_making_trading_mode/tests/test_order_book_distribution.py
+./tentacles/Trading/Mode/market_making_trading_mode/tests/test_market_making_trading.py
+./tentacles/Trading/Mode/market_making_trading_mode/tests/__init__.py
+./tentacles/Trading/Mode/market_making_trading_mode/reference_price.py
+./tentacles/Trading/Mode/market_making_trading_mode/order_book_distribution.py
+./tentacles/Trading/Mode/market_making_trading_mode/market_making_trading.py
+./tentacles/Trading/Mode/market_making_trading_mode/__init__.py
+./tentacles/Trading/Mode/signal_trading_mode/__init__.py
+./tentacles/Trading/Mode/signal_trading_mode/signal_trading.py
+./tentacles/Trading/Mode/grid_trading_mode/tests/open_orders_data.py
+./tentacles/Trading/Mode/grid_trading_mode/tests/test_grid_trading_mode.py
+./tentacles/Trading/Mode/grid_trading_mode/tests/__init__.py
+./tentacles/Trading/Mode/grid_trading_mode/grid_trading.py
+./tentacles/Trading/Mode/grid_trading_mode/__init__.py
+./tentacles/Trading/Mode/remote_trading_signals_trading_mode/tests/test_remote_trading_signals_trading_producer.py
+./tentacles/Trading/Mode/remote_trading_signals_trading_mode/tests/test_remote_trading_signals_trading_consumer.py
+./tentacles/Trading/Mode/remote_trading_signals_trading_mode/tests/__init__.py
+./tentacles/Trading/Mode/remote_trading_signals_trading_mode/remote_trading_signals_trading.py
+./tentacles/Trading/Mode/remote_trading_signals_trading_mode/__init__.py
+./tentacles/Trading/Mode/daily_trading_mode/tests/test_daily_trading_mode_consumer.py
+./tentacles/Trading/Mode/daily_trading_mode/tests/test_daily_trading_mode.py
+./tentacles/Trading/Mode/daily_trading_mode/tests/test_daily_trading_mode_producer.py
+./tentacles/Trading/Mode/daily_trading_mode/tests/__init__.py
+./tentacles/Trading/Mode/daily_trading_mode/daily_trading.py
+./tentacles/Trading/Mode/daily_trading_mode/__init__.py
+./tentacles/Trading/Mode/arbitrage_trading_mode/arbitrage_container.py
+./tentacles/Trading/Mode/arbitrage_trading_mode/tests/test_arbitrage_trading_mode_producer.py
+./tentacles/Trading/Mode/arbitrage_trading_mode/tests/test_arbitrage_container.py
+./tentacles/Trading/Mode/arbitrage_trading_mode/tests/test_arbitrage_trading_mode_consumer.py
+./tentacles/Trading/Mode/arbitrage_trading_mode/tests/__init__.py
+./tentacles/Trading/Mode/arbitrage_trading_mode/arbitrage_trading.py
+./tentacles/Trading/Mode/arbitrage_trading_mode/__init__.py
+./tentacles/Trading/Mode/dca_trading_mode/dca_trading.py
+./tentacles/Trading/Mode/dca_trading_mode/tests/test_dca_trading_mode.py
+./tentacles/Trading/Mode/dca_trading_mode/tests/__init__.py
+./tentacles/Trading/Mode/dca_trading_mode/__init__.py
+./tentacles/Trading/Mode/staggered_orders_trading_mode/tests/test_staggered_orders_trading_mode.py
+./tentacles/Trading/Mode/staggered_orders_trading_mode/tests/__init__.py
+./tentacles/Trading/Mode/staggered_orders_trading_mode/__init__.py
+./tentacles/Trading/Mode/staggered_orders_trading_mode/staggered_orders_trading.py
+./tentacles/Trading/Mode/index_trading_mode/tests/test_index_trading_mode.py
+./tentacles/Trading/Mode/index_trading_mode/tests/__init__.py
+./tentacles/Trading/Mode/index_trading_mode/tests/test_index_distribution.py
+./tentacles/Trading/Mode/index_trading_mode/index_distribution.py
+./tentacles/Trading/Mode/index_trading_mode/__init__.py
+./tentacles/Trading/Mode/index_trading_mode/index_trading.py
+./tentacles/Trading/Mode/trading_view_signals_trading_mode/tests/test_trading_view_signals_trading.py
+./tentacles/Trading/Mode/trading_view_signals_trading_mode/tests/__init__.py
+./tentacles/Trading/Mode/trading_view_signals_trading_mode/__init__.py
+./tentacles/Trading/Mode/trading_view_signals_trading_mode/trading_view_signals_trading.py
+./tentacles/Trading/Mode/__init__.py
+./tentacles/Trading/__init__.py
+./tentacles/Automation/actions/send_notification_action/send_notification.py
+./tentacles/Automation/actions/send_notification_action/__init__.py
+./tentacles/Automation/actions/stop_trading_action/stop_trading.py
+./tentacles/Automation/actions/stop_trading_action/__init__.py
+./tentacles/Automation/actions/cancel_open_order_action/__init__.py
+./tentacles/Automation/actions/cancel_open_order_action/cancel_open_orders.py
+./tentacles/Automation/actions/sell_all_currencies_action/sell_all_currencies.py
+./tentacles/Automation/actions/sell_all_currencies_action/__init__.py
+./tentacles/Automation/actions/__init__.py
+./tentacles/Automation/conditions/no_condition_condition/__init__.py
+./tentacles/Automation/conditions/no_condition_condition/no_condition.py
+./tentacles/Automation/conditions/scripted_condition/scripted_condition.py
+./tentacles/Automation/conditions/scripted_condition/__init__.py
+./tentacles/Automation/conditions/__init__.py
+./tentacles/Automation/trigger_events/period_check_event/period_check.py
+./tentacles/Automation/trigger_events/period_check_event/__init__.py
+./tentacles/Automation/trigger_events/profitability_threshold_event/profitability_threshold.py
+./tentacles/Automation/trigger_events/profitability_threshold_event/__init__.py
+./tentacles/Automation/trigger_events/price_threshold_event/price_threshold.py
+./tentacles/Automation/trigger_events/price_threshold_event/__init__.py
+./tentacles/Automation/trigger_events/__init__.py
+./tentacles/Automation/__init__.py
+./tentacles/Meta/Keywords/scripting_library/constants.py
+./tentacles/Meta/Keywords/scripting_library/tests/configuration/test_profile_data_configuration.py
+./tentacles/Meta/Keywords/scripting_library/tests/configuration/test_indexes_configuration.py
+./tentacles/Meta/Keywords/scripting_library/tests/configuration/__init__.py
+./tentacles/Meta/Keywords/scripting_library/tests/exchanges/__init__.py
+./tentacles/Meta/Keywords/scripting_library/tests/orders/order_types/test_market_order.py
+./tentacles/Meta/Keywords/scripting_library/tests/orders/order_types/test_stop_loss_order.py
+./tentacles/Meta/Keywords/scripting_library/tests/orders/order_types/test_trailing_limit_order.py
+./tentacles/Meta/Keywords/scripting_library/tests/orders/order_types/test_trailing_stop_loss_order.py
+./tentacles/Meta/Keywords/scripting_library/tests/orders/order_types/test_create_order.py
+./tentacles/Meta/Keywords/scripting_library/tests/orders/order_types/test_trailing_market_order.py
+./tentacles/Meta/Keywords/scripting_library/tests/orders/order_types/test_multiple_orders_creation.py
+./tentacles/Meta/Keywords/scripting_library/tests/orders/order_types/test_limit_order.py
+./tentacles/Meta/Keywords/scripting_library/tests/orders/order_types/__init__.py
+./tentacles/Meta/Keywords/scripting_library/tests/orders/position_size/test_target_position.py
+./tentacles/Meta/Keywords/scripting_library/tests/orders/position_size/__init__.py
+./tentacles/Meta/Keywords/scripting_library/tests/orders/__init__.py
+./tentacles/Meta/Keywords/scripting_library/tests/orders/test_cancelling.py
+./tentacles/Meta/Keywords/scripting_library/tests/test_utils/order_util.py
+./tentacles/Meta/Keywords/scripting_library/tests/test_utils/__init__.py
+./tentacles/Meta/Keywords/scripting_library/tests/__init__.py
+./tentacles/Meta/Keywords/scripting_library/tests/backtesting/test_run_data.py
+./tentacles/Meta/Keywords/scripting_library/tests/backtesting/test_backtesting_data_collector.py
+./tentacles/Meta/Keywords/scripting_library/tests/backtesting/test_collect_data_and_run_backtesting.py
+./tentacles/Meta/Keywords/scripting_library/tests/backtesting/data_store.py
+./tentacles/Meta/Keywords/scripting_library/tests/backtesting/__init__.py
+./tentacles/Meta/Keywords/scripting_library/configuration/profile_data_configuration.py
+./tentacles/Meta/Keywords/scripting_library/configuration/tentacles_configuration.py
+./tentacles/Meta/Keywords/scripting_library/configuration/indexes_configuration.py
+./tentacles/Meta/Keywords/scripting_library/configuration/__init__.py
+./tentacles/Meta/Keywords/scripting_library/configuration/exchanges_configuration.py
+./tentacles/Meta/Keywords/scripting_library/exchanges/local_exchange.py
+./tentacles/Meta/Keywords/scripting_library/exchanges/__init__.py
+./tentacles/Meta/Keywords/scripting_library/orders/grouping.py
+./tentacles/Meta/Keywords/scripting_library/orders/editing.py
+./tentacles/Meta/Keywords/scripting_library/orders/open_orders.py
+./tentacles/Meta/Keywords/scripting_library/orders/mocks.py
+./tentacles/Meta/Keywords/scripting_library/orders/cancelling.py
+./tentacles/Meta/Keywords/scripting_library/orders/waiting.py
+./tentacles/Meta/Keywords/scripting_library/orders/order_types/create_order.py
+./tentacles/Meta/Keywords/scripting_library/orders/order_types/trailing_limit_order.py
+./tentacles/Meta/Keywords/scripting_library/orders/order_types/market_order.py
+./tentacles/Meta/Keywords/scripting_library/orders/order_types/stop_loss_order.py
+./tentacles/Meta/Keywords/scripting_library/orders/order_types/trailing_market_order.py
+./tentacles/Meta/Keywords/scripting_library/orders/order_types/trailing_stop_loss_order.py
+./tentacles/Meta/Keywords/scripting_library/orders/order_types/scaled_order.py
+./tentacles/Meta/Keywords/scripting_library/orders/order_types/limit_order.py
+./tentacles/Meta/Keywords/scripting_library/orders/order_types/__init__.py
+./tentacles/Meta/Keywords/scripting_library/orders/position_size/target_position.py
+./tentacles/Meta/Keywords/scripting_library/orders/position_size/amount.py
+./tentacles/Meta/Keywords/scripting_library/orders/position_size/__init__.py
+./tentacles/Meta/Keywords/scripting_library/orders/order_tags.py
+./tentacles/Meta/Keywords/scripting_library/orders/__init__.py
+./tentacles/Meta/Keywords/scripting_library/orders/chaining.py
+./tentacles/Meta/Keywords/scripting_library/alerts/notifications.py
+./tentacles/Meta/Keywords/scripting_library/alerts/__init__.py
+./tentacles/Meta/Keywords/scripting_library/settings/script_settings.py
+./tentacles/Meta/Keywords/scripting_library/settings/__init__.py
+./tentacles/Meta/Keywords/scripting_library/TA/trigger/eval_triggered.py
+./tentacles/Meta/Keywords/scripting_library/TA/trigger/__init__.py
+./tentacles/Meta/Keywords/scripting_library/TA/__init__.py
+./tentacles/Meta/Keywords/scripting_library/UI/inputs/select_candle.py
+./tentacles/Meta/Keywords/scripting_library/UI/inputs/select_time_frame.py
+./tentacles/Meta/Keywords/scripting_library/UI/inputs/select_history.py
+./tentacles/Meta/Keywords/scripting_library/UI/inputs/triggers.py
+./tentacles/Meta/Keywords/scripting_library/UI/inputs/library_user_inputs.py
+./tentacles/Meta/Keywords/scripting_library/UI/inputs/__init__.py
+./tentacles/Meta/Keywords/scripting_library/UI/plots/displayed_elements.py
+./tentacles/Meta/Keywords/scripting_library/UI/plots/__init__.py
+./tentacles/Meta/Keywords/scripting_library/UI/__init__.py
+./tentacles/Meta/Keywords/scripting_library/data/reading/exchange_public_data.py
+./tentacles/Meta/Keywords/scripting_library/data/reading/trading_settings.py
+./tentacles/Meta/Keywords/scripting_library/data/reading/metadata_reader.py
+./tentacles/Meta/Keywords/scripting_library/data/reading/exchange_private_data/open_positions.py
+./tentacles/Meta/Keywords/scripting_library/data/reading/exchange_private_data/__init__.py
+./tentacles/Meta/Keywords/scripting_library/data/reading/__init__.py
+./tentacles/Meta/Keywords/scripting_library/data/writing/portfolio.py
+./tentacles/Meta/Keywords/scripting_library/data/writing/plotting.py
+./tentacles/Meta/Keywords/scripting_library/data/writing/__init__.py
+./tentacles/Meta/Keywords/scripting_library/data/__init__.py
+./tentacles/Meta/Keywords/scripting_library/__init__.py
+./tentacles/Meta/Keywords/scripting_library/errors.py
+./tentacles/Meta/Keywords/scripting_library/backtesting/run_data_analysis.py
+./tentacles/Meta/Keywords/scripting_library/backtesting/metadata.py
+./tentacles/Meta/Keywords/scripting_library/backtesting/backtesting_settings.py
+./tentacles/Meta/Keywords/scripting_library/backtesting/backtesting_data_collector.py
+./tentacles/Meta/Keywords/scripting_library/backtesting/backtesting_intialization.py
+./tentacles/Meta/Keywords/scripting_library/backtesting/default_backtesting_run_analysis_script.py
+./tentacles/Meta/Keywords/scripting_library/backtesting/backtesting_data_selector.py
+./tentacles/Meta/Keywords/scripting_library/backtesting/__init__.py
+./tentacles/Meta/Keywords/__init__.py
+./tentacles/Meta/__init__.py
+./tentacles/Meta/DSL_operators/ta_operators/tulipy_technical_analysis_operators.py
+./tentacles/Meta/DSL_operators/ta_operators/tests/test_tulipy_technical_analysis_operators.py
+./tentacles/Meta/DSL_operators/ta_operators/tests/test_docs_examples.py
+./tentacles/Meta/DSL_operators/ta_operators/ta_operator.py
+./tentacles/Meta/DSL_operators/ta_operators/__init__.py
+./tentacles/Meta/DSL_operators/exchange_operators/exchange_operator.py
+./tentacles/Meta/DSL_operators/exchange_operators/tests/test_mocks.py
+./tentacles/Meta/DSL_operators/exchange_operators/tests/exchange_public_data_operators/test_ohlcv_operators.py
+./tentacles/Meta/DSL_operators/exchange_operators/tests/__init__.py
+./tentacles/Meta/DSL_operators/exchange_operators/exchange_public_data_operators/ohlcv_operators.py
+./tentacles/Meta/DSL_operators/exchange_operators/exchange_public_data_operators/__init__.py
+./tentacles/Meta/DSL_operators/exchange_operators/exchange_private_data_operators/portfolio_operators.py
+./tentacles/Meta/DSL_operators/exchange_operators/exchange_private_data_operators/__init__.py
+./tentacles/Meta/DSL_operators/exchange_operators/__init__.py
+./tentacles/Meta/DSL_operators/python_std_operators/base_subscripting_operators.py
+./tentacles/Meta/DSL_operators/python_std_operators/tests/test_dictionnaries.py
+./tentacles/Meta/DSL_operators/python_std_operators/tests/test_base_operators.py
+./tentacles/Meta/DSL_operators/python_std_operators/base_call_operators.py
+./tentacles/Meta/DSL_operators/python_std_operators/base_iterable_operators.py
+./tentacles/Meta/DSL_operators/python_std_operators/base_name_operators.py
+./tentacles/Meta/DSL_operators/python_std_operators/base_binary_operators.py
+./tentacles/Meta/DSL_operators/python_std_operators/base_compare_operators.py
+./tentacles/Meta/DSL_operators/python_std_operators/base_nary_operators.py
+./tentacles/Meta/DSL_operators/python_std_operators/__init__.py
+./tentacles/Meta/DSL_operators/python_std_operators/base_expression_operators.py
+./tentacles/Meta/DSL_operators/python_std_operators/base_unary_operators.py
+./tentacles/Meta/DSL_operators/__init__.py
+./tentacles/Evaluator/RealTime/instant_fluctuations_evaluator/instant_fluctuations.py
+./tentacles/Evaluator/RealTime/instant_fluctuations_evaluator/__init__.py
+./tentacles/Evaluator/RealTime/__init__.py
+./tentacles/Evaluator/Strategies/mixed_strategies_evaluator/tests/test_technical_analysis_strategy_evaluator.py
+./tentacles/Evaluator/Strategies/mixed_strategies_evaluator/tests/__init__.py
+./tentacles/Evaluator/Strategies/mixed_strategies_evaluator/tests/test_simple_strategy_evaluator.py
+./tentacles/Evaluator/Strategies/mixed_strategies_evaluator/__init__.py
+./tentacles/Evaluator/Strategies/mixed_strategies_evaluator/mixed_strategies.py
+./tentacles/Evaluator/Strategies/move_signals_strategy_evaluator/tests/test_move_signals_strategy_evaluator.py
+./tentacles/Evaluator/Strategies/move_signals_strategy_evaluator/tests/__init__.py
+./tentacles/Evaluator/Strategies/move_signals_strategy_evaluator/move_signals_strategy.py
+./tentacles/Evaluator/Strategies/move_signals_strategy_evaluator/__init__.py
+./tentacles/Evaluator/Strategies/blank_strategy_evaluator/blank_strategy.py
+./tentacles/Evaluator/Strategies/blank_strategy_evaluator/__init__.py
+./tentacles/Evaluator/Strategies/dip_analyser_strategy_evaluator/tests/test_dip_analyser_strategy_evaluator.py
+./tentacles/Evaluator/Strategies/dip_analyser_strategy_evaluator/tests/__init__.py
+./tentacles/Evaluator/Strategies/dip_analyser_strategy_evaluator/dip_analyser_strategy.py
+./tentacles/Evaluator/Strategies/dip_analyser_strategy_evaluator/__init__.py
+./tentacles/Evaluator/Strategies/__init__.py
+./tentacles/Evaluator/Social/news_evaluator/news.py
+./tentacles/Evaluator/Social/news_evaluator/__init__.py
+./tentacles/Evaluator/Social/trends_evaluator/trends.py
+./tentacles/Evaluator/Social/trends_evaluator/__init__.py
+./tentacles/Evaluator/Social/forum_evaluator/forum.py
+./tentacles/Evaluator/Social/forum_evaluator/__init__.py
+./tentacles/Evaluator/Social/signal_evaluator/tests/test_telegram_channel_signal_evaluator.py
+./tentacles/Evaluator/Social/signal_evaluator/tests/__init__.py
+./tentacles/Evaluator/Social/signal_evaluator/__init__.py
+./tentacles/Evaluator/Social/signal_evaluator/signal.py
+./tentacles/Evaluator/Social/__init__.py
+./tentacles/Evaluator/TA/ai_evaluator/tests/test_ai.py
+./tentacles/Evaluator/TA/ai_evaluator/ai.py
+./tentacles/Evaluator/TA/ai_evaluator/__init__.py
+./tentacles/Evaluator/TA/momentum_evaluator/tests/test_klinger_TA_evaluator.py
+./tentacles/Evaluator/TA/momentum_evaluator/tests/test_macd_TA_evaluator.py
+./tentacles/Evaluator/TA/momentum_evaluator/tests/test_rsi_TA_evaluator.py
+./tentacles/Evaluator/TA/momentum_evaluator/tests/test_adx_momentum_evaluator.py
+./tentacles/Evaluator/TA/momentum_evaluator/tests/test_bollinger_bands_momentum_TA_evaluator.py
+./tentacles/Evaluator/TA/momentum_evaluator/tests/__init__.py
+./tentacles/Evaluator/TA/momentum_evaluator/momentum.py
+./tentacles/Evaluator/TA/momentum_evaluator/__init__.py
+./tentacles/Evaluator/TA/volatility_evaluator/volatility.py
+./tentacles/Evaluator/TA/volatility_evaluator/__init__.py
+./tentacles/Evaluator/TA/trend_evaluator/tests/test_double_moving_averages_TA_evaluator.py
+./tentacles/Evaluator/TA/trend_evaluator/tests/__init__.py
+./tentacles/Evaluator/TA/trend_evaluator/trend.py
+./tentacles/Evaluator/TA/trend_evaluator/__init__.py
+./tentacles/Evaluator/TA/__init__.py
+./tentacles/Evaluator/Util/pattern_analysis/pattern_analysis.py
+./tentacles/Evaluator/Util/pattern_analysis/__init__.py
+./tentacles/Evaluator/Util/statistics_analysis/statistics_analysis.py
+./tentacles/Evaluator/Util/statistics_analysis/__init__.py
+./tentacles/Evaluator/Util/overall_state_analysis/overall_state_analysis.py
+./tentacles/Evaluator/Util/overall_state_analysis/__init__.py
+./tentacles/Evaluator/Util/text_analysis/text_analysis.py
+./tentacles/Evaluator/Util/text_analysis/__init__.py
+./tentacles/Evaluator/Util/trend_analysis/trend_analysis.py
+./tentacles/Evaluator/Util/trend_analysis/__init__.py
+./tentacles/Evaluator/Util/__init__.py
+./tentacles/Evaluator/Util/candles_util/tests/test_candles_util.py
+./tentacles/Evaluator/Util/candles_util/candles_util.py
+./tentacles/Evaluator/Util/candles_util/__init__.py
+./tentacles/Evaluator/__init__.py
+./tentacles/__init__.py
+
+
+## All Documentation
+### docs/00_overview.md
+# 00_overview.md
+# OctoBot × AI × Notion × Aave 自動運用システム 概要
+
+## プロジェクト目的
+ニュースURLをNotionに貼るだけで  
+AIが判断し、ロボット（OctoBot）が自動で運用し、  
+Aaveで資産を最適化する「完全自動の金融運用システム」を構築する。
+
+## 完成イメージ
+1. ユーザーが Notion にニュースURLを貼る  
+2. AIがニュース内容を解析し、買い/売り/様子見を判断  
+3. OctoBot へシグナルを送る  
+4. Aaveの預け入れ・引き出し比率を自動調整  
+5. システムが止まったらLINE通知  
+6. 毎日AIが自動レポート生成  
+7. 管理画面から全体を確認できる
+
+## 主な構成要素
+- Notion API（入力）
+- AI（OpenAI）
+- OctoBot（売買ロジック）
+- Aave（資産運用）
+- 自動化機能（監視、通知、レポート）
+- 管理画面（Web UI）
+
+## 非エンジニア向け説明
+Notionに貼られたニュースを、AIが読んで判断し、  
+ロボットが自動で投資運用をしてくれる「自動金融ロボット」です。
+---
+
+### docs/01_requirements.md
+# 01_requirements.md
+# 要件定義（Requirements）
+
+## 機能要件
+
+### 1. 情報入力（Notion）
+- ニュースURLをNotionに貼ると自動で取得する
+- AI判断の結果をNotionに書き戻す
+
+### 2. AI判断
+- ニュース本文を取得・解析
+- BUY / SELL / HOLD を決定
+- 信頼度スコア（0〜100）付与
+- 判定根拠の要約
+
+### 3. OctoBot連携
+- AI判断を外部シグナルとして送信
+- OctoBotが判断に従って戦略を選択可能にする
+
+### 4. Aave自動運用
+- BUY → 預け入れ増加
+- SELL → 引き出し処理
+- HOLD → 何もしない
+- 安全性チェック（LTV、残高）
+
+### 5. 自動化・保守性
+- データ自動バックアップ
+- 24時間監視
+- 障害時にLINE通知
+- 日次レポート自動生成
+
+### 6. 管理画面
+- AI判断履歴
+- 運用実績
+- Aave残高
+- エラーログ
+
+## 非機能要件
+- 安定稼働
+- エラー耐性
+- コード可読性
+- セキュリティ（秘密鍵管理）
+
+## 優先度
+- P1：Notion→AI判断→OctoBot→Aave の基本連携
+- P2：自動化（監視・通知）
+- P3：管理画面
+- P4：高度分析・最適化
+---
+
+### docs/02_phase_plan.md
+# 02_phase_plan.md  
+Ultra AutoTrade – フェーズ計画（DoD 追加版）
+
+---
+
+# Week1：Notion → AI → OctoBot → Aave（基本連携）
+
+### ✔ 完了条件（Definition of Done）
+- Notion APIで最低1件取得  
+- AI APIレスポンス < 5秒  
+- BUY/SELL/HOLD の基本判定成功  
+- OctoBot へシグナル送信成功  
+- Aaveテストネットで deposit/withdraw 成功  
+
+---
+
+# Week1.5：シミュレーション・バックテスト
+
+### ✔ 完了条件
+- 過去ニュース10件で精度80%以上  
+- 誤判定の原因メモ  
+- しきい値最適化の反映  
+
+---
+
+# Week2：自動化・安定化
+
+### ✔ 完了条件
+- 監視＆アラート動作確認  
+- レポート自動生成成功  
+- 全フロー成功率95%以上  
+
+※ 実装マッピング（Phase5）  
+- 監視＆アラート: `MonitoringService` + Aave/OctoBot 連携  
+- レポート自動生成: `ReportingService` による日次/週次サマリー  
+- 通知インターフェース: `notifications/*` で NotificationMessage / Sender 抽象化  
+- 緊急停止時の安全動作: Aave 側での NOOP 保証（ヘルスファクター/緊急停止フラグ連携）
+---
+
+### docs/03_directory_structure.md
+# 03_directory_structure.md
+# ディレクトリ構成
+
+Ultra AutoTrade プロジェクト全体のディレクトリ構成と、  
+各ディレクトリ／ファイルの役割をまとめる。
+
+---
+
+project root/
+├── backend/
+│   ├── app/
+│   │   ├── main.py                 # FastAPI エントリーポイント（create_app, ルータマウント）
+│   │   ├── ai/                     # AI解析ロジック（Phase2 以降）
+│   │   │   ├── __init__.py         # AI モジュールパッケージマーカー
+│   │   │   ├── schemas.py          # AIAnalysisRequest/Response, AIAnalysisResult, TradeAction など
+│   │   │   ├── service.py          # ニュース文から BUY/SELL/HOLD を決定するサービス層
+│   │   │   └── router.py           # POST /ai/analyze エンドポイント
+│   │   ├── notion/                 # Notion 連携モジュール（Phase1）
+│   │   │   ├── __init__.py         # Notion 連携パッケージマーカー
+│   │   │   ├── config.py           # Notion API 設定（環境変数読み取り）
+│   │   │   ├── client.py           # Notion API クライアント（HTTP 通信）
+│   │   │   ├── service.py          # Notion レコード取得・内部モデル変換サービス層
+│   │   │   ├── schemas.py          # NotionNewsItem / NotionIngestResponse スキーマ
+│   │   │   └── router.py           # POST /notion/ingest エンドポイント定義
+│   │   ├── bots/                   # OctoBot 連携モジュール（Phase3）
+│   │   │   ├── __init__.py         # パッケージマーカー
+│   │   │   ├── config.py           # OctoBot API のエンドポイント/キー/タイムアウト設定
+│   │   │   ├── schemas.py          # /octobot/signal 用の Request/Response スキーマ
+│   │   │   ├── client.py           # OctoBot 外部シグナル API クライアント
+│   │   │   ├── service.py          # AIAnalysisResult → シグナル生成・送信ロジック
+│   │   │   └── router.py           # POST /octobot/signal エンドポイント
+│   │   ├── aave/                   # Aave 運用ロジック（別フェーズで実装）
+│   │   │   ├── __init__.py         # Aave パッケージマーカー
+│   │   │   ├── config.py           # Aave 設定（環境変数ラッパー、最大ポジション/クールダウンなど）
+│   │   │   ├── client.py           # Aave クライアント（DummyAaveClient など）
+│   │   │   ├── service.py          # TradeAction → AaveOperation 変換サービス層
+│   │   │   ├── schemas.py          # AaveRebalanceRequest/Response, AaveOperationResult など
+│   │   │   ├── router.py           # /aave/rebalance エンドポイント定義
+│   │   ├── automation/             # 自動化・監視・レポート用モジュール（Phase5）
+│   │   │   ├── __init__.py         # automation パッケージマーカー
+│   │   │   ├── schemas.py          # MonitoringEvent / AutomationStatus / 
+│   │   │   ├── monitoring_service.py # 死活監視・緊急停止ロジック本体
+│   │   │   ├── reporting_service.py # 日次/週次サマリーレポート集計ロジック
+│   │   │   ├── backup_service.py   # 日次/週次サマリーレポート集計ロジック
+│   │   │   ├── emergency_report_service.py # 日次/週次サマリーレポート集計ロジック
+│   │   │   ├── jobs.py             # 日次/週次サマリーレポート集計ロジック
+│   │   │   └── state.py            # MonitoringService の共有インスタンス管理
+│   │   ├── notifications/          # 通知系（LINE, Slack など）サービス
+│   │   │   ├── __init__.py         # notifications パッケージマーカー
+│   │   │   ├── schemas.py          # NotificationMessage / NotificationChannel / Severity など 
+│   │   │   ├── service.py.         # NotificationSender / CompositeNotificationService 実装
+│   │   │   └── factory.py          # get_notification_service() ファクトリ
+│   │   └── utils/
+│   │       ├── __init__.py         # 共通ユーティリティパッケージマーカー
+│   │       └── config.py           # /aave/rebalance エンドポイント定義
+│   ├── tests/
+│   │   ├── conftest.py             # テスト共通設定（app インポート・環境変数など）
+│   │   ├── test_notion_client.py   # Notion API クライアントのユニットテスト
+│   │   ├── test_notion_router.py   # /notion/ingest API のテスト
+│   │   ├── test_ai_service.py      # AI 判定ロジック（BUY/SELL/HOLD, 信頼度レンジ）のユニットテスト
+│   │   ├── test_ai_router.py       # /ai/analyze API のテスト
+│   │   ├── test_octobot_client.py  # OctoBotクライアントのユニットテスト
+│   │   ├── test_octobot_service.py # OctoBotサービス（安全弁・レート制限）のテスト
+│   │   ├── test_octobot_router.py  # /octobot/signal API のテスト
+│   │   ├── test_smoke.py           # バックエンド全体のスモークテスト
+│   │   ├── test_aave_service.py    # AaveService のユニットテスト（Dummy/Fake クライアント）
+│   │   ├── test_aave_router.py     # /aave/rebalance の API テスト
+│   │   ├── test_flow_with_aave_stub.py # AI → OctoBot → Aave 統合テストの雛形（現状 skip）
+│   │   ├── test_automation_monitoring.py # MonitoringService と AaveService 連携テスト
+│   │   ├── test_automation_emergency_integration.py # サマリーレポート集計ロジックのテスト
+│   │   ├── test_automation_reporting.py # 通知サービス（Logging/Composite）のテスト
+│   │   ├── test_notifications_service.py # 通知インターフェースのユニットテスト
+│   │   ├── test_automation_reporting_notifications.py # サマリ→NotificationMessage 変換のテスト
+│   │   ├── test_automation_backup_service.py # BackupService の集約ロジックテスト
+│   │   ├── test_automation_emergency_report_service.py # 緊急レポート生成ロジックのテスト
+│   │   └── test_automation_jobs.py # 日次/週次ジョブIFのテスト
+│   └── requirements.txt            # backend 依存パッケージ一覧
+│
+├── frontend/
+│   ├── pages/                      # 画面ルーティング（Next.js 等を想定）
+│   ├── components/                 # UI コンポーネント
+│   └── api/                        # フロントエンド側 API 呼び出しラッパ
+│
+├── docs/
+│   ├── 00_overview.md              # プロジェクト全体概要
+│   ├── 01_requirements.md          # 要求仕様・非機能要件
+│   ├── 02_phase_plan.md            # フェーズ別開発計画
+│   ├── 03_directory_structure.md   # 本ファイル（ディレクトリ構成）
+│   ├── 04_api_design.md            # Backend API 設計 (/notion/ingest, /ai/analyze, /octobot/signal, /aave/...)
+│   ├── 05_ai_judgement_rules.md    # AI 判定ルール（BUY/SELL/HOLD 条件 等）
+│   ├── 06_octobot_signal_flow.md   # OctoBot 連携フローとシグナル構造
+│   ├── 07_aave_operation_logic.md  # Aave 運用ロジック・リスク管理
+│   ├── 08_automation_rules.md      # 自動化・監視・アラートルール
+│   ├── 09_notion_schema.md         # Notion DB スキーマと内部モデル対応
+│   ├── 10_next_phase_prompt_generator.md # 次フェーズ用プロンプト生成ルール
+│   ├── 11_prompt_sync_rules.md     # GPT プロンプト同期ルール
+│   ├── 12_phase_operations.md      # フェーズ運用ルール・進め方
+│   ├── 13_security_design.md       # セキュリティ設計
+│   ├── 14_test_strategy.md         # テスト戦略
+│   └── 15_rollback_procedures.md   # ロールバック手順
+│
+├── scripts/
+│   ├── backup.sh                   # バックアップスクリプト
+│   ├── monitor.sh                  # 死活監視・メトリクス監視スクリプト
+│   ├── zip_phase2_seed.sh          # Phase2 用 seed ファイル ZIP 生成
+│   ├── zip_phase3_seed.sh          # Phase3 用 seed ファイル ZIP 生成
+│   └── deploy_staging_backend.sh   # staging 環境へのバックエンドデプロイスクリプト
+│
+├── Dockerfile                      # FastAPI バックエンドのコンテナ定義
+├── docker-compose.staging.yml.     # staging 環境向け docker-compose 設定
+├── infra/
+│   └──  systemd/
+│       └── ultra-autotrade-backend.service # systemd 用バックエンドサービス定義（テンプレート）
+│
+└── README.md                       # プロジェクト概要・セットアップ手順
+
+---
+
+### docs/04_api_design.md
+# 04_api_design.md
+# API設計書
+
+## API一覧
+
+### 1. /notion/ingest
+Notionから「未処理(Status: 未処理)」のニュースレコードを取得し、  
+AI解析フェーズ（/ai/analyze）へ渡すためのデータ構造で返す。
+
+- Method: POST
+- Path: `/notion/ingest`
+- 認証: （Phase1時点では未実装 / 今後追加予定）
+- 用途: Notion → AI の入口となるAPI
+
+### 2. /ai/analyze
+
+ニュースを解析し、売買アクション（BUY / SELL / HOLD）と信頼度などを返す。
+
+- Method: POST
+- Path: `/ai/analyze`
+- 認証: （Phase2時点では未実装 / 今後追加予定）
+- 用途: Notion から取得したニュース（`NotionNewsItem`）を AI に渡し、売買判定を得るための API
+
+#### リクエスト
+
+- Content-Type: `application/json`
+- Body スキーマ: `AIAnalysisRequest`
+
+```json
+{
+  "items": [
+    {
+      "id": "page-1",
+      "url": "https://example.com/news1",
+      "summary": "The company reported record profit and strong growth.",
+      "sentiment": null,
+      "action": null,
+      "confidence": null,
+      "status": "未処理",
+      "timestamp": null
+    }
+  ]
+}
+
+フィールド	型	説明
+items	NotionNewsItem[]	解析対象ニュースの配列。/notion/ingest と同じ形式
+NotionNewsItem の詳細な定義は docs/09_notion_schema.md を参照。
+通常は /notion/ingest のレスポンスの items をそのまま渡す。
+レスポンス（200 OK）
+Body スキーマ: AIAnalysisResponse
+
+{
+  "results": [
+    {
+      "id": "page-1",
+      "url": "https://example.com/news1",
+      "action": "BUY",
+      "confidence": 80,
+      "sentiment": "positive",
+      "summary": "The company reported record profit and strong growth.",
+      "reason": "好材料が多く、市場にポジティブな影響が見込まれるため BUY 判定としました。",
+      "timestamp": "2025-12-07T08:09:35.007682Z"
+    }
+  ],
+  "count": 1
+}
+
+| フィールド   | 型                  | 説明                            |
+| ------- | ------------------ | ----------------------------- |
+| results | AIAnalysisResult[] | 各ニュースに対する AI 判定結果の配列          |
+| count   | integer            | `results` の件数（`len(results)`） |
+
+##### `AIAnalysisResult` スキーマ
+
+| フィールド      | 型               | 説明                                                    |
+| ---------- | --------------- | ----------------------------------------------------- |
+| id         | string          | 入力 `NotionNewsItem.id` をそのまま引き継ぐ                      |
+| url        | string          | 対象ニュースの URL                                           |
+| action     | string          | `BUY` / `SELL` / `HOLD` のいずれか                         |
+| confidence | integer         | 信頼度スコア（0〜100）。閾値は `docs/05_ai_judgement_rules.md` を参照 |
+| sentiment  | string          | ニュース全体のセンチメント（例: `positive` / `negative` / `neutral`） |
+| summary    | string          | ニュース内容の要約（入力 summary を補正またはそのまま利用）                    |
+| reason     | string          | 当該アクションになった理由の短い説明（日本語）                               |
+| timestamp  | string(ISO8601) | 判定実施時刻（UTC, 例: `2025-12-07T08:09:35.007682Z`）         |
+
+#### エラーレスポンス（概要）
+
+* 422 Unprocessable Entity
+
+  * 条件: リクエスト JSON がスキーマと一致しない場合（必須項目の欠落、型不一致など）
+  * 例: `items` が配列でない / `id` が string でない 等
+
+* 500 Internal Server Error
+
+  * 条件: AIService 内での予期しない例外（LLM 呼び出し失敗、想定外のエラーなど）
+  * 備考: Phase2 実装では、内部例外は FastAPI の例外ハンドリングを通じて 500 として返却される。
+
+````
+
+---
+
+## 2. `docs/03_directory_structure.md` 修正案
+
+### 対象
+
+- ファイル: `docs/03_directory_structure.md`
+- セクション: `backend/app/` 配下のツリーのうち `ai/` 行
+
+### 修正方針（概要）
+
+- 実際に実装された `backend/app/ai/` 配下のファイル構成を明示。
+- AI モジュールの責務が一目で分かるようにする。
+
+### 具体的な修正文案
+
+> 既存の `│ │ ├── ai/                     # AI解析ロジック（Phase2以降）` を、以下のブロックに置き換え
+
+```markdown
+project root/
+├── backend/
+│ ├── app/
+│ │ ├── main.py                 # FastAPIエントリーポイント
+│ │ ├── ai/                     # AI解析ロジック（Phase2）
+│ │ │ ├── __init__.py           # AIモジュールパッケージマーカー
+│ │ │ ├── schemas.py            # AIAnalysisRequest/Response, AIAnalysisResult, TradeAction 定義
+│ │ │ ├── service.py            # LLM呼び出し＋ルールベース判定ロジック（BUY/SELL/HOLD 判定）
+│ │ │ └── router.py             # /ai/analyze エンドポイント定義
+│ │ ├── notion/                 # Notion連携モジュール（Phase1）
+│ │ │ ├── __init__.py           # Notion連携パッケージマーカー
+│ │ │ ├── config.py             # Notion API設定（環境変数読み取り）
+│ │ │ ├── client.py             # Notion APIクライアント（HTTP通信）
+│ │ │ ├── service.py            # Notionレコード取得・内部モデル変換サービス層
+│ │ │ ├── schemas.py            # NotionNewsItem / NotionIngestResponse スキーマ
+│ │ │ └── router.py             # /notion/ingest エンドポイント定義
+
+### 3. /octobot/signal
+
+AI が出した判定結果（AIAnalysisResult相当）をもとに、OctoBot 外部シグナルAPIへ送るための窓口。
+
+- Method: `POST`
+- Path: `/octobot/signal`
+
+#### 3.1 Request
+
+```json
+{
+  "signals": [
+    {
+      "id": "string",              // シグナルの一意なID（NotionレコードIDなど）
+      "url": "string | null",      // ニュースURL（任意）
+      "action": "BUY | SELL | HOLD",
+      "confidence": 85,            // 0〜100
+      "reason": "string",          // なぜそのアクションになったか
+      "timestamp": "2025-01-01T00:00:00Z"
+    }
+  ],
+  "count": 1                        // signals配列の件数（整合チェック用）
+}
+count と signals.length が一致しない場合、400 Bad Request。
+
+3.2 Response
+
+{
+  "success_count": 1,              // OctoBotヘの送信成功件数
+  "skipped_count": 0,              // 安全弁によりスキップされた件数
+  "failed_count": 0,               // 送信エラー件数
+  "details": [
+    {
+      "id": "string",
+      "status": "sent | skipped | failed",
+      "message": "string | null"   // エラー内容やスキップ理由
+    }
+  ]
+}
+
+- 200: リクエスト自体は正常に処理された（success/skipped/failed の内訳は details 参照）。
+- 400: count と signals.length が不整合など、クライアント入力エラー。
+- 500: サーバ内部エラー（OctoBot APIのエラーなど詳細はログで追跡）。
+
+### 4. /aave/rebalance
+AI または OctoBot シグナルからの `BUY/SELL/HOLD` アクションを受け取り、  
+Aave 上のポジションを `deposit/withdraw/NOOP` で調整する。
+
+- Method: POST
+- Path: `/aave/rebalance`
+- 認証: （Phase4 時点では未実装 / 今後追加予定）
+- 用途:
+  - BUY → deposit
+  - SELL → withdraw
+  - HOLD → 何もしない（NOOP）
+  - リスク制御（ヘルスファクター・最大ポジション・クールダウン）を満たさない場合は NOOP
+
+#### Request Body: `AaveRebalanceRequest`
+
+```json
+{
+  "action": "BUY" | "SELL" | "HOLD",
+  "amount": "10.0",
+  "asset_symbol": "USDC",   // 省略時は設定のデフォルト資産（例: USDC）
+  "dry_run": false          // true の場合は実トランザクション送信無し
+}
+
+- action: TradeAction と同じ意味（BUY/SELL/HOLD）
+- amount: 0 より大きい数値。上限はサーバ側で AAVE_MAX_SINGLE_TRADE_USD にクリップされる
+- asset_symbol: 任意。省略時は AAVE_DEFAULT_ASSET_SYMBOL
+- dry_run: true の場合、Aave には送信せず「実行した場合の結果」を返す
+
+Response Body: AaveRebalanceResponse
+{
+  "result": {
+    "operation": "DEPOSIT" | "WITHDRAW" | "NOOP",
+    "status": "success" | "skipped" | "error",
+    "asset_symbol": "USDC",
+    "amount": "10.0",
+    "tx_hash": "0x....",          // NOOP と dry_run では null
+    "message": "human readable",
+    "before_health_factor": "2.0",
+    "after_health_factor": "2.0"
+  }
+}
+
+エラーレスポンス
+- 400: amount <= 0 など、入力値の異常
+- 422: Pydantic でのバリデーションエラー
+- 500: サービス層の予期しない例外
+
+
+---
+
+### 3. `docs/07_aave_operation_logic.md`
+
+**更新対象セクション案**
+
+- `# 1. 基本行動` の後に **「3. Phase4 実装ルール」** を追加
+
+**修正案テキスト（追記）**
+
+```md
+# 3. Phase4 実装ルール（/aave/rebalance）
+
+Phase4 では、Aave 運用ロジックを以下のルールで実装した：
+
+- BUY → 基本は `DEPOSIT`
+  - ただし、以下の条件のいずれかに該当する場合は **NOOP（skipped）**
+    - ヘルスファクター < `AAVE_MIN_HEALTH_FACTOR`（デフォルト 1.6）
+    - 10分以内にすでにトレードが行われている（クールダウンルール）
+- SELL → `WITHDRAW`
+  - withdraw は「ポジションを減らす」方向なので、BUY より優先的に許可
+- HOLD → 常に `NOOP`
+- 不正な action 値（BUY/SELL/HOLD 以外）はログを残して `NOOP`
+
+### 金額制御
+
+- リクエストの `amount` が 0 以下の場合は 400 エラー
+- `amount > AAVE_MAX_SINGLE_TRADE_USD` の場合は、
+  `AAVE_MAX_SINGLE_TRADE_USD`（デフォルト 100 USD）にクリップして実行する
+
+### クライアントエラー時のポリシー
+
+- Aave クライアントがエラーを返した場合：
+  - `status = "error"` として結果を返す
+  - 実際のポジションは **変更しない**（amount=0 として扱う）
+  - 「ポジションを増やさない」を最優先とし、自動リトライは別レイヤー（監視・運用）で判断する
+
+### 5. /report/daily
+日次レポート生成。
+
+#### リクエスト
+
+- Body: なし（Phase1時点ではリクエストボディ不要）
+- Queryパラメータ: なし（将来、件数制限やページングを追加する余地あり）
+
+#### レスポンス
+
+- HTTP 200 OK
+
+```json
+{
+  "items": [
+    {
+      "id": "ページID",
+      "url": "https://example.com/news",
+      "summary": "ニュースの要約テキスト",
+      "sentiment": "Positive",
+      "action": "BUY",
+      "confidence": 78.0,
+      "status": "未処理",
+      "timestamp": "2025-01-01T12:34:56+00:00"
+    }
+  ],
+  "count": 1
+}
+
+#### レスポンススキーマ
+
+* `items`: NotionNewsItem の配列
+* `count`: `items` の件数（int）
+
+##### NotionNewsItem
+
+| フィールド名     | 型           | 説明                                                    |
+| ---------- | ----------- | ----------------------------------------------------- |
+| id         | string      | NotionページID                                           |
+| url        | string      | ニュースURL（必須／空の場合は内部的にスキップされる）                          |
+| summary    | string|null | ニュース本文の要約（Notionの Summary プロパティ）                      |
+| sentiment  | string|null | Sentiment select の name（例: Positive/Negative/Neutral） |
+| action     | string|null | Action select の name（例: BUY/SELL/HOLD）                |
+| confidence | number|null | 信頼度スコア（0〜100）                                         |
+| status     | string|null | Status select の name（例: 未処理 / 処理済）                    |
+| timestamp  | string|null | Timestamp date の start（ISO8601文字列）                    |
+
+#### エラーレスポンス（概要）
+
+* 502 Bad Gateway
+
+  * 条件: Notion API 呼び出し失敗（ネットワークエラー / 4xx,5xx）
+  * 例: Notion API キー不正、権限不足、タイムアウト など
+
+* 500 Internal Server Error
+
+  * 条件: 上記以外の予期しないエラー
+
+---
+
+## 追加: Automation Dashboard APIs（Phase11 実装済み）
+
+本フェーズ（Phase12）では **契約変更を行わず**、以下の API を UI/Grafana/Runbook と整合させて運用可能にする。
+
+### GET /api/automation/dashboard
+
+- 用途: ダッシュボード用スナップショット（一定期間の集計 + 現在ステータス）
+- Query:
+  - `lookback_hours` (int): 1..24（集計対象期間）
+- Response: `DashboardSnapshot`
+
+### GET /api/automation/status
+
+- 用途: 自動運用基盤のステータスサマリ（緊急停止・HF・直近イベントなど）
+- Response: `AutomationStatus`
+
+### GET /api/automation/reports/latest
+
+- 用途: 直近のサマリレポート（定例確認用）
+- Response: `AutomationReportSummary`
+
+### 備考（契約に関する運用ルール）
+
+- これら 3 API の **レスポンススキーマは backend 側の定義を真実**とする。
+- フロントエンド/Grafana 側は、既知フィールドを表示しつつ、未知フィールドは Raw JSON 表示で吸収する（契約破壊を防ぐ）。
+
+---
+
+### docs/05_ai_judgement_rules.md
+# 05_ai_judgement_rules.md  
+Ultra AutoTrade – AI判定ルール（具体化版）
+
+---
+
+# 1. BUY 判定条件
+
+```
+センチメントスコア > 0.7  
+AI信頼度 > 75  
+ニュースソースランク A以上  
+過去24時間以内にポジティブニュース ≥ 2件  
+直近5件の過去ニュースとの整合性が高い  
+```
+
+---
+
+# 2. SELL 判定条件
+
+```
+センチメントスコア < -0.6  
+価格暴落の兆候（ニュース・流動性低下）  
+AI信頼度 > 70  
+重要ソースからのネガティブ情報  
+```
+
+---
+
+# 3. HOLD 判定
+
+```
+複数ソースの判断が矛盾  
+センチメント -0.3〜0.3 の間  
+AI信頼度 < 60  
+```
+
+---
+
+# 4. 過剰取引防止
+
+```
+1時間以内に同じ判定が3連続 → HOLD
+前回取引から10分以内 → HOLD
+```
+
+---
+
+# 5. 多数記事の集計ロジック
+
+- スコアを重みづけ合計  
+- 信頼度と組み合わせて最終判定  
+
+---
+
+# 6. 判定の最終保証
+
+すべて異常値（信頼度 < 40）の場合 → **HOLD（安全優先）**
+
+---
+
+### docs/06_octobot_signal_flow.md
+# 06_octobot_signal_flow.md
+# OctoBot連携仕様
+
+Ultra AutoTrade における  
+**AI → OctoBot → Aave** のうち、  
+本フェーズで扱う **AI → OctoBot（シグナル連携）** の仕様をまとめる。
+
+---
+
+## 1. シグナル構造（OctoBot 外部API向け・基本形）
+
+OctoBot 外部シグナル API に送信されるペイロードの基本形は次のとおり：
+
+```json
+{
+  "action": "BUY",
+  "confidence": 85,
+  "reason": "Positive market sentiment",
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+````
+
+* `action`
+
+  * BUY / SELL / HOLD
+  * 判定ロジックは `docs/05_ai_judgement_rules.md` に従う。
+* `confidence`
+
+  * 0〜100 の信頼度スコア。
+  * 低すぎる場合は「シグナルを送らない（HOLD扱い）」方向で扱う。
+* `reason`
+
+  * なぜそのアクションになったかの要約テキスト。
+* `timestamp`
+
+  * AI 判定時刻（ISO8601, UTC 推奨）。
+
+---
+
+## 2. コンポーネントと役割
+
+### 2.1 AI モジュール（backend/app/ai）
+
+* `/ai/analyze` エンドポイントを提供。
+* 入力: `NotionNewsItem[]`（/notion/ingest の出力）。
+* 出力: `AIAnalysisResult[]`
+
+  * `id, url, action, confidence, sentiment, summary, reason, timestamp` など。
+
+### 2.2 OctoBot シグナルAPI（backend/app/bots）
+
+* `/octobot/signal` エンドポイントを提供。
+* 入力: `AIAnalysisResult` をベースにしたシグナル配列。
+* 処理:
+
+  * 信頼度しきい値 / 連続トレード制限などの安全弁を適用。
+  * 送信対象と判断されたシグナルのみ OctoBot 外部 API へ送信。
+* 出力:
+
+  * `success_count / skipped_count / failed_count` と、各シグナルのステータス詳細。
+
+### 2.3 OctoBot 外部シグナルAPI
+
+* 本システムからは `bots.client` 経由で HTTP 通信。
+* 受け取ったシグナルを元に、戦略の切り替えやポジション調整を行う。
+
+### 2.4 Aave 運用モジュール（別フェーズ）
+
+* BUY → deposit, SELL → withdraw, HOLD → 何もしない
+  というマッピングは `docs/07_aave_operation_logic.md` に定義。
+* 本ドキュメントでは詳細ロジックには踏み込まず、
+  「OctoBot のシグナルが Aave 操作に最終的に影響する」という前提のみ記載する。
+
+---
+
+## 3. データフロー詳細
+
+### 3.1 Notion → AI
+
+1. `/notion/ingest`
+
+   * Notion DB から `Status = 未処理` のニュースを取得。
+   * `NotionNewsItem[]` としてバックエンドに返す。
+2. `/ai/analyze`
+
+   * `NotionNewsItem[]` を入力として、ニュースごとに AI 判定を実施。
+   * `AIAnalysisResult[]` を返す。
+
+* `signals[*]` は `AIAnalysisResult` 相当。
+* `id`, `url` は内部トレーサビリティ用の情報として扱う。
+
+3. `/octobot/signal` 内部では `bots.service` が以下を行う：
+
+   * 信頼度がしきい値未満のシグナル → 「skipped（送信しない）」判定。
+   * 連続トレード制限・過剰取引ルールに抵触するシグナル → 「skipped」判定。
+     （ルール詳細は `docs/08_automation_rules.md` を参照）
+   * 送信対象になったシグナル → `bots.client` を通じて OctoBot 外部 API に送信。
+
+### 3.2 AI → /octobot/signal
+
+1. クライアント（もしくはバッチ処理）が `/ai/analyze` の結果 `AIAnalysisResult[]` を取得。
+2. `/octobot/signal` に対して、次のようなボディでリクエストを送る：
+
+```json
+{
+  "signals": [
+    {
+      "id": "notion-page-id-1",
+      "url": "https://example.com/news1",
+      "action": "BUY",
+      "confidence": 80,
+      "reason": "ポジティブなニュースが多く、市場全体の上昇トレンドが継続しているため",
+      "timestamp": "2025-12-07T08:09:35.007682Z"
+    }
+  ],
+  "count": 1
+}
+```
+- 200: リクエスト自体は正常に処理された（success/skipped/failed の内訳は details 参照）。
+- 400: count と signals.length が不整合など、クライアント入力エラー。
+- 500: サーバ内部エラー（OctoBot APIのエラーなど詳細はログで追跡）。
+
+
+---
+
+### 1-3. `docs/06_octobot_signal_flow.md`
+
+**更新対象**
+
+- シグナル構造
+- 処理フロー（安全弁の追加）
+
+**修正案**
+
+```md
+## シグナル構造（AI → /octobot/signal）
+
+```json
+{
+  "action": "BUY",
+  "confidence": 85,
+  "reason": "Positive market sentiment",
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+
+※ 実際のリクエストボディでは、これに加えて id, url を含む signals[] 配列として送信する。
+処理フロー
+1. /octobot/signal エンドポイントが AI からの判定結果（signals[]）を受け取る
+2. OctoBotService が以下の安全弁を適用
+- 信頼度しきい値チェック（confidence < min_confidence は SKIPPED）
+- 1時間以内の同一アクション回数チェック（max_same_action_per_hour を超過した分は SKIPPED）
+3. 送信対象のシグナルのみ OctoBot 外部シグナルAPIへ送信
+4. 送信結果を success/skipped/failed に集計し、レスポンスとして返す
+5. 主要なイベント（送信成功/失敗、スキップ理由）はログに記録される想定
+
+
+---
+
+### 1-4. `docs/08_automation_rules.md`
+
+**更新対象アイデア**
+
+- 「過剰取引制御」の項目に、現状実装されているレート制限ルールを明文化。
+
+**追記案（イメージ）**
+
+```md
+### 2. 過剰取引制御（OctoBotシグナル生成側）
+
+- 信頼度しきい値
+  - `confidence < min_confidence` のシグナルは `/octobot/signal` 側で SKIPPED とする。
+- 連続トレード制限（Phase3実装）
+  - 1時間以内に同一アクション（BUY / SELL / HOLD）が `max_same_action_per_hour` 回を超える場合、
+    それ以降のシグナルは `/octobot/signal` 側で SKIPPED とする。
+  - Phase3 のデフォルト値: `max_same_action_per_hour = 3`
+
+### 3.3 /octobot/signal → OctoBot 外部API
+
+* `bots.client` は `config.py` で定義された
+
+  * `OCTOBOT_API_BASE_URL`
+  * `OCTOBOT_API_KEY`
+  * `OCTOBOT_TIMEOUT_SECONDS`
+    を用いて外部 API を呼び出す。
+* OctoBot には、基本形 `{action, confidence, reason, timestamp}` の JSON を POST する。
+* OctoBot 側はこのシグナルをトリガに
+
+  * ストラテジ切り替え
+  * 新規ポジション/クローズ
+    などを行う（詳細は OctoBot 側の戦略設定に依存）。
+
+---
+
+## 4. AIAnalysisResult からシグナルへのマッピング
+
+`AIAnalysisResult` から OctoBot シグナル構造への対応表：
+
+| AIAnalysisResult フィールド | OctoBot シグナル フィールド | 備考                      |
+| ---------------------- | ------------------ | ----------------------- |
+| action                 | action             | BUY / SELL / HOLD       |
+| confidence             | confidence         | 0〜100 のスコアをそのまま利用       |
+| reason                 | reason             | なぜその action になったかの要約    |
+| timestamp              | timestamp          | AI 判定時刻（ISO8601, UTC推奨） |
+| id                     | （内部のみ）             | ログ・トレース用。外部には送られない場合あり  |
+| url                    | （内部のみ）             | デバッグや検証時に参照するための補助情報    |
+
+---
+
+## 5. エラー時の扱い（概要）
+
+### 5.1 安全弁ロジック（送信前）
+
+* 信頼度が内部しきい値未満、または
+  `docs/05_ai_judgement_rules.md` / `docs/08_automation_rules.md` で定義された
+  過剰取引・連続トレード制限に抵触する場合：
+
+  * `/octobot/signal` 内部で「skipped」として扱い、外部 API には送信しない。
+  * レスポンスの `skipped_count` と `details[*].status = "skipped"` に反映する。
+
+### 5.2 外部APIエラー
+
+* OctoBot 外部シグナル API が 4xx/5xx を返却、またはタイムアウトした場合：
+
+  * 対象シグナルは「failed」として扱う。
+  * `/octobot/signal` のレスポンスで
+
+    * `failed_count` のカウント増加
+    * `details[*].status = "failed"`
+    * `details[*].message` にエラー内容（機密情報を含まない要約）を格納。
+  * 具体的なリトライ回数・連続エラー時の停止ルールは
+    `docs/08_automation_rules.md` と `docs/15_rollback_procedures.md` に従って設計・実装する。
+
+### 5.3 致命的エラー
+
+* バックエンド内部で予期しない例外が発生した場合：
+
+  * `/octobot/signal` は 500 系のエラーを返却。
+  * ログにはスタックトレースを記録するが、レスポンスには詳細を含めない。
+  * ロールバック／緊急停止条件は `docs/15_rollback_procedures.md` に従う。
+
+---
+
+## 6. ログと監視
+
+* 送信成功・スキップ・失敗それぞれについて、最低限次の情報をログに残す：
+
+  * シグナル ID（`AIAnalysisResult.id`）
+  * action / confidence
+  * status（sent / skipped / failed）
+  * OctoBot からのレスポンスコード（可能な範囲で）
+* ログを元に、`docs/08_automation_rules.md` で定義された
+
+  * エラー率
+  * 応答時間
+  * 連続エラー回数
+    などの監視指標を集計し、アラート／緊急停止をトリガする。
+
+---
+
+## 7. ステージング環境での OctoBot 接続
+
+本番運用に入る前に、OctoBot との連携は **staging 用 OctoBot インスタンス** を使って検証する。  
+接続情報はすべて「環境変数」経由で設定し、`.env.staging` にのみ保存する。
+
+### 7.1 ステージング用環境変数
+
+OctoBot 関連の設定値は `backend/app/bots/config.py` で  
+次の環境変数から読み込まれる:
+
+| 環境変数名              | 役割                                   | ステージングでの例                          |
+|-------------------------|----------------------------------------|---------------------------------------------|
+| `OCTOBOT_API_BASE_URL`  | OctoBot 外部シグナル API のベースURL   | `https://octobot-staging.example.com/api`  |
+| `OCTOBOT_API_KEY`       | シグナル送信用の API キー              | `octo_test_xxx`                             |
+| `OCTOBOT_TIMEOUT_SECONDS` | HTTP タイムアウト秒数                 | `5`〜`10` 秒程度を推奨                      |
+
+- 本番用の URL / API キーとは **必ず分離** して管理する
+- `.env.staging` は Git 管理外とし、`13_security_design.md` のポリシーに従う
+
+### 7.2 `.env.staging` の設定例（OctoBot）
+
+```bash
+# OctoBot (staging)
+OCTOBOT_API_BASE_URL=https://octobot-staging.example.com/api
+OCTOBOT_API_KEY=octo_test_xxx
+OCTOBOT_TIMEOUT_SECONDS=5
+
+### 7.3 ステージングと本番の切り替え方針
+- ステージング環境：
+ - docker-compose.staging.yml + .env.staging を使用
+ - OCTOBOT_API_BASE_URL は staging OctoBot を指す
+ - API キーも staging 専用のものを使用する
+- 本番環境：
+.env.production など別ファイルを使用し、
+ - OctoBot の Base URL / API キーを本番用に差し替える
+ - staging 用の値を使い回さないこと
+ 
+ステージング環境での疎通確認やシグナルフロー検証は、
+必ず staging OctoBot 接続で完了させてから、本番接続に切り替える。
+---
+
+### docs/07_aave_operation_logic.md
+# 07_aave_operation_logic.md  
+Ultra AutoTrade – Aave運用ロジック（リスク管理追加）
+
+---
+
+# 1. 基本行動
+
+BUY → deposit  
+SELL → withdraw  
+HOLD → 何もしない  
+
+---
+
+# 2. リスク管理（重要）
+
+## 2.1 Health Factor
+```
+HF < 1.8 → 警告  
+HF < 1.6 → 運用停止 + 通知  
+```
+
+## 2.2 投資上限
+```
+1回の投資額：総資金の10%  
+1日の投資上限：総資金の30%
+```
+
+## 2.3 自動停止条件
+- ガスエラー2回連続  
+- Aave応答なし3回  
+- 資産変動 > 20%/日  
+
+---
+
+# 3. ガス管理
+- ガス高騰時は自動待機  
+- 5分後に再実行  
+
+---
+
+# 4. 連続トレード制限
+- 10分以内の連続取引は禁止  
+
+
+---
+
+## 5. ステージング環境（テストネット）での運用ルール
+
+本番運用前に、Aave との連携は **テストネット（staging）** で検証する。  
+Ultra AutoTrade では、Aave 関連の設定値は `backend/app/aave/config.py` から  
+次の環境変数で制御される。
+
+## 5.1 ステージング環境の基本方針
+
+- ステージングでは **テストネットのみ** を使用する
+  - 例: `polygon-mumbai` などのテストネット
+- ウォレットは **テスト用アドレス** を利用し、本番資金とは完全に分離する
+- 取引金額は極小（検証に十分な最小額）に抑える
+- Health Factor / クールダウンなどのリスクパラメータは  
+  本番と同等か、それ以上に保守的な値を設定する
+
+## 5.2 Aave 関連環境変数（抜粋）
+
+`backend/app/aave/config.py` では、次の環境変数を使用する:
+
+| 環境変数名                    | 役割                                        | ステージングの推奨例                          |
+|------------------------------|---------------------------------------------|-----------------------------------------------|
+| `AAVE_NETWORK`               | 利用するネットワーク名                      | `polygon-mumbai` などテストネット名          |
+| `AAVE_RPC_URL`               | 対応ネットワークの RPC エンドポイント      | テストネット RPC の URL                       |
+| `AAVE_DEFAULT_ASSET_SYMBOL`  | デフォルトで扱う資産シンボル               | 例: `USDC`（テストネット上のトークン）        |
+| `AAVE_MAX_SINGLE_TRADE_USD`  | 1 回のトレードで許容する最大 USD 相当額    | 本番よりさらに小さく（例: `1`〜`10` USD）     |
+| `AAVE_MIN_HEALTH_FACTOR`     | 最小許容 Health Factor                      | 本番と同等以上（例: `1.6` など）              |
+| `AAVE_TRADE_COOLDOWN_SECONDS`| 連続トレードのクールダウン秒数             | 本番と同等以上（例: `600` 秒）                |
+
+## 5.3 `.env.staging` の設定例（Aave テストネット）
+
+```bash
+# Aave (staging / testnet)
+AAVE_NETWORK=polygon-mumbai
+AAVE_RPC_URL=https://polygon-mumbai.infura.io/v3/your_project_id
+AAVE_DEFAULT_ASSET_SYMBOL=USDC
+AAVE_MAX_SINGLE_TRADE_USD=5
+AAVE_MIN_HEALTH_FACTOR=1.6
+AAVE_TRADE_COOLDOWN_SECONDS=600
+
+※ 上記はあくまで例であり、実際には利用するテストネット・RPC プロバイダに応じて変更する。
+
+## 5.4 緊急停止フラグ・ロールバックとの関係
+- テストネットであっても、異常挙動が発生した場合は
+  - 緊急停止フラグを立てる（MonitoringService 経由）
+  - 必要に応じて 15_rollback_procedures.md に従いロールバック手順を実施する
+- 本番への移行前に、staging 環境で
+  - 緊急停止フロー
+  - ロールバックフロー
+  - の動作確認を行うことが望ましい。
+---
+
+### docs/08_automation_rules.md
+# 08_automation_rules.md  
+Ultra AutoTrade – 自動化ルール（アラート閾値追加）
+
+---
+
+# 1. 死活監視（1分ごと）
+```
+応答時間 > 10秒 → 警告  
+応答時間 > 30秒 → アラート  
+```
+
+---
+
+# 2. 過剰取引監視
+
+（既存のルールに加えて）
+
+- Aave へのトレード間隔ルール：
+  - 同一ウォレットからの `/aave/rebalance` 実行は **10分に1回まで**
+  - 直近トレードから 10分未満のリクエストは
+    - サービス層で `NOOP (status=skipped)` として処理
+    - ログに「cooldown によりスキップ」と明示的に残す
+
+これにより「AIが暴走して BUY を連打する」ケースでも、  
+Aave 側のポジション増加ペースを機械的に抑制する。
+
+---
+
+# 3. Aave運用監視
+```
+ヘルスファクター < 1.8 → 警告  
+ヘルスファクター < 1.6 → 緊急停止  
+資産変動 > 20%/日 → アラート
+
+# 3.1 緊急停止ルール
+
+- ヘルスファクター < 1.8 → 警告  
+- ヘルスファクター < 1.6 → 緊急停止  
+- 資産変動 > 20%/日 → アラート  
+
+※ Phase5 実装状況  
+- `backend/app/automation/monitoring_service.py` の `MonitoringService` にて、  
+  上記しきい値に基づく `MonitoringEvent` 発行と `is_trading_paused` 制御を実装済み。  
+- `backend/app/aave/service.py` の `AaveService` が `MonitoringService` を参照し、  
+  緊急停止中は BUY/DEPOSIT 系のトレードを NOOP として扱う。  
+```
+
+---
+
+# 4. スケジューラ連携（cron 実行ルール）
+
+本章では、これまでに定義した自動化ルールを、  
+実際のサーバ上でどのようにスケジューラ（cron）に紐付けて実行するかを整理する。
+
+- 実行主体：Linux サーバ上の cron（デプロイユーザ例：`ultra`）
+- 実行対象：`scripts/backup.sh` / `scripts/monitor.sh`
+- 詳細な crontab 設定例は `docs/18_scheduler_and_cron.md` を参照
+
+## 4.1 ジョブとスクリプトの対応関係
+
+自動化ルールと、実際に呼び出すスクリプトの対応は以下の通りとする。
+
+1. **日次監視・レポート（daily）**
+   - 目的：
+     - 過去 1 日分の監視イベント / 取引履歴 / Aave 状態を集計し、
+       `AutomationReportSummary` を生成・通知する。
+   - 実行スクリプト：
+     - `scripts/monitor.sh daily`
+       - 内部で `python -m app.automation.jobs daily` を呼び出す。
+   - 出力：
+     - 通知（LINE / Slack など）
+     - 日次サマリ（`ReportingService` ベース）
+
+2. **週次監視・レポート（weekly）**
+   - 目的：
+     - 過去 1 週間分の状態を集計し、長期的な傾向や異常を確認する。
+   - 実行スクリプト：
+     - `scripts/monitor.sh weekly`
+       - 内部で `python -m app.automation.jobs weekly` を呼び出す。
+   - 出力：
+     - 週次レポート（`ReportPeriod.WEEKLY` 相当）
+     - 通知（必要に応じて）
+
+3. **定期バックアップ（backup-only）**
+   - 目的：
+     - Notion / AI 判定結果 / 取引履歴などを安全なストレージにバックアップする。
+   - 実行スクリプト：
+     - `scripts/backup.sh`
+       - 内部で `python -m app.automation.jobs backup-only` を呼び出す。
+   - 出力：
+     - バックアップファイル、あるいはバックアップ先ストレージへの書き込み
+
+> 補足：  
+> 「死活監視（1分ごと）」などの短周期ヘルスチェックは、  
+> 外部監視サービス（例：Ping / Uptime 系）や、単純な `curl /health` ベースの cron ジョブで実装してよい。  
+> その具体例は `18_scheduler_and_cron.md` で示す。
+
+## 4.2 推奨スケジュール（論理レベル）
+
+Ultra AutoTrade の論理的な日次 / 週次サイクルは、**Asia/Tokyo タイムゾーン** を基準とする。
+
+- **日次監視・レポート**
+  - 実行タイミング：毎日 00:30（前日分を集計）
+  - 対象期間：前日 00:00:00〜23:59:59（UTC 換算は実装側が吸収）
+- **週次監視・レポート**
+  - 実行タイミング：毎週 月曜日 01:00
+  - 対象期間：前週 月曜〜日曜の 7 日間
+- **定期バックアップ**
+  - 実行タイミング：毎日 00:00
+  - 対象：直近状態のバックアップ
+
+サーバ OS のタイムゾーンが UTC の場合、  
+cron の時間指定は **UTC ベース** となるため、  
+Asia/Tokyo と合わせる場合は +9 時間を考慮して設定すること。
+
+## 4.3 環境ごとのジョブ有効化方針
+
+- **ローカル開発環境**
+  - 通常は cron による自動実行は行わず、必要に応じて手動実行のみとする。
+  - 開発時に動作確認をしたい場合、直接 `scripts/backup.sh` / `scripts/monitor.sh` を叩く。
+
+- **staging 環境**
+  - Phase7 時点で、以下のジョブを有効化することを想定する：
+    - 毎日 00:00: `scripts/backup.sh`
+    - 毎日 00:30: `scripts/monitor.sh daily`
+    - 毎週 月曜 01:00: `scripts/monitor.sh weekly`
+  - 初期運用では、ログ監視・通知内容の確認を目的とし、閾値や頻度は保守的に設定する。
+
+- **production 環境**
+  - 本番フェーズで別途検討・有効化する。
+  - 基本的なスケジュールは staging と同一だが、
+    - 通知先
+    - エラー時のエスカレーション
+    などは本番用の運用ルールに従う。
+
+## 4.4 失敗時の扱いとリトライ
+
+- `scripts/backup.sh` / `scripts/monitor.sh` は `set -euo pipefail` により、
+  途中でエラーが発生した場合は **非ゼロステータスで異常終了** する。
+- cron 実行では、ジョブが失敗しても **次回スケジュールで自然に再試行される** ことを前提とする。
+- 連続失敗や重大なエラーは、
+  - ログ監視
+  - `MonitoringService` / 通知サービス
+  により検知し、人間オペレータが介入できるようにする。
+
+cron の具体的な書式（`crontab -e` に書く 1 行ごとの設定例）は、  
+`docs/18_scheduler_and_cron.md` に記載する。
+
+---
+
+# 5. 緊急時のAIレポート
+- 異常検知時、AI/ルールベースロジックが状況説明レポートを生成  
+- レポート内容：
+  - 対象期間（daily / weekly）
+  - イベント件数（info / warning / alert / critical / emergency）
+  - ヘルスファクターの最小値・最大値・直近値
+  - 直近の重要イベント（EMERGENCY / CRITICAL / ALERT 優先）
+  - 補足ノート（人手 or AI からのコメント欄）
+
+- 実装：
+  - `backend/app/automation/emergency_report_service.py` の `EmergencyReportService` が、
+    `AutomationReportSummary` と `MonitoringEvent[]` から `EmergencyReport`（title / body）を生成する。
+  - 生成されたレポートは、通知（LINE / Slack）や Notion レポートページに再利用できるテキスト形式。
+  - 現時点ではテンプレートベースの自然言語生成とし、将来的に LLM へ差し替え可能な構造とする。
+
+> ※ Phase6 で `AutomationReportSummary` → 自然言語レポート生成ロジック (`EmergencyReportService`) まで実装済み。
+
+# 6. 監視メトリクス一覧
+
+本節では、Ultra AutoTrade で監視対象とするメトリクスを一覧化する。  
+実際の集計・保存方法（Prometheus / ログ集計ツール / 独自 DB など）は実装に委ねるが、  
+**「何をどの閾値で見るか」** は本ドキュメントを基準とする。
+
+## 6.1 メトリクス一覧（論理定義）
+
+| カテゴリ                   | メトリクスID                       | 説明                                                                 | 種別      | 正常レンジ / 目安                           | ALERT / EMERGENCY との関係                          |
+|----------------------------|------------------------------------|----------------------------------------------------------------------|-----------|----------------------------------------------|-----------------------------------------------------|
+| 死活・レイテンシ           | `backend_http_latency_p95_ms`      | `/health` など代表的な HTTP エンドポイントの p95 レイテンシ（ミリ秒） | gauge     | < 1,000ms                                   | > 10,000ms が一定時間継続で WARNING, > 30,000ms で ALERT（#1 死活監視と同じ） |
+| 死活・エラー率             | `backend_http_error_rate_1m`       | HTTP リクエストの 1 分あたりエラー率（5xx / 全体）                  | gauge     | < 1%                                       | 連続 5 分間で > 5% なら ALERT                       |
+| フロー成功率               | `news_pipeline_success_rate_1h`    | Notion → AI → OctoBot → Aave の 1 時間あたり成功率                   | gauge     | ≥ 95%                                      | < 90% が続く場合は ALERT                            |
+| フロー異常件数             | `news_pipeline_error_count_1h`     | 上記フロー内でのエラー件数（例外・タイムアウトなど）                 | counter   | 0〜少数                                    | 急増（前時間比 X 倍）した場合に WARNING / ALERT     |
+| 取引頻度（信号側）         | `signals_per_10min`                | OctoBot から受信したシグナル数（10分あたり）                         | counter   | 通常レンジは運用実績ベース                  | 異常に多い場合は「2. 過剰取引監視」のルールに基づき WARNING / ALERT |
+| 取引頻度（実行側）         | `aave_executed_trades_1h`          | 実際に Aave で約定したトレード数（1時間あたり）                      | counter   | 通常レンジは運用実績ベース                  | 異常に多い場合は「2. 過剰取引監視」のクールダウン対象 |
+| Aave リスク                | `aave_health_factor_min`           | 対象期間内の Aave Health Factor 最小値                              | gauge     | ≥ 1.8                                     | < 1.8 で WARNING, < 1.6 で EMERGENCY（#3 Aave運用監視と同じ） |
+| Aave 現状リスク            | `aave_health_factor_current`       | 現在時点の Aave Health Factor                                       | gauge     | ≥ 1.8                                     | < 1.8 で WARNING, < 1.6 で EMERGENCY                |
+| 資産変動                   | `portfolio_value_change_1d_pct`    | ポートフォリオの 1 日あたりの評価額変化率（%）                      | gauge     | ± 20% 以内                                 | 絶対値 > 20% で ALERT（#3 Aave運用監視のルールに対応） |
+| 緊急停止フラグ             | `emergency_stop_flag`              | 自動トレード緊急停止フラグ（0: OFF, 1: ON）                          | gauge(0/1)| 0（OFF）が通常                             | 1（ON）の間は EMERGENCY 状態として扱う               |
+| 緊急イベント件数           | `emergency_event_count_24h`        | 過去24時間の EMERGENCY レベル MonitoringEvent 件数                  | counter   | 0〜ごく少数                                | 急増した場合はインシデント扱い（Runbook 参照）      |
+| バックアップ／ジョブ失敗数 | `automation_job_failure_count_24h` | `monitor_daily` / `monitor_weekly` / バックアップ等のジョブ失敗件数 | counter   | 0                                         | > 0 の場合は WARNING、継続する場合は ALERT          |
+
+> ※ ここでの「通常レンジ」はあくまで目安であり、  
+>  実際の値は運用実績を踏まえて調整する。  
+>  ただし、閾値（ヘルスファクター 1.8 / 1.6 や 20%/日など）は、  
+>  既存のルール（#1〜#3）と **矛盾させないこと**。
+
+## 6.2 MonitoringEvent.level との対応
+
+`MonitoringEvent.level`（info / warning / alert / critical / emergency）と  
+メトリクスの関係性は、概ね次のように扱う。
+
+| level       | 典型トリガ例                                      | 代表メトリクス例                         | Runbook 上の対応イメージ                      |
+|-------------|---------------------------------------------------|------------------------------------------|-----------------------------------------------|
+| info        | 正常系の完了通知、日次/週次レポート生成成功など   | `news_pipeline_success_rate_1h` など     | ログ・レポートとして記録。特に対応不要        |
+| warning     | 閾値に近づいてきた状態                           | p95 レイテンシ上昇、軽微なエラー増加     | 運用担当が状況確認。原因調査のトリガ          |
+| alert       | 閾値超過だが即時停止までは不要な状態             | `backend_http_latency_p95_ms` > 30s 等   | 優先度高めで調査。必要に応じて一時停止やリトライ |
+| critical    | Aave リスク増大、連続エラー多発など、危険水準手前 | `aave_health_factor_min` が 1.6 付近など | 緊急停止フラグ ON を検討。即時エスカレーション |
+| emergency   | 緊急停止フラグ ON、または明確な重大インシデント   | `emergency_stop_flag` = 1                | 自動トレード停止。Runbook の緊急対応フローに従う |
+
+> 実装上は、メトリクスの値 → `MonitoringEvent.level` → 通知・レポート  
+> の順で情報が伝播する想定とし、  
+> 閾値ロジックは **本ドキュメントと Runbook の両方** に明示しておく。
+
+## 6.3 ダッシュボード / レポートとの対応（Phase10）
+
+本節で定義したメトリクスは、Phase10 で実装された  
+`MonitoringService` / `ReportingService` / `DashboardSnapshot` により、次のように扱われる。
+
+### 6.3.1 データの流れ（概念）
+
+1. **MonitoringService**
+   - 各種 `record_*` メソッドが、しきい値判定と同時に `MonitoringEvent` を発行する。
+   - 関連するメトリクスは `MonitoringEvent.metric`（`MetricPoint`）として添付される。
+     - 例：
+       - レイテンシ: `metric_id=latency_{component}_s`（秒単位）
+       - ヘルスファクター: `metric_id=aave_health_factor_current`
+       - 資産変動率: `metric_id=portfolio_value_change_1d_pct`
+
+2. **ReportingService**
+   - 日次 / 週次の監視レポート生成時に、一定期間内の `MonitoringEvent.metric` を集計し、
+     `AutomationReportSummary.metric_aggregates` にまとめる。
+   - これにより、レポート本文では「どのメトリクスが閾値を超えたか」を説明しつつ、  
+     サマリ部分では集計値（平均・最大など）を確認できる。
+
+3. **DashboardSnapshot（MonitoringService.build_dashboard_snapshot）**
+   - ダッシュボード向けには、直近 `lookback` 期間（例: 1 時間）に限定してメトリクスを集計し、
+     `DashboardSnapshot.metric_aggregates` に格納する。
+   - 各エントリは `MetricAggregate` として管理され、少なくとも次の情報を持つ：
+     - `metric_id`
+     - `unit`
+     - `count`（期間内のサンプル数）
+     - `min` / `max` / `avg` / `last`（いずれも `Decimal` または `None`）
+
+### 6.3.2 メトリクス定義との関係
+
+- 本ドキュメントの「6.1 メトリクス一覧（論理定義）」は、  
+  **「運用者が見るべき論理メトリクス」** を定義している。
+- `MetricPoint.metric_id` および `MetricAggregate.metric_id` は、  
+  原則としてこの論理メトリクス ID と整合するように設計するが、
+  必要に応じて次のようなパターンも許容する：
+  - ダッシュボード上の論理メトリクスを、複数の raw メトリクス（例: `latency_system_s`）から算出する。
+  - 実装上は秒単位 (`*_s`) を記録し、ダッシュボード側でミリ秒換算して表示する。
+
+> 方針：  
+> - 閾値判定・緊急停止は `MonitoringService` 側の実装（`record_health_factor` / `record_price_change_24h` など）を唯一の基準とする。  
+> - ダッシュボードやレポートは、その結果を「可視化するだけ」であり、  
+>   追加で独自の判定ロジックを持たないこと。
+
+### 6.3.3 ダッシュボード構成時の注意
+
+- ダッシュボードの各パネルは、可能な限り `metric_id` ベースで定義し、
+  本節および「6.1 メトリクス一覧（論理定義）」に矛盾しないようにする。
+- 代表的な対応イメージ：
+  - Aave リスク系パネル
+    - `DashboardSnapshot.metric_aggregates["aave_health_factor_current"]` の `last` / `min` を表示
+  - 資産変動率パネル
+    - `DashboardSnapshot.metric_aggregates["portfolio_value_change_1d_pct"]` の `last` を表示
+  - レイテンシ系パネル
+    - `latency_*` 系メトリクスの `avg` / `max` から、`backend_http_latency_p95_ms` 相当の指標を算出して表示
+
+> 実際のダッシュボードツール（Grafana / CloudWatch 等）はプロジェクト外の前提とし、  
+> ここでは **「どのメトリクスを、どのように見ればよいか」** のルールのみを定義する。
+---
+
+### docs/09_notion_schema.md
+## プロパティ一覧
+- URL（text or URL）
+- Summary（text）
+- Sentiment（select）
+- Action（select: BUY/SELL/HOLD）
+- Confidence（number）
+- Status（select: 未処理 / 処理済）
+- Timestamp（date）
+
+## 内部モデル（NotionNewsItem）との対応
+
+Phase1 では、Notion API から取得したレコードを  
+`backend/app/notion/schemas.py` の `NotionNewsItem` として扱う。
+
+| Notionプロパティ | 型             | Notionの例                                     | 内部フィールド            | 備考 |
+| ---------------- | -------------- | ---------------------------------------------- | ------------------------- | ---- |
+| URL              | URL / text     | `https://example.com/news`                     | `url: str`                | 空の場合はレコードをスキップ（必須扱い） |
+| Summary          | text           | 「○○企業が△△を発表…」                        | `summary: str \| None`    | rich_text / title から plain_text を抽出 |
+| Sentiment        | select         | `Positive`, `Negative`, `Neutral`              | `sentiment: str \| None`  | select.name を使用 |
+| Action           | select         | `BUY`, `SELL`, `HOLD`                          | `action: str \| None`     | AI解析後に設定予定 |
+| Confidence       | number         | `78`                                           | `confidence: float \| None` | 0〜100を想定 |
+| Status           | select         | `未処理`, `処理済`                             | `status: str \| None`     | Phase1では「未処理」のみ取得対象 |
+| Timestamp        | date           | `2025-01-01T12:34:56+00:00`                    | `timestamp: datetime \| None` | date.start を ISO8601 として扱う |
+
+### Notion APIレスポンスとのマッピング仕様
+
+- URL / Summary は、Notion の `url` / `rich_text` / `title` からプレーンテキストを抽出する。
+- select 型は、`{ "select": { "name": "..." } }` の `name` をそのまま使用する。
+- number 型は `number` の値を `float` に変換して使用する。
+- date 型は `date.start` を ISO8601 文字列として受け取り、内部では `datetime` に変換する。
+
+## 処理フロー
+
+1. ユーザーが Notion にニュースURLを貼り付ける  
+   - URL プロパティに値を設定  
+   - Status を「未処理」にする
+2. /notion/ingest  
+   - Status が「未処理」のレコードのみを Notion API から取得  
+   - 上記のマッピング仕様に従って `NotionNewsItem` に変換  
+   - AI解析フェーズ（/ai/analyze）へ渡すデータとする
+3. AI解析 → Action / Confidence / Summary / Sentiment を更新（Phase2以降）
+4. OctoBotへ送信
+5. 完了 → Status を「処理済」に更新（Phase2以降）
+
+---
+
+### docs/10_next_phase_prompt_generator.md
+# 10_next_phase_prompt_generator.md
+# 次フェーズ用システムプロンプト生成テンプレート
+
+このファイルは、各フェーズの最後に GPT によって
+「次フェーズGPTチャットに貼り付けるためのシステムプロンプト」を自動生成するためのテンプレートです。
+
+次フェーズの開始時点で GPT が100%最新状態で開発に入れるようにするための“プロジェクトの脳”です。
+
+---
+
+# 🎯 このテンプレートの目的
+- フェーズ終了時点の仕様・決定事項を正しくまとめる
+- 次フェーズGPTの役割・タスクを明確にする
+- 使用するファイルや依存するロジックを引き継ぐ
+- 開発のブレや仕様ズレを完全に防ぐ
+- GPTと.mdの同期を自動化する
+
+---
+
+# 🧠 次フェーズ用システムプロンプト生成テンプレート
+
+以下のフォーマットを使用して、
+**GPTはフェーズ終了時に “次フェーズのためのシステムプロンプト” を自動生成すること。**
+
+---
+
+# ==============================
+# 🧩 次フェーズ用システムプロンプト（生成テンプレ）
+# ==============================
+
+以下は、次フェーズのGPTチャットに貼り付ける文章です。
+
+---
+
+## 1. 現フェーズで決まったこと（確定仕様）
+- （GPTが自動で箇条書き）
+- （.mdに反映された変更内容）
+- （生成されたファイル）
+- （削除された仕様や廃止された案）
+
+---
+
+## 2. 次フェーズに引き継がれる前提条件
+- 使用する重要ファイル一覧  
+  - 例：backend/app/ai/analyzer.py  
+  - 例：docs/05_ai_judgement_rules.md  
+- 現時点の前提ロジック（AI判定、OctoBotシグナル仕様 等）
+- 未解決のTODO
+- 依存関係
+
+---
+
+## 3. 次フェーズGPTの役割（明確に）
+例：
+- AIニュース解析の改善  
+- OctoBot連携の完成  
+- Aave運用ロジックのPoC  
+- 管理画面のフロント実装  
+
+GPTは、このフェーズで扱う内容“だけ”を扱い、それ以外は扱わない。
+
+---
+
+## 4. 次フェーズのタスク一覧（優先度付き）
+- P1: 最重要タスク  
+- P2: 必須タスク  
+- P3: 改善タスク  
+
+GPTが迷わないように詳細なタスクを記述する。
+
+---
+
+## 5. GPTが守るべきルール（フェーズ固有 + 共通ルール）
+- 作業前に必ずファイル名 & 概要を先に提示  
+- 「OK」が出るまでコードを書かない  
+- 要件変更は要件変更チャットへ誘導  
+- 常に最新の .md を参照  
+- フェーズ範囲外の開発はしない  
+
+---
+
+## 6. このフェーズで使う重要ファイル
+- backend/app/...  
+- docs/...  
+
+GPTはこれらのファイル内容を前提として行動する。
+
+---
+
+## 7. このフェーズ完了時に GPT が必ず行うこと
+- .md更新案を提出  
+- GitHub Issue案の作成  
+- GitHub PR案の作成  
+- ブランチ名/コミット提案  
+- 次フェーズ用ファイルリスト提出  
+- ZIP作成スクリプト提示  
+- **次の次フェーズ用システムプロンプトを生成すること**
+
+---
+
+## 8. フェーズ開始時にGPTが行う準備
+- 必要ファイルの読み込み  
+- .mdの整合性チェック  
+- タスクの優先順位理解  
+- 不明点の質問  
+
+---
+---
+
+### docs/11_prompt_sync_rules.md
+# 11_prompt_sync_rules.md
+# 自動プロンプト同期ルール（GPTの認知を常に最新に保つためのルール）
+
+このドキュメントは、  
+**OctoBot × AI × Notion × Aave 自動運用システム開発において、  
+GPT の認知を常に最新状態に保つための統一ルールセット** です。
+
+GPT がフェーズ間で情報を失わず、  
+仕様・コード・要件の一貫性を保ったまま開発を継続するために必須のルールです。
+
+---
+
+# 🎯 このルールの目的
+- 仕様変更・フェーズ進行による認知のズレを防ぐ
+- GPTチャット間で共通した“最新仕様”を維持する
+- .mdファイルとGPTの状態の同期を自動で保つ
+- コード・タスク・要件の誤解をゼロにする
+- プロジェクトを「機械的に正しく進行」させる
+
+---
+
+# ==============================
+# 🧠 1. GPTは常に .md を唯一の正しい仕様と認識する
+# ==============================
+
+## ✔ GPTが参照すべき仕様は必ず docs/ ディレクトリ内の .md とする
+- 会話履歴よりも **.md が優先される**  
+- 人間の発言よりも **仕様書の方が正確とみなす**
+
+## ✔ GPTはコード・設計を作る前に必ず関連 .md を参照する  
+例：  
+- AI判定 → 05\_ai\_judgement_rules.md  
+- OctoBot → 06\_octobot_signal_flow.md  
+- Aave運用 → 07\_aave_operation_logic.md  
+
+## ✔ .md の内容と会話内容に不一致があれば、GPTは必ず指摘する  
+そして更新案を出す。
+
+---
+
+# ==============================
+# 🧠 2. GPTはフェーズ開始時に「認知同期」を行う
+# ==============================
+
+各フェーズの入り口で GPT は次を確認する：
+
+### ✔ 必要ファイルの存在  
+### ✔ .md と既存コードの整合  
+### ✔ 未完了タスクの引き継ぎ  
+### ✔ フェーズの目的と範囲  
+### ✔ 不明点（GPTが質問する）  
+
+これにより GPT の“開始状態”が毎回完全に初期化・同期される。
+
+---
+
+# ==============================
+# 🧠 3. GPTはフェーズ終了時に必ず「次フェーズシステムプロンプト」を生成する
+# ==============================
+
+すべてのフェーズは次を出力してから終了する：
+
+1. 今フェーズの決定事項まとめ  
+2. .md更新案  
+3. GitHub Issue案  
+4. GitHub PR案  
+5. 次フェーズで必要なファイル一覧  
+6. Zip生成スクリプト案  
+7. **次フェーズGPT用のシステムプロンプト生成（必須）**
+
+これによりフェーズ間の認知が連続的に維持される。
+
+---
+
+# ==============================
+# 🧠 4. 要件変更は絶対に「要件変更チャット」でのみ扱う
+# ==============================
+
+フェーズチャットで以下は禁止：
+
+❌ 新機能の相談  
+❌ 仕様追加  
+❌ ロジック変更  
+❌ AI判定ルールの変更  
+❌ Aave運用ルールの変更  
+
+フェーズチャットでこれらが出た場合 GPTは必ずこう答える：
+
+> 「この内容は要件変更です。要件変更チャットに入力してください。」
+
+これによりフェーズチャットの純度が100%保たれる。
+
+---
+
+# ==============================
+# 🧠 5. GPTは変更前に必ず“ファイル名を宣言”しなければならない
+# ==============================
+
+GPTはコードを書く前に：
+
+### ✔ 編集対象ファイル名  
+### ✔ 新規作成ファイル名  
+### ✔ そのファイルで行う変更の説明  
+
+を必ず宣言し、人間の承認を待つ。
+
+→ 承認前にコードを書いたら **ルール違反**。
+
+---
+
+# ==============================
+# 🧠 6. GPTは変更内容をすべて差分（diff形式）で提示する
+# ==============================
+
+例：
+
+# 11_prompt_sync_rules.md
+# 自動プロンプト同期ルール（GPTの認知を常に最新に保つためのルール）
+
+このドキュメントは、  
+**OctoBot × AI × Notion × Aave 自動運用システム開発において、  
+GPT の認知を常に最新状態に保つための統一ルールセット** です。
+
+GPT がフェーズ間で情報を失わず、  
+仕様・コード・要件の一貫性を保ったまま開発を継続するために必須のルールです。
+
+---
+
+# 🎯 このルールの目的
+- 仕様変更・フェーズ進行による認知のズレを防ぐ
+- GPTチャット間で共通した“最新仕様”を維持する
+- .mdファイルとGPTの状態の同期を自動で保つ
+- コード・タスク・要件の誤解をゼロにする
+- プロジェクトを「機械的に正しく進行」させる
+
+---
+
+# ==============================
+# 🧠 1. GPTは常に .md を唯一の正しい仕様と認識する
+# ==============================
+
+## ✔ GPTが参照すべき仕様は必ず docs/ ディレクトリ内の .md とする
+- 会話履歴よりも **.md が優先される**  
+- 人間の発言よりも **仕様書の方が正確とみなす**
+
+## ✔ GPTはコード・設計を作る前に必ず関連 .md を参照する  
+例：  
+- AI判定 → 05\_ai\_judgement_rules.md  
+- OctoBot → 06\_octobot_signal_flow.md  
+- Aave運用 → 07\_aave_operation_logic.md  
+
+## ✔ .md の内容と会話内容に不一致があれば、GPTは必ず指摘する  
+そして更新案を出す。
+
+---
+
+# ==============================
+# 🧠 2. GPTはフェーズ開始時に「認知同期」を行う
+# ==============================
+
+各フェーズの入り口で GPT は次を確認する：
+
+### ✔ 必要ファイルの存在  
+### ✔ .md と既存コードの整合  
+### ✔ 未完了タスクの引き継ぎ  
+### ✔ フェーズの目的と範囲  
+### ✔ 不明点（GPTが質問する）  
+
+これにより GPT の“開始状態”が毎回完全に初期化・同期される。
+
+---
+
+# ==============================
+# 🧠 3. GPTはフェーズ終了時に必ず「次フェーズシステムプロンプト」を生成する
+# ==============================
+
+すべてのフェーズは次を出力してから終了する：
+
+1. 今フェーズの決定事項まとめ  
+2. .md更新案  
+3. GitHub Issue案  
+4. GitHub PR案  
+5. 次フェーズで必要なファイル一覧  
+6. Zip生成スクリプト案  
+7. **次フェーズGPT用のシステムプロンプト生成（必須）**
+
+これによりフェーズ間の認知が連続的に維持される。
+
+---
+
+# ==============================
+# 🧠 4. 要件変更は絶対に「要件変更チャット」でのみ扱う
+# ==============================
+
+フェーズチャットで以下は禁止：
+
+❌ 新機能の相談  
+❌ 仕様追加  
+❌ ロジック変更  
+❌ AI判定ルールの変更  
+❌ Aave運用ルールの変更  
+
+フェーズチャットでこれらが出た場合 GPTは必ずこう答える：
+
+> 「この内容は要件変更です。要件変更チャットに入力してください。」
+
+これによりフェーズチャットの純度が100%保たれる。
+
+---
+
+# ==============================
+# 🧠 5. GPTは変更前に必ず“ファイル名を宣言”しなければならない
+# ==============================
+
+GPTはコードを書く前に：
+
+### ✔ 編集対象ファイル名  
+### ✔ 新規作成ファイル名  
+### ✔ そのファイルで行う変更の説明  
+
+を必ず宣言し、人間の承認を待つ。
+
+→ 承認前にコードを書いたら **ルール違反**。
+
+---
+
+# ==============================
+# 🧠 6. GPTは変更内容をすべて差分（diff形式）で提示する
+# ==============================
+
+例：
+修正前
+BUY 判定は sentiment > 0.3 の場合
+修正後
+BUY 判定は sentiment > 0.5 の場合
+
+
+これにより、私が変更内容を誤解しない。
+
+---
+
+# ==============================
+# 🧠 7. GPTは常に矛盾チェックをする
+# ==============================
+
+GPTは次の矛盾を随時チェックし、あれば報告する：
+
+- .md とコードの不一致  
+- フェーズ間の整合性問題  
+- ロジックの破綻  
+- タスク漏れ  
+- 隠れた依存問題  
+
+---
+
+# ==============================
+# 🧠 8. GPTはプロジェクトをまたいだ際にも同期を保つ
+# ==============================
+
+あるフェーズやチャットから別チャットへ移るとき：
+
+- 最新の .md 内容  
+- 次フェーズプロンプト  
+- 必要ファイル情報  
+
+を持っている前提で動く。
+
+---
+
+# ==============================
+# 🧠 9. GPTは「推測で進める」ことを禁止する
+# ==============================
+
+不明点があれば必ず質問し、勝手な推測で進めない。
+
+---
+
+# ==============================
+# 🧠 10. GPTは一貫してプロジェクトの目的を保持する
+# ==============================
+
+目的：
+
+> **Notion → AI → OctoBot → Aave → 自動化**  
+> をすべて連動させる「完全自動金融運用システム」を構築すること。
+
+フェーズが変わってもこの目的を見失ってはいけない。
+
+---
+
+# 🎉 このルールを遵守することで得られる効果
+- GPTが毎回正しく認知リセット & 同期される  
+- フェーズ間のズレが0になる  
+- .mdとの乖離が起きない  
+- 大規模プロジェクトでも破綻しない  
+- 実際のソフト開発と同等の精度でAIが行動できる  
+- あなたは「OK」と言うだけで開発が進む  
+
+---
+
+# 📌 付録：GPTが遵守すべき禁止事項
+
+### ❌ 未承認のコード生成  
+### ❌ 勝手な仕様追加  
+### ❌ フェーズ範囲外の作業  
+### ❌ .mdへの無断変更  
+### ❌ 要件変更をフェーズチャットで扱う  
+### ❌ 古い仕様に基づく推測  
+
+---
+
+# 以上が、自動プロンプト同期ルールです。  
+このファイルをプロジェクトに組み込むことで、  
+GPTは“壊れないプロジェクト構造”の中で動作します。
+
+---
+
+### docs/12_phase_operations.md
+# 12_phase_operations.md
+# フェーズ運用ルール統合版（Phase Operations Rules）
+
+このドキュメントは、  
+**OctoBot × AI × Notion × Aave 自動運用システム** の開発における  
+「各フェーズチャット」「GPTの行動ルール」「開発フロー」を  
+一つにまとめた *プロジェクト運用の中心文書* です。
+
+GPTプロジェクトが破綻せず、常に同期された状態を保つためのルールを明確化します。
+
+---
+
+# 🎯 目的
+- GPTの認知ズレをゼロにする  
+- 人間とGPT間で一貫した開発フローを維持する  
+- 各フェーズを自動かつ安全に進行させる  
+- 要件変更・仕様変更がブレずに伝達されるようにする  
+- GitHub運用、Zip構築、システムプロンプト生成まで含む完全自動化の実現  
+
+---
+
+# ======================
+# 🧠 1. フェーズ全体の開発フロー
+# ======================
+
+各フェーズは以下の順で実行される：
+
+1. フェーズ用システムプロンプトを貼る  
+2. GPTが .md を読み込み、前提を同期  
+3. GPTが作業対象ファイル名＋変更概要を提示  
+4. 人間が「OK」と言う  
+5. GPTがコード・設計を生成  
+6. GPTがフェーズ終了処理を行う  
+7. GPTが次フェーズ用システムプロンプトを自動生成  
+8. 人間がそのプロンプトを次フェーズのチャットに貼る  
+
+---
+
+# ==============================
+# 🧠 2. GPTが必ず守るべき重要ルール（あなたの指示を統合）
+# ==============================
+
+## ✔ 2.1 作業前に「必ず」ファイル名を提示する
+GPTはコードを書く前に次を必ず行う：
+
+- 編集する既存ファイル名  
+- 作成する新規ファイル名  
+- そのファイルで何を変更・追加するか（概要）
+
+※ **この“事前宣言”が完了するまでコードを書いてはいけない。**
+
+---
+
+## ✔ 2.2 フェーズ完了時の必須タスク（あなたの指示の完全版）
+
+フェーズが終わるとき、GPTは以下を必ず実行する：
+
+### 🔹 ① そのフェーズで作業した内容のまとめ  
+（重要決定・変更仕様・作成ファイル）
+
+### 🔹 ② それを .md に反映する案を提示  
+- 対象ファイル名  
+- 修正箇所  
+- 文章案（diff式）
+
+### 🔹 ③ GitHub Issue案 を作成  
+- タイトル  
+- 詳細説明  
+- ラベル  
+- タスク一覧  
+
+### 🔹 ④ GitHub PR案 を作成  
+- タイトル  
+- 変更点の要約  
+- チェックリスト  
+- リスク情報  
+
+### 🔹 ⑤ Git ブランチ名とコミット例を提示  
+例：
+```
+
+git checkout -b feature/phase4-aave-ops
+git add .
+git commit -m "Phase4: Implement Aave deposit/withdraw logic"
+git push origin feature/phase4-aave-ops
+
+```
+
+### 🔹 ⑥ 次フェーズで必要となるファイルリストを作成  
+例：
+- backend/app/aave/handler.py  
+- docs/07_aave_operation_logic.md  
+
+### 🔹 ⑦ それを Zip にまとめるためのスクリプト案を提示  
+例：
+```
+
+zip next_phase.zip backend/app/aave/*.py docs/*.md
+
+```
+
+### 🔹 ⑧ 次フェーズの最初にGPTに貼る「システムプロンプト」を生成  
+→ これが認知同期の中心
+
+---
+
+## ✔ 2.3 要件変更は必ず「要件変更チャット」へ
+
+フェーズチャットでは：
+
+❌ 新しい要件  
+❌ 機能追加  
+❌ 提案の検討  
+❌ ロジック変更  
+❌ デザイン変更  
+
+は一切しない。
+
+GPTは必ず次のように返す：
+
+> 「これは要件変更です。要件変更チャットに入力してください。」
+
+---
+
+## ✔ 2.4 GPTは常に最新.mdを唯一の正しい仕様とみなす
+- 会話内容より .md が優先  
+- 過去フェーズのログより .md が優先  
+- 「仕様の解釈に迷ったら .md を参照する」  
+
+---
+
+## ✔ 2.5 GPTは「推測で進める」ことを禁止
+分からない点は必ず質問する。
+
+---
+
+# =====================================
+# 🧠 3. フェーズ開始時の GPT の義務
+# =====================================
+
+各フェーズ開始時に GPT は必ず：
+
+1. 使用するべき .md の整合性を確認  
+2. 重要ファイルを読み込む（名前だけでOK）  
+3. フェーズ範囲外の作業をしないことを再確認  
+4. タスクの優先順位を理解  
+5. 必要であれば質問  
+
+GPTは「準備完了」を宣言してから作業に入る。
+
+---
+
+# =====================================
+# 🧠 4. フェーズ終了時の「完全自動処理」
+# =====================================
+
+フェーズ終了処理には次の要素が含まれる：
+
+- 仕様反映（.md修正案）  
+- GitHub Issue案  
+- GitHub PR案  
+- Gitコマンド案  
+- 次フェーズファイルリスト  
+- Zip生成スクリプト  
+- **次フェーズ用GPTシステムプロンプト生成** ←最重要  
+
+これにより、  
+フェーズ間の認知ズレは完全に消える。
+
+---
+
+# ==============================
+# 🧠 5. 自動プロンプト同期の流れ（完全図解）
+# ==============================
+
+```
+
+フェーズ開始
+↓
+GPT：.md読み込み→同期
+↓
+GPT：変更前にファイル名＋概要提示
+↓（OK）
+コード生成
+↓
+フェーズ終了処理（Issue, PR, md更新案）
+↓
+GPT：次フェーズ用システムプロンプト自動生成
+↓
+人間が次フェーズチャットに貼る
+↓
+次フェーズ開始（同期済）
+
+```
+
+→ **プロジェクト全体が自動で自己同期して進む仕組み**
+
+---
+
+# ==============================
+# 🧠 6. GPTがやってはならない行為（禁止事項）
+# ==============================
+
+- ❌ 承認前にコードを書く  
+- ❌ フェーズ範囲外の作業を始める  
+- ❌ .md への無断変更  
+- ❌ 要件変更をフェーズチャットで扱う  
+- ❌ 推測で仕様を補完する  
+- ❌ 古い仕様書を使う  
+
+---
+---
+
+### docs/13_security_design.md
+# 13_security_design.md  
+Ultra AutoTrade – セキュリティ設計書（完全版）
+
+本ドキュメントは、Notion → AI → OctoBot → Aave という自動運用システムにおいて  
+「資金を失わない」「GPTの自動生成コードが安全に実行できる」ことを目的に作成する。
+
+---
+
+# 1. APIキー管理（Notion / AI / OctoBot / Aave）
+
+## 1.1 APIキーの保存場所
+- すべて「環境変数」で管理する  
+- `.env` を使用する場合は **必ず .gitignore に追加**
+- GitHub に push される形で保存してはならない
+
+## 1.2 本番／開発キーの分離
+- `NOTION_API_KEY_PROD`
+- `NOTION_API_KEY_DEV`
+- `AAVE_PRIVATE_KEY_PROD`
+- `AAVE_PRIVATE_KEY_DEV`
+
+誤用を防ぐため、環境切替フラグを導入：
+
+```
+APP_ENV=dev | prod
+```
+- 本番用のキー・秘密情報は **`.env.production` にのみ定義** する
+  - ローカル開発用 `.env.local` や staging 用 `.env.staging` と混在させない
+  - どの環境でどの .env が使われているかは、  
+    staging 用は `docs/17_staging_environment_config.md`、  
+    本番用は `docs/21_production_environment_config.md` に記録しておく
+
+- `.env.staging` と `.env.production` の中身をコピーして使い回さない
+  - 特に API キー・ウォレット関連は環境ごとに **物理的に異なるもの** を用意する
+
+- 本番と開発（staging / local）の API キー・ウォレットは、必ず物理的に分離する
+  - 同じ鍵・トークンを複数環境で使い回さない
+- 本番用のキー・秘密情報は **`.env.production` にのみ定義** する
+  - staging 用は `.env.staging`
+  - ローカル開発用は `.env.local` など
+  - 各環境ごとの .env ファイルを必ず分ける
+
+- `.env` 系ファイルはすべて Git 管理外とし、`.gitignore` に含める
+  - 誤って GitHub に push された場合は、即座にキーのローテーションを行う
+
+- 環境ごとの .env に何を定義するかは、次のドキュメントで管理する
+  - staging 環境：`docs/17_staging_environment_config.md`
+  - production 環境：`docs/21_production_environment_config.md`
+
+
+## 1.3 Aave 関連環境変数
+
+- `AAVE_NETWORK`
+- `AAVE_DEFAULT_ASSET_SYMBOL`
+- `AAVE_MAX_SINGLE_TRADE_USD`
+- `AAVE_MIN_HEALTH_FACTOR`
+- `AAVE_TRADE_COOLDOWN_SECONDS`
+
+### 方針
+
+- すべて環境変数から読み取るが、Phase4 時点では **必須にはしない**
+- 未設定の場合は Aave モジュール側で安全なデフォルト値を採用する：
+  - `AAVE_NETWORK`: `"sepolia"`
+  - `AAVE_DEFAULT_ASSET_SYMBOL`: `"USDC"`
+  - `AAVE_MAX_SINGLE_TRADE_USD`: `"100.0"`
+  - `AAVE_MIN_HEALTH_FACTOR`: `"1.6"`
+  - `AAVE_TRADE_COOLDOWN_SECONDS`: `600`（10分）
+- 本番環境では `.env` ではなくインフラ側のシークレット管理に移行すること
+
+## 4.x Aave 機能のフェイルセーフ
+
+- Aave 関連設定が不正値の場合、アプリケーション起動時に例外で気づけるようにする
+- ランタイムエラー時は「ポジションを増やさない」挙動（NOOP or ERROR）を優先
+- Aave 機能が無効でも、Notion / AI / OctoBot 部分は単体で動作できるように分離する
+
+---
+
+# 2. 秘密鍵の保護（Aave運用）
+
+## 2.1 原則
+- Aave運用に使用する秘密鍵は **最低限の金額のみ保持した専用ウォレット**  
+- 運用額に応じてウォレットを分割（資産集中を避ける）
+
+## 2.2 ハードウェアウォレットの推奨
+本番環境では可能であれば **Ledger などの HW Wallet を使用**。
+
+## 2.3 マルチシグ設定（任意）
+- Gnosis Safe を利用し、運用の大きなアクションは multi-sig による承認を必要とする
+
+---
+
+# 3. 操作額制限（スマートコントラクト保護）
+
+```
+・1回の最大投資額：総資産の 10% 以内  
+・1日最大投資額：総資産の 30% 以内  
+・自動売買は 10分間に 1回まで  
+```
+
+---
+
+# 4. 通信暗号化ポリシー
+
+- すべて HTTPS / TLS
+- API通信ログには資格情報を含めない
+- Webhook / OctoBot API は IP 制限を設定（安全な IP のみ許可）
+
+---
+
+# 5. ログのサニタイズ（匿名化）
+
+ログに以下を出してはならない：
+
+- トークン
+- APIキー
+- 秘密鍵
+- 生のウォレットアドレス（必要に応じて先頭6文字＋末尾4文字）
+
+---
+
+# 6. セキュリティ自動化
+
+- エラー多発時に自動停止
+- AI判定が異常値連続（例：BUY or SELL が5回連続）→ 停止
+- Aaveヘルスファクター < 1.6 → 運用ストップ通知
+
+---
+
+# 7. 緊急停止（Emergency Stop）
+
+```
+・AI API エラー率 > 20%  
+・OctoBot 応答なし 3回連続  
+・Aave Gas エラー 2回連続  
+・価格変動 > 20% / 1日  
+```
+
+該当したら自動的に：
+
+- Aave から資金を引き出し
+- 運用停止
+- LINE / Slack へ通知
+
+---
+
+# 8. バージョン管理のセキュリティ
+
+- GitHub Personal Token を使用（classic は禁止）
+- SSH 認証必須
+- main ブランチへの push は禁止（PR必須）
+
+---
+
+---
+
+# 9. インフラデプロイ時の秘密情報管理
+
+本番・staging 環境へのデプロイ時も、これまでのポリシー  
+（API キーは環境変数管理 / Git に含めない）を一貫して守る。
+
+## 9.1 環境ごとの .env / 環境変数方針
+
+- 本番 / staging / 開発で、**環境ごとに値を分離** する
+  - 例：
+    - `.env.local`（ローカル開発マシン専用）
+    - `.env.staging`（staging サーバ上にのみ配置）
+    - `.env.production`（本番サーバ上にのみ配置）
+- これらの `.env.*` ファイルは **必ず .gitignore に含める**
+- ファイル権限
+  - サーバ上では `chmod 600` を推奨
+  - 所有ユーザはデプロイユーザ（例：`ultra`）のみ
+
+## 9.2 Docker 運用時の秘密情報
+
+- `docker-compose.staging.yml` などから `env_file: .env.staging` として読み込む
+- `.env.staging` は **サーバ上のプロジェクトルート直下** にのみ配置し、Git には含めない
+- Dockerfile には API キーや秘密情報を **絶対に書かない**
+  - すべて `env_file` や `environment` 経由で注入する
+- コンテナログに API キーやトークンを出さないよう、
+  ログ出力時は値のマスク（先頭数文字のみなど）を徹底する
+
+## 9.3 systemd 運用時の秘密情報
+
+- Docker を使わない場合、systemd の `EnvironmentFile` 機能を利用する
+  - 例：`/etc/ultra-autotrade/backend.env`
+- `backend.env` の権限
+  - `chmod 600 /etc/ultra-autotrade/backend.env`
+  - 所有者：`root:root` または、専用デプロイユーザに限定
+- `backend.env` 内のフォーマット例：
+  ```ini
+  NOTION_API_KEY=xxxxxxxx
+  NOTION_DATABASE_ID=yyyyyyyy
+  OCTOBOT_API_BASE_URL=https://octobot-staging.example.com/api
+  OCTOBOT_API_KEY=octo_test_xxx
+  AAVE_NETWORK=polygon-mumbai
+
+  systemd ユニットファイルでは、次のように参照する：
+
+  EnvironmentFile=/etc/ultra-autotrade/backend.env
+
+
+## 9.4 デプロイユーザと権限管理
+- サーバ上に、アプリケーション専用ユーザ（例：ultra）を用意する
+このユーザのみがプロジェクトディレクトリに書き込み可能
+- SSH ログインは公開鍵認証に限定し、パスワードログインは禁止
+- sudo 権限は最小限にし、ultra ユーザでの sudo 実行は必要な場合のみに限定する
+
+## 9.5 ログと秘密情報の取り扱い
+- API レスポンスやリクエストをログに残す場合も、
+アクセストークンやウォレットアドレスなどの機微情報は マスク or 削除 する
+- ログファイルはサーバローカルか、セキュリティが担保されたストレージに保存し、
+公開 S3 バケットなどには置かない
+- ログローテーションを設定し、長期間のログがサーバ上に残りすぎないようにする
+
+## 9.6 環境ごとの .env ファイルと接続先の分離
+- 同じ変数名でも、環境ごとに接続先を必ず分離 する
+
+ - 例：
+  - AAVE_NETWORK / AAVE_RPC_URL：
+   - staging: テストネット（例：polygon-mumbai）
+   - production: 本番ネットワーク（例：polygon）
+
+  - OCTOBOT_API_BASE_URL / OCTOBOT_API_KEY：
+   - staging: ステージング OctoBot インスタンス
+   - production: 本番 OctoBot インスタンス
+
+  - NOTION_API_KEY / NOTION_DATABASE_ID：
+   - staging: 検証用 Notion DB
+   - production: 本番運用用 Notion DB
+
+- .env.staging と .env.production の中身をコピーして使い回さない
+  - 特に API キー・ウォレット関連は環境ごとに 物理的に異なるもの を用意する
+- どの .env がどのサーバで使われているかを、ドキュメントとして明示する
+  - staging 環境：`docs/17_staging_environment_config.md`
+  - production 環境：`docs/21_production_environment_config.md`
+
+- どの .env がどのサーバで使われているかを、ドキュメントとして明示する
+  - staging 環境：`docs/17_staging_environment_config.md`
+  - production 環境：`docs/21_production_environment_config.md`
+- 新しい環境（例：検証用 sandbox 等）を追加する場合は、  
+  専用の .env とドキュメントを作成し、既存環境のキーと混在させない
+
+  # 10. バックアップ・リストア時のセキュリティ方針
+
+## 10.1 バックアップの方針
+
+- `.env.production` を含む設定ファイルは、以下の条件を満たす場合にのみバックアップする：
+  - 暗号化されたストレージ（例：暗号化ボリューム、パスワード付きアーカイブ）に保存する
+  - バックアップファイル自体も Git / 共有ストレージに無防備に置かない
+  - アクセス権を最小限の運用メンバーに限定する
+
+- バックアップ対象は次を想定する：
+  - `.env.production`（もしくは同等の環境設定）
+  - デプロイスクリプト / systemd unit / docker-compose ファイル
+  - 運用ランブック（`docs/19_operations_runbook.md`） 等の手順書
+
+- バックアップ作成時には、作成日時・作成者・対象環境（staging / production）を記録しておく。
+
+## 10.2 リストア時のチェック
+
+- バックアップから `.env.production` を復元する際は、必ず次を確認する：
+  - 復元対象が **正しい環境（production）向けのファイル** であること
+  - staging 用のキーやウォレット情報が混入していないこと
+  - 期限切れのキー（API キー・トークン）が含まれていないこと
+
+- 復元後に必ず実施するチェック：
+  - `docs/21_production_environment_config.md` に記載の必須項目が埋まっている
+  - `docs/22_production_release_checklist.md` の「前提条件チェック」を満たす
+
+## 10.3 インシデント時のキー・秘密情報の扱い
+
+- `.env.production` の内容が漏えいした疑いがある場合：
+  - 直ちに該当する API キー・秘密鍵をローテーションする
+  - Aave / OctoBot / Notion / 通知サービス側で、古いキーの無効化を行う
+  - ログ・監査情報を確認し、不正アクセスや不正トレードがないかを調査する
+  - 詳細な手順は `docs/19_operations_runbook.md` のインシデント対応セクションに従う
+
+---
+
+### docs/14_test_strategy.md
+# 14_test_strategy.md  
+Ultra AutoTrade – テスト戦略
+
+---
+
+# 1. テストの目的
+
+Notion → AI → OctoBot → Aave のフローが  
+
+- 誤作動しない  
+- 不要な損失を生まない  
+- 同じ入力に対して同じ結果が再現できる  
+
+ことを保証する。
+
+---
+
+# 2. テスト構成（レベル）
+
+- Unit Test（モジュール単体）
+  - 例: AI 判定ロジック, Notion クライアント, OctoBot クライアント, Aave 操作ユーティリティ 等
+- Integration Test（2つ以上の連携）
+  - 例: Notion → AI, AI → OctoBot, OctoBot → Aave
+- Scenario Test（連続動作）
+  - ニュース複数件を時間順に処理するシナリオテスト
+- E2E Test（テストネット）
+  - 実際のテストネット上で Aave スマートコントラクトを叩く検証
+- Regression Test（回帰テスト）
+  - PR 時に自動実行する一括テスト（AI判定・統合フロー）
+
+---
+
+## 2.1 Unit Test 詳細（AI 周り）
+
+- 対象ファイル
+  - `backend/tests/test_ai_service.py`  
+  - `backend/tests/test_ai_router.py`
+
+  - `backend/tests/test_octobot_client.py`
+  - OctoBotClient の初期化、例外クラス（OctoBotHTTPError が OctoBotClientError を継承していること）を確認。
+- `backend/tests/test_octobot_service.py`
+  - 信頼度しきい値に基づく SKIPPED 判定。
+  - 1時間以内の同一アクション回数がしきい値を超えた場合にレート制限で SKIPPED になること。
+- `backend/tests/test_octobot_router.py`
+  - `/octobot/signal` の 400（count 不整合）を確認。
+  - 正常リクエストで 400 以外（200 or 500）が返ることを確認（OctoBot 側はモック/no-op）。
+
+- `test_ai_service.py`  
+  - 入力ニュース文（ポジティブ / ネガティブ / 中立）に対して、  
+    `TradeAction` が BUY / SELL / HOLD の期待値どおりになるかを確認。  
+  - 信頼度スコアが 0〜100 の範囲に収まることを確認。  
+  - `docs/05_ai_judgement_rules.md` の条件に沿った境界値テスト（しきい値ギリギリ前後）。
+
+- `test_ai_router.py`  
+  - `/ai/analyze` エンドポイントの正常系（200）レスポンスを確認。  
+    - モックした `AIService.analyze_items` が返す `AIAnalysisResult` がそのままレスポンスに反映されること。  
+  - `AIService.analyze_items` が予期しない例外を投げた場合、  
+    ステータスコードが 500 系になることを確認。  
+  - バリデーションエラー時に 422 Unprocessable Entity になること。
+
+---
+
+## 2.2 Unit Test 詳細（OctoBot 連携周り）
+
+### 2.2.1 bots.client（OctoBot 外部シグナルAPIクライアント）
+
+- 対象ファイル
+  - `backend/tests/test_octobot_client.py`
+
+- 目的  
+  OctoBot 外部シグナルAPIへの HTTP 通信が、正常系・異常系ともに想定どおり振る舞うことを保証する。
+
+- 主な観点  
+  - 正常系: 2xx レスポンスを受け取った場合、成功として結果が返却されること。  
+  - 4xx / 5xx レスポンス: 適切な例外クラスに変換され、上位層（service）でハンドリング可能になっていること。  
+  - タイムアウト・接続エラー: 所定の回数リトライした上で、最終的に例外を返すこと。  
+  - ログ出力: APIキーなどの機密情報がログに出力されないこと（メッセージをモック／スパイで検証）。
+
+### 2.2.2 bots.service（シグナル生成・送信ロジック）
+
+- 対象ファイル
+  - `backend/tests/test_octobot_service.py`
+
+- 目的  
+  `AIAnalysisResult` を入力として、過剰取引制限・信頼度しきい値に基づいた  
+  「送信 / スキップ / 失敗」の判定が正しく行われることを保証する。
+
+- 主な観点  
+  - 信頼度がしきい値以上のシグナルのみ、OctoBot 外部API送信対象となること。  
+  - `docs/08_automation_rules.md` で定義された連続トレード制限ルールに抵触するシグナルは「skipped」として扱われること。  
+  - client からエラーが返却された場合、「failed」として集計され、詳細メッセージがレスポンスに含まれること。  
+  - すべてのシグナルがスキップまたは失敗になる場合でも、サービス層が異常終了せず、集計結果を返すこと。
+
+### 2.2.3 bots.router（/octobot/signal エンドポイント）
+
+- 対象ファイル
+  - `backend/tests/test_octobot_router.py`
+
+- 目的  
+  `/octobot/signal` エンドポイントの外部仕様（Request/Response・ステータスコード）が  
+  `docs/04_api_design.md` の定義と一致していることを保証する。
+
+- 主な観点  
+  - 正常なリクエスト → 200 OK とともに、`success_count / skipped_count / failed_count` が整合していること。  
+  - bots.service がシグナル送信失敗を返した場合、設計された HTTP ステータス（例: 502）とエラーボディになること。  
+  - リクエストボディの形式が明らかに不正（`count` と配列長の不一致など）の場合 → 400 Bad Request。  
+  - 必須フィールド欠如や型不一致 → 422 Unprocessable Entity（FastAPI デフォルト）。
+
+---
+
+## 2.3 Unit Test 詳細（Notion / Aave / その他）
+
+- Notion クライアント / ルータ
+  - `backend/tests/test_notion_client.py`  
+    - Notion API レスポンスのパース・エラーハンドリング。  
+  - `backend/tests/test_notion_router.py`  
+    - `/notion/ingest` の正常系・エラー系動作。
+
+- Aave 関連（別フェーズで詳細実装）
+  - Aave SDK ラッパの deposit / withdraw / borrow / repay の単体テスト。  
+  - ガス計算・リトライロジック等。
+
+---
+
+# 3. Unit Test（サマリ）
+
+## 3.1 対象
+
+- AI 判定処理（文章 → BUY/SELL/HOLD）
+- Notion API パーサ／クライアント
+- OctoBot シグナル送信モジュール（client / service / router）
+- Aave SDK 操作（deposit, withdraw, borrow, repay）※実装フェーズに応じて追加
+
+## 3.2 Mock 方針
+
+- 外部 API（Notion / OctoBot / Aave / 価格フィードなど）は **すべて Mock**。  
+- 時系列処理は固定日時を使用し、同じテストが何度実行されても同じ結果になるようにする。
+
+## 3.4 Aave 運用ロジックのテスト
+
+### ユニットテスト（`test_aave_service.py`）
+
+- FakeAaveClient を用意し、Aave 実ネットワークには一切アクセスしない
+- 検証項目：
+  - BUY かつ条件安全 → `DEPOSIT` が 1 回実行される
+  - SELL → `WITHDRAW` が 1 回実行される
+  - HOLD → クライアント呼び出し無し（NOOP）
+  - ヘルスファクター < 閾値 → BUY は NOOP
+  - クールダウン時間内の連続トレード → 2 回目以降は NOOP
+  - 負の金額 → ValueError を投げる
+
+### API テスト（`test_aave_router.py`）
+
+- FastAPI の `TestClient` を使い `/aave/rebalance` を直接叩く
+- AaveService は dependency override でダミー実装に差し替え
+- 検証項目：
+  - 正常系：200 + `operation=DEPOSIT` など
+  - amount が負数 → 422（Pydantic バリデーション）
+  - サービス層が ValueError → 400
+  - 予期しない例外 → 500
+
+### 統合テストの雛形（`test_flow_with_aave_stub.py`）
+
+- 現時点では `pytest.mark.skip` としてプレースホルダのみ実装
+- 将来的に Notion → AI → OctoBot → Aave のフローをすべてモックで接続し、
+  「1件のニュースから Aave まで到達する」シナリオを増やす予定
+
+### 監視・自動化まわりのテスト（Phase5）
+
+- `backend/tests/test_automation_monitoring.py`  
+  - `MonitoringService` 単体のしきい値判定（応答時間 / ヘルスファクター / 価格変動）。
+- `backend/tests/test_automation_emergency_integration.py`  
+  - 緊急停止フラグが立っている状態で、`AaveService.execute_rebalance` が  
+    ポジションを増やさない（NOOP になる）ことを確認。
+- `backend/tests/test_automation_reporting.py`  
+  - 直近のイベント／ヘルスファクター履歴から、  
+    `AutomationReportSummary` が日次 / 週次で正しく集計されることを確認。
+- `backend/tests/test_notifications_service.py`  
+  - `LoggingNotificationSender` が severity に応じて適切なログレベルを使うこと。  
+  - `CompositeNotificationService` が複数 Sender へファンアウトすること。
+- `backend/tests/test_automation_reporting_notifications.py`  
+  - `ReportingService.build_notification_message` が  
+    サマリ内容に応じて NotificationSeverity / タイトル / 本文を正しく構築すること。
+- `backend/tests/test_notifications_service.py`  
+  - `LoggingNotificationSender` が severity に応じて適切なログレベルを使うこと。  
+  - `CompositeNotificationService` が複数 Sender へファンアウトすること。
+- `backend/tests/test_automation_reporting_notifications.py`  
+  - `ReportingService.build_notification_message` が  
+    サマリ内容に応じて NotificationSeverity / タイトル / 本文を正しく構築すること。
+
+- `backend/tests/test_automation_backup_service.py`  
+  - `BackupService` が複数のバックアップハンドラを順に実行し、  
+    成功件数の集約と `SUCCESS / PARTIAL / FAILURE` 判定を正しく行うこと。  
+  - 1つのハンドラが例外を投げても、他のハンドラの実行が継続されること。
+
+- `backend/tests/test_automation_emergency_report_service.py`  
+  - `EmergencyReportService.build_emergency_report` が  
+    `AutomationReportSummary` と `MonitoringEvent[]` から人間向けレポートを生成できること。  
+  - EMERGENCY あり / イベントゼロ / notes ありなどのパターンで、  
+    レポート本文に必要な情報（期間・イベント数・重要イベント・ノート）が含まれていること。
+
+- `backend/tests/test_automation_jobs.py`  
+  - `run_daily_jobs` / `run_weekly_jobs` が  
+    `ReportingService.generate_summary_report` → `build_notification_message` → `NotificationService.send`  
+    の流れを1回ずつ実行すること。  
+  - `run_backup_only` が渡された `BackupService` の `run_backup()` を1回実行すること。  
+  - `run_backup=True` オプション時に、日次/週次ジョブからバックアップが起動されること。
+
+- `backend/tests/test_automation_monitoring.py`
+  - しきい値判定に加え、`MonitoringEvent` にメトリクス情報が正しく含まれることを確認する：
+    - `metric_id`（例：`backend_http_latency_p95_ms`, `aave_health_factor_current` など）
+    - `metric_value`（数値）
+    - `metric_unit`（`ms` / `percent` / `ratio` など）
+    - 対象コンポーネントやタグ（例：`component=backend`, `component=aave`）
+  - `docs/08_automation_rules.md` の「6. 監視メトリクス一覧」で定義された主要メトリクスについて、
+    閾値境界前後のケース（正常 / WARNING / ALERT / EMERGENCY）をユニットテストでカバーする。
+
+- `backend/tests/test_automation_reporting.py`
+  - 日次 / 週次サマリーレポートに、メトリクスサマリ（例：平均ヘルスファクター、期間内のエラー件数など）が
+    含まれることを確認する。
+  - EMERGENCY に至った場合は、どのメトリクスが閾値を超えたかがレポート本文に反映されることを確認する。
+
+- `backend/tests/test_automation_reporting.py`
+  - 日次 / 週次サマリーレポートに、メトリクスサマリ（例：平均ヘルスファクター、期間内のエラー件数など）が
+    含まれることを確認する。
+  - EMERGENCY に至った場合は、どのメトリクスが閾値を超えたかがレポート本文に反映されることを確認する。
+
+- `backend/tests/test_automation_reporting.py`
+  - 日次 / 週次サマリーレポートに、メトリクスサマリ（例：平均ヘルスファクター、期間内のエラー件数など）が
+    含まれることを確認する。
+  - EMERGENCY に至った場合は、どのメトリクスが閾値を超えたかがレポート本文に反映されることを確認する。
+  - Phase10 では、`AutomationReportSummary.metric_aggregates` に対して、
+    `latency_*` や `portfolio_value_change_1d_pct`、`aave_health_factor_current` などの代表的メトリクスが
+    正しく集計されていることを確認するテストを追加する。
+
+- `backend/tests/test_automation_dashboard_view.py`
+  - `MonitoringService.build_dashboard_snapshot` により、ダッシュボード向けスナップショット
+    （`DashboardSnapshot`）が期待どおりに構成されることを確認する：
+    - `generated_at` / `period_start` / `period_end` が、テストで固定した現在時刻と `lookback` に整合している。
+    - 対象期間内の `MonitoringEvent.metric` から、`metric_aggregates` に `count` / `min` / `max` / `avg` / `last` が
+      正しく集計されている（範囲外のイベントは含まれない）。
+    - `AutomationStatus` の情報（`is_trading_paused` / `last_health_factor` /
+      `last_price_change_24h` / `last_event_level` / `emergency_reason` など）が、
+      `DashboardSnapshot.status` にそのまま反映されている。
+  - ダッシュボード UI 自体はツール依存であるため、本プロジェクトでは
+    「バックエンドが提供するスナップショット構造」が契約となる。
+    ツール変更時も、このテスト群が通っている限り、ダッシュボードに必要な情報は提供されているとみなす。
+
+---
+
+# 4. Integration Test
+
+## 4.1 対象シナリオ
+
+- Notion → AI  
+  - `/notion/ingest` → `/ai/analyze`
+- AI → OctoBot  
+  - `/ai/analyze` で生成された `AIAnalysisResult[]` を `/octobot/signal` に渡した際、
+    安全弁の適用とシグナル送信の集計（success/skipped/failed）が期待どおりになること。
+- OctoBot → Aave  
+  - OctoBot シグナル → Aave 操作ユーティリティ（将来フェーズ）
+
+## 4.2 成功基準
+
+- 各ステップの遅延: 10秒以内（開発環境の目安）。
+- 95%以上の成功率（ネットワーク障害など一時的要因は別途考慮）。
+
+---
+
+# 5. Scenario Test
+
+ニュース 10件程度を時系列で処理するシナリオテスト：
+
+- BUY → Aave deposit  
+- SELL → Aave withdraw  
+- HOLD → 何もしない  
+
+を想定シナリオとして、各ニュースの結果が期待どおりであることを確認する。
+
+- 確認観点
+  - 過剰取引ルール（短時間に同一アクション連発しない）が守られている。  
+  - 緊急停止条件に抵触した場合、システムが適切に処理を止める（`docs/08_automation_rules.md`, `docs/15_rollback_procedures.md` 参照）。
+
+---
+
+# 6. E2E Test（テストネット）
+
+テストネット（Goerli / Sepolia など）で以下を確認：
+
+- deposit
+- borrow
+- repay
+- withdraw
+
+本番同様のスマートコントラクト動作、gas 計算まで含めて確認する。  
+E2E テストは頻度を絞り（例: デイリー、リリース前）、コストと安全性のバランスを取る。
+
+---
+
+# 7. Regression Test
+
+GitHub PR 時に自動実行する想定：
+
+- AI 判定の一括テスト（ニュース 50件程度）
+- 全フローの統合テスト（モック OctoBot / モック Aave を利用）
+
+PR マージ前に、既存機能が壊れていないことを担保する。
+
+---
+
+# 8. 最低合格ライン（MVP）
+
+- エラー率：5% 以下  
+- フロー成功率：95% 以上  
+- AI 判定精度：80% 以上  
+
+上記基準を満たした状態を **MVP の最低ライン** とし、  
+以降は本番運用やフィードバックを通じて閾値を引き上げていく。
+
+---
+
+## フロントエンド（運用ダッシュボード）
+
+本フェーズでは、フロントエンドは **読み取り専用** のため、テストは最小構成とする。
+
+### 目的
+
+- 既存 API 契約（`AutomationStatus` / `DashboardSnapshot` / `AutomationReportSummary`）と整合すること
+- API 失敗時に運用者が原因追跡できるエラー表示になっていること
+
+### 推奨テスト
+
+- スモーク（手動/自動どちらでも可）
+  - `/dashboard/automation` が 3 API を呼び出し、表示できる
+  - `/dashboard/reports` が最新レポートを表示できる
+- CI での最低限（将来タスク）
+  - Playwright 等でページロードと主要DOMの存在を確認（契約変更なし前提）
+
+## Automation APIs – 初期状態テスト
+
+- データが0件でも 500 を返さないこと
+- dashboard / reports は「空構造」を返す
+- latest report は DAILY を既定 period とする
+
+---
+
+### docs/15_rollback_procedures.md
+# 15_rollback_procedures.md  
+Ultra AutoTrade – ロールバック手順
+
+---
+
+# 1. ロールバックの目的
+誤作動・暴落・通信障害などで  
+資金損失を防ぐための“即時復旧”手順。
+
+---
+
+# 2. 取引ステップ別ロールバック
+
+## 2.1 Notion → AI
+失敗時は Notion の該当ブロックを “再処理キュー” に移動。
+
+## 2.2 AI → OctoBot
+OctoBot API失敗時：
+
+- 3回リトライ  
+- 失敗時は “HOLD 判定” 処理に切り替え  
+- 同時に手動確認通知
+
+## 2.3 OctoBot → Aave
+Aave deposit 失敗時：
+
+- ガスリトライ  
+- ガス高騰時は自動キャンセル  
+- 失敗ログを Notion に保存  
+
+withdraw 失敗時：
+
+- Gas不足でない場合は即緊急通知
+
+## 2.4 Aave 操作失敗時（/aave/rebalance）
+
+### 失敗パターン
+- Aave クライアントエラー（RPC 断、レスポンス異常）
+- ヘルスファクター取得失敗
+- 想定外の例外
+
+### Phase4 実装での挙動
+- deposit / withdraw 前にヘルスファクター取得を試みる（失敗時は None として継続）
+- `BUY/SELL/HOLD` → `DEPOSIT/WITHDRAW/NOOP` 判定後、
+  - クライアント例外が発生した場合は
+    - 実際のトランザクションは送られない
+    - `status="error"`, `amount=0` として API レスポンスを返す
+- いかなるエラー時も **「ポジションを増やす方向の変更は行わない」** ことを保証する
+
+### 運用側でのロールバック対応
+- Aave 関連でエラーが連続した場合：
+  - OctoBot シグナル → Aave 連携を一時停止
+  - 必要に応じて手動で Aave ダッシュボードから withdraw
+  - 緊急停止条件（ヘルスファクター < 1.6 など）に該当する場合は「全停止＋通知」を優先
+
+---
+
+# 3. 本番環境のロールバック
+
+## Aave 運用ロールバック
+
+1. 自動運用停止  
+2. 資金をステーブルコインに変換  
+3. ウォレットへ退避  
+4. LINE/Slack通知
+
+---
+
+# 4. バージョン管理ロールバック
+GitHub：
+
+- `main` のタグ管理  
+- `rollback/vX.Y.Z` ブランチの作成  
+- 前バージョンをデプロイ可能
+
+---
+
+# 5. 緊急停止（Emergency Mode）
+
+### 発火条件例
+- 価格変動 > 20%  
+- ヘルスファクター < 1.6  
+- OctoBot応答なし  
+- AI API失敗率 > 20%  
+
+### 発動後
+- 全処理停止  
+- Aave withdraw  
+- 通知
+
+---
+
+# 4. staging 環境でのロールバック手順（インフラ視点）
+
+本章では、Phase7 で整備した staging 環境において、  
+デプロイ後に問題が発生した場合のロールバック手順を整理する。
+
+基本方針：
+
+- staging では、**アプリケーションコードのバージョンを元に戻す** ことでロールバックする。
+- `.env.staging` は原則としてそのまま（接続先・キーは変えない）。
+- 緊急停止フラグを併用し、問題の波及を防ぐ。
+
+## 4.1 Docker + docker-compose パターン
+
+staging で Docker を利用している場合（`docker-compose.staging.yml`）の手順。
+
+### 4.1.1 直前デプロイの確認
+
+1. サーバにログイン（例：`ssh ultra@staging-server`）
+2. プロジェクトルートへ移動：
+   ```bash
+   cd /opt/ultra-autotrade
+
+3. 現在の Git 状態を確認：
+git log -5 --oneline
+
+
+### 4.1.2 1 つ前のコミットに戻す
+1. 直前のコミット ID を確認し、その 1 つ前のコミットを特定する。
+2. staging 用ブランチ（例：staging）をそのコミットにリセット：
+
+git checkout staging
+git reset --hard <rollback_target_commit>
+
+3. デプロイスクリプトを実行：
+
+./scripts/deploy_staging_backend.sh
+
+### 4.1.3 動作確認
+1. コンテナの状態：
+
+docker compose -f docker-compose.staging.yml ps
+
+2. ヘルスチェック：
+curl -fsS http://localhost:8000/health
+
+3. 必要に応じて、staging 用のテストケース（Notion 連携 / OctoBot / Aave テストネット）を手動確認する。
+問題が解消された場合、緊急停止フラグの解除を検討する（詳細は 19_operations_runbook.md を参照）。
+
+### 4.2 systemd パターン
+Docker を利用せず、systemd + uvicorn で常駐させている場合。
+
+### 4.2.1 アプリケーションのロールバック
+1. サーバにログインし、アプリケーションディレクトリへ移動：
+cd /opt/ultra-autotrade
+
+2. Git でロールバック対象コミットへ戻す：
+git checkout staging
+git reset --hard <rollback_target_commit>
+
+3. 必要であれば依存パッケージを再インストール：
+source venv/bin/activate
+pip install -r backend/requirements.txt
+
+### 4.2.2 サービス再起動
+sudo systemctl restart ultra-autotrade-backend
+sudo systemctl status ultra-autotrade-backend
+
+その後、/health やログで状態を確認する。
+
+### 4.3 緊急停止フラグとの組み合わせ
+重大な障害が発生した場合は、ロールバック作業に入る前に 緊急停止フラグを ON にする ことを推奨する。
+1. 緊急停止フラグを ON（具体的な操作方法は 19_operations_runbook.md 参照）
+2. 上記 4.1 / 4.2 の手順でロールバックを実施
+3. ロールバック後、以下を確認：
+ - /health が OK を返す
+ - 主要なユースケース（Notion → AI → OctoBot → Aave） が staging で正常に動作する
+4. 問題が解消されたと判断したら、緊急停止フラグを OFF にする
+
+### 4.4 ロールバックの記録
+ロールバックを実施した場合、以下を記録しておくことが望ましい。
+- 実施日時
+- 対象環境（staging / production）
+- ロールバックしたコミット ID / バージョン
+- ロールバックの理由（障害概要）
+- 影響範囲と対策メモ
+
+これらは、今後のリリース計画や回帰テストの観点で重要な情報となる。
+---
+
+### docs/16_infra_deployment_guide.md
+# 16_infra_deployment_guide.md
+Ultra AutoTrade – インフラデプロイガイド（staging 想定）
+
+本ドキュメントは、Ultra AutoTrade のバックエンド（FastAPI）を  
+Hetzner などの Linux サーバ上にデプロイし、**staging 環境** として安全に動かすための手順を示す。
+
+---
+
+## 1. 前提条件
+
+- 対象環境
+  - Debian / Ubuntu 系 Linux（例：Hetzner Cloud Ubuntu 22.04）
+- 前提となるインストール
+  - `git`
+  - `docker` および `docker compose`（もしくは `docker-compose`）
+- Ultra AutoTrade リポジトリが GitHub 上に存在し、  
+  デプロイユーザが **SSH 鍵認証で clone 可能** であること
+- セキュリティに関する前提
+  - 本ドキュメントの内容は `13_security_design.md` に準拠する
+  - staging では **本番資金を使わないウォレット** を利用する
+
+---
+
+## 2. デプロイ戦略の選択肢
+
+本プロジェクトのバックエンドは、以下の 2 つの方法で常駐させることを想定する。
+
+1. **Docker + docker-compose（推奨）**
+   - `Dockerfile` ＋ `docker-compose.staging.yml` でコンテナとして起動
+   - 環境変数は `.env.staging` を `env_file` として注入
+2. **systemd + uvicorn（fallback）**
+   - Python 仮想環境上で `uvicorn app.main:app` を起動
+   - `infra/systemd/ultra-autotrade-backend.service` をテンプレートとして使用
+
+本ガイドでは、**1. Docker + docker-compose** をメインパターンとして説明する。
+
+---
+
+## 3. staging 環境構築手順（Docker パターン）
+
+### 3.1 サーバ初期設定
+
+```bash
+# パッケージ更新
+sudo apt update && sudo apt upgrade -y
+
+# docker / docker compose インストール（例：公式 convenience script）
+curl -fsSL https://get.docker.com | sh
+
+# デプロイ用ユーザに docker グループ権限を付与（例：ultra ユーザ）
+sudo usermod -aG docker ultra
+
+再ログイン後、docker ps が実行できることを確認する。
+
+3.2 リポジトリ取得
+
+# デプロイユーザでログイン（例）
+ssh ultra@your-server
+
+# 任意のディレクトリで clone
+git clone git@github.com:your-org/ultra-autotrade.git
+cd ultra-autotrade
+
+以降、このディレクトリを project root と呼ぶ。
+
+3.3 .env.staging の作成
+
+project root 直下に .env.staging を作成し、
+13_security_design.md のポリシーに従って必要な環境変数を定義する。
+
+例（※値はダミー、実際は安全に管理する）：
+
+# Notion
+NOTION_API_TOKEN=secret_xxx
+NOTION_DATABASE_ID=xxxxxxxx
+
+# OctoBot
+OCTOBOT_BASE_URL=https://octobot-staging.example.com
+OCTOBOT_API_KEY=octo_yyy
+
+# Aave / ネットワーク
+AAVE_RPC_URL=https://polygon-mumbai.infura.io/v3/...
+AAVE_NETWORK=polygon-mumbai
+AAVE_WALLET_PRIVATE_KEY=0x...
+
+# その他（AI, 通知など）
+OPENAI_API_KEY=sk-...
+LINE_NOTIFY_TOKEN=...
+SLACK_WEBHOOK_URL=...
+
+.env.staging は Git にコミットしない（.gitignore 対象）
+サーバ上での権限は chmod 600 .env.staging を推奨
+
+3.4 コンテナのビルドと起動
+
+# project root にいる前提
+docker compose -f docker-compose.staging.yml build
+docker compose -f docker-compose.staging.yml up -d
+
+起動状況確認：
+
+docker compose -f docker-compose.staging.yml ps
+
+---
+
+4. systemd パターン（テンプレート利用）
+Docker を利用できない環境向けの fallback パターン。
+
+4.1 Python 仮想環境の作成
+
+cd /opt/ultra-autotrade
+python3 -m venv venv
+source venv/bin/activate
+
+# 必要なライブラリのインストール
+pip install --upgrade pip
+pip install fastapi "uvicorn[standard]" httpx
+
+リポジトリは /opt/ultra-autotrade に clone 済みとする。
+
+4.2 backend.env の作成
+
+sudo mkdir -p /etc/ultra-autotrade
+sudo touch /etc/ultra-autotrade/backend.env
+sudo chmod 600 /etc/ultra-autotrade/backend.env
+sudo chown root:root /etc/ultra-autotrade/backend.env
+
+backend.env に staging 用の環境変数を定義する（内容は .env.staging 相当）。
+
+4.3 systemd ユニットファイルの配置
+
+infra/systemd/ultra-autotrade-backend.service を /etc/systemd/system/ にコピーし、
+パスなどを実環境に合わせて修正する。
+
+sudo cp infra/systemd/ultra-autotrade-backend.service \
+  /etc/systemd/system/ultra-autotrade-backend.service
+
+sudo systemctl daemon-reload
+sudo systemctl enable ultra-autotrade-backend
+sudo systemctl start ultra-autotrade-backend
+
+---
+
+5. ヘルスチェックと動作確認
+
+5.1 HTTP ヘルスチェック
+FastAPI 側で /health などのヘルスチェックエンドポイントが用意されている場合：
+
+curl http://<server-ip>:8000/health
+# 期待レスポンス例：
+# {"status":"ok"}
+
+これが成功すれば、staging backend が外部から到達可能 な状態である。
+
+5.2 ログ確認
+Docker パターン：
+
+docker logs ultra-autotrade-backend-staging
+
+systemd パターン：
+
+sudo journalctl -u ultra-autotrade-backend -f
+
+---
+
+6. 更新・再デプロイ
+
+6.1 scripts/deploy_staging_backend.sh の利用
+staging サーバ上で、project root にて以下を実行することで
+
+git pull（※任意）
+イメージのビルド
+コンテナの再起動
+
+をまとめて行うことができる：
+
+cd /path/to/ultra-autotrade
+./scripts/deploy_staging_backend.sh
+
+詳細は scripts/deploy_staging_backend.sh のコメントを参照。
+
+---
+
+7. 障害時の基本対応
+
+状態確認
+Docker：docker compose -f docker-compose.staging.yml ps
+systemd：systemctl status ultra-autotrade-backend
+
+ログ確認
+Docker：docker logs ultra-autotrade-backend-staging
+systemd：journalctl -u ultra-autotrade-backend -n 200
+
+再起動
+Docker：docker compose -f docker-compose.staging.yml restart backend
+systemd：systemctl restart ultra-autotrade-backend
+
+問題が解決しない場合は、15_rollback_procedures.md に従いロールバックを検討する。
+
+
+---
+
+## 4. `Dockerfile`（新規）
+
+```dockerfile
+# Ultra AutoTrade Backend 用 Dockerfile
+# FastAPI + uvicorn を用いて backend/app/main.py の app を公開する
+
+FROM python:3.11-slim
+
+# システムレベルの依存パッケージ（必要最低限）
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# 作業ディレクトリを project root に設定
+WORKDIR /app
+
+# backend ディレクトリのみをコンテナにコピー
+# （docs や .git はデプロイに不要なため）
+COPY backend ./backend
+
+# Python ライブラリのインストール
+# - FastAPI: Web フレームワーク
+# - uvicorn[standard]: ASGI サーバ
+# - httpx: 非同期 HTTP クライアント（OctoBot 連携など）
+RUN pip install --no-cache-dir \
+    fastapi \
+    "uvicorn[standard]" \
+    httpx
+
+# 環境変数
+ENV PYTHONUNBUFFERED=1
+
+# アプリケーションポート
+EXPOSE 8000
+
+# backend ディレクトリをカレントにして起動
+WORKDIR /app/backend
+
+# uvicorn で FastAPI アプリを起動
+# app.main:app は backend/app/main.py の app を指す
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+## X.Y 環境ファイルの準備（production）
+
+production 環境では、アプリケーションの設定値・秘密情報を  
+サーバ上の `.env.production` で管理する。
+
+### 手順（概要）
+
+1. リポジトリ内の `backend/.env.production.example` を参照し、必要な項目を確認する
+2. デプロイ先サーバ上で `.env.production` ファイルを作成する
+3. 各項目に本番用の値を設定する
+   - Notion / OctoBot / Aave / 通知サービスのキー・URL は、  
+     staging 用とは物理的に異なるものを使用する
+4. ファイル権限を設定する
+   - 所有ユーザ：デプロイユーザ（例：`ultra`）
+   - パーミッション：`chmod 600 .env.production`
+
+詳細な項目一覧や設定方針は `docs/21_production_environment_config.md` を参照すること。
+
+## X.Z systemd / Docker と .env.production の扱い
+
+- systemd の unit ファイル（例：`infra/systemd/ultra-autotrade-backend.service`）では、
+  必要に応じて以下のいずれかの方式で環境変数を読み込む：
+
+  - `EnvironmentFile=/path/to/.env.production` を指定する
+  - または、必要な変数のみ unit ファイル内で `Environment=KEY=VALUE` として定義する
+
+- Docker / docker-compose を利用する場合：
+
+  - staging：`docker-compose.staging.yml` + `.env.staging`
+  - production：将来的に `docker-compose.production.yml` + `.env.production` を使用する方針
+
+- どの方式を採用する場合でも、
+  `.env.production` 自体は Git にコミットせず、  
+  サーバ上でのみ管理すること。
+
+## 5. Production 環境への展開（概要）
+
+本セクションでは、Ultra AutoTrade の **production（本番）環境** へのデプロイ方針をまとめる。
+
+- staging 環境：
+  - `docker-compose.staging.yml`
+  - （必要に応じて）`infra/systemd/ultra-autotrade-backend.service`
+  - `.env.staging`
+- production 環境：
+  - `docker-compose.production.yml`
+  - （必要に応じて）`infra/systemd/ultra-autotrade-backend-production.service`
+  - `.env.production`
+
+各環境ごとの設定値については、次を参照すること：
+
+- staging：`docs/17_staging_environment_config.md`
+- production：`docs/21_production_environment_config.md`
+
+### 5.1 環境ファイルの準備（production）
+
+production 環境では、アプリケーションの設定値・秘密情報を  
+サーバ上の `.env.production` で管理する。
+
+#### 手順（概要）
+
+1. リポジトリ内の `backend/.env.production.example` を参照し、必要な項目を確認する
+2. デプロイ先サーバ上の backend ディレクトリ（例：`/opt/ultra-autotrade/backend`）に `.env.production` ファイルを作成する
+3. 各項目に **本番用の値** を設定する
+   - Notion / OctoBot / Aave / 通知サービスのキー・URL は、staging 用とは物理的に異なるものを使用する
+4. ファイル権限を設定する
+   - 所有ユーザ：デプロイユーザ（例：`ultra`）
+   - パーミッション：`chmod 600 .env.production`
+
+詳細な項目一覧や設定方針は `docs/21_production_environment_config.md` を参照すること。
+
+### 5.2 デプロイスクリプト（production）
+
+production 環境では、次のシェルスクリプトを用意しておくことで、  
+デプロイ作業を標準化できる。
+
+- スクリプト: `scripts/deploy_production_backend.sh`
+- 想定パス:
+  - リポジトリ: `/opt/ultra-autotrade`
+  - backend: `/opt/ultra-autotrade/backend`
+  - compose: `/opt/ultra-autotrade/docker-compose.production.yml`
+  - env: `/opt/ultra-autotrade/backend/.env.production`
+
+スクリプトは次のような流れで処理を行う：
+
+1. Git リポジトリの存在確認 / `git pull --ff-only` による最新化
+2. `docker-compose.production.yml` / `.env.production` の存在確認
+3. `docker compose -f docker-compose.production.yml build backend`
+4. `docker compose -f docker-compose.production.yml up -d backend`
+5. `docker compose ... ps backend` による状態確認
+
+環境に合わせてパスを変更した場合は、  
+このドキュメントとスクリプト内のコメントも合わせて更新すること。
+
+### 5.3 systemd との連携（production）
+
+Docker を使わず、Linux ホスト上で直接 uvicorn を起動する場合は、  
+production 用の systemd unit を用意する。
+
+- ファイル例：`infra/systemd/ultra-autotrade-backend-production.service`
+- 主な設定：
+  - `WorkingDirectory=/opt/ultra-autotrade/backend`
+  - `EnvironmentFile=/opt/ultra-autotrade/backend/.env.production`
+  - `ExecStart=/opt/ultra-autotrade/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000`
+
+配置と有効化の例：
+
+```bash
+sudo cp infra/systemd/ultra-autotrade-backend-production.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable ultra-autotrade-backend-production
+sudo systemctl start ultra-autotrade-backend-production
+
+staging 用 unit（ultra-autotrade-backend.service）とはファイル名を分け、
+.env.staging / .env.production の取り違えを防ぐこと。
+---
+
+### docs/17_staging_environment_config.md
+# 17_staging_environment_config.md
+Ultra AutoTrade – Staging 環境設定ガイド
+
+本ドキュメントは、Ultra AutoTrade の **staging 環境** で使用する  
+`.env.staging` の設定項目を整理したものです。
+
+- ネットワークは原則として **テストネット**
+- 資金はテスト用ウォレットに限定
+- 本番用のキー / URL と混ざらないこと
+
+を目的とします。
+
+---
+
+## 1. 環境ファイルの役割
+
+- `.env.local`
+  - ローカル開発用（個人マシン）
+  - デバッグ・検証のための設定
+- `.env.staging`
+  - staging サーバ用
+  - Aave テストネット / OctoBot ステージング / 検証用 Notion DB など
+- `.env.production`
+  - 本番サーバ用
+  - 実運用の資金と本番サービスに接続
+
+これらのファイルはすべて `.gitignore` 対象とし、  
+サーバ上では `chmod 600` を推奨する。詳細は `13_security_design.md` を参照。
+
+---
+
+## 2. Aave（テストネット）関連の環境変数
+
+Aave 設定は `backend/app/aave/config.py` から読み込まれる。
+
+| 変数名                        | 必須 | 説明                                       | Staging 例                                   |
+|------------------------------|------|--------------------------------------------|----------------------------------------------|
+| `AAVE_NETWORK`               | 必須 | 利用するネットワーク名                     | `polygon-mumbai` などテストネット名         |
+| `AAVE_RPC_URL`               | 必須 | 上記ネットワークの RPC エンドポイント     | `https://polygon-mumbai.infura.io/v3/...`    |
+| `AAVE_DEFAULT_ASSET_SYMBOL`  | 任意 | デフォルト運用対象の資産シンボル          | `USDC`                                       |
+| `AAVE_MAX_SINGLE_TRADE_USD`  | 任意 | 1 回のトレードで許容する最大 USD 相当額   | `5` など、極小値                             |
+| `AAVE_MIN_HEALTH_FACTOR`     | 任意 | 最小許容 Health Factor                     | `1.6` など保守的な値                         |
+| `AAVE_TRADE_COOLDOWN_SECONDS`| 任意 | 連続トレードのクールダウン時間（秒）      | `600`（10 分）など                           |
+
+---
+
+## 3. OctoBot（シグナル API）関連の環境変数
+
+OctoBot 設定は `backend/app/bots/config.py` から読み込まれる。
+
+| 変数名                   | 必須 | 説明                                  | Staging 例                                          |
+|-------------------------|------|---------------------------------------|-----------------------------------------------------|
+| `OCTOBOT_API_BASE_URL`  | 必須 | OctoBot 外部シグナル API のベース URL| `https://octobot-staging.example.com/api`          |
+| `OCTOBOT_API_KEY`       | 必須 | シグナル送信用 API キー               | `octo_test_xxx`                                     |
+| `OCTOBOT_TIMEOUT_SECONDS` | 任意 | HTTP タイムアウト秒数                 | `5`〜`10` 秒                                        |
+
+- 本番用の OctoBot とは URL / API キーを明確に分ける
+- テスト用インスタンスが落ちても資金リスクが無い構成にする
+
+---
+
+## 4. Notion 連携関連の環境変数
+
+Notion 設定は `backend/app/notion/config.py` から読み込まれる。
+
+| 変数名                  | 必須 | 説明                                      | Staging 例                           |
+|------------------------|------|-------------------------------------------|--------------------------------------|
+| `NOTION_API_KEY`       | 必須 | Notion API 用シークレットキー             | `secret_staging_xxx`                 |
+| `NOTION_DATABASE_ID`   | 必須 | ニュース管理用の Notion Database ID       | `xxxx-yyyy-zzzz-...`                 |
+| `NOTION_API_BASE_URL`  | 任意 | Notion API ベース URL                     | デフォルトのまま（通常は変更不要）   |
+| `NOTION_API_VERSION`   | 任意 | Notion API バージョン                      | `2022-06-28` など                     |
+
+- staging では **本番とは別の Database** を使用する
+- 誤って本番 DB を参照しないよう、ID を明示的に分ける
+
+---
+
+## 5. その他（AI / 通知など）
+
+AI クライアントや通知系クライアント（LINE / Slack 等）の環境変数は、  
+各クライアント実装に従って `.env.staging` に追加する。
+
+例（環境変数名は実装側に合わせて定義）:
+
+- AI / LLM クライアント
+  - LLM API 用のキー
+  - モデル名、エンドポイント URL
+- 通知系
+  - LINE Notify トークン
+  - Slack Webhook URL
+  - その他通知チャネルのトークン / URL
+
+これらも本番と staging で必ず分ける。
+
+---
+
+## 6. `.env.staging` サンプル
+
+以下は、staging 環境用の `.env.staging` のイメージである。  
+※ 値はすべてダミー。
+
+```bash
+# ===== Notion =====
+NOTION_API_KEY=secret_staging_notion_xxx
+NOTION_DATABASE_ID=1111-2222-3333-4444
+NOTION_API_BASE_URL=https://api.notion.com
+NOTION_API_VERSION=2022-06-28
+
+# ===== OctoBot (staging) =====
+OCTOBOT_API_BASE_URL=https://octobot-staging.example.com/api
+OCTOBOT_API_KEY=octo_test_xxx
+OCTOBOT_TIMEOUT_SECONDS=5
+
+# ===== Aave (testnet) =====
+AAVE_NETWORK=polygon-mumbai
+AAVE_RPC_URL=https://polygon-mumbai.infura.io/v3/your_project_id
+AAVE_DEFAULT_ASSET_SYMBOL=USDC
+AAVE_MAX_SINGLE_TRADE_USD=5
+AAVE_MIN_HEALTH_FACTOR=1.6
+AAVE_TRADE_COOLDOWN_SECONDS=600
+
+# ===== その他（AI / 通知など） =====
+# AI / LLM クライアント用のキー
+# 通知用トークン（LINE / Slack など）
+
+## 6. 監視・自動化関連の環境変数
+
+staging 環境でも、本番と同じ種類のメトリクスを取得できるよう、  
+監視・自動化用の環境変数を定義しておく。
+
+| 変数名                    | 必須 | 説明                                                   | Staging 例                                   |
+|--------------------------|------|--------------------------------------------------------|----------------------------------------------|
+| `MONITOR_HEALTHCHECK_URL`| 必須 | HTTP ヘルスチェック対象の URL                         | `http://localhost:8000/health`               |
+| `MONITOR_WARN_MS`        | 任意 | レイテンシ警告しきい値（ミリ秒）                       | `1000`                                       |
+| `MONITOR_ALERT_MS`       | 任意 | レイテンシアラートしきい値（ミリ秒）                   | `30000`                                      |
+| `METRICS_LOG_DIR`        | 任意 | メトリクス用ログファイル配置ディレクトリ               | `/var/log/ultra`                             |
+| `MONITOR_NOTIFY_CHANNEL` | 任意 | 監視アラート送信先（論理名。実際の通知先は通知設定に依存） | `staging-monitoring`                         |
+
+- 具体的な利用方法は `docs/18_scheduler_and_cron.md` および  
+  `scripts/monitor.sh` / `backend/app/automation/monitoring_service.py` の実装に従う。
+- staging では本番と同じ項目を測ることを優先しつつ、  
+  しきい値自体はやや緩めでもよい（例：テスト時の一時的高負荷を許容する）。
+
+## 7. 本番環境への切り替え時の注意点（概要）
+- .env.staging の内容をそのまま .env.production にコピーして使い回さない
+- 少なくとも以下の項目は すべて本番用に差し替える必要がある：
+ - Aave:
+  - AAVE_NETWORK / AAVE_RPC_URL
+  - 本番用ウォレット（別アドレス）と秘密鍵
+ - OctoBot:
+  - OCTOBOT_API_BASE_URL / OCTOBOT_API_KEY
+ - Notion:
+  - NOTION_API_KEY / NOTION_DATABASE_ID
+ - その他通知 / AI 系キー
+- 切り替え前に、15_rollback_procedures.md を参照し、
+  ロールバック手順が機能することを staging で確認しておくこと
+---
+
+### docs/18_scheduler_and_cron.md
+# 18_scheduler_and_cron.md
+Ultra AutoTrade – スケジューラ & cron 設定ガイド
+
+本ドキュメントは、Ultra AutoTrade の各種自動ジョブを  
+Linux サーバの cron で実行するための設定例をまとめたものです。
+
+- 対象：
+  - `scripts/backup.sh`
+  - `scripts/monitor.sh`
+  - シンプルな HTTP ヘルスチェック（`/health`）
+- 想定環境：
+  - Linux（Debian / Ubuntu）
+  - デプロイユーザ例：`ultra`
+  - タイムゾーン：可能であればサーバ自体を `Asia/Tokyo` に設定
+
+---
+
+## 1. ジョブ一覧と目的
+
+### 1.1 バックアップジョブ（backup_daily）
+
+- スクリプト：`scripts/backup.sh`
+- 目的：
+  - Notion / AI 判定結果 / 取引履歴など、重要データの定期バックアップ
+- 実行タイミング（推奨）：
+  - 毎日 00:00（Asia/Tokyo 基準）
+- 備考：
+  - 失敗時はログを確認し、必要に応じて手動再実行する
+
+### 1.2 日次監視・レポートジョブ（monitor_daily）
+
+- スクリプト：`scripts/monitor.sh daily`
+- 目的：
+  - 過去 1 日分の監視イベントを集計し、日次レポート・通知を生成する
+- 実行タイミング（推奨）：
+  - 毎日 00:30（バックアップ完了後）
+- 備考：
+  - 期間の切り方は `ReportingService` / `ReportPeriod.DAILY` に従う
+
+### 1.3 週次監視・レポートジョブ（monitor_weekly）
+
+- スクリプト：`scripts/monitor.sh weekly`
+- 目的：
+  - 過去 1 週間分の状態を集計し、長期の傾向を把握する
+- 実行タイミング（推奨）：
+  - 毎週 月曜日 01:00
+- 備考：
+  - 前週（月〜日）のデータを対象とする想定
+
+### 1.4 ヘルスチェックジョブ（health_check）
+
+- コマンド例：`curl http://localhost:8000/health`
+- 目的：
+  - FastAPI バックエンドのヘルスチェック（HTTP レベル）を 1 分間隔で監視
+- 実行タイミング（推奨）：
+  - 毎分 1 回
+- 備考：
+  - 簡易的な監視として、外部サービス（UptimeRobot 等）と併用してもよい
+
+---
+
+## 2. 推奨スケジュール（一覧）
+
+| ジョブ名           | 種別          | スクリプト / コマンド                        | 推奨タイミング（Asia/Tokyo） | 備考                            |
+|--------------------|---------------|-----------------------------------------------|------------------------------|---------------------------------|
+| `backup_daily`     | バックアップ  | `scripts/backup.sh`                           | 毎日 00:00                    | データ保全                      |
+| `monitor_daily`    | 日次レポート  | `scripts/monitor.sh daily`                    | 毎日 00:30                    | 前日分の集計                    |
+| `monitor_weekly`   | 週次レポート  | `scripts/monitor.sh weekly`                   | 毎週 月曜 01:00               | 前週分の集計                    |
+| `health_check`     | 死活監視      | `curl http://localhost:8000/health` など      | 毎分                          | HTTP レベルの生存確認           |
+
+サーバのタイムゾーンが UTC の場合は、上記時刻から 9 時間引いた時間を cron に設定する。
+
+---
+
+## 3. staging 環境向け crontab 設定例
+
+以下は、staging サーバ上で `ultra` ユーザの crontab に設定する例である。
+
+### 3.1 前提
+
+- プロジェクトルート：`/opt/ultra-autotrade`
+- ログディレクトリ：`/var/log/ultra`（存在しなければ事前に作成）
+  ```bash
+  sudo mkdir -p /var/log/ultra
+  sudo chown ultra:ultra /var/log/ultra
+
+### 3.2 crontab 設定例（crontab -e）
+
+# Ultra AutoTrade (staging) cron jobs
+# タイムゾーン: サーバローカル（可能なら Asia/Tokyo）
+
+# 1) HTTP ヘルスチェック（毎分）
+* * * * * cd /opt/ultra-autotrade && curl -fsS http://localhost:8000/health \
+  >> /var/log/ultra/healthcheck.log 2>&1
+
+# 2) 毎日 00:00 にバックアップ実行
+0 0 * * * cd /opt/ultra-autotrade && ./scripts/backup.sh \
+  >> /var/log/ultra/backup_daily.log 2>&1
+
+# 3) 毎日 00:30 に日次監視・レポート実行
+30 0 * * * cd /opt/ultra-autotrade && ./scripts/monitor.sh daily \
+  >> /var/log/ultra/monitor_daily.log 2>&1
+
+# 4) 毎週 月曜 01:00 に週次監視・レポート実行
+0 1 * * 1 cd /opt/ultra-autotrade && ./scripts/monitor.sh weekly \
+  >> /var/log/ultra/monitor_weekly.log 2>&1
+
+注意:
+cd /opt/ultra-autotrade によってプロジェクトルートへ移動してからスクリプトを実行している。
+スクリプトには実行権限（chmod +x scripts/*.sh）を付けておくこと。
+
+### 4. エラー時の扱いと再実行
+4.1 スクリプト側の挙動
+- scripts/backup.sh / scripts/monitor.sh は set -euo pipefail により、
+途中でエラーが発生した場合は 即座に異常終了 し、終了ステータスは非ゼロとなる。
+- cron から見ると「ジョブ失敗」として扱われる。
+
+## 4.2 再実行戦略
+- Phase7 時点では、専用のリトライスクリプトは用意しない。
+- 再実行は以下のいずれかで行う：
+ - 次のスケジュール時刻に、cron が自動で再実行する
+ - オペレータがサーバにログインして手動実行する
+  - 例：cd /opt/ultra-autotrade && ./scripts/backup.sh
+
+連続して失敗している場合は、ログを確認し、
+必要に応じて緊急停止フラグやロールバック手順（15_rollback_procedures.md）を検討する。
+
+## 4.5 緊急停止フラグと自動ジョブの関係
+
+Ultra AutoTrade では、致命的な異常や想定外の挙動が検知された場合、  
+「緊急停止フラグ（emergency stop）」を ON にすることで **自動トレードを停止** できる。
+
+### 4.5.1 緊急停止フラグ ON 時に止まるもの / 止まらないもの
+
+- **停止するもの（またはブロックされるもの）**
+  - 新規のトレード実行（Aave でのポジション変更）
+  - OctoBot シグナルに応じた自動ポジション調整
+  - AI 判定結果に基づくリスクの高い自動アクション
+
+- **停止しないもの（継続するもの）**
+  - 監視ジョブ（`scripts/monitor.sh`）
+    - 異常状態の観測・記録・通知
+  - バックアップジョブ（`scripts/backup.sh`）
+    - 状態のスナップショット取得
+  - ログ出力
+    - 障害原因を特定するための情報蓄積
+
+> 方針：  
+> 「危険なアクション（トレード）」は即停止するが、  
+> 「観測・記録・バックアップ」は止めないことで、  
+> 後から原因を追える状態を維持する。
+
+### 4.5.2 緊急停止フラグが ON になるトリガ例
+
+緊急停止フラグは、以下のような条件で ON になることを想定する。
+
+- Aave の Health Factor が閾値を大きく割り込んだ場合
+- 短時間に異常な数のトレード要求が発生した場合
+- 外部サービス（OctoBot / RPC など）が長時間ダウンしている場合
+- 開発者・運用者が手動で「危険」と判断した場合
+
+具体的な判定ロジック・閾値は、`MonitoringService` / `EmergencyReportService` の実装・  
+および `05_ai_judgement_rules.md` などのルール定義に従う。
+
+### 4.5.3 緊急停止フラグ ON 時の運用フロー（高レベル）
+
+1. **通知を受け取る**
+   - 緊急停止フラグが ON になった時点で、通知チャネル（LINE / Slack など）にアラートが送信される。
+
+2. **状態を確認する**
+   - `/health` エンドポイント、監視レポート、ログを確認し、  
+     どのコンポーネントで問題が起きているかを把握する。
+
+3. **必要に応じてロールバック / デプロイ停止を行う**
+   - コードの変更が原因と疑われる場合は、`15_rollback_procedures.md` に従いロールバックを検討する。
+
+4. **原因が解消されたことを確認する**
+   - 再度ヘルスチェック、テストトレード、OctoBot との連携確認などを行う。
+
+5. **緊急停止フラグを OFF にする**
+   - 問題が解消されたと判断したら、緊急停止フラグを OFF にして自動トレードを再開する。
+   - 誰が OFF にしてよいか（権限）は、`19_operations_runbook.md` で運用ルールとして定義する。
+
+緊急停止フラグの実際の保持場所（例：Notion プロパティ、設定テーブルなど）は、  
+アプリケーション実装および `09_notion_schema.md` の定義に従う。
+
+### 5. ログ出力とローテーション
+
+## 5.1 ログファイルの場所
+本ドキュメントでは、以下のログファイルを想定している：
+- /var/log/ultra/healthcheck.log
+- /var/log/ultra/backup_daily.log
+- /var/log/ultra/monitor_daily.log
+- /var/log/ultra/monitor_weekly.log
+これらはすべて ultra ユーザが書き込み可能である必要がある。
+
+## 5.2 ログローテーション（方針）
+- 長期間ログを残し続けるとディスクを圧迫するため、
+OS 標準の logrotate などを利用してローテーションすることを推奨する。
+
+- 例：
+ - 日次でローテーション
+ - 7〜30 世代分を保持
+ - gzip 圧縮を有効化
+
+ログローテーションの詳細な設定は、インフラ側の標準運用に合わせて決定する。
+
+### 6. 実運用への展開
+- staging 環境
+ - 本ドキュメントの設定例をベースに、実際のサーバで cron を設定する。
+ - 初期運用期間中は、ログ内容と通知内容を重点的に確認する。
+- production 環境
+ - staging で問題ないことを確認してから、
+実行タイミング / ログパス / 通知チャンネルを本番用に変更して適用する。
+ - 特に、バックアップの保存先や通知のエスカレーションルールは
+本番用のセキュリティ・運用ポリシーに合わせて調整する。
+
+以上により、scripts/backup.sh / scripts/monitor.sh を中心とした
+自動実行ジョブを、インフラ側で一貫して管理できる。
+---
+
+### docs/19_operations_runbook.md
+
+---
+
+## 3. `docs/19_operations_runbook.md` 新規作成案
+
+```md
+# 19_operations_runbook.md
+Ultra AutoTrade – 運用ランブック（staging 版）
+
+本ドキュメントは、Ultra AutoTrade の運用担当者が  
+日常運用や障害対応を行う際の「手順書（Runbook）」である。
+
+Phase7 時点では **staging 環境** を対象とし、  
+将来的に production 版を拡張する前提とする。
+
+---
+
+## 1. 役割と前提
+
+- 対象読者
+  - インフラ担当
+  - アプリケーション運用担当
+- 対象環境
+  - Ultra AutoTrade – staging 環境（Hetzner 等）
+- 前提
+  - インフラ構成とデプロイ手順は `16_infra_deployment_guide.md` に準拠
+  - ジョブスケジュールは `18_scheduler_and_cron.md` に準拠
+  - セキュリティポリシーは `13_security_design.md` に準拠
+
+---
+
+## 2. 日常運用フロー
+
+### 2.1 毎日のチェック項目（例）
+
+1. **通知チャネルの確認**
+   - LINE / Slack などに異常通知が来ていないか確認する。
+   - 日次レポートが想定時刻（毎日 00:30 頃）に届いているか確認する。
+
+2. **ログのざっと確認**
+   - `/var/log/ultra/backup_daily.log`
+   - `/var/log/ultra/monitor_daily.log`
+   - `/var/log/ultra/healthcheck.log`
+   の最新行を確認し、明らかなエラーがないかを見る。
+
+3. **ヘルスチェック**
+   - 必要に応じて、手動で `/health` を叩いてレスポンスを確認する：
+     ```bash
+     curl -fsS http://localhost:8000/health
+     ```
+
+### 2.2 週次のチェック項目（例）
+
+1. **週次レポートの確認**
+   - `monitor_weekly` の結果（週次レポート）が正しく生成・通知されているか確認する。
+2. **バックアップの状態確認**
+   - バックアップ先（ローカル / 外部ストレージ）の容量と、最新ファイルの日付を確認する。
+3. **ログ容量の確認**
+   - `/var/log/ultra` の容量を確認し、過大であれば logrotate 設定を見直す。
+
+### 2.3 メトリクス監視の基本視点
+
+日々の運用では、個別ログを見るだけでなく、  
+**定義済みメトリクスの「傾向」をざっと見る** ことが重要である。
+
+最低限、次の観点を押さえておく：
+
+1. **死活・レイテンシ系**
+   - `/health` の p95 レイテンシ（`backend_http_latency_p95_ms`）
+   - HTTP エラー率（`backend_http_error_rate_1m`）
+   - 「1. 死活監視（1分ごと）」の閾値（10秒 / 30秒）に近づいていないかを見る。
+
+2. **フロー成功率系**
+   - Notion → AI → OctoBot → Aave の成功率（`news_pipeline_success_rate_1h`）
+   - エラー件数（`news_pipeline_error_count_1h`）
+   - 成功率がいつもより低い時間帯がないか、エラーが集中していないかを確認する。
+
+3. **取引頻度・過剰取引系**
+   - シグナル数（`signals_per_10min`）
+   - 実行トレード数（`aave_executed_trades_1h`）
+   - 「2. 過剰取引監視」のクールダウンルールに照らして、  
+     明らかに多すぎる時間帯がないかを見る。
+
+4. **Aave リスク・資産変動系**
+   - 最小ヘルスファクター（`aave_health_factor_min`）
+   - 現在のヘルスファクター（`aave_health_factor_current`）
+   - 1 日あたりの資産変動率（`portfolio_value_change_1d_pct`）
+   - 「3. Aave運用監視」の閾値（1.8 / 1.6 / ±20%/日）に対してどの位置にいるかを確認する。
+
+5. **緊急停止・インシデント系**
+   - 緊急停止フラグ（`emergency_stop_flag`）
+   - 過去24時間の EMERGENCY イベント件数（`emergency_event_count_24h`）
+   - フラグが ON のままになっていないか、EMERGENCY が頻発していないかを確認する。
+
+> 具体的なダッシュボード構成やグラフの種類はツールに依存するが、  
+> 上記メトリクスが一目で分かるビューを用意しておくことが望ましい。  
+> メトリクス定義の詳細は `docs/08_automation_rules.md` の  
+> 「6. 監視メトリクス一覧」を参照。
+
+### 2.4 ダッシュボードの見方（AutomationStatus / DashboardSnapshot）
+
+Phase10 では、監視ダッシュボードは次の 2 種類の情報を前提とする：
+
+1. **自動運用ステータス（AutomationStatus）**
+   - 代表的な項目：
+     - `is_trading_paused`  
+       - `True` → 「緊急停止中」として扱う（新規トレードはブロックされる想定）
+       - `False` → 通常運用中
+     - `last_health_factor`  
+       - 現在の Aave Health Factor。`1.8` / `1.6` を基準に安全度を判断する。
+     - `last_price_change_24h`  
+       - ポートフォリオの 24 時間変動率（%）。絶対値が 20% を超える場合は注意。
+     - `last_event_level`  
+       - 直近の `MonitoringEvent.level`（info / warning / alert / critical / emergency）。
+       - 「今どれくらい危険な状態なのか」を一目で把握する指標。
+     - `emergency_reason`  
+       - 緊急停止中の場合、その理由（例: "health factor 1.55 below emergency threshold 1.6"）。
+
+2. **メトリクス集計（DashboardSnapshot.metric_aggregates）**
+   - 直近 `lookback` 期間（例: 過去 1 時間）におけるメトリクスの集計結果。
+   - 各メトリクスについて、少なくとも以下を確認できる：
+     - `count`（期間内のサンプル数）
+     - `min` / `max` / `avg` / `last`
+   - 運用者は、次の観点でざっと見る：
+     - 値が `docs/08_automation_rules.md` で定義された閾値に近づいていないか
+     - 「普段と比べて明らかにおかしい」時間帯がないか
+     - WARNING / ALERT / EMERGENCY 相当のスパイクが出ていないか
+
+> ポイント：  
+> - まず `AutomationStatus` で「今この瞬間の全体状態」を把握し、  
+>   続いて `DashboardSnapshot.metric_aggregates` で「直近の傾向」を確認する。
+
+### 2.5 アラート受信時の確認順序（ダッシュボード活用）
+
+通知チャネル（LINE / Slack 等）でアラートを受信したら、  
+ダッシュボード上では次の順序で確認することを推奨する。
+
+1. **アラートレベルと対象メトリクスの確認**
+   - 通知メッセージ内の `MonitoringEvent.level` と `code` / `message` を確認する。
+   - 緊急度イメージ：
+     - INFO: 情報
+     - WARNING: 要注意（しきい値に近づいている）
+     - ALERT: 明確な異常（要対応）
+     - CRITICAL / EMERGENCY: Aave ポジション喪失リスクやトレード暴走など、即時対応レベル
+   - どのメトリクス（`metric_id`）が原因かを確認する  
+     （例: `aave_health_factor_current`, `portfolio_value_change_1d_pct`, `latency_system_s` など）。
+
+2. **AutomationStatus の確認**
+   - `is_trading_paused` が `True` になっていないか。
+   - `last_health_factor` / `last_price_change_24h` の値が、閾値（1.8 / 1.6 / ±20%/日）に対してどの位置か。
+   - `last_event_level` が EMERGENCY に張り付いていないか。
+   - `emergency_reason` に、具体的な発火理由が記録されているか。
+
+3. **DashboardSnapshot の確認**
+   - アラート対象メトリクスの `min` / `max` / `avg` / `last` を確認し、
+     - 「一時的なスパイク」なのか
+     - 「期間全体で高止まりしている」のか
+     を切り分ける。
+   - 関連メトリクス（例: レイテンシ悪化とエラー率増加が同時に起きていないか）も合わせて見る。
+
+4. **Runbook との対応付け**
+   - Aave リスク系のアラートであれば、「3. Aave運用監視」「4. 緊急停止フラグの運用」を参照。
+   - バックアップやジョブ失敗系であれば、「2. 日常運用フロー」「4.5.1 緊急停止フラグ ON 時に止まるもの / 止まらないもの」を参照。
+   - 必要に応じて `15_rollback_procedures.md` を確認し、ロールバックの要否を検討する。
+
+### 2.6 緊急停止解除前チェックリスト（ダッシュボード観点）
+
+`4.4 OFF にするまでのチェックリスト（簡易）`を満たした上で、  
+**ダッシュボード上でも次の項目を確認してから緊急停止を解除** する。
+
+1. **Aave リスクの安定化**
+   - `aave_health_factor_current` の `last` が十分に安全レンジ（目安: `>= 1.8`）に戻っている。
+   - `aave_health_factor_min` の `min` も、直近の期間で危険水準（< 1.6）を記録していない。
+   - ヘルスファクターに関する EMERGENCY / ALERT イベントが、直近では発生していない。
+
+2. **資産変動の落ち着き**
+   - `portfolio_value_change_1d_pct` の `last` が ±20% 以内に収まっている。
+   - 異常なスパイクが連続していないことを、期間内の `min` / `max` で確認する。
+
+3. **レイテンシ / エラー率の収束**
+   - レイテンシ系メトリクス（例: `backend_http_latency_p95_ms` 相当）の `avg` / `max` が
+     通常レンジ（数秒〜数十秒以内）に戻っている。
+   - HTTP エラー率（`backend_http_error_rate_1m` 等）が、通常値（< 1%）に近い水準で安定している。
+
+4. **緊急停止フラグまわりの整合性**
+   - `emergency_stop_flag` が ON のままになっている理由が、`emergency_reason` として明確に把握できている。
+   - `emergency_event_count_24h` が異常に多い場合は、原因調査・再発防止策が検討済みである。
+
+5. **ジョブ・バックアップ系の健全性**
+   - `automation_job_failure_count_24h` が 0、または許容範囲内に収まっている。
+   - バックアップ / 監視ジョブが正常に完走していることをログで確認している。
+
+> 原則：  
+> - 「ダッシュボード上のメトリクスが正常レンジに戻っている」ことを確認しない限り、  
+>   緊急停止フラグを安易に OFF にしない。  
+> - OFF にする場合は、最低でも 2 名以上で状態を確認し、  
+>   必要に応じて運用メモに解除理由と時刻を記録する。
+
+---
+
+## 3. 異常検知時の基本フロー
+
+### 3.1 通知からの起点
+
+異常は、主に以下の経路から検知されることを想定する：
+
+- 通知チャネルへのエラーメッセージ
+- 日次 / 週次レポート内の異常値
+- 外部監視サービスからのダウン通知
+- 手動チェック中のエラーログ発見
+
+### 3.2 フロー（高レベル）
+
+1. **緊急度の確認**
+   - トレードに直接影響するか？
+   - Aave ポジションのリスクレベルは？
+   - 単なる一時的な外部サービスエラーか？
+
+2. **緊急停止フラグの検討**
+   - 重大な金銭的リスクがある、またはトレードロジックがおかしい場合は、
+     **すぐに緊急停止フラグを ON** にする。
+   - 軽微なログエラーの場合は、状況を見ながら対応。
+
+3. **状態の確認**
+   - `/health` レスポンス
+   - コンテナ / サービス状態（`docker ps` or `systemctl status`）
+   - 監視ログ・バックアップログ
+
+4. **原因の切り分け**
+   - 外部サービス（Notion / OctoBot / RPC）の障害か？
+   - コード変更の影響か？
+   - インフラ（サーバ / ネットワーク / DNS）の問題か？
+
+5. **対応の決定**
+   - 単純再起動で解決するか？
+   - ロールバックが必要か？（`15_rollback_procedures.md` 参照）
+   - 一時的にジョブを止める必要があるか？
+
+6. **対応後の確認と記録**
+   - 再度 `/health` / テストフローで正常に動作するか確認
+   - 対応内容と結果を運用メモに残す
+
+---
+
+## 4. 緊急停止フラグの運用
+
+### 4.1 概要
+
+緊急停止フラグ（emergency stop）は、  
+「**自動トレードを即時停止** するための安全装置」である。
+
+- ON（有効）：
+  - トレード系アクション（Aave での実トランザクション）をブロック
+- OFF（無効）：
+  - 通常どおり自動トレードを実行
+
+実際のフラグ管理場所（例：Notion データベースのプロパティ / 設定テーブル）は、  
+`09_notion_schema.md` およびコード実装に従う。
+
+### 4.2 誰が操作してよいか（権限イメージ）
+
+- ON（停止）
+  - インフラ担当 / 運用責任者 クラス
+- OFF（再開）
+  - インフラ担当 / 運用責任者
+  - 原則として、原因が解消されたことを確認した上で行う
+
+### 4.3 ON にするタイミングの例
+
+- Aave 側ポジションが危険水準（Health Factor が閾値以下）に落ち込んだ
+- OctoBot からのシグナルが明らかに異常（短時間で大量など）
+- バグ・誤った設定変更により、トレード結果が想定と大きく異なる
+- 開発チームが「このバージョンは危険」と判断した場合
+
+### 4.4 OFF にするまでのチェックリスト（簡易）
+
+1. エラー原因が特定されている
+2. 必要であればロールバック・再デプロイが完了している
+3. staging でテストフローが成功している
+4. 監視・バックアップに問題が出ていない
+5. 関係者と認識が合っている（可能であれば 2 名以上で確認）
+
+---
+
+## 5. 連絡・エスカレーション
+
+※ 実際の組織名・個人名は記載せず、抽象的なレベルで定義する。
+
+### 5.1 障害レベル（例）
+
+- **S1（重大）**
+  - トレードロジックの暴走
+  - Aave ポジション喪失リスク
+  - セキュリティインシデントが疑われる場合
+- **S2（中）**
+  - 一部機能障害（レポート生成失敗、OctoBot 連携不調など）
+  - ただし資金リスクは限定的
+- **S3（小）**
+  - 軽微なログエラー / 一時的な外部サービスエラー
+
+### 5.2 レベルごとの対応方針（例）
+
+- S1：
+  - 即座に緊急停止フラグ ON
+  - インフラ担当・開発担当へ即時連絡
+  - ロールバックも視野に入れて対応開始
+- S2：
+  - 状況を確認しつつ、必要に応じて緊急停止フラグ ON を検討
+  - 通常営業時間内での対応でもよいが、放置しない
+- S3：
+  - 日次の運用時間内に対応
+  - 影響が広がらない限り、緊急停止は不要
+
+---
+
+## 6. 今後の拡張
+
+本ランブックは Phase7 時点の **staging 運用** を前提としている。  
+production への展開時には、以下の項目を拡張・更新する必要がある。
+
+- 本番用エスカレーションルール（24/7 対応など）
+- 本番用バックアップポリシー（保持期間 / 暗号化）
+- 本番用の監査ログ保存・コンプライアンス要件
+
+これらは本番フェーズ以降で別途定義する。
+
+## 7. 本番環境の定期ヘルスチェック
+
+本番環境では、以下の観点で **定期的（例：毎日 / 毎週）** にヘルスチェックを行う。
+
+### 7.1 アプリケーションレベル
+
+- [ ] backend API に対して、read-only なエンドポイントで疎通確認
+- [ ] ログに重大なエラーが継続的に出ていないことを確認
+- [ ] スケジューラ（cron / 自動ジョブ）が想定どおり動作している
+
+### 7.2 連携サービス
+
+- [ ] Notion API への read-only アクセスが正常
+- [ ] OctoBot へのシグナル送信 / ヘルスチェックが正常
+- [ ] Aave RPC のレスポンスが安定している（タイムアウト・エラーが多発していない）
+
+### 7.3 監視・通知
+
+- [ ] 主要なアラート（プロセス死活・例外多発など）が正しく設定されている
+- [ ] LINE / Slack / Webhook などで、テスト通知が正常に届く
+- [ ] 監視設定が `docs/08_automation_rules.md` / `docs/18_scheduler_and_cron.md` と整合している
+
+## 8. 本番リリース手順（運用担当者向け）
+
+本番リリースは、次のドキュメントを前提として行う：
+
+- テスト戦略：`docs/14_test_strategy.md`
+- staging リリースチェックリスト：`docs/20_staging_release_checklist.md`
+- 本番リリースチェックリスト：`docs/22_production_release_checklist.md`
+- ロールバック手順：`docs/15_rollback_procedures.md`
+
+### 8.1 リリース前の準備
+
+- [ ] `20_staging_release_checklist.md` が完了している
+- [ ] `22_production_release_checklist.md` の「前提条件チェック」を満たしている
+- [ ] `.env.production` が最新状態であることを確認した
+- [ ] ロールバック手順（`15_rollback_procedures.md`）をリリース担当者が事前に読み直した
+
+### 8.2 デプロイ作業
+
+- 通常は `scripts/deploy_production_backend.sh` を実行する：
+  - [ ] 実行前に、対象ブランチ / タグが正しいことを確認
+  - [ ] スクリプト実行ログ（開始〜終了）を必ず保存する
+
+### 8.3 リリース後の確認
+
+- [ ] backend コンテナ / プロセスが稼働している
+- [ ] スモークテスト（API疎通、Notion → backend の軽いテスト等）が成功している
+- [ ] ログに重大なエラーが出ていない
+- [ ] 1〜2 時間ほどモニタリングを継続し、異常がないことを確認
+
+## 9. インシデント対応・緊急停止（production 向け補足）
+
+### 9.1 Aave 側の運用停止
+
+- 本番資金に影響が出る可能性がある場合、まず「新規トレードを止める」ことを最優先とする
+- 具体的な停止方法（例）：
+  - Aave 側で手動ポジション調整を行う
+  - OctoBot 側のシグナルを一時停止する
+  - backend 側の「緊急停止フラグ」を ON にする（実装済みであれば）
+
+※ 具体的な操作内容は、Aave 運用ロジック (`docs/07_aave_operation_logic.md`) と  
+　緊急停止仕様に従う。
+
+### 9.2 API キー漏えい時の対応
+
+- `.env.production` の漏えいが疑われる場合：
+  - [ ] 該当する API キー・トークン・秘密鍵を直ちにローテーション
+  - [ ] 古いキーをすべて無効化（Notion / OctoBot / Aave / 通知サービス側）
+  - [ ] ログ・ブロックチェーン履歴等を確認し、不正取引や不正アクセスがないか調査
+  - [ ] 調査内容と対応履歴を記録し、必要に応じて関係者に共有
+
+- キーのローテーション後、`docs/21_production_environment_config.md` の内容が  
+  新しい設定と整合しているかを確認する。
+
+## 10. メトリクスレビューと改善サイクル
+
+メトリクスは一度決めたら終わりではなく、  
+**運用実績に応じて定期的に見直すべき対象** である。
+
+### 10.1 月次レビュー（例）
+
+月に 1 回程度、開発チーム・運用担当者で次の観点をレビューする：
+
+- 閾値が厳しすぎて、頻繁に WARNING / ALERT が出ていないか
+- 閾値が緩すぎて、危険な状態を見逃していないか
+- 新しく監視したい指標がないか（例：特定通貨ペアのリスクなど）
+- 既存メトリクスのうち、ほとんど見ていないものはないか
+
+レビューの結果は、以下に反映する：
+
+- `docs/08_automation_rules.md`（閾値・メトリクス定義）
+- `docs/19_operations_runbook.md`（この Runbook）
+- 必要に応じて監視ツール／ダッシュボード設定
+
+### 10.2 変更時の注意
+
+- メトリクス定義や閾値は、**いきなり本番だけ変えない**。
+  - 可能であればまず staging で検証し、過去データと比較したうえで適用する。
+- 閾値を変更した場合は、必ず変更理由と日時を運用メモに残す。
+- Aave のヘルスファクターや緊急停止フラグに関わる閾値を変更する場合は、  
+  資金リスクに直結するため、開発・運用双方の合意を取る。
+
+> メトリクスや閾値の変更は **新しい要件の追加・仕様変更に近い性質** を持つ場合がある。  
+> 大きな変更が必要な場合は「要件変更チャット」で正式にスコープ化し、  
+> 本 Runbook と自動化ルールに反映すること。
+
+
+
+### 2.5 運用ダッシュボードUI（Web）
+
+Phase12 では、既存の運用API（`AutomationStatus` / `DashboardSnapshot` / `AutomationReportSummary`）を
+**読み取り専用の運用ダッシュボードUI** として提供する。
+
+- 目的:
+  - オンコール/運用者が「今見るべき情報」を最短導線で確認できること
+  - Runbook の手順と画面遷移が一致すること
+- 禁止:
+  - 運用画面からの戦略変更・取引実行など **状態変更操作**（BtoC 誤操作リスクを排除）
+
+#### 2.5.1 画面遷移（Web）
+
+- `/` : エントリ（運用ビューの入口）
+- `/dashboard` : インデックス（運用導線）
+- `/dashboard/automation` : 稼働状況（`GET /api/automation/status` + `GET /api/automation/dashboard`）
+- `/dashboard/reports` : 最新レポート（`GET /api/automation/reports/latest`）
+
+#### 2.5.2 画面とRunbook手順の対応
+
+- `/dashboard/automation`
+  - `is_trading_paused = True` の場合: 「緊急停止状態の確認」手順へ
+  - `last_health_factor` が低下している場合: 「Aave HF 劣化時の確認」手順へ
+  - `last_event_level` が warning/error の場合: 「直近イベント確認」手順へ
+- `/dashboard/reports`
+  - `highlights` / 主要集計値を確認し、未解消の警告がないことを確認
+
+### 2.6 可観測性（Grafana）
+
+Grafana などの可観測性ツールでは、Web ダッシュボードと同じ情報をパネル化して確認する。
+
+- 推奨パネル:
+  - `is_trading_paused`（緊急停止の有無）
+  - `last_health_factor`（安全度の把握）
+  - `last_price_change_24h`（急変動の検知）
+  - `last_event_level`（直近異常の把握）
+  - `DashboardSnapshot.aggregates`（集計テーブル）
+  - `AutomationReportSummary`（定例確認）
+
+> 注意: Grafana 側の表示は **既存 API の JSON を読み取る構成**とし、  
+> メトリクス定義の追加/変更は行わない（要件変更チャット案件）。
+
+---
+
+### docs/20_staging_release_checklist.md
+# 20_staging_release_checklist.md
+Ultra AutoTrade – Staging リリース前チェックリスト
+
+本ドキュメントは、Ultra AutoTrade の各フェーズで実装した機能を  
+**staging 環境で実際に動かす前に確認すべき項目** を一覧化したものである。
+
+このチェックリストを満たすことで、  
+「staging での結合動作確認に進んでよい状態」を定義する。
+
+---
+
+## 1. インフラ準備チェック
+
+- [ ] Staging 用サーバ（例：Hetzner Cloud）が用意されている
+- [ ] OS のセキュリティアップデートが適用されている
+- [ ] `git`, `docker`, `docker compose` など必要なツールがインストール済み
+- [ ] プロジェクトリポジトリが `/opt/ultra-autotrade`（または同等のパス）に配置されている
+- [ ] `Dockerfile` / `docker-compose.staging.yml` がサーバに反映されている
+- [ ] `.env.staging` が作成されており、**Git に含まれていない**
+
+参考：`16_infra_deployment_guide.md`, `13_security_design.md`, `17_staging_environment_config.md`
+
+---
+
+## 2. アプリケーション動作チェック
+
+### 2.1 基本動作
+
+- [ ] `docker compose -f docker-compose.staging.yml up -d` で backend コンテナが起動している
+- [ ] `/health` に対して HTTP 200 が返る
+  ```bash
+  curl -fsS http://localhost:8000/health
+
+- [ ] ログに致命的エラーが出ていない（起動直後のログを確認）
+
+### 2.2 Notion 連携
+- [ ] .env.staging の NOTION_API_KEY / NOTION_DATABASE_ID が staging 用 Notion DB を指している
+- [ ] テスト用ニュースページを作成し、Notion → Backend への Ingest（/notion/ingest）が成功する
+- [ ] 失敗時に適切なエラーメッセージがログに記録される
+
+### 2.3 OctoBot（staging）連携
+- [ ] .env.staging の OCTOBOT_API_BASE_URL / OCTOBOT_API_KEY が staging OctoBot を指している
+- [ ] テスト用シグナル送信が成功し、OctoBot 側で受信が確認できる
+- [ ] OctoBot 側がダウンしている場合、リトライ・エラーハンドリングが正常に動作する
+
+### 2.4 Aave（テストネット）連携
+- [ ] .env.staging の Aave 関連変数がテストネット設定になっている（AAVE_NETWORK=polygon-mumbai など）
+- [ ] ウォレットはテスト用アドレスであり、本番資金が入っていない
+- [ ] 少額のテスト取引が正常に実行できる（またはシュミレーションが成功する）
+- [ ] Health Factor やリスク関連設定が保守的な値になっている
+
+## 3. ジョブ・スケジューラチェック
+### 3.1 手動実行
+- [ ] ./scripts/backup.sh を手動実行し、バックアップ処理が成功する
+- [ ] ./scripts/monitor.sh daily を手動実行し、日次レポートが生成・通知される
+- [ ] ./scripts/monitor.sh weekly を手動実行し、週次レポートが生成・通知される
+- [ ] いずれもエラー終了せず、ログに異常が残っていない
+
+### 3.2 cron 設定
+- [ ] crontab -l で、以下のジョブが設定されていることを確認
+ - 毎日 00:00 バックアップ
+ - 毎日 00:30 日次監視・レポート
+ - 毎週 月曜 01:00 週次監視・レポート
+ - 毎分ヘルスチェック（必要に応じて）
+- [ ] /var/log/ultra/*.log が生成され、更新されていることを確認
+- [ ] ログファイルのサイズが肥大化していない、または logrotate 設定が検討されている
+
+## 3. ログ・監視設定チェック
+
+- [ ] `docs/08_automation_rules.md` の「6. 監視メトリクス一覧」にある主要メトリクスが、
+      少なくともログファイルまたは簡易ダッシュボード上で確認できる
+- [ ] `scripts/monitor.sh daily` / `scripts/monitor.sh weekly` を手動実行し、
+      `monitor_daily.log` / `monitor_weekly.log` に正常終了のログが出力されることを確認した
+- [ ] 緊急停止フラグを一時的に ON/OFF した際、MonitoringEvent / ログに
+      `emergency_stop_flag` の変化が記録されることを確認した（staging 資金で実施）
+
+
+## 4. 運用フロー確認
+- [ ] 19_operations_runbook.md に一度目を通し、
+　日常運用フロー・異常時のフローが理解できている
+- [ ] 緊急停止フラグの ON/OFF 方法を把握している
+- [ ] 緊急停止フラグを ON にした場合、トレード系処理がブロックされることを確認済み
+- [ ] 15_rollback_procedures.md に従い、staging での簡易ロールバック手順を一度試してみた
+- [ ] ロールバック後もバックアップ・監視ジョブが正常に動作していることを確認
+
+## 5. サインオフ
+- チェック完了日：
+- 確認者：
+- 備考欄：
+ - 例：一部項目についての補足、今後の改善点など
+---
+
+### docs/21_production_environment_config.md
+# 21_production_environment_config.md
+Ultra AutoTrade – Production 環境設定ガイド
+
+本ドキュメントは、Ultra AutoTrade の **production（本番）環境** で使用する  
+`.env.production` の設定項目と運用ポリシーを整理したものです。
+
+- すべての資金が **リアル資産**
+- 誤設定 = 直接的な資金リスク
+- staging / 開発環境と **物理的に分離されたキー・ウォレット** を使用する
+
+ことを目的とします。
+
+---
+
+## 1. 環境ファイルの役割
+
+- 本番環境では、アプリケーションの設定値・秘密情報を **環境変数** で管理する
+- サーバ上では、運用上の利便性のために `.env.production` ファイルを使用してもよいが、
+  - `.env.production` 自体は **Git にコミットしない**
+  - ファイル権限を最小限（例：`chmod 600`）に制限する
+
+本ドキュメントは、`.env.production` に定義すべき主な項目と  
+staging 環境（`docs/17_staging_environment_config.md`）との差分ポリシーを示す。
+
+---
+
+## 2. 本番環境の前提・ポリシー
+
+- ネットワークは **本番ネットワーク**
+  - 例：Aave の場合、`AAVE_NETWORK=polygon` など
+- 資金は **本番用ウォレット** にのみ存在し、staging 用ウォレットとは完全に分離する
+- Notion / OctoBot / Aave / 通知サービスは、それぞれ本番専用のキー・URL を使用する
+- `.env.staging` の内容を **コピーして流用しない**
+  - 各キー・秘密情報は、環境ごとに物理的に異なるものを用意する
+
+---
+
+## 3. `.env.production` の構造（項目一覧）
+
+※ 以下は「変数名の一覧と役割」を示すものであり、  
+　具体的な値や秘密情報は一切記載しないこと。
+
+### 3.1 Core / 共通設定
+
+- `APP_ENV`
+  - 例：`production`
+  - アプリケーションが現在どの環境で動作しているかを判定するためのフラグ
+
+- （その他、backend 実装で既に使用している共通系の環境変数）
+  - 例：タイムゾーン、ロギング設定、HTTP ポート番号など  
+  - **新しい変数名を追加する場合は要件変更チャット経由で仕様に反映すること**
+
+---
+
+### 3.2 Notion 関連
+
+- `NOTION_API_KEY`
+  - 本番 Notion API へのアクセスキー
+  - staging 用 `NOTION_API_KEY_DEV` / `NOTION_API_KEY_STAGING` などと混在させない
+
+- `NOTION_DATABASE_ID`
+  - 本番で運用する Notion データベースの ID
+  - staging 用の DB ID とは必ず分離する
+
+- `NOTION_API_BASE_URL`
+  - 通常は `https://api.notion.com`
+  - 特殊なルーティングを行う場合のみ変更
+
+- `NOTION_API_VERSION`
+  - 使用している Notion API のバージョン（例：`2022-06-28`）
+
+---
+
+### 3.3 OctoBot 関連
+
+- `OCTOBOT_API_BASE_URL`
+  - 本番 OctoBot インスタンスの Base URL
+  - 例：`https://octobot.example.com/api`
+  - staging 用（`https://octobot-staging.example.com/api` 等）と混同してはならない
+
+- `OCTOBOT_API_KEY`
+  - 本番 OctoBot に対してトレードシグナル等を送信するための API キー
+  - 本番資金へのアクセス権限を持つため、厳格に管理する
+
+- `OCTOBOT_TIMEOUT_SECONDS`
+  - OctoBot API 呼び出しのタイムアウト秒数
+  - 通信遅延を考慮しつつ、過度な待ち時間にならない範囲で設定
+
+---
+
+### 3.4 Aave / チェーン関連
+
+- `AAVE_NETWORK`
+  - 例：`polygon`
+  - テストネット用の `polygon-mumbai` 等と異なる値になる
+
+- `AAVE_RPC_URL`
+  - 本番ネットワーク向け RPC エンドポイント URL
+  - Infura / Alchemy 等の本番用プロジェクトを使用する
+
+- `AAVE_DEFAULT_ASSET_SYMBOL`
+  - デフォルトで運用対象とするアセット（例：`USDC`）
+
+- `AAVE_MAX_SINGLE_TRADE_USD`
+  - 1 回のトレードで許容される上限金額（USD 換算）
+  - 本番では staging よりも慎重な値を設定することが多い
+
+- `AAVE_MIN_HEALTH_FACTOR`
+  - ヘルスファクターの下限値
+  - これを下回る運用は行わない
+
+- `AAVE_TRADE_COOLDOWN_SECONDS`
+  - 連続トレードを防ぐためのクールダウン時間（秒）
+
+- `AAVE_PRIVATE_KEY_PROD`
+  - 本番用ウォレットの秘密鍵
+  - **この値は決して Git / ログ / チャット等に貼り付けない**
+
+---
+
+### 3.5 通知・監視関連
+
+- （例）LINE / Slack / Webhook などの通知先トークン・URL
+  - 具体的な変数名は運用設計 / 既存実装に従う
+  - staging 用トークンと共有せず、**本番用のチャネル** を利用する
+
+---
+
+### 3.6 AI / LLM 関連
+
+- LLM クライアント用の API キーやモデル名等
+  - 具体的な変数名は backend 実装・`05_ai_judgement_rules.md` で使用されているものに合わせる
+  - 例として `OPENAI_API_KEY` 等が考えられるが、**実際の変数名はコード側を必ず確認すること**
+
+### 3.7 メトリクス・監視しきい値関連
+
+本番環境では、監視・アラートが直接資金リスクに影響するため、  
+staging よりも慎重な値を設定する。
+
+| 変数名                    | 必須 | 説明                                                   | Production 例                               |
+|--------------------------|------|--------------------------------------------------------|--------------------------------------------|
+| `MONITOR_HEALTHCHECK_URL`| 必須 | HTTP ヘルスチェック対象の URL                         | `https://backend.example.com/health`       |
+| `MONITOR_WARN_MS`        | 任意 | レイテンシ警告しきい値（ミリ秒）                       | `1000`                                     |
+| `MONITOR_ALERT_MS`       | 任意 | レイテンシアラートしきい値（ミリ秒）                   | `30000`                                    |
+| `METRICS_LOG_DIR`        | 任意 | メトリクス用ログファイル配置ディレクトリ               | `/var/log/ultra`                           |
+| `MONITOR_NOTIFY_CHANNEL` | 任意 | 監視アラート送信先（本番用通知チャネル名、または種別） | `production-monitoring`                    |
+
+運用ポリシー：
+
+- 本番通知チャネルは staging と共有せず、**本番運用専用のチャネル** を利用する。
+- `docs/08_automation_rules.md` で定義された閾値と矛盾しない設定とすること。
+- しきい値を変更する際は、`docs/19_operations_runbook.md` の  
+  「10. メトリクスレビューと改善サイクル」に従い、理由と日時を記録する。
+
+---
+
+## 4. Staging との比較・差分ポリシー
+
+- 詳細な staging 用設定は `docs/17_staging_environment_config.md` を参照
+- `.env.staging` と `.env.production` の関係性：
+  - ファイル名は似ているが、**中身は完全に別物** として扱う
+  - 特に以下は **必ず本番用に差し替える**：
+    - `AAVE_NETWORK` / `AAVE_RPC_URL` / `AAVE_PRIVATE_KEY_PROD`
+    - `OCTOBOT_API_BASE_URL` / `OCTOBOT_API_KEY`
+    - `NOTION_API_KEY` / `NOTION_DATABASE_ID`
+    - 通知・AI 系キー全般
+- 「staging の値をベースにして、一部だけ本番用に上書きする」運用は原則禁止
+  - 誤ってテスト用 RPC / ウォレットを本番で使う、またはその逆のリスクがあるため
+
+---
+
+## 5. `.env.production` の管理・権限
+
+- `.env.production` は次のルールで管理する：
+  - Git 管理外（`.gitignore` に含める）
+  - サーバ上の配置パスはインフラ設計に従うが、原則としてアプリケーションディレクトリ直下などに限定する
+  - 所有ユーザ：デプロイユーザ（例：`ultra`）
+  - パーミッション：`chmod 600`（所有者のみ読み取り・書き込み）
+
+- ファイル配布の方針：
+  - できる限り手入力または安全なチャンネル（暗号化チャネル）で共有する
+  - SCP 等でのコピー時には、転送元・転送先の権限設定を必ず確認する
+
+---
+
+## 6. 運用チェックリスト（抜粋）
+
+本番環境でのリリース・設定変更時には、少なくとも以下を確認する：
+
+- [ ] `.env.production` がサーバ上に存在する
+- [ ] ファイル権限が `600` になっている
+- [ ] `APP_ENV=production` になっている
+- [ ] Aave / OctoBot / Notion / 通知系の URL / キーが **本番用** になっている
+- [ ] `AAVE_NETWORK` / `AAVE_RPC_URL` がテストネットではない
+- [ ] `AAVE_PRIVATE_KEY_PROD` が staging / 開発用と異なるウォレットである
+- [ ] 通知チャネル（LINE / Slack 等）が、本番運用用のチャネルに向いている
+- [ ] 変更内容が `docs/13_security_design.md` / `docs/19_operations_runbook.md` 等と矛盾していない
+
+本チェックリストは `19_operations_runbook.md` や `20_staging_release_checklist.md` と連携して  
+必要に応じて拡張していく。
+
+---
+
+### docs/22_production_release_checklist.md
+# 22_production_release_checklist.md
+Ultra AutoTrade – Production リリース前チェックリスト
+
+本ドキュメントは、Ultra AutoTrade の機能を  
+**production 本番環境にデプロイする前・直後に確認すべき項目** を一覧化したものである。
+
+このチェックリストを満たすことで、  
+「本番リリースを実行してよい状態」を定義する。
+
+---
+
+## 1. 前提条件チェック
+
+- [ ] `20_staging_release_checklist.md` の全項目が完了している
+- [ ] `14_test_strategy.md` に沿ったテストが実施され、問題がないことを確認した
+- [ ] リリース対象のコードが staging で一定期間安定稼働している
+- [ ] ロールバック手順（`15_rollback_procedures.md`）をリリース担当者が事前に確認した
+- [ ] 関係者（プロジェクトオーナー / インフラ担当など）にリリース時間帯を共有済み
+
+---
+
+## 2. 環境設定の確認（.env.production）
+
+- [ ] 本番サーバに `.env.production` が存在する
+- [ ] `.env.production` のパーミッションが `600` になっている
+- [ ] `APP_ENV=production` に設定されている
+- [ ] `docs/21_production_environment_config.md` に記載されている必須項目がすべて埋まっている
+- [ ] Notion / OctoBot / Aave / 通知系などのキー・URL が **すべて本番用** である
+- [ ] staging 用のキー・ウォレット・トークンが混入していないことをダブルチェックした
+
+---
+
+## 3. リリース前の技術チェック
+
+- [ ] リリース対象ブランチ / タグが正しい（例：`main` の特定コミット）
+- [ ] 本番サーバ上のリポジトリがクリーンであり、不要なローカル変更がない
+- [ ] `scripts/deploy_production_backend.sh` の内容が最新である
+- [ ] 必要なツール（`git`, `docker`, `docker compose`, `systemd` など）がインストール済み
+
+---
+
+## 4. リリース作業中のチェック
+
+- [ ] リリース作業開始前に、作業者・開始時刻を記録した
+- [ ] `scripts/deploy_production_backend.sh` を実行し、エラーなく完了した
+- [ ] デプロイ中に出力されたログを保存した（少なくとも直近の出力をコピー）
+- [ ] docker または systemd のステータスを確認し、backend が `running` になっている
+
+---
+
+## 5. リリース直後のスモークテスト
+
+- [ ] backend API に対して、read-only なエンドポイントで疎通確認を行った
+- [ ] Notion から backend への軽量なフロー（安全なニュース / テスト用レコード等）が成功する
+- [ ] OctoBot / Aave との連携について、致命的なエラーが発生していない
+- [ ] ログに予期しない例外・スタックトレースが連続して出ていない
+- [ ] LINE / Slack / Webhook など、本番通知チャネルへのテスト通知が成功した
+
+---
+
+## 6. リリース後モニタリング
+
+- [ ] リリース直後の 1〜2 時間、ログと監視アラートを継続的に確認した
+- [ ] 不審なトレード・シグナル・API アクセスがないことを確認した
+- [ ] Aave ポジションの状態（残高 / Health Factor 等）に異常がない
+- [ ] リリース直後〜数時間の間、`docs/08_automation_rules.md` で定義された
+      主要メトリクス（レスポンスタイム / エラー率 / ヘルスファクター / 緊急停止フラグなど）を確認した
+- [ ] 緊急停止フラグが ON になった場合、メトリクス `emergency_stop_flag` および
+      EMERGENCY レベルの MonitoringEvent が期待どおりに記録されていることを確認した
+- [ ] `scripts/monitor.sh daily` / `scripts/monitor.sh weekly` が予定どおり動作し、
+      monitor 系ログにエラーが出ていないことを確認した
+
+問題が発生した場合：
+
+- [ ] `15_rollback_procedures.md` に従い、ロールバックの是非と手順を検討した
+- [ ] 必要に応じてロールバックを実行し、その結果を確認した
+
+---
+
+## 7. 記録・振り返り
+
+- [ ] リリース日・担当者・対象コミット（ハッシュ）を記録した
+- [ ] 主要な実行ログ（デプロイログ / 監視アラート / スモークテスト結果）を保存した
+- [ ] 問題点や改善点があれば、Issue / Notion ページなどにメモを残した
+
+本チェックリストは、Phase8 で整備した本番インフラ・セキュリティ設計  
+およびテスト戦略に基づき、随時更新していく。
+
+---
+
+## Backend Structure Detail
+backend
+├── app
+│   ├── __init__.py
+│   ├── aave
+│   │   ├── client.py
+│   │   ├── config.py
+│   │   ├── router.py
+│   │   ├── schemas.py
+│   │   └── service.py
+│   ├── ai
+│   │   ├── __init__.py
+│   │   ├── router.py
+│   │   ├── schemas.py
+│   │   └── service.py
+│   ├── api
+│   │   ├── __init__.py
+│   │   ├── automation_dashboard.py
+│   │   └── automation_reports.py
+│   ├── app
+│   │   ├── __init__.py
+│   │   └── api
+│   │       └── __init__.py
+│   ├── automation
+│   │   ├── __init__.py
+│   │   ├── backup_service.py
+│   │   ├── emergency_report_service.py
+│   │   ├── jobs.py
+│   │   ├── monitoring_service.py
+│   │   ├── reporting_service.py
+│   │   ├── schemas.py
+│   │   └── state.py
+│   ├── bots
+│   │   ├── __init__.py
+│   │   ├── client.py
+│   │   ├── config.py
+│   │   ├── router.py
+│   │   ├── schemas.py
+│   │   └── service.py
+│   ├── main.py
+│   ├── notifications
+│   │   ├── __init__.py
+│   │   ├── factory.py
+│   │   ├── schemas.py
+│   │   └── service.py
+│   ├── notion
+│   │   ├── __init__.py
+│   │   ├── client.py
+│   │   ├── config.py
+│   │   ├── router.py
+│   │   ├── schemas.py
+│   │   └── service.py
+│   └── utils
+│       ├── __init__.py
+│       └── config.py
+├── package-lock.json
+├── requirements.txt
+├── ruff.toml
+└── tests
+    ├── conftest.py
+    ├── test_aave_router.py
+    ├── test_aave_service.py
+    ├── test_ai_router.py
+    ├── test_ai_service.py
+    ├── test_automation_backup_service.py
+    ├── test_automation_dashboard_api.py
+    ├── test_automation_dashboard_view.py
+    ├── test_automation_emergency_integration.py
+    ├── test_automation_emergency_report_service.py
+    ├── test_automation_jobs.py
+    ├── test_automation_monitoring.py
+    ├── test_automation_reporting.py
+    ├── test_automation_reporting_notifications.py
+    ├── test_flow_with_aave_stub.py
+    ├── test_notifications_service.py
+    ├── test_notion_client.py
+    ├── test_notion_router.py
+    ├── test_octobot_client.py
+    ├── test_octobot_router.py
+    ├── test_octobot_service.py
+    └── test_smoke.py
+
+13 directories, 67 files
+
+
+## Frontend Structure Detail
+frontend
+├── README.md
+├── components
+│   ├── dashboard
+│   │   ├── KpiCards.tsx
+│   │   ├── ReportSummaryPanel.tsx
+│   │   ├── SnapshotCharts.tsx
+│   │   └── StatusPanel.tsx
+│   └── layout
+│       └── AppShell.tsx
+├── lib
+│   ├── api
+│   │   ├── automation.ts
+│   │   └── http.ts
+│   └── types.ts
+├── next-env.d.ts
+├── next.config.js
+├── package-lock.json
+├── package.json
+├── pages
+│   ├── _app.tsx
+│   ├── api
+│   │   └── automation
+│   │       └── [...path].ts
+│   ├── dashboard
+│   │   ├── automation.tsx
+│   │   ├── index.tsx
+│   │   └── reports.tsx
+│   └── index.tsx
+└── tsconfig.json
+
+10 directories, 20 files
+
+
+## Scripts Content
+### scripts/backup.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+# プロジェクトルート（scripts/ の1つ上）に移動
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${PROJECT_ROOT}/backend"
+
+# Python 仮想環境の管理方法は環境によって異なるため、
+# ここでは poetry があればそれを使い、なければ素の python を使う。
+if command -v poetry >/dev/null 2>&1; then
+  poetry run python -m app.automation.jobs backup-only
+else
+  python -m app.automation.jobs backup-only
+fi
+
+---
+
+### scripts/deploy_production_backend.sh
+#!/usr/bin/env bash
+# scripts/deploy_production_backend.sh
+#
+# Ultra AutoTrade Backend を production 環境にデプロイするための標準スクリプト。
+# 想定:
+# - リポジトリ: /opt/ultra-autotrade
+# - backend:   /opt/ultra-autotrade/backend
+# - env:       /opt/ultra-autotrade/backend/.env.production
+# - compose:   /opt/ultra-autotrade/docker-compose.production.yml
+#
+# ※ 上記パスは環境に応じて調整してよい。
+#   調整した場合は docs/16_infra_deployment_guide.md も更新すること。
+
+set -euo pipefail
+
+REPO_DIR="/opt/ultra-autotrade"
+BACKEND_DIR="${REPO_DIR}/backend"
+ENV_FILE="${BACKEND_DIR}/.env.production"
+COMPOSE_FILE="${REPO_DIR}/docker-compose.production.yml"
+SERVICE_NAME="ultra-autotrade-backend-production"
+
+log() {
+  # シンプルなログ出力関数
+  echo "[deploy][$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+error() {
+  echo "[deploy][ERROR] $*" >&2
+  exit 1
+}
+
+log "Ultra AutoTrade backend production deploy 開始"
+
+# 1. リポジトリ確認
+if [[ ! -d "${REPO_DIR}" ]]; then
+  error "REPO_DIR=${REPO_DIR} が存在しません。パスを確認してください。"
+fi
+
+if [[ ! -d "${REPO_DIR}/.git" ]]; then
+  error "REPO_DIR=${REPO_DIR} は Git リポジトリではありません。"
+fi
+
+cd "${REPO_DIR}"
+
+# 2. 最新コード取得
+log "Git リポジトリを更新します（git pull --ff-only）"
+git pull --ff-only || error "git pull に失敗しました。"
+
+# 3. 必須ファイルの存在確認
+if [[ ! -f "${COMPOSE_FILE}" ]]; then
+  error "docker-compose.production.yml が見つかりません: ${COMPOSE_FILE}"
+fi
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  error ".env.production が見つかりません: ${ENV_FILE}"
+fi
+
+# 4. backend イメージビルド & コンテナ起動
+log "docker compose で backend イメージをビルドします"
+docker compose -f "${COMPOSE_FILE}" build backend || error "backend のビルドに失敗しました。"
+
+log "docker compose で backend コンテナを再起動します (up -d)"
+docker compose -f "${COMPOSE_FILE}" up -d backend || error "backend コンテナの起動に失敗しました。"
+
+# 5. 状態確認
+log "backend コンテナの状態を確認します"
+docker compose -f "${COMPOSE_FILE}" ps backend || log "docker compose ps backend の実行に失敗しました（致命的ではありません）"
+
+log "Ultra AutoTrade backend production deploy 完了"
+
+実行権限付与例
+
+chmod +x scripts/deploy_production_backend.sh
+
+実行例
+
+sudo ./scripts/deploy_production_backend.sh
+
+※ このスクリプトは docker-compose 運用前提 です。
+systemd で運用する場合は、Git 更新 → venv 再インストール →
+sudo systemctl restart ultra-autotrade-backend-production を
+手順として docs 側に書く想定です。
+---
+
+### scripts/deploy_staging_backend.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Ultra AutoTrade – staging backend デプロイスクリプト
+#
+# 想定する処理フロー:
+#  1. プロジェクトルートへ移動
+#  2. 任意で git pull (コメントアウトで運用側が制御)
+#  3. docker compose によるビルド＆再起動
+#
+# 注意:
+#  - .env.staging が project root に存在していること
+#  - docker / docker compose が使用可能であること
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${PROJECT_ROOT}"
+
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.staging.yml}"
+
+if [[ ! -f "${COMPOSE_FILE}" ]]; then
+  echo "ERROR: ${COMPOSE_FILE} not found in ${PROJECT_ROOT}" >&2
+  exit 1
+fi
+
+echo "[deploy] project root: ${PROJECT_ROOT}"
+echo "[deploy] using compose file: ${COMPOSE_FILE}"
+
+# 必要に応じてコメントアウトを外して利用:
+# echo "[deploy] pulling latest code from git..."
+# git pull --ff-only
+
+# docker compose / docker-compose のどちらが使えるか判定
+if command -v docker compose >/dev/null 2>&1; then
+  DC="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  DC="docker-compose"
+else
+  echo "ERROR: docker compose or docker-compose is not installed." >&2
+  exit 1
+fi
+
+echo "[deploy] building image..."
+${DC} -f "${COMPOSE_FILE}" build
+
+echo "[deploy] restarting containers..."
+${DC} -f "${COMPOSE_FILE}" up -d
+
+echo "[deploy] current status:"
+${DC} -f "${COMPOSE_FILE}" ps
+
+echo "[deploy] done."
+
+---
+
+### scripts/monitor.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+# scripts/monitor.sh
+#
+# Ultra AutoTrade の簡易監視スクリプト。
+# - /health の死活監視
+# - レイテンシをメトリクスログとして出力
+#
+# 用途:
+#   monitor.sh daily   # 日次チェック（cron から呼ぶ）
+#   monitor.sh weekly  # 週次チェック（cron から呼ぶ）
+
+MODE="${1:-daily}"
+
+BACKEND_HEALTH_URL="${MONITOR_HEALTHCHECK_URL:-http://localhost:8000/health}"
+METRICS_LOG_DIR="${METRICS_LOG_DIR:-/var/log/ultra}"
+mkdir -p "${METRICS_LOG_DIR}"
+
+LOG_FILE="${METRICS_LOG_DIR}/monitor_${MODE}.log"
+METRICS_LOG_FILE="${METRICS_LOG_DIR}/metrics.log"
+
+timestamp() {
+  date -u +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+log() {
+  echo "$(timestamp) [monitor:${MODE}] $*" | tee -a "${LOG_FILE}"
+}
+
+check_health() {
+  local start end status latency_ms
+
+  start=$(date +%s%3N)
+  # -s: silent, -o /dev/null: body 捨てる, -w '%{http_code}': ステータスのみ出力
+  status=$(curl -s -o /dev/null -w '%{http_code}' "${BACKEND_HEALTH_URL}" || echo "000")
+  end=$(date +%s%3N)
+
+  latency_ms=$((end - start))
+
+  log "health_check status=${status} latency_ms=${latency_ms}"
+
+  # メトリクスログ (JSON Lines 形式に近いもの)
+  printf '%s\t%s\t%s\n' \
+    "$(timestamp)" \
+    "backend_http_latency_p95_ms" \
+    "${latency_ms}" >> "${METRICS_LOG_FILE}"
+
+  if [[ "${status}" -ne 200 ]]; then
+    log "ERROR: health check failed (status=${status})"
+    return 1
+  fi
+
+  return 0
+}
+
+case "${MODE}" in
+  daily)
+    log "starting daily monitor"
+    check_health
+    log "finished daily monitor"
+    ;;
+
+  weekly)
+    log "starting weekly monitor"
+    check_health
+    log "finished weekly monitor"
+    ;;
+
+  *)
+    echo "Usage: $0 {daily|weekly}" >&2
+    exit 2
+    ;;
+esac
+
+---
+
+### scripts/zip_next_phase.sh
+
+---
+
+### scripts/zip_phase10_seed.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${PROJECT_ROOT}"
+
+OUTPUT="phase10_seed_files.zip"
+
+zip -r "${OUTPUT}" \
+  docs/08_automation_rules.md \
+  docs/19_operations_runbook.md \
+  docs/17_staging_environment_config.md \
+  docs/21_production_environment_config.md \
+  docs/14_test_strategy.md \
+  docs/20_staging_release_checklist.md \
+  docs/22_production_release_checklist.md \
+  backend/app/automation/schemas.py \
+  backend/app/automation/monitoring_service.py \
+  backend/app/automation/reporting_service.py \
+  backend/tests/test_automation_monitoring.py \
+  backend/tests/test_automation_reporting.py
+
+echo "Created ${OUTPUT}"
+---
+
+### scripts/zip_phase11_seed.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${PROJECT_ROOT}"
+
+OUTPUT="phase11_seed_files.zip"
+
+zip -r "${OUTPUT}" \
+  backend/app/automation/schemas.py \
+  backend/app/automation/monitoring_service.py \
+  backend/app/automation/reporting_service.py \
+  backend/tests/test_automation_dashboard_view.py \
+  backend/tests/test_automation_reporting.py \
+  docs/08_automation_rules.md \
+  docs/19_operations_runbook.md \
+  docs/14_test_strategy.md
+
+echo "Created ${OUTPUT}"
+---
+
+### scripts/zip_phase12_seed.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${PROJECT_ROOT}"
+
+OUTPUT="phase12_seed_files.zip"
+
+zip -r "${OUTPUT}" \
+  backend/app/api/automation_dashboard.py \
+  backend/app/main.py \
+  backend/app/automation/schemas.py \
+  backend/app/automation/monitoring_service.py \
+  backend/app/automation/reporting_service.py \
+  backend/tests/test_automation_dashboard_api.py \
+  backend/app/bots/router.py \
+  docs/04_api_design.md \
+  docs/14_test_strategy.md \
+  docs/19_operations_runbook.md
+
+echo "Created ${OUTPUT}"
+---
+
+### scripts/zip_phase2_seed.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+cd "$ROOT_DIR"
+
+zip -r phase2_seed_files.zip \
+  backend/app/main.py \
+  backend/app/notion \
+  backend/app/utils/config.py \
+  backend/requirements.txt \
+  backend/tests/test_notion_client.py \
+  backend/tests/test_notion_router.py \
+  docs/00_overview.md \
+  docs/01_requirements.md \
+  docs/02_phase_plan.md \
+  docs/03_directory_structure.md \
+  docs/04_api_design.md \
+  docs/05_ai_judgement_rules.md \
+  docs/09_notion_schema.md \
+  docs/10_next_phase_prompt_generator.md \
+  docs/11_prompt_sync_rules.md \
+  docs/12_phase_operations.md \
+  docs/14_test_strategy.md \
+  docs/15_rollback_procedures.md \
+  -x "*/__pycache__/*" "*.pyc"
+
+
+---
+
+### scripts/zip_phase3_seed.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+ZIP_NAME="phase3_seed_files.zip"
+
+rm -f "$ZIP_NAME"
+
+zip -r "$ZIP_NAME" \
+  backend/app/main.py \
+  backend/app/ai \
+  backend/app/notion/schemas.py \
+  backend/app/utils \
+  backend/tests/test_ai_service.py \
+  backend/tests/test_ai_router.py \
+  docs/00_overview.md \
+  docs/01_requirements.md \
+  docs/02_phase_plan.md \
+  docs/03_directory_structure.md \
+  docs/04_api_design.md \
+  docs/05_ai_judgement_rules.md \
+  docs/06_octobot_signal_flow.md \
+  docs/07_aave_operation_logic.md \
+  docs/08_automation_rules.md \
+  docs/09_notion_schema.md \
+  docs/11_prompt_sync_rules.md \
+  docs/12_phase_operations.md \
+  docs/13_security_design.md \
+  docs/14_test_strategy.md \
+  docs/15_rollback_procedures.md
+
+---
+
+### scripts/zip_phase4_seed.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+ZIP_NAME="phase4_seed_files.zip"
+
+rm -f "$ZIP_NAME"
+
+zip -r "$ZIP_NAME" \
+  backend/app/main.py \
+  backend/app/ai \
+  backend/app/bots \
+  backend/app/utils/config.py \
+  backend/app/aave \
+  backend/tests/test_ai_service.py \
+  backend/tests/test_octobot_service.py \
+  backend/tests/test_smoke.py \
+  docs/00_overview.md \
+  docs/01_requirements.md \
+  docs/02_phase_plan.md \
+  docs/03_directory_structure.md \
+  docs/04_api_design.md \
+  docs/06_octobot_signal_flow.md \
+  docs/07_aave_operation_logic.md \
+  docs/08_automation_rules.md \
+  docs/13_security_design.md \
+  docs/14_test_strategy.md \
+  docs/15_rollback_procedures.md
+
+---
+
+### scripts/zip_phase5_seed.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+OUTPUT_ZIP="phase5_seed_files.zip"
+
+zip -r "${OUTPUT_ZIP}" \
+  backend/app/main.py \
+  backend/app/ai \
+  backend/app/bots \
+  backend/app/aave \
+  backend/app/utils \
+  backend/tests/test_ai_service.py \
+  backend/tests/test_octobot_service.py \
+  backend/tests/test_aave_service.py \
+  backend/tests/test_aave_router.py \
+  docs/00_overview.md \
+  docs/01_requirements.md \
+  docs/02_phase_plan.md \
+  docs/08_automation_rules.md \
+  docs/13_security_design.md \
+  docs/14_test_strategy.md \
+  docs/15_rollback_procedures.md
+
+---
+
+### scripts/zip_phase6_seed.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+ZIP_NAME="phase6_seed_files.zip"
+
+cd "${ROOT_DIR}"
+
+zip -r "${ZIP_NAME}" \
+  backend/app/automation/*.py \
+  backend/app/notifications/*.py \
+  backend/app/aave/service.py \
+  backend/app/bots/service.py \
+  backend/tests/test_automation_*.py \
+  backend/tests/test_notifications_service.py \
+  docs/02_phase_plan.md \
+  docs/03_directory_structure.md \
+  docs/08_automation_rules.md \
+  docs/13_security_design.md \
+  docs/14_test_strategy.md \
+  docs/15_rollback_procedures.md \
+  scripts/backup.sh \
+  scripts/monitor.sh
+
+---
+
+### scripts/zip_phase7_seed.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+OUTPUT="phase7_seed_files.zip"
+
+zip -r "${OUTPUT}" \
+  docs/*.md \
+  backend/app/main.py \
+  backend/app/ai \
+  backend/app/notion \
+  backend/app/bots \
+  backend/app/aave \
+  backend/app/automation \
+  backend/app/notifications \
+  backend/tests \
+  scripts/backup.sh \
+  scripts/monitor.sh
+
+---
+
+### scripts/zip_phase8_seed.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Phase8 用 seed ファイルをまとめるスクリプト
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${PROJECT_ROOT}"
+
+OUTPUT="phase8_seed_files.zip"
+
+zip -r "${OUTPUT}" \
+  backend/app \
+  Dockerfile \
+  docker-compose.staging.yml \
+  infra/systemd/ultra-autotrade-backend.service \
+  docs/00_overview.md \
+  docs/01_requirements.md \
+  docs/02_phase_plan.md \
+  docs/03_directory_structure.md \
+  docs/04_api_design.md \
+  docs/05_ai_judgement_rules.md \
+  docs/06_octobot_signal_flow.md \
+  docs/07_aave_operation_logic.md \
+  docs/08_automation_rules.md \
+  docs/09_notion_schema.md \
+  docs/10_next_phase_prompt_generator.md \
+  docs/11_prompt_sync_rules.md \
+  docs/12_phase_operations.md \
+  docs/13_security_design.md \
+  docs/14_test_strategy.md \
+  docs/15_rollback_procedures.md \
+  docs/16_infra_deployment_guide.md \
+  docs/17_staging_environment_config.md \
+  docs/18_scheduler_and_cron.md \
+  docs/19_operations_runbook.md \
+  docs/20_staging_release_checklist.md
+
+echo "Created ${OUTPUT}"
+---
+
+### scripts/zip_phase9_seed.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${PROJECT_ROOT}"
+
+OUTPUT="phase9_seed_files.zip"
+
+zip -r "${OUTPUT}" \
+  docs/00_overview.md \
+  docs/01_requirements.md \
+  docs/02_phase_plan.md \
+  docs/03_directory_structure.md \
+  docs/04_api_design.md \
+  docs/05_ai_judgement_rules.md \
+  docs/06_octobot_signal_flow.md \
+  docs/07_aave_operation_logic.md \
+  docs/08_automation_rules.md \
+  docs/09_notion_schema.md \
+  docs/10_next_phase_prompt_generator.md \
+  docs/11_prompt_sync_rules.md \
+  docs/12_phase_operations.md \
+  docs/13_security_design.md \
+  docs/14_test_strategy.md \
+  docs/15_rollback_procedures.md \
+  docs/17_staging_environment_config.md \
+  docs/18_scheduler_and_cron.md \
+  docs/19_operations_runbook.md \
+  docs/20_staging_release_checklist.md \
+  docs/21_production_environment_config.md \
+  docs/22_production_release_checklist.md \
+  infra/systemd/ultra-autotrade-backend-production.service \
+  docker-compose.production.yml \
+  scripts/deploy_production_backend.sh \
+  backend/.env.production.example
+
+echo "Created ${OUTPUT}"
+---
+
+## Config Files
+./frontend/tsconfig.json
+./frontend/package.json
+./frontend/.next/server/pages-manifest.json
+./frontend/.next/server/middleware-manifest.json
+./frontend/.next/server/next-font-manifest.json
+./frontend/.next/package.json
+./frontend/.next/react-loadable-manifest.json
+./frontend/.next/static/webpack/633457081244afec._.hot-update.json
+./frontend/.next/static/webpack/b6834f94d14166a0.webpack.hot-update.json
+./frontend/.next/static/webpack/766d7d243bed588e.webpack.hot-update.json
+./frontend/.next/static/webpack/d853b1469ce0f21e.webpack.hot-update.json
+./frontend/.next/build-manifest.json
+./frontend/package-lock.json
+./docker-compose.staging.yml
+./user/profiles/market_making/profile.json
+./user/profiles/market_making/tentacles_config.json
+./user/profiles/market_making/specific_config/MarketMakingTradingMode.json
+./user/profiles/tradingview_trading/profile.json
+./user/profiles/tradingview_trading/tentacles_config.json
+./user/profiles/tradingview_trading/specific_config/TradingViewSignalsTradingMode.json
+./user/profiles/copy_trading/profile.json
+./user/profiles/copy_trading/tentacles_config.json
+./user/profiles/copy_trading/specific_config/RemoteTradingSignalsTradingMode.json
+./user/profiles/arbitrage_trading/profile.json
+./user/profiles/arbitrage_trading/tentacles_config.json
+./user/profiles/arbitrage_trading/specific_config/ArbitrageTradingMode.json
+./user/profiles/index_trading/profile.json
+./user/profiles/index_trading/tentacles_config.json
+./user/profiles/index_trading/specific_config/IndexTradingMode.json
+./user/profiles/daily_trading/profile.json
+./user/profiles/daily_trading/tentacles_config.json
+./user/profiles/daily_trading/specific_config/SimpleStrategyEvaluator.json
+./user/profiles/daily_trading/specific_config/DailyTradingMode.json
+./user/profiles/smart_dca/profile.json
+./user/profiles/smart_dca/tentacles_config.json
+./user/profiles/smart_dca/specific_config/SimpleStrategyEvaluator.json
+./user/profiles/smart_dca/specific_config/EMAMomentumEvaluator.json
+./user/profiles/smart_dca/specific_config/DCATradingMode.json
+./user/profiles/trailing_grid_trading/profile.json
+./user/profiles/trailing_grid_trading/tentacles_config.json
+./user/profiles/trailing_grid_trading/specific_config/GridTradingMode.json
+./user/profiles/gpt_trading/profile.json
+./user/profiles/gpt_trading/tentacles_config.json
+./user/profiles/gpt_trading/specific_config/SimpleStrategyEvaluator.json
+./user/profiles/gpt_trading/specific_config/GPTEvaluator.json
+./user/profiles/gpt_trading/specific_config/DCATradingMode.json
+./user/profiles/simple_dca/profile.json
+./user/profiles/simple_dca/tentacles_config.json
+./user/profiles/simple_dca/specific_config/DCATradingMode.json
+./user/profiles/grid_trading/profile.json
+./user/profiles/grid_trading/tentacles_config.json
+./user/profiles/grid_trading/specific_config/GridTradingMode.json
+./user/profiles/dip_analyser/profile.json
+./user/profiles/dip_analyser/tentacles_config.json
+./user/profiles/dip_analyser/specific_config/DipAnalyserStrategyEvaluator.json
+./user/profiles/dip_analyser/specific_config/RSIWeightMomentumEvaluator.json
+./user/profiles/dip_analyser/specific_config/DipAnalyserTradingMode.json
+./user/profiles/dip_analyser/specific_config/InstantFluctuationsEvaluator.json
+./user/profiles/signal_trading/profile.json
+./user/profiles/signal_trading/tentacles_config.json
+./user/profiles/signal_trading/specific_config/SignalTradingMode.json
+./user/profiles/signal_trading/specific_config/MoveSignalsStrategyEvaluator.json
+./user/profiles/staggered_orders_trading/profile.json
+./user/profiles/staggered_orders_trading/tentacles_config.json
+./user/profiles/staggered_orders_trading/specific_config/StaggeredOrdersTradingMode.json
+./user/profiles/non-trading/profile.json
+./user/profiles/non-trading/tentacles_config.json
+./user/profiles/non-trading/specific_config/BlankStrategyEvaluator.json
+./user/BrowsingDataProvider_data.json
+./user/reference_tentacles_config/tentacles_config.json
+./user/data/live/live_1/run_data.json
+./user/data/live/live_1/binance/trades_spot_trader-simulator.json
+./user/data/live/live_1/binance/portfolio_value_spot_trader-simulator.json
+./user/config.json
+./observability/grafana/dashboards/automation-dashboard.json
+./observability/grafana/provisioning/dashboards/dashboards.yaml
+./observability/grafana/provisioning/datasources/datasources.yaml
+./.env.example
+./docker-compose.production.yml
+./backend/ruff.toml
+./backend/package-lock.json
+./tentacles/Backtesting/converters/exchanges/legacy_data_converter/metadata.json
+./tentacles/Backtesting/importers/exchanges/generic_exchange_importer/metadata.json
+./tentacles/Backtesting/collectors/exchanges/exchange_history_collector/metadata.json
+./tentacles/Backtesting/collectors/exchanges/exchange_live_collector/metadata.json
+./tentacles/Backtesting/collectors/exchanges/exchange_bot_snapshot_data_collector/metadata.json
+./tentacles/Services/Notifiers/telegram_notifier/metadata.json
+./tentacles/Services/Notifiers/web_notifier/metadata.json
+./tentacles/Services/Notifiers/twitter_notifier/metadata.json
+./tentacles/Services/Services_bases/webhook_service/metadata.json
+./tentacles/Services/Services_bases/telegram_service/metadata.json
+./tentacles/Services/Services_bases/reddit_service/metadata.json
+./tentacles/Services/Services_bases/trading_view_service/metadata.json
+./tentacles/Services/Services_bases/gpt_service/metadata.json
+./tentacles/Services/Services_bases/web_service/metadata.json
+./tentacles/Services/Services_bases/telegram_api_service/metadata.json
+./tentacles/Services/Services_bases/google_service/metadata.json
+./tentacles/Services/Services_bases/twitter_service/metadata.json
+./tentacles/Services/Interfaces/web_interface/metadata.json
+./tentacles/Services/Interfaces/telegram_bot_interface/metadata.json
+./tentacles/Services/Services_feeds/google_service_feed/metadata.json
+./tentacles/Services/Services_feeds/twitter_service_feed/metadata.json
+./tentacles/Services/Services_feeds/telegram_api_service_feed/metadata.json
+./tentacles/Services/Services_feeds/telegram_service_feed/metadata.json
+./tentacles/Services/Services_feeds/reddit_service_feed/metadata.json
+./tentacles/Services/Services_feeds/trading_view_service_feed/metadata.json
+./tentacles/Trading/Exchange/htx/metadata.json
+./tentacles/Trading/Exchange/binance_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/poloniex/metadata.json
+./tentacles/Trading/Exchange/bitso/metadata.json
+./tentacles/Trading/Exchange/hyperliquid_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/hollaex_autofilled_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/bitstamp/metadata.json
+./tentacles/Trading/Exchange/mexc_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/coinbase_pro/metadata.json
+./tentacles/Trading/Exchange/huobi_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/hollaex_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/polymarket_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/bitmex/metadata.json
+./tentacles/Trading/Exchange/kraken_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/okxus_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/kraken/metadata.json
+./tentacles/Trading/Exchange/coinex/metadata.json
+./tentacles/Trading/Exchange/okcoin/metadata.json
+./tentacles/Trading/Exchange/hitbtc/metadata.json
+./tentacles/Trading/Exchange/binance/metadata.json
+./tentacles/Trading/Exchange/cryptocom/metadata.json
+./tentacles/Trading/Exchange/kucoin_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/okx_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/upbitexchange/metadata.json
+./tentacles/Trading/Exchange/bithumb/metadata.json
+./tentacles/Trading/Exchange/coinbase_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/bybit_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/gateio/metadata.json
+./tentacles/Trading/Exchange/hollaex_autofilled/metadata.json
+./tentacles/Trading/Exchange/hollaex_autofilled/config/HollaexAutofilled.json
+./tentacles/Trading/Exchange/okx/metadata.json
+./tentacles/Trading/Exchange/mexc/metadata.json
+./tentacles/Trading/Exchange/bingx_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/polymarket/metadata.json
+./tentacles/Trading/Exchange/coinbase_pro_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/myokx/metadata.json
+./tentacles/Trading/Exchange/cryptocom_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/bingx/metadata.json
+./tentacles/Trading/Exchange/okxus/metadata.json
+./tentacles/Trading/Exchange/myokx_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/coinex_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/kucoin/metadata.json
+./tentacles/Trading/Exchange/wavesexchange/metadata.json
+./tentacles/Trading/Exchange/phemex_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/bitmart_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/bitget_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/gateio_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/ascendex/metadata.json
+./tentacles/Trading/Exchange/ndax/metadata.json
+./tentacles/Trading/Exchange/bitfinex/metadata.json
+./tentacles/Trading/Exchange/bitmart/metadata.json
+./tentacles/Trading/Exchange/hollaex/metadata.json
+./tentacles/Trading/Exchange/hollaex/config/hollaex.json
+./tentacles/Trading/Exchange/binanceus/metadata.json
+./tentacles/Trading/Exchange/ascendex_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/bitget/metadata.json
+./tentacles/Trading/Exchange/coinbase/metadata.json
+./tentacles/Trading/Exchange/phemex/metadata.json
+./tentacles/Trading/Exchange/binanceus_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/hyperliquid/metadata.json
+./tentacles/Trading/Exchange/huobi/metadata.json
+./tentacles/Trading/Exchange/configurable_default_ccxt_rest/metadata.json
+./tentacles/Trading/Exchange/htx_websocket_feed/metadata.json
+./tentacles/Trading/Exchange/bybit/metadata.json
+./tentacles/Trading/Exchange/bitfinex_websocket_feed/metadata.json
+./tentacles/Trading/Mode/dip_analyser_trading_mode/metadata.json
+./tentacles/Trading/Mode/dip_analyser_trading_mode/config/DipAnalyserTradingMode.json
+./tentacles/Trading/Mode/blank_trading_mode/metadata.json
+./tentacles/Trading/Mode/blank_trading_mode/config/BlankTradingMode.json
+./tentacles/Trading/Mode/market_making_trading_mode/metadata.json
+./tentacles/Trading/Mode/market_making_trading_mode/config/MarketMakingTradingMode.json
+./tentacles/Trading/Mode/signal_trading_mode/metadata.json
+./tentacles/Trading/Mode/signal_trading_mode/config/SignalTradingMode.json
+./tentacles/Trading/Mode/grid_trading_mode/metadata.json
+./tentacles/Trading/Mode/grid_trading_mode/config/GridTradingMode.json
+./tentacles/Trading/Mode/remote_trading_signals_trading_mode/metadata.json
+./tentacles/Trading/Mode/remote_trading_signals_trading_mode/config/RemoteTradingSignalsTradingMode.json
+./tentacles/Trading/Mode/daily_trading_mode/metadata.json
+./tentacles/Trading/Mode/daily_trading_mode/config/DailyTradingMode.json
+./tentacles/Trading/Mode/arbitrage_trading_mode/metadata.json
+./tentacles/Trading/Mode/arbitrage_trading_mode/config/ArbitrageTradingMode.json
+./tentacles/Trading/Mode/dca_trading_mode/metadata.json
+./tentacles/Trading/Mode/dca_trading_mode/config/DCATradingMode.json
+./tentacles/Trading/Mode/staggered_orders_trading_mode/metadata.json
+./tentacles/Trading/Mode/staggered_orders_trading_mode/config/StaggeredOrdersTradingMode.json
+./tentacles/Trading/Mode/index_trading_mode/metadata.json
+./tentacles/Trading/Mode/index_trading_mode/config/IndexTradingMode.json
+./tentacles/Trading/Mode/trading_view_signals_trading_mode/metadata.json
+./tentacles/Trading/Mode/trading_view_signals_trading_mode/config/TradingViewSignalsTradingMode.json
+./tentacles/Automation/actions/send_notification_action/metadata.json
+./tentacles/Automation/actions/stop_trading_action/metadata.json
+./tentacles/Automation/actions/cancel_open_order_action/metadata.json
+./tentacles/Automation/actions/sell_all_currencies_action/metadata.json
+./tentacles/Automation/conditions/no_condition_condition/metadata.json
+./tentacles/Automation/conditions/scripted_condition/metadata.json
+./tentacles/Automation/trigger_events/period_check_event/metadata.json
+./tentacles/Automation/trigger_events/profitability_threshold_event/metadata.json
+./tentacles/Automation/trigger_events/price_threshold_event/metadata.json
+./tentacles/Meta/Keywords/scripting_library/tests/static/profile.json
+./tentacles/Meta/Keywords/scripting_library/tests/static/config.json
+./tentacles/Meta/Keywords/scripting_library/metadata.json
+./tentacles/Meta/DSL_operators/ta_operators/metadata.json
+./tentacles/Meta/DSL_operators/exchange_operators/metadata.json
+./tentacles/Meta/DSL_operators/python_std_operators/metadata.json
+./tentacles/Evaluator/RealTime/instant_fluctuations_evaluator/metadata.json
+./tentacles/Evaluator/RealTime/instant_fluctuations_evaluator/config/InstantMAEvaluator.json
+./tentacles/Evaluator/RealTime/instant_fluctuations_evaluator/config/InstantFluctuationsEvaluator.json
+./tentacles/Evaluator/Strategies/mixed_strategies_evaluator/metadata.json
+./tentacles/Evaluator/Strategies/mixed_strategies_evaluator/config/SimpleStrategyEvaluator.json
+./tentacles/Evaluator/Strategies/mixed_strategies_evaluator/config/TechnicalAnalysisStrategyEvaluator.json
+./tentacles/Evaluator/Strategies/move_signals_strategy_evaluator/metadata.json
+./tentacles/Evaluator/Strategies/move_signals_strategy_evaluator/config/MoveSignalsStrategyEvaluator.json
+./tentacles/Evaluator/Strategies/blank_strategy_evaluator/metadata.json
+./tentacles/Evaluator/Strategies/blank_strategy_evaluator/config/BlankStrategyEvaluator.json
+./tentacles/Evaluator/Strategies/dip_analyser_strategy_evaluator/metadata.json
+./tentacles/Evaluator/Strategies/dip_analyser_strategy_evaluator/config/DipAnalyserStrategyEvaluator.json
+./tentacles/Evaluator/Social/news_evaluator/metadata.json
+./tentacles/Evaluator/Social/news_evaluator/config/TwitterNewsEvaluator.json
+./tentacles/Evaluator/Social/trends_evaluator/metadata.json
+./tentacles/Evaluator/Social/trends_evaluator/config/GoogleTrendsEvaluator.json
+./tentacles/Evaluator/Social/forum_evaluator/metadata.json
+./tentacles/Evaluator/Social/forum_evaluator/config/RedditForumEvaluator.json
+./tentacles/Evaluator/Social/signal_evaluator/metadata.json
+./tentacles/Evaluator/Social/signal_evaluator/config/TelegramSignalEvaluator.json
+./tentacles/Evaluator/Social/signal_evaluator/config/TelegramChannelSignalEvaluator.json
+./tentacles/Evaluator/TA/ai_evaluator/metadata.json
+./tentacles/Evaluator/TA/ai_evaluator/config/GPTEvaluator.json
+./tentacles/Evaluator/TA/momentum_evaluator/metadata.json
+./tentacles/Evaluator/TA/momentum_evaluator/config/EMAMomentumEvaluator.json
+./tentacles/Evaluator/TA/momentum_evaluator/config/ADXMomentumEvaluator.json
+./tentacles/Evaluator/TA/momentum_evaluator/config/MACDMomentumEvaluator.json
+./tentacles/Evaluator/TA/momentum_evaluator/config/KlingerOscillatorMomentumEvaluator.json
+./tentacles/Evaluator/TA/momentum_evaluator/config/KlingerOscillatorReversalConfirmationMomentumEvaluator.json
+./tentacles/Evaluator/TA/momentum_evaluator/config/RSIWeightMomentumEvaluator.json
+./tentacles/Evaluator/TA/momentum_evaluator/config/RSIMomentumEvaluator.json
+./tentacles/Evaluator/TA/momentum_evaluator/config/BBMomentumEvaluator.json
+./tentacles/Evaluator/TA/volatility_evaluator/metadata.json
+./tentacles/Evaluator/TA/volatility_evaluator/config/StochasticRSIVolatilityEvaluator.json
+./tentacles/Evaluator/TA/trend_evaluator/metadata.json
+./tentacles/Evaluator/TA/trend_evaluator/config/DeathAndGoldenCrossEvaluator.json
+./tentacles/Evaluator/TA/trend_evaluator/config/EMADivergenceTrendEvaluator.json
+./tentacles/Evaluator/TA/trend_evaluator/config/SuperTrendEvaluator.json
+./tentacles/Evaluator/TA/trend_evaluator/config/DoubleMovingAverageTrendEvaluator.json
+./tentacles/Evaluator/Util/pattern_analysis/metadata.json
+./tentacles/Evaluator/Util/statistics_analysis/metadata.json
+./tentacles/Evaluator/Util/overall_state_analysis/metadata.json
+./tentacles/Evaluator/Util/text_analysis/metadata.json
+./tentacles/Evaluator/Util/trend_analysis/metadata.json
+./tentacles/Evaluator/Util/candles_util/metadata.json
+
+
+## All READMEs
+### ./frontend/README.md
+# Ultra AutoTrade - Operations Dashboard (Web)
+
+Read-only operations UI aligned with `docs/19_operations_runbook.md`.
+
+## Requirements
+
+- Node.js 18+
+- Backend FastAPI running
+
+## Run (local)
+
+1) Start backend (example):
+- `uvicorn app.main:app --reload --port 8000`
+
+2) Start UI:
+
+```bash
+cd frontend
+npm install
+BACKEND_BASE_URL=http://localhost:8000 npm run dev
+```
+
+Then open:
+- http://localhost:3000/dashboard/automation
+- http://localhost:3000/dashboard/reports
+
+## Notes
+
+- By default the UI calls **same-origin** `/api/automation/*`, which is proxied by Next.js to `BACKEND_BASE_URL`.
+- If you prefer calling backend directly from the browser, set:
+  - `NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8000`
+  - (Backend CORS may be required.)
+
+---
+
+### ./observability/grafana/README.md
+# Grafana - Automation Operations Dashboard
+
+This folder provides a **configuration template** to visualize the existing Operations APIs:
+
+- `GET /api/automation/status` → `AutomationStatus`
+- `GET /api/automation/dashboard?lookback_hours=1..24` → `DashboardSnapshot`
+- `GET /api/automation/reports/latest` → `AutomationReportSummary`
+
+## Principles (contract-safe)
+
+- **No backend contract changes** are required.
+- Panels are designed to be resilient when fields evolve (they fall back to JSON views when needed).
+- This is **read-only visibility** for SRE/operations.
+
+## Recommended datasource approach
+
+Grafana needs a datasource capable of reading JSON over HTTP.
+
+Two common approaches:
+
+1. **Infinity datasource plugin** (recommended for quick setup)
+2. **JSON API datasource plugin** (alternative)
+
+This repository provides provisioning files assuming **Infinity**. If your environment prefers JSON API, keep the dashboard layout but adjust the datasource type accordingly.
+
+## Local usage (example)
+
+1. Run backend (FastAPI) on `http://localhost:8000`
+2. Run Grafana (docker)
+3. Install Infinity plugin in Grafana
+4. Provision datasource + dashboards using the YAML files in `provisioning/`
+
+## Dashboard scope
+
+The included dashboard focuses on:
+
+- Emergency pause state (`is_trading_paused`)
+- Last health factor (`last_health_factor`)
+- Last 24h portfolio change (`last_price_change_24h`)
+- Last event level (`last_event_level`)
+- Snapshot aggregates table (best-effort)
+- Latest report JSON / highlights
+
+This mirrors the operational guidance in `docs/19_operations_runbook.md` (§2.4 and related sections).
+
+---
+
+### ./README.md
+# Ultra AutoTrade Project
+
+---
+

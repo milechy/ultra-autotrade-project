@@ -24,10 +24,12 @@ from app.automation.schemas import AlertLevel, ComponentType
 from .client import AaveClient, AaveClientError, get_default_aave_client
 from .config import AaveSettings, get_aave_settings
 from .schemas import (
+    AaveOperationMode,
     AaveOperationResult,
     AaveOperationStatus,
     AaveOperationType,
 )
+from .state_manager import AaveStateManager, get_default_state_manager
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +59,17 @@ class AaveService:
         self,
         client: AaveClient | None = None,
         settings: AaveSettings | None = None,
-        monitoring_service: Optional[MonitoringService] | None = None,
+        monitoring_service: Optional[MonitoringService] = None,
+        state_manager: Optional[AaveStateManager] = None,
     ) -> None:
         self._client: AaveClient = client or get_default_aave_client()
         self._settings: AaveSettings = settings or get_aave_settings()
 
         # 監視・緊急停止ロジック
         self._monitoring: MonitoringService = monitoring_service or get_monitoring_service()
+
+        # state.json 管理
+        self._state_manager: AaveStateManager = state_manager or get_default_state_manager()
 
         # 直近のトレード時刻を記録する（単純なリストで十分）
         self._recent_actions: List[datetime] = []
@@ -170,10 +176,85 @@ class AaveService:
         :param asset_symbol: 対象トークン。None の場合は設定値のデフォルトを使用。
         :param dry_run: True の場合は実際のトランザクションを送信しない。
         """
+        token = asset_symbol or self._settings.default_asset_symbol
+
+        # 1. state.json の stale チェック（最優先）
+        if self._state_manager.is_stale():
+            logger.warning("state.json is stale; forcing NOOP for safety")
+            return AaveOperationResult(
+                operation=AaveOperationType.NOOP,
+                status=AaveOperationStatus.SKIPPED,
+                asset_symbol=token,
+                amount=Decimal("0"),
+                tx_hash=None,
+                message="state.json is stale; no Aave operation executed.",
+                before_health_factor=None,
+                after_health_factor=None,
+            )
+
+        # 2. state.json からモード取得
+        state = self._state_manager.read_state()
+        mode = state.mode
+        action_val = self._normalize_action_value(action)
+
+        # 3. emergency_stop のチェック（P1対応）
+        if state.emergency_stop:
+            logger.warning("emergency_stop is True in state.json; forcing NOOP")
+            return AaveOperationResult(
+                operation=AaveOperationType.NOOP,
+                status=AaveOperationStatus.SKIPPED,
+                asset_symbol=token,
+                amount=Decimal("0"),
+                tx_hash=None,
+                message="emergency_stop is True; all Aave operations are blocked.",
+                before_health_factor=state.health_factor,
+                after_health_factor=state.health_factor,
+            )
+
+        # 4. circuit_closed のチェック（P1対応）
+        if not state.circuit_closed:
+            logger.warning("circuit_closed is False in state.json; forcing NOOP")
+            return AaveOperationResult(
+                operation=AaveOperationType.NOOP,
+                status=AaveOperationStatus.SKIPPED,
+                asset_symbol=token,
+                amount=Decimal("0"),
+                tx_hash=None,
+                message="circuit_closed is False; all Aave operations are blocked.",
+                before_health_factor=state.health_factor,
+                after_health_factor=state.health_factor,
+            )
+
+        # 5. モード別の制御
+        if mode == AaveOperationMode.HARD_STOP:
+            logger.warning("Mode=%s: all operations are blocked", mode.value)
+            return AaveOperationResult(
+                operation=AaveOperationType.NOOP,
+                status=AaveOperationStatus.SKIPPED,
+                asset_symbol=token,
+                amount=Decimal("0"),
+                tx_hash=None,
+                message=f"Mode={mode.value}: all Aave operations are blocked.",
+                before_health_factor=state.health_factor,
+                after_health_factor=state.health_factor,
+            )
+
+        if mode == AaveOperationMode.SAFE_MODE and action_val == "BUY":
+            logger.warning("Mode=%s: BUY is blocked", mode.value)
+            return AaveOperationResult(
+                operation=AaveOperationType.NOOP,
+                status=AaveOperationStatus.SKIPPED,
+                asset_symbol=token,
+                amount=Decimal("0"),
+                tx_hash=None,
+                message=f"Mode={mode.value}: BUY is blocked; only SELL/HOLD allowed.",
+                before_health_factor=state.health_factor,
+                after_health_factor=state.health_factor,
+            )
+
         # まず入力バリデーションを行う（負の金額などはここで ValueError）
         normalized_amount = self._normalize_amount(amount)
 
-        token = asset_symbol or self._settings.default_asset_symbol
         now = self._now()
 
         # 監視ロジック側で緊急停止中の場合は、ポジションを増やさない

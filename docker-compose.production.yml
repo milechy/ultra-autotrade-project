@@ -1,5 +1,22 @@
 # docker-compose.production.yml
+#
+# Ultra AutoTrade Production 環境用 Docker Compose
+#
+# staging との主な差分:
+# - container_name: -staging → -production
+# - env_file: .env.staging → ./backend/.env.production
+# - healthcheck: 本番向けに設定
+# - restart: always（本番は常に再起動）
+#
+# 使用方法:
+#   docker compose -f docker-compose.production.yml up -d
+#   docker compose -f docker-compose.production.yml logs -f backend
+
 version: "3.9"
+
+volumes:
+  ultra-state:
+    driver: local
 
 services:
   backend:
@@ -12,19 +29,46 @@ services:
       uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
+      --workers 1
+      --log-level info
+
+    # 環境変数ファイル（Git 管理外）
     env_file:
-      - ./backend/.env.production   # production 用の環境変数ファイル（Git 管理外）
+      - ./backend/.env.production
+
+    # ポート公開
     ports:
       - "8000:8000"
+
+    # state.json 永続化ボリューム
+    volumes:
+      - ultra-state:/var/run/ultra:rw
+
+    # 再起動ポリシー
     restart: always
-    # 必要に応じてログローテーションや制限を設定
+
+    # ヘルスチェック設定
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # ログ設定（ローテーション）
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "5"
+        max-size: "50m"
+        max-file: "10"
+        compress: "true"
 
-- staging との差分は主に：
- - container_name: -staging → -production
- - env_file: .env.staging → ./backend/.env.production
-- ポートやコマンドは staging と揃えたままにしてあります（必要ならインフラ側でポート変更）。
+    # リソース制限（必要に応じて調整）
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M

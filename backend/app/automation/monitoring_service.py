@@ -17,10 +17,12 @@ AutomationStatus / MonitoringEvent / AutomationReportSummary を参照して行�
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from collections import deque
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Deque, Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Deque, Dict, List, Optional, Sequence, Tuple
 
 from .schemas import (
     AlertLevel,
@@ -34,6 +36,8 @@ from .schemas import (
     MonitoringEvent,
     TradeActivityRecord,
 )
+
+logger = logging.getLogger(__name__)
 
 _HEALTH_FACTOR_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
@@ -59,6 +63,7 @@ class MonitoringService:
         max_latency_records: int = 1000,
         max_trade_records: int = 1000,
         max_healthfactor_records: int = 1000,
+        enable_state_sync: bool = True,
     ) -> None:
         # 閾値
         self._latency_warning_threshold_s = float(latency_warning_threshold_s)
@@ -66,6 +71,9 @@ class MonitoringService:
         self._hf_warning_threshold = Decimal(healthfactor_warning_threshold)
         self._hf_emergency_threshold = Decimal(healthfactor_emergency_threshold)
         self._price_change_alert_threshold_pct = float(price_change_alert_threshold_pct)
+
+        # state.json 同期設定
+        self._enable_state_sync = enable_state_sync
 
         # 状態
         self._events: Deque[MonitoringEvent] = deque(maxlen=max_events)
@@ -119,6 +127,95 @@ class MonitoringService:
         if level_order[event.level] >= level_order[self._last_event_level]:
             self._last_event_level = event.level
         return event
+
+    def _sync_state_file(
+        self,
+        health_factor: Optional[Decimal],
+        hf_triggered_emergency: bool,
+        reason: Optional[str],
+        now: datetime,
+    ) -> None:
+        """
+        state.json にシステム状態を同期する。
+
+        - HF >= 1.8: NORMAL
+        - 1.6 <= HF < 1.8: SAFE_MODE
+        - HF < 1.6: HARD_STOP
+
+        書き込み失敗時はログ出力のみ（サービス継続）。
+        circuit_closed と既存の emergency_stop=True は維持（OR 条件）。
+        """
+        if not self._enable_state_sync:
+            return
+
+        try:
+            from app.aave.schemas import AaveOperationMode, AaveSystemState
+            from app.aave.state_manager import (
+                get_default_state,
+                get_safe_default_state,
+                read_system_state,
+                write_system_state,
+                StateFileNotFoundError,
+                StateFileParseError,
+            )
+            from app.aave.config import get_aave_settings
+
+            settings = get_aave_settings()
+
+            # 現在の state を読み込み（circuit_closed, emergency_stop を維持するため）
+            try:
+                current = read_system_state()
+            except StateFileNotFoundError:
+                # 初回起動時はデフォルト値を使用
+                current = get_default_state()
+            except StateFileParseError:
+                # パースエラー時は安全側デフォルトを使用（オペレーター設定を保護）
+                logger.warning(
+                    "State file parse error, using SAFE default for sync "
+                    "(emergency_stop=True, circuit_closed=False)"
+                )
+                current = get_safe_default_state()
+
+            # モード判定
+            if health_factor is None:
+                mode = AaveOperationMode.NORMAL
+            elif health_factor < self._hf_emergency_threshold:
+                mode = AaveOperationMode.HARD_STOP
+            elif health_factor < self._hf_warning_threshold:
+                mode = AaveOperationMode.SAFE_MODE
+            else:
+                mode = AaveOperationMode.NORMAL
+
+            # emergency_stop は OR 条件で更新
+            # - 既存の emergency_stop=True は維持（オペレーター設定を尊重）
+            # - HF < 1.6 で新たに True にする
+            # - False に戻すのは clear_emergency_stop() 呼び出し時のみ
+            existing_emergency = current.emergency_stop
+            final_emergency_stop = existing_emergency or hf_triggered_emergency
+
+            # reason も既存を維持（新しい理由がある場合のみ更新）
+            final_reason = reason if reason else current.reason
+
+            new_state = AaveSystemState(
+                emergency_stop=final_emergency_stop,
+                mode=mode,
+                health_factor=health_factor,
+                last_update=now,
+                reason=final_reason,
+                circuit_closed=current.circuit_closed,  # 既存値を維持
+                stale_threshold_seconds=settings.state_stale_threshold_seconds,
+            )
+
+            write_system_state(new_state)
+            logger.debug(
+                "Synced state file: mode=%s, emergency_stop=%s, hf=%s",
+                mode.value,
+                final_emergency_stop,
+                health_factor,
+            )
+
+        except Exception as exc:
+            logger.warning("Failed to sync state file: %s", exc)
 
     # ------------------------------------------------------------------
     # 公開 API: メトリクス登録
@@ -222,14 +319,24 @@ class MonitoringService:
         ヘルスファクターを記録し、警告・緊急停止判定を行う。
 
         docs/08_automation_rules.md / 15_rollback_procedures.md:
-        - ヘルスファクター < 1.8 → 警告
-        - ヘルスファクター < 1.6 → 緊急停止
+        - ヘルスファクター < 1.8 → 警告（SAFE_MODE）
+        - ヘルスファクター < 1.6 → 緊急停止（HARD_STOP）
+
+        state.json への同期も行う（enable_state_sync=True の場合）。
         """
         now = self._now(at)
         self._last_health_factor = value
         self._health_factors.append((now, value))
 
         if value is None:
+            # HF=None は「借入なし（ポジションなし）」を意味する
+            # state.json は更新する（last_update を最新に保つため）
+            self._sync_state_file(
+                health_factor=None,
+                hf_triggered_emergency=False,
+                reason=None,
+                now=now,
+            )
             return HealthFactorStatus(
                 current=None,
                 level=AlertLevel.INFO,
@@ -238,22 +345,24 @@ class MonitoringService:
 
         level: AlertLevel = AlertLevel.INFO
         is_emergency = False
+        reason: Optional[str] = None
 
         if value < self._hf_emergency_threshold:
             level = AlertLevel.EMERGENCY
             is_emergency = True
             self._trading_paused = True
+            reason = (
+                f"health factor {value} below emergency threshold "
+                f"{self._hf_emergency_threshold}"
+            )
             if self._emergency_reason is None:
-                self._emergency_reason = (
-                    f"health factor {value} below emergency threshold "
-                    f"{self._hf_emergency_threshold}"
-                )
+                self._emergency_reason = reason
             event = MonitoringEvent(
                 timestamp=now,
                 component=ComponentType.AAVE,
                 level=level,
                 code="HF_BELOW_EMERGENCY",
-                message=self._emergency_reason,
+                message=reason,
             )
             event.metric = MetricPoint(
                 metric_id="aave_health_factor_current",
@@ -266,15 +375,16 @@ class MonitoringService:
 
         elif value < self._hf_warning_threshold:
             level = AlertLevel.WARNING
+            reason = (
+                f"health factor {value} below warning threshold "
+                f"{self._hf_warning_threshold}"
+            )
             event = MonitoringEvent(
                 timestamp=now,
                 component=ComponentType.AAVE,
                 level=level,
                 code="HF_BELOW_WARNING",
-                message=(
-                    f"health factor {value} below warning threshold "
-                    f"{self._hf_warning_threshold}"
-                ),
+                message=reason,
             )
             event.metric = MetricPoint(
                 metric_id="aave_health_factor_current",
@@ -284,6 +394,14 @@ class MonitoringService:
                 recorded_at=now,
             )
             self._append_event(event)
+
+        # state.json への同期
+        self._sync_state_file(
+            health_factor=value,
+            hf_triggered_emergency=is_emergency,
+            reason=reason,
+            now=now,
+        )
 
         return HealthFactorStatus(
             current=value,
@@ -370,9 +488,70 @@ class MonitoringService:
         緊急停止状態を解除する。
 
         自動解除は危険なので、基本的には運用者が明示的に呼び出す想定。
+        state.json も同期して emergency_stop=False にする。
         """
         self._trading_paused = False
         self._emergency_reason = None
+
+        # state.json も同期
+        if self._enable_state_sync:
+            try:
+                from app.aave.schemas import AaveOperationMode, AaveSystemState
+                from app.aave.state_manager import (
+                    get_default_state,
+                    get_safe_default_state,
+                    read_system_state,
+                    write_system_state,
+                    StateFileNotFoundError,
+                    StateFileParseError,
+                )
+
+                try:
+                    current = read_system_state()
+                except StateFileNotFoundError:
+                    # 初回起動時はデフォルト値を使用
+                    current = get_default_state()
+                except StateFileParseError:
+                    # パースエラー時は安全側デフォルトを使用
+                    # ただし clear_emergency_stop() が呼ばれているので
+                    # emergency_stop=False に上書きされる
+                    logger.warning(
+                        "State file parse error in clear_emergency_stop, "
+                        "using safe default for circuit_closed preservation"
+                    )
+                    current = get_safe_default_state()
+
+                # HF に基づいてモードを再計算
+                hf = self._last_health_factor
+                if hf is None:
+                    mode = AaveOperationMode.NORMAL
+                elif hf < self._hf_emergency_threshold:
+                    # HF がまだ危険域なら HARD_STOP のまま（ただし emergency_stop は False）
+                    mode = AaveOperationMode.HARD_STOP
+                elif hf < self._hf_warning_threshold:
+                    mode = AaveOperationMode.SAFE_MODE
+                else:
+                    mode = AaveOperationMode.NORMAL
+
+                new_state = AaveSystemState(
+                    emergency_stop=False,
+                    mode=mode,
+                    health_factor=hf,
+                    last_update=self._now(None),
+                    reason=None,
+                    circuit_closed=current.circuit_closed,
+                    stale_threshold_seconds=current.stale_threshold_seconds,
+                )
+                write_system_state(new_state)
+                logger.debug(
+                    "Cleared emergency stop in state file: mode=%s",
+                    mode.value,
+                )
+
+            except Exception as exc:
+                logger.warning(
+                    "Failed to sync state file on clear_emergency_stop: %s", exc
+                )
 
     def get_recent_events(self, limit: int = 100) -> List[MonitoringEvent]:
         """
@@ -504,3 +683,119 @@ class MonitoringService:
             status=status,
             metric_aggregates=metric_aggregates,
         )
+
+    # ------------------------------------------------------------------
+    # 公開 API: 並列ヘルスファクターチェック
+    # ------------------------------------------------------------------
+    async def check_health_factors_concurrent(
+        self,
+        wallets: List[str],
+        get_health_factor_func: Callable[[str], Optional[Decimal]],
+        *,
+        max_concurrent: int = 10,
+        timeout_seconds: float = 30.0,
+    ) -> List[Optional[Decimal]]:
+        """
+        複数ウォレットのヘルスファクターを並列取得する。
+
+        Pattern: python-async-patterns.md の「Pattern 1: Parallel RPC Calls」を適用。
+
+        Args:
+            wallets: チェック対象のウォレットアドレスリスト
+            get_health_factor_func: 同期版のヘルスファクター取得関数
+                                    (wallet_address) -> Optional[Decimal]
+            max_concurrent: 最大同時実行数（RPC 負荷軽減）
+            timeout_seconds: 各ウォレットのタイムアウト秒数
+
+        Returns:
+            List[Optional[Decimal]]: 各ウォレットのヘルスファクター
+                                     エラー時は None（fail-closed）
+
+        Note:
+            - Web3.py は同期ライブラリのため asyncio.to_thread() でラップ
+            - 1つのウォレットで失敗しても他は継続（partial success）
+            - 全体の結果を record_health_factor() に渡すのは呼び出し側の責務
+        """
+        if not wallets:
+            return []
+
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def check_wallet_safe(wallet: str) -> Optional[Decimal]:
+            """個別ウォレットのヘルスファクター取得（タイムアウト付き）"""
+            async with semaphore:
+                try:
+                    # 同期関数をスレッドプールで実行
+                    hf = await asyncio.wait_for(
+                        asyncio.to_thread(get_health_factor_func, wallet),
+                        timeout=timeout_seconds,
+                    )
+                    logger.debug("Health factor for %s: %s", wallet, hf)
+                    return hf
+                except asyncio.TimeoutError:
+                    logger.error(
+                        "Timeout checking health factor for %s (%.1fs)",
+                        wallet,
+                        timeout_seconds,
+                    )
+                    return None  # Fail-closed
+                except Exception as exc:
+                    logger.error(
+                        "Failed to check health factor for %s: %s",
+                        wallet,
+                        exc,
+                    )
+                    return None  # Fail-closed
+
+        tasks = [check_wallet_safe(w) for w in wallets]
+        results = await asyncio.gather(*tasks)
+
+        logger.info(
+            "Checked %d wallets concurrently: %d succeeded, %d failed",
+            len(wallets),
+            sum(1 for r in results if r is not None),
+            sum(1 for r in results if r is None),
+        )
+
+        return list(results)
+
+    async def check_all_positions_safe(
+        self,
+        get_health_factor_func: Callable[[], Optional[Decimal]],
+    ) -> bool:
+        """
+        単一ポジションのヘルスファクターを確認し、安全かどうかを返す。
+
+        Args:
+            get_health_factor_func: 引数なしのヘルスファクター取得関数
+
+        Returns:
+            bool: True=安全（HF >= threshold または HF=None）, False=危険
+
+        Note:
+            - HF=None は「借入なし」として安全扱い
+            - エラー発生時は False（fail-closed）
+        """
+        try:
+            hf = await asyncio.to_thread(get_health_factor_func)
+
+            if hf is None:
+                # 借入なし = 安全
+                logger.info("No debt position - considered safe")
+                return True
+
+            # ヘルスファクターを記録（state.json 同期含む）
+            status = self.record_health_factor(hf)
+
+            if status.is_emergency:
+                logger.warning(
+                    "Health factor %s is below emergency threshold",
+                    hf,
+                )
+                return False
+
+            return True
+
+        except Exception as exc:
+            logger.error("Failed to check position safety: %s", exc)
+            return False  # Fail-closed

@@ -1,0 +1,96 @@
+=== PROJECT DETAILS ===
+
+## README.md
+# Ultra AutoTrade Project
+
+
+
+## Backend Requirements
+pytest
+
+
+
+## Main Backend Code
+
+
+
+## Documentation Overview
+# 00_overview.md
+# OctoBot × AI × Notion × Aave 自動運用システム 概要
+
+## プロジェクト目的
+ニュースURLをNotionに貼るだけで  
+AIが判断し、ロボット（OctoBot）が自動で運用し、  
+Aaveで資産を最適化する「完全自動の金融運用システム」を構築する。
+
+## 完成イメージ
+1. ユーザーが Notion にニュースURLを貼る  
+2. AIがニュース内容を解析し、買い/売り/様子見を判断  
+3. OctoBot へシグナルを送る  
+4. Aaveの預け入れ・引き出し比率を自動調整  
+5. システムが止まったらLINE通知  
+6. 毎日AIが自動レポート生成  
+7. 管理画面から全体を確認できる
+
+## 主な構成要素
+- Notion API（入力）
+- AI（OpenAI）
+- OctoBot（売買ロジック）
+- Aave（資産運用）
+- 自動化機能（監視、通知、レポート）
+- 管理画面（Web UI）
+
+## 非エンジニア向け説明
+Notionに貼られたニュースを、AIが読んで判断し、  
+ロボットが自動で投資運用をしてくれる「自動金融ロボット」です。
+
+
+## Requirements Doc
+# 01_requirements.md
+# 要件定義（Requirements）
+
+## 機能要件
+
+### 1. 情報入力（Notion）
+- ニュースURLをNotionに貼ると自動で取得する
+- AI判断の結果をNotionに書き戻す
+
+### 2. AI判断
+- ニュース本文を取得・解析
+- BUY / SELL / HOLD を決定
+- 信頼度スコア（0〜100）付与
+- 判定根拠の要約
+
+### 3. OctoBot連携
+- AI判断を外部シグナルとして送信
+- OctoBotが判断に従って戦略を選択可能にする
+
+### 4. Aave自動運用
+- BUY → 預け入れ増加
+- SELL → 引き出し処理
+- HOLD → 何もしない
+- 安全性チェック（LTV、残高）
+
+### 5. 自動化・保守性
+- データ自動バックアップ
+- 24時間監視
+- 障害時にLINE通知
+- 日次レポート自動生成
+
+### 6. 管理画面
+- AI判断履歴
+- 運用実績
+- Aave残高
+- エラーログ
+
+## 非機能要件
+- 安定稼働
+- エラー耐性
+- コード可読性
+- セキュリティ（秘密鍵管理）
+
+## 優先度
+- P1：Notion→AI判断→OctoBot→Aave の基本連携
+- P2：自動化（監視・通知）
+- P3：管理画面
+- P4：高度分析・最適化

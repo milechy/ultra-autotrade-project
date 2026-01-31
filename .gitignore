@@ -19,9 +19,12 @@ __pycache__/
 
 # Environment
 .env
-.env.local
-.env.staging
-.env.production
+.env.*
+!.env.example
+!.env.*.example
+
+# Claude Code
+.mcp/
 
 # IDE
 .vscode/

@@ -1,5 +1,9 @@
 version: "3.9"
 
+volumes:
+  ultra-state:
+    driver: local
+
 services:
   backend:
     container_name: ultra-autotrade-backend-staging
@@ -15,6 +19,8 @@ services:
       - .env.staging       # staging 用の環境変数ファイル（Git 管理外）
     ports:
       - "8000:8000"
+    volumes:
+      - ultra-state:/var/run/ultra:rw
     restart: always
     # 必要に応じてログローテーションや制限を設定
     logging:
