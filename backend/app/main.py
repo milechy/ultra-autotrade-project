@@ -14,18 +14,25 @@ Phase5 で追加された責務:
 
 Phase6 で追加された責務:
 - 日次・週次レポートの自動生成スケジューラ
+
+Phase12 で追加された責務:
+- ユーザー認証・アカウント管理
 """
 
 import logging
 import os
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.ai.router import router as ai_router
 from app.bots.router import router as octobot_router
 from app.notion.router import router as notion_router
 from app.aave.router import router as aave_router
 from app.api.automation_dashboard import router as automation_dashboard_router
+from app.auth.router import router as auth_router
+from app.users.router import router as users_router
+from app.database import init_db
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +43,20 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
+    # --- CORS 設定 ---
+    # フロントエンドからのアクセスを許可
+    cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     # --- ルーター登録 ---
+    app.include_router(auth_router)     # Auth (Phase12)
+    app.include_router(users_router)    # Users (Phase12)
     app.include_router(notion_router)   # Notion (Phase1)
     app.include_router(ai_router)       # AI (Phase2)
     app.include_router(octobot_router)  # OctoBot (Phase3)
@@ -49,6 +69,18 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["health"])
     def health_check() -> dict:
         return {"status": "ok"}
+
+    # --- データベース初期化 (Phase12) ---
+    @app.on_event("startup")
+    async def startup_database():
+        """
+        アプリケーション起動時にデータベースを初期化する。
+        """
+        try:
+            init_db()
+            logger.info("Database initialized successfully")
+        except Exception as exc:
+            logger.error("Failed to initialize database: %s", exc)
 
     # --- バックグラウンド監視タスク (Phase5) ---
     @app.on_event("startup")

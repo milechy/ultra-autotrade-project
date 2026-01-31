@@ -1,0 +1,324 @@
+# backend/app/auth/service.py
+"""
+認証サービス。
+
+パスワードハッシュ化、JWT トークン生成・検証を担当。
+docs/13_security_design.md に準拠。
+"""
+
+import logging
+import os
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+import bcrypt
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+
+from .models import User, UserRole
+from .schemas import RegisterRequest, UserCreateRequest
+
+logger = logging.getLogger(__name__)
+
+
+class AuthService:
+    """認証サービス。"""
+
+    # JWT 設定
+    SECRET_KEY = os.getenv("JWT_SECRET_KEY", "development-secret-key-change-in-production")
+    ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 24時間
+
+    # bcrypt 設定
+    BCRYPT_ROUNDS = 12
+
+    # 本番環境で使用禁止の弱いシークレットキー
+    _WEAK_SECRET_KEYS = {
+        "development-secret-key-change-in-production",
+        "secret",
+        "changeme",
+        "password",
+        "test",
+        "",
+    }
+
+    @classmethod
+    def validate_secret_key(cls) -> None:
+        """
+        JWT シークレットキーの強度を検証する。
+
+        本番環境（APP_ENV が production または staging）では、
+        弱いシークレットキーの使用を禁止する。
+
+        Raises:
+            RuntimeError: 弱いシークレットキーが本番環境で使用されている場合
+        """
+        app_env = os.getenv("APP_ENV", "dev").lower()
+
+        # 本番環境チェック
+        if app_env in ("production", "staging"):
+            if cls.SECRET_KEY in cls._WEAK_SECRET_KEYS:
+                raise RuntimeError(
+                    "JWT_SECRET_KEY is not set or using a weak default. "
+                    "Please set a strong secret key for production/staging environment."
+                )
+            if len(cls.SECRET_KEY) < 32:
+                raise RuntimeError(
+                    "JWT_SECRET_KEY is too short. "
+                    "Please use a secret key with at least 32 characters."
+                )
+
+    @classmethod
+    def hash_password(cls, password: str) -> str:
+        """
+        パスワードを bcrypt でハッシュ化する。
+
+        Args:
+            password: 平文パスワード
+
+        Returns:
+            ハッシュ化されたパスワード
+        """
+        salt = bcrypt.gensalt(rounds=cls.BCRYPT_ROUNDS)
+        return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+
+    @classmethod
+    def verify_password(cls, plain_password: str, hashed_password: str) -> bool:
+        """
+        パスワードを検証する。
+
+        Args:
+            plain_password: 平文パスワード
+            hashed_password: ハッシュ化されたパスワード
+
+        Returns:
+            パスワードが一致すれば True
+        """
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8"),
+        )
+
+    @classmethod
+    def create_access_token(
+        cls,
+        user_id: int,
+        email: str,
+        role: str,
+        expires_delta: Optional[timedelta] = None,
+    ) -> tuple[str, int]:
+        """
+        JWT アクセストークンを生成する。
+
+        Args:
+            user_id: ユーザー ID
+            email: メールアドレス
+            role: ユーザーロール
+            expires_delta: 有効期限（省略時はデフォルト）
+
+        Returns:
+            (トークン, 有効期限秒数) のタプル
+        """
+        if expires_delta is None:
+            expires_delta = timedelta(minutes=cls.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+        expire = datetime.now(timezone.utc) + expires_delta
+        to_encode = {
+            "sub": str(user_id),
+            "email": email,
+            "role": role,
+            "exp": expire,
+            "iat": datetime.now(timezone.utc),
+        }
+
+        token = jwt.encode(to_encode, cls.SECRET_KEY, algorithm=cls.ALGORITHM)
+        expires_in = int(expires_delta.total_seconds())
+
+        return token, expires_in
+
+    @classmethod
+    def decode_token(cls, token: str) -> Optional[dict]:
+        """
+        JWT トークンをデコードする。
+
+        Args:
+            token: JWT トークン
+
+        Returns:
+            ペイロード辞書、または無効な場合は None
+        """
+        try:
+            payload = jwt.decode(token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM])
+            return payload
+        except JWTError as e:
+            logger.warning("JWT decode error: %s", e)
+            return None
+
+    @classmethod
+    def get_user_by_email(cls, db: Session, email: str) -> Optional[User]:
+        """メールアドレスでユーザーを取得する。"""
+        return db.query(User).filter(User.email == email).first()
+
+    @classmethod
+    def get_user_by_id(cls, db: Session, user_id: int) -> Optional[User]:
+        """ID でユーザーを取得する。"""
+        return db.query(User).filter(User.id == user_id).first()
+
+    @classmethod
+    def get_user_by_username(cls, db: Session, username: str) -> Optional[User]:
+        """ユーザー名でユーザーを取得する。"""
+        return db.query(User).filter(User.username == username).first()
+
+    @classmethod
+    def user_exists(cls, db: Session) -> bool:
+        """ユーザーが1人以上存在するか確認する。"""
+        return db.query(User).first() is not None
+
+    @classmethod
+    def authenticate_user(
+        cls,
+        db: Session,
+        email: str,
+        password: str,
+    ) -> Optional[User]:
+        """
+        ユーザーを認証する。
+
+        Args:
+            db: データベースセッション
+            email: メールアドレス
+            password: 平文パスワード
+
+        Returns:
+            認証成功時は User、失敗時は None
+        """
+        user = cls.get_user_by_email(db, email)
+        if user is None:
+            return None
+        if not user.is_active:
+            return None
+        if not cls.verify_password(password, user.hashed_password):
+            return None
+        return user
+
+    @classmethod
+    def create_user(
+        cls,
+        db: Session,
+        request: RegisterRequest | UserCreateRequest,
+        role: str = UserRole.VIEWER.value,
+    ) -> User:
+        """
+        ユーザーを作成する。
+
+        Args:
+            db: データベースセッション
+            request: 登録リクエスト
+            role: ユーザーロール
+
+        Returns:
+            作成されたユーザー
+
+        Raises:
+            ValueError: メールまたはユーザー名が既に使用されている場合
+        """
+        # 重複チェック
+        if cls.get_user_by_email(db, request.email):
+            raise ValueError(f"Email already registered: {request.email}")
+        if cls.get_user_by_username(db, request.username):
+            raise ValueError(f"Username already taken: {request.username}")
+
+        # UserCreateRequest の場合はロールを取得
+        if isinstance(request, UserCreateRequest):
+            role = request.role.value
+
+        user = User(
+            email=request.email,
+            username=request.username.lower(),
+            hashed_password=cls.hash_password(request.password),
+            role=role,
+        )
+
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        logger.info("Created user: %s (role=%s)", user.email, user.role)
+        return user
+
+    @classmethod
+    def update_user(
+        cls,
+        db: Session,
+        user: User,
+        email: Optional[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        role: Optional[str] = None,
+        is_active: Optional[bool] = None,
+    ) -> User:
+        """
+        ユーザーを更新する。
+
+        Args:
+            db: データベースセッション
+            user: 更新対象のユーザー
+            email: 新しいメールアドレス（任意）
+            username: 新しいユーザー名（任意）
+            password: 新しいパスワード（任意）
+            role: 新しいロール（任意）
+            is_active: 新しいアクティブ状態（任意）
+
+        Returns:
+            更新されたユーザー
+
+        Raises:
+            ValueError: メールまたはユーザー名が既に使用されている場合
+        """
+        if email and email != user.email:
+            if cls.get_user_by_email(db, email):
+                raise ValueError(f"Email already registered: {email}")
+            user.email = email
+
+        if username and username != user.username:
+            if cls.get_user_by_username(db, username.lower()):
+                raise ValueError(f"Username already taken: {username}")
+            user.username = username.lower()
+
+        if password:
+            user.hashed_password = cls.hash_password(password)
+
+        if role is not None:
+            user.role = role
+
+        if is_active is not None:
+            user.is_active = is_active
+
+        db.commit()
+        db.refresh(user)
+
+        logger.info("Updated user: %s", user.email)
+        return user
+
+    @classmethod
+    def delete_user(cls, db: Session, user: User) -> None:
+        """
+        ユーザーを削除する。
+
+        Args:
+            db: データベースセッション
+            user: 削除対象のユーザー
+        """
+        logger.info("Deleting user: %s", user.email)
+        db.delete(user)
+        db.commit()
+
+    @classmethod
+    def get_all_users(cls, db: Session) -> list[User]:
+        """全ユーザーを取得する。"""
+        return db.query(User).order_by(User.created_at.desc()).all()
+
+    @classmethod
+    def count_admins(cls, db: Session) -> int:
+        """管理者の数を取得する。"""
+        return db.query(User).filter(User.role == UserRole.ADMIN.value).count()
