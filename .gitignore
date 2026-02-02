@@ -56,3 +56,5 @@ __pycache__/
 .env
 .env.staging
 .env.production
+backend/data/
+frontend/.next/

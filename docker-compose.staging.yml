@@ -21,6 +21,7 @@ services:
       - "8000:8000"
     volumes:
       - ultra-state:/var/run/ultra:rw
+      - ./backend/data:/app/backend/data:rw
     restart: always
     # 必要に応じてログローテーションや制限を設定
     logging:
