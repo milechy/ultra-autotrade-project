@@ -1,6 +1,7 @@
 # backend/app/bots/router.py
 from __future__ import annotations
 
+from functools import lru_cache
 import inspect
 import os
 from functools import lru_cache
@@ -66,6 +67,7 @@ def _build_octobot_client(*, api_base_url: str, api_key: str) -> OctoBotClient:
             ) from e
 
 
+@lru_cache()
 @lru_cache()
 def get_octobot_service() -> OctoBotService:
     """
