@@ -87,8 +87,10 @@ def get_octobot_service() -> OctoBotService:
 
     return OctoBotService(
         client=client,
-        # TODO: min_confidence を docs/08_automation_rules.md から拾う
-        min_confidence=0,
+        # docs/05_ai_judgement_rules.md: SELL 判定最下限は「AI信頼度 > 70」
+        min_confidence=70,
+        # docs/06_octobot_signal_flow.md: 1時間以内に同一アクション 3件まで
+        max_same_action_per_hour=3,
     )
 
 

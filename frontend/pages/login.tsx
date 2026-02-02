@@ -36,7 +36,11 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const redirect = getSafeRedirect(router.query.redirect as string);
+  // router.query.redirect は string | string[] | undefined のため正規化
+  const rawRedirect = router.query.redirect;
+  const redirect = getSafeRedirect(
+    Array.isArray(rawRedirect) ? rawRedirect[0] : rawRedirect
+  );
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {

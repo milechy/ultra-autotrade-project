@@ -1,7 +1,10 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Tuple
 
 from app.automation.state import get_monitoring_service
+
+logger = logging.getLogger(__name__)
 from app.automation.schemas import ComponentType
 from .client import OctoBotClient, OctoBotClientError
 from .schemas import (
@@ -74,6 +77,16 @@ class OctoBotService:
 
             # 1. 信頼度しきい値チェック
             if signal.confidence < self._min_confidence:
+                logger.info(
+                    "Signal skipped: confidence below threshold",
+                    extra={
+                        "signal_id": signal.id,
+                        "action": action_val,
+                        "confidence": signal.confidence,
+                        "threshold": self._min_confidence,
+                        "status": "SKIPPED",
+                    },
+                )
                 details.append(
                     OctoBotSignalDetail(
                         id=signal.id,
@@ -89,6 +102,17 @@ class OctoBotService:
             if self._max_same_action_per_hour > 0:
                 current_count = self._count_same_action_recent(action_val, ts)
                 if current_count >= self._max_same_action_per_hour:
+                    logger.warning(
+                        "Signal skipped: rate limit exceeded for same action per hour",
+                        extra={
+                            "signal_id": signal.id,
+                            "action": action_val,
+                            "confidence": signal.confidence,
+                            "current_count": current_count,
+                            "limit": self._max_same_action_per_hour,
+                            "status": "SKIPPED",
+                        },
+                    )
                     details.append(
                         OctoBotSignalDetail(
                             id=signal.id,
@@ -109,6 +133,16 @@ class OctoBotService:
             try:
                 self._send_to_octobot(signal)
             except OctoBotClientError as exc:
+                logger.error(
+                    "Signal send failed: OctoBot API error",
+                    extra={
+                        "signal_id": signal.id,
+                        "action": action_val,
+                        "confidence": signal.confidence,
+                        "error": str(exc),
+                        "status": "FAILED",
+                    },
+                )
                 details.append(
                     OctoBotSignalDetail(
                         id=signal.id,
@@ -120,6 +154,15 @@ class OctoBotService:
                 continue
 
             # 成功時
+            logger.info(
+                "Signal sent successfully",
+                extra={
+                    "signal_id": signal.id,
+                    "action": action_val,
+                    "confidence": signal.confidence,
+                    "status": "SENT",
+                },
+            )
             self._recent_actions.append((action_val, ts))
             details.append(
                 OctoBotSignalDetail(
@@ -136,6 +179,18 @@ class OctoBotService:
                 action_val,
                 at=ts,
             )
+
+        # 処理サマリログ
+        total_count = success_count + skipped_count + failed_count
+        logger.info(
+            "Signal processing completed",
+            extra={
+                "total": total_count,
+                "sent": success_count,
+                "skipped": skipped_count,
+                "failed": failed_count,
+            },
+        )
 
         return OctoBotSignalResponse(
             success_count=success_count,
