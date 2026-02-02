@@ -26,6 +26,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.ai.router import router as ai_router
+from app.automation.automation_router import router as automation_router
 from app.bots.router import router as octobot_router
 from app.notion.router import router as notion_router
 from app.aave.router import router as aave_router
@@ -61,6 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(ai_router)       # AI (Phase2)
     app.include_router(octobot_router)  # OctoBot (Phase3)
     app.include_router(aave_router)     # Aave (Phase4)
+    app.include_router(automation_router)  # Automation workflow
     app.include_router(
         automation_dashboard_router,
         prefix="/api/automation",
