@@ -38,6 +38,10 @@ Thumbs.db
 
 # Build
 dist/
+
+# Database (Phase12)
+backend/data/
+*.db
 build/
 *.egg-info/
 
@@ -58,3 +62,4 @@ __pycache__/
 .env.production
 backend/data/
 frontend/.next/
+frontend/tsconfig.tsbuildinfo
