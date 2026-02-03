@@ -14,7 +14,7 @@ export default function StatusPanel({ status }: { status: AutomationStatus }) {
       </div>
 
       <details style={{ marginTop: 12 }}>
-        <summary style={{ cursor: "pointer" }}>Raw JSON</summary>
+        <summary style={{ cursor: "pointer" }}>生データ（JSON）</summary>
         <pre style={preStyle}>{JSON.stringify(status, null, 2)}</pre>
       </details>
     </section>

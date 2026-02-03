@@ -11,14 +11,14 @@ export default function ReportSummaryPanel({ report }: { report: AutomationRepor
 
       <div style={{ marginTop: 10 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-          <Card title="period">{String(report.period ?? "N/A")}</Card>
-          <Card title="generated_at">{String(report.generated_at ?? "N/A")}</Card>
+          <Card title="期間">{String(report.period ?? "N/A")}</Card>
+          <Card title="生成日時">{String(report.generated_at ?? "N/A")}</Card>
         </div>
       </div>
 
       {Array.isArray(report.highlights) && report.highlights.length > 0 ? (
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>highlights</div>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>ハイライト</div>
           <ul style={{ marginTop: 0 }}>
             {report.highlights.map((h, idx) => (
               <li key={idx} style={{ marginBottom: 6 }}>{h}</li>
@@ -28,7 +28,7 @@ export default function ReportSummaryPanel({ report }: { report: AutomationRepor
       ) : null}
 
       <details style={{ marginTop: 12 }}>
-        <summary style={{ cursor: "pointer" }}>Raw JSON</summary>
+        <summary style={{ cursor: "pointer" }}>生データ（JSON）</summary>
         <pre style={preStyle}>{JSON.stringify(report, null, 2)}</pre>
       </details>
     </section>

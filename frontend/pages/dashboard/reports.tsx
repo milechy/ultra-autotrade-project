@@ -28,14 +28,14 @@ export default function ReportsPage() {
   return (
     <AppShell>
       <Head>
-        <title>Reports - Ultra AutoTrade</title>
+        <title>レポート - Ultra AutoTrade</title>
       </Head>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ marginBottom: 6 }}>Latest Report</h1>
+          <h1 style={{ marginBottom: 6 }}>最新レポート</h1>
           <p style={{ marginTop: 0, color: "#555" }}>
-            Summary view aligned with runbook reporting checks.
+            Runbook のレポート確認に沿ったサマリービュー。
           </p>
         </div>
 
@@ -44,13 +44,13 @@ export default function ReportsPage() {
           disabled={loading}
           style={{ padding: "6px 10px", borderRadius: 10, border: "1px solid #ddd", background: "#fff", cursor: "pointer" }}
         >
-          {loading ? "Loading..." : "Refresh"}
+          {loading ? "読み込み中..." : "更新"}
         </button>
       </div>
 
       {error ? (
         <div style={{ marginTop: 12, padding: 12, border: "1px solid #f1c0c0", background: "#fff5f5", borderRadius: 12 }}>
-          <strong>Failed to load</strong>
+          <strong>読み込み失敗</strong>
           <div style={{ marginTop: 6, fontFamily: "ui-monospace, Menlo, monospace", fontSize: 12 }}>{error}</div>
         </div>
       ) : null}
@@ -58,10 +58,10 @@ export default function ReportsPage() {
       {report ? <ReportSummaryPanel report={report} /> : null}
 
       <section style={{ marginTop: 16, border: "1px dashed #ddd", borderRadius: 12, padding: 14 }}>
-        <h2 style={{ margin: 0, fontSize: 14 }}>Operational actions (runbook)</h2>
+        <h2 style={{ margin: 0, fontSize: 14 }}>運用アクション（Runbook）</h2>
         <ul style={{ marginTop: 10, marginBottom: 0, color: "#555" }}>
-          <li>Review <code>highlights</code> and confirm no unresolved warnings.</li>
-          <li>If report generation fails, check ReportingService logs and dependencies.</li>
+          <li><code>highlights</code> を確認し、未解決の警告がないことを確認。</li>
+          <li>レポート生成が失敗した場合、ReportingService のログと依存関係を確認。</li>
         </ul>
       </section>
     </AppShell>

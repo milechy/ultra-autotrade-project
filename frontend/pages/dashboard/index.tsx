@@ -6,23 +6,23 @@ export default function DashboardIndex() {
   return (
     <AppShell>
       <Head>
-        <title>Dashboard - Ultra AutoTrade</title>
+        <title>ダッシュボード - Ultra AutoTrade</title>
       </Head>
 
-      <h1 style={{ marginBottom: 8 }}>Dashboard</h1>
+      <h1 style={{ marginBottom: 8 }}>ダッシュボード</h1>
       <p style={{ marginTop: 0, color: "#555" }}>
-        Operations entry point. Choose a view aligned with the runbook.
+        運用エントリーポイント。Runbook に沿ったビューを選択してください。
       </p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
         <Link href="/dashboard/automation" style={cardStyle}>
-          <strong>Automation Health</strong>
+          <strong>自動売買ステータス</strong>
           <div style={{ color: "#555", marginTop: 6 }}>
             AutomationStatus + DashboardSnapshot
           </div>
         </Link>
         <Link href="/dashboard/reports" style={cardStyle}>
-          <strong>Latest Report</strong>
+          <strong>最新レポート</strong>
           <div style={{ color: "#555", marginTop: 6 }}>
             AutomationReportSummary
           </div>
@@ -30,9 +30,9 @@ export default function DashboardIndex() {
       </div>
 
       <section style={{ marginTop: 24 }}>
-        <h2 style={{ fontSize: 16 }}>Runbook mapping</h2>
+        <h2 style={{ fontSize: 16 }}>Runbook マッピング</h2>
         <p style={{ color: "#555" }}>
-          Each view includes an “Operational actions” section that links back to the corresponding runbook steps.
+          各ビューには Runbook の該当ステップにリンクする「運用アクション」セクションがあります。
         </p>
       </section>
     </AppShell>

@@ -20,24 +20,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
               <strong>Ultra AutoTrade</strong>
             </Link>
-            <span style={{ color: "#666", fontSize: 12 }}>Operations</span>
+            <span style={{ color: "#666", fontSize: 12 }}>運用ダッシュボード</span>
           </div>
           <nav style={{ display: "flex", gap: 12, fontSize: 14, alignItems: "center" }}>
-            <Link href="/dashboard/automation" style={navLinkStyle}>Automation</Link>
-            <Link href="/dashboard/reports" style={navLinkStyle}>Reports</Link>
+            <Link href="/dashboard/automation" style={navLinkStyle}>自動売買</Link>
+            <Link href="/dashboard/reports" style={navLinkStyle}>レポート</Link>
             {!isLoading && user && (
               <>
                 <span style={{ color: "#999" }}>|</span>
-                <Link href="/settings/account" style={navLinkStyle}>Settings</Link>
+                <Link href="/settings/account" style={navLinkStyle}>設定</Link>
                 {user.role === "admin" && (
-                  <Link href="/settings/users" style={navLinkStyle}>Users</Link>
+                  <Link href="/settings/users" style={navLinkStyle}>ユーザー管理</Link>
                 )}
                 <span style={{ color: "#666", fontSize: 12 }}>{user.username}</span>
-                <button onClick={handleLogout} style={logoutButtonStyle}>Logout</button>
+                <button onClick={handleLogout} style={logoutButtonStyle}>ログアウト</button>
               </>
             )}
             {!isLoading && !user && (
-              <Link href="/login" style={navLinkStyle}>Login</Link>
+              <Link href="/login" style={navLinkStyle}>ログイン</Link>
             )}
           </nav>
         </div>
@@ -46,7 +46,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "16px" }}>{children}</main>
 
       <footer style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px", color: "#777", fontSize: 12 }}>
-        Read-only dashboard. Backend base URL: <code>{process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "(not set)"}</code>
+        読み取り専用ダッシュボード。バックエンドURL: <code>{process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "(未設定)"}</code>
       </footer>
     </div>
   );

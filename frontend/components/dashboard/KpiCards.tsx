@@ -9,28 +9,28 @@ export default function KpiCards({ status, snapshot }: { status: AutomationStatu
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-      <Card title="Trading">
-        <div style={{ fontSize: 20, fontWeight: 700 }}>{paused ? "PAUSED" : "RUNNING"}</div>
+      <Card title="取引状態">
+        <div style={{ fontSize: 20, fontWeight: 700 }}>{paused ? "停止中" : "稼働中"}</div>
         <div style={{ color: "#666", marginTop: 4 }}>is_trading_paused</div>
       </Card>
 
-      <Card title="Health Factor">
+      <Card title="安全度">
         <div style={{ fontSize: 20, fontWeight: 700 }}>{hf === null ? "N/A" : String(hf)}</div>
         <div style={{ color: "#666", marginTop: 4 }}>last_health_factor</div>
       </Card>
 
-      <Card title="Portfolio 24h">
+      <Card title="ポートフォリオ 24時間">
         <div style={{ fontSize: 20, fontWeight: 700 }}>{change24h === null ? "N/A" : `${change24h}%`}</div>
         <div style={{ color: "#666", marginTop: 4 }}>last_price_change_24h</div>
       </Card>
 
-      <Card title="Last Event Level">
+      <Card title="最新イベントレベル">
         <div style={{ fontSize: 20, fontWeight: 700 }}>{level ?? "N/A"}</div>
         <div style={{ color: "#666", marginTop: 4 }}>last_event_level</div>
       </Card>
 
       {snapshot?.generated_at ? (
-        <Card title="Snapshot Generated">
+        <Card title="スナップショット生成日時">
           <div style={{ fontSize: 14, fontWeight: 700 }}>{new Date(snapshot.generated_at).toISOString()}</div>
           <div style={{ color: "#666", marginTop: 4 }}>generated_at (UTC)</div>
         </Card>

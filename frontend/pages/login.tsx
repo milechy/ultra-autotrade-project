@@ -57,7 +57,7 @@ export default function LoginPage() {
       await login(email, password);
       router.replace(redirect);
     } catch (err: any) {
-      setError(err?.message || "Login failed");
+      setError(err?.message || "ログインに失敗しました");
     } finally {
       setSubmitting(false);
     }
@@ -66,7 +66,7 @@ export default function LoginPage() {
   if (isLoading) {
     return (
       <div style={{ padding: 40, textAlign: "center" }}>
-        <div>Loading...</div>
+        <div>読み込み中...</div>
       </div>
     );
   }
@@ -78,7 +78,7 @@ export default function LoginPage() {
   return (
     <>
       <Head>
-        <title>Login - Ultra AutoTrade</title>
+        <title>ログイン - Ultra AutoTrade</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
@@ -86,7 +86,7 @@ export default function LoginPage() {
         <div style={cardStyle}>
           <h1 style={{ margin: 0, marginBottom: 8 }}>Ultra AutoTrade</h1>
           <p style={{ margin: 0, marginBottom: 24, color: "#666" }}>
-            Operations Dashboard
+            運用ダッシュボード
           </p>
 
           <form onSubmit={handleSubmit}>
@@ -97,7 +97,7 @@ export default function LoginPage() {
             )}
 
             <div style={fieldStyle}>
-              <label style={labelStyle}>Email</label>
+              <label style={labelStyle}>メールアドレス</label>
               <input
                 type="email"
                 value={email}
@@ -110,7 +110,7 @@ export default function LoginPage() {
             </div>
 
             <div style={fieldStyle}>
-              <label style={labelStyle}>Password</label>
+              <label style={labelStyle}>パスワード</label>
               <input
                 type="password"
                 value={password}
@@ -127,12 +127,12 @@ export default function LoginPage() {
               style={buttonStyle}
               disabled={submitting}
             >
-              {submitting ? "Logging in..." : "Login"}
+              {submitting ? "ログイン中..." : "ログイン"}
             </button>
           </form>
 
           <p style={{ marginTop: 24, fontSize: 12, color: "#999", textAlign: "center" }}>
-            Initial setup? Contact your administrator.
+            初期設定が必要な場合は管理者にお問い合わせください。
           </p>
         </div>
       </main>

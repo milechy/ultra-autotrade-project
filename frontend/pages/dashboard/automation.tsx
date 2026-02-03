@@ -36,26 +36,26 @@ export default function AutomationPage() {
   return (
     <AppShell>
       <Head>
-        <title>Automation - Ultra AutoTrade</title>
+        <title>自動売買 - Ultra AutoTrade</title>
       </Head>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ marginBottom: 6 }}>Automation Health</h1>
+          <h1 style={{ marginBottom: 6 }}>自動売買ステータス</h1>
           <p style={{ marginTop: 0, color: "#555" }}>
-            Operational read-only view. Aligns with <code>docs/19_operations_runbook.md</code> §2.4.
+            運用読み取り専用ビュー。<code>docs/19_operations_runbook.md</code> §2.4 に準拠。
           </p>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <label style={{ fontSize: 12, color: "#666" }}>lookback_hours</label>
+          <label style={{ fontSize: 12, color: "#666" }}>参照時間</label>
           <select
             value={lookbackHours}
             onChange={(e) => setLookbackHours(Number(e.target.value))}
             style={{ padding: "6px 10px", borderRadius: 10, border: "1px solid #ddd" }}
           >
             {[1, 6, 12, 24].map((v) => (
-              <option key={v} value={v}>{v}</option>
+              <option key={v} value={v}>{v}時間</option>
             ))}
           </select>
           <button
@@ -63,14 +63,14 @@ export default function AutomationPage() {
             disabled={loading}
             style={{ padding: "6px 10px", borderRadius: 10, border: "1px solid #ddd", background: "#fff", cursor: "pointer" }}
           >
-            {loading ? "Loading..." : "Refresh"}
+            {loading ? "読み込み中..." : "更新"}
           </button>
         </div>
       </div>
 
       {error ? (
         <div style={{ marginTop: 12, padding: 12, border: "1px solid #f1c0c0", background: "#fff5f5", borderRadius: 12 }}>
-          <strong>Failed to load</strong>
+          <strong>読み込み失敗</strong>
           <div style={{ marginTop: 6, fontFamily: "ui-monospace, Menlo, monospace", fontSize: 12 }}>{error}</div>
         </div>
       ) : null}
@@ -81,11 +81,11 @@ export default function AutomationPage() {
       {snapshot ? <SnapshotCharts snapshot={snapshot} /> : null}
 
       <section style={{ marginTop: 16, border: "1px dashed #ddd", borderRadius: 12, padding: 14 }}>
-        <h2 style={{ margin: 0, fontSize: 14 }}>Operational actions (runbook)</h2>
+        <h2 style={{ margin: 0, fontSize: 14 }}>運用アクション（Runbook）</h2>
         <ul style={{ marginTop: 10, marginBottom: 0, color: "#555" }}>
-          <li>If <code>is_trading_paused = true</code>, follow Runbook “Emergency stop state” checks.</li>
-          <li>If <code>last_health_factor</code> is low, follow Runbook “Aave HF degradation” checks.</li>
-          <li>If errors persist, confirm backend logs and dependency health.</li>
+          <li><code>is_trading_paused = true</code> の場合、Runbook「緊急停止状態」の確認手順に従う。</li>
+          <li><code>last_health_factor</code> が低い場合、Runbook「Aave HF 低下」の確認手順に従う。</li>
+          <li>エラーが継続する場合、バックエンドログと依存関係の状態を確認。</li>
         </ul>
       </section>
     </AppShell>
