@@ -137,42 +137,65 @@ def trigger_github_action(action: str, pr_number: int, review_data: Dict[str, An
 
 @app.route("/slack/interactions", methods=["POST"])
 def handle_interaction():
-    """Handle Slack interactive button clicks."""
-    
-    # Verify request is from Slack
     request_data = request.get_data()
     timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
     signature = request.headers.get("X-Slack-Signature", "")
-    
+
     if not verify_slack_request(request_data, timestamp, signature):
         return jsonify({"error": "Invalid request signature"}), 401
+
+    content_type = request.headers.get("Content-Type", "")
     
-    # Parse payload (URL-encoded)
-    payload_str = request.form.get("payload", "{}")
-    payload = json.loads(payload_str)
+    if "application/json" in content_type:
+        payload = request.json or {}
+        if payload.get("type") == "url_verification":
+            return jsonify({"challenge": payload.get("challenge")})
+    else:
+        payload_str = request.form.get("payload", "{}")
+        payload = json.loads(payload_str)
+
+    action_id = None
+    if payload.get("type") == "block_actions" and payload.get("actions"):
+        action_id = payload["actions"][0].get("action_id")
     
-    # Extract action
-    actions = payload.get("actions", [])
-    if not actions:
+    if not action_id:
         return jsonify({"error": "No action provided"}), 400
     
-    action = actions[0]
-    action_id = action.get("action_id", "")
-    action_value = action.get("value", "")
+    pr_number = None
+    if "message" in payload:
+        blocks = payload["message"].get("blocks", [])
+        for block in blocks:
+            if block.get("type") == "section" and block.get("text"):
+                text = block["text"].get("text", "")
+                import re
+                match = re.search(r'PR #(\d+)', text)
+                if match:
+                    pr_number = int(match.group(1))
+                    break
     
-    # Extract PR number from message (stored in callback_id or parsed from text)
-    # For this example, we'll store PR number in the button value
-    # Format: "approve:123" where 123 is PR number
+    if not pr_number:
+        return jsonify({"error": "Could not find PR number"}), 400
+
+    user = payload.get("user", {}).get("name", "unknown")
     
-    # Parse action_id to determine action type
-    if action_id == "review_approve":
-        action_type = "approve"
-    elif action_id == "review_request_changes":
-        action_type = "request_changes"
-    elif action_id == "review_reject":
-        action_type = "reject"
-    else:
-        return jsonify({"error": "Unknown action"}), 400
+    try:
+        if action_id == "review_approve":
+            approve_pr(pr_number, user)
+            message = f"✅ PR #{pr_number} approved successfully"
+        elif action_id == "review_request_changes":
+            request_changes_pr(pr_number, user)
+            message = f"🔄 Changes requested on PR #{pr_number}"
+        elif action_id == "review_reject":
+            close_pr(pr_number, user)
+            message = f"❌ PR #{pr_number} closed"
+        else:
+            return jsonify({"error": f"Unknown action: {action_id}"}), 400
+        
+        return jsonify({"text": message})
+    
+    except Exception as e:
+        logger.error(f"Error handling interaction: {e}")
+        return jsonify({"error": "Failed to process action"}), 500
     
     # TODO: Extract PR number from message or store it in button metadata
     # For now, hardcoded for demonstration
