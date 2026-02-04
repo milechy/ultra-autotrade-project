@@ -85,8 +85,10 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           PR_URL="${{ github.event.pull_request.html_url || '' }}"
+          PR_NUMBER="${{ github.event.pull_request.number || '' }}"
           python scripts/slack_notify.py \
             --review review_result.json \
+            --pr-number "$PR_NUMBER" \
             --pr-url "$PR_URL"
       
       - name: Comment on PR (if applicable)
