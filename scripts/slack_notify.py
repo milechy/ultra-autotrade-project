@@ -161,11 +161,21 @@ def build_slack_blocks(review: Dict[str, Any], pr_url: str = "") -> List[Dict[st
     return blocks
 
 
-def send_to_slack(webhook_url: str, blocks: List[Dict[str, Any]]) -> bool:
+def send_to_slack(webhook_url: str, blocks: List[Dict[str, Any]], pr_url: str = "") -> bool:
     """Send message to Slack via Webhook."""
+    
+    # Extract PR number from URL
+    pr_number = ""
+    if pr_url:
+        import re
+        match = re.search(r'/pull/(\d+)', pr_url)
+        if match:
+            pr_number = f"PR #{match.group(1)} - "
+    
     payload = {
+
         "blocks": blocks,
-        "text": "Code Review Complete"  # Fallback text
+        "text": f"{pr_number}Code Review Complete"  # Fallback text with PR number
     }
     
     try:
@@ -203,7 +213,7 @@ def main():
     blocks = build_slack_blocks(review, args.pr_url)
     
     # Send to Slack
-    success = send_to_slack(webhook_url, blocks)
+    success = send_to_slack(webhook_url, blocks, args.pr_url)
     
     if not success:
         sys.exit(1)
