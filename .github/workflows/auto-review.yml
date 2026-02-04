@@ -36,7 +36,7 @@ jobs:
           pip install --upgrade pip
           pip install openai requests
       
-      - name: Get changed files
+- name: Get changed files
         id: changed-files
         run: |
           # Get list of changed files
@@ -54,23 +54,13 @@ jobs:
           else
             echo "Changed files:"
             echo "$CHANGED_FILES"
+            
+            # Convert newlines to spaces for single-line output
+            FILES_ONELINE=$(echo "$CHANGED_FILES" | tr '\n' ' ' | sed 's/ $//')
+            
             echo "has_changes=true" >> $GITHUB_OUTPUT
-            # Quote and escape the files list properly
-            FILES_ESCAPED=$(echo "$CHANGED_FILES" | tr '\n' ' ')
-            echo "files=$FILES_ESCAPED" >> $GITHUB_OUTPUT
-          fi
-          
-          CHANGED_FILES=$(git diff --name-only $BASE_REF HEAD | grep -E '\.(py|ts|tsx|js|jsx)$' || echo "")
-          
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No code files changed"
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          else
-            echo "Changed files: $CHANGED_FILES"
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
-          fi
-      
+            echo "files=$FILES_ONELINE" >> $GITHUB_OUTPUT
+          fi      
       - name: Run Codex review
         if: steps.changed-files.outputs.has_changes == 'true'
         env:
