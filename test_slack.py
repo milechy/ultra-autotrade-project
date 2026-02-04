@@ -1,1 +1,1 @@
-print("Test Slack notification workflow")
+print('test')
