@@ -10,6 +10,11 @@ on:
       - main
       - staging
 
+permissions:  # ← この4行を追加
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   code-review:
     runs-on: ubuntu-latest
