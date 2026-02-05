@@ -54,7 +54,9 @@ jobs:
           else
             echo "Changed files: $CHANGED_FILES"
             echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+            echo "files<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           fi
        
       - name: Run Codex review
