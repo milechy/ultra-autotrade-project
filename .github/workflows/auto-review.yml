@@ -57,14 +57,12 @@ jobs:
             echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
           fi
       
-      - name: Run Codex review
-        if: steps.changed-files.outputs.has_changes == 'true'
+- name: Run Codex review
+        if: steps.changed-files.outputs.has_changes == 'true' && github.event.pull_request.head.repo.full_name == github.repository  # ← フォークの場合はスキップ
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          python scripts/codex_review.py \
-            --files "${{ steps.changed-files.outputs.files }}" \
-            --output review_result.json
+          python scripts/codex_review.py --files "${{ steps.changed-files.outputs.files }}" --output review_result.json
       
       - name: Upload review result
         if: steps.changed-files.outputs.has_changes == 'true'
