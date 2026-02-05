@@ -72,6 +72,13 @@ jobs:
           path: review_result.json
           retention-days: 7
       
+      - name: Create dummy review result if needed
+        if: steps.changed-files.outputs.has_changes == 'true'
+        run: |
+          if [ ! -f review_result.json ]; then
+            echo '{"files_reviewed":0,"issues":0,"suggestions":0,"review_time":"N/A"}' > review_result.json
+          fi
+
       - name: Send Slack notification
         if: steps.changed-files.outputs.has_changes == 'true'
         env:
