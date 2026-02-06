@@ -65,14 +65,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           python scripts/codex_review.py --files "${{ steps.changed-files.outputs.files }}" --output review_result.json
-
-      - name: Upload review result
-        if: steps.changed-files.outputs.has_changes == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: review-result
-          path: review_result.json
-          retention-days: 7
       
       - name: Create dummy review result if needed
         if: steps.changed-files.outputs.has_changes == 'true'
@@ -80,6 +72,14 @@ jobs:
           if [ ! -f review_result.json ]; then
             echo '{"files_reviewed":0,"issues":[],"suggestions":[],"review_time_seconds":0,"summary":"Codex review was skipped"}' > review_result.json
           fi
+      
+      - name: Upload review result
+        if: steps.changed-files.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-result
+          path: review_result.json
+          retention-days: 7
 
       - name: Send Slack notification
         if: steps.changed-files.outputs.has_changes == 'true'
