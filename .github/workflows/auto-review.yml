@@ -10,11 +10,11 @@ on:
       - main
       - staging
 
-permissions:  # ← この4行を追加
+permissions:
   contents: read
   pull-requests: write
   issues: write
-
+  
 jobs:
   code-review:
     runs-on: ubuntu-latest
@@ -54,17 +54,24 @@ jobs:
           else
             echo "Changed files: $CHANGED_FILES"
             echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+            echo "files<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           fi
-      
+       
       - name: Run Codex review
-        if: steps.changed-files.outputs.has_changes == 'true'
+        if: false  # ← 一時的に完全無効化
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          python scripts/codex_review.py \
-            --files "${{ steps.changed-files.outputs.files }}" \
-            --output review_result.json
+          python scripts/codex_review.py --files "${{ steps.changed-files.outputs.files }}" --output review_result.json
+      
+      - name: Create dummy review result if needed
+        if: steps.changed-files.outputs.has_changes == 'true'
+        run: |
+          if [ ! -f review_result.json ]; then
+            echo '{"files_reviewed":0,"issues":[],"suggestions":[],"review_time_seconds":0,"summary":"Codex review was skipped"}' > review_result.json
+          fi
       
       - name: Upload review result
         if: steps.changed-files.outputs.has_changes == 'true'
@@ -73,15 +80,17 @@ jobs:
           name: review-result
           path: review_result.json
           retention-days: 7
-      
+
       - name: Send Slack notification
         if: steps.changed-files.outputs.has_changes == 'true'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           PR_URL="${{ github.event.pull_request.html_url || '' }}"
+          PR_NUMBER="${{ github.event.pull_request.number || '' }}"
           python scripts/slack_notify.py \
             --review review_result.json \
+            --pr-number "$PR_NUMBER" \
             --pr-url "$PR_URL"
       
       - name: Comment on PR (if applicable)

@@ -3,7 +3,7 @@
 Send code review results to Slack with interactive buttons.
 
 Usage:
-    python slack_notify.py --review review_result.json
+    python slack_notify.py --review review_result.json --pr-number 32
 """
 
 import argparse
@@ -25,18 +25,23 @@ def load_review_result(filepath: str) -> Dict[str, Any]:
         return json.load(f)
 
 
-def build_slack_blocks(review: Dict[str, Any], pr_url: str = "") -> List[Dict[str, Any]]:
+def build_slack_blocks(review: Dict[str, Any], pr_number: str = "", pr_url: str = "") -> List[Dict[str, Any]]:
     """
     Build Slack Block Kit message with interactive buttons.
     
     https://api.slack.com/reference/block-kit
     """
+    # Title with PR number
+    title_text = "🤖 Code Review Complete"
+    if pr_number:
+        title_text = f"PR #{pr_number} - Code Review Complete"
+    
     blocks = [
         {
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": "🤖 Code Review Complete",
+                "text": title_text,
                 "emoji": True
             }
         },
@@ -161,32 +166,20 @@ def build_slack_blocks(review: Dict[str, Any], pr_url: str = "") -> List[Dict[st
     return blocks
 
 
-def send_to_slack(webhook_url: str, blocks: List[Dict[str, Any]], pr_url: str = "") -> bool:
-    """Send message to Slack via Webhook."""
-    
-    # Extract PR number from URL
-    pr_number = ""
-    if pr_url:
-        import re
-        match = re.search(r'/pull/(\d+)', pr_url)
-        if match:
-            pr_number = f"PR #{match.group(1)} - "
+def send_to_slack(webhook_url: str, blocks: List[Dict[str, Any]], fallback_text: str = "") -> bool:
+    """Send message to Slack using webhook."""
+    if not fallback_text:
+        fallback_text = "Code review completed"
     
     payload = {
-
-        "blocks": blocks,
-        "text": f"{pr_number}Code Review Complete"  # Fallback text with PR number
+        "text": fallback_text,
+        "blocks": blocks
     }
     
     try:
-        response = requests.post(
-            webhook_url,
-            json=payload,
-            headers={"Content-Type": "application/json"},
-            timeout=10,
-        )
+        response = requests.post(webhook_url, json=payload, timeout=10)
         response.raise_for_status()
-        print(f"✅ Slack notification sent successfully")
+        print("✅ Slack notification sent successfully")
         return True
     except requests.exceptions.RequestException as e:
         print(f"❌ Slack notification failed: {e}")
@@ -196,6 +189,7 @@ def send_to_slack(webhook_url: str, blocks: List[Dict[str, Any]], pr_url: str = 
 def main():
     parser = argparse.ArgumentParser(description="Send code review to Slack")
     parser.add_argument("--review", required=True, help="Path to review_result.json")
+    parser.add_argument("--pr-number", default="", help="Pull request number")
     parser.add_argument("--pr-url", default="", help="Pull request URL")
     
     args = parser.parse_args()
@@ -210,13 +204,13 @@ def main():
     review = load_review_result(args.review)
     
     # Build Slack message
-    blocks = build_slack_blocks(review, args.pr_url)
+    blocks = build_slack_blocks(review, args.pr_number, args.pr_url)
     
     # Send to Slack
-    success = send_to_slack(webhook_url, blocks, args.pr_url)
+    fallback_text = f"PR #{args.pr_number} - Code Review Complete" if args.pr_number else "Code Review Complete"
+    success = send_to_slack(webhook_url, blocks, fallback_text)
     
-    if not success:
-        sys.exit(1)
+    sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":
