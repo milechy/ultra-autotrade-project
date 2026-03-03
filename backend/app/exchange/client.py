@@ -45,7 +45,11 @@ class BybitSandboxClient:
     - ccxt.bybit を同期モードで使用する
     - sandbox=True がデフォルトであり、本番環境への誤送信を防止する
     - ccxt は遅延インポートしてテスト時にモックしやすくする
+    - BYBIT_API_KEY が空文字列または "dry-run" の場合は DRY-RUN モードで動作する
     """
+
+    # DRY-RUN モード時のダミー価格（BTC/USDT 相当の固定値）
+    _DRY_RUN_TICKER_PRICE = 50000.0
 
     def __init__(self, settings: ExchangeSettings | None = None) -> None:
         """
@@ -55,17 +59,23 @@ class BybitSandboxClient:
             settings: ExchangeSettings インスタンス。省略時は環境変数から取得。
 
         Raises:
-            ExchangeClientError: ccxt パッケージが未インストールの場合
-            ExchangeConnectionError: 取引所への接続確立に失敗した場合
+            ExchangeClientError: ccxt パッケージが未インストールの場合（非 DRY-RUN 時）
+            ExchangeConnectionError: 取引所への接続確立に失敗した場合（非 DRY-RUN 時）
         """
+        self._settings = settings or get_exchange_settings()
+        self._dry_run = (not self._settings.api_key) or self._settings.api_key == "dry-run"
+        self._dry_run_counter = 0
+
+        if self._dry_run:
+            logger.info("BybitSandboxClient initialized in DRY-RUN mode (no API key)")
+            return
+
         try:
             import ccxt
         except ImportError as exc:
             raise ExchangeClientError(
                 "ccxt package is required. Install with: pip install ccxt"
             ) from exc
-
-        self._settings = settings or get_exchange_settings()
 
         logger.info(
             "Initializing BybitSandboxClient (sandbox=%s, symbol=%s)",
@@ -96,11 +106,31 @@ class BybitSandboxClient:
             amount: 取引数量（基軸通貨単位、例: BTC 0.001）
 
         Returns:
-            ccxt が返す注文情報の辞書
+            ccxt が返す注文情報の辞書（DRY-RUN 時はダミーデータ）
 
         Raises:
-            ExchangeOrderError: 注文送信に失敗した場合
+            ExchangeOrderError: 注文送信に失敗した場合（非 DRY-RUN 時）
         """
+        if self._dry_run:
+            self._dry_run_counter += 1
+            logger.info(
+                "[DRY-RUN] Order: %s %s %s",
+                side.upper(),
+                symbol,
+                amount,
+            )
+            return {
+                "id": f"dry-run-{self._dry_run_counter:04d}",
+                "symbol": symbol,
+                "type": "market",
+                "side": side,
+                "amount": amount,
+                "price": self._DRY_RUN_TICKER_PRICE,
+                "status": "closed",
+                "filled": amount,
+                "cost": amount * self._DRY_RUN_TICKER_PRICE,
+            }
+
         try:
             logger.info(
                 "Creating market order: symbol=%s, side=%s, amount=%s",
@@ -120,11 +150,25 @@ class BybitSandboxClient:
         口座残高を取得する。
 
         Returns:
-            ccxt が返す残高情報の辞書
+            ccxt が返す残高情報の辞書（DRY-RUN 時はダミーデータ）
 
         Raises:
-            ExchangeConnectionError: 残高取得に失敗した場合
+            ExchangeConnectionError: 残高取得に失敗した場合（非 DRY-RUN 時）
         """
+        if self._dry_run:
+            return {
+                "USDT": {
+                    "free": 10000.0,
+                    "used": 0.0,
+                    "total": 10000.0,
+                },
+                "BTC": {
+                    "free": 0.1,
+                    "used": 0.0,
+                    "total": 0.1,
+                },
+            }
+
         try:
             balance = self._exchange.fetch_balance()
             logger.info("Balance fetched successfully")
@@ -141,11 +185,20 @@ class BybitSandboxClient:
             symbol: 取引シンボル（例: "BTC/USDT"）
 
         Returns:
-            ccxt が返すティッカー情報の辞書（'last' キーに最終取引価格が入る）
+            ccxt が返すティッカー情報の辞書（DRY-RUN 時はダミーデータ）
 
         Raises:
-            ExchangeConnectionError: ティッカー取得に失敗した場合
+            ExchangeConnectionError: ティッカー取得に失敗した場合（非 DRY-RUN 時）
         """
+        if self._dry_run:
+            return {
+                "symbol": symbol,
+                "last": self._DRY_RUN_TICKER_PRICE,
+                "bid": self._DRY_RUN_TICKER_PRICE - 10.0,
+                "ask": self._DRY_RUN_TICKER_PRICE + 10.0,
+                "timestamp": None,
+            }
+
         try:
             ticker = self._exchange.fetch_ticker(symbol)
             logger.info(

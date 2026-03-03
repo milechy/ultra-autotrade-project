@@ -22,7 +22,8 @@
       "Bash(.venv/bin/python -m pytest backend/tests/ --ignore=backend/tests/test_aave_router.py --ignore=backend/tests/test_ai_router.py --ignore=backend/tests/test_auth.py --ignore=backend/tests/test_automation_dashboard_api.py --ignore=backend/tests/test_notion_router.py -v)",
       "Bash(python -m pytest backend/tests/test_knowledge_service.py backend/tests/test_exchange_client.py backend/tests/test_exchange_service.py backend/tests/test_ai_judge.py backend/tests/test_e2e_workflow.py -v)",
       "Bash(python -m pytest backend/tests/test_smoke.py backend/tests/test_ai_service.py backend/tests/test_notion_service.py backend/tests/test_octobot_service.py -v)",
-      "Bash(python -m pytest backend/tests/test_smoke.py backend/tests/test_ai_service.py backend/tests/test_flow_with_aave_stub.py -v)"
+      "Bash(python -m pytest backend/tests/test_smoke.py backend/tests/test_ai_service.py backend/tests/test_flow_with_aave_stub.py -v)",
+      "Bash(python -m pytest backend/tests/test_exchange_client.py backend/tests/test_exchange_service.py -v)"
     ],
     "additionalDirectories": [
       "/Users/hkobayashi/.claude/projects/-Users-hkobayashi-projects-ultra-autotrade"
