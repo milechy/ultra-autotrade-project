@@ -3,12 +3,14 @@
 SQLAlchemy データベース設定。
 
 Phase 12: ユーザー認証・アカウント管理用の SQLite データベース。
+PoC Pivot: DATABASE_URL 環境変数で PostgreSQL (+ pgvector) に切り替え可能。
+           未設定時は SQLite にフォールバック（既存テスト互換性を維持）。
 """
 
 import os
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 
@@ -28,15 +30,18 @@ def get_database_url() -> str:
     return os.getenv("DATABASE_URL", f"sqlite:///{default_path}")
 
 
-# データベースディレクトリを作成
+# データベースディレクトリを作成（SQLite の場合のみ）
 db_url = get_database_url()
 if db_url.startswith("sqlite:///"):
     db_path = Path(db_url.replace("sqlite:///", ""))
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
+# connect_args は SQLite 専用 (check_same_thread)。PostgreSQL では不要。
+_connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else {}
+
 engine = create_engine(
     db_url,
-    connect_args={"check_same_thread": False} if db_url.startswith("sqlite") else {},
+    connect_args=_connect_args,
     echo=os.getenv("DATABASE_ECHO", "false").lower() == "true",
 )
 
@@ -64,5 +69,11 @@ def init_db():
     データベーステーブルを初期化する。
 
     アプリケーション起動時に呼び出す。
+    PostgreSQL 使用時は pgvector 拡張を有効化する。
     """
+    if db_url.startswith("postgresql"):
+        with engine.connect() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            conn.commit()
+
     Base.metadata.create_all(bind=engine)

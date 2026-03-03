@@ -46,6 +46,8 @@ class ComponentType(str, Enum):
     SYSTEM = "system"
     BACKUP = "backup"
     REPORT = "report"
+    KNOWLEDGE = "knowledge"
+    EXCHANGE = "exchange"
 
 
 class MetricPoint(BaseModel):

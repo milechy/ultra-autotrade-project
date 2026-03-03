@@ -60,6 +60,7 @@ __pycache__/
 .env
 .env.staging
 .env.production
+.env.local
 backend/data/
 frontend/.next/
 frontend/tsconfig.tsbuildinfo

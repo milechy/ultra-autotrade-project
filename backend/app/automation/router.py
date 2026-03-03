@@ -26,6 +26,13 @@ from .schemas import (
 )
 from .state import get_monitoring_service
 
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.automation.workflow import process_pending_knowledge
+from app.knowledge.service import KnowledgeService
+from app.ai.service import AIService
+from app.exchange.router import get_exchange_service
+
 router = APIRouter(tags=["automation"])
 
 
@@ -121,5 +128,42 @@ def get_latest_report(
     """
     if period is None:
         period = ReportPeriod.DAILY
-    
+
     return reporter.generate_summary_report(period=period)
+
+
+@router.post("/workflow/run")
+def run_workflow(
+    dry_run: bool = Query(default=True, description="If true, simulate trades"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Trigger E2E workflow for pending knowledge items."""
+    knowledge_service = KnowledgeService()
+    ai_service = AIService()
+    exchange_service = get_exchange_service()
+
+    results = process_pending_knowledge(
+        db,
+        knowledge_service=knowledge_service,
+        ai_service=ai_service,
+        exchange_service=exchange_service,
+        dry_run=dry_run,
+    )
+
+    return {
+        "processed": len(results),
+        "trades_executed": sum(
+            1 for r in results
+            if r.order_result and r.order_result.status.value == "success"
+        ),
+        "items": [
+            {
+                "item_id": r.item_id,
+                "action": r.action.value,
+                "confidence": r.confidence,
+                "trade_status": r.order_result.status.value if r.order_result else "skipped",
+                "reason": r.reason,
+            }
+            for r in results
+        ],
+    }

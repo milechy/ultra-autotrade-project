@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -l \"class\\\\|def\\\\|router\\\\|Router\" /Users/hkobayashi/projects/ultra-autotrade/backend/app/automation/*.py)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[0][''text''][:15000]\\)\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); text=data[0][''text'']; print\\(text[15000:30000]\\)\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); text=data[0][''text'']; print\\(text[30000:45000]\\)\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); text=data[0][''text'']; print\\(text[45000:]\\)\")",
+      "Bash(python -c \"import ast; files = [''backend/app/knowledge/__init__.py'',''backend/app/knowledge/config.py'',''backend/app/knowledge/schemas.py'',''backend/app/knowledge/models.py'',''backend/app/knowledge/service.py'',''backend/app/knowledge/router.py'']; [ast.parse\\(open\\(f\\).read\\(\\)\\) or print\\(f''OK: {f}''\\) for f in files]; print\\(''All files parse OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''/Users/hkobayashi/projects/ultra-autotrade/backend/app/main.py''\\).read\\(\\)\\); print\\(''main.py parses OK''\\)\")",
+      "Bash(python -c \"from backend.app.exchange import config, schemas, client, service, router; print\\(''All imports OK''\\)\")",
+      "Bash(python -m pytest backend/tests/ -x -q --co)",
+      "Bash(.venv/bin/python -c \":*)",
+      "Bash(python -c \":*)",
+      "Bash(python -m pytest backend/tests/test_ai*.py -v)",
+      "Bash(python -m pytest backend/tests/ -v)",
+      "Bash(.venv/bin/python -m pytest backend/tests/ -v)",
+      "Bash(.venv/bin/pip list)",
+      "Bash(.venv/bin/pip install sqlalchemy openai anthropic tiktoken beautifulsoup4 ccxt)",
+      "Bash(.venv/bin/pip install \"pydantic[email]\" email-validator)",
+      "Bash(.venv/bin/python -m pytest backend/tests/test_knowledge_service.py backend/tests/test_exchange_client.py backend/tests/test_exchange_service.py backend/tests/test_ai_judge.py backend/tests/test_e2e_workflow.py backend/tests/test_ai_service.py backend/tests/test_flow_with_aave_stub.py -v)",
+      "Bash(.venv/bin/python -m pytest backend/tests/ --ignore=backend/tests/test_aave_router.py --ignore=backend/tests/test_ai_router.py --ignore=backend/tests/test_auth.py --ignore=backend/tests/test_automation_dashboard_api.py --ignore=backend/tests/test_notion_router.py -v)",
+      "Bash(python -m pytest backend/tests/test_knowledge_service.py backend/tests/test_exchange_client.py backend/tests/test_exchange_service.py backend/tests/test_ai_judge.py backend/tests/test_e2e_workflow.py -v)",
+      "Bash(python -m pytest backend/tests/test_smoke.py backend/tests/test_ai_service.py backend/tests/test_notion_service.py backend/tests/test_octobot_service.py -v)",
+      "Bash(python -m pytest backend/tests/test_smoke.py backend/tests/test_ai_service.py backend/tests/test_flow_with_aave_stub.py -v)"
+    ],
+    "additionalDirectories": [
+      "/Users/hkobayashi/.claude/projects/-Users-hkobayashi-projects-ultra-autotrade"
+    ]
+  }
+}

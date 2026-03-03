@@ -32,6 +32,8 @@ from app.aave.router import router as aave_router
 from app.api.automation_dashboard import router as automation_dashboard_router
 from app.auth.router import router as auth_router
 from app.users.router import router as users_router
+from app.knowledge.router import router as knowledge_router
+from app.exchange.router import router as exchange_router
 from app.database import init_db
 
 logger = logging.getLogger(__name__)
@@ -55,12 +57,14 @@ def create_app() -> FastAPI:
     )
 
     # --- ルーター登録 ---
-    app.include_router(auth_router)     # Auth (Phase12)
-    app.include_router(users_router)    # Users (Phase12)
-    app.include_router(notion_router)   # Notion (Phase1)
-    app.include_router(ai_router)       # AI (Phase2)
-    app.include_router(octobot_router)  # OctoBot (Phase3)
-    app.include_router(aave_router)     # Aave (Phase4)
+    app.include_router(auth_router)       # Auth (Phase12)
+    app.include_router(users_router)      # Users (Phase12)
+    app.include_router(notion_router)     # Notion (Phase1)
+    app.include_router(ai_router)         # AI (Phase2)
+    app.include_router(octobot_router)    # OctoBot (Phase3)
+    app.include_router(aave_router)       # Aave (Phase4)
+    app.include_router(knowledge_router)  # Knowledge Hub (PoC Pivot Step 2)
+    app.include_router(exchange_router)   # Exchange (PoC Pivot Step 3)
     app.include_router(
         automation_dashboard_router,
         prefix="/api/automation",

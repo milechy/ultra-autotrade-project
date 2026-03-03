@@ -1,0 +1,43 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: ultra-autotrade-db-local
+    environment:
+      POSTGRES_USER: ultra
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: ultra_autotrade
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ultra"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    container_name: ultra-autotrade-backend-local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/backend
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --reload-dir /app/backend
+    env_file:
+      - .env.local
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend:rw
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

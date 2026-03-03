@@ -40,6 +40,12 @@ def _ensure_test_env_vars() -> None:
     """
     os.environ.setdefault("NOTION_API_KEY", "dummy-notion-api-key-for-tests")
     os.environ.setdefault("NOTION_DATABASE_ID", "dummy-notion-db-id-for-tests")
+    os.environ.setdefault("OPENAI_API_KEY", "dummy-openai-key-for-tests")
+    os.environ.setdefault("ANTHROPIC_API_KEY", "dummy-anthropic-key-for-tests")
+    os.environ.setdefault("BYBIT_API_KEY", "dummy-bybit-key-for-tests")
+    os.environ.setdefault("BYBIT_API_SECRET", "dummy-bybit-secret-for-tests")
+    os.environ.setdefault("BYBIT_SANDBOX", "true")
+    os.environ.setdefault("EXCHANGE_CLIENT_TYPE", "dummy")
     # 将来必要になりそうなキーも、必要に応じてここに追加していける
 
 

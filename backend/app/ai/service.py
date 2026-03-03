@@ -9,13 +9,15 @@ AI 解析ロジックのサービス層。
 - エラー時・異常値時は HOLD 優先で安全側に倒す
 """
 
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Callable, Iterable, List, Optional
 
 from app.notion.schemas import NotionNewsItem
 
-from .schemas import AIAnalysisResult, TradeAction
+from .config import AISettings, get_ai_settings
+from .schemas import AIAnalysisResult, CrossValidationResult, LLMDecision, LLMProvider, RAGContext, TradeAction
 
 logger = logging.getLogger(__name__)
 
@@ -211,4 +213,158 @@ class AIService:
             reason=reason,
             timestamp=now,
         )
+
+    # ------------------------------------------------------------------
+    # Two-Phase AI Judge with RAG（Step 4 追加分）
+    # ------------------------------------------------------------------
+
+    def judge_with_rag(
+        self,
+        query: str,
+        rag_context: RAGContext,
+        *,
+        settings: Optional[AISettings] = None,
+    ) -> CrossValidationResult:
+        """
+        Two-phase AI judge with RAG context.
+        Phase 1: Claude (primary)
+        Phase 2: GPT-4o (secondary, cross-validation)
+        """
+        ai_settings = settings or get_ai_settings()
+        prompt = self._build_rag_prompt(query, rag_context)
+
+        # Phase 1: Primary (Claude)
+        primary = self._call_claude(prompt, ai_settings)
+
+        # Phase 2: Secondary (OpenAI) - only if enabled and key available
+        secondary = None
+        if ai_settings.cross_validation_enabled and ai_settings.openai_api_key:
+            secondary = self._call_openai(prompt, ai_settings)
+
+        return self._cross_validate(primary, secondary)
+
+    def _build_rag_prompt(self, query: str, rag_context: RAGContext) -> str:
+        """Build prompt with RAG context chunks."""
+        chunks_text = "\n---\n".join(rag_context.chunks) if rag_context.chunks else "(No relevant context found)"
+        return f"""{LLM_SYSTEM_PROMPT}
+
+## Retrieved Context (from Knowledge Hub):
+{chunks_text}
+
+## Analysis Request:
+{query}
+
+Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-100, "reason": "..."}}"""
+
+    def _call_claude(self, prompt: str, settings: AISettings) -> LLMDecision:
+        """Call Claude API. Fail-closed: error→HOLD."""
+        if not settings.anthropic_api_key:
+            logger.warning("ANTHROPIC_API_KEY not set; falling back to HOLD")
+            return LLMDecision(
+                provider=LLMProvider.CLAUDE, action=TradeAction.HOLD,
+                confidence=0, reason="API key not configured"
+            )
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+            response = client.messages.create(
+                model=settings.claude_model,
+                max_tokens=500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return self._parse_llm_response(response.content[0].text, LLMProvider.CLAUDE)
+        except Exception as exc:
+            logger.error("Claude API call failed: %s", exc)
+            return LLMDecision(
+                provider=LLMProvider.CLAUDE, action=TradeAction.HOLD,
+                confidence=0, reason=f"API error: {exc}"
+            )
+
+    def _call_openai(self, prompt: str, settings: AISettings) -> LLMDecision:
+        """Call OpenAI API. Fail-closed: error→HOLD."""
+        if not settings.openai_api_key:
+            logger.warning("OPENAI_API_KEY not set; falling back to HOLD")
+            return LLMDecision(
+                provider=LLMProvider.OPENAI, action=TradeAction.HOLD,
+                confidence=0, reason="API key not configured"
+            )
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=settings.openai_api_key)
+            response = client.chat.completions.create(
+                model=settings.openai_model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=500,
+                response_format={"type": "json_object"},
+            )
+            return self._parse_llm_response(
+                response.choices[0].message.content, LLMProvider.OPENAI
+            )
+        except Exception as exc:
+            logger.error("OpenAI API call failed: %s", exc)
+            return LLMDecision(
+                provider=LLMProvider.OPENAI, action=TradeAction.HOLD,
+                confidence=0, reason=f"API error: {exc}"
+            )
+
+    def _parse_llm_response(self, raw: str, provider: LLMProvider) -> LLMDecision:
+        """Parse JSON response from LLM. Parse failure→HOLD."""
+        try:
+            text = raw.strip()
+            # Handle markdown code blocks
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
+                text = text.strip()
+            data = json.loads(text)
+            action_str = data.get("action", "HOLD").upper()
+            if action_str not in ("BUY", "SELL", "HOLD"):
+                action_str = "HOLD"
+            action = TradeAction(action_str)
+            confidence = max(0, min(100, int(data.get("confidence", 0))))
+            reason = data.get("reason", "")
+            return LLMDecision(
+                provider=provider, action=action, confidence=confidence,
+                reason=reason, raw_response=raw
+            )
+        except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
+            logger.warning("Failed to parse LLM response from %s: %s", provider.value, exc)
+            return LLMDecision(
+                provider=provider, action=TradeAction.HOLD,
+                confidence=0, reason=f"Parse error: {exc}", raw_response=raw
+            )
+
+    def _cross_validate(
+        self, primary: LLMDecision, secondary: Optional[LLMDecision]
+    ) -> CrossValidationResult:
+        """
+        Cross-validation logic:
+        - No secondary → use primary
+        - Both agree → average confidence
+        - Disagree → HOLD (fail-closed)
+        """
+        if secondary is None:
+            return CrossValidationResult(
+                primary=primary, secondary=None, agreed=True,
+                final_action=primary.action, final_confidence=primary.confidence,
+                final_reason=primary.reason,
+            )
+
+        agreed = primary.action == secondary.action
+        if agreed:
+            avg_confidence = (primary.confidence + secondary.confidence) // 2
+            return CrossValidationResult(
+                primary=primary, secondary=secondary, agreed=True,
+                final_action=primary.action, final_confidence=avg_confidence,
+                final_reason=f"Both LLMs agree: {primary.reason}",
+            )
+        else:
+            min_confidence = min(primary.confidence, secondary.confidence)
+            return CrossValidationResult(
+                primary=primary, secondary=secondary, agreed=False,
+                final_action=TradeAction.HOLD,
+                final_confidence=min(min_confidence, 30),
+                final_reason=f"LLMs disagree ({primary.action.value} vs {secondary.action.value}); defaulting to HOLD",
+            )
 

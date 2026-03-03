@@ -79,3 +79,58 @@ class AIAnalysisResponse(BaseModel):
     )
     count: int = Field(..., description="results に含まれる件数。")
 
+
+# ---------------------------------------------------------------------------
+# Two-Phase Cross-Validation / RAG スキーマ（Step 4 追加分）
+# ---------------------------------------------------------------------------
+
+
+class LLMProvider(str, Enum):
+    """LLM プロバイダーの列挙型。"""
+
+    CLAUDE = "claude"
+    OPENAI = "openai"
+    RULE_BASED = "rule_based"
+
+
+class LLMDecision(BaseModel):
+    """
+    1 つの LLM プロバイダーによる判定結果。
+    """
+
+    provider: LLMProvider = Field(..., description="判定を行った LLM プロバイダー。")
+    action: TradeAction = Field(..., description="BUY / SELL / HOLD のいずれか。")
+    confidence: int = Field(..., ge=0, le=100, description="信頼度スコア（0〜100）。")
+    reason: Optional[str] = Field(None, description="判定理由の短い説明。")
+    raw_response: Optional[str] = Field(None, description="LLM からの生レスポンス文字列。")
+
+
+class CrossValidationResult(BaseModel):
+    """
+    Two-Phase クロスバリデーション結果。
+    primary（Claude）と secondary（OpenAI）の判定を照合し最終判定を返す。
+    """
+
+    primary: LLMDecision = Field(..., description="Phase 1: 主判定（Claude）。")
+    secondary: Optional[LLMDecision] = Field(
+        None,
+        description="Phase 2: 副判定（OpenAI）。cross_validation_enabled=False または APIキー未設定時は None。",
+    )
+    agreed: bool = Field(..., description="primary と secondary が一致したかどうか。")
+    final_action: TradeAction = Field(..., description="最終アクション（BUY / SELL / HOLD）。")
+    final_confidence: int = Field(..., ge=0, le=100, description="最終信頼度スコア（0〜100）。")
+    final_reason: Optional[str] = Field(None, description="最終判定理由。")
+
+
+class RAGContext(BaseModel):
+    """
+    RAG（Retrieval-Augmented Generation）で取得したコンテキスト。
+    """
+
+    chunks: list[str] = Field(
+        default_factory=list,
+        description="Knowledge Hub から取得したテキストチャンクの一覧。",
+    )
+    query: str = Field(..., description="検索クエリ文字列。")
+    source_count: int = Field(0, description="取得元ドキュメント数。")
+
