@@ -37,7 +37,9 @@ def _get_env_int(name: str, default: int) -> int:
     except (TypeError, ValueError):
         logger.warning(
             "環境変数 %s のパース失敗（value=%r）。デフォルト値 %d を使用します。",
-            name, raw, default
+            name,
+            raw,
+            default,
         )
         return default
 
