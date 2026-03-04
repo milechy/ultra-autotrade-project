@@ -7,15 +7,12 @@ Notion → AI → OctoBot → Notion書き戻し のフロー全体をテスト�
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.ai.schemas import AIAnalysisResult, TradeAction
 from app.ai.service import AIService
 from app.automation.state import reset_state
 from app.automation.workflow import WorkflowService
-from app.bots.schemas import OctoBotSignalResponse, OctoBotSignalDetail, OctoBotSignalStatus
 from app.notion.schemas import NotionNewsItem
 
 
