@@ -54,7 +54,7 @@ class TokenResponse(BaseModel):
     """トークンレスポンス。"""
 
     access_token: str
-    token_type: str = "bearer"
+    token_type: str = "bearer"  # noqa: S105
     expires_in: int  # 秒数
 
 

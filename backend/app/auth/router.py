@@ -98,7 +98,7 @@ def login(
     logger.info("User logged in: %s", user.email)
     return TokenResponse(
         access_token=token,
-        token_type="bearer",
+        token_type="bearer",  # noqa: S106
         expires_in=expires_in,
     )
 

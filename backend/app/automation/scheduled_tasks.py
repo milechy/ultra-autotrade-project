@@ -317,7 +317,7 @@ class ScheduledTaskManager:
 
         logger.info("Stopping daily report task")
 
-        assert self._daily_task is not None
+        assert self._daily_task is not None  # noqa: S101
         self._daily_task.cancel()
 
         try:
@@ -348,7 +348,7 @@ class ScheduledTaskManager:
 
         logger.info("Stopping weekly report task")
 
-        assert self._weekly_task is not None
+        assert self._weekly_task is not None  # noqa: S101
         self._weekly_task.cancel()
 
         try:
