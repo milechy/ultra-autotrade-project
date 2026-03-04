@@ -115,7 +115,7 @@ def process_pending_knowledge(
             try:
                 knowledge_service.update_status(db, item.id, KnowledgeItemStatus.SKIPPED)
             except Exception:
-                pass  # Best effort status update
+                logger.warning("Failed to update status for item %d", item.id)
         return WorkflowRunResult(
             fetched_count=len(pending),
             hold_count=len(pending),
