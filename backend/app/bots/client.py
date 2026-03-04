@@ -82,7 +82,8 @@ class OctoBotClient:
             raise OctoBotHTTPError(status_code=response.status_code, body=body)
 
         try:
-            return response.json()
+            result: Dict[str, Any] = response.json()
+            return result
         except ValueError:
             # JSON でないレスポンスはそのままテキストで返す。
             return {"raw": response.text}

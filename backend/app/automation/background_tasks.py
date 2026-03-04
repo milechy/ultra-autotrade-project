@@ -100,7 +100,7 @@ class BackgroundTaskManager:
     """
 
     def __init__(self) -> None:
-        self._monitoring_task: Optional[asyncio.Task] = None
+        self._monitoring_task: Optional[asyncio.Task[None]] = None
         self._is_running: bool = False
 
     @property

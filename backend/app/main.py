@@ -71,12 +71,12 @@ def create_app() -> FastAPI:
     )
 
     @app.get("/health", tags=["health"])
-    def health_check() -> dict:
+    def health_check() -> dict[str, str]:
         return {"status": "ok"}
 
     # --- データベース初期化 (Phase12) ---
     @app.on_event("startup")
-    async def startup_database():
+    async def startup_database() -> None:
         """
         アプリケーション起動時にデータベースを初期化する。
         """
@@ -88,7 +88,7 @@ def create_app() -> FastAPI:
 
     # --- バックグラウンド監視タスク (Phase5) ---
     @app.on_event("startup")
-    async def startup_event():
+    async def startup_event() -> None:
         """
         アプリケーション起動時にバックグラウンド監視を開始する。
 
@@ -118,7 +118,7 @@ def create_app() -> FastAPI:
                 get_health_factor_func=aave_client.get_health_factor,
                 # HF=None も記録する（state.json の last_update を常に更新）
                 # MonitoringService.record_health_factor() は None を正しく処理する
-                on_health_factor=lambda hf: monitoring_service.record_health_factor(hf),
+                on_health_factor=lambda hf: (monitoring_service.record_health_factor(hf), None)[-1],
                 interval_seconds=float(os.getenv("MONITORING_INTERVAL_SECONDS", "60")),
             )
 
@@ -129,7 +129,7 @@ def create_app() -> FastAPI:
             # 監視の起動失敗はアプリ起動をブロックしない（fail-safe）
 
     @app.on_event("shutdown")
-    async def shutdown_event():
+    async def shutdown_event() -> None:
         """
         アプリケーション終了時にバックグラウンド監視を停止する。
         """
@@ -147,7 +147,7 @@ def create_app() -> FastAPI:
 
     # --- スケジュールタスク (Phase6) ---
     @app.on_event("startup")
-    async def startup_scheduled_tasks():
+    async def startup_scheduled_tasks() -> None:
         """
         アプリケーション起動時にスケジュールタスクを開始する。
 
@@ -189,7 +189,7 @@ def create_app() -> FastAPI:
             # スケジュールタスクの起動失敗はアプリ起動をブロックしない（fail-safe）
 
     @app.on_event("shutdown")
-    async def shutdown_scheduled_tasks():
+    async def shutdown_scheduled_tasks() -> None:
         """
         アプリケーション終了時にスケジュールタスクを停止する。
         """

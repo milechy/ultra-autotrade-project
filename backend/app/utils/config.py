@@ -36,6 +36,6 @@ def get_env(
     if value is None or value == "":
         if required:
             raise EnvVarMissingError(name)
-        return default
+        return default or ""
 
     return value

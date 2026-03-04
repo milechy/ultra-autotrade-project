@@ -31,7 +31,7 @@ except ImportError:  # pragma: no cover
 try:
     from bs4 import BeautifulSoup
 except ImportError:  # pragma: no cover
-    BeautifulSoup = None  # type: ignore[assignment]
+    BeautifulSoup = None  # type: ignore[misc,assignment]
 
 from .config import KnowledgeSettings, get_knowledge_settings
 from .models import KnowledgeChunk, KnowledgeDocument, KnowledgeSource
@@ -66,7 +66,7 @@ class KnowledgeService:
         if tiktoken is not None:
             self._tokenizer = tiktoken.encoding_for_model("gpt-3.5-turbo")
         else:
-            self._tokenizer = None  # type: ignore[assignment]
+            self._tokenizer = None
 
     # ------------------------------------------------------------------ #
     # 公開 API                                                             #

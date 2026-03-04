@@ -140,7 +140,7 @@ class BybitSandboxClient:
             )
             order = self._exchange.create_market_order(symbol, side, amount)
             logger.info("Market order created: order_id=%s", order.get("id"))
-            return order
+            return dict(order)
         except Exception as exc:
             logger.error("Failed to create market order: %s", exc)
             raise ExchangeOrderError(f"Failed to create market order: {exc}") from exc
@@ -172,7 +172,7 @@ class BybitSandboxClient:
         try:
             balance = self._exchange.fetch_balance()
             logger.info("Balance fetched successfully")
-            return balance
+            return dict(balance)
         except Exception as exc:
             logger.error("Failed to fetch balance: %s", exc)
             raise ExchangeConnectionError(f"Failed to fetch balance: {exc}") from exc
@@ -206,7 +206,7 @@ class BybitSandboxClient:
                 symbol,
                 ticker.get("last"),
             )
-            return ticker
+            return dict(ticker)
         except Exception as exc:
             logger.error("Failed to fetch ticker for %s: %s", symbol, exc)
             raise ExchangeConnectionError(f"Failed to fetch ticker for {symbol}: {exc}") from exc

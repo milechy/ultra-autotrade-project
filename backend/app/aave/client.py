@@ -223,7 +223,7 @@ class Web3AaveClient:
             "USDC": Web3.to_checksum_address(self.settings.usdc_address),
         }
 
-    def _get_token_contract(self, asset_symbol: str):
+    def _get_token_contract(self, asset_symbol: str):  # type: ignore[no-untyped-def]
         """トークンコントラクトを取得する。"""
 
         token_address = self.token_addresses.get(asset_symbol)
@@ -367,7 +367,7 @@ class Web3AaveClient:
             supply_hash = self.w3.eth.send_raw_transaction(signed_supply.raw_transaction)
             receipt = self.w3.eth.wait_for_transaction_receipt(supply_hash)
 
-            if receipt.status != 1:
+            if receipt["status"] != 1:
                 raise AaveTransactionError(f"Supply transaction failed: {supply_hash.hex()}")
 
             logger.info("Supply tx successful: %s", supply_hash.hex())
@@ -422,7 +422,7 @@ class Web3AaveClient:
             withdraw_hash = self.w3.eth.send_raw_transaction(signed_withdraw.raw_transaction)
             receipt = self.w3.eth.wait_for_transaction_receipt(withdraw_hash)
 
-            if receipt.status != 1:
+            if receipt["status"] != 1:
                 raise AaveTransactionError(f"Withdraw transaction failed: {withdraw_hash.hex()}")
 
             logger.info("Withdraw tx successful: %s", withdraw_hash.hex())

@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, conint
+from pydantic import BaseModel, Field
 
 from app.ai.schemas import TradeAction
 
@@ -21,8 +21,10 @@ class OctoBotSignal(BaseModel):
         ...,
         description="AI が判定したアクション（BUY / SELL / HOLD）",
     )
-    confidence: conint(ge=0, le=100) = Field(
+    confidence: int = Field(
         ...,
+        ge=0,
+        le=100,
         description="信頼度スコア（0〜100）",
     )
     reason: str = Field(

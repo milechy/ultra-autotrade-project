@@ -225,8 +225,8 @@ class ScheduledTaskManager:
     """
 
     def __init__(self) -> None:
-        self._daily_task: Optional[asyncio.Task] = None
-        self._weekly_task: Optional[asyncio.Task] = None
+        self._daily_task: Optional[asyncio.Task[None]] = None
+        self._weekly_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -317,6 +317,7 @@ class ScheduledTaskManager:
 
         logger.info("Stopping daily report task")
 
+        assert self._daily_task is not None
         self._daily_task.cancel()
 
         try:
@@ -347,6 +348,7 @@ class ScheduledTaskManager:
 
         logger.info("Stopping weekly report task")
 
+        assert self._weekly_task is not None
         self._weekly_task.cancel()
 
         try:

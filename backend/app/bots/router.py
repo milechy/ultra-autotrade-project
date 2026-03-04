@@ -55,7 +55,7 @@ def _build_octobot_client(*, api_base_url: str, api_key: str) -> OctoBotClient:
 
     # fallback: 位置引数で渡す
     try:
-        return OctoBotClient(api_base_url, api_key)  # type: ignore[arg-type]
+        return OctoBotClient(api_base_url, api_key)  # type: ignore[arg-type,call-arg]
     except TypeError:
         # さらに fallback: url だけ/ key だけ等の特殊形
         try:

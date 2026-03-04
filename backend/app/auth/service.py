@@ -9,7 +9,7 @@ docs/13_security_design.md に準拠。
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import bcrypt
 from jose import JWTError, jwt
@@ -139,7 +139,7 @@ class AuthService:
         return token, expires_in
 
     @classmethod
-    def decode_token(cls, token: str) -> Optional[dict]:
+    def decode_token(cls, token: str) -> Optional[dict[str, Any]]:
         """
         JWT トークンをデコードする。
 
@@ -150,7 +150,7 @@ class AuthService:
             ペイロード辞書、または無効な場合は None
         """
         try:
-            payload = jwt.decode(token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM])
+            payload: dict[str, Any] = jwt.decode(token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM])
             return payload
         except JWTError as e:
             logger.warning("JWT decode error: %s", e)

@@ -65,9 +65,9 @@ def build_metrics_summary(
     now = now or datetime.now(timezone.utc)
     period_start = now - period
 
-    sums: Dict[str, float] = defaultdict(float)
-    mins: Dict[str, float] = {}
-    maxs: Dict[str, float] = {}
+    sums: Dict[str, Decimal] = defaultdict(Decimal)
+    mins: Dict[str, Decimal] = {}
+    maxs: Dict[str, Decimal] = {}
     counts: Dict[str, int] = defaultdict(int)
 
     for event in events:
@@ -93,9 +93,9 @@ def build_metrics_summary(
     for mid, total in sums.items():
         cnt = counts[mid]
         stats[mid] = {
-            "min": mins[mid],
-            "max": maxs[mid],
-            "avg": total / cnt if cnt else 0.0,
+            "min": float(mins[mid]),
+            "max": float(maxs[mid]),
+            "avg": float(total / cnt) if cnt else 0.0,
             "count": float(cnt),
         }
 

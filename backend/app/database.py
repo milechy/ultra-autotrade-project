@@ -8,10 +8,11 @@ PoC Pivot: DATABASE_URL 環境変数で PostgreSQL (+ pgvector) に切り替え�
 """
 
 import os
+from collections.abc import Generator
 from pathlib import Path
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
 class Base(DeclarativeBase):
@@ -49,7 +50,7 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     """
     FastAPI 依存性注入用のデータベースセッション取得。
 
@@ -65,7 +66,7 @@ def get_db():
         db.close()
 
 
-def init_db():
+def init_db() -> None:
     """
     データベーステーブルを初期化する。
 

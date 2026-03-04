@@ -98,7 +98,7 @@ def get_items(
     except Exception as exc:
         logger.error("Unexpected error in get_items: %s", exc)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail="Internal server error",
         )
 

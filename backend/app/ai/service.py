@@ -286,7 +286,12 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
                 max_tokens=500,
                 messages=[{"role": "user", "content": prompt}],
             )
-            return self._parse_llm_response(response.content[0].text, LLMProvider.CLAUDE)
+            raw_text = ""
+            for block in response.content:
+                if hasattr(block, "text"):
+                    raw_text = block.text
+                    break
+            return self._parse_llm_response(raw_text, LLMProvider.CLAUDE)
         except Exception as exc:
             logger.error("Claude API call failed: %s", exc)
             return LLMDecision(
@@ -316,7 +321,8 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
                 max_tokens=500,
                 response_format={"type": "json_object"},
             )
-            return self._parse_llm_response(response.choices[0].message.content, LLMProvider.OPENAI)
+            content = response.choices[0].message.content or ""
+            return self._parse_llm_response(content, LLMProvider.OPENAI)
         except Exception as exc:
             logger.error("OpenAI API call failed: %s", exc)
             return LLMDecision(

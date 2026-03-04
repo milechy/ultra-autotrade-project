@@ -12,7 +12,7 @@ docs/04_api_design.md および docs/19_operations_runbook.md に準拠。
 """
 
 from datetime import timedelta
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -133,7 +133,7 @@ def get_latest_report(
 def run_workflow(
     dry_run: bool = Query(default=True, description="If true, simulate trades"),
     db: Session = Depends(get_db),
-) -> dict:
+) -> dict[str, Any]:
     """Trigger E2E workflow for pending knowledge items."""
     knowledge_service = KnowledgeService()
     ai_service = AIService()
