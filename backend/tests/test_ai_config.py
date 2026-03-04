@@ -112,15 +112,24 @@ class TestGetAISettings:
             "OPENAI_API_KEY": "sk-test-openai",
         }
         # Remove model override vars if present, keep only required keys
-        env = {k: v for k, v in os.environ.items()
-               if k not in ("AI_CLAUDE_MODEL", "AI_OPENAI_MODEL",
-                            "AI_MIN_CONFIDENCE_THRESHOLD", "AI_CROSS_VALIDATION_ENABLED")}
+        env = {
+            k: v
+            for k, v in os.environ.items()
+            if k
+            not in (
+                "AI_CLAUDE_MODEL",
+                "AI_OPENAI_MODEL",
+                "AI_MIN_CONFIDENCE_THRESHOLD",
+                "AI_CROSS_VALIDATION_ENABLED",
+            )
+        }
         env.update(env_overrides)
 
         with patch.dict(os.environ, env, clear=True):
             import importlib
 
             from app.ai import config as ai_config
+
             importlib.reload(ai_config)
             settings = ai_config.get_ai_settings()
 
@@ -146,6 +155,7 @@ class TestGetAISettings:
             import importlib
 
             from app.ai import config as ai_config
+
             importlib.reload(ai_config)
             settings = ai_config.get_ai_settings()
 
@@ -156,13 +166,15 @@ class TestGetAISettings:
 
     def test_api_keys_are_none_when_not_set(self):
         """When API keys are absent, settings fields are None or empty."""
-        env = {k: v for k, v in os.environ.items()
-               if k not in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY")}
+        env = {
+            k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY")
+        }
 
         with patch.dict(os.environ, env, clear=True):
             import importlib
 
             from app.ai import config as ai_config
+
             importlib.reload(ai_config)
             settings = ai_config.get_ai_settings()
 
@@ -172,13 +184,13 @@ class TestGetAISettings:
 
     def test_cross_validation_enabled_true_by_default(self):
         """cross_validation_enabled defaults to True."""
-        env = {k: v for k, v in os.environ.items()
-               if k != "AI_CROSS_VALIDATION_ENABLED"}
+        env = {k: v for k, v in os.environ.items() if k != "AI_CROSS_VALIDATION_ENABLED"}
 
         with patch.dict(os.environ, env, clear=True):
             import importlib
 
             from app.ai import config as ai_config
+
             importlib.reload(ai_config)
             settings = ai_config.get_ai_settings()
 
@@ -192,6 +204,7 @@ class TestGetAISettings:
             import importlib
 
             from app.ai import config as ai_config
+
             importlib.reload(ai_config)
             with pytest.raises(RuntimeError, match="Invalid integer value"):
                 ai_config.get_ai_settings()

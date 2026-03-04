@@ -77,6 +77,7 @@ class TestGetExchangeServiceFactory:
 
         # Clear lru_cache so the factory re-runs with our env var
         from app.exchange import router as exchange_router_mod
+
         exchange_router_mod.get_exchange_service.cache_clear()
 
         with patch.dict(os.environ, {"EXCHANGE_CLIENT_TYPE": "dummy"}):
@@ -84,6 +85,7 @@ class TestGetExchangeServiceFactory:
 
         from app.exchange.client import DummyExchangeClient
         from app.exchange.service import ExchangeService
+
         assert isinstance(service, ExchangeService)
         assert isinstance(service._client, DummyExchangeClient)
 
@@ -95,6 +97,7 @@ class TestGetExchangeServiceFactory:
         import os
 
         from app.exchange import router as exchange_router_mod
+
         exchange_router_mod.get_exchange_service.cache_clear()
 
         with patch.dict(os.environ, {"EXCHANGE_CLIENT_TYPE": "sandbox"}):
@@ -102,6 +105,7 @@ class TestGetExchangeServiceFactory:
 
         from app.exchange.client import BybitSandboxClient
         from app.exchange.service import ExchangeService
+
         assert isinstance(service, ExchangeService)
         assert isinstance(service._client, BybitSandboxClient)
 

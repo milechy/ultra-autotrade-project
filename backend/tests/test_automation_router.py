@@ -167,9 +167,7 @@ class TestGetLatestReport:
         response = client.get("/api/automation/reports/latest")
 
         assert response.status_code == 200
-        mock_reporter.generate_summary_report.assert_called_once_with(
-            period=ReportPeriod.DAILY
-        )
+        mock_reporter.generate_summary_report.assert_called_once_with(period=ReportPeriod.DAILY)
 
     def test_returns_200_with_weekly_period(self):
         from app.automation.router import get_reporting_service
@@ -189,9 +187,7 @@ class TestGetLatestReport:
         response = client.get("/api/automation/reports/latest?period=weekly")
 
         assert response.status_code == 200
-        mock_reporter.generate_summary_report.assert_called_once_with(
-            period=ReportPeriod.WEEKLY
-        )
+        mock_reporter.generate_summary_report.assert_called_once_with(period=ReportPeriod.WEEKLY)
 
     def test_returns_200_with_daily_period(self):
         from app.automation.router import get_reporting_service
@@ -211,9 +207,7 @@ class TestGetLatestReport:
         response = client.get("/api/automation/reports/latest?period=daily")
 
         assert response.status_code == 200
-        mock_reporter.generate_summary_report.assert_called_once_with(
-            period=ReportPeriod.DAILY
-        )
+        mock_reporter.generate_summary_report.assert_called_once_with(period=ReportPeriod.DAILY)
 
 
 class TestWorkflowRun:
@@ -241,11 +235,12 @@ class TestWorkflowRun:
         app.include_router(automation_router, prefix="/api/automation")
         app.dependency_overrides[get_db] = lambda: mock_db
 
-        with patch("app.automation.router.KnowledgeService") as _MockKS, \
-             patch("app.automation.router.AIService") as _MockAI, \
-             patch("app.automation.router.get_exchange_service") as _mock_get_ex, \
-             patch("app.automation.router.process_pending_knowledge") as mock_process:
-
+        with (
+            patch("app.automation.router.KnowledgeService") as _MockKS,
+            patch("app.automation.router.AIService") as _MockAI,
+            patch("app.automation.router.get_exchange_service") as _mock_get_ex,
+            patch("app.automation.router.process_pending_knowledge") as mock_process,
+        ):
             mock_process.return_value = []
             client = TestClient(app)
             response = client.post("/api/automation/workflow/run?dry_run=true")
@@ -264,11 +259,12 @@ class TestWorkflowRun:
         app.include_router(automation_router, prefix="/api/automation")
         app.dependency_overrides[get_db] = lambda: mock_db
 
-        with patch("app.automation.router.KnowledgeService"), \
-             patch("app.automation.router.AIService"), \
-             patch("app.automation.router.get_exchange_service"), \
-             patch("app.automation.router.process_pending_knowledge") as mock_process:
-
+        with (
+            patch("app.automation.router.KnowledgeService"),
+            patch("app.automation.router.AIService"),
+            patch("app.automation.router.get_exchange_service"),
+            patch("app.automation.router.process_pending_knowledge") as mock_process,
+        ):
             mock_process.return_value = []
             client = TestClient(app)
             response = client.post("/api/automation/workflow/run")
@@ -297,11 +293,12 @@ class TestWorkflowRun:
         app.include_router(automation_router, prefix="/api/automation")
         app.dependency_overrides[get_db] = lambda: mock_db
 
-        with patch("app.automation.router.KnowledgeService"), \
-             patch("app.automation.router.AIService"), \
-             patch("app.automation.router.get_exchange_service"), \
-             patch("app.automation.router.process_pending_knowledge") as mock_process:
-
+        with (
+            patch("app.automation.router.KnowledgeService"),
+            patch("app.automation.router.AIService"),
+            patch("app.automation.router.get_exchange_service"),
+            patch("app.automation.router.process_pending_knowledge") as mock_process,
+        ):
             mock_process.return_value = [fake_result]
             client = TestClient(app)
             response = client.post("/api/automation/workflow/run?dry_run=true")
@@ -353,11 +350,12 @@ class TestWorkflowRun:
         app.include_router(automation_router, prefix="/api/automation")
         app.dependency_overrides[get_db] = lambda: mock_db
 
-        with patch("app.automation.router.KnowledgeService"), \
-             patch("app.automation.router.AIService"), \
-             patch("app.automation.router.get_exchange_service"), \
-             patch("app.automation.router.process_pending_knowledge") as mock_process:
-
+        with (
+            patch("app.automation.router.KnowledgeService"),
+            patch("app.automation.router.AIService"),
+            patch("app.automation.router.get_exchange_service"),
+            patch("app.automation.router.process_pending_knowledge") as mock_process,
+        ):
             mock_process.return_value = [fake_result]
             client = TestClient(app)
             response = client.post("/api/automation/workflow/run?dry_run=false")
@@ -379,11 +377,12 @@ class TestWorkflowRun:
         app.include_router(automation_router, prefix="/api/automation")
         app.dependency_overrides[get_db] = lambda: mock_db
 
-        with patch("app.automation.router.KnowledgeService"), \
-             patch("app.automation.router.AIService"), \
-             patch("app.automation.router.get_exchange_service"), \
-             patch("app.automation.router.process_pending_knowledge") as mock_process:
-
+        with (
+            patch("app.automation.router.KnowledgeService"),
+            patch("app.automation.router.AIService"),
+            patch("app.automation.router.get_exchange_service"),
+            patch("app.automation.router.process_pending_knowledge") as mock_process,
+        ):
             mock_process.return_value = []
             client = TestClient(app)
             client.post("/api/automation/workflow/run?dry_run=false")

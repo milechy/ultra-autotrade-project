@@ -50,8 +50,7 @@ class TestCreateApp:
 
         # user_middleware contains Middleware objects with cls attribute
         cors_registered = any(
-            getattr(m, "cls", None) is CORSMiddleware
-            for m in app.user_middleware
+            getattr(m, "cls", None) is CORSMiddleware for m in app.user_middleware
         )
         assert cors_registered, "CORSMiddleware should be registered"
 

@@ -58,6 +58,7 @@ def test_octobot_client_can_be_instantiated_with_dummy_settings(monkeypatch):
 # OctoBotHTTPError init
 # ---------------------------------------------------------------------------
 
+
 class TestOctoBotHTTPError:
     def test_stores_status_code_and_body(self):
         err = OctoBotHTTPError(status_code=422, body={"error": "invalid"})
@@ -80,6 +81,7 @@ class TestOctoBotHTTPError:
 # OctoBotClient._build_headers
 # ---------------------------------------------------------------------------
 
+
 class TestBuildHeaders:
     def test_returns_content_type_and_authorization(self):
         settings = _make_settings(api_key="my-secret-key")
@@ -92,6 +94,7 @@ class TestBuildHeaders:
 # ---------------------------------------------------------------------------
 # OctoBotClient.send_signal
 # ---------------------------------------------------------------------------
+
 
 class TestSendSignal:
     def test_send_signal_success_returns_json(self):

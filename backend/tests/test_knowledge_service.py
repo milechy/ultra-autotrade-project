@@ -358,9 +358,7 @@ class TestKnowledgeServiceCRUD:
         service = _make_service()
         db = MagicMock()
 
-        with patch.object(
-            service, "get_items", return_value=[]
-        ) as mock_get_items:
+        with patch.object(service, "get_items", return_value=[]) as mock_get_items:
             result = service.get_pending(db)
 
         mock_get_items.assert_called_once_with(db, status=KnowledgeItemStatus.PENDING.value)
@@ -448,7 +446,14 @@ class TestKnowledgeServiceCRUD:
         request = KnowledgeSearchRequest(query="bitcoin price", top_k=3)
 
         # Simulate one row returned by db.execute()
-        fake_row = (10, 20, "Bitcoin price is high", 0.92, "https://news.example.com", "Crypto News")
+        fake_row = (
+            10,
+            20,
+            "Bitcoin price is high",
+            0.92,
+            "https://news.example.com",
+            "Crypto News",
+        )
 
         db = MagicMock()
         db.execute.return_value.fetchall.return_value = [fake_row]

@@ -241,6 +241,7 @@ class TestCallClaude:
         mock_anthropic_module.Anthropic.return_value = mock_client
 
         import sys
+
         with patch.dict(sys.modules, {"anthropic": mock_anthropic_module}):
             result = service._call_claude("test prompt", settings)
         assert result.action == TradeAction.BUY
@@ -257,6 +258,7 @@ class TestCallClaude:
         mock_anthropic_module.Anthropic.side_effect = Exception("Connection refused")
 
         import sys
+
         with patch.dict(sys.modules, {"anthropic": mock_anthropic_module}):
             result = service._call_claude("test prompt", settings)
         assert result.action == TradeAction.HOLD
@@ -279,6 +281,7 @@ class TestCallClaude:
         mock_anthropic_module.Anthropic.return_value = mock_client
 
         import sys
+
         with patch.dict(sys.modules, {"anthropic": mock_anthropic_module}):
             result = service._call_claude("test prompt", settings)
         # empty string → JSON parse fails → HOLD
@@ -310,13 +313,12 @@ class TestCallOpenAI:
         mock_msg.content = '{"action":"SELL","confidence":70,"reason":"bearish"}'
         mock_choice = MagicMock()
         mock_choice.message = mock_msg
-        mock_client.chat.completions.create.return_value = MagicMock(
-            choices=[mock_choice]
-        )
+        mock_client.chat.completions.create.return_value = MagicMock(choices=[mock_choice])
         mock_openai_cls.return_value = mock_client
         mock_openai_module.OpenAI = mock_openai_cls
 
         import sys
+
         with patch.dict(sys.modules, {"openai": mock_openai_module}):
             result = service._call_openai("test prompt", settings)
         assert result.action == TradeAction.SELL
@@ -335,6 +337,7 @@ class TestCallOpenAI:
         mock_openai_module.OpenAI = mock_openai_cls
 
         import sys
+
         with patch.dict(sys.modules, {"openai": mock_openai_module}):
             result = service._call_openai("test prompt", settings)
         assert result.action == TradeAction.HOLD
@@ -355,13 +358,12 @@ class TestCallOpenAI:
         mock_msg.content = None
         mock_choice = MagicMock()
         mock_choice.message = mock_msg
-        mock_client.chat.completions.create.return_value = MagicMock(
-            choices=[mock_choice]
-        )
+        mock_client.chat.completions.create.return_value = MagicMock(choices=[mock_choice])
         mock_openai_cls.return_value = mock_client
         mock_openai_module.OpenAI = mock_openai_cls
 
         import sys
+
         with patch.dict(sys.modules, {"openai": mock_openai_module}):
             result = service._call_openai("test prompt", settings)
         assert result.action == TradeAction.HOLD
