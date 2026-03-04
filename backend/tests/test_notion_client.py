@@ -1,13 +1,12 @@
 # backend/tests/test_notion_client.py
 
 import json
-from unittest.mock import patch
 
 import httpx
 import pytest
 
-from app.notion.client import NotionClient, NotionClientError, NotionAuthError
-from app.notion.config import get_notion_config
+from app.notion.client import NotionAuthError, NotionClient, NotionClientError
+
 
 @pytest.fixture(autouse=True)
 def _notion_env(monkeypatch):
@@ -66,4 +65,3 @@ def test_query_unprocessed_entries_network_error(monkeypatch):
 
     with pytest.raises(NotionClientError):
         client.query_unprocessed_entries()
-

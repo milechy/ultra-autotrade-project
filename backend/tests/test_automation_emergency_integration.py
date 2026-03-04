@@ -2,10 +2,10 @@
 
 from decimal import Decimal
 
-from app.ai.schemas import TradeAction
 from app.aave.config import AaveSettings
 from app.aave.schemas import AaveOperationStatus, AaveOperationType
 from app.aave.service import AaveService
+from app.ai.schemas import TradeAction
 from app.automation.monitoring_service import MonitoringService
 from app.automation.schemas import ComponentType
 from app.automation.state import reset_state

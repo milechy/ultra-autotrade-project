@@ -1,20 +1,23 @@
 # backend/app/automation/workflow.py
-"""
-Notion → AI → OctoBot → Notion書き戻し の自動フロー オーケストレーター。
 
-責務:
-- NotionService から未処理ニュースを取得
-- AIService で判定
-- OctoBotService でシグナル送信
-- NotionService に結果を書き戻し
+"""
+E2E ワークフロー: Knowledge Hub → RAG → AI Judge → Exchange
+
+PoC Pivot の中心となるオーケストレーション。
+Legacy Notion → AI → OctoBot フローも維持 (WorkflowService)。
 """
 
 import logging
-from dataclasses import dataclass
-from typing import List, Optional
+from dataclasses import dataclass, field
+from decimal import Decimal
+from typing import List, Optional, Tuple
 
-from app.ai.schemas import AIAnalysisResult, TradeAction
+from sqlalchemy.orm import Session
+
+from app.ai.schemas import AIAnalysisResult, RAGContext, TradeAction
 from app.ai.service import AIService
+from app.automation.monitoring_service import MonitoringService
+from app.automation.schemas import WorkflowRunResult, WorkflowStepError
 from app.bots.schemas import (
     OctoBotSignal,
     OctoBotSignalRequest,
@@ -22,22 +25,40 @@ from app.bots.schemas import (
     OctoBotSignalStatus,
 )
 from app.bots.service import OctoBotService
+from app.exchange.schemas import OrderRequest, OrderResult, OrderStatus
+from app.exchange.service import ExchangeService
+from app.knowledge.schemas import (
+    KnowledgeItem,
+    KnowledgeItemStatus,
+    KnowledgeSearchRequest,
+)
+from app.knowledge.service import KnowledgeService
 from app.notion.service import NotionService
 
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Shared dataclass: WorkflowResult (used by automation_router.py / legacy flow)
+# ---------------------------------------------------------------------------
+
+
 @dataclass
 class WorkflowResult:
-    """ワークフロー実行結果のサマリ。"""
+    """ワークフロー実行結果のサマリ (Notion→AI→OctoBot 旧フロー用)。"""
 
-    fetched_count: int
-    analyzed_count: int
-    octobot_success_count: int
-    octobot_skipped_count: int
-    octobot_failed_count: int
-    notion_updated_count: int
-    errors: List[str]
+    fetched_count: int = 0
+    analyzed_count: int = 0
+    octobot_success_count: int = 0
+    octobot_skipped_count: int = 0
+    octobot_failed_count: int = 0
+    notion_updated_count: int = 0
+    errors: List[str] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Legacy flow: WorkflowService (Notion → AI → OctoBot → Notion)
+# ---------------------------------------------------------------------------
 
 
 class WorkflowService:
@@ -125,7 +146,6 @@ class WorkflowService:
             )
 
         # 3. OctoBot へシグナル送信
-        # 失敗したシグナルの ID とエラーメッセージを追跡
         failed_signal_ids: dict[str, str] = {}
         response: Optional[OctoBotSignalResponse] = None
 
@@ -145,7 +165,6 @@ class WorkflowService:
                     octobot_failed,
                 )
 
-                # 失敗したシグナルの ID を記録
                 for detail in response.details:
                     if detail.status == OctoBotSignalStatus.FAILED:
                         failed_signal_ids[detail.id] = detail.message or "OctoBot送信失敗"
@@ -158,7 +177,6 @@ class WorkflowService:
                 error_msg = f"OctoBot signal processing failed: {exc}"
                 logger.error(error_msg)
                 errors.append(error_msg)
-                # 全シグナルを失敗として扱う
                 octobot_failed = len(signals)
                 for signal in signals:
                     failed_signal_ids[signal.id] = str(exc)
@@ -166,12 +184,10 @@ class WorkflowService:
             logger.info("Workflow: no signals to send to OctoBot")
 
         # 4. Notion に結果を書き戻し
-        # 失敗したシグナルは「エラー」ステータスに、成功・スキップは「処理済」に
         logger.info("Workflow: updating Notion with AI results")
         for result in ai_results:
             try:
                 if result.id in failed_signal_ids:
-                    # OctoBot 送信失敗 → 「エラー」ステータスで次回再処理
                     self._notion.update_item_with_error(
                         page_id=result.id,
                         error_message=failed_signal_ids[result.id],
@@ -183,7 +199,6 @@ class WorkflowService:
                         result.id,
                     )
                 else:
-                    # 成功 or スキップ or HOLD → 「処理済」
                     self._notion.update_item_with_ai_result(
                         page_id=result.id,
                         action=result.action.value,
@@ -218,19 +233,12 @@ class WorkflowService:
     def _convert_to_octobot_signals(
         self, ai_results: List[AIAnalysisResult]
     ) -> List[OctoBotSignal]:
-        """
-        AIAnalysisResult を OctoBotSignal に変換する。
-
-        HOLD アクションはシグナル送信対象外とする。
-        """
+        """AIAnalysisResult を OctoBotSignal に変換する。HOLD はスキップ。"""
         signals: List[OctoBotSignal] = []
 
         for result in ai_results:
-            # HOLD はシグナル送信対象外
             if result.action == TradeAction.HOLD:
-                logger.debug(
-                    "Skipping HOLD signal for id=%s", result.id
-                )
+                logger.debug("Skipping HOLD signal for id=%s", result.id)
                 continue
 
             signal = OctoBotSignal(
@@ -244,3 +252,230 @@ class WorkflowService:
             signals.append(signal)
 
         return signals
+
+
+# ---------------------------------------------------------------------------
+# New PoC flow: Knowledge Hub → RAG → AI Judge → Exchange
+# ---------------------------------------------------------------------------
+
+
+class WorkflowError(Exception):
+    """Workflow processing error."""
+
+
+class _SingleItemResult:
+    """Result of processing a single knowledge item (internal use)."""
+
+    def __init__(
+        self,
+        item_id: int,
+        action: TradeAction,
+        confidence: int,
+        order_result: Optional[OrderResult],
+        reason: str,
+    ) -> None:
+        self.item_id = item_id
+        self.action = action
+        self.confidence = confidence
+        self.order_result = order_result
+        self.reason = reason
+
+
+def check_rule_engine(
+    monitoring_service: Optional[MonitoringService] = None,
+) -> Tuple[bool, str]:
+    """Check rule engine constraints before LLM call.
+
+    Returns (can_trade, reason).
+    Rule engine runs BEFORE LLM to save cost (CLAUDE.md execution order).
+
+    Check order (most specific first):
+    1. HF below threshold (hf_below_threshold)
+    2. Generic emergency stop (emergency_stop)
+    """
+    if monitoring_service is None:
+        return True, "no_monitoring"
+
+    status = monitoring_service.get_status()
+    if status.last_health_factor is not None:
+        if status.last_health_factor < Decimal("1.6"):
+            return False, "hf_below_threshold"
+
+    if not monitoring_service.is_trading_allowed():
+        return False, "emergency_stop"
+
+    return True, "ok"
+
+
+def process_pending_knowledge(
+    db: Session,
+    *,
+    knowledge_service: KnowledgeService,
+    ai_service: AIService,
+    exchange_service: ExchangeService,
+    monitoring_service: Optional[MonitoringService] = None,
+    trade_amount_usd: Decimal = Decimal("50"),
+    dry_run: bool = False,
+) -> WorkflowRunResult:
+    """Process pending knowledge items through the full pipeline.
+
+    Flow:
+    1. Fetch pending items from Knowledge Hub
+    2. Rule engine pre-check (HF, emergency stop)
+    3. For each item: RAG → AI Judge → Exchange
+    4. Update item status (traded/skipped/error)
+    5. Return aggregated result
+    """
+    pending = knowledge_service.get_pending(db)
+
+    if not pending:
+        logger.info("No pending knowledge items to process")
+        return WorkflowRunResult(status="no_items")
+
+    logger.info("Processing %d pending knowledge items", len(pending))
+
+    can_trade, rule_reason = check_rule_engine(monitoring_service)
+
+    if not can_trade:
+        logger.info("Rule engine blocked trading: %s", rule_reason)
+        for item in pending:
+            try:
+                knowledge_service.update_status(db, item.id, KnowledgeItemStatus.SKIPPED)
+            except Exception:
+                logger.warning("Failed to update status for item %d", item.id)
+        return WorkflowRunResult(
+            fetched_count=len(pending),
+            hold_count=len(pending),
+            status="completed",
+        )
+
+    errors: List[WorkflowStepError] = []
+    traded_count = 0
+    hold_count = 0
+    skipped_count = 0
+
+    for item in pending:
+        try:
+            result = _process_single_item(
+                db,
+                item,
+                knowledge_service=knowledge_service,
+                ai_service=ai_service,
+                exchange_service=exchange_service,
+                trade_amount_usd=trade_amount_usd,
+                dry_run=dry_run,
+            )
+
+            if (
+                result.order_result is not None
+                and result.order_result.status == OrderStatus.SUCCESS
+            ):
+                traded_count += 1
+                knowledge_service.update_status(db, item.id, KnowledgeItemStatus.ANALYZED)
+            elif result.action == TradeAction.HOLD:
+                hold_count += 1
+                knowledge_service.update_status(db, item.id, KnowledgeItemStatus.SKIPPED)
+            else:
+                skipped_count += 1
+                knowledge_service.update_status(db, item.id, KnowledgeItemStatus.SKIPPED)
+        except Exception as exc:
+            logger.error("Failed to process item %d: %s", item.id, exc)
+            errors.append(
+                WorkflowStepError(
+                    item_id=item.id,
+                    step="pipeline",
+                    message=str(exc)[:200],
+                )
+            )
+            try:
+                knowledge_service.update_status(db, item.id, KnowledgeItemStatus.ERROR)
+            except Exception as update_exc:
+                logger.error("Failed to update error status for item %d: %s", item.id, update_exc)
+
+    status = "completed"
+    if errors:
+        status = (
+            "completed_with_errors" if (traded_count + hold_count + skipped_count) > 0 else "failed"
+        )
+
+    logger.info(
+        "Workflow completed: fetched=%d, traded=%d, hold=%d, skipped=%d, errors=%d",
+        len(pending),
+        traded_count,
+        hold_count,
+        skipped_count,
+        len(errors),
+    )
+
+    return WorkflowRunResult(
+        fetched_count=len(pending),
+        analyzed_count=traded_count + hold_count + skipped_count,
+        traded_count=traded_count,
+        skipped_count=skipped_count,
+        hold_count=hold_count,
+        errors=errors,
+        status=status,
+    )
+
+
+def _process_single_item(
+    db: Session,
+    item: KnowledgeItem,
+    *,
+    knowledge_service: KnowledgeService,
+    ai_service: AIService,
+    exchange_service: ExchangeService,
+    trade_amount_usd: Decimal,
+    dry_run: bool,
+) -> _SingleItemResult:
+    """Process a single knowledge item through the full pipeline."""
+    query = item.title or item.source_url or "analyze market conditions"
+    search_request = KnowledgeSearchRequest(query=query, top_k=5)
+    search_results = knowledge_service.search(db, search_request)
+
+    rag_context = RAGContext(
+        chunks=[r.content for r in search_results],
+        query=query,
+        source_count=len(search_results),
+    )
+
+    cross_result = ai_service.judge_with_rag(query, rag_context)
+    action = cross_result.final_action
+    confidence = cross_result.final_confidence
+    reason = cross_result.final_reason or ""
+
+    logger.info(
+        "AI judge for item %d: action=%s, confidence=%d, agreed=%s",
+        item.id,
+        action.value,
+        confidence,
+        cross_result.agreed,
+    )
+
+    order_result: Optional[OrderResult] = None
+    if action in (TradeAction.BUY, TradeAction.SELL) and confidence >= 40:
+        order_request = OrderRequest(
+            action=action,
+            amount_usd=trade_amount_usd,
+            reason=reason,
+            dry_run=dry_run,
+        )
+        order_result = exchange_service.execute_trade(order_request)
+        logger.info(
+            "Trade for item %d: status=%s, order_id=%s",
+            item.id,
+            order_result.status.value,
+            order_result.order_id,
+        )
+    else:
+        logger.info(
+            "Skip trade for item %d: action=%s, confidence=%d", item.id, action.value, confidence
+        )
+
+    return _SingleItemResult(
+        item_id=item.id,
+        action=action,
+        confidence=confidence,
+        order_result=order_result,
+        reason=reason,
+    )

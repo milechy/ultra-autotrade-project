@@ -1,6 +1,5 @@
 # backend/app/bots/router.py
 from functools import lru_cache
-import os
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -19,7 +18,7 @@ def get_octobot_service() -> OctoBotService:
     """
     settings = get_octobot_settings()
     client = OctoBotClient(settings=settings)
-    
+
     return OctoBotService(
         client=client,
         min_confidence=70,

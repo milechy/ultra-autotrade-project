@@ -17,7 +17,6 @@ from pydantic import BaseModel, Field
 
 from app.ai.schemas import TradeAction
 
-
 # ===== システム状態管理用 =====
 
 

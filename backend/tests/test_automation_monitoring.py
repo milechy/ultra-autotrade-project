@@ -1,6 +1,5 @@
 # backend/tests/test_automation_monitoring.py
 
-import os
 import tempfile
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -105,9 +104,7 @@ def test_state_sync_disabled_does_not_write_file(temp_state_file) -> None:
         enable_state_sync=False,
     )
 
-    service.record_health_factor(
-        Decimal("1.7"), at=datetime(2025, 1, 1, tzinfo=timezone.utc)
-    )
+    service.record_health_factor(Decimal("1.7"), at=datetime(2025, 1, 1, tzinfo=timezone.utc))
 
     assert not temp_state_file.exists()
 
@@ -123,9 +120,7 @@ def test_state_sync_normal_mode(temp_state_file) -> None:
         enable_state_sync=True,
     )
 
-    service.record_health_factor(
-        Decimal("2.0"), at=datetime(2025, 1, 1, tzinfo=timezone.utc)
-    )
+    service.record_health_factor(Decimal("2.0"), at=datetime(2025, 1, 1, tzinfo=timezone.utc))
 
     assert temp_state_file.exists()
     state = read_system_state()
@@ -146,9 +141,7 @@ def test_state_sync_safe_mode(temp_state_file) -> None:
         enable_state_sync=True,
     )
 
-    service.record_health_factor(
-        Decimal("1.7"), at=datetime(2025, 1, 1, tzinfo=timezone.utc)
-    )
+    service.record_health_factor(Decimal("1.7"), at=datetime(2025, 1, 1, tzinfo=timezone.utc))
 
     state = read_system_state()
     assert state is not None
@@ -169,9 +162,7 @@ def test_state_sync_hard_stop(temp_state_file) -> None:
         enable_state_sync=True,
     )
 
-    service.record_health_factor(
-        Decimal("1.5"), at=datetime(2025, 1, 1, tzinfo=timezone.utc)
-    )
+    service.record_health_factor(Decimal("1.5"), at=datetime(2025, 1, 1, tzinfo=timezone.utc))
 
     state = read_system_state()
     assert state is not None
@@ -205,9 +196,7 @@ def test_state_sync_preserves_circuit_closed(temp_state_file) -> None:
     )
 
     # HF を更新
-    service.record_health_factor(
-        Decimal("1.9"), at=datetime(2025, 1, 2, tzinfo=timezone.utc)
-    )
+    service.record_health_factor(Decimal("1.9"), at=datetime(2025, 1, 2, tzinfo=timezone.utc))
 
     state = read_system_state()
     assert state is not None
@@ -227,23 +216,17 @@ def test_state_sync_mode_transition(temp_state_file) -> None:
     )
 
     # NORMAL (HF=2.0)
-    service.record_health_factor(
-        Decimal("2.0"), at=datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc)
-    )
+    service.record_health_factor(Decimal("2.0"), at=datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc))
     state = read_system_state()
     assert state.mode == AaveOperationMode.NORMAL
 
     # SAFE_MODE (HF=1.7)
-    service.record_health_factor(
-        Decimal("1.7"), at=datetime(2025, 1, 1, 1, 0, tzinfo=timezone.utc)
-    )
+    service.record_health_factor(Decimal("1.7"), at=datetime(2025, 1, 1, 1, 0, tzinfo=timezone.utc))
     state = read_system_state()
     assert state.mode == AaveOperationMode.SAFE_MODE
 
     # HARD_STOP (HF=1.5)
-    service.record_health_factor(
-        Decimal("1.5"), at=datetime(2025, 1, 1, 2, 0, tzinfo=timezone.utc)
-    )
+    service.record_health_factor(Decimal("1.5"), at=datetime(2025, 1, 1, 2, 0, tzinfo=timezone.utc))
     state = read_system_state()
     assert state.mode == AaveOperationMode.HARD_STOP
     assert state.emergency_stop is True
@@ -273,9 +256,7 @@ def test_manual_emergency_stop_not_overwritten_by_hf_update(temp_state_file) -> 
     )
 
     # HF 2.0 を記録（本来なら NORMAL になる）
-    service.record_health_factor(
-        Decimal("2.0"), at=datetime(2025, 1, 2, tzinfo=timezone.utc)
-    )
+    service.record_health_factor(Decimal("2.0"), at=datetime(2025, 1, 2, tzinfo=timezone.utc))
 
     # emergency_stop は True のまま維持されるべき
     state = read_system_state()
@@ -296,9 +277,7 @@ def test_clear_emergency_stop_syncs_state_file(temp_state_file) -> None:
     )
 
     # まず HARD_STOP 状態にする
-    service.record_health_factor(
-        Decimal("1.5"), at=datetime(2025, 1, 1, tzinfo=timezone.utc)
-    )
+    service.record_health_factor(Decimal("1.5"), at=datetime(2025, 1, 1, tzinfo=timezone.utc))
 
     state = read_system_state()
     assert state.emergency_stop is True
@@ -326,15 +305,11 @@ def test_clear_emergency_stop_with_recovered_hf(temp_state_file) -> None:
     )
 
     # HARD_STOP 状態にする
-    service.record_health_factor(
-        Decimal("1.5"), at=datetime(2025, 1, 1, tzinfo=timezone.utc)
-    )
+    service.record_health_factor(Decimal("1.5"), at=datetime(2025, 1, 1, tzinfo=timezone.utc))
     assert service.is_trading_allowed() is False
 
     # HF が回復
-    service.record_health_factor(
-        Decimal("2.0"), at=datetime(2025, 1, 2, tzinfo=timezone.utc)
-    )
+    service.record_health_factor(Decimal("2.0"), at=datetime(2025, 1, 2, tzinfo=timezone.utc))
 
     state = read_system_state()
     # emergency_stop は OR 条件で True のまま
@@ -362,9 +337,7 @@ def test_state_sync_with_hf_none(temp_state_file) -> None:
     )
 
     # HF=None を記録（借入なし = ポジションなし）
-    status = service.record_health_factor(
-        None, at=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
-    )
+    status = service.record_health_factor(None, at=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc))
 
     # HealthFactorStatus の確認
     assert status.current is None

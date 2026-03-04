@@ -8,7 +8,7 @@ docs/13_security_design.md に準拠したセキュリティ要件を満たす�
 from datetime import datetime, timezone
 from enum import Enum
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -16,6 +16,7 @@ from app.database import Base
 
 class UserRole(str, Enum):
     """ユーザーロール。"""
+
     ADMIN = "admin"
     VIEWER = "viewer"
 
@@ -34,6 +35,7 @@ class User(Base):
         created_at: 作成日時
         updated_at: 更新日時
     """
+
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

@@ -15,22 +15,24 @@ Usage:
 """
 
 import os
-import pytest
 from decimal import Decimal
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+pytest.importorskip("web3")
+
+from app.aave.client import (
+    AaveClientError,
+    DummyAaveClient,
+    Web3AaveClient,
+    get_default_aave_client,
+)
+from app.aave.config import AaveSettings
 
 # E2E テストのスキップ条件
 SKIP_E2E = os.getenv("RUN_E2E_TESTS", "0") != "1"
 E2E_SKIP_REASON = "Requires RUN_E2E_TESTS=1 and Mumbai testnet setup"
-
-from app.aave.client import (
-    Web3AaveClient,
-    DummyAaveClient,
-    AaveClientError,
-    AaveTransactionError,
-    get_default_aave_client,
-)
-from app.aave.config import AaveSettings
 
 
 @pytest.fixture
@@ -156,7 +158,7 @@ def test_missing_usdc_address_raises_error(mock_settings):
 
 
 @patch("eth_account.Account")
-@patch("web3.Web3")
+@patch("app.aave.client.Web3")
 def test_web3_connection_error(mock_web3, mock_account, mock_settings):
     """RPC 接続失敗時のエラーハンドリング。"""
     # Web3 接続失敗をシミュレート
@@ -165,12 +167,12 @@ def test_web3_connection_error(mock_web3, mock_account, mock_settings):
     mock_web3.return_value = mock_web3_instance
     mock_web3.HTTPProvider = MagicMock()
 
-    with pytest.raises(AaveClientError, match="Failed to connect to RPC"):
+    with pytest.raises(AaveClientError, match="RPC に接続できません"):
         Web3AaveClient(settings=mock_settings)
 
 
 @patch("eth_account.Account")
-@patch("web3.Web3")
+@patch("app.aave.client.Web3")
 def test_web3_client_initialization_success(mock_web3, mock_account, mock_settings):
     """Web3AaveClient が正常に初期化できること（モック）。"""
     # Web3 接続成功をシミュレート
@@ -197,7 +199,7 @@ def test_web3_client_initialization_success(mock_web3, mock_account, mock_settin
 
 
 @patch("eth_account.Account")
-@patch("web3.Web3")
+@patch("app.aave.client.Web3")
 def test_get_health_factor_returns_value(mock_web3, mock_account, mock_settings):
     """ヘルスファクターが正常に取得できること（モック）。"""
     # Web3 モック
@@ -217,10 +219,10 @@ def test_get_health_factor_returns_value(mock_web3, mock_account, mock_settings)
     # healthFactor = 2.0 (1e18 スケール)
     mock_pool.functions.getUserAccountData.return_value.call.return_value = (
         100000000,  # totalCollateralBase
-        50000000,   # totalDebtBase
-        50000000,   # availableBorrowsBase
-        8000,       # currentLiquidationThreshold
-        7500,       # ltv
+        50000000,  # totalDebtBase
+        50000000,  # availableBorrowsBase
+        8000,  # currentLiquidationThreshold
+        7500,  # ltv
         2 * 10**18,  # healthFactor = 2.0
     )
     mock_web3_instance.eth.contract.return_value = mock_pool
@@ -232,9 +234,9 @@ def test_get_health_factor_returns_value(mock_web3, mock_account, mock_settings)
 
 
 @patch("eth_account.Account")
-@patch("web3.Web3")
+@patch("app.aave.client.Web3")
 def test_get_health_factor_returns_none_for_no_debt(mock_web3, mock_account, mock_settings):
-    """借入がない場合に None が返ること（モック）。"""
+    """借入がない場合に Decimal('inf') が返ること（モック）。"""
     # Web3 モック
     mock_web3_instance = MagicMock()
     mock_web3_instance.is_connected.return_value = True
@@ -250,18 +252,23 @@ def test_get_health_factor_returns_none_for_no_debt(mock_web3, mock_account, moc
     # Pool コントラクトモック（healthFactor = 0, totalDebtBase = 0 は借入なし）
     mock_pool = MagicMock()
     mock_pool.functions.getUserAccountData.return_value.call.return_value = (
-        0, 0, 0, 0, 0, 0  # totalDebtBase=0, healthFactor = 0
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,  # totalDebtBase=0, healthFactor = 0
     )
     mock_web3_instance.eth.contract.return_value = mock_pool
 
     client = Web3AaveClient(settings=mock_settings)
     hf = client.get_health_factor()
 
-    assert hf is None
+    assert hf == Decimal("inf")
 
 
 @patch("eth_account.Account")
-@patch("web3.Web3")
+@patch("app.aave.client.Web3")
 def test_get_health_factor_returns_zero_for_critical_debt(mock_web3, mock_account, mock_settings):
     """借入ありで HF=0 の場合に Decimal('0') が返ること（清算寸前の危険状態）。"""
     # Web3 モック
@@ -280,11 +287,11 @@ def test_get_health_factor_returns_zero_for_critical_debt(mock_web3, mock_accoun
     mock_pool = MagicMock()
     mock_pool.functions.getUserAccountData.return_value.call.return_value = (
         100000000,  # totalCollateralBase
-        50000000,   # totalDebtBase > 0 (債務あり)
-        0,          # availableBorrowsBase
-        8000,       # currentLiquidationThreshold
-        7500,       # ltv
-        0,          # healthFactor = 0 (清算寸前)
+        50000000,  # totalDebtBase > 0 (債務あり)
+        0,  # availableBorrowsBase
+        8000,  # currentLiquidationThreshold
+        7500,  # ltv
+        0,  # healthFactor = 0 (清算寸前)
     )
     mock_web3_instance.eth.contract.return_value = mock_pool
 
@@ -352,7 +359,7 @@ def test_dummy_client_health_factor():
     )
     client = DummyAaveClient(settings=settings)
 
-    assert client.get_health_factor() == Decimal("2.0")
+    assert client.get_health_factor() == Decimal("2.5")
 
 
 def test_dummy_client_deposit():

@@ -7,6 +7,10 @@ Phase2 では以下を提供することを目的とする：
 - ニュースを BUY / SELL / HOLD に分類するサービスロジック
 """
 
-from .schemas import AIAnalysisRequest, AIAnalysisResponse, AIAnalysisResult, TradeAction  # noqa: F401
+from .schemas import (  # noqa: F401
+    AIAnalysisRequest,
+    AIAnalysisResponse,
+    AIAnalysisResult,
+    TradeAction,
+)
 from .service import AIService  # noqa: F401
-

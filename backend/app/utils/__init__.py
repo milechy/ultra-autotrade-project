@@ -4,4 +4,3 @@ Utility helpers for the Ultra AutoTrade backend.
 
 - config: environment variable loading helpers, etc.
 """
-

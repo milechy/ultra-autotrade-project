@@ -16,10 +16,8 @@ from decimal import Decimal
 from typing import List, Optional
 
 from app.ai.schemas import TradeAction
-
-from app.automation.state import get_monitoring_service
 from app.automation.monitoring_service import MonitoringService
-from app.automation.schemas import AlertLevel, ComponentType
+from app.automation.state import get_monitoring_service
 
 from .client import AaveClient, AaveClientError, get_default_aave_client
 from .config import AaveSettings, get_aave_settings
@@ -83,9 +81,7 @@ class AaveService:
     def _cleanup_recent_actions(self, now: datetime) -> None:
         """トレードクールダウン期間外の履歴を破棄する。"""
         window_start = now - timedelta(seconds=self._settings.trade_cooldown_seconds)
-        self._recent_actions = [
-            ts for ts in self._recent_actions if ts >= window_start
-        ]
+        self._recent_actions = [ts for ts in self._recent_actions if ts >= window_start]
 
     def _is_in_cooldown(self, now: datetime) -> bool:
         """
@@ -263,9 +259,7 @@ class AaveService:
             and self._monitoring is not None
             and not self._monitoring.is_trading_allowed()
         ):
-            logger.warning(
-                "Trading is paused by MonitoringService emergency stop. Forcing NOOP."
-            )
+            logger.warning("Trading is paused by MonitoringService emergency stop. Forcing NOOP.")
             return AaveOperationResult(
                 operation=AaveOperationType.NOOP,
                 status=AaveOperationStatus.SKIPPED,

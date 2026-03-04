@@ -155,18 +155,14 @@ class NotionService:
             "Action": {"select": {"name": action}},
             "Confidence": {"number": confidence},
             "Status": {"select": {"name": "処理済"}},
-            "Timestamp": {
-                "date": {"start": datetime.now(timezone.utc).isoformat()}
-            },
+            "Timestamp": {"date": {"start": datetime.now(timezone.utc).isoformat()}},
         }
 
         if sentiment:
             properties["Sentiment"] = {"select": {"name": sentiment}}
 
         if summary:
-            properties["Summary"] = {
-                "rich_text": [{"text": {"content": summary[:2000]}}]
-            }
+            properties["Summary"] = {"rich_text": [{"text": {"content": summary[:2000]}}]}
 
         try:
             self.client.update_page_properties(page_id, properties)
@@ -204,12 +200,8 @@ class NotionService:
         """
         properties: Dict[str, Any] = {
             "Status": {"select": {"name": "エラー"}},
-            "Timestamp": {
-                "date": {"start": datetime.now(timezone.utc).isoformat()}
-            },
-            "Summary": {
-                "rich_text": [{"text": {"content": f"[ERROR] {error_message[:1900]}"}}]
-            },
+            "Timestamp": {"date": {"start": datetime.now(timezone.utc).isoformat()}},
+            "Summary": {"rich_text": [{"text": {"content": f"[ERROR] {error_message[:1900]}"}}]},
         }
 
         if action:
@@ -232,4 +224,3 @@ class NotionService:
                 exc,
             )
             raise
-

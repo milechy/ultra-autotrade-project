@@ -54,9 +54,7 @@ class NotionClient:
         if response.status_code == 403:
             raise NotionAuthError("Forbidden. Check Notion integration permissions.")
         if response.status_code >= 400:
-            raise NotionAPIError(
-                f"Notion API error: {response.status_code} {response.text}"
-            )
+            raise NotionAPIError(f"Notion API error: {response.status_code} {response.text}")
 
     def query_unprocessed_entries(self) -> List[Dict[str, Any]]:
         """
@@ -116,4 +114,3 @@ class NotionClient:
             raise NotionClientError(f"Failed to update Notion page: {exc}") from exc
 
         self._raise_for_status(response)
-

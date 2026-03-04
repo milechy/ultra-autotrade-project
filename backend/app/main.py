@@ -25,15 +25,17 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.ai.router import router as ai_router
-from app.automation.automation_router import router as automation_router
-from app.bots.router import router as octobot_router
-from app.notion.router import router as notion_router
 from app.aave.router import router as aave_router
+from app.ai.router import router as ai_router
 from app.api.automation_dashboard import router as automation_dashboard_router
 from app.auth.router import router as auth_router
-from app.users.router import router as users_router
+from app.automation.automation_router import router as automation_router
+from app.bots.router import router as octobot_router
 from app.database import init_db
+from app.exchange.router import router as exchange_router
+from app.knowledge.router import router as knowledge_router
+from app.notion.router import router as notion_router
+from app.users.router import router as users_router
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +58,14 @@ def create_app() -> FastAPI:
     )
 
     # --- ルーター登録 ---
-    app.include_router(auth_router)     # Auth (Phase12)
-    app.include_router(users_router)    # Users (Phase12)
-    app.include_router(notion_router)   # Notion (Phase1)
-    app.include_router(ai_router)       # AI (Phase2)
+    app.include_router(auth_router)  # Auth (Phase12)
+    app.include_router(users_router)  # Users (Phase12)
+    app.include_router(notion_router)  # Notion (Phase1)
+    app.include_router(ai_router)  # AI (Phase2)
     app.include_router(octobot_router)  # OctoBot (Phase3)
-    app.include_router(aave_router)     # Aave (Phase4)
+    app.include_router(aave_router)  # Aave (Phase4)
+    app.include_router(knowledge_router)  # Knowledge Hub (PoC Pivot Step 2)
+    app.include_router(exchange_router)  # Exchange (PoC Pivot Step 3)
     app.include_router(automation_router)  # Automation workflow
     app.include_router(
         automation_dashboard_router,
@@ -69,12 +73,12 @@ def create_app() -> FastAPI:
     )
 
     @app.get("/health", tags=["health"])
-    def health_check() -> dict:
-        return {"status": "ok"}
+    def health_check() -> dict[str, str]:
+        return {"status": "ok", "env": os.getenv("APP_ENV", "dev")}
 
     # --- データベース初期化 (Phase12) ---
     @app.on_event("startup")
-    async def startup_database():
+    async def startup_database() -> None:
         """
         アプリケーション起動時にデータベースを初期化する。
         """
@@ -86,7 +90,7 @@ def create_app() -> FastAPI:
 
     # --- バックグラウンド監視タスク (Phase5) ---
     @app.on_event("startup")
-    async def startup_event():
+    async def startup_event() -> None:
         """
         アプリケーション起動時にバックグラウンド監視を開始する。
 
@@ -97,15 +101,14 @@ def create_app() -> FastAPI:
 
         if not enable_monitoring:
             logger.info(
-                "Background monitoring disabled "
-                "(set ENABLE_BACKGROUND_MONITORING=1 to enable)"
+                "Background monitoring disabled (set ENABLE_BACKGROUND_MONITORING=1 to enable)"
             )
             return
 
         try:
+            from app.aave.client import get_default_aave_client
             from app.automation.background_tasks import get_task_manager
             from app.automation.state import get_monitoring_service
-            from app.aave.client import get_default_aave_client
 
             # サービスとクライアントの初期化（シングルトン）
             monitoring_service = get_monitoring_service()
@@ -117,10 +120,8 @@ def create_app() -> FastAPI:
                 get_health_factor_func=aave_client.get_health_factor,
                 # HF=None も記録する（state.json の last_update を常に更新）
                 # MonitoringService.record_health_factor() は None を正しく処理する
-                on_health_factor=lambda hf: monitoring_service.record_health_factor(hf),
-                interval_seconds=float(
-                    os.getenv("MONITORING_INTERVAL_SECONDS", "60")
-                ),
+                on_health_factor=lambda hf: (monitoring_service.record_health_factor(hf), None)[-1],
+                interval_seconds=float(os.getenv("MONITORING_INTERVAL_SECONDS", "60")),
             )
 
             logger.info("Background monitoring started successfully")
@@ -130,7 +131,7 @@ def create_app() -> FastAPI:
             # 監視の起動失敗はアプリ起動をブロックしない（fail-safe）
 
     @app.on_event("shutdown")
-    async def shutdown_event():
+    async def shutdown_event() -> None:
         """
         アプリケーション終了時にバックグラウンド監視を停止する。
         """
@@ -148,7 +149,7 @@ def create_app() -> FastAPI:
 
     # --- スケジュールタスク (Phase6) ---
     @app.on_event("startup")
-    async def startup_scheduled_tasks():
+    async def startup_scheduled_tasks() -> None:
         """
         アプリケーション起動時にスケジュールタスクを開始する。
 
@@ -190,7 +191,7 @@ def create_app() -> FastAPI:
             # スケジュールタスクの起動失敗はアプリ起動をブロックしない（fail-safe）
 
     @app.on_event("shutdown")
-    async def shutdown_scheduled_tasks():
+    async def shutdown_scheduled_tasks() -> None:
         """
         アプリケーション終了時にスケジュールタスクを停止する。
         """

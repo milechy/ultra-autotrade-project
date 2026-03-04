@@ -42,4 +42,3 @@ def analyze_news(request: AIAnalysisRequest) -> AIAnalysisResponse:
         ) from exc
 
     return AIAnalysisResponse(results=results, count=len(results))
-

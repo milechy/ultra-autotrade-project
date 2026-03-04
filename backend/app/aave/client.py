@@ -1,34 +1,179 @@
 # backend/app/aave/client.py
-
 """
-Aave とのやり取りを行うクライアント層。
+Aave V3 クライアント — web3.py ベース。
 
-- DummyAaveClient: テスト・開発用のダミークライアント
-- Web3AaveClient: Aave V3 の実クライアント（Polygon Mumbai テストネット対応）
+CLAUDE.md: Start Small, Iterate
+Step 1: get_health_factor() のみ実装。
+Step 2: deposit() + テスト（次イテレーション）
+Step 3: withdraw() + 統合テスト（その次）
+
+セキュリティ: docs/13_security_design.md
+- 秘密鍵は環境変数のみ（ハードコード禁止）
+- ログにアドレス・キーを出さない
+- 金額計算は Decimal のみ（float 禁止）
 """
+
+from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import Optional, Protocol
+from typing import Any, Optional, Protocol
 
 from .config import AaveSettings, get_aave_settings
 
 logger = logging.getLogger(__name__)
 
+# web3 はオプション依存。モジュールレベルで参照を試み、未インストール時は None にする。
+# これにより @patch("app.aave.client.Web3") が正常に機能する。
+try:
+    from web3 import Web3
+except ImportError:
+    Web3 = None  # type: ignore[assignment,misc]
+
+# Aave V3 Pool ABI（getUserAccountData + supply — 最小限）
+_POOL_ABI_MINIMAL = [
+    {
+        "inputs": [{"internalType": "address", "name": "user", "type": "address"}],
+        "name": "getUserAccountData",
+        "outputs": [
+            {"internalType": "uint256", "name": "totalCollateralBase", "type": "uint256"},
+            {"internalType": "uint256", "name": "totalDebtBase", "type": "uint256"},
+            {"internalType": "uint256", "name": "availableBorrowsBase", "type": "uint256"},
+            {"internalType": "uint256", "name": "currentLiquidationThreshold", "type": "uint256"},
+            {"internalType": "uint256", "name": "ltv", "type": "uint256"},
+            {"internalType": "uint256", "name": "healthFactor", "type": "uint256"},
+        ],
+        "stateMutability": "view",
+        "type": "function",
+    },
+    {
+        "inputs": [
+            {"internalType": "address", "name": "asset", "type": "address"},
+            {"internalType": "uint256", "name": "amount", "type": "uint256"},
+            {"internalType": "address", "name": "onBehalfOf", "type": "address"},
+            {"internalType": "uint16", "name": "referralCode", "type": "uint16"},
+        ],
+        "name": "supply",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+    {
+        "inputs": [
+            {"internalType": "address", "name": "asset", "type": "address"},
+            {"internalType": "uint256", "name": "amount", "type": "uint256"},
+            {"internalType": "address", "name": "to", "type": "address"},
+        ],
+        "name": "withdraw",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+]
+
+# ERC-20 ABI（approve + decimals — 最小限）
+_ERC20_ABI_MINIMAL = [
+    {
+        "inputs": [
+            {"internalType": "address", "name": "spender", "type": "address"},
+            {"internalType": "uint256", "name": "amount", "type": "uint256"},
+        ],
+        "name": "approve",
+        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+    {
+        "inputs": [],
+        "name": "decimals",
+        "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+        "stateMutability": "view",
+        "type": "function",
+    },
+]
+
+# Aave V3 Pool アドレス（Sepolia テストネット）
+# 出典: https://docs.aave.com/developers/deployed-contracts/v3-testnet-addresses
+_POOL_ADDRESS_SEPOLIA = "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951"
+
+# Sepolia USDC アドレス
+_USDC_ADDRESS_SEPOLIA = "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8"
+
+
+class AaveClientBase(ABC):
+    """Aave クライアントの抽象基底クラス。"""
+
+    @abstractmethod
+    def get_health_factor(self, wallet_address: str) -> Decimal:
+        """
+        ウォレットの現在の Health Factor を取得する。
+
+        Returns:
+            Decimal: Health Factor 値。
+                     ポジションなし（担保なし）の場合は Decimal("inf") を返す。
+        Raises:
+            AaveClientError: RPC 接続失敗・コントラクト呼び出し失敗時。
+        """
+
+    @abstractmethod
+    def deposit(
+        self,
+        asset_address: str,
+        amount: Decimal,
+        wallet_address: str,
+        private_key: str,
+        dry_run: bool = False,
+    ) -> "dict[str, Any] | str":
+        """
+        Aave V3 Pool に deposit（supply）する。
+
+        Args:
+            asset_address: ERC-20 トークンのアドレス
+            amount: deposit する量（人間が読める単位、例: 10.5 USDC）
+            wallet_address: 送信元ウォレットアドレス
+            private_key: 秘密鍵（tx署名用）
+            dry_run: True の場合は tx を送信しない
+
+        Returns:
+            dict: {"tx_hash": "0x...", "amount": "...", "dry_run": bool}
+            str: 後方互換（asset_symbol 呼び出し時）
+
+        Raises:
+            AaveClientError: トランザクション失敗時
+            ValueError: amount <= 0 の場合
+        """
+
+    @abstractmethod
+    def withdraw(
+        self,
+        asset_address: str,
+        amount: Decimal,
+        wallet_address: str,
+        private_key: str,
+        dry_run: bool = False,
+    ) -> "dict[str, Any] | str":
+        """
+        Aave V3 Pool から withdraw する。
+
+        HF < 1.6 の場合は AaveClientError を raise する（docs/13 rule 2）。
+        """
+
 
 class AaveClientError(Exception):
-    """Aave クライアント全般の基底例外。"""
+    """Aave クライアントの基底例外。"""
 
 
+# 後方互換: 旧コードが AaveTransactionError を参照している箇所のため維持
 class AaveTransactionError(AaveClientError):
     """トランザクション送信・実行エラー。"""
 
 
+# 後方互換: service.py が AaveClient Protocol を使っているため維持
 class AaveClient(Protocol):
     """
-    Aave クライアントのインターフェース。
+    Aave クライアントのインターフェース（後方互換 Protocol）。
 
     deposit / withdraw / get_health_factor を備えた実装であれば差し替え可能。
     """
@@ -37,201 +182,489 @@ class AaveClient(Protocol):
         """現在のポジションのヘルスファクターを返す。"""
 
     def deposit(self, asset_symbol: str, amount: Decimal) -> str:
-        """
-        指定したトークンを Aave に deposit する。
-
-        :return: トランザクションハッシュ
-        """
+        """指定したトークンを Aave に deposit する。"""
 
     def withdraw(self, asset_symbol: str, amount: Decimal) -> str:
-        """
-        指定したトークンを Aave から withdraw する。
-
-        :return: トランザクションハッシュ
-        """
+        """指定したトークンを Aave から withdraw する。"""
 
 
-@dataclass
-class DummyAaveClient:
+class DummyAaveClient(AaveClientBase):
     """
-    テスト・開発用のダミー Aave クライアント。
+    テスト・ローカル開発用のダミークライアント。
 
-    - 実ネットワークには一切アクセスしない
-    - ヘルスファクターは常に安全側の値（例: 2.0）を返す
-    - deposit / withdraw は tx_hash 風の文字列を返すだけ
+    AAVE_CLIENT_TYPE=dummy の場合に使用。
+    実際の RPC 接続は行わない。
+
+    後方互換のため settings 引数を受け付けるが、無視する。
     """
 
-    settings: AaveSettings
+    def __init__(self, settings: Optional[AaveSettings] = None) -> None:
+        # settings は後方互換のために受け付けるが、ダミークライアントでは使用しない
+        _ = settings
 
-    def get_health_factor(self) -> Decimal:
-        # 安全側の固定値。実装時にはここを本物の値に差し替える。
-        return Decimal("2.0")
+    def get_health_factor(self, wallet_address: str = "") -> Decimal:
+        logger.info("DummyAaveClient.get_health_factor called (no RPC)")
+        return Decimal("2.5")  # 安全な値を返す
 
-    def deposit(self, asset_symbol: str, amount: Decimal) -> str:
-        return f"dummy-deposit-{asset_symbol}-{amount}"
-
-    def withdraw(self, asset_symbol: str, amount: Decimal) -> str:
-        return f"dummy-withdraw-{asset_symbol}-{amount}"
-
-
-class Web3AaveClient:
-    """
-    Aave V3 の実クライアント実装（Polygon Mumbai テストネット対応）。
-
-    責務:
-    - Web3 経由で Aave Pool コントラクトと通信
-    - deposit（supply）/ withdraw / getHealthFactor の実行
-    - トランザクション署名・送信
-
-    NOTE:
-    - Aave V3 では deposit は supply() 関数に変更されている
-    - healthFactor は 1e18 スケール（1.0 = 1e18）
-    """
-
-    # Aave V3 Pool の簡易 ABI（必要な関数のみ）
-    POOL_ABI = [
-        {
-            "inputs": [
-                {"internalType": "address", "name": "asset", "type": "address"},
-                {"internalType": "uint256", "name": "amount", "type": "uint256"},
-                {"internalType": "address", "name": "onBehalfOf", "type": "address"},
-                {"internalType": "uint16", "name": "referralCode", "type": "uint16"},
-            ],
-            "name": "supply",
-            "outputs": [],
-            "stateMutability": "nonpayable",
-            "type": "function",
-        },
-        {
-            "inputs": [
-                {"internalType": "address", "name": "asset", "type": "address"},
-                {"internalType": "uint256", "name": "amount", "type": "uint256"},
-                {"internalType": "address", "name": "to", "type": "address"},
-            ],
-            "name": "withdraw",
-            "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-            "stateMutability": "nonpayable",
-            "type": "function",
-        },
-        {
-            "inputs": [{"internalType": "address", "name": "user", "type": "address"}],
-            "name": "getUserAccountData",
-            "outputs": [
-                {"internalType": "uint256", "name": "totalCollateralBase", "type": "uint256"},
-                {"internalType": "uint256", "name": "totalDebtBase", "type": "uint256"},
-                {"internalType": "uint256", "name": "availableBorrowsBase", "type": "uint256"},
-                {"internalType": "uint256", "name": "currentLiquidationThreshold", "type": "uint256"},
-                {"internalType": "uint256", "name": "ltv", "type": "uint256"},
-                {"internalType": "uint256", "name": "healthFactor", "type": "uint256"},
-            ],
-            "stateMutability": "view",
-            "type": "function",
-        },
-    ]
-
-    # ERC20 トークンの簡易 ABI
-    ERC20_ABI = [
-        {
-            "inputs": [
-                {"internalType": "address", "name": "spender", "type": "address"},
-                {"internalType": "uint256", "name": "amount", "type": "uint256"},
-            ],
-            "name": "approve",
-            "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-            "stateMutability": "nonpayable",
-            "type": "function",
-        },
-        {
-            "inputs": [{"internalType": "address", "name": "account", "type": "address"}],
-            "name": "balanceOf",
-            "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-            "stateMutability": "view",
-            "type": "function",
-        },
-        {
-            "inputs": [],
-            "name": "decimals",
-            "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
-            "stateMutability": "view",
-            "type": "function",
-        },
-        {
-            "inputs": [
-                {"internalType": "address", "name": "owner", "type": "address"},
-                {"internalType": "address", "name": "spender", "type": "address"},
-            ],
-            "name": "allowance",
-            "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-            "stateMutability": "view",
-            "type": "function",
-        },
-    ]
-
-    def __init__(self, settings: Optional[AaveSettings] = None):
-        """
-        Web3AaveClient を初期化する。
-
-        Args:
-            settings: AaveSettings インスタンス。省略時は環境変数から取得。
-
-        Raises:
-            AaveClientError: RPC 接続失敗、または必須設定が不足している場合
-        """
-        # web3 は遅延インポート（テスト時にモックしやすくするため）
-        try:
-            from eth_account import Account
-            from web3 import Web3
-        except ImportError as exc:
-            raise AaveClientError(
-                "web3 and eth-account packages are required. "
-                "Install with: pip install web3 eth-account"
-            ) from exc
-
-        self.settings = settings or get_aave_settings()
-
-        # 必須設定のチェック
-        if not self.settings.rpc_url:
-            raise AaveClientError("AAVE_RPC_URL is required for Web3AaveClient")
-        if not self.settings.wallet_private_key:
-            raise AaveClientError("AAVE_WALLET_PRIVATE_KEY is required for Web3AaveClient")
-        if not self.settings.pool_address:
-            raise AaveClientError("AAVE_POOL_ADDRESS is required for Web3AaveClient")
-        if not self.settings.usdc_address:
-            raise AaveClientError("AAVE_USDC_ADDRESS is required for Web3AaveClient")
-
-        # Web3 接続
-        self.w3 = Web3(Web3.HTTPProvider(self.settings.rpc_url))
-        if not self.w3.is_connected():
-            raise AaveClientError(f"Failed to connect to RPC: {self.settings.rpc_url}")
-
-        # ウォレット
-        self.account = Account.from_key(self.settings.wallet_private_key)
-        logger.info("Web3AaveClient initialized with wallet: %s", self.account.address)
-
-        # コントラクト
-        self.pool = self.w3.eth.contract(
-            address=Web3.to_checksum_address(self.settings.pool_address),
-            abi=self.POOL_ABI,
-        )
-
-        # トークンアドレスマップ
-        self.token_addresses = {
-            "USDC": Web3.to_checksum_address(self.settings.usdc_address),
+    def deposit(
+        self,
+        asset_address: str = "",
+        amount: Decimal = Decimal("0"),
+        wallet_address: str = "",
+        private_key: str = "",
+        dry_run: bool = False,
+        # 後方互換: 旧コードは deposit(asset_symbol, amount) と呼び出す
+        asset_symbol: str = "",
+    ) -> "dict[str, Any] | str":
+        logger.info("DummyAaveClient.deposit called (no tx sent)")
+        # 後方互換: asset_symbol が渡された場合は文字列を返す
+        if asset_symbol:
+            return f"dummy-deposit-{asset_symbol}-{amount}"
+        # asset_address が最初の位置引数として asset_symbol 扱いで渡された場合も検出
+        # service.py は deposit(token, amount) と呼び出すため
+        if asset_address and not asset_address.startswith("0x"):
+            return f"dummy-deposit-{asset_address}-{amount}"
+        return {
+            "tx_hash": "0xdummy_deposit_hash",
+            "amount": str(amount),
+            "dry_run": dry_run,
         }
 
-    def _get_token_contract(self, asset_symbol: str):
-        """トークンコントラクトを取得する。"""
-        from web3 import Web3
+    def withdraw(
+        self,
+        asset_address: str = "",
+        amount: Decimal = Decimal("0"),
+        wallet_address: str = "",
+        private_key: str = "",
+        dry_run: bool = False,
+        asset_symbol: str = "",
+    ) -> "dict[str, Any] | str":
+        logger.info("DummyAaveClient.withdraw called (no tx sent)")
+        # backward compat: old service.py calls withdraw(asset_symbol, amount) → str
+        if asset_symbol:
+            return f"dummy-withdraw-{asset_symbol}-{amount}"
+        if asset_address and not asset_address.startswith("0x"):
+            return f"dummy-withdraw-{asset_address}-{amount}"
+        return {
+            "tx_hash": "0xdummy_withdraw_hash",
+            "amount": str(amount),
+            "dry_run": dry_run,
+        }
 
-        token_address = self.token_addresses.get(asset_symbol)
-        if not token_address:
-            raise AaveClientError(f"Unknown asset symbol: {asset_symbol}")
 
-        return self.w3.eth.contract(
-            address=token_address,
-            abi=self.ERC20_ABI,
+class Web3AaveClient(AaveClientBase):
+    """
+    web3.py を使った Aave V3 本実装クライアント。
+
+    AAVE_CLIENT_TYPE=web3 の場合に使用。
+    現時点では get_health_factor() のみ実装。
+
+    後方互換のため settings 引数も受け付ける。
+    web3 は遅延インポート（テスト時にモックしやすくするため）。
+    """
+
+    def __init__(
+        self,
+        rpc_url: Optional[str] = None,
+        pool_address: str = _POOL_ADDRESS_SEPOLIA,
+        settings: Optional[AaveSettings] = None,
+    ) -> None:
+        # web3 はモジュールレベルで参照（テスト時にモックしやすくするため）
+        if Web3 is None:
+            raise AaveClientError("web3 package is required. Install with: pip install web3")
+
+        # 後方互換: settings から rpc_url/pool_address を取得することもできる
+        if settings is not None:
+            if not settings.rpc_url:
+                raise AaveClientError("AAVE_RPC_URL is required for Web3AaveClient")
+            if not settings.wallet_private_key:
+                raise AaveClientError("AAVE_WALLET_PRIVATE_KEY is required for Web3AaveClient")
+            if not settings.pool_address:
+                raise AaveClientError("AAVE_POOL_ADDRESS is required for Web3AaveClient")
+            if not settings.usdc_address:
+                raise AaveClientError("AAVE_USDC_ADDRESS is required for Web3AaveClient")
+            effective_rpc_url = settings.rpc_url
+            effective_pool_address = settings.pool_address
+        else:
+            if not rpc_url:
+                raise AaveClientError("AAVE_RPC_URL is required for Web3AaveClient")
+            effective_rpc_url = rpc_url
+            effective_pool_address = pool_address
+
+        self._w3 = Web3(Web3.HTTPProvider(effective_rpc_url))
+        if not self._w3.is_connected():
+            raise AaveClientError(
+                f"RPC に接続できません: {effective_rpc_url[:20]}..."
+            )  # URLを切り詰めてログ
+        self._pool = self._w3.eth.contract(
+            address=Web3.to_checksum_address(effective_pool_address),
+            abi=_POOL_ABI_MINIMAL,
         )
 
+        # 後方互換: settings が渡された場合はウォレット情報を保持
+        if settings is not None:
+            try:
+                from eth_account import Account
+
+                self.account = Account.from_key(settings.wallet_private_key)
+                self.w3 = self._w3
+                self.pool = self._pool
+                self.settings = settings
+                # トークンアドレスマップ（後方互換）
+                if settings.usdc_address:
+                    self.token_addresses = {
+                        "USDC": Web3.to_checksum_address(settings.usdc_address),
+                    }
+            except ImportError as exc:
+                raise AaveClientError(
+                    "eth-account package is required. Install with: pip install eth-account"
+                ) from exc
+
+        logger.info(
+            "Web3AaveClient 初期化完了 (pool=%s...%s)",
+            effective_pool_address[:6],
+            effective_pool_address[-4:],
+        )
+
+    def get_health_factor(self, wallet_address: str = "") -> Decimal:
+        """
+        Aave V3 Pool.getUserAccountData() から Health Factor を取得。
+
+        Health Factor は 1e18 スケールで返るため Decimal に変換。
+        ポジションなし（HF = type(uint256).max）の場合は Decimal("inf") を返す。
+
+        後方互換: wallet_address が空の場合は self.account.address を使用。
+        """
+        # web3 はモジュールレベルで参照
+        if Web3 is None:
+            raise AaveClientError("web3 package is required. Install with: pip install web3")
+
+        # 後方互換: wallet_address が未指定の場合は self.account.address を使用
+        if not wallet_address and hasattr(self, "account"):
+            wallet_address = self.account.address
+
+        try:
+            checksum_addr = Web3.to_checksum_address(wallet_address)
+            result = self._pool.functions.getUserAccountData(checksum_addr).call()
+            hf_raw: int = result[5]  # healthFactor は6番目の戻り値
+
+            # 後方互換: HF=0 かつ totalDebtBase=0 は借入なし → inf を返す
+            total_debt_base: int = result[1]
+            if hf_raw == 0:
+                if total_debt_base == 0:
+                    logger.info("No debt position - health factor is infinite")
+                    return Decimal("inf")
+                else:
+                    # 借入ありで HF=0 → 清算寸前の超危険状態
+                    logger.warning(
+                        "CRITICAL: Health factor is 0 with debt=%s - liquidation imminent!",
+                        total_debt_base,
+                    )
+                    return Decimal("0")
+
+            # ポジションなし = uint256 最大値
+            if hf_raw >= 2**256 - 1:
+                return Decimal("inf")
+
+            # 1e18 スケールから実数へ変換（Decimal で精度保持）
+            hf = Decimal(hf_raw) / Decimal(10**18)
+            logger.info(
+                "Health Factor 取得: wallet=%s...%s, hf=%s",
+                wallet_address[:6],
+                wallet_address[-4:],
+                hf,
+            )
+            return hf
+
+        except AaveClientError:
+            raise
+        except Exception as exc:
+            raise AaveClientError(f"get_health_factor 失敗: {exc}") from exc
+
+    def deposit(
+        self,
+        asset_address: str = "",
+        amount: Decimal = Decimal("0"),
+        wallet_address: str = "",
+        private_key: str = "",
+        dry_run: bool = False,
+        # 後方互換: 旧コードは deposit(asset_symbol, amount) と呼び出す
+        asset_symbol: str = "",
+    ) -> "dict[str, Any] | str":
+        """
+        Aave V3 Pool.supply() を呼び出して deposit する。
+
+        処理フロー:
+        1. amount <= 0 チェック
+        2. dry_run=True なら tx送信せず結果を返す
+        3. ERC-20 decimals() で桁数取得
+        4. ERC-20 approve(pool_address, amount_in_token_units)
+        5. Pool.supply(asset, amount, wallet, referralCode=0)
+        6. tx_hash を返す
+        """
+        if Web3 is None:
+            raise AaveClientError("web3 package is required")
+
+        # 後方互換: asset_symbol キーワード引数で呼ばれた場合
+        if asset_symbol:
+            if not hasattr(self, "token_addresses"):
+                raise AaveClientError(f"Unknown asset: {asset_symbol}")
+            asset_addr = self.token_addresses.get(asset_symbol)
+            if not asset_addr:
+                raise AaveClientError(f"Unknown asset: {asset_symbol}")
+            asset_address = asset_addr
+            if hasattr(self, "account"):
+                wallet_address = self.account.address
+            else:
+                raise AaveClientError("No wallet configured")
+
+        # 後方互換: asset_address が "0x" で始まらない場合は asset_symbol として扱う
+        if asset_address and not asset_address.startswith("0x"):
+            _sym = asset_address
+            if not hasattr(self, "token_addresses"):
+                raise AaveClientError(f"Unknown asset: {_sym}")
+            asset_addr = self.token_addresses.get(_sym)
+            if not asset_addr:
+                raise AaveClientError(f"Unknown asset: {_sym}")
+            asset_address = asset_addr
+            if hasattr(self, "account"):
+                wallet_address = self.account.address
+            else:
+                raise AaveClientError("No wallet configured")
+
+        # amount バリデーション
+        if amount <= 0:
+            raise ValueError(f"deposit amount must be positive, got {amount}")
+
+        # アドレスを安全にログ出力（末尾4文字のみ）
+        logger.info(
+            "deposit: asset=%s...%s, amount=%s, wallet=%s...%s, dry_run=%s",
+            asset_address[:6] if asset_address else "N/A",
+            asset_address[-4:] if asset_address else "N/A",
+            amount,
+            wallet_address[:6] if wallet_address else "N/A",
+            wallet_address[-4:] if wallet_address else "N/A",
+            dry_run,
+        )
+
+        if dry_run:
+            return {
+                "tx_hash": None,
+                "amount": str(amount),
+                "dry_run": True,
+            }
+
+        try:
+            # ERC-20 コントラクト取得
+            token_contract = self._w3.eth.contract(
+                address=Web3.to_checksum_address(asset_address),
+                abi=_ERC20_ABI_MINIMAL,
+            )
+            decimals = token_contract.functions.decimals().call()
+            amount_wei = self._to_wei(amount, decimals)
+
+            pool_address = self._pool.address
+
+            # 署名用アカウント決定
+            if hasattr(self, "account"):
+                account = self.account
+            else:
+                from eth_account import Account
+
+                account = Account.from_key(private_key)
+
+            checksum_wallet = Web3.to_checksum_address(
+                wallet_address if wallet_address else account.address
+            )
+
+            # Step 1: ERC-20 approve
+            approve_tx = token_contract.functions.approve(
+                pool_address, amount_wei
+            ).build_transaction(
+                {
+                    "from": checksum_wallet,
+                    "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                    "gas": 100000,
+                    "gasPrice": self._w3.eth.gas_price,
+                }
+            )
+            signed_approve = self._w3.eth.account.sign_transaction(
+                approve_tx, private_key=account.key
+            )
+            approve_hash = self._w3.eth.send_raw_transaction(signed_approve.raw_transaction)
+            self._w3.eth.wait_for_transaction_receipt(approve_hash)
+
+            logger.info("approve tx confirmed: %s", approve_hash.hex())
+
+            # Step 2: Pool.supply
+            supply_tx = self._pool.functions.supply(
+                Web3.to_checksum_address(asset_address),
+                amount_wei,
+                checksum_wallet,
+                0,  # referralCode
+            ).build_transaction(
+                {
+                    "from": checksum_wallet,
+                    "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                    "gas": 300000,
+                    "gasPrice": self._w3.eth.gas_price,
+                }
+            )
+            signed_supply = self._w3.eth.account.sign_transaction(
+                supply_tx, private_key=account.key
+            )
+            supply_hash = self._w3.eth.send_raw_transaction(signed_supply.raw_transaction)
+            receipt = self._w3.eth.wait_for_transaction_receipt(supply_hash)
+
+            tx_hash_hex = receipt["transactionHash"].hex()
+            logger.info(
+                "deposit 完了: tx=%s, amount=%s",
+                tx_hash_hex,
+                amount,
+            )
+
+            return {
+                "tx_hash": tx_hash_hex,
+                "amount": str(amount),
+                "dry_run": False,
+            }
+
+        except (AaveClientError, ValueError):
+            raise
+        except Exception as exc:
+            raise AaveClientError(f"deposit 失敗: {exc}") from exc
+
+    def withdraw(
+        self,
+        asset_address: str = "",
+        amount: Decimal = Decimal("0"),
+        wallet_address: str = "",
+        private_key: str = "",
+        dry_run: bool = False,
+        # 後方互換: 旧コードは withdraw(asset_symbol, amount) と呼び出す
+        asset_symbol: str = "",
+    ) -> "dict[str, Any] | str":
+        """
+        Aave V3 Pool.withdraw() を呼び出す。
+
+        処理フロー:
+        1. amount <= 0 → ValueError
+        2. dry_run=True → tx送信なし
+        3. get_health_factor() で HF チェック
+        4. HF < 1.6 → AaveClientError("HF below threshold, withdrawal blocked")
+        5. Pool.withdraw(asset, amount_wei, wallet)
+        6. tx_hash を返す
+        """
+        if Web3 is None:
+            raise AaveClientError("web3 package is required")
+
+        # 後方互換: asset_symbol キーワード引数で呼ばれた場合
+        if asset_symbol:
+            if not hasattr(self, "token_addresses"):
+                raise AaveClientError(f"Unknown asset: {asset_symbol}")
+            asset_addr = self.token_addresses.get(asset_symbol)
+            if not asset_addr:
+                raise AaveClientError(f"Unknown asset: {asset_symbol}")
+            asset_address = asset_addr
+            if hasattr(self, "account"):
+                wallet_address = self.account.address
+            else:
+                raise AaveClientError("No wallet configured")
+
+        # 後方互換: asset_address が "0x" で始まらない場合は asset_symbol として扱う
+        if asset_address and not asset_address.startswith("0x"):
+            _sym = asset_address
+            if not hasattr(self, "token_addresses"):
+                raise AaveClientError(f"Unknown asset: {_sym}")
+            asset_addr = self.token_addresses.get(_sym)
+            if not asset_addr:
+                raise AaveClientError(f"Unknown asset: {_sym}")
+            asset_address = asset_addr
+            if hasattr(self, "account"):
+                wallet_address = self.account.address
+            else:
+                raise AaveClientError("No wallet configured")
+
+        if amount <= 0:
+            raise ValueError(f"withdraw amount must be positive, got {amount}")
+
+        logger.info(
+            "withdraw: asset=%s...%s, amount=%s, wallet=%s...%s, dry_run=%s",
+            asset_address[:6] if asset_address else "N/A",
+            asset_address[-4:] if asset_address else "N/A",
+            amount,
+            wallet_address[:6] if wallet_address else "N/A",
+            wallet_address[-4:] if wallet_address else "N/A",
+            dry_run,
+        )
+
+        if dry_run:
+            return {
+                "tx_hash": None,
+                "amount": str(amount),
+                "dry_run": True,
+            }
+
+        try:
+            # CRITICAL: HF check before withdrawal (docs/13_security_design.md rule 2)
+            hf = self.get_health_factor(wallet_address)
+            if hf != Decimal("inf") and hf < Decimal("1.6"):
+                raise AaveClientError(
+                    f"HF below threshold ({hf} < 1.6), withdrawal blocked for safety"
+                )
+
+            # Get token decimals
+            token_contract = self._w3.eth.contract(
+                address=Web3.to_checksum_address(asset_address),
+                abi=_ERC20_ABI_MINIMAL,
+            )
+            decimals = token_contract.functions.decimals().call()
+            amount_wei = self._to_wei(amount, decimals)
+
+            # Determine account for signing
+            if hasattr(self, "account"):
+                account = self.account
+            else:
+                from eth_account import Account
+
+                account = Account.from_key(private_key)
+
+            checksum_wallet = Web3.to_checksum_address(
+                wallet_address if wallet_address else account.address
+            )
+
+            # Pool.withdraw(asset, amount, to)
+            withdraw_tx = self._pool.functions.withdraw(
+                Web3.to_checksum_address(asset_address),
+                amount_wei,
+                checksum_wallet,
+            ).build_transaction(
+                {
+                    "from": checksum_wallet,
+                    "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                    "gas": 300000,
+                    "gasPrice": self._w3.eth.gas_price,
+                }
+            )
+            signed_tx = self._w3.eth.account.sign_transaction(withdraw_tx, private_key=account.key)
+            tx_hash = self._w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+            receipt = self._w3.eth.wait_for_transaction_receipt(tx_hash)
+
+            tx_hash_hex = receipt["transactionHash"].hex()
+            logger.info("withdraw 完了: tx=%s, amount=%s", tx_hash_hex, amount)
+
+            return {
+                "tx_hash": tx_hash_hex,
+                "amount": str(amount),
+                "dry_run": False,
+            }
+
+        except (AaveClientError, ValueError):
+            raise
+        except Exception as exc:
+            raise AaveClientError(f"withdraw 失敗: {exc}") from exc
+
+    # 後方互換: 旧 Web3AaveClient が持っていたユーティリティメソッド
     def _to_wei(self, amount: Decimal, decimals: int) -> int:
         """Decimal → Wei（最小単位）変換。"""
         return int(amount * Decimal(10**decimals))
@@ -240,211 +673,32 @@ class Web3AaveClient:
         """Wei（最小単位）→ Decimal 変換。"""
         return Decimal(amount) / Decimal(10**decimals)
 
-    def get_health_factor(self) -> Optional[Decimal]:
-        """
-        現在のヘルスファクターを取得する。
 
-        Returns:
-            Decimal: ヘルスファクター値（0 以上）
-            None: 借入なしの場合（ヘルスファクター無限大として扱う）
+def make_aave_client(
+    client_type: str,
+    rpc_url: Optional[str] = None,
+    pool_address: str = _POOL_ADDRESS_SEPOLIA,
+) -> AaveClientBase:
+    """
+    環境変数 AAVE_CLIENT_TYPE に基づいてクライアントを生成するファクトリ。
 
-        Raises:
-            AaveClientError: コントラクト呼び出しに失敗した場合
-
-        Note:
-            - HF=0 かつ totalDebtBase > 0 は清算寸前の超危険状態
-            - この場合は None ではなく Decimal('0') を返す（fail-closed 原則）
-            - MonitoringService が緊急停止を発動できるようにするため
-        """
-        try:
-            user_data = self.pool.functions.getUserAccountData(
-                self.account.address
-            ).call()
-
-            # getUserAccountData の戻り値:
-            # (totalCollateralBase, totalDebtBase, availableBorrowsBase,
-            #  currentLiquidationThreshold, ltv, healthFactor)
-            total_debt_base = user_data[1]
-            health_factor_raw = user_data[5]
-
-            if health_factor_raw == 0:
-                if total_debt_base == 0:
-                    # 借入なし → ヘルスファクター無限大として扱う
-                    logger.info("No debt position - health factor is infinite")
-                    return None
-                else:
-                    # 借入ありで HF=0 → 清算寸前の超危険状態
-                    # fail-closed: 緊急停止を発動させるため 0 を返す
-                    logger.warning(
-                        "CRITICAL: Health factor is 0 with debt=%s - liquidation imminent!",
-                        total_debt_base,
-                    )
-                    return Decimal("0")
-
-            # Aave V3 では healthFactor は 1e18 スケール（1.0 = 1e18）
-            health_factor = Decimal(health_factor_raw) / Decimal(10**18)
-            logger.info("Current health factor: %s", health_factor)
-            return health_factor
-
-        except Exception as exc:
-            logger.error("Failed to get health factor: %s", exc)
-            raise AaveClientError(f"Failed to get health factor: {exc}") from exc
-
-    def deposit(self, asset_symbol: str, amount: Decimal) -> str:
-        """
-        指定したトークンを Aave に deposit（supply）する。
-
-        手順:
-        1. トークンの approve（既に十分な allowance がある場合はスキップ）
-        2. Pool.supply() 実行
-
-        Args:
-            asset_symbol: トークンシンボル（例: "USDC"）
-            amount: 預入額（人間が読める単位、例: 10.5 USDC）
-
-        Returns:
-            str: supply トランザクションハッシュ
-
-        Raises:
-            AaveTransactionError: トランザクション失敗時
-        """
-        try:
-            token = self._get_token_contract(asset_symbol)
-            decimals = token.functions.decimals().call()
-            amount_wei = self._to_wei(amount, decimals)
-
-            logger.info(
-                "Depositing %s %s (wei: %d) to Aave",
-                amount,
-                asset_symbol,
-                amount_wei,
-            )
-
-            # 現在の allowance をチェック
-            current_allowance = token.functions.allowance(
-                self.account.address,
-                self.pool.address,
-            ).call()
-
-            # 1. Approve（必要な場合のみ）
-            if current_allowance < amount_wei:
-                logger.info("Approving %s for Aave Pool...", asset_symbol)
-                approve_tx = token.functions.approve(
-                    self.pool.address,
-                    amount_wei,
-                ).build_transaction(
-                    {
-                        "from": self.account.address,
-                        "nonce": self.w3.eth.get_transaction_count(self.account.address),
-                        "gas": 100000,
-                        "gasPrice": self.w3.eth.gas_price,
-                    }
-                )
-
-                signed_approve = self.account.sign_transaction(approve_tx)
-                approve_hash = self.w3.eth.send_raw_transaction(
-                    signed_approve.raw_transaction
-                )
-                self.w3.eth.wait_for_transaction_receipt(approve_hash)
-                logger.info("Approve tx: %s", approve_hash.hex())
-
-            # 2. Supply
-            logger.info("Supplying %s to Aave Pool...", asset_symbol)
-            supply_tx = self.pool.functions.supply(
-                token.address,
-                amount_wei,
-                self.account.address,
-                0,  # referralCode
-            ).build_transaction(
-                {
-                    "from": self.account.address,
-                    "nonce": self.w3.eth.get_transaction_count(self.account.address),
-                    "gas": 300000,
-                    "gasPrice": self.w3.eth.gas_price,
-                }
-            )
-
-            signed_supply = self.account.sign_transaction(supply_tx)
-            supply_hash = self.w3.eth.send_raw_transaction(signed_supply.raw_transaction)
-            receipt = self.w3.eth.wait_for_transaction_receipt(supply_hash)
-
-            if receipt.status != 1:
-                raise AaveTransactionError(
-                    f"Supply transaction failed: {supply_hash.hex()}"
-                )
-
-            logger.info("Supply tx successful: %s", supply_hash.hex())
-            return supply_hash.hex()
-
-        except AaveTransactionError:
-            raise
-        except Exception as exc:
-            logger.error("Deposit failed: %s", exc)
-            raise AaveTransactionError(f"Deposit failed: {exc}") from exc
-
-    def withdraw(self, asset_symbol: str, amount: Decimal) -> str:
-        """
-        指定したトークンを Aave から withdraw する。
-
-        Args:
-            asset_symbol: トークンシンボル（例: "USDC"）
-            amount: 引出額（人間が読める単位、例: 10.5 USDC）
-
-        Returns:
-            str: withdraw トランザクションハッシュ
-
-        Raises:
-            AaveTransactionError: トランザクション失敗時
-        """
-        try:
-            token = self._get_token_contract(asset_symbol)
-            decimals = token.functions.decimals().call()
-            amount_wei = self._to_wei(amount, decimals)
-
-            logger.info(
-                "Withdrawing %s %s (wei: %d) from Aave",
-                amount,
-                asset_symbol,
-                amount_wei,
-            )
-
-            withdraw_tx = self.pool.functions.withdraw(
-                token.address,
-                amount_wei,
-                self.account.address,
-            ).build_transaction(
-                {
-                    "from": self.account.address,
-                    "nonce": self.w3.eth.get_transaction_count(self.account.address),
-                    "gas": 300000,
-                    "gasPrice": self.w3.eth.gas_price,
-                }
-            )
-
-            signed_withdraw = self.account.sign_transaction(withdraw_tx)
-            withdraw_hash = self.w3.eth.send_raw_transaction(
-                signed_withdraw.raw_transaction
-            )
-            receipt = self.w3.eth.wait_for_transaction_receipt(withdraw_hash)
-
-            if receipt.status != 1:
-                raise AaveTransactionError(
-                    f"Withdraw transaction failed: {withdraw_hash.hex()}"
-                )
-
-            logger.info("Withdraw tx successful: %s", withdraw_hash.hex())
-            return withdraw_hash.hex()
-
-        except AaveTransactionError:
-            raise
-        except Exception as exc:
-            logger.error("Withdraw failed: %s", exc)
-            raise AaveTransactionError(f"Withdraw failed: {exc}") from exc
+    Args:
+        client_type: "dummy" または "web3"
+        rpc_url: web3 の場合は必須
+        pool_address: Aave V3 Pool コントラクトアドレス
+    """
+    if client_type == "dummy":
+        return DummyAaveClient()
+    if client_type == "web3":
+        if not rpc_url:
+            raise ValueError("AAVE_CLIENT_TYPE=web3 の場合は AAVE_RPC_URL が必須です")
+        return Web3AaveClient(rpc_url=rpc_url, pool_address=pool_address)
+    raise ValueError(f"不明な AAVE_CLIENT_TYPE: {client_type!r} (dummy | web3)")
 
 
 def get_default_aave_client() -> AaveClient:
     """
-    デフォルトの Aave クライアントを返す。
+    デフォルトの Aave クライアントを返す（後方互換）。
 
     環境変数 AAVE_CLIENT_TYPE で切り替え可能:
     - "web3": Web3AaveClient（実クライアント）
@@ -459,16 +713,16 @@ def get_default_aave_client() -> AaveClient:
 
     if client_type == "web3":
         logger.info("Using Web3AaveClient (explicit)")
-        return Web3AaveClient(settings=settings)
+        return Web3AaveClient(settings=settings)  # type: ignore[return-value]
     elif client_type == "dummy":
         logger.info("Using DummyAaveClient (explicit)")
-        return DummyAaveClient(settings=settings)
+        return DummyAaveClient(settings=settings)  # type: ignore[return-value]
     else:
         # デフォルト: 環境に応じて自動選択
         env = os.getenv("APP_ENV", "dev")
         if env == "staging":
             logger.info("Using Web3AaveClient for staging environment")
-            return Web3AaveClient(settings=settings)
+            return Web3AaveClient(settings=settings)  # type: ignore[return-value]
         else:
             logger.info("Using DummyAaveClient for %s environment", env)
-            return DummyAaveClient(settings=settings)
+            return DummyAaveClient(settings=settings)  # type: ignore[return-value]

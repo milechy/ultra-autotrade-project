@@ -7,15 +7,12 @@ Notion → AI → OctoBot → Notion書き戻し のフロー全体をテスト�
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.ai.schemas import AIAnalysisResult, TradeAction
 from app.ai.service import AIService
 from app.automation.state import reset_state
 from app.automation.workflow import WorkflowService
-from app.bots.schemas import OctoBotSignalResponse, OctoBotSignalDetail, OctoBotSignalStatus
 from app.notion.schemas import NotionNewsItem
 
 
@@ -44,14 +41,16 @@ class MockNotionService:
         sentiment: str = None,
         summary: str = None,
     ) -> None:
-        self.updated_pages.append({
-            "page_id": page_id,
-            "action": action,
-            "confidence": confidence,
-            "sentiment": sentiment,
-            "summary": summary,
-            "status": "処理済",
-        })
+        self.updated_pages.append(
+            {
+                "page_id": page_id,
+                "action": action,
+                "confidence": confidence,
+                "sentiment": sentiment,
+                "summary": summary,
+                "status": "処理済",
+            }
+        )
 
     def update_item_with_error(
         self,
@@ -60,13 +59,15 @@ class MockNotionService:
         action: str = None,
         confidence: int = None,
     ) -> None:
-        self.error_pages.append({
-            "page_id": page_id,
-            "error_message": error_message,
-            "action": action,
-            "confidence": confidence,
-            "status": "エラー",
-        })
+        self.error_pages.append(
+            {
+                "page_id": page_id,
+                "error_message": error_message,
+                "action": action,
+                "confidence": confidence,
+                "status": "エラー",
+            }
+        )
 
 
 class MockOctoBotClient:
@@ -100,6 +101,7 @@ def test_workflow_no_news() -> None:
 
     octobot_client = MockOctoBotClient()
     from app.bots.service import OctoBotService
+
     octobot_service = OctoBotService(
         client=octobot_client,
         min_confidence=70,
@@ -144,6 +146,7 @@ def test_workflow_with_bullish_news() -> None:
 
     octobot_client = MockOctoBotClient()
     from app.bots.service import OctoBotService
+
     octobot_service = OctoBotService(
         client=octobot_client,
         min_confidence=70,
@@ -198,6 +201,7 @@ def test_workflow_with_neutral_news() -> None:
 
     octobot_client = MockOctoBotClient()
     from app.bots.service import OctoBotService
+
     octobot_service = OctoBotService(
         client=octobot_client,
         min_confidence=70,
@@ -269,6 +273,7 @@ def test_workflow_with_multiple_news() -> None:
 
     octobot_client = MockOctoBotClient()
     from app.bots.service import OctoBotService
+
     octobot_service = OctoBotService(
         client=octobot_client,
         min_confidence=70,
@@ -323,6 +328,7 @@ def test_workflow_octobot_failure_marks_notion_as_error() -> None:
     # 失敗するクライアントを使用
     failing_client = FailingOctoBotClient()
     from app.bots.service import OctoBotService
+
     octobot_service = OctoBotService(
         client=failing_client,
         min_confidence=70,
@@ -387,6 +393,7 @@ def test_workflow_partial_octobot_failure() -> None:
     # 失敗するクライアントを使用（BUY シグナルのみ失敗）
     failing_client = FailingOctoBotClient()
     from app.bots.service import OctoBotService
+
     octobot_service = OctoBotService(
         client=failing_client,
         min_confidence=70,

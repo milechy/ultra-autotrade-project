@@ -22,7 +22,7 @@ import logging
 from collections import deque
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Callable, Deque, Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Deque, Dict, List, Optional, Tuple
 
 from .schemas import (
     AlertLevel,
@@ -149,16 +149,16 @@ class MonitoringService:
             return
 
         try:
+            from app.aave.config import get_aave_settings
             from app.aave.schemas import AaveOperationMode, AaveSystemState
             from app.aave.state_manager import (
+                StateFileNotFoundError,
+                StateFileParseError,
                 get_default_state,
                 get_safe_default_state,
                 read_system_state,
                 write_system_state,
-                StateFileNotFoundError,
-                StateFileParseError,
             )
-            from app.aave.config import get_aave_settings
 
             settings = get_aave_settings()
 
@@ -236,9 +236,7 @@ class MonitoringService:
         """
         now = self._now(at)
         seconds = (
-            float(duration.total_seconds())
-            if isinstance(duration, timedelta)
-            else float(duration)
+            float(duration.total_seconds()) if isinstance(duration, timedelta) else float(duration)
         )
         millis = int(seconds * 1000)
 
@@ -352,8 +350,7 @@ class MonitoringService:
             is_emergency = True
             self._trading_paused = True
             reason = (
-                f"health factor {value} below emergency threshold "
-                f"{self._hf_emergency_threshold}"
+                f"health factor {value} below emergency threshold {self._hf_emergency_threshold}"
             )
             if self._emergency_reason is None:
                 self._emergency_reason = reason
@@ -375,10 +372,7 @@ class MonitoringService:
 
         elif value < self._hf_warning_threshold:
             level = AlertLevel.WARNING
-            reason = (
-                f"health factor {value} below warning threshold "
-                f"{self._hf_warning_threshold}"
-            )
+            reason = f"health factor {value} below warning threshold {self._hf_warning_threshold}"
             event = MonitoringEvent(
                 timestamp=now,
                 component=ComponentType.AAVE,
@@ -498,12 +492,12 @@ class MonitoringService:
             try:
                 from app.aave.schemas import AaveOperationMode, AaveSystemState
                 from app.aave.state_manager import (
+                    StateFileNotFoundError,
+                    StateFileParseError,
                     get_default_state,
                     get_safe_default_state,
                     read_system_state,
                     write_system_state,
-                    StateFileNotFoundError,
-                    StateFileParseError,
                 )
 
                 try:
@@ -549,9 +543,7 @@ class MonitoringService:
                 )
 
             except Exception as exc:
-                logger.warning(
-                    "Failed to sync state file on clear_emergency_stop: %s", exc
-                )
+                logger.warning("Failed to sync state file on clear_emergency_stop: %s", exc)
 
     def get_recent_events(self, limit: int = 100) -> List[MonitoringEvent]:
         """

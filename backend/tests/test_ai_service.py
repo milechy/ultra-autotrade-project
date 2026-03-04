@@ -6,6 +6,7 @@ from app.ai.schemas import AIAnalysisResult, TradeAction
 from app.ai.service import AIService
 from app.notion.schemas import NotionNewsItem
 
+
 def _make_item(summary: str) -> NotionNewsItem:
     return NotionNewsItem(
         id="dummy-id",
@@ -66,4 +67,3 @@ def test_ai_service_uses_llm_analyzer_when_provided():
     assert result.action == TradeAction.BUY
     assert result.confidence == 90
     assert result.sentiment == "positive"
-

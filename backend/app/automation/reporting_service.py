@@ -15,28 +15,31 @@ MonitoringService が蓄積したメトリクスを元に、
 
 from __future__ import annotations
 
+from collections import defaultdict
+from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
-from .monitoring_service import MonitoringService
-from .schemas import (
-    AlertLevel,
-    AutomationReportSummary,
-    MetricAggregate,
-    ReportPeriod,
-)
-
-from .state import get_monitoring_service
 from app.notifications.schemas import (
     NotificationChannel,
     NotificationMessage,
     NotificationSeverity,
 )
 
-from app.automation.schemas import ReportPeriod, AutomationReportSummary
+from .monitoring_service import MonitoringService
+from .schemas import (
+    AlertLevel,
+    AutomationReportSummary,
+    MetricAggregate,
+    MetricPoint,
+    MonitoringEvent,
+    ReportPeriod,
+)
+from .state import get_monitoring_service
+
 
 class MetricsSummary(BaseModel):
     """単純なメトリクスサマリ（最小限）。"""
@@ -59,12 +62,12 @@ def build_metrics_summary(
     - metric_id ごとに min/max/avg/count を算出する
     """
 
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     period_start = now - period
 
-    sums: Dict[str, float] = defaultdict(float)
-    mins: Dict[str, float] = {}
-    maxs: Dict[str, float] = {}
+    sums: Dict[str, Decimal] = defaultdict(Decimal)
+    mins: Dict[str, Decimal] = {}
+    maxs: Dict[str, Decimal] = {}
     counts: Dict[str, int] = defaultdict(int)
 
     for event in events:
@@ -90,9 +93,9 @@ def build_metrics_summary(
     for mid, total in sums.items():
         cnt = counts[mid]
         stats[mid] = {
-            "min": mins[mid],
-            "max": maxs[mid],
-            "avg": total / cnt if cnt else 0.0,
+            "min": float(mins[mid]),
+            "max": float(maxs[mid]),
+            "avg": float(total / cnt) if cnt else 0.0,
             "count": float(cnt),
         }
 
@@ -101,6 +104,7 @@ def build_metrics_summary(
         period_end=now,
         stats=stats,
     )
+
 
 class ReportingService:
     """
@@ -152,22 +156,6 @@ class ReportingService:
         """
         return self.generate_summary_report(period=ReportPeriod.DAILY)
 
-    def generate_summary_report(self, period: ReportPeriod) -> AutomationReportSummary:
-        records = self.report_repo.fetch(period=period)
-
-        if not records:
-            return AutomationReportSummary(
-                period=period,
-                generated_at=datetime.utcnow(),
-                total_trades=0,
-                success_trades=0,
-                failed_trades=0,
-                pnl=0.0,
-            )
-        
-    # ------------------------------------------------------------------
-    # 公開 API
-    # ------------------------------------------------------------------
     def generate_summary_report(
         self,
         period: ReportPeriod,
@@ -218,9 +206,7 @@ class ReportingService:
 
             if values:
                 total = sum(values, Decimal("0"))
-                avg_v: Optional[Decimal] = (
-                    total / Decimal(count) if count > 0 else None
-                )
+                avg_v: Optional[Decimal] = total / Decimal(count) if count > 0 else None
             else:
                 avg_v = None
 
@@ -236,9 +222,7 @@ class ReportingService:
 
         # 3. ヘルスファクターの集計
         hf_history = self._monitoring.get_health_factor_history(from_ts, to_ts)
-        hf_values: List[Decimal] = [
-            value for _, value in hf_history if value is not None
-        ]
+        hf_values: List[Decimal] = [value for _, value in hf_history if value is not None]
 
         if hf_values:
             min_hf = min(hf_values)
@@ -247,9 +231,7 @@ class ReportingService:
 
             # HF のメトリクスも metric_aggregates に反映しておく
             total_hf = sum(hf_values, Decimal("0"))
-            avg_hf: Optional[Decimal] = (
-                total_hf / Decimal(len(hf_values)) if hf_values else None
-            )
+            avg_hf: Optional[Decimal] = total_hf / Decimal(len(hf_values)) if hf_values else None
             metric_aggregates["aave_health_factor_current"] = MetricAggregate(
                 metric_id="aave_health_factor_current",
                 unit="ratio",
@@ -326,9 +308,7 @@ class ReportingService:
         title = f"[AUTO-REPORT] {summary.period.value.upper()} summary ({status_label})"
 
         # 本文（シンプルなテキスト）
-        period_str = (
-            f"{summary.from_timestamp.isoformat()} - {summary.to_timestamp.isoformat()}"
-        )
+        period_str = f"{summary.from_timestamp.isoformat()} - {summary.to_timestamp.isoformat()}"
         lines: List[str] = [
             f"Period: {summary.period.value} ({period_str})",
             f"Events: total={summary.total_events}, "

@@ -14,7 +14,6 @@ from typing import Any, Dict, List
 
 import pytest
 
-from app.ai.schemas import TradeAction
 from app.aave.schemas import (
     AaveOperationMode,
     AaveOperationStatus,
@@ -23,10 +22,10 @@ from app.aave.schemas import (
 )
 from app.aave.service import AaveService
 from app.aave.state_manager import AaveStateManager
+from app.ai.schemas import TradeAction
 from app.automation.state import reset_state
 from app.bots.schemas import OctoBotSignal, OctoBotSignalRequest
 from app.bots.service import OctoBotService
-
 
 # ---- Mock / Fake Classes ----
 

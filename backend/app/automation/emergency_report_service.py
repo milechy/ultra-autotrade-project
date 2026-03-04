@@ -6,7 +6,7 @@ from typing import List, Sequence
 
 from pydantic import BaseModel, Field
 
-from .schemas import AutomationReportSummary, MonitoringEvent, AlertLevel
+from .schemas import AlertLevel, AutomationReportSummary, MonitoringEvent
 
 
 class EmergencyReport(BaseModel):
@@ -30,7 +30,10 @@ class EmergencyReportService:
     @staticmethod
     def _derive_severity_label(summary: AutomationReportSummary) -> str:
         # emergency > alert/critical > warning > info の順で判定
-        if getattr(summary, "emergency_occurred", False) or getattr(summary, "emergency_count", 0) > 0:
+        if (
+            getattr(summary, "emergency_occurred", False)
+            or getattr(summary, "emergency_count", 0) > 0
+        ):
             return "EMERGENCY"
         if getattr(summary, "alert_count", 0) > 0 or getattr(summary, "critical_count", 0) > 0:
             return "ALERT"
@@ -111,10 +114,7 @@ class EmergencyReportService:
         max_hf = getattr(summary, "max_health_factor", None)
         last_hf = getattr(summary, "last_health_factor", None)
         if any(v is not None for v in (min_hf, max_hf, last_hf)):
-            lines.append(
-                "Health factor: "
-                f"min={min_hf}, max={max_hf}, last={last_hf}"
-            )
+            lines.append(f"Health factor: min={min_hf}, max={max_hf}, last={last_hf}")
 
         # 重要なイベント一覧
         notable_events = self._select_notable_events(events, max_events=max_events)

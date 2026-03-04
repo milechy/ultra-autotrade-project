@@ -67,4 +67,3 @@ def test_ai_analyze_unexpected_error():
         resp = client.post("/ai/analyze", json=payload)
 
     assert resp.status_code >= 500
-

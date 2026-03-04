@@ -522,7 +522,7 @@ class TestUsersManagement:
             "/auth/me",
             headers={"Authorization": f"Bearer {admin2_token}"},
         )
-        admin2_id = admin2_me.json()["id"]
+        admin2_me.json()["id"]  # verify response has id
 
         # 最後の admin (admin2) を削除しようとする → 失敗
         # 別のユーザーで試す必要があるが、admin2 は自分を削除できないので viewer を作成

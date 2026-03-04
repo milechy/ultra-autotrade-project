@@ -66,7 +66,7 @@ def test_daily_report_summarizes_events_and_health_factor() -> None:
     # イベント件数（対象日の4件のみ）
     assert summary.total_events == 4
     assert summary.warning_count == 2  # latency(11s) + HF(1.7)
-    assert summary.alert_count == 1    # latency(31s)
+    assert summary.alert_count == 1  # latency(31s)
     assert summary.emergency_count == 1  # HF(1.5)
     assert summary.critical_count == 0
     assert summary.emergency_occurred is True
@@ -105,7 +105,8 @@ def test_weekly_report_uses_last_7_days_window() -> None:
     assert summary.period == ReportPeriod.WEEKLY
     # 直近7日分なので、件数は 1 のみ
     assert summary.total_events == 1
-    
+
+
 def test_daily_report_contains_metric_aggregates_for_events() -> None:
     service = MonitoringService(
         latency_warning_threshold_s=10.0,

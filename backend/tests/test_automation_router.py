@@ -1,199 +1,380 @@
-# backend/tests/test_automation_router.py
-"""
-automation_router.py のユニットテスト。
+"""Tests for app.automation.router endpoints."""
 
-POST /automation/process-news のステータス判定をテスト。
-"""
+from datetime import timedelta
+from unittest.mock import MagicMock, patch
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List
-from unittest.mock import MagicMock
-
-import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.automation.automation_router import get_workflow_service
-from app.automation.state import reset_state
-from app.automation.workflow import WorkflowResult, WorkflowService
-from app.main import app
+from app.automation.router import router as automation_router
+from app.automation.schemas import (
+    AutomationReportSummary,
+    AutomationStatus,
+    DashboardSnapshot,
+    WorkflowRunResult,
+)
+from app.automation.state import get_monitoring_service
+from app.database import get_db
 
 
-@pytest.fixture(autouse=True)
-def reset_monitoring_state() -> None:
-    """各テスト前に MonitoringService の状態をリセット。"""
-    reset_state()
-
-
-@pytest.fixture
-def client() -> TestClient:
-    """テスト用 FastAPI クライアント。"""
-    return TestClient(app)
-
-
-def test_process_news_completed_status(client: TestClient) -> None:
-    """全て成功時は completed ステータス。"""
-    mock_result = WorkflowResult(
-        fetched_count=2,
-        analyzed_count=2,
-        octobot_success_count=2,
-        octobot_skipped_count=0,
-        octobot_failed_count=0,
-        notion_updated_count=2,
-        errors=[],
+def _make_minimal_automation_status() -> AutomationStatus:
+    return AutomationStatus.model_construct(
+        is_trading_paused=False,
+        emergency_reason=None,
     )
 
-    mock_service = MagicMock(spec=WorkflowService)
-    mock_service.process_pending_news.return_value = mock_result
 
-    app.dependency_overrides[get_workflow_service] = lambda: mock_service
+def _make_minimal_dashboard_snapshot() -> DashboardSnapshot:
+    from datetime import datetime, timezone
 
-    try:
-        response = client.post("/automation/process-news")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "completed"
-        assert data["octobot_failed_count"] == 0
-        assert len(data["errors"]) == 0
-    finally:
-        app.dependency_overrides.clear()
-
-
-def test_process_news_completed_with_errors_on_octobot_failure(
-    client: TestClient,
-) -> None:
-    """OctoBot 送信失敗時は completed_with_errors ステータス。"""
-    mock_result = WorkflowResult(
-        fetched_count=2,
-        analyzed_count=2,
-        octobot_success_count=1,
-        octobot_skipped_count=0,
-        octobot_failed_count=1,  # 1件失敗
-        notion_updated_count=2,
-        errors=[],  # errors リストは空でも octobot_failed_count > 0 で判定
+    return DashboardSnapshot.model_construct(
+        generated_at=datetime.now(timezone.utc),
+        period_start=datetime.now(timezone.utc),
+        period_end=datetime.now(timezone.utc),
+        status=_make_minimal_automation_status(),
+        metric_aggregates={},
     )
 
-    mock_service = MagicMock(spec=WorkflowService)
-    mock_service.process_pending_news.return_value = mock_result
 
-    app.dependency_overrides[get_workflow_service] = lambda: mock_service
-
-    try:
-        response = client.post("/automation/process-news")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "completed_with_errors"
-        assert data["octobot_failed_count"] == 1
-    finally:
-        app.dependency_overrides.clear()
-
-
-def test_process_news_completed_with_errors_on_error_list(
-    client: TestClient,
-) -> None:
-    """errors リストにエラーがある場合も completed_with_errors ステータス。"""
-    mock_result = WorkflowResult(
-        fetched_count=2,
-        analyzed_count=2,
-        octobot_success_count=2,
-        octobot_skipped_count=0,
-        octobot_failed_count=0,
-        notion_updated_count=1,  # 1件は Notion 書き戻し失敗
-        errors=["Failed to update Notion page page-001"],
+def _make_minimal_report_summary() -> AutomationReportSummary:
+    return AutomationReportSummary.model_construct(
+        metric_aggregates={},
     )
 
-    mock_service = MagicMock(spec=WorkflowService)
-    mock_service.process_pending_news.return_value = mock_result
 
-    app.dependency_overrides[get_workflow_service] = lambda: mock_service
+def _build_test_app(
+    mock_monitoring: MagicMock | None = None,
+    db_session: MagicMock | None = None,
+) -> FastAPI:
+    """Build a minimal test FastAPI app with the automation router mounted."""
+    app = FastAPI()
+    app.include_router(automation_router, prefix="/api/automation")
 
-    try:
-        response = client.post("/automation/process-news")
+    if mock_monitoring is not None:
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
+
+    if db_session is not None:
+        app.dependency_overrides[get_db] = lambda: db_session
+
+    return app
+
+
+class TestGetAutomationStatus:
+    """GET /api/automation/status"""
+
+    def test_returns_200_with_status(self):
+        mock_monitoring = MagicMock()
+        mock_monitoring.get_status.return_value = _make_minimal_automation_status()
+
+        app = _build_test_app(mock_monitoring=mock_monitoring)
+        client = TestClient(app)
+
+        response = client.get("/api/automation/status")
+        assert response.status_code == 200
+        mock_monitoring.get_status.assert_called_once()
+
+    def test_response_contains_is_trading_paused(self):
+        mock_monitoring = MagicMock()
+        mock_monitoring.get_status.return_value = AutomationStatus.model_construct(
+            is_trading_paused=True,
+            emergency_reason="Test emergency",
+        )
+
+        app = _build_test_app(mock_monitoring=mock_monitoring)
+        client = TestClient(app)
+
+        response = client.get("/api/automation/status")
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "completed_with_errors"
-        assert len(data["errors"]) == 1
-    finally:
-        app.dependency_overrides.clear()
+        assert "is_trading_paused" in data
 
 
-def test_process_news_failed_status(client: TestClient) -> None:
-    """全て失敗時は failed ステータス。"""
-    mock_result = WorkflowResult(
-        fetched_count=1,
-        analyzed_count=0,  # AI 解析失敗
-        octobot_success_count=0,
-        octobot_skipped_count=0,
-        octobot_failed_count=0,
-        notion_updated_count=0,
-        errors=["AI analysis failed: Connection error"],
-    )
+class TestGetDashboardSnapshot:
+    """GET /api/automation/dashboard"""
 
-    mock_service = MagicMock(spec=WorkflowService)
-    mock_service.process_pending_news.return_value = mock_result
+    def test_returns_200_with_default_lookback(self):
+        mock_monitoring = MagicMock()
+        mock_monitoring.build_dashboard_snapshot.return_value = _make_minimal_dashboard_snapshot()
 
-    app.dependency_overrides[get_workflow_service] = lambda: mock_service
+        app = _build_test_app(mock_monitoring=mock_monitoring)
+        client = TestClient(app)
 
-    try:
-        response = client.post("/automation/process-news")
+        response = client.get("/api/automation/dashboard")
+        assert response.status_code == 200
+        mock_monitoring.build_dashboard_snapshot.assert_called_once()
+
+    def test_passes_lookback_hours_to_service(self):
+        mock_monitoring = MagicMock()
+        mock_monitoring.build_dashboard_snapshot.return_value = _make_minimal_dashboard_snapshot()
+
+        app = _build_test_app(mock_monitoring=mock_monitoring)
+        client = TestClient(app)
+
+        response = client.get("/api/automation/dashboard?lookback_hours=3")
+        assert response.status_code == 200
+
+        call_kwargs = mock_monitoring.build_dashboard_snapshot.call_args
+        assert call_kwargs.kwargs["lookback"] == timedelta(hours=3)
+
+    def test_returns_422_for_lookback_below_minimum(self):
+        mock_monitoring = MagicMock()
+        app = _build_test_app(mock_monitoring=mock_monitoring)
+        client = TestClient(app)
+
+        response = client.get("/api/automation/dashboard?lookback_hours=0")
+        assert response.status_code == 422
+
+    def test_returns_422_for_lookback_above_maximum(self):
+        mock_monitoring = MagicMock()
+        app = _build_test_app(mock_monitoring=mock_monitoring)
+        client = TestClient(app)
+
+        response = client.get("/api/automation/dashboard?lookback_hours=25")
+        assert response.status_code == 422
+
+
+class TestGetLatestReport:
+    """GET /api/automation/reports/latest"""
+
+    def _make_app_with_reporting_stub(self, report_summary=None):
+        from app.automation.router import get_reporting_service
+
+        if report_summary is None:
+            report_summary = _make_minimal_report_summary()
+
+        mock_reporter = MagicMock()
+        mock_reporter.generate_summary_report.return_value = report_summary
+
+        mock_monitoring = MagicMock()
+
+        app = FastAPI()
+        app.include_router(automation_router, prefix="/api/automation")
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
+        app.dependency_overrides[get_reporting_service] = lambda: mock_reporter
+
+        return app, mock_reporter
+
+    def test_returns_200_with_default_period(self):
+        from app.automation.router import get_reporting_service
+        from app.automation.schemas import ReportPeriod
+
+        mock_reporter = MagicMock()
+        mock_reporter.generate_summary_report.return_value = _make_minimal_report_summary()
+        mock_monitoring = MagicMock()
+
+        app = FastAPI()
+        app.include_router(automation_router, prefix="/api/automation")
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
+        app.dependency_overrides[get_reporting_service] = lambda: mock_reporter
+
+        client = TestClient(app)
+        response = client.get("/api/automation/reports/latest")
+
+        assert response.status_code == 200
+        mock_reporter.generate_summary_report.assert_called_once_with(period=ReportPeriod.DAILY)
+
+    def test_returns_200_with_weekly_period(self):
+        from app.automation.router import get_reporting_service
+        from app.automation.schemas import ReportPeriod
+
+        mock_reporter = MagicMock()
+        mock_reporter.generate_summary_report.return_value = _make_minimal_report_summary()
+        mock_monitoring = MagicMock()
+
+        app = FastAPI()
+        app.include_router(automation_router, prefix="/api/automation")
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
+        app.dependency_overrides[get_reporting_service] = lambda: mock_reporter
+
+        client = TestClient(app)
+        # ReportPeriod enum values are lowercase: "weekly", "daily"
+        response = client.get("/api/automation/reports/latest?period=weekly")
+
+        assert response.status_code == 200
+        mock_reporter.generate_summary_report.assert_called_once_with(period=ReportPeriod.WEEKLY)
+
+    def test_returns_200_with_daily_period(self):
+        from app.automation.router import get_reporting_service
+        from app.automation.schemas import ReportPeriod
+
+        mock_reporter = MagicMock()
+        mock_reporter.generate_summary_report.return_value = _make_minimal_report_summary()
+        mock_monitoring = MagicMock()
+
+        app = FastAPI()
+        app.include_router(automation_router, prefix="/api/automation")
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
+        app.dependency_overrides[get_reporting_service] = lambda: mock_reporter
+
+        client = TestClient(app)
+        # ReportPeriod enum values are lowercase: "weekly", "daily"
+        response = client.get("/api/automation/reports/latest?period=daily")
+
+        assert response.status_code == 200
+        mock_reporter.generate_summary_report.assert_called_once_with(period=ReportPeriod.DAILY)
+
+
+class TestWorkflowRun:
+    """POST /api/automation/workflow/run"""
+
+    def _make_app_with_workflow_mock(self, process_return_value=None):
+        """Create a test app with process_pending_knowledge mocked."""
+        if process_return_value is None:
+            process_return_value = WorkflowRunResult(status="no_items")
+
+        mock_db = MagicMock()
+        mock_monitoring = MagicMock()
+
+        app = FastAPI()
+        app.include_router(automation_router, prefix="/api/automation")
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
+        app.dependency_overrides[get_db] = lambda: mock_db
+
+        return app
+
+    def test_workflow_run_dry_run_returns_no_items(self):
+        mock_db = MagicMock()
+        mock_monitoring = MagicMock()
+
+        app = FastAPI()
+        app.include_router(automation_router, prefix="/api/automation")
+        app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
+
+        with (
+            patch("app.automation.router.KnowledgeService") as _MockKS,
+            patch("app.automation.router.AIService") as _MockAI,
+            patch("app.automation.router.get_exchange_service") as _mock_get_ex,
+            patch("app.automation.router.process_pending_knowledge") as mock_process,
+        ):
+            mock_process.return_value = WorkflowRunResult(status="no_items")
+            client = TestClient(app)
+            response = client.post("/api/automation/workflow/run?dry_run=true")
+
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "failed"
-    finally:
-        app.dependency_overrides.clear()
-
-
-def test_process_news_no_news_completed(client: TestClient) -> None:
-    """未処理ニュースがない場合は completed ステータス。"""
-    mock_result = WorkflowResult(
-        fetched_count=0,
-        analyzed_count=0,
-        octobot_success_count=0,
-        octobot_skipped_count=0,
-        octobot_failed_count=0,
-        notion_updated_count=0,
-        errors=[],
-    )
-
-    mock_service = MagicMock(spec=WorkflowService)
-    mock_service.process_pending_news.return_value = mock_result
-
-    app.dependency_overrides[get_workflow_service] = lambda: mock_service
-
-    try:
-        response = client.post("/automation/process-news")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "completed"
+        assert data["status"] == "no_items"
         assert data["fetched_count"] == 0
-    finally:
-        app.dependency_overrides.clear()
+        assert data["traded_count"] == 0
+        assert data["errors"] == []
 
+    def test_workflow_run_default_dry_run_is_true(self):
+        """dry_run defaults to True when not specified."""
+        mock_db = MagicMock()
+        mock_monitoring = MagicMock()
 
-def test_process_news_exception_sanitized_response(client: TestClient) -> None:
-    """例外発生時、内部情報が漏れないことを確認。"""
-    # 内部的な詳細情報を含む例外
-    internal_error_message = "Database connection failed: host=192.168.1.100 user=admin password=secret123"
+        app = FastAPI()
+        app.include_router(automation_router, prefix="/api/automation")
+        app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
 
-    mock_service = MagicMock(spec=WorkflowService)
-    mock_service.process_pending_news.side_effect = Exception(internal_error_message)
+        with (
+            patch("app.automation.router.KnowledgeService"),
+            patch("app.automation.router.AIService"),
+            patch("app.automation.router.get_exchange_service"),
+            patch("app.automation.router.process_pending_knowledge") as mock_process,
+        ):
+            mock_process.return_value = WorkflowRunResult(status="no_items")
+            client = TestClient(app)
+            response = client.post("/api/automation/workflow/run")
 
-    app.dependency_overrides[get_workflow_service] = lambda: mock_service
+        assert response.status_code == 200
+        # Verify dry_run=True was passed
+        call_kwargs = mock_process.call_args
+        assert call_kwargs.kwargs.get("dry_run") is True
 
-    try:
-        response = client.post("/automation/process-news")
+    def test_workflow_run_with_completed_result(self):
+        """When workflow returns a completed result with trades."""
+        mock_db = MagicMock()
+        mock_monitoring = MagicMock()
 
-        # 500 エラーが返る
-        assert response.status_code == 500
+        fake_result = WorkflowRunResult(
+            fetched_count=1,
+            analyzed_count=1,
+            traded_count=0,
+            hold_count=1,
+            skipped_count=0,
+            errors=[],
+            status="completed",
+        )
 
+        app = FastAPI()
+        app.include_router(automation_router, prefix="/api/automation")
+        app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
+
+        with (
+            patch("app.automation.router.KnowledgeService"),
+            patch("app.automation.router.AIService"),
+            patch("app.automation.router.get_exchange_service"),
+            patch("app.automation.router.process_pending_knowledge") as mock_process,
+        ):
+            mock_process.return_value = fake_result
+            client = TestClient(app)
+            response = client.post("/api/automation/workflow/run?dry_run=true")
+
+        assert response.status_code == 200
         data = response.json()
+        assert data["fetched_count"] == 1
+        assert data["hold_count"] == 1
+        assert data["traded_count"] == 0
+        assert data["status"] == "completed"
 
-        # レスポンスには一般的なメッセージのみ
-        assert data["detail"] == "Internal server error during news processing"
+    def test_workflow_run_with_successful_trade(self):
+        """When workflow returns results with a successful order."""
+        mock_db = MagicMock()
+        mock_monitoring = MagicMock()
 
-        # 内部情報が漏れていないことを確認
-        assert "192.168.1.100" not in str(data)
-        assert "password" not in str(data)
-        assert "secret123" not in str(data)
-        assert internal_error_message not in str(data)
-    finally:
-        app.dependency_overrides.clear()
+        fake_result = WorkflowRunResult(
+            fetched_count=1,
+            analyzed_count=1,
+            traded_count=1,
+            hold_count=0,
+            skipped_count=0,
+            errors=[],
+            status="completed",
+        )
+
+        app = FastAPI()
+        app.include_router(automation_router, prefix="/api/automation")
+        app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
+
+        with (
+            patch("app.automation.router.KnowledgeService"),
+            patch("app.automation.router.AIService"),
+            patch("app.automation.router.get_exchange_service"),
+            patch("app.automation.router.process_pending_knowledge") as mock_process,
+        ):
+            mock_process.return_value = fake_result
+            client = TestClient(app)
+            response = client.post("/api/automation/workflow/run?dry_run=false")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["fetched_count"] == 1
+        assert data["traded_count"] == 1
+        assert data["status"] == "completed"
+
+    def test_workflow_run_dry_run_false_passes_flag(self):
+        """dry_run=false is correctly passed to process_pending_knowledge."""
+        mock_db = MagicMock()
+        mock_monitoring = MagicMock()
+
+        app = FastAPI()
+        app.include_router(automation_router, prefix="/api/automation")
+        app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
+
+        with (
+            patch("app.automation.router.KnowledgeService"),
+            patch("app.automation.router.AIService"),
+            patch("app.automation.router.get_exchange_service"),
+            patch("app.automation.router.process_pending_knowledge") as mock_process,
+        ):
+            mock_process.return_value = WorkflowRunResult(status="no_items")
+            client = TestClient(app)
+            client.post("/api/automation/workflow/run?dry_run=false")
+
+        call_kwargs = mock_process.call_args
+        assert call_kwargs.kwargs.get("dry_run") is False

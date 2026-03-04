@@ -53,4 +53,3 @@ def test_notion_ingest_error():
         resp = client.post("/notion/ingest")
 
     assert resp.status_code >= 500
-

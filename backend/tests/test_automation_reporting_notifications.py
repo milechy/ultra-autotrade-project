@@ -1,12 +1,11 @@
 # backend/tests/test_automation_reporting_notifications.py
 
 from datetime import datetime, timezone
-from decimal import Decimal
 
+from app.automation.monitoring_service import MonitoringService
 from app.automation.reporting_service import ReportingService
 from app.automation.schemas import AutomationReportSummary, ReportPeriod
 from app.notifications.schemas import NotificationChannel, NotificationSeverity
-from app.automation.monitoring_service import MonitoringService
 
 
 def _utc(year: int, month: int, day: int, hour: int = 0, minute: int = 0) -> datetime:

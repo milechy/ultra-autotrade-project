@@ -9,9 +9,9 @@ OctoBot 連携モジュール。
 """
 
 from .config import OctoBotSettings, get_octobot_settings  # noqa: F401
-from .service import OctoBotService  # noqa: F401
 from .schemas import (  # noqa: F401
     OctoBotSignal,
     OctoBotSignalRequest,
     OctoBotSignalResponse,
 )
+from .service import OctoBotService  # noqa: F401

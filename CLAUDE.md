@@ -11,14 +11,14 @@ Based on:
 ## Claude Code 設定
 
 ### グローバル設定
-**ファイル**: `~/.claude/settings.json`
+**ファイル:** `~/.claude/settings.json`
 ```json
 {
   "cleanupPeriodDays": 99999
 }
 ```
-- **効果**: メモリ永続化（プロジェクトコンテキスト長期保持）
-- **デフォルト**: 30日（短すぎる）
+- **効果:** メモリ永続化（プロジェクトコンテキスト長期保持）
+- **デフォルト:** 30日（短すぎる）
 
 ---
 
@@ -47,176 +47,136 @@ Based on:
 
 ---
 
-## プロジェクト固有の重要原則
+## Definition of Done (DoD)
 
-### Fail-Closed Design
-- エラー時は安全側（停止）に倒す
-- state.json パースエラー -> `emergency_stop=True`
-- RPC接続エラー -> NOOP返却
+コード変更をコミットする前に、以下をすべて通過させること:
 
-### 二重安全機構
-- **Backend**: `emergency_stop` (monitoring_service)
-- **Infrastructure**: `circuit_closed` (nginx)
-- どちらか一方が有効なら動作抑止
+1. `ruff check .` — lint エラー 0
+2. `ruff format --check .` — フォーマット違反 0
+3. `mypy app/ --config-file ../pyproject.toml` — 型エラー 0
+4. `pytest tests/ --cov=app --cov-fail-under=80 -q` — 全テスト通過 + coverage 80%+
+5. `ruff check . --select S` — セキュリティ警告の確認（新規の critical なし）
 
-### Code Preference: Explicit Error Handling
-```python
-# Bad: Silent failure
-try:
-    risky_operation()
-except:
-    pass
+### Core Principles (3つのみ)
 
-# Good: Explicit propagation
-try:
-    risky_operation()
-except SpecificError as exc:
-    logger.error("Operation failed: %s", exc)
-    raise SafetyError(f"Cannot proceed: {exc}") from exc
+1. **Simplicity First** — 最小限の変更で目的を達成する。過剰な抽象化・将来対応は不要
+2. **No Laziness** — テスト・lint・フォーマットを省略しない。verify コマンドで確認
+3. **Minimal Impact** — 既存コードへの影響を最小化。変更はスコープ内に限定
+
+---
+
+## Architecture
+
+- Backend: FastAPI (Python 3.11) — Hetzner VPS (Docker Compose)
+- Frontend: Next.js App Router + shadcn/ui + TailwindCSS — Cloudflare Pages
+- DB: PostgreSQL 16 + pgvector (HNSW index, NOT IVFFlat)
+- Exchange: Bybit (primary, via ccxt) + OKX (backup)
+- Aave: V3 on Polygon/Arbitrum (web3.py)
+- AI: Claude Opus 4.6 (primary judge) + GPT-4o (cross-verify on BUY/SELL only)
+- Proxy/DNS: Cloudflare Tunnel → Hetzner backend
+- Notion: 完全撤去 → Knowledge Hub (PostgreSQL + pgvector)
+
+---
+
+## Security Rules (ABSOLUTE — docs/13_security_design.md)
+
+1. Private keys: environment variables ONLY. Never hardcode. Never log.
+2. Health Factor < 1.6 → automatic HARD_STOP
+3. Max single trade: 10% of total assets
+4. Max daily trades: 30% of total assets
+5. Cooldown: 10 minutes between Aave operations
+6. Emergency stop flag: OR logic — manual stop can NEVER be overwritten
+7. .env.staging and .env.production MUST use physically different keys
+8. No tokens/keys in logs — mask to first 6 + last 4 chars
+9. main branch: no direct push, PR + review required
+10. LLM output MUST be JSON Schema validated — parse failure → HOLD
+11. Financial calculations: Decimal type ONLY (never float)
+
+---
+
+## Execution Order (Rule Engine BEFORE LLM)
+
+1. Rule engine: HF < 1.6? → HOLD (skip LLM call, save cost)
+2. Rule engine: cooldown active? → HOLD
+3. Rule engine: daily limit 30% reached? → HOLD
+4. RAG: Knowledge Hub → context generation
+5. Phase A: Claude Opus judgment → JSON
+6. Phase B: (conditional) GPT-4o cross-verify on BUY/SELL
+7. Rule engine: final guardrail check
+8. Execution: ccxt → Bybit
+
+---
+
+## Key API Endpoints
+
+- POST /knowledge/items — register knowledge (replaces /notion/ingest)
+- GET  /knowledge/items?status=pending — fetch unprocessed items
+- POST /knowledge/search — RAG vector search
+- POST /ai/analyze — multi-LLM BUY/SELL/HOLD judgment
+- POST /octobot/signal — OctoBot signals
+- POST /aave/rebalance — Aave deposit/withdraw with safety
+- POST /exchange/order — ccxt → Bybit order execution
+- GET  /exchange/status — exchange connection & balance
+
+---
+
+## Directory Structure
+
+```
+backend/app/
+├── knowledge/     # NEW: PostgreSQL + pgvector (replaces notion/)
+│   ├── schemas.py, client.py, service.py, router.py
+├── exchange/      # NEW: ccxt abstraction (Bybit/OKX)
+│   ├── client.py, schemas.py, service.py, router.py
+├── ai/            # ENHANCED: multi-LLM judge + JSON Schema
+├── aave/          # UPGRADE: DummyClient → web3.py
+├── bots/          # KEEP: OctoBot signals
+├── automation/    # KEEP: monitoring, reporting, emergency stop
+└── notifications/ # KEEP: Slack/LINE
 ```
 
 ---
 
-## テスト戦略
+## マルチLLM開発ワークフロー
 
-### ユニットテスト
-- 外部依存はモック（Web3, Notion API等）
-- 既存テストを壊さない
-- 新機能には必ずテスト追加
+### ロール割り当て
+| LLM | ロール | 使うタイミング |
+|-----|--------|---------------|
+| **Claude Opus 4.6** | アーキテクト & インテグレーター | 新モジュール設計、Aave/セキュリティ、統合レビュー |
+| **Claude Sonnet 4.5** | 高速実装 (デフォルト) | 実装80%、テスト、バグ修正、ドキュメント |
+| **Claude Haiku 4.5** | インフラ & ユーティリティ | Docker、CI/CD、シェルスクリプト |
+| **Codex 5.3** | 自動レビュアー | PR作成→GitHub Actions自動実行 |
+| **GPT-4o** | クロス判定 (本番のみ) | BUY/SELL判定のPhase B、仕様書共同作成 |
 
-### 統合テスト
-- `@pytest.mark.integration` を使用
-- テストネット（Mumbai）で実施
-- 少額（< 10 USD相当）でテスト
+### デバッグ昇格ルール
+- フロントエンド / 一般バグ → Sonnet で開始
+- 複雑 or 解決しない → Opus に昇格 (`claude --model opus`)
+- Aave / セキュリティ → 最初から Opus
+- CI / Docker → Haiku (`claude --model haiku`)
 
-### E2Eテスト
-- staging環境でのみ実施
-- Notion -> AI -> OctoBot -> Aave の全フロー
-
----
-
-## 禁止事項
-
-- `.env.staging` のコミット
-- 本番ウォレットの使用
-- `emergency_stop` の無効化
-- エラーをsilentに握りつぶすコード
-- 500行を超える単一ファイル（分割推奨）
-
----
-
-## 参照ドキュメント
-
-### 設計ドキュメント（Single Source of Truth）
-- `docs/07_aave_operation_logic.md`: Aave運用ルール
-- `docs/08_automation_rules.md`: 監視・アラート
-- `docs/13_security_design.md`: セキュリティ設計
-- `docs/14_test_strategy.md`: テスト戦略
-
-### Skills
-- `ultra-autotrade-context`: プロジェクト全体像
-- `aave-development`: Aave実装ガイド
-- `state-management`: state.json管理
-
----
-
-## Phase 進捗
-
-## 現在の状態（Phase 12 完了）
-
-**完了した主要機能:**
-- ✅ Notion → AI → OctoBot → Notion 自動ワークフロー（5分ごと自動実行）
-- ✅ Frontend dashboard（日本語化完了）
-- ✅ Partner testing environment（staging: 77.42.46.155）
-- ✅ 認証システム（SQLite-based）
-- ✅ 193+ passing tests
-- ✅ 25+ ドキュメント
-
-**環境:**
-- Development: Codespaces
-- Staging: 77.42.46.155 (testnet)
-  - Frontend: http://77.42.46.155:3000
-  - Backend: http://77.42.46.155:8000
-- Production: 未デプロイ
-
-**Tech Stack:**
-- Backend: FastAPI (Python 3.11+)
-- Frontend: Next.js + Mantine UI（日本語化済み）
-- Database: Notion, SQLite
-- Infrastructure: Docker Compose, Hetzner Cloud
+### ブランチ戦略
+```
+feature/* (各LLM担当) → dev (Opus統合) → staging (Codex最終レビュー) → main
 ```
 
 ---
 
-### Step 4: 保存 & 再起動
+## Testing (docs/14_test_strategy.md)
 
-1. **Ctrl+S / Cmd+S** で保存
-2. **Cmd+Shift+P → "Developer: Reload Window"**
-
----
-
-### Step 5: 動作確認
-
-Claude Code で新しい会話:
-```
-Ultra AutoTrade プロジェクトの現在のフェーズは？
-```
-
-**期待される回答:**
-```
-Phase 12 が完了しています。主な成果:
-- Notion → AI → OctoBot 自動ワークフロー
-- UI 日本語化
-- Partner testing 環境（staging）
-- 193+ テスト
+- Unit: pytest + mypy strict + ruff
+- LLM: VCR replay (record once, replay in CI = zero API cost)
+- E2E: Playwright (mobile viewport)
+- Aave: Sepolia testnet before mainnet
+- Exchange: Bybit Sandbox API
+- Coverage gate: 80%+
+- CI: GitHub Actions (lint → test → security-check → codex-review)
 
 ---
 
-## Tips
+## Current Phase: PoC (Local)
 
-### Plan モードの活用
-```
-User: "Web3AaveClient を実装して"
-
-期待される動作:
-1. Skills読み込み（aave-development）
-2. 実行計画表示（変更ファイル・差分）
-3. ユーザー承認待ち
-4. 承認後に実行
-```
-
-### Incremental Development
-- 1コミットあたり5ファイル以下
-- 1ファイルあたり500行以下（警告）
-- PRはできるだけ小さく
-
-### Error Handling
-- 過度なtry-exceptは避ける
-- エラーは明確に伝播させる
-- ログには詳細を残す
-
-### Memory Persistence
-- `~/.claude/settings.json` で永続化済み
-- プロジェクトコンテキストを長期保持
-- 再起動してもコンテキスト維持
-
----
-
-## クイックコマンド
-
-```bash
-# テスト実行
-python -m pytest backend/tests/ -v
-
-# Aave関連テストのみ
-python -m pytest backend/tests/test_aave*.py -v
-
-# カバレッジ
-python -m pytest backend/tests/ --cov=backend/app --cov-report=html
-
-# 型チェック（mypy）
-mypy backend/app/
-
-# フォーマット（black）
-black backend/
-```
+- Goal: Knowledge input → RAG → AI judge → Bybit Sandbox order, end-to-end
+- Stack: Docker Compose local (PostgreSQL + pgvector + FastAPI)
+- NO frontend needed yet — curl + pytest only
+- Bybit: Sandbox mode (sandbox=True)
+- AI: Claude Opus → JSON → validate → execute OR hold

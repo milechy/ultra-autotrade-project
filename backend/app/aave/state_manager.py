@@ -310,15 +310,12 @@ class AaveStateManager:
                     self._last_read_error = None
                     self._consecutive_errors = 0
                     self._last_retry_attempt = None
-                    logger.info(
-                        "state.json successfully recovered from persistent error"
-                    )
+                    logger.info("state.json successfully recovered from persistent error")
                     return is_state_stale(state)
                 except StateFileNotFoundError:
                     # ファイルが削除された → 初回起動扱い
                     logger.info(
-                        "state.json was deleted; treating as NOT stale "
-                        "(reset to initial state)"
+                        "state.json was deleted; treating as NOT stale (reset to initial state)"
                     )
                     self._last_read_error = None
                     self._consecutive_errors = 0
@@ -380,9 +377,7 @@ class AaveStateManager:
             # パースエラー = 壊れている → stale (fail-closed)
             self._last_read_error = e
             self._consecutive_errors = 1
-            logger.warning(
-                "state.json parse error in is_stale(): %s; treating as stale", e
-            )
+            logger.warning("state.json parse error in is_stale(): %s; treating as stale", e)
             return True
 
         # 3. タイムスタンプチェック

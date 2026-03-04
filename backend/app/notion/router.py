@@ -33,4 +33,3 @@ def ingest_from_notion() -> NotionIngestResponse:
         ) from exc
 
     return NotionIngestResponse(items=items, count=len(items))
-

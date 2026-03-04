@@ -15,7 +15,6 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.database import get_db
 from app.auth.dependencies import require_active_user, require_admin
 from app.auth.models import User
 from app.auth.schemas import (
@@ -24,6 +23,7 @@ from app.auth.schemas import (
     UserUpdateRequest,
 )
 from app.auth.service import AuthService
+from app.database import get_db
 
 logger = logging.getLogger(__name__)
 

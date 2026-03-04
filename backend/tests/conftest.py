@@ -13,21 +13,13 @@ import sys
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 
-@pytest.fixture()
-def client():
-    app = create_app()
-    return TestClient(app)
 
 def _ensure_project_root_in_sys_path() -> None:
-    # This file is located at: backend/tests/conftest.py
-    # parents[1] -> backend/
     project_root = Path(__file__).resolve().parents[1]
     project_root_str = str(project_root)
 
     if project_root_str not in sys.path:
-        # Insert at the beginning so it has priority over site-packages, etc.
         sys.path.insert(0, project_root_str)
 
 
@@ -40,21 +32,23 @@ def _ensure_test_env_vars() -> None:
     """
     os.environ.setdefault("NOTION_API_KEY", "dummy-notion-api-key-for-tests")
     os.environ.setdefault("NOTION_DATABASE_ID", "dummy-notion-db-id-for-tests")
-    # 将来必要になりそうなキーも、必要に応じてここに追加していける
+    os.environ.setdefault("OPENAI_API_KEY", "dummy-openai-key-for-tests")
+    os.environ.setdefault("ANTHROPIC_API_KEY", "dummy-anthropic-key-for-tests")
+    os.environ.setdefault("BYBIT_API_KEY", "dummy-bybit-key-for-tests")
+    os.environ.setdefault("BYBIT_API_SECRET", "dummy-bybit-secret-for-tests")
+    os.environ.setdefault("BYBIT_SANDBOX", "true")
+    os.environ.setdefault("EXCHANGE_CLIENT_TYPE", "dummy")
 
 
 _ensure_project_root_in_sys_path()
 _ensure_test_env_vars()
 
-import pytest
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.main import create_app  # noqa: E402
 
 
 @pytest.fixture()
 def client():
-    # sys.path を conftest 冒頭で調整した後に import させる（遅延import）
-    from fastapi.testclient import TestClient
-    from app.main import create_app
-
     app = create_app()
     return TestClient(app)
-

@@ -9,7 +9,6 @@ python-async-patterns.md の「Pattern 8: Testing Async Code」に準拠。
 import asyncio
 from decimal import Decimal
 from typing import Optional
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 

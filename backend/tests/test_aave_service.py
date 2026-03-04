@@ -6,7 +6,6 @@ from typing import Optional
 
 import pytest
 
-from app.ai.schemas import TradeAction
 from app.aave.config import AaveSettings
 from app.aave.schemas import (
     AaveOperationMode,
@@ -15,6 +14,7 @@ from app.aave.schemas import (
     AaveSystemState,
 )
 from app.aave.service import AaveService
+from app.ai.schemas import TradeAction
 
 
 class FakeAaveClient:
@@ -81,9 +81,11 @@ class FakeMonitoringService:
     def record_health_factor(self, value: Optional[Decimal], *, at=None):
         """ヘルスファクターを記録（テスト用ダミー）"""
         self._last_health_factor = value
+
         # HealthFactorStatus の代わりにシンプルなオブジェクトを返す
         class FakeHFStatus:
             is_emergency = False
+
         return FakeHFStatus()
 
 
@@ -707,9 +709,9 @@ def test_normal_default_state_values() -> None:
 
 def test_parse_error_returns_safe_default() -> None:
     """AaveStateManager.read_state() がパースエラー時に安全側デフォルトを返すこと。"""
+    import os
     import tempfile
     from pathlib import Path
-    import os
 
     from app.aave.state_manager import AaveStateManager
 
@@ -796,9 +798,9 @@ def test_parse_error_blocks_all_operations() -> None:
 
 def test_file_not_found_returns_normal_default() -> None:
     """state.json が存在しない場合は通常のデフォルト（運用可能状態）を返すこと。"""
+    import os
     import tempfile
     from pathlib import Path
-    import os
 
     from app.aave.state_manager import AaveStateManager
 
@@ -859,9 +861,9 @@ def test_retry_throttle_within_interval() -> None:
 
 def test_retry_throttle_after_interval_still_broken() -> None:
     """リトライ間隔経過後、再読み取りを試みるがまだ壊れている場合。"""
+    import os
     import tempfile
     from pathlib import Path
-    import os
 
     from app.aave.state_manager import AaveStateManager, StateFileParseError
 
@@ -900,10 +902,10 @@ def test_retry_throttle_after_interval_still_broken() -> None:
 
 def test_retry_throttle_recovery_after_interval() -> None:
     """リトライ間隔経過後、ファイルが修復されていれば回復すること。"""
+    import json
+    import os
     import tempfile
     from pathlib import Path
-    import os
-    import json
 
     from app.aave.state_manager import AaveStateManager, StateFileParseError
 
