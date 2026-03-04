@@ -1,0 +1,117 @@
+name: Codex Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  codex-review:
+    name: Codex 5.3 Auto Review
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install review dependencies
+        run: pip install openai httpx
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > /tmp/pr_diff.patch
+          echo "diff_size=$(wc -c < /tmp/pr_diff.patch)" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if diff is empty
+        if: steps.diff.outputs.diff_size == '0'
+        run: echo "No diff to review." && exit 0
+
+      - name: Run Codex review
+        id: review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python scripts/codex_review.py \
+            --diff /tmp/pr_diff.patch \
+            --security-doc docs/13_security_design.md \
+            --output /tmp/review_result.json
+
+      - name: Post review comment
+        if: always() && steps.review.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const result = JSON.parse(fs.readFileSync('/tmp/review_result.json', 'utf8'));
+
+            let body = `## 🤖 Codex Review\n\n`;
+            body += `**Security Check:** ${result.security_ok ? '✅ PASS' : '❌ FAIL'}\n`;
+            body += `**Test Coverage:** ${result.test_coverage_ok ? '✅ OK' : '⚠️ Needs attention'}\n\n`;
+
+            if (result.issues && result.issues.length > 0) {
+              body += `### Issues Found\n\n`;
+              for (const issue of result.issues) {
+                const icon = issue.severity === 'critical' ? '🔴' :
+                             issue.severity === 'warning' ? '🟡' : '🔵';
+                body += `${icon} **[${issue.severity.toUpperCase()}]** ${issue.message}\n`;
+                if (issue.file) body += `  📁 \`${issue.file}\``;
+                if (issue.line) body += ` (L${issue.line})`;
+                body += `\n\n`;
+              }
+            } else {
+              body += `No issues found. ✨\n`;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: body,
+            });
+
+      - name: Notify Slack on critical issues
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -s -X POST "$SLACK_WEBHOOK_URL" \
+              -H 'Content-Type: application/json' \
+              -d "{
+                \"text\": \"🔴 Codex Review: Critical issues found in PR #${{ github.event.pull_request.number }}\",
+                \"blocks\": [{
+                  \"type\": \"section\",
+                  \"text\": {
+                    \"type\": \"mrkdwn\",
+                    \"text\": \"*🔴 Codex Review — Critical Issues*\n• PR: <${{ github.event.pull_request.html_url }}|#${{ github.event.pull_request.number }} ${{ github.event.pull_request.title }}>\n• Branch: \`${{ github.head_ref }}\`\"
+                  }
+                }]
+              }"
+          fi
+
+      - name: Fail on critical issues
+        if: always() && steps.review.outcome == 'success'
+        run: |
+          if [ -f /tmp/review_result.json ]; then
+            python -c "
+            import json, sys
+            result = json.load(open('/tmp/review_result.json'))
+            critical = [i for i in result.get('issues', []) if i.get('severity') == 'critical']
+            if critical:
+                print(f'::error::{len(critical)} critical issue(s) found by Codex review')
+                sys.exit(1)
+            "
+          fi

@@ -2,63 +2,152 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main, dev, staging]
   pull_request:
+    branches: [main, dev, staging]
+
+env:
+  PYTHON_VERSION: "3.11"
+  VCR_RECORD_MODE: none
 
 jobs:
-  backend-tests:
-    name: Backend tests (Python)
+  lint:
+    name: Lint (ruff + mypy)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
 
       - name: Install dependencies
         run: |
-          if [ -f "requirements.txt" ]; then
-            pip install -r requirements.txt
-          else
-            echo "requirements.txt not found, skipping install"
-          fi
+          pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Run tests (pytest)
-        run: |
-          if command -v pytest >/dev/null 2>&1; then
-            pytest || echo "pytest failed or no tests yet"
-          else
-            echo "pytest not installed or no tests configured yet"
-          fi
+      - name: Ruff check
+        run: ruff check .
 
-  backend-lint:
-    name: Backend lint (ruff)
+      - name: Ruff format check
+        run: ruff format --check .
+
+      - name: Mypy strict
+        run: mypy app/ --config-file ../pyproject.toml
+
+  test:
+    name: Test (pytest + coverage)
     runs-on: ubuntu-latest
-    needs: backend-tests
+    needs: lint
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: ultra_autotrade_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test_user -d ultra_autotrade_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://test_user:test_password@localhost:5432/ultra_autotrade_test
+      APP_ENV: test
+      VCR_RECORD_MODE: none
+
     defaults:
       run:
         working-directory: backend
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
 
-      - name: Install ruff
-        run: pip install ruff
-
-      - name: Run ruff lint
+      - name: Install dependencies
         run: |
-          ruff check . || echo "ruff reported issues (fix later)"
+          pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Enable pgvector extension
+        run: |
+          PGPASSWORD=test_password psql -h localhost -U test_user -d ultra_autotrade_test \
+            -c "CREATE EXTENSION IF NOT EXISTS vector;"
+
+      - name: Run pytest with coverage
+        run: |
+          pytest \
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=80 \
+            -v
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: backend/coverage.xml
+
+  security-check:
+    name: Security Check
+    runs-on: ubuntu-latest
+    needs: lint
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Bandit security scan (via ruff S rules)
+        run: ruff check . --select S
+
+      - name: Check for hardcoded secrets
+        run: |
+          if rg -i '(api_key|secret|password|private_key)\s*=' app/ \
+             --glob '!*.pyc' --glob '!__pycache__' \
+             | grep -v 'os\.getenv\|os\.environ\|settings\.\|config\.\|\.env\|#\|"""' \
+             | grep -v 'test_\|mock_\|fake_\|dummy_'; then
+            echo "::error::Potential hardcoded secrets detected!"
+            exit 1
+          fi
+          echo "No hardcoded secrets found."
+
+      - name: Verify .env files are gitignored
+        run: |
+          if git ls-files --cached | grep -E '\.env\.(staging|production|local)$'; then
+            echo "::error::.env files must not be tracked in git (see docs/13_security_design.md)"
+            exit 1
+          fi
+          echo ".env files are properly gitignored."
+
+      - name: Check Decimal usage for financial calculations
+        run: |
+          if rg 'float\(' app/ --glob '*.py' \
+             | grep -i 'price\|amount\|balance\|health_factor\|deposit\|withdraw' \
+             | grep -v '#.*noqa\|test_\|mock_'; then
+            echo "::warning::Possible float usage in financial calculations. Use Decimal instead (see docs/13_security_design.md)."
+          fi
