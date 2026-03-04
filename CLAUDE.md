@@ -47,6 +47,24 @@ Based on:
 
 ---
 
+## Definition of Done (DoD)
+
+コード変更をコミットする前に、以下をすべて通過させること:
+
+1. `ruff check .` — lint エラー 0
+2. `ruff format --check .` — フォーマット違反 0
+3. `mypy app/ --config-file ../pyproject.toml` — 型エラー 0
+4. `pytest tests/ --cov=app --cov-fail-under=80 -q` — 全テスト通過 + coverage 80%+
+5. `ruff check . --select S` — セキュリティ警告の確認（新規の critical なし）
+
+### Core Principles (3つのみ)
+
+1. **Simplicity First** — 最小限の変更で目的を達成する。過剰な抽象化・将来対応は不要
+2. **No Laziness** — テスト・lint・フォーマットを省略しない。verify コマンドで確認
+3. **Minimal Impact** — 既存コードへの影響を最小化。変更はスコープ内に限定
+
+---
+
 ## Architecture
 
 - Backend: FastAPI (Python 3.11) — Hetzner VPS (Docker Compose)

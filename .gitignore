@@ -1,21 +1,14 @@
-# macOS
+# OS
 .DS_Store
+Thumbs.db
 
-# Python bytecode
-__pycache__/
-*.pyc
-
-# Phase seed zip files
-phase*_seed_files.zip
-.DS_Store
-# Dependencies
-node_modules/
-.venv/
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
+.venv/
 
 # Environment
 .env
@@ -23,27 +16,20 @@ __pycache__/
 !.env.example
 !.env.*.example
 
-# Claude Code
-.mcp/
-
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS
-.DS_Store
-Thumbs.db
-
 # Build
 dist/
-
-# Database (Phase12)
-backend/data/
-*.db
 build/
 *.egg-info/
+
+# Database
+backend/data/
+*.db
 
 # Test
 .pytest_cache/
@@ -52,15 +38,17 @@ htmlcov/
 
 # Logs
 *.log
+
+# Node
 node_modules/
-.venv/
-*.zip
-__pycache__/
-.DS_Store
-.env
-.env.staging
-.env.production
-.env.local
-backend/data/
+
+# Frontend
 frontend/.next/
 frontend/tsconfig.tsbuildinfo
+
+# Archives
+phase*_seed_files.zip
+*.zip
+
+# Claude Code
+.mcp/
