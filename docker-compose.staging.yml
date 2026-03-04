@@ -3,8 +3,33 @@ version: "3.9"
 volumes:
   ultra-state:
     driver: local
+  postgres-data:
+    driver: local
 
 services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ultra-autotrade-postgres-staging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ultra}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ultra_autotrade}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ultra}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   backend:
     container_name: ultra-autotrade-backend-staging
     build:
@@ -17,13 +42,17 @@ services:
       --port 8000
     env_file:
       - .env.staging       # staging 用の環境変数ファイル（Git 管理外）
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade}
     ports:
       - "8000:8000"
     volumes:
       - ultra-state:/var/run/ultra:rw
       - ./backend/data:/app/backend/data:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: always
-    # 必要に応じてログローテーションや制限を設定
     logging:
       driver: "json-file"
       options:

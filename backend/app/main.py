@@ -72,7 +72,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["health"])
     def health_check() -> dict[str, str]:
-        return {"status": "ok"}
+        return {"status": "ok", "env": os.getenv("APP_ENV", "dev")}
 
     # --- データベース初期化 (Phase12) ---
     @app.on_event("startup")
