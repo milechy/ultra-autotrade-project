@@ -1,5 +1,4 @@
 # backend/tests/test_automation_jobs.py
-import sys
 from datetime import datetime, timezone
 from unittest.mock import patch
 

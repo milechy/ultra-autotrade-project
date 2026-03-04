@@ -4,13 +4,12 @@
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.automation.router import router as automation_router
+from app.automation.schemas import AutomationReportSummary, AutomationStatus, DashboardSnapshot
 from app.automation.state import get_monitoring_service
-from app.automation.schemas import AutomationStatus, DashboardSnapshot, AutomationReportSummary
 from app.database import get_db
 
 
@@ -242,9 +241,9 @@ class TestWorkflowRun:
         app.include_router(automation_router, prefix="/api/automation")
         app.dependency_overrides[get_db] = lambda: mock_db
 
-        with patch("app.automation.router.KnowledgeService") as MockKS, \
-             patch("app.automation.router.AIService") as MockAI, \
-             patch("app.automation.router.get_exchange_service") as mock_get_ex, \
+        with patch("app.automation.router.KnowledgeService") as _MockKS, \
+             patch("app.automation.router.AIService") as _MockAI, \
+             patch("app.automation.router.get_exchange_service") as _mock_get_ex, \
              patch("app.automation.router.process_pending_knowledge") as mock_process:
 
             mock_process.return_value = []
@@ -281,8 +280,8 @@ class TestWorkflowRun:
 
     def test_workflow_run_with_results_skipped(self):
         """When workflow returns results with no order, trade_status is skipped."""
-        from app.automation.workflow import WorkflowResult
         from app.ai.schemas import TradeAction
+        from app.automation.workflow import WorkflowResult
 
         mock_db = MagicMock()
 
@@ -322,11 +321,12 @@ class TestWorkflowRun:
 
     def test_workflow_run_with_successful_trade(self):
         """When workflow returns results with a successful order."""
-        from app.automation.workflow import WorkflowResult
-        from app.ai.schemas import TradeAction
-        from app.exchange.schemas import OrderResult, OrderStatus, OrderSide
-        from decimal import Decimal
         from datetime import datetime, timezone
+        from decimal import Decimal
+
+        from app.ai.schemas import TradeAction
+        from app.automation.workflow import WorkflowResult
+        from app.exchange.schemas import OrderResult, OrderSide, OrderStatus
 
         mock_db = MagicMock()
 

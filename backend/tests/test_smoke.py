@@ -7,6 +7,7 @@ class TestCreateApp:
 
     def test_create_app_returns_fastapi_instance(self):
         from fastapi import FastAPI
+
         from app.main import create_app
 
         app = create_app()
@@ -20,6 +21,7 @@ class TestCreateApp:
 
     def test_health_check_endpoint_returns_200(self):
         from fastapi.testclient import TestClient
+
         from app.main import create_app
 
         app = create_app()
@@ -29,6 +31,7 @@ class TestCreateApp:
 
     def test_health_check_returns_ok_status(self):
         from fastapi.testclient import TestClient
+
         from app.main import create_app
 
         app = create_app()
@@ -40,6 +43,7 @@ class TestCreateApp:
     def test_cors_middleware_is_registered(self):
         """CORS middleware class is registered in the app middleware stack."""
         from starlette.middleware.cors import CORSMiddleware
+
         from app.main import create_app
 
         app = create_app()
@@ -54,6 +58,7 @@ class TestCreateApp:
     def test_module_level_app_is_created(self):
         """The module-level `app` is a valid FastAPI instance."""
         from fastapi import FastAPI
+
         from app import main
 
         assert isinstance(main.app, FastAPI)

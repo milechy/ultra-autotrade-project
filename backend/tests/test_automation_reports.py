@@ -2,10 +2,8 @@
 """Tests for app.api.automation_reports endpoints."""
 
 from datetime import datetime, timezone
-from decimal import Decimal
 from unittest.mock import MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

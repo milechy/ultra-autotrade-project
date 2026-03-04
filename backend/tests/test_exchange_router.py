@@ -73,7 +73,6 @@ class TestGetExchangeServiceFactory:
 
     def test_factory_returns_dummy_client_when_env_is_dummy(self) -> None:
         """get_exchange_service returns ExchangeService with DummyExchangeClient."""
-        import importlib
         import os
 
         # Clear lru_cache so the factory re-runs with our env var
@@ -83,8 +82,8 @@ class TestGetExchangeServiceFactory:
         with patch.dict(os.environ, {"EXCHANGE_CLIENT_TYPE": "dummy"}):
             service = exchange_router_mod.get_exchange_service()
 
-        from app.exchange.service import ExchangeService
         from app.exchange.client import DummyExchangeClient
+        from app.exchange.service import ExchangeService
         assert isinstance(service, ExchangeService)
         assert isinstance(service._client, DummyExchangeClient)
 
@@ -101,8 +100,8 @@ class TestGetExchangeServiceFactory:
         with patch.dict(os.environ, {"EXCHANGE_CLIENT_TYPE": "sandbox"}):
             service = exchange_router_mod.get_exchange_service()
 
-        from app.exchange.service import ExchangeService
         from app.exchange.client import BybitSandboxClient
+        from app.exchange.service import ExchangeService
         assert isinstance(service, ExchangeService)
         assert isinstance(service._client, BybitSandboxClient)
 

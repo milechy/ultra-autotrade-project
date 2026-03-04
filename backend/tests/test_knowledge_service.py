@@ -3,11 +3,11 @@
 
 import os
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.knowledge.config import KnowledgeSettings, _get_env_int, get_knowledge_settings
+from app.knowledge.config import _get_env_int, get_knowledge_settings
 from app.knowledge.schemas import (
     KnowledgeCreateRequest,
     KnowledgeItemStatus,
@@ -422,7 +422,7 @@ class TestKnowledgeServiceCRUD:
 
         with patch.object(service, "_to_schema") as mock_to_schema:
             mock_to_schema.return_value = MagicMock(id=5)
-            result = service.update_status(db, 5, KnowledgeItemStatus.ANALYZED)
+            _result = service.update_status(db, 5, KnowledgeItemStatus.ANALYZED)
 
         assert fake_source.status == KnowledgeItemStatus.ANALYZED.value
         db.commit.assert_called_once()

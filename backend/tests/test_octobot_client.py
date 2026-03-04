@@ -1,6 +1,7 @@
+from unittest.mock import MagicMock, patch
+
 import httpx
 import pytest
-from unittest.mock import MagicMock, patch
 
 from app.bots.client import (
     OctoBotClient,

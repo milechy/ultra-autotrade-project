@@ -12,7 +12,6 @@ from app.knowledge.schemas import (
     KnowledgeItem,
     KnowledgeItemStatus,
     KnowledgeItemType,
-    KnowledgeSearchResponse,
     KnowledgeSearchResult,
 )
 from app.knowledge.service import KnowledgeServiceError

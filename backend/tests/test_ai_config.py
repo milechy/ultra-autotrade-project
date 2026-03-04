@@ -32,6 +32,7 @@ class TestGetEnvInt:
 
     def test_raises_runtime_error_on_invalid_value(self):
         import pytest
+
         from app.ai.config import _get_env_int
 
         with patch.dict(os.environ, {"TEST_INT_BAD": "not_a_number"}):
@@ -40,6 +41,7 @@ class TestGetEnvInt:
 
     def test_raises_runtime_error_on_float_string(self):
         import pytest
+
         from app.ai.config import _get_env_int
 
         with patch.dict(os.environ, {"TEST_INT_FLOAT": "3.14"}):
@@ -116,8 +118,9 @@ class TestGetAISettings:
         env.update(env_overrides)
 
         with patch.dict(os.environ, env, clear=True):
-            from app.ai import config as ai_config
             import importlib
+
+            from app.ai import config as ai_config
             importlib.reload(ai_config)
             settings = ai_config.get_ai_settings()
 
@@ -140,8 +143,9 @@ class TestGetAISettings:
         }
 
         with patch.dict(os.environ, env_overrides):
-            from app.ai import config as ai_config
             import importlib
+
+            from app.ai import config as ai_config
             importlib.reload(ai_config)
             settings = ai_config.get_ai_settings()
 
@@ -156,8 +160,9 @@ class TestGetAISettings:
                if k not in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY")}
 
         with patch.dict(os.environ, env, clear=True):
-            from app.ai import config as ai_config
             import importlib
+
+            from app.ai import config as ai_config
             importlib.reload(ai_config)
             settings = ai_config.get_ai_settings()
 
@@ -171,8 +176,9 @@ class TestGetAISettings:
                if k != "AI_CROSS_VALIDATION_ENABLED"}
 
         with patch.dict(os.environ, env, clear=True):
-            from app.ai import config as ai_config
             import importlib
+
+            from app.ai import config as ai_config
             importlib.reload(ai_config)
             settings = ai_config.get_ai_settings()
 
@@ -183,8 +189,9 @@ class TestGetAISettings:
         import pytest
 
         with patch.dict(os.environ, {"AI_MIN_CONFIDENCE_THRESHOLD": "not_an_int"}):
-            from app.ai import config as ai_config
             import importlib
+
+            from app.ai import config as ai_config
             importlib.reload(ai_config)
             with pytest.raises(RuntimeError, match="Invalid integer value"):
                 ai_config.get_ai_settings()
