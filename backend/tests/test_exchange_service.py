@@ -1,9 +1,9 @@
 # backend/tests/test_exchange_service.py
 """Exchange service (rule engine) tests."""
-import pytest
-from datetime import datetime, timedelta, timezone
+
 from decimal import Decimal
 from unittest.mock import MagicMock
+
 from app.ai.schemas import TradeAction
 from app.exchange.client import DummyExchangeClient
 from app.exchange.schemas import OrderRequest, OrderStatus
@@ -61,7 +61,9 @@ class TestExchangeService:
 
     def test_max_order_usd_enforced(self):
         client = DummyExchangeClient()
-        service = ExchangeService(client=client, settings=_make_settings(max_order_usd=Decimal("50")))
+        service = ExchangeService(
+            client=client, settings=_make_settings(max_order_usd=Decimal("50"))
+        )
         request = OrderRequest(action=TradeAction.BUY, amount_usd=Decimal("100"))
         result = service.execute_trade(request)
         assert result.status == OrderStatus.SKIPPED

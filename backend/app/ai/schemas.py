@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from app.notion.schemas import NotionNewsItem
 
+
 class TradeAction(str, Enum):
     """AI 判定で返すアクションの列挙型。"""
 
@@ -133,4 +134,3 @@ class RAGContext(BaseModel):
     )
     query: str = Field(..., description="検索クエリ文字列。")
     source_count: int = Field(0, description="取得元ドキュメント数。")
-

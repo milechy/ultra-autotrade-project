@@ -11,6 +11,7 @@ class OctoBotSignal(BaseModel):
     """
     AIAnalysisResult 1件分をベースにした、/octobot/signal 用の入力モデル。
     """
+
     id: str = Field(..., description="Notion レコード ID など、シグナルの一意な識別子")
     url: Optional[str] = Field(
         None,
@@ -40,6 +41,7 @@ class OctoBotSignalRequest(BaseModel):
 
     AIAnalysisResult 相当のシグナルを複数件まとめて送信できる。
     """
+
     signals: List[OctoBotSignal] = Field(
         ...,
         description="送信対象とするシグナルの配列",
@@ -72,6 +74,7 @@ class OctoBotSignalDetail(BaseModel):
     """
     シグナルごとの送信結果詳細。
     """
+
     id: str = Field(..., description="対象となったシグナルの ID")
     status: OctoBotSignalStatus = Field(
         ...,
@@ -89,6 +92,7 @@ class OctoBotSignalResponse(BaseModel):
 
     集計サマリ＋各シグナルの結果詳細を返す。
     """
+
     success_count: int = Field(..., ge=0, description="送信に成功したシグナル件数")
     skipped_count: int = Field(..., ge=0, description="安全弁によりスキップしたシグナル件数")
     failed_count: int = Field(..., ge=0, description="送信に失敗したシグナル件数")

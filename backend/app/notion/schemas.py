@@ -5,7 +5,7 @@ Notion から取得したデータを内部で扱うためのスキーマ定義�
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -24,9 +24,7 @@ class NotionNewsItem(BaseModel):
         None,
         description="Sentiment（select 値）: Positive / Negative / Neutral など",
     )
-    action: Optional[str] = Field(
-        None, description="Action（select 値）: BUY / SELL / HOLD"
-    )
+    action: Optional[str] = Field(None, description="Action（select 値）: BUY / SELL / HOLD")
     confidence: Optional[float] = Field(
         None,
         ge=0,
@@ -52,4 +50,3 @@ class NotionIngestResponse(BaseModel):
 
     items: List[NotionNewsItem]
     count: int
-

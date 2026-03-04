@@ -5,8 +5,8 @@ E2E ワークフロー: Knowledge Hub → RAG → AI Judge → Exchange
 
 PoC Pivot の中心となるオーケストレーション。
 """
+
 import logging
-from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 
@@ -17,7 +17,9 @@ from app.ai.service import AIService
 from app.exchange.schemas import OrderRequest, OrderResult, OrderStatus
 from app.exchange.service import ExchangeService
 from app.knowledge.schemas import (
-    KnowledgeItem, KnowledgeItemStatus, KnowledgeSearchRequest,
+    KnowledgeItem,
+    KnowledgeItemStatus,
+    KnowledgeSearchRequest,
 )
 from app.knowledge.service import KnowledgeService
 
@@ -30,6 +32,7 @@ class WorkflowError(Exception):
 
 class WorkflowResult:
     """Result of processing a single knowledge item."""
+
     def __init__(
         self,
         item_id: int,
@@ -75,7 +78,8 @@ def process_pending_knowledge(
     for item in pending_items:
         try:
             result = _process_single_item(
-                db=db, item=item,
+                db=db,
+                item=item,
                 knowledge_service=knowledge_service,
                 ai_service=ai_service,
                 exchange_service=exchange_service,
@@ -89,10 +93,15 @@ def process_pending_knowledge(
                 knowledge_service.update_status(db, item.id, KnowledgeItemStatus.ERROR)
             except Exception as update_exc:
                 logger.error("Failed to update error status for item %d: %s", item.id, update_exc)
-            results.append(WorkflowResult(
-                item_id=item.id, action=TradeAction.HOLD, confidence=0,
-                order_result=None, reason=f"Processing error: {exc}",
-            ))
+            results.append(
+                WorkflowResult(
+                    item_id=item.id,
+                    action=TradeAction.HOLD,
+                    confidence=0,
+                    order_result=None,
+                    reason=f"Processing error: {exc}",
+                )
+            )
 
     logger.info(
         "Workflow completed: %d items processed, %d trades executed",
@@ -132,7 +141,10 @@ def _process_single_item(
 
     logger.info(
         "AI judge for item %d: action=%s, confidence=%d, agreed=%s",
-        item.id, action.value, confidence, cross_result.agreed,
+        item.id,
+        action.value,
+        confidence,
+        cross_result.agreed,
     )
 
     # 3. Execute trade if applicable
@@ -147,15 +159,22 @@ def _process_single_item(
         order_result = exchange_service.execute_trade(order_request)
         logger.info(
             "Trade for item %d: status=%s, order_id=%s",
-            item.id, order_result.status.value, order_result.order_id,
+            item.id,
+            order_result.status.value,
+            order_result.order_id,
         )
     else:
-        logger.info("Skip trade for item %d: action=%s, confidence=%d", item.id, action.value, confidence)
+        logger.info(
+            "Skip trade for item %d: action=%s, confidence=%d", item.id, action.value, confidence
+        )
 
     # 4. Update status
     knowledge_service.update_status(db, item.id, KnowledgeItemStatus.ANALYZED)
 
     return WorkflowResult(
-        item_id=item.id, action=action, confidence=confidence,
-        order_result=order_result, reason=reason,
+        item_id=item.id,
+        action=action,
+        confidence=confidence,
+        order_result=order_result,
+        reason=reason,
     )

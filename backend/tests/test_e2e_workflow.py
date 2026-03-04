@@ -1,12 +1,15 @@
 # backend/tests/test_e2e_workflow.py
 """E2E workflow integration tests."""
-import pytest
+
 from datetime import datetime, timezone
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from app.ai.schemas import (
-    CrossValidationResult, LLMDecision, LLMProvider, RAGContext, TradeAction,
+    CrossValidationResult,
+    LLMDecision,
+    LLMProvider,
+    TradeAction,
 )
 from app.ai.service import AIService
 from app.automation.workflow import process_pending_knowledge
@@ -14,16 +17,22 @@ from app.exchange.client import DummyExchangeClient
 from app.exchange.schemas import OrderStatus
 from app.exchange.service import ExchangeService
 from app.knowledge.schemas import (
-    KnowledgeItem, KnowledgeItemStatus, KnowledgeItemType,
+    KnowledgeItem,
+    KnowledgeItemStatus,
+    KnowledgeItemType,
     KnowledgeSearchResult,
 )
 
 
 def _make_item(item_id=1, title="BTC News", status=KnowledgeItemStatus.PENDING):
     return KnowledgeItem(
-        id=item_id, source_url=None, title=title,
-        raw_text="Bitcoin surges", status=status,
-        chunk_count=3, item_type=KnowledgeItemType.TEXT,
+        id=item_id,
+        source_url=None,
+        title=title,
+        raw_text="Bitcoin surges",
+        status=status,
+        chunk_count=3,
+        item_type=KnowledgeItemType.TEXT,
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )
@@ -32,21 +41,26 @@ def _make_item(item_id=1, title="BTC News", status=KnowledgeItemStatus.PENDING):
 def _make_search_results():
     return [
         KnowledgeSearchResult(
-            chunk_id=1, document_id=1,
+            chunk_id=1,
+            document_id=1,
             content="Bitcoin hits new all-time high",
-            similarity=0.95, source_url=None, title="BTC News",
+            similarity=0.95,
+            source_url=None,
+            title="BTC News",
         )
     ]
 
 
 def _make_cross_result(action, confidence, agreed=True):
     primary = LLMDecision(
-        provider=LLMProvider.CLAUDE, action=action,
-        confidence=confidence, reason="test"
+        provider=LLMProvider.CLAUDE, action=action, confidence=confidence, reason="test"
     )
     return CrossValidationResult(
-        primary=primary, secondary=None, agreed=agreed,
-        final_action=action, final_confidence=confidence,
+        primary=primary,
+        secondary=None,
+        agreed=agreed,
+        final_action=action,
+        final_confidence=confidence,
         final_reason="test reason",
     )
 

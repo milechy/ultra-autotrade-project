@@ -1,17 +1,19 @@
 # backend/tests/test_ai_judge.py
 """AI Judge cross-validation and RAG tests."""
-import pytest
-from unittest.mock import patch, MagicMock
+
+from unittest.mock import MagicMock, patch
+
 from app.ai.schemas import (
-    TradeAction, RAGContext, LLMDecision, LLMProvider, CrossValidationResult,
+    LLMDecision,
+    LLMProvider,
+    RAGContext,
+    TradeAction,
 )
 from app.ai.service import AIService
 
 
 def _make_decision(provider, action, confidence, reason="test"):
-    return LLMDecision(
-        provider=provider, action=action, confidence=confidence, reason=reason
-    )
+    return LLMDecision(provider=provider, action=action, confidence=confidence, reason=reason)
 
 
 class TestCrossValidation:
@@ -171,12 +173,17 @@ class TestJudgeWithRAG:
     def test_existing_analyze_items_still_works(self):
         """Backward compatibility: existing API still functions."""
         from app.notion.schemas import NotionNewsItem
+
         service = AIService()
         items = [
             NotionNewsItem(
-                id="test-1", url="https://example.com",
-                summary="Record profit reported", sentiment="positive",
-                action="", confidence=0, status="unprocessed",
+                id="test-1",
+                url="https://example.com",
+                summary="Record profit reported",
+                sentiment="positive",
+                action="",
+                confidence=0,
+                status="unprocessed",
                 timestamp="2024-01-01T00:00:00Z",
             )
         ]
@@ -192,8 +199,10 @@ class TestJudgeWithRAG:
         buy_decision = _make_decision(LLMProvider.CLAUDE, TradeAction.BUY, 80)
         sell_decision = _make_decision(LLMProvider.OPENAI, TradeAction.SELL, 70)
 
-        with patch.object(service, "_call_claude", return_value=buy_decision), \
-             patch.object(service, "_call_openai", return_value=sell_decision):
+        with (
+            patch.object(service, "_call_claude", return_value=buy_decision),
+            patch.object(service, "_call_openai", return_value=sell_decision),
+        ):
             settings = MagicMock()
             settings.cross_validation_enabled = True
             settings.openai_api_key = "some-key"

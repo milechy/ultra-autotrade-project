@@ -27,7 +27,9 @@ class AuthService:
     # JWT 設定
     SECRET_KEY = os.getenv("JWT_SECRET_KEY", "development-secret-key-change-in-production")
     ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 24時間
+    ACCESS_TOKEN_EXPIRE_MINUTES = int(
+        os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "1440")
+    )  # 24時間
 
     # bcrypt 設定
     BCRYPT_ROUNDS = 12

@@ -7,8 +7,8 @@ python-async-patterns.md の「Pattern 8: Testing Async Code」に準拠。
 """
 
 import asyncio
-from datetime import datetime, time, timedelta
-from unittest.mock import MagicMock, patch
+from datetime import datetime, time
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -56,9 +56,7 @@ class TestCalculateSecondsUntil:
         target = time(1, 0)  # 01:00
         target_weekday = 0  # Monday
 
-        seconds = _calculate_seconds_until(
-            target, target_weekday=target_weekday, tz=tz, now=now
-        )
+        seconds = _calculate_seconds_until(target, target_weekday=target_weekday, tz=tz, now=now)
 
         # 次の月曜 01:00 まで (2025-01-20 01:00)
         # 水曜 10:00 → 月曜 01:00 = 4日15時間 = 111時間 = 399600秒
@@ -72,9 +70,7 @@ class TestCalculateSecondsUntil:
         target = time(1, 0)  # 01:00
         target_weekday = 0  # Monday
 
-        seconds = _calculate_seconds_until(
-            target, target_weekday=target_weekday, tz=tz, now=now
-        )
+        seconds = _calculate_seconds_until(target, target_weekday=target_weekday, tz=tz, now=now)
 
         # 30分後 = 1800秒
         assert seconds == 1800.0
@@ -87,9 +83,7 @@ class TestCalculateSecondsUntil:
         target = time(1, 0)  # 01:00
         target_weekday = 0  # Monday
 
-        seconds = _calculate_seconds_until(
-            target, target_weekday=target_weekday, tz=tz, now=now
-        )
+        seconds = _calculate_seconds_until(target, target_weekday=target_weekday, tz=tz, now=now)
 
         # 翌週月曜 01:00 まで = 7日 - 1時間 = 167時間 = 601200秒
         assert seconds == 601200.0
@@ -150,6 +144,7 @@ class TestScheduledTaskManager:
         assert not manager.is_weekly_running
 
         with patch("app.automation.scheduled_tasks.weekly_report_loop") as mock_loop:
+
             async def mock_coro(*args, **kwargs):
                 await asyncio.sleep(100)
 
@@ -169,6 +164,7 @@ class TestScheduledTaskManager:
         manager = ScheduledTaskManager()
 
         with patch("app.automation.scheduled_tasks.daily_report_loop") as mock_loop:
+
             async def mock_coro(*args, **kwargs):
                 await asyncio.sleep(100)
 
@@ -187,6 +183,7 @@ class TestScheduledTaskManager:
         manager = ScheduledTaskManager()
 
         with patch("app.automation.scheduled_tasks.weekly_report_loop") as mock_loop:
+
             async def mock_coro(*args, **kwargs):
                 await asyncio.sleep(100)
 
@@ -204,8 +201,10 @@ class TestScheduledTaskManager:
         """全タスクの停止"""
         manager = ScheduledTaskManager()
 
-        with patch("app.automation.scheduled_tasks.daily_report_loop") as mock_daily, \
-             patch("app.automation.scheduled_tasks.weekly_report_loop") as mock_weekly:
+        with (
+            patch("app.automation.scheduled_tasks.daily_report_loop") as mock_daily,
+            patch("app.automation.scheduled_tasks.weekly_report_loop") as mock_weekly,
+        ):
 
             async def mock_coro(*args, **kwargs):
                 await asyncio.sleep(100)

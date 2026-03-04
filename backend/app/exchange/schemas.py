@@ -60,8 +60,7 @@ class OrderRequest(BaseModel):
     dry_run: bool = Field(
         False,
         description=(
-            "True の場合、取引所に対して実際の注文は送信せず、"
-            "実行されるであろう結果のみを返す。"
+            "True の場合、取引所に対して実際の注文は送信せず、実行されるであろう結果のみを返す。"
         ),
     )
 

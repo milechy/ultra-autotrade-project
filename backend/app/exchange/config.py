@@ -9,7 +9,6 @@ Exchange（Bybit Sandbox）関連の設定値読み出しモジュール。
 
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Optional
 
 from app.utils.config import get_env
 
@@ -47,9 +46,7 @@ def _get_env_int(name: str, default: int) -> int:
     try:
         return int(raw)
     except ValueError as exc:
-        raise RuntimeError(
-            f"Invalid integer value for env var {name}: {raw!r}"
-        ) from exc
+        raise RuntimeError(f"Invalid integer value for env var {name}: {raw!r}") from exc
 
 
 def _get_env_decimal(name: str, default: str) -> Decimal:
@@ -66,9 +63,7 @@ def _get_env_decimal(name: str, default: str) -> Decimal:
     try:
         return Decimal(raw)
     except (InvalidOperation, ValueError) as exc:
-        raise RuntimeError(
-            f"Invalid decimal value for env var {name}: {raw!r}"
-        ) from exc
+        raise RuntimeError(f"Invalid decimal value for env var {name}: {raw!r}") from exc
 
 
 def _get_env_bool(name: str, default: bool) -> bool:
@@ -104,9 +99,7 @@ def get_exchange_settings() -> ExchangeSettings:
     api_secret = get_env("EXCHANGE_API_SECRET", required=False) or ""
 
     sandbox = _get_env_bool("EXCHANGE_SANDBOX", default=True)
-    default_symbol = (
-        get_env("EXCHANGE_DEFAULT_SYMBOL", required=False) or "BTC/USDT"
-    )
+    default_symbol = get_env("EXCHANGE_DEFAULT_SYMBOL", required=False) or "BTC/USDT"
 
     max_order_usd = _get_env_decimal(
         "EXCHANGE_MAX_ORDER_USD",

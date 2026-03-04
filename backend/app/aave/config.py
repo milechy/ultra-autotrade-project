@@ -60,9 +60,7 @@ def _get_env_int(name: str, default: int) -> int:
     try:
         return int(raw)
     except ValueError as exc:  # noqa: TRY003
-        raise RuntimeError(
-            f"Invalid integer value for env var {name}: {raw!r}"
-        ) from exc
+        raise RuntimeError(f"Invalid integer value for env var {name}: {raw!r}") from exc
 
 
 def _get_env_decimal(name: str, default: str) -> Decimal:
@@ -81,9 +79,7 @@ def _get_env_decimal(name: str, default: str) -> Decimal:
         return Decimal(raw)
     except (InvalidOperation, ValueError) as exc:  # noqa: TRY003
         # 不正な値が入っていた場合も「安全側」のデフォルトに倒す。
-        raise RuntimeError(
-            f"Invalid decimal value for env var {name}: {raw!r}"
-        ) from exc
+        raise RuntimeError(f"Invalid decimal value for env var {name}: {raw!r}") from exc
 
 
 def get_aave_settings() -> AaveSettings:
@@ -94,9 +90,7 @@ def get_aave_settings() -> AaveSettings:
     """
     # ★ ここも required=False にして、未設定なら安全側デフォルトへ
     network = get_env("AAVE_NETWORK", required=False) or "polygon-mumbai"
-    default_asset_symbol = (
-        get_env("AAVE_DEFAULT_ASSET_SYMBOL", required=False) or "USDC"
-    )
+    default_asset_symbol = get_env("AAVE_DEFAULT_ASSET_SYMBOL", required=False) or "USDC"
 
     max_single_trade_usd = _get_env_decimal(
         "AAVE_MAX_SINGLE_TRADE_USD",
@@ -121,10 +115,7 @@ def get_aave_settings() -> AaveSettings:
 
     # 動作モードと状態ファイル設定
     operation_mode = get_env("AAVE_OPERATION_MODE", required=False) or "NORMAL"
-    state_file_path = (
-        get_env("AAVE_STATE_FILE_PATH", required=False)
-        or "/var/run/ultra/state.json"
-    )
+    state_file_path = get_env("AAVE_STATE_FILE_PATH", required=False) or "/var/run/ultra/state.json"
     state_stale_threshold_seconds = _get_env_int(
         "AAVE_STATE_STALE_THRESHOLD_SECONDS",
         default=300,  # 5分

@@ -12,12 +12,14 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 class UserRole(str, Enum):
     """ユーザーロール。"""
+
     ADMIN = "admin"
     VIEWER = "viewer"
 
 
 class RegisterRequest(BaseModel):
     """初回管理者登録リクエスト。"""
+
     email: EmailStr
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=8, max_length=100)
@@ -43,12 +45,14 @@ class RegisterRequest(BaseModel):
 
 class LoginRequest(BaseModel):
     """ログインリクエスト。"""
+
     email: EmailStr
     password: str
 
 
 class TokenResponse(BaseModel):
     """トークンレスポンス。"""
+
     access_token: str
     token_type: str = "bearer"
     expires_in: int  # 秒数
@@ -56,6 +60,7 @@ class TokenResponse(BaseModel):
 
 class UserResponse(BaseModel):
     """ユーザー情報レスポンス。"""
+
     id: int
     email: str
     username: str
@@ -70,6 +75,7 @@ class UserResponse(BaseModel):
 
 class UserCreateRequest(BaseModel):
     """ユーザー作成リクエスト（管理者用）。"""
+
     email: EmailStr
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=8, max_length=100)
@@ -89,6 +95,7 @@ class UserCreateRequest(BaseModel):
 
 class UserUpdateRequest(BaseModel):
     """ユーザー更新リクエスト。"""
+
     email: Optional[EmailStr] = None
     username: Optional[str] = Field(default=None, min_length=3, max_length=50)
     password: Optional[str] = Field(default=None, min_length=8, max_length=100)
@@ -111,5 +118,6 @@ class UserUpdateRequest(BaseModel):
 
 class PasswordChangeRequest(BaseModel):
     """パスワード変更リクエスト。"""
+
     current_password: str
     new_password: str = Field(min_length=8, max_length=100)

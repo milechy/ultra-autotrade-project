@@ -1,7 +1,9 @@
 # backend/app/auth/__init__.py
 """認証モジュール。"""
 
+from .dependencies import get_current_user, require_active_user, require_admin
 from .models import User
+from .router import router
 from .schemas import (
     LoginRequest,
     RegisterRequest,
@@ -10,8 +12,6 @@ from .schemas import (
     UserRole,
 )
 from .service import AuthService
-from .dependencies import get_current_user, require_admin, require_active_user
-from .router import router
 
 __all__ = [
     "User",

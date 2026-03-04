@@ -17,7 +17,14 @@ from typing import Callable, Iterable, List, Optional
 from app.notion.schemas import NotionNewsItem
 
 from .config import AISettings, get_ai_settings
-from .schemas import AIAnalysisResult, CrossValidationResult, LLMDecision, LLMProvider, RAGContext, TradeAction
+from .schemas import (
+    AIAnalysisResult,
+    CrossValidationResult,
+    LLMDecision,
+    LLMProvider,
+    RAGContext,
+    TradeAction,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +252,11 @@ class AIService:
 
     def _build_rag_prompt(self, query: str, rag_context: RAGContext) -> str:
         """Build prompt with RAG context chunks."""
-        chunks_text = "\n---\n".join(rag_context.chunks) if rag_context.chunks else "(No relevant context found)"
+        chunks_text = (
+            "\n---\n".join(rag_context.chunks)
+            if rag_context.chunks
+            else "(No relevant context found)"
+        )
         return f"""{LLM_SYSTEM_PROMPT}
 
 ## Retrieved Context (from Knowledge Hub):
@@ -261,11 +272,14 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
         if not settings.anthropic_api_key:
             logger.warning("ANTHROPIC_API_KEY not set; falling back to HOLD")
             return LLMDecision(
-                provider=LLMProvider.CLAUDE, action=TradeAction.HOLD,
-                confidence=0, reason="API key not configured"
+                provider=LLMProvider.CLAUDE,
+                action=TradeAction.HOLD,
+                confidence=0,
+                reason="API key not configured",
             )
         try:
             import anthropic
+
             client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
             response = client.messages.create(
                 model=settings.claude_model,
@@ -276,8 +290,10 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
         except Exception as exc:
             logger.error("Claude API call failed: %s", exc)
             return LLMDecision(
-                provider=LLMProvider.CLAUDE, action=TradeAction.HOLD,
-                confidence=0, reason=f"API error: {exc}"
+                provider=LLMProvider.CLAUDE,
+                action=TradeAction.HOLD,
+                confidence=0,
+                reason=f"API error: {exc}",
             )
 
     def _call_openai(self, prompt: str, settings: AISettings) -> LLMDecision:
@@ -285,11 +301,14 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
         if not settings.openai_api_key:
             logger.warning("OPENAI_API_KEY not set; falling back to HOLD")
             return LLMDecision(
-                provider=LLMProvider.OPENAI, action=TradeAction.HOLD,
-                confidence=0, reason="API key not configured"
+                provider=LLMProvider.OPENAI,
+                action=TradeAction.HOLD,
+                confidence=0,
+                reason="API key not configured",
             )
         try:
             from openai import OpenAI
+
             client = OpenAI(api_key=settings.openai_api_key)
             response = client.chat.completions.create(
                 model=settings.openai_model,
@@ -297,14 +316,14 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
                 max_tokens=500,
                 response_format={"type": "json_object"},
             )
-            return self._parse_llm_response(
-                response.choices[0].message.content, LLMProvider.OPENAI
-            )
+            return self._parse_llm_response(response.choices[0].message.content, LLMProvider.OPENAI)
         except Exception as exc:
             logger.error("OpenAI API call failed: %s", exc)
             return LLMDecision(
-                provider=LLMProvider.OPENAI, action=TradeAction.HOLD,
-                confidence=0, reason=f"API error: {exc}"
+                provider=LLMProvider.OPENAI,
+                action=TradeAction.HOLD,
+                confidence=0,
+                reason=f"API error: {exc}",
             )
 
     def _parse_llm_response(self, raw: str, provider: LLMProvider) -> LLMDecision:
@@ -325,14 +344,20 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
             confidence = max(0, min(100, int(data.get("confidence", 0))))
             reason = data.get("reason", "")
             return LLMDecision(
-                provider=provider, action=action, confidence=confidence,
-                reason=reason, raw_response=raw
+                provider=provider,
+                action=action,
+                confidence=confidence,
+                reason=reason,
+                raw_response=raw,
             )
         except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
             logger.warning("Failed to parse LLM response from %s: %s", provider.value, exc)
             return LLMDecision(
-                provider=provider, action=TradeAction.HOLD,
-                confidence=0, reason=f"Parse error: {exc}", raw_response=raw
+                provider=provider,
+                action=TradeAction.HOLD,
+                confidence=0,
+                reason=f"Parse error: {exc}",
+                raw_response=raw,
             )
 
     def _cross_validate(
@@ -346,8 +371,11 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
         """
         if secondary is None:
             return CrossValidationResult(
-                primary=primary, secondary=None, agreed=True,
-                final_action=primary.action, final_confidence=primary.confidence,
+                primary=primary,
+                secondary=None,
+                agreed=True,
+                final_action=primary.action,
+                final_confidence=primary.confidence,
                 final_reason=primary.reason,
             )
 
@@ -355,16 +383,20 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
         if agreed:
             avg_confidence = (primary.confidence + secondary.confidence) // 2
             return CrossValidationResult(
-                primary=primary, secondary=secondary, agreed=True,
-                final_action=primary.action, final_confidence=avg_confidence,
+                primary=primary,
+                secondary=secondary,
+                agreed=True,
+                final_action=primary.action,
+                final_confidence=avg_confidence,
                 final_reason=f"Both LLMs agree: {primary.reason}",
             )
         else:
             min_confidence = min(primary.confidence, secondary.confidence)
             return CrossValidationResult(
-                primary=primary, secondary=secondary, agreed=False,
+                primary=primary,
+                secondary=secondary,
+                agreed=False,
                 final_action=TradeAction.HOLD,
                 final_confidence=min(min_confidence, 30),
                 final_reason=f"LLMs disagree ({primary.action.value} vs {secondary.action.value}); defaulting to HOLD",
             )
-

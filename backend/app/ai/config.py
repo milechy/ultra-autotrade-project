@@ -46,9 +46,7 @@ def _get_env_int(name: str, default: int) -> int:
     try:
         return int(raw)
     except ValueError as exc:
-        raise RuntimeError(
-            f"Invalid integer value for env var {name}: {raw!r}"
-        ) from exc
+        raise RuntimeError(f"Invalid integer value for env var {name}: {raw!r}") from exc
 
 
 def _get_env_bool(name: str, default: bool) -> bool:
@@ -79,9 +77,7 @@ def get_ai_settings() -> AISettings:
     anthropic_api_key = get_env("ANTHROPIC_API_KEY", required=False)
     openai_api_key = get_env("OPENAI_API_KEY", required=False)
 
-    claude_model = (
-        get_env("AI_CLAUDE_MODEL", required=False) or "claude-sonnet-4-20250514"
-    )
+    claude_model = get_env("AI_CLAUDE_MODEL", required=False) or "claude-sonnet-4-20250514"
     openai_model = get_env("AI_OPENAI_MODEL", required=False) or "gpt-4o"
 
     min_confidence_threshold = _get_env_int(

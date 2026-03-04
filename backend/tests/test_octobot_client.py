@@ -1,5 +1,3 @@
-import pytest
-
 from app.bots.client import (
     OctoBotClient,
     OctoBotClientError,

@@ -172,6 +172,7 @@ class AutomationStatus(BaseModel):
 # レポート用スキーマ
 # ---------------------------------------------------------------------------
 
+
 class MetricAggregate(BaseModel):
     """
     単一メトリクスIDに対する集計値。
@@ -238,6 +239,8 @@ class DashboardSnapshot(BaseModel):
         default_factory=dict,
         description="メトリクスIDごとの集計結果。キーは metric_id。",
     )
+
+
 class ReportPeriod(str, Enum):
     """
     レポート対象期間の種別。

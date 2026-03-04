@@ -20,7 +20,7 @@ from typing import List, Optional, Tuple, Union
 
 from app.ai.schemas import TradeAction
 
-from .client import ExchangeClientError, DummyExchangeClient, BybitSandboxClient
+from .client import BybitSandboxClient, DummyExchangeClient, ExchangeClientError
 from .config import ExchangeSettings, get_exchange_settings
 from .schemas import ExchangeStatusResponse, OrderRequest, OrderResult, OrderSide, OrderStatus
 

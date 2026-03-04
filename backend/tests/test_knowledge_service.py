@@ -1,10 +1,11 @@
 # backend/tests/test_knowledge_service.py
 """Knowledge Hub service tests with mocked embeddings and HTTP."""
-import pytest
-from unittest.mock import patch, MagicMock
-from app.knowledge.service import KnowledgeService
-from app.knowledge.schemas import KnowledgeCreateRequest, KnowledgeItemType
 
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from app.knowledge.service import KnowledgeService
 
 # Since pgvector requires PostgreSQL, these tests focus on the service logic
 # with mocked DB interactions and mocked OpenAI embeddings.
@@ -15,8 +16,10 @@ class TestKnowledgeServiceChunking:
 
     def test_chunk_text_splits_correctly(self):
         """Verify text is split into chunks of appropriate size."""
-        with patch("app.knowledge.service.OpenAI"), \
-             patch("app.knowledge.service.tiktoken") as mock_tiktoken:
+        with (
+            patch("app.knowledge.service.OpenAI"),
+            patch("app.knowledge.service.tiktoken") as mock_tiktoken,
+        ):
             mock_enc = MagicMock()
             # Simulate 1000 tokens
             mock_enc.encode.return_value = list(range(1000))
@@ -37,8 +40,10 @@ class TestKnowledgeServiceChunking:
 
     def test_chunk_text_single_small_text(self):
         """Small text should produce exactly one chunk."""
-        with patch("app.knowledge.service.OpenAI"), \
-             patch("app.knowledge.service.tiktoken") as mock_tiktoken:
+        with (
+            patch("app.knowledge.service.OpenAI"),
+            patch("app.knowledge.service.tiktoken") as mock_tiktoken,
+        ):
             mock_enc = MagicMock()
             mock_enc.encode.return_value = list(range(100))  # 100 tokens
             mock_enc.decode.side_effect = lambda tokens: "short text"
@@ -90,8 +95,10 @@ class TestKnowledgeServiceEmbedding:
 
     def test_embed_texts_empty_returns_empty(self):
         """Empty input should return empty list without calling API."""
-        with patch("app.knowledge.service.OpenAI") as mock_openai_cls, \
-             patch("app.knowledge.service.tiktoken") as mock_tiktoken:
+        with (
+            patch("app.knowledge.service.OpenAI") as mock_openai_cls,
+            patch("app.knowledge.service.tiktoken") as mock_tiktoken,
+        ):
             mock_tiktoken.encoding_for_model.return_value = MagicMock()
             mock_openai_instance = MagicMock()
             mock_openai_cls.return_value = mock_openai_instance
@@ -111,8 +118,10 @@ class TestKnowledgeServiceScraping:
 
     def test_scrape_url_extracts_text(self):
         """Verify URL scraping extracts text content."""
-        with patch("app.knowledge.service.OpenAI"), \
-             patch("app.knowledge.service.tiktoken") as mock_tiktoken:
+        with (
+            patch("app.knowledge.service.OpenAI"),
+            patch("app.knowledge.service.tiktoken") as mock_tiktoken,
+        ):
             mock_tiktoken.encoding_for_model.return_value = MagicMock()
 
             settings = MagicMock()
@@ -137,8 +146,10 @@ class TestKnowledgeServiceScraping:
 
     def test_scrape_url_failure_raises(self):
         """URL scraping failure should raise KnowledgeServiceError."""
-        with patch("app.knowledge.service.OpenAI"), \
-             patch("app.knowledge.service.tiktoken") as mock_tiktoken:
+        with (
+            patch("app.knowledge.service.OpenAI"),
+            patch("app.knowledge.service.tiktoken") as mock_tiktoken,
+        ):
             mock_tiktoken.encoding_for_model.return_value = MagicMock()
 
             settings = MagicMock()
@@ -147,6 +158,7 @@ class TestKnowledgeServiceScraping:
             service = KnowledgeService(settings=settings)
 
             import httpx as real_httpx
+
             with patch("app.knowledge.service.httpx") as mock_httpx:
                 mock_client = MagicMock()
                 mock_client.__enter__ = MagicMock(return_value=mock_client)
@@ -159,5 +171,6 @@ class TestKnowledgeServiceScraping:
                 mock_httpx.Client.return_value = mock_client
 
                 from app.knowledge.service import KnowledgeServiceError
+
                 with pytest.raises(KnowledgeServiceError):
                     service._scrape_url("https://unreachable.example.com")

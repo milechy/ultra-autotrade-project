@@ -72,9 +72,7 @@ class KnowledgeService:
     # 公開 API                                                             #
     # ------------------------------------------------------------------ #
 
-    def create_item(
-        self, db: Session, request: KnowledgeCreateRequest
-    ) -> KnowledgeItem:
+    def create_item(self, db: Session, request: KnowledgeCreateRequest) -> KnowledgeItem:
         """
         ナレッジアイテムを登録する。
 
@@ -88,14 +86,11 @@ class KnowledgeService:
         except KnowledgeServiceError:
             raise
         except Exception as exc:
-            raise KnowledgeServiceError(
-                f"Failed to resolve raw text: {exc}"
-            ) from exc
+            raise KnowledgeServiceError(f"Failed to resolve raw text: {exc}") from exc
 
         if not raw_text:
             raise KnowledgeServiceError(
-                "No text content available. "
-                "Provide raw_text or a valid source_url."
+                "No text content available. Provide raw_text or a valid source_url."
             )
 
         # タイトルは引数優先、フォールバックはスクレイピング由来
@@ -142,14 +137,10 @@ class KnowledgeService:
             # 埋め込み失敗時はステータスを ERROR に更新してコミットする（fail-closed）
             source.status = KnowledgeItemStatus.ERROR.value
             db.commit()
-            raise KnowledgeServiceError(
-                f"Embedding generation failed: {exc}"
-            ) from exc
+            raise KnowledgeServiceError(f"Embedding generation failed: {exc}") from exc
 
         # 6. KnowledgeChunk 行の作成
-        for idx, (chunk_text, embedding) in enumerate(
-            zip(chunks_text, embeddings)
-        ):
+        for idx, (chunk_text, embedding) in enumerate(zip(chunks_text, embeddings)):
             token_count = (
                 len(self._tokenizer.encode(chunk_text))
                 if self._tokenizer is not None
@@ -180,9 +171,7 @@ class KnowledgeService:
 
         return self._to_schema(source)
 
-    def search(
-        self, db: Session, request: KnowledgeSearchRequest
-    ) -> List[KnowledgeSearchResult]:
+    def search(self, db: Session, request: KnowledgeSearchRequest) -> List[KnowledgeSearchResult]:
         """
         RAG 検索: クエリを埋め込み化し、pgvector コサイン類似度で検索する。
         """
@@ -190,9 +179,7 @@ class KnowledgeService:
         try:
             query_embeddings = self._embed_texts([request.query])
         except Exception as exc:
-            raise KnowledgeServiceError(
-                f"Failed to embed search query: {exc}"
-            ) from exc
+            raise KnowledgeServiceError(f"Failed to embed search query: {exc}") from exc
 
         query_vector = query_embeddings[0]
 
@@ -242,9 +229,7 @@ class KnowledgeService:
         """status='pending' のアイテムを全件取得する。"""
         return self.get_items(db, status=KnowledgeItemStatus.PENDING.value)
 
-    def get_items(
-        self, db: Session, *, status: Optional[str] = None
-    ) -> List[KnowledgeItem]:
+    def get_items(self, db: Session, *, status: Optional[str] = None) -> List[KnowledgeItem]:
         """
         アイテムを全件取得する。status を指定するとフィルタリングする。
         """
@@ -263,14 +248,10 @@ class KnowledgeService:
 
         item_id が存在しない場合は KnowledgeServiceError を送出する。
         """
-        source = db.query(KnowledgeSource).filter(
-            KnowledgeSource.id == item_id
-        ).first()
+        source = db.query(KnowledgeSource).filter(KnowledgeSource.id == item_id).first()
 
         if source is None:
-            raise KnowledgeServiceError(
-                f"KnowledgeSource not found: id={item_id}"
-            )
+            raise KnowledgeServiceError(f"KnowledgeSource not found: id={item_id}")
 
         source.status = status.value
         db.commit()
@@ -287,9 +268,7 @@ class KnowledgeService:
     # 内部ヘルパー                                                         #
     # ------------------------------------------------------------------ #
 
-    def _resolve_raw_text(
-        self, request: KnowledgeCreateRequest
-    ) -> tuple[str, Optional[str]]:
+    def _resolve_raw_text(self, request: KnowledgeCreateRequest) -> tuple[str, Optional[str]]:
         """
         リクエストの種別に応じてテキストと推定タイトルを返す。
 
@@ -298,17 +277,13 @@ class KnowledgeService:
         """
         if request.item_type == KnowledgeItemType.URL:
             if not request.source_url:
-                raise KnowledgeServiceError(
-                    "source_url is required when item_type is 'url'."
-                )
+                raise KnowledgeServiceError("source_url is required when item_type is 'url'.")
             raw_text = self._scrape_url(request.source_url)
             return raw_text, None
 
         # TEXT 種別
         if not request.raw_text:
-            raise KnowledgeServiceError(
-                "raw_text is required when item_type is 'text'."
-            )
+            raise KnowledgeServiceError("raw_text is required when item_type is 'text'.")
         return request.raw_text, None
 
     def _scrape_url(self, url: str) -> str:
@@ -324,19 +299,14 @@ class KnowledgeService:
             )
         if BeautifulSoup is None:
             raise KnowledgeServiceError(
-                "beautifulsoup4 is not installed. "
-                "Install it with: pip install beautifulsoup4"
+                "beautifulsoup4 is not installed. Install it with: pip install beautifulsoup4"
             )
 
         try:
             with httpx.Client(timeout=30.0, follow_redirects=True) as client:
                 response = client.get(
                     url,
-                    headers={
-                        "User-Agent": (
-                            "Mozilla/5.0 (compatible; UltraAutoTrade/1.0)"
-                        )
-                    },
+                    headers={"User-Agent": ("Mozilla/5.0 (compatible; UltraAutoTrade/1.0)")},
                 )
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -344,9 +314,7 @@ class KnowledgeService:
                 f"HTTP error while scraping {url}: {exc.response.status_code}"
             ) from exc
         except httpx.RequestError as exc:
-            raise KnowledgeServiceError(
-                f"Network error while scraping {url}: {exc}"
-            ) from exc
+            raise KnowledgeServiceError(f"Network error while scraping {url}: {exc}") from exc
 
         soup = BeautifulSoup(response.text, "html.parser")
 
@@ -355,12 +323,7 @@ class KnowledgeService:
             tag.decompose()
 
         # テキスト抽出優先順位: <article> → <main> → <body>
-        target = (
-            soup.find("article")
-            or soup.find("main")
-            or soup.find("body")
-            or soup
-        )
+        target = soup.find("article") or soup.find("main") or soup.find("body") or soup
 
         raw_text = target.get_text(separator="\n", strip=True)
 
@@ -369,9 +332,7 @@ class KnowledgeService:
         cleaned = "\n".join(lines)
 
         if not cleaned:
-            raise KnowledgeServiceError(
-                f"No text content extracted from URL: {url}"
-            )
+            raise KnowledgeServiceError(f"No text content extracted from URL: {url}")
 
         logger.info(
             "URL scraped successfully",
@@ -389,9 +350,7 @@ class KnowledgeService:
         """
         if self._tokenizer is None:
             # tiktoken が利用できない場合は単純な文字数分割にフォールバック
-            logger.warning(
-                "tiktoken not available, falling back to character-based chunking"
-            )
+            logger.warning("tiktoken not available, falling back to character-based chunking")
             chunk_size = self._settings.chunk_size_tokens * 4  # 1 token ≈ 4 chars
             overlap = self._settings.chunk_overlap_tokens * 4
             chunks: List[str] = []
@@ -436,9 +395,7 @@ class KnowledgeService:
                 input=texts,
             )
         except Exception as exc:
-            raise KnowledgeServiceError(
-                f"OpenAI embeddings API call failed: {exc}"
-            ) from exc
+            raise KnowledgeServiceError(f"OpenAI embeddings API call failed: {exc}") from exc
 
         # レスポンスは index 順に並んでいることが保証されているが念のためソート
         sorted_data = sorted(response.data, key=lambda d: d.index)

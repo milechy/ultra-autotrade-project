@@ -50,9 +50,7 @@ class KnowledgeCreateRequest(BaseModel):
     """
 
     title: Optional[str] = Field(None, description="アイテムのタイトル（任意）")
-    item_type: KnowledgeItemType = Field(
-        ..., description="入力種別: url または text"
-    )
+    item_type: KnowledgeItemType = Field(..., description="入力種別: url または text")
     source_url: Optional[str] = Field(
         None, description="スクレイピング対象の URL（item_type=url の場合に使用）"
     )
@@ -114,8 +112,6 @@ class KnowledgeSearchResponse(BaseModel):
     ベクトル検索レスポンス全体。
     """
 
-    results: List[KnowledgeSearchResult] = Field(
-        default_factory=list, description="検索結果リスト"
-    )
+    results: List[KnowledgeSearchResult] = Field(default_factory=list, description="検索結果リスト")
     count: int = Field(..., description="返却件数")
     query: str = Field(..., description="実行した検索クエリ")

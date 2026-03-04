@@ -129,4 +129,3 @@ class NotionService:
             items.append(item)
 
         return items
-

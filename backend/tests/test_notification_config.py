@@ -7,13 +7,11 @@
 import os
 from unittest.mock import patch
 
-import pytest
-
 from app.notifications.config import (
     NotificationSettings,
     _parse_notification_channel,
-    load_notification_settings,
     get_notification_settings,
+    load_notification_settings,
     reset_notification_settings,
 )
 from app.notifications.schemas import NotificationChannel
@@ -88,11 +86,14 @@ class TestLoadNotificationSettings:
 
     def test_load_with_all_env_vars(self):
         """全ての環境変数が設定されている場合"""
-        with patch.dict(os.environ, {
-            "LINE_NOTIFY_TOKEN": "test-line-token",
-            "SLACK_WEBHOOK_URL": "https://hooks.slack.com/test",
-            "NOTIFICATION_CHANNEL": "SLACK",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "LINE_NOTIFY_TOKEN": "test-line-token",
+                "SLACK_WEBHOOK_URL": "https://hooks.slack.com/test",
+                "NOTIFICATION_CHANNEL": "SLACK",
+            },
+        ):
             settings = load_notification_settings()
 
             assert settings.line_notify_token == "test-line-token"
@@ -103,8 +104,11 @@ class TestLoadNotificationSettings:
         """環境変数が未設定の場合"""
         with patch.dict(os.environ, {}, clear=True):
             # 他の環境変数の影響を排除
-            env = {k: v for k, v in os.environ.items()
-                   if k not in ["LINE_NOTIFY_TOKEN", "SLACK_WEBHOOK_URL", "NOTIFICATION_CHANNEL"]}
+            env = {
+                k: v
+                for k, v in os.environ.items()
+                if k not in ["LINE_NOTIFY_TOKEN", "SLACK_WEBHOOK_URL", "NOTIFICATION_CHANNEL"]
+            }
             with patch.dict(os.environ, env, clear=True):
                 settings = load_notification_settings()
 
@@ -114,11 +118,14 @@ class TestLoadNotificationSettings:
 
     def test_load_with_empty_values(self):
         """空文字が設定されている場合は None として扱う"""
-        with patch.dict(os.environ, {
-            "LINE_NOTIFY_TOKEN": "",
-            "SLACK_WEBHOOK_URL": "",
-            "NOTIFICATION_CHANNEL": "",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "LINE_NOTIFY_TOKEN": "",
+                "SLACK_WEBHOOK_URL": "",
+                "NOTIFICATION_CHANNEL": "",
+            },
+        ):
             settings = load_notification_settings()
 
             assert settings.line_notify_token is None
@@ -140,10 +147,8 @@ class TestGetNotificationSettings:
 
     def test_reset_clears_singleton(self):
         """reset 後は新しいインスタンスが生成されることを確認"""
-        settings1 = get_notification_settings()
+        get_notification_settings()
         reset_notification_settings()
         settings2 = get_notification_settings()
 
-        # リセット後は新しいインスタンス（ただし内容は同じ可能性あり）
-        # ここでは reset が正常に動作することを確認
         assert settings2 is not None

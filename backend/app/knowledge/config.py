@@ -8,7 +8,6 @@ Knowledge Hub 関連の設定値読み出しモジュール。
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 from app.utils.config import get_env
 
@@ -25,11 +24,11 @@ class KnowledgeSettings:
     """
 
     openai_api_key: str
-    embedding_model: str      # default: text-embedding-3-small
+    embedding_model: str  # default: text-embedding-3-small
     embedding_dimensions: int  # default: 1536
-    chunk_size_tokens: int    # default: 500
+    chunk_size_tokens: int  # default: 500
     chunk_overlap_tokens: int  # default: 50
-    search_top_k: int         # default: 5
+    search_top_k: int  # default: 5
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -45,9 +44,7 @@ def _get_env_int(name: str, default: int) -> int:
     try:
         return int(raw)
     except ValueError as exc:  # noqa: TRY003
-        raise RuntimeError(
-            f"Invalid integer value for env var {name}: {raw!r}"
-        ) from exc
+        raise RuntimeError(f"Invalid integer value for env var {name}: {raw!r}") from exc
 
 
 def get_knowledge_settings() -> KnowledgeSettings:
@@ -59,8 +56,7 @@ def get_knowledge_settings() -> KnowledgeSettings:
     openai_api_key = get_env("OPENAI_API_KEY", required=False) or ""
 
     embedding_model = (
-        get_env("KNOWLEDGE_EMBEDDING_MODEL", required=False)
-        or "text-embedding-3-small"
+        get_env("KNOWLEDGE_EMBEDDING_MODEL", required=False) or "text-embedding-3-small"
     )
 
     embedding_dimensions = _get_env_int(

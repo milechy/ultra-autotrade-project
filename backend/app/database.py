@@ -11,11 +11,12 @@ import os
 from pathlib import Path
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 
 class Base(DeclarativeBase):
     """SQLAlchemy モデルの基底クラス。"""
+
     pass
 
 

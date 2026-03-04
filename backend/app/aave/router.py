@@ -6,8 +6,8 @@ Aave 操作用の FastAPI ルーター定義。
 - POST /aave/rebalance
 """
 
-from functools import lru_cache
 from decimal import Decimal
+from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException, status
 

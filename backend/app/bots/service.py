@@ -2,10 +2,9 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Tuple
 
+from app.automation.schemas import ComponentType
 from app.automation.state import get_monitoring_service
 
-logger = logging.getLogger(__name__)
-from app.automation.schemas import ComponentType
 from .client import OctoBotClient, OctoBotClientError
 from .schemas import (
     OctoBotSignal,
@@ -14,6 +13,8 @@ from .schemas import (
     OctoBotSignalResponse,
     OctoBotSignalStatus,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class OctoBotService:
@@ -209,9 +210,7 @@ class OctoBotService:
         { action, confidence, reason, timestamp } のみ。
         """
         # TradeAction が Enum の場合と素の str の場合両方に対応
-        action_val = (
-            signal.action.value if hasattr(signal.action, "value") else str(signal.action)
-        )
+        action_val = signal.action.value if hasattr(signal.action, "value") else str(signal.action)
 
         ts = getattr(signal, "timestamp", None) or self._now()
 
@@ -222,7 +221,7 @@ class OctoBotService:
             "timestamp": ts.isoformat(),
         }
         self._client.send_signal(payload)
-    
+
     def _send_to_octobot(self, signal: OctoBotSignal) -> None:
         """
         後方互換用（テストが monkeypatch するフック）。
@@ -230,5 +229,3 @@ class OctoBotService:
         """
         # このクラスの実送信は _send_single_signal に集約されているため、そこへ委譲する
         return self._send_single_signal(signal)
-
-

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from .schemas import NotificationChannel, NotificationSeverity, NotificationMessage
+from .schemas import NotificationChannel, NotificationMessage, NotificationSeverity
 from .service import CompositeNotificationService, LoggingNotificationSender
 
 _notification_service: Optional[CompositeNotificationService] = None

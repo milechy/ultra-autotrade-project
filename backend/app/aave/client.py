@@ -120,7 +120,11 @@ class Web3AaveClient:
                 {"internalType": "uint256", "name": "totalCollateralBase", "type": "uint256"},
                 {"internalType": "uint256", "name": "totalDebtBase", "type": "uint256"},
                 {"internalType": "uint256", "name": "availableBorrowsBase", "type": "uint256"},
-                {"internalType": "uint256", "name": "currentLiquidationThreshold", "type": "uint256"},
+                {
+                    "internalType": "uint256",
+                    "name": "currentLiquidationThreshold",
+                    "type": "uint256",
+                },
                 {"internalType": "uint256", "name": "ltv", "type": "uint256"},
                 {"internalType": "uint256", "name": "healthFactor", "type": "uint256"},
             ],
@@ -221,7 +225,6 @@ class Web3AaveClient:
 
     def _get_token_contract(self, asset_symbol: str):
         """トークンコントラクトを取得する。"""
-        from web3 import Web3
 
         token_address = self.token_addresses.get(asset_symbol)
         if not token_address:
@@ -257,9 +260,7 @@ class Web3AaveClient:
             - MonitoringService が緊急停止を発動できるようにするため
         """
         try:
-            user_data = self.pool.functions.getUserAccountData(
-                self.account.address
-            ).call()
+            user_data = self.pool.functions.getUserAccountData(self.account.address).call()
 
             # getUserAccountData の戻り値:
             # (totalCollateralBase, totalDebtBase, availableBorrowsBase,
@@ -342,9 +343,7 @@ class Web3AaveClient:
                 )
 
                 signed_approve = self.account.sign_transaction(approve_tx)
-                approve_hash = self.w3.eth.send_raw_transaction(
-                    signed_approve.raw_transaction
-                )
+                approve_hash = self.w3.eth.send_raw_transaction(signed_approve.raw_transaction)
                 self.w3.eth.wait_for_transaction_receipt(approve_hash)
                 logger.info("Approve tx: %s", approve_hash.hex())
 
@@ -369,9 +368,7 @@ class Web3AaveClient:
             receipt = self.w3.eth.wait_for_transaction_receipt(supply_hash)
 
             if receipt.status != 1:
-                raise AaveTransactionError(
-                    f"Supply transaction failed: {supply_hash.hex()}"
-                )
+                raise AaveTransactionError(f"Supply transaction failed: {supply_hash.hex()}")
 
             logger.info("Supply tx successful: %s", supply_hash.hex())
             return supply_hash.hex()
@@ -422,15 +419,11 @@ class Web3AaveClient:
             )
 
             signed_withdraw = self.account.sign_transaction(withdraw_tx)
-            withdraw_hash = self.w3.eth.send_raw_transaction(
-                signed_withdraw.raw_transaction
-            )
+            withdraw_hash = self.w3.eth.send_raw_transaction(signed_withdraw.raw_transaction)
             receipt = self.w3.eth.wait_for_transaction_receipt(withdraw_hash)
 
             if receipt.status != 1:
-                raise AaveTransactionError(
-                    f"Withdraw transaction failed: {withdraw_hash.hex()}"
-                )
+                raise AaveTransactionError(f"Withdraw transaction failed: {withdraw_hash.hex()}")
 
             logger.info("Withdraw tx successful: %s", withdraw_hash.hex())
             return withdraw_hash.hex()

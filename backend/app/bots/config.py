@@ -9,6 +9,7 @@ class OctoBotSettings:
     """
     OctoBot 外部シグナル API 関連の設定値。
     """
+
     base_url: str
     api_key: str
     timeout_seconds: int = 10

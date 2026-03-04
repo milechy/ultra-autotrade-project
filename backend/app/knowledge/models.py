@@ -12,7 +12,7 @@ Knowledge Hub モジュールの SQLAlchemy モデル定義。
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -39,9 +39,7 @@ class KnowledgeSource(Base):
     source_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     title: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     item_type: Mapped[str] = mapped_column(String(20), nullable=False, default="text")
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="pending", index=True
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -61,8 +59,7 @@ class KnowledgeSource(Base):
 
     def __repr__(self) -> str:
         return (
-            f"<KnowledgeSource(id={self.id}, item_type={self.item_type!r}, "
-            f"status={self.status!r})>"
+            f"<KnowledgeSource(id={self.id}, item_type={self.item_type!r}, status={self.status!r})>"
         )
 
 
@@ -140,9 +137,7 @@ class KnowledgeChunk(Base):
     try:
         from pgvector.sqlalchemy import Vector as _Vector
 
-        embedding: Mapped[Optional[List[float]]] = mapped_column(
-            _Vector(1536), nullable=True
-        )
+        embedding: Mapped[Optional[List[float]]] = mapped_column(_Vector(1536), nullable=True)
     except ImportError:
         # SQLite などの非 PostgreSQL 環境では Text 型で代替（テスト用）
         embedding: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # type: ignore[no-redef]

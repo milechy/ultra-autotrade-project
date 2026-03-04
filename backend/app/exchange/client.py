@@ -209,9 +209,7 @@ class BybitSandboxClient:
             return ticker
         except Exception as exc:
             logger.error("Failed to fetch ticker for %s: %s", symbol, exc)
-            raise ExchangeConnectionError(
-                f"Failed to fetch ticker for {symbol}: {exc}"
-            ) from exc
+            raise ExchangeConnectionError(f"Failed to fetch ticker for {symbol}: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------

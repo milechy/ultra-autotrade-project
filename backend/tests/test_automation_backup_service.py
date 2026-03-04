@@ -2,7 +2,6 @@
 from app.automation.backup_service import (
     BackupService,
     BackupStatus,
-    BackupTargetType,
 )
 
 

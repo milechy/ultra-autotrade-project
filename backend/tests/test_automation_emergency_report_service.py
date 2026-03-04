@@ -59,7 +59,9 @@ def test_emergency_report_includes_severity_and_counts() -> None:
         last_health_factor=Decimal("1.3"),
     )
     events = [
-        _event(AlertLevel.EMERGENCY, "HF_BELOW_THRESHOLD", "Health factor dropped below safe threshold"),
+        _event(
+            AlertLevel.EMERGENCY, "HF_BELOW_THRESHOLD", "Health factor dropped below safe threshold"
+        ),
     ]
 
     service = EmergencyReportService()

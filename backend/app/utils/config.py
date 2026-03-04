@@ -39,4 +39,3 @@ def get_env(
         return default
 
     return value
-

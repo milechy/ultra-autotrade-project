@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 
-from .dependencies import get_current_user, require_active_user
+from .dependencies import require_active_user
 from .models import User, UserRole
 from .schemas import (
     LoginRequest,

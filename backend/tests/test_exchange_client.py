@@ -1,7 +1,7 @@
 # backend/tests/test_exchange_client.py
 """Exchange client tests."""
-import pytest
-from app.exchange.client import DummyExchangeClient, ExchangeOrderError
+
+from app.exchange.client import DummyExchangeClient
 
 
 class TestDummyExchangeClient:

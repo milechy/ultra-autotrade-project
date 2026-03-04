@@ -9,6 +9,7 @@ from functools import lru_cache
 
 from app.utils.config import get_env
 
+
 @dataclass(frozen=True)
 class NotionConfig:
     """Notion API 用の設定値コンテナ。"""
@@ -52,4 +53,3 @@ def get_notion_config() -> NotionConfig:
         api_base_url=api_base_url,
         api_version=api_version,
     )
-
