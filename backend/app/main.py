@@ -29,6 +29,7 @@ from app.aave.router import router as aave_router
 from app.ai.router import router as ai_router
 from app.api.automation_dashboard import router as automation_dashboard_router
 from app.auth.router import router as auth_router
+from app.automation.automation_router import router as automation_router
 from app.bots.router import router as octobot_router
 from app.database import init_db
 from app.exchange.router import router as exchange_router
@@ -65,6 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(aave_router)  # Aave (Phase4)
     app.include_router(knowledge_router)  # Knowledge Hub (PoC Pivot Step 2)
     app.include_router(exchange_router)  # Exchange (PoC Pivot Step 3)
+    app.include_router(automation_router)  # Automation workflow
     app.include_router(
         automation_dashboard_router,
         prefix="/api/automation",

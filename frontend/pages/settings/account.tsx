@@ -37,17 +37,17 @@ function AccountSettingsContent() {
     setSuccess(null);
 
     if (newPassword !== confirmPassword) {
-      setError("New passwords do not match");
+      setError("新しいパスワードが一致しません");
       return;
     }
 
     if (newPassword.length < 8) {
-      setError("New password must be at least 8 characters");
+      setError("新しいパスワードは8文字以上必要です");
       return;
     }
 
     if (!token) {
-      setError("Not authenticated");
+      setError("認証されていません");
       return;
     }
 
@@ -57,12 +57,12 @@ function AccountSettingsContent() {
         current_password: currentPassword,
         new_password: newPassword,
       });
-      setSuccess("Password changed successfully");
+      setSuccess("パスワードを変更しました");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (err: any) {
-      setError(err?.message || "Failed to change password");
+      setError(err?.message || "パスワード変更に失敗しました");
     } finally {
       setIsSubmitting(false);
     }
@@ -75,28 +75,28 @@ function AccountSettingsContent() {
   return (
     <AppShell>
       <Head>
-        <title>Account Settings - Ultra AutoTrade</title>
+        <title>アカウント設定 - Ultra AutoTrade</title>
       </Head>
 
-      <h1 style={{ marginBottom: 6 }}>Account Settings</h1>
+      <h1 style={{ marginBottom: 6 }}>アカウント設定</h1>
       <p style={{ marginTop: 0, color: "#555" }}>
-        View your profile and change your password.
+        プロフィール情報の確認とパスワード変更ができます。
       </p>
 
       {/* Profile Section */}
       <section style={sectionStyle}>
-        <h2 style={{ margin: 0, fontSize: 16 }}>Profile Information</h2>
+        <h2 style={{ margin: 0, fontSize: 16 }}>プロフィール情報</h2>
         <div style={{ marginTop: 16 }}>
           <div style={fieldRowStyle}>
-            <span style={labelStyle}>Email</span>
+            <span style={labelStyle}>メールアドレス</span>
             <span style={valueStyle}>{user.email}</span>
           </div>
           <div style={fieldRowStyle}>
-            <span style={labelStyle}>Username</span>
+            <span style={labelStyle}>ユーザー名</span>
             <span style={valueStyle}>{user.username}</span>
           </div>
           <div style={fieldRowStyle}>
-            <span style={labelStyle}>Role</span>
+            <span style={labelStyle}>ロール</span>
             <span style={valueStyle}>
               <span style={{
                 padding: "2px 8px",
@@ -105,12 +105,12 @@ function AccountSettingsContent() {
                 background: user.role === "admin" ? "#e8f5e9" : "#e3f2fd",
                 color: user.role === "admin" ? "#2e7d32" : "#1565c0",
               }}>
-                {user.role}
+                {user.role === "admin" ? "管理者" : "閲覧者"}
               </span>
             </span>
           </div>
           <div style={fieldRowStyle}>
-            <span style={labelStyle}>Status</span>
+            <span style={labelStyle}>ステータス</span>
             <span style={valueStyle}>
               <span style={{
                 padding: "2px 8px",
@@ -119,12 +119,12 @@ function AccountSettingsContent() {
                 background: user.is_active ? "#e8f5e9" : "#ffebee",
                 color: user.is_active ? "#2e7d32" : "#c62828",
               }}>
-                {user.is_active ? "Active" : "Inactive"}
+                {user.is_active ? "有効" : "無効"}
               </span>
             </span>
           </div>
           <div style={fieldRowStyle}>
-            <span style={labelStyle}>Created</span>
+            <span style={labelStyle}>作成日時</span>
             <span style={valueStyle}>{new Date(user.created_at).toLocaleString()}</span>
           </div>
         </div>
@@ -132,7 +132,7 @@ function AccountSettingsContent() {
 
       {/* Password Change Section */}
       <section style={sectionStyle}>
-        <h2 style={{ margin: 0, fontSize: 16 }}>Change Password</h2>
+        <h2 style={{ margin: 0, fontSize: 16 }}>パスワード変更</h2>
         <form onSubmit={handleChangePassword} style={{ marginTop: 16 }}>
           {error && (
             <div style={errorStyle}>{error}</div>
@@ -142,7 +142,7 @@ function AccountSettingsContent() {
           )}
 
           <div style={{ marginBottom: 12 }}>
-            <label style={inputLabelStyle}>Current Password</label>
+            <label style={inputLabelStyle}>現在のパスワード</label>
             <input
               type="password"
               value={currentPassword}
@@ -153,7 +153,7 @@ function AccountSettingsContent() {
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <label style={inputLabelStyle}>New Password</label>
+            <label style={inputLabelStyle}>新しいパスワード</label>
             <input
               type="password"
               value={newPassword}
@@ -165,7 +165,7 @@ function AccountSettingsContent() {
           </div>
 
           <div style={{ marginBottom: 16 }}>
-            <label style={inputLabelStyle}>Confirm New Password</label>
+            <label style={inputLabelStyle}>新しいパスワード（確認）</label>
             <input
               type="password"
               value={confirmPassword}
@@ -181,7 +181,7 @@ function AccountSettingsContent() {
             disabled={isSubmitting}
             style={buttonStyle}
           >
-            {isSubmitting ? "Changing..." : "Change Password"}
+            {isSubmitting ? "変更中..." : "パスワードを変更"}
           </button>
         </form>
       </section>

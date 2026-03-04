@@ -51,7 +51,7 @@ function UsersManagementContent() {
       const data = await listUsers(token);
       setUsers(data);
     } catch (err: any) {
-      setError(err?.message || "Failed to load users");
+      setError(err?.message || "ユーザーの読み込みに失敗しました");
     } finally {
       setIsLoading(false);
     }
@@ -101,37 +101,37 @@ function UsersManagementContent() {
   return (
     <AppShell>
       <Head>
-        <title>User Management - Ultra AutoTrade</title>
+        <title>ユーザー管理 - Ultra AutoTrade</title>
       </Head>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
         <div>
-          <h1 style={{ marginBottom: 6 }}>User Management</h1>
+          <h1 style={{ marginBottom: 6 }}>ユーザー管理</h1>
           <p style={{ marginTop: 0, color: "#555" }}>
-            Manage user accounts and permissions.
+            ユーザーアカウントと権限を管理します。
           </p>
         </div>
         <button onClick={() => setShowCreateModal(true)} style={primaryButtonStyle}>
-          + Create User
+          + ユーザー作成
         </button>
       </div>
 
       {error && <div style={errorStyle}>{error}</div>}
 
       {isLoading ? (
-        <div style={{ padding: 40, textAlign: "center", color: "#666" }}>Loading...</div>
+        <div style={{ padding: 40, textAlign: "center", color: "#666" }}>読み込み中...</div>
       ) : (
         <section style={tableContainerStyle}>
           <table style={tableStyle}>
             <thead>
               <tr>
                 <th style={thStyle}>ID</th>
-                <th style={thStyle}>Email</th>
-                <th style={thStyle}>Username</th>
-                <th style={thStyle}>Role</th>
-                <th style={thStyle}>Status</th>
-                <th style={thStyle}>Created</th>
-                <th style={thStyle}>Actions</th>
+                <th style={thStyle}>メールアドレス</th>
+                <th style={thStyle}>ユーザー名</th>
+                <th style={thStyle}>ロール</th>
+                <th style={thStyle}>ステータス</th>
+                <th style={thStyle}>作成日</th>
+                <th style={thStyle}>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -148,7 +148,7 @@ function UsersManagementContent() {
                       background: user.role === "admin" ? "#e8f5e9" : "#e3f2fd",
                       color: user.role === "admin" ? "#2e7d32" : "#1565c0",
                     }}>
-                      {user.role}
+                      {user.role === "admin" ? "管理者" : "閲覧者"}
                     </span>
                   </td>
                   <td style={tdStyle}>
@@ -159,7 +159,7 @@ function UsersManagementContent() {
                       background: user.is_active ? "#e8f5e9" : "#ffebee",
                       color: user.is_active ? "#2e7d32" : "#c62828",
                     }}>
-                      {user.is_active ? "Active" : "Inactive"}
+                      {user.is_active ? "有効" : "無効"}
                     </span>
                   </td>
                   <td style={tdStyle}>{new Date(user.created_at).toLocaleDateString()}</td>
@@ -168,14 +168,14 @@ function UsersManagementContent() {
                       onClick={() => setEditingUser(user)}
                       style={actionButtonStyle}
                     >
-                      Edit
+                      編集
                     </button>
                     {user.id !== currentUser.id && (
                       <button
                         onClick={() => setDeleteConfirm(user)}
                         style={{ ...actionButtonStyle, color: "#c62828" }}
                       >
-                        Delete
+                        削除
                       </button>
                     )}
                   </td>
@@ -189,7 +189,7 @@ function UsersManagementContent() {
       {/* Create User Modal */}
       {showCreateModal && (
         <UserFormModal
-          title="Create New User"
+          title="新規ユーザー作成"
           onSubmit={(data) => handleCreateUser(data as CreateUserRequest)}
           onClose={() => setShowCreateModal(false)}
         />
@@ -198,7 +198,7 @@ function UsersManagementContent() {
       {/* Edit User Modal */}
       {editingUser && (
         <UserFormModal
-          title="Edit User"
+          title="ユーザー編集"
           user={editingUser}
           isCurrentUser={editingUser.id === currentUser.id}
           onSubmit={(data) => handleUpdateUser(editingUser.id, data as UpdateUserRequest)}
@@ -256,14 +256,14 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
         await onSubmit(data);
       } else {
         if (!password || password.length < 8) {
-          setError("Password must be at least 8 characters");
+          setError("パスワードは8文字以上必要です");
           setIsSubmitting(false);
           return;
         }
         await onSubmit({ email, username, password, role });
       }
     } catch (err: any) {
-      setError(err?.message || "Operation failed");
+      setError(err?.message || "操作に失敗しました");
     } finally {
       setIsSubmitting(false);
     }
@@ -278,7 +278,7 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
           {error && <div style={errorStyle}>{error}</div>}
 
           <div style={{ marginBottom: 12 }}>
-            <label style={inputLabelStyle}>Email</label>
+            <label style={inputLabelStyle}>メールアドレス</label>
             <input
               type="email"
               value={email}
@@ -289,7 +289,7 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <label style={inputLabelStyle}>Username</label>
+            <label style={inputLabelStyle}>ユーザー名</label>
             <input
               type="text"
               value={username}
@@ -301,7 +301,7 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
 
           <div style={{ marginBottom: 12 }}>
             <label style={inputLabelStyle}>
-              {isEditing ? "New Password (leave empty to keep current)" : "Password"}
+              {isEditing ? "新しいパスワード（変更しない場合は空欄）" : "パスワード"}
             </label>
             <input
               type="password"
@@ -316,14 +316,14 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
           {!isCurrentUser && (
             <>
               <div style={{ marginBottom: 12 }}>
-                <label style={inputLabelStyle}>Role</label>
+                <label style={inputLabelStyle}>ロール</label>
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value as "admin" | "viewer")}
                   style={inputStyle}
                 >
-                  <option value="viewer">Viewer</option>
-                  <option value="admin">Admin</option>
+                  <option value="viewer">閲覧者</option>
+                  <option value="admin">管理者</option>
                 </select>
               </div>
 
@@ -335,7 +335,7 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
                       checked={isActive}
                       onChange={(e) => setIsActive(e.target.checked)}
                     />
-                    <span style={{ fontSize: 14 }}>Active</span>
+                    <span style={{ fontSize: 14 }}>有効</span>
                   </label>
                 </div>
               )}
@@ -344,10 +344,10 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
 
           <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
             <button type="submit" disabled={isSubmitting} style={primaryButtonStyle}>
-              {isSubmitting ? "Saving..." : "Save"}
+              {isSubmitting ? "保存中..." : "保存"}
             </button>
             <button type="button" onClick={onClose} style={secondaryButtonStyle}>
-              Cancel
+              キャンセル
             </button>
           </div>
         </form>
@@ -373,7 +373,7 @@ function DeleteConfirmModal({ user, onConfirm, onClose }: DeleteConfirmModalProp
     try {
       await onConfirm();
     } catch (err: any) {
-      setError(err?.message || "Failed to delete user");
+      setError(err?.message || "ユーザーの削除に失敗しました");
       setIsDeleting(false);
     }
   };
@@ -381,10 +381,10 @@ function DeleteConfirmModal({ user, onConfirm, onClose }: DeleteConfirmModalProp
   return (
     <div style={modalOverlayStyle} onClick={onClose}>
       <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ marginTop: 0 }}>Delete User</h2>
+        <h2 style={{ marginTop: 0 }}>ユーザー削除</h2>
 
-        <p>Are you sure you want to delete user <strong>{user.username}</strong> ({user.email})?</p>
-        <p style={{ color: "#c62828" }}>This action cannot be undone.</p>
+        <p>ユーザー <strong>{user.username}</strong>（{user.email}）を削除しますか？</p>
+        <p style={{ color: "#c62828" }}>この操作は取り消せません。</p>
 
         {error && <div style={errorStyle}>{error}</div>}
 
@@ -394,10 +394,10 @@ function DeleteConfirmModal({ user, onConfirm, onClose }: DeleteConfirmModalProp
             disabled={isDeleting}
             style={{ ...primaryButtonStyle, background: "#c62828" }}
           >
-            {isDeleting ? "Deleting..." : "Delete"}
+            {isDeleting ? "削除中..." : "削除"}
           </button>
           <button onClick={onClose} style={secondaryButtonStyle}>
-            Cancel
+            キャンセル
           </button>
         </div>
       </div>

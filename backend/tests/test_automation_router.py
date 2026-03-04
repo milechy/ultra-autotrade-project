@@ -1,4 +1,3 @@
-# backend/tests/test_automation_router.py
 """Tests for app.automation.router endpoints."""
 
 from datetime import timedelta

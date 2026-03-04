@@ -7,11 +7,14 @@ Notion クライアントと内部スキーマをつなぐサービス層。
 - Notion API レスポンス → NotionNewsItem への変換
 """
 
-from datetime import datetime
+import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from .client import NotionClient
 from .schemas import NotionNewsItem
+
+logger = logging.getLogger(__name__)
 
 
 def _extract_rich_text_text(prop: Dict[str, Any]) -> Optional[str]:
@@ -129,3 +132,103 @@ class NotionService:
             items.append(item)
 
         return items
+
+    def update_item_with_ai_result(
+        self,
+        page_id: str,
+        action: str,
+        confidence: int,
+        sentiment: Optional[str] = None,
+        summary: Optional[str] = None,
+    ) -> None:
+        """
+        AI 判定結果を Notion ページに書き戻す。
+
+        Args:
+            page_id: Notion ページ ID
+            action: BUY / SELL / HOLD
+            confidence: 信頼度 (0-100)
+            sentiment: センチメント (positive / negative / neutral)
+            summary: 要約テキスト
+        """
+        properties: Dict[str, Any] = {
+            "Action": {"select": {"name": action}},
+            "Confidence": {"number": confidence},
+            "Status": {"select": {"name": "処理済"}},
+            "Timestamp": {
+                "date": {"start": datetime.now(timezone.utc).isoformat()}
+            },
+        }
+
+        if sentiment:
+            properties["Sentiment"] = {"select": {"name": sentiment}}
+
+        if summary:
+            properties["Summary"] = {
+                "rich_text": [{"text": {"content": summary[:2000]}}]
+            }
+
+        try:
+            self.client.update_page_properties(page_id, properties)
+            logger.info(
+                "Updated Notion page: page_id=%s, action=%s, confidence=%d",
+                page_id,
+                action,
+                confidence,
+            )
+        except Exception as exc:
+            logger.error(
+                "Failed to update Notion page: page_id=%s, error=%s",
+                page_id,
+                exc,
+            )
+            raise
+
+    def update_item_with_error(
+        self,
+        page_id: str,
+        error_message: str,
+        action: Optional[str] = None,
+        confidence: Optional[int] = None,
+    ) -> None:
+        """
+        OctoBot 送信失敗時に Notion ページを「エラー」ステータスに更新する。
+
+        次回の cron 実行時に再処理されるよう、Status を「エラー」に設定する。
+
+        Args:
+            page_id: Notion ページ ID
+            error_message: エラーメッセージ（Summary に記録）
+            action: AI 判定結果（記録用）
+            confidence: 信頼度（記録用）
+        """
+        properties: Dict[str, Any] = {
+            "Status": {"select": {"name": "エラー"}},
+            "Timestamp": {
+                "date": {"start": datetime.now(timezone.utc).isoformat()}
+            },
+            "Summary": {
+                "rich_text": [{"text": {"content": f"[ERROR] {error_message[:1900]}"}}]
+            },
+        }
+
+        if action:
+            properties["Action"] = {"select": {"name": action}}
+
+        if confidence is not None:
+            properties["Confidence"] = {"number": confidence}
+
+        try:
+            self.client.update_page_properties(page_id, properties)
+            logger.warning(
+                "Updated Notion page with error status: page_id=%s, error=%s",
+                page_id,
+                error_message,
+            )
+        except Exception as exc:
+            logger.error(
+                "Failed to update Notion page with error: page_id=%s, error=%s",
+                page_id,
+                exc,
+            )
+            raise

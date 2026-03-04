@@ -4,18 +4,27 @@
 E2E ワークフロー: Knowledge Hub → RAG → AI Judge → Exchange
 
 PoC Pivot の中心となるオーケストレーション。
+Legacy Notion → AI → OctoBot フローも維持 (WorkflowService)。
 """
 
 import logging
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.ai.schemas import RAGContext, TradeAction
+from app.ai.schemas import AIAnalysisResult, RAGContext, TradeAction
 from app.ai.service import AIService
 from app.automation.monitoring_service import MonitoringService
 from app.automation.schemas import WorkflowRunResult, WorkflowStepError
+from app.bots.schemas import (
+    OctoBotSignal,
+    OctoBotSignalRequest,
+    OctoBotSignalResponse,
+    OctoBotSignalStatus,
+)
+from app.bots.service import OctoBotService
 from app.exchange.schemas import OrderRequest, OrderResult, OrderStatus
 from app.exchange.service import ExchangeService
 from app.knowledge.schemas import (
@@ -24,12 +33,252 @@ from app.knowledge.schemas import (
     KnowledgeSearchRequest,
 )
 from app.knowledge.service import KnowledgeService
+from app.notion.service import NotionService
 
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Shared dataclass: WorkflowResult (used by automation_router.py / legacy flow)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class WorkflowResult:
+    """ワークフロー実行結果のサマリ (Notion→AI→OctoBot 旧フロー用)。"""
+
+    fetched_count: int = 0
+    analyzed_count: int = 0
+    octobot_success_count: int = 0
+    octobot_skipped_count: int = 0
+    octobot_failed_count: int = 0
+    notion_updated_count: int = 0
+    errors: List[str] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Legacy flow: WorkflowService (Notion → AI → OctoBot → Notion)
+# ---------------------------------------------------------------------------
+
+
+class WorkflowService:
+    """
+    Notion → AI → OctoBot → Notion書き戻しのオーケストレーター。
+
+    各サービスをコンストラクタで受け取り、DI を可能にする。
+    """
+
+    def __init__(
+        self,
+        notion_service: NotionService,
+        ai_service: AIService,
+        octobot_service: OctoBotService,
+    ) -> None:
+        self._notion = notion_service
+        self._ai = ai_service
+        self._octobot = octobot_service
+
+    def process_pending_news(self) -> WorkflowResult:
+        """
+        未処理ニュースを取得し、AI判定→OctoBot送信→Notion書き戻しを行う。
+
+        Returns:
+            WorkflowResult: 処理結果のサマリ
+        """
+        errors: List[str] = []
+        fetched_count = 0
+        analyzed_count = 0
+        octobot_success = 0
+        octobot_skipped = 0
+        octobot_failed = 0
+        notion_updated = 0
+
+        # 1. Notion から未処理ニュースを取得
+        logger.info("Workflow: fetching unprocessed news from Notion")
+        try:
+            news_items = self._notion.fetch_unprocessed_news()
+            fetched_count = len(news_items)
+            logger.info("Workflow: fetched %d unprocessed news items", fetched_count)
+        except Exception as exc:
+            error_msg = f"Failed to fetch news from Notion: {exc}"
+            logger.error(error_msg)
+            errors.append(error_msg)
+            return WorkflowResult(
+                fetched_count=0,
+                analyzed_count=0,
+                octobot_success_count=0,
+                octobot_skipped_count=0,
+                octobot_failed_count=0,
+                notion_updated_count=0,
+                errors=errors,
+            )
+
+        if fetched_count == 0:
+            logger.info("Workflow: no unprocessed news to process")
+            return WorkflowResult(
+                fetched_count=0,
+                analyzed_count=0,
+                octobot_success_count=0,
+                octobot_skipped_count=0,
+                octobot_failed_count=0,
+                notion_updated_count=0,
+                errors=[],
+            )
+
+        # 2. AI で判定
+        logger.info("Workflow: analyzing %d news items with AI", fetched_count)
+        try:
+            ai_results = self._ai.analyze_items(news_items)
+            analyzed_count = len(ai_results)
+            logger.info("Workflow: AI analyzed %d items", analyzed_count)
+        except Exception as exc:
+            error_msg = f"AI analysis failed: {exc}"
+            logger.error(error_msg)
+            errors.append(error_msg)
+            return WorkflowResult(
+                fetched_count=fetched_count,
+                analyzed_count=0,
+                octobot_success_count=0,
+                octobot_skipped_count=0,
+                octobot_failed_count=0,
+                notion_updated_count=0,
+                errors=errors,
+            )
+
+        # 3. OctoBot へシグナル送信
+        failed_signal_ids: dict[str, str] = {}
+        response: Optional[OctoBotSignalResponse] = None
+
+        signals = self._convert_to_octobot_signals(ai_results)
+        if signals:
+            logger.info("Workflow: sending %d signals to OctoBot", len(signals))
+            try:
+                request = OctoBotSignalRequest(signals=signals, count=len(signals))
+                response = self._octobot.process_signals(request)
+                octobot_success = response.success_count
+                octobot_skipped = response.skipped_count
+                octobot_failed = response.failed_count
+                logger.info(
+                    "Workflow: OctoBot result - sent=%d, skipped=%d, failed=%d",
+                    octobot_success,
+                    octobot_skipped,
+                    octobot_failed,
+                )
+
+                for detail in response.details:
+                    if detail.status == OctoBotSignalStatus.FAILED:
+                        failed_signal_ids[detail.id] = detail.message or "OctoBot送信失敗"
+                        logger.warning(
+                            "OctoBot signal failed: id=%s, message=%s",
+                            detail.id,
+                            detail.message,
+                        )
+            except Exception as exc:
+                error_msg = f"OctoBot signal processing failed: {exc}"
+                logger.error(error_msg)
+                errors.append(error_msg)
+                octobot_failed = len(signals)
+                for signal in signals:
+                    failed_signal_ids[signal.id] = str(exc)
+        else:
+            logger.info("Workflow: no signals to send to OctoBot")
+
+        # 4. Notion に結果を書き戻し
+        logger.info("Workflow: updating Notion with AI results")
+        for result in ai_results:
+            try:
+                if result.id in failed_signal_ids:
+                    self._notion.update_item_with_error(
+                        page_id=result.id,
+                        error_message=failed_signal_ids[result.id],
+                        action=result.action.value,
+                        confidence=result.confidence,
+                    )
+                    logger.info(
+                        "Notion page marked as error for retry: page_id=%s",
+                        result.id,
+                    )
+                else:
+                    self._notion.update_item_with_ai_result(
+                        page_id=result.id,
+                        action=result.action.value,
+                        confidence=result.confidence,
+                        sentiment=result.sentiment,
+                        summary=result.summary,
+                    )
+                notion_updated += 1
+            except Exception as exc:
+                error_msg = f"Failed to update Notion page {result.id}: {exc}"
+                logger.error(error_msg)
+                errors.append(error_msg)
+
+        logger.info(
+            "Workflow: completed - fetched=%d, analyzed=%d, octobot_sent=%d, notion_updated=%d",
+            fetched_count,
+            analyzed_count,
+            octobot_success,
+            notion_updated,
+        )
+
+        return WorkflowResult(
+            fetched_count=fetched_count,
+            analyzed_count=analyzed_count,
+            octobot_success_count=octobot_success,
+            octobot_skipped_count=octobot_skipped,
+            octobot_failed_count=octobot_failed,
+            notion_updated_count=notion_updated,
+            errors=errors,
+        )
+
+    def _convert_to_octobot_signals(
+        self, ai_results: List[AIAnalysisResult]
+    ) -> List[OctoBotSignal]:
+        """AIAnalysisResult を OctoBotSignal に変換する。HOLD はスキップ。"""
+        signals: List[OctoBotSignal] = []
+
+        for result in ai_results:
+            if result.action == TradeAction.HOLD:
+                logger.debug("Skipping HOLD signal for id=%s", result.id)
+                continue
+
+            signal = OctoBotSignal(
+                id=result.id,
+                url=result.url,
+                action=result.action,
+                confidence=result.confidence,
+                reason=result.reason or "AI判定によるシグナル",
+                timestamp=result.timestamp,
+            )
+            signals.append(signal)
+
+        return signals
+
+
+# ---------------------------------------------------------------------------
+# New PoC flow: Knowledge Hub → RAG → AI Judge → Exchange
+# ---------------------------------------------------------------------------
+
+
 class WorkflowError(Exception):
     """Workflow processing error."""
+
+
+class _SingleItemResult:
+    """Result of processing a single knowledge item (internal use)."""
+
+    def __init__(
+        self,
+        item_id: int,
+        action: TradeAction,
+        confidence: int,
+        order_result: Optional[OrderResult],
+        reason: str,
+    ) -> None:
+        self.item_id = item_id
+        self.action = action
+        self.confidence = confidence
+        self.order_result = order_result
+        self.reason = reason
 
 
 def check_rule_engine(
@@ -47,35 +296,15 @@ def check_rule_engine(
     if monitoring_service is None:
         return True, "no_monitoring"
 
-    # Check last recorded health factor first (most specific reason)
     status = monitoring_service.get_status()
     if status.last_health_factor is not None:
         if status.last_health_factor < Decimal("1.6"):
             return False, "hf_below_threshold"
 
-    # Check generic emergency stop (manual activation or other reasons)
     if not monitoring_service.is_trading_allowed():
         return False, "emergency_stop"
 
     return True, "ok"
-
-
-class WorkflowResult:
-    """Result of processing a single knowledge item."""
-
-    def __init__(
-        self,
-        item_id: int,
-        action: TradeAction,
-        confidence: int,
-        order_result: Optional[OrderResult],
-        reason: str,
-    ) -> None:
-        self.item_id = item_id
-        self.action = action
-        self.confidence = confidence
-        self.order_result = order_result
-        self.reason = reason
 
 
 def process_pending_knowledge(
@@ -105,12 +334,10 @@ def process_pending_knowledge(
 
     logger.info("Processing %d pending knowledge items", len(pending))
 
-    # Rule engine pre-check (runs BEFORE LLM to save cost)
     can_trade, rule_reason = check_rule_engine(monitoring_service)
 
     if not can_trade:
         logger.info("Rule engine blocked trading: %s", rule_reason)
-        # Mark all items as skipped
         for item in pending:
             try:
                 knowledge_service.update_status(db, item.id, KnowledgeItemStatus.SKIPPED)
@@ -200,9 +427,8 @@ def _process_single_item(
     exchange_service: ExchangeService,
     trade_amount_usd: Decimal,
     dry_run: bool,
-) -> WorkflowResult:
+) -> _SingleItemResult:
     """Process a single knowledge item through the full pipeline."""
-    # 1. RAG search
     query = item.title or item.source_url or "analyze market conditions"
     search_request = KnowledgeSearchRequest(query=query, top_k=5)
     search_results = knowledge_service.search(db, search_request)
@@ -213,7 +439,6 @@ def _process_single_item(
         source_count=len(search_results),
     )
 
-    # 2. AI Two-Phase judge
     cross_result = ai_service.judge_with_rag(query, rag_context)
     action = cross_result.final_action
     confidence = cross_result.final_confidence
@@ -227,7 +452,6 @@ def _process_single_item(
         cross_result.agreed,
     )
 
-    # 3. Execute trade if applicable
     order_result: Optional[OrderResult] = None
     if action in (TradeAction.BUY, TradeAction.SELL) and confidence >= 40:
         order_request = OrderRequest(
@@ -248,7 +472,7 @@ def _process_single_item(
             "Skip trade for item %d: action=%s, confidence=%d", item.id, action.value, confidence
         )
 
-    return WorkflowResult(
+    return _SingleItemResult(
         item_id=item.id,
         action=action,
         confidence=confidence,

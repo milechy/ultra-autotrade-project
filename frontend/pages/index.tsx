@@ -11,26 +11,26 @@ export default function Home() {
       <main style={{ fontFamily: "system-ui", padding: 24, maxWidth: 920, margin: "0 auto" }}>
         <h1 style={{ marginBottom: 8 }}>Ultra AutoTrade</h1>
         <p style={{ marginTop: 0, color: "#555" }}>
-          Operations Dashboard (read-only). Use this UI to confirm health and review the latest report.
+          運用ダッシュボード（読み取り専用）. Use this UI to confirm health and review the latest report.
         </p>
 
         <div style={{ display: "flex", gap: 12, marginTop: 20, flexWrap: "wrap" }}>
           <Link href="/dashboard/automation" style={cardStyle}>
-            <strong>Automation</strong>
+            <strong>自動売買</strong>
             <div style={{ color: "#555", marginTop: 6 }}>
               Status, recent events, and snapshot panels.
             </div>
           </Link>
 
           <Link href="/dashboard/reports" style={cardStyle}>
-            <strong>Latest Report</strong>
+            <strong>最新レポート</strong>
             <div style={{ color: "#555", marginTop: 6 }}>
               Most recent summary report (daily/weekly).
             </div>
           </Link>
 
           <a href="/dashboard" style={cardStyle}>
-            <strong>Dashboard Index</strong>
+            <strong>ダッシュボード</strong>
             <div style={{ color: "#555", marginTop: 6 }}>
               Landing page for operations navigation.
             </div>
