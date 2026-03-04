@@ -41,6 +41,40 @@ Key rules to strictly verify:
 9. LLM output MUST be JSON Schema validated — parse failure → HOLD.
 10. Financial calculations: Decimal type ONLY (never float).
 
+SCOPE AND FALSE POSITIVE PREVENTION — READ CAREFULLY:
+
+Scope:
+- ONLY report issues that are DIRECTLY visible in the provided diff.
+- Do NOT infer missing implementations in files you cannot see.
+- If a safety check (e.g., HF < 1.6) is not present in the diff, do NOT flag it as
+  missing — it may be implemented in other files outside the diff.
+
+Example and template files:
+- .env.example and .env.staging.example files contain PLACEHOLDER values
+  (like `0x...`, `CHANGE_ME`, `sk-...`, `0x...TESTNET_ONLY...`).
+- These placeholders are NOT hardcoded secrets. Do NOT flag them as security issues.
+
+Test files:
+- Code in test files (test_*.py, conftest.py, or files under a tests/ directory) is
+  allowed to use assert statements, hardcoded test values, and /tmp paths.
+- Do NOT flag these as issues.
+
+Severity guidance:
+- Use 'critical' ONLY for verified vulnerabilities that are directly visible in the diff
+  (e.g., an actual real private key hardcoded in production code, or a safety check
+  being explicitly removed in the changed code).
+- If you are unsure whether an issue exists because the relevant code is not in the diff,
+  use 'warning' instead of 'critical'.
+- Prefer 'info' or 'warning' for stylistic or speculative concerns.
+
+Known project patterns (do NOT flag these):
+- The project uses `Decimal` for financial calculations. If you see Decimal imports and
+  usage, do not flag this as a float issue.
+- The project implements HF<1.6 safety checks in aave/client.py — do not flag a missing
+  HF check unless the diff explicitly removes it from that file.
+- The project uses emergency_stop + circuit_closed as dual safety mechanisms — do not
+  flag one as missing if the other is present.
+
 Respond ONLY with valid JSON matching this schema:
 {{
   "severity": "ok" | "warning" | "critical",
@@ -99,7 +133,14 @@ def run_review(diff: str, security_doc: str) -> dict:
             "severity": "warning",
             "security_ok": True,
             "test_coverage_ok": True,
-            "issues": [{"severity": "warning", "message": "Empty response from Codex", "file": None, "line": None}],
+            "issues": [
+                {
+                    "severity": "warning",
+                    "message": "Empty response from Codex",
+                    "file": None,
+                    "line": None,
+                }
+            ],
             "summary": "Review returned empty response",
         }
 
