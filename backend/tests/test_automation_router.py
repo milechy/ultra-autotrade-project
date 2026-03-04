@@ -8,7 +8,12 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.automation.router import router as automation_router
-from app.automation.schemas import AutomationReportSummary, AutomationStatus, DashboardSnapshot
+from app.automation.schemas import (
+    AutomationReportSummary,
+    AutomationStatus,
+    DashboardSnapshot,
+    WorkflowRunResult,
+)
 from app.automation.state import get_monitoring_service
 from app.database import get_db
 
@@ -216,7 +221,7 @@ class TestWorkflowRun:
     def _make_app_with_workflow_mock(self, process_return_value=None):
         """Create a test app with process_pending_knowledge mocked."""
         if process_return_value is None:
-            process_return_value = []
+            process_return_value = WorkflowRunResult(status="no_items")
 
         mock_db = MagicMock()
         mock_monitoring = MagicMock()
@@ -228,12 +233,14 @@ class TestWorkflowRun:
 
         return app
 
-    def test_workflow_run_dry_run_returns_empty_results(self):
+    def test_workflow_run_dry_run_returns_no_items(self):
         mock_db = MagicMock()
+        mock_monitoring = MagicMock()
 
         app = FastAPI()
         app.include_router(automation_router, prefix="/api/automation")
         app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
 
         with (
             patch("app.automation.router.KnowledgeService") as _MockKS,
@@ -241,23 +248,26 @@ class TestWorkflowRun:
             patch("app.automation.router.get_exchange_service") as _mock_get_ex,
             patch("app.automation.router.process_pending_knowledge") as mock_process,
         ):
-            mock_process.return_value = []
+            mock_process.return_value = WorkflowRunResult(status="no_items")
             client = TestClient(app)
             response = client.post("/api/automation/workflow/run?dry_run=true")
 
         assert response.status_code == 200
         data = response.json()
-        assert data["processed"] == 0
-        assert data["trades_executed"] == 0
-        assert data["items"] == []
+        assert data["status"] == "no_items"
+        assert data["fetched_count"] == 0
+        assert data["traded_count"] == 0
+        assert data["errors"] == []
 
     def test_workflow_run_default_dry_run_is_true(self):
         """dry_run defaults to True when not specified."""
         mock_db = MagicMock()
+        mock_monitoring = MagicMock()
 
         app = FastAPI()
         app.include_router(automation_router, prefix="/api/automation")
         app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
 
         with (
             patch("app.automation.router.KnowledgeService"),
@@ -265,7 +275,7 @@ class TestWorkflowRun:
             patch("app.automation.router.get_exchange_service"),
             patch("app.automation.router.process_pending_knowledge") as mock_process,
         ):
-            mock_process.return_value = []
+            mock_process.return_value = WorkflowRunResult(status="no_items")
             client = TestClient(app)
             response = client.post("/api/automation/workflow/run")
 
@@ -274,24 +284,25 @@ class TestWorkflowRun:
         call_kwargs = mock_process.call_args
         assert call_kwargs.kwargs.get("dry_run") is True
 
-    def test_workflow_run_with_results_skipped(self):
-        """When workflow returns results with no order, trade_status is skipped."""
-        from app.ai.schemas import TradeAction
-        from app.automation.workflow import WorkflowResult
-
+    def test_workflow_run_with_completed_result(self):
+        """When workflow returns a completed result with trades."""
         mock_db = MagicMock()
+        mock_monitoring = MagicMock()
 
-        fake_result = WorkflowResult(
-            item_id=42,
-            action=TradeAction.HOLD,
-            confidence=30,
-            order_result=None,
-            reason="Low confidence",
+        fake_result = WorkflowRunResult(
+            fetched_count=1,
+            analyzed_count=1,
+            traded_count=0,
+            hold_count=1,
+            skipped_count=0,
+            errors=[],
+            status="completed",
         )
 
         app = FastAPI()
         app.include_router(automation_router, prefix="/api/automation")
         app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
 
         with (
             patch("app.automation.router.KnowledgeService"),
@@ -299,56 +310,36 @@ class TestWorkflowRun:
             patch("app.automation.router.get_exchange_service"),
             patch("app.automation.router.process_pending_knowledge") as mock_process,
         ):
-            mock_process.return_value = [fake_result]
+            mock_process.return_value = fake_result
             client = TestClient(app)
             response = client.post("/api/automation/workflow/run?dry_run=true")
 
         assert response.status_code == 200
         data = response.json()
-        assert data["processed"] == 1
-        assert data["trades_executed"] == 0
-        assert len(data["items"]) == 1
-        item = data["items"][0]
-        assert item["item_id"] == 42
-        # TradeAction enum values are uppercase: "HOLD", "BUY", "SELL"
-        assert item["action"] == "HOLD"
-        assert item["confidence"] == 30
-        assert item["trade_status"] == "skipped"
-        assert item["reason"] == "Low confidence"
+        assert data["fetched_count"] == 1
+        assert data["hold_count"] == 1
+        assert data["traded_count"] == 0
+        assert data["status"] == "completed"
 
     def test_workflow_run_with_successful_trade(self):
         """When workflow returns results with a successful order."""
-        from datetime import datetime, timezone
-        from decimal import Decimal
-
-        from app.ai.schemas import TradeAction
-        from app.automation.workflow import WorkflowResult
-        from app.exchange.schemas import OrderResult, OrderSide, OrderStatus
-
         mock_db = MagicMock()
+        mock_monitoring = MagicMock()
 
-        order_result = OrderResult(
-            order_id="dry-run-0001",
-            status=OrderStatus.SUCCESS,
-            side=OrderSide.BUY,
-            symbol="BTC/USDT",
-            amount_usd=Decimal("50"),
-            price=Decimal("45000"),
-            message="Order executed",
-            timestamp=datetime.now(timezone.utc),
-        )
-
-        fake_result = WorkflowResult(
-            item_id=10,
-            action=TradeAction.BUY,
-            confidence=80,
-            order_result=order_result,
-            reason="Strong buy signal",
+        fake_result = WorkflowRunResult(
+            fetched_count=1,
+            analyzed_count=1,
+            traded_count=1,
+            hold_count=0,
+            skipped_count=0,
+            errors=[],
+            status="completed",
         )
 
         app = FastAPI()
         app.include_router(automation_router, prefix="/api/automation")
         app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
 
         with (
             patch("app.automation.router.KnowledgeService"),
@@ -356,26 +347,25 @@ class TestWorkflowRun:
             patch("app.automation.router.get_exchange_service"),
             patch("app.automation.router.process_pending_knowledge") as mock_process,
         ):
-            mock_process.return_value = [fake_result]
+            mock_process.return_value = fake_result
             client = TestClient(app)
             response = client.post("/api/automation/workflow/run?dry_run=false")
 
         assert response.status_code == 200
         data = response.json()
-        assert data["processed"] == 1
-        assert data["trades_executed"] == 1
-        item = data["items"][0]
-        assert item["trade_status"] == "success"
-        # TradeAction enum values are uppercase: "BUY"
-        assert item["action"] == "BUY"
+        assert data["fetched_count"] == 1
+        assert data["traded_count"] == 1
+        assert data["status"] == "completed"
 
     def test_workflow_run_dry_run_false_passes_flag(self):
         """dry_run=false is correctly passed to process_pending_knowledge."""
         mock_db = MagicMock()
+        mock_monitoring = MagicMock()
 
         app = FastAPI()
         app.include_router(automation_router, prefix="/api/automation")
         app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
 
         with (
             patch("app.automation.router.KnowledgeService"),
@@ -383,7 +373,7 @@ class TestWorkflowRun:
             patch("app.automation.router.get_exchange_service"),
             patch("app.automation.router.process_pending_knowledge") as mock_process,
         ):
-            mock_process.return_value = []
+            mock_process.return_value = WorkflowRunResult(status="no_items")
             client = TestClient(app)
             client.post("/api/automation/workflow/run?dry_run=false")
 

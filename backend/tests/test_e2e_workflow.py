@@ -12,9 +12,9 @@ from app.ai.schemas import (
     TradeAction,
 )
 from app.ai.service import AIService
+from app.automation.schemas import WorkflowRunResult
 from app.automation.workflow import process_pending_knowledge
 from app.exchange.client import DummyExchangeClient
-from app.exchange.schemas import OrderStatus
 from app.exchange.service import ExchangeService
 from app.knowledge.schemas import (
     KnowledgeItem,
@@ -77,7 +77,7 @@ def _make_exchange_settings():
 
 class TestE2EWorkflow:
     def test_buy_flow(self):
-        """Full BUY pipeline: pending -> RAG -> AI(BUY,85) -> exchange -> analyzed."""
+        """Full BUY pipeline: pending -> RAG -> AI(BUY,85) -> exchange -> traded."""
         mock_db = MagicMock()
         mock_ks = MagicMock()
         mock_ks.get_pending.return_value = [_make_item()]
@@ -89,21 +89,21 @@ class TestE2EWorkflow:
         client = DummyExchangeClient()
         exchange = ExchangeService(client=client, settings=_make_exchange_settings())
 
-        results = process_pending_knowledge(
+        result = process_pending_knowledge(
             mock_db,
             knowledge_service=mock_ks,
             ai_service=mock_ai,
             exchange_service=exchange,
         )
 
-        assert len(results) == 1
-        assert results[0].action == TradeAction.BUY
-        assert results[0].order_result is not None
-        assert results[0].order_result.status == OrderStatus.SUCCESS
+        assert isinstance(result, WorkflowRunResult)
+        assert result.fetched_count == 1
+        assert result.traded_count == 1
+        assert result.status == "completed"
         mock_ks.update_status.assert_called_once()
 
     def test_hold_flow(self):
-        """HOLD pipeline: pending -> RAG -> AI(HOLD,50) -> skip exchange -> analyzed."""
+        """HOLD pipeline: pending -> RAG -> AI(HOLD,50) -> skip exchange -> skipped."""
         mock_db = MagicMock()
         mock_ks = MagicMock()
         mock_ks.get_pending.return_value = [_make_item()]
@@ -115,16 +115,17 @@ class TestE2EWorkflow:
         client = DummyExchangeClient()
         exchange = ExchangeService(client=client, settings=_make_exchange_settings())
 
-        results = process_pending_knowledge(
+        result = process_pending_knowledge(
             mock_db,
             knowledge_service=mock_ks,
             ai_service=mock_ai,
             exchange_service=exchange,
         )
 
-        assert len(results) == 1
-        assert results[0].action == TradeAction.HOLD
-        assert results[0].order_result is None
+        assert isinstance(result, WorkflowRunResult)
+        assert result.fetched_count == 1
+        assert result.hold_count == 1
+        assert result.traded_count == 0
 
     def test_disagree_defaults_hold(self):
         """Disagreement -> HOLD (fail-closed)."""
@@ -141,15 +142,16 @@ class TestE2EWorkflow:
         client = DummyExchangeClient()
         exchange = ExchangeService(client=client, settings=_make_exchange_settings())
 
-        results = process_pending_knowledge(
+        result = process_pending_knowledge(
             mock_db,
             knowledge_service=mock_ks,
             ai_service=mock_ai,
             exchange_service=exchange,
         )
 
-        assert results[0].action == TradeAction.HOLD
-        assert results[0].order_result is None
+        assert isinstance(result, WorkflowRunResult)
+        assert result.hold_count == 1
+        assert result.traded_count == 0
 
     def test_error_marks_item(self):
         """Processing error -> item marked as ERROR, continue."""
@@ -164,22 +166,23 @@ class TestE2EWorkflow:
         client = DummyExchangeClient()
         exchange = ExchangeService(client=client, settings=_make_exchange_settings())
 
-        results = process_pending_knowledge(
+        result = process_pending_knowledge(
             mock_db,
             knowledge_service=mock_ks,
             ai_service=mock_ai,
             exchange_service=exchange,
         )
 
-        assert len(results) == 2
-        # First item errored
-        assert results[0].action == TradeAction.HOLD
-        assert results[0].confidence == 0
-        # Second item processed normally
-        assert results[1].action == TradeAction.HOLD
+        assert isinstance(result, WorkflowRunResult)
+        assert result.fetched_count == 2
+        # First item errored, second item processed normally (HOLD)
+        assert len(result.errors) == 1
+        assert result.errors[0].item_id == 1
+        assert result.hold_count == 1
+        assert result.status == "completed_with_errors"
 
     def test_no_pending_items(self):
-        """No pending items -> empty results."""
+        """No pending items -> no_items status."""
         mock_db = MagicMock()
         mock_ks = MagicMock()
         mock_ks.get_pending.return_value = []
@@ -188,17 +191,19 @@ class TestE2EWorkflow:
         client = DummyExchangeClient()
         exchange = ExchangeService(client=client, settings=_make_exchange_settings())
 
-        results = process_pending_knowledge(
+        result = process_pending_knowledge(
             mock_db,
             knowledge_service=mock_ks,
             ai_service=mock_ai,
             exchange_service=exchange,
         )
 
-        assert len(results) == 0
+        assert isinstance(result, WorkflowRunResult)
+        assert result.status == "no_items"
+        assert result.fetched_count == 0
 
     def test_dry_run(self):
-        """Dry run: trade should be skipped."""
+        """Dry run: trade should be skipped (order_result.status == SKIPPED)."""
         mock_db = MagicMock()
         mock_ks = MagicMock()
         mock_ks.get_pending.return_value = [_make_item()]
@@ -210,7 +215,7 @@ class TestE2EWorkflow:
         client = DummyExchangeClient()
         exchange = ExchangeService(client=client, settings=_make_exchange_settings())
 
-        results = process_pending_knowledge(
+        result = process_pending_knowledge(
             mock_db,
             knowledge_service=mock_ks,
             ai_service=mock_ai,
@@ -218,12 +223,15 @@ class TestE2EWorkflow:
             dry_run=True,
         )
 
-        assert len(results) == 1
-        assert results[0].order_result is not None
-        assert results[0].order_result.status == OrderStatus.SKIPPED
+        assert isinstance(result, WorkflowRunResult)
+        assert result.fetched_count == 1
+        # Dry run returns OrderResult with SKIPPED status → order_result is not None
+        # but the trade itself didn't execute → counted as skipped_count
+        assert result.traded_count == 0
+        assert result.skipped_count == 1
 
     def test_sell_flow(self):
-        """Full SELL pipeline: pending -> RAG -> AI(SELL,80) -> exchange -> analyzed."""
+        """Full SELL pipeline: pending -> RAG -> AI(SELL,80) -> exchange -> traded."""
         mock_db = MagicMock()
         mock_ks = MagicMock()
         mock_ks.get_pending.return_value = [_make_item()]
@@ -235,17 +243,17 @@ class TestE2EWorkflow:
         client = DummyExchangeClient()
         exchange = ExchangeService(client=client, settings=_make_exchange_settings())
 
-        results = process_pending_knowledge(
+        result = process_pending_knowledge(
             mock_db,
             knowledge_service=mock_ks,
             ai_service=mock_ai,
             exchange_service=exchange,
         )
 
-        assert len(results) == 1
-        assert results[0].action == TradeAction.SELL
-        assert results[0].order_result is not None
-        assert results[0].order_result.status == OrderStatus.SUCCESS
+        assert isinstance(result, WorkflowRunResult)
+        assert result.fetched_count == 1
+        assert result.traded_count == 1
+        assert result.status == "completed"
 
     def test_low_confidence_buy_skips_trade(self):
         """BUY with confidence < 40 should not trigger trade (per workflow logic)."""
@@ -261,15 +269,14 @@ class TestE2EWorkflow:
         client = DummyExchangeClient()
         exchange = ExchangeService(client=client, settings=_make_exchange_settings())
 
-        results = process_pending_knowledge(
+        result = process_pending_knowledge(
             mock_db,
             knowledge_service=mock_ks,
             ai_service=mock_ai,
             exchange_service=exchange,
         )
 
-        assert len(results) == 1
-        assert results[0].action == TradeAction.BUY
-        # order_result should be None because confidence < 40
-        assert results[0].order_result is None
+        assert isinstance(result, WorkflowRunResult)
+        assert result.fetched_count == 1
+        assert result.traded_count == 0
         assert len(client.orders) == 0

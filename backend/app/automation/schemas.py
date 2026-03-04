@@ -301,3 +301,28 @@ class AutomationReportSummary(BaseModel):
         None,
         description="人間向けの簡易コメント。将来的に AI による文章生成に置き換え可能。",
     )
+
+
+# ---------------------------------------------------------------------------
+# ワークフロー実行結果スキーマ
+# ---------------------------------------------------------------------------
+
+
+class WorkflowStepError(BaseModel):
+    """Individual error during workflow processing."""
+
+    item_id: int
+    step: str  # "rag_search", "rule_engine", "ai_judge", "exchange"
+    message: str
+
+
+class WorkflowRunResult(BaseModel):
+    """Aggregated result of a workflow run."""
+
+    fetched_count: int = 0
+    analyzed_count: int = 0
+    traded_count: int = 0
+    skipped_count: int = 0
+    hold_count: int = 0
+    errors: List[WorkflowStepError] = []
+    status: str  # "completed", "completed_with_errors", "failed", "no_items"

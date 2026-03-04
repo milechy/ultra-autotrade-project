@@ -12,7 +12,7 @@ docs/04_api_design.md および docs/19_operations_runbook.md に準拠。
 """
 
 from datetime import timedelta
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -30,6 +30,7 @@ from .schemas import (
     AutomationStatus,
     DashboardSnapshot,
     ReportPeriod,
+    WorkflowRunResult,
 )
 from .state import get_monitoring_service
 
@@ -129,37 +130,33 @@ def get_latest_report(
     return reporter.generate_summary_report(period=period)
 
 
-@router.post("/workflow/run")
+@router.post(
+    "/workflow/run",
+    response_model=WorkflowRunResult,
+    summary="ペンディング知識アイテムに対して E2E ワークフローを実行",
+)
 def run_workflow(
     dry_run: bool = Query(default=True, description="If true, simulate trades"),
     db: Session = Depends(get_db),
-) -> dict[str, Any]:
+    monitoring: MonitoringService = Depends(get_monitoring_service),
+) -> WorkflowRunResult:
     """Trigger E2E workflow for pending knowledge items."""
     knowledge_service = KnowledgeService()
     ai_service = AIService()
     exchange_service = get_exchange_service()
 
-    results = process_pending_knowledge(
+    run_result = process_pending_knowledge(
         db,
         knowledge_service=knowledge_service,
         ai_service=ai_service,
         exchange_service=exchange_service,
+        monitoring_service=monitoring,
         dry_run=dry_run,
     )
 
-    return {
-        "processed": len(results),
-        "trades_executed": sum(
-            1 for r in results if r.order_result and r.order_result.status.value == "success"
-        ),
-        "items": [
-            {
-                "item_id": r.item_id,
-                "action": r.action.value,
-                "confidence": r.confidence,
-                "trade_status": r.order_result.status.value if r.order_result else "skipped",
-                "reason": r.reason,
-            }
-            for r in results
-        ],
-    }
+    # Sanitize error messages (no internal details in API response)
+    sanitized_errors = [
+        err.model_copy(update={"message": err.message[:200]}) for err in run_result.errors
+    ]
+
+    return run_result.model_copy(update={"errors": sanitized_errors})
