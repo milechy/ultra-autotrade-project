@@ -19,7 +19,7 @@ import logging
 import os
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import Optional, Protocol
+from typing import Any, Optional, Protocol
 
 from .config import AaveSettings, get_aave_settings
 
@@ -125,7 +125,7 @@ class AaveClientBase(ABC):
         wallet_address: str,
         private_key: str,
         dry_run: bool = False,
-    ) -> "dict | str":
+    ) -> "dict[str, Any] | str":
         """
         Aave V3 Pool に deposit（supply）する。
 
@@ -153,7 +153,7 @@ class AaveClientBase(ABC):
         wallet_address: str,
         private_key: str,
         dry_run: bool = False,
-    ) -> "dict | str":
+    ) -> "dict[str, Any] | str":
         """
         Aave V3 Pool から withdraw する。
 
@@ -215,7 +215,7 @@ class DummyAaveClient(AaveClientBase):
         dry_run: bool = False,
         # 後方互換: 旧コードは deposit(asset_symbol, amount) と呼び出す
         asset_symbol: str = "",
-    ) -> "dict | str":
+    ) -> "dict[str, Any] | str":
         logger.info("DummyAaveClient.deposit called (no tx sent)")
         # 後方互換: asset_symbol が渡された場合は文字列を返す
         if asset_symbol:
@@ -238,7 +238,7 @@ class DummyAaveClient(AaveClientBase):
         private_key: str = "",
         dry_run: bool = False,
         asset_symbol: str = "",
-    ) -> "dict | str":
+    ) -> "dict[str, Any] | str":
         logger.info("DummyAaveClient.withdraw called (no tx sent)")
         # backward compat: old service.py calls withdraw(asset_symbol, amount) → str
         if asset_symbol:
@@ -390,7 +390,7 @@ class Web3AaveClient(AaveClientBase):
         dry_run: bool = False,
         # 後方互換: 旧コードは deposit(asset_symbol, amount) と呼び出す
         asset_symbol: str = "",
-    ) -> "dict | str":
+    ) -> "dict[str, Any] | str":
         """
         Aave V3 Pool.supply() を呼び出して deposit する。
 
@@ -516,7 +516,7 @@ class Web3AaveClient(AaveClientBase):
             supply_hash = self._w3.eth.send_raw_transaction(signed_supply.raw_transaction)
             receipt = self._w3.eth.wait_for_transaction_receipt(supply_hash)
 
-            tx_hash_hex = receipt.transactionHash.hex()
+            tx_hash_hex = receipt["transactionHash"].hex()
             logger.info(
                 "deposit 完了: tx=%s, amount=%s",
                 tx_hash_hex,
@@ -543,7 +543,7 @@ class Web3AaveClient(AaveClientBase):
         dry_run: bool = False,
         # 後方互換: 旧コードは withdraw(asset_symbol, amount) と呼び出す
         asset_symbol: str = "",
-    ) -> "dict | str":
+    ) -> "dict[str, Any] | str":
         """
         Aave V3 Pool.withdraw() を呼び出す。
 
@@ -650,7 +650,7 @@ class Web3AaveClient(AaveClientBase):
             tx_hash = self._w3.eth.send_raw_transaction(signed_tx.raw_transaction)
             receipt = self._w3.eth.wait_for_transaction_receipt(tx_hash)
 
-            tx_hash_hex = receipt.transactionHash.hex()
+            tx_hash_hex = receipt["transactionHash"].hex()
             logger.info("withdraw 完了: tx=%s, amount=%s", tx_hash_hex, amount)
 
             return {
