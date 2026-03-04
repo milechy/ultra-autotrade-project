@@ -212,3 +212,241 @@ class TestJudgeWithRAG:
             # Disagreement → HOLD (fail-closed)
             assert result.final_action == TradeAction.HOLD
             assert result.agreed is False
+
+
+class TestCallClaude:
+    def test_call_claude_no_api_key_returns_hold(self):
+        service = AIService()
+        settings = MagicMock()
+        settings.anthropic_api_key = None
+
+        result = service._call_claude("test prompt", settings)
+        assert result.action == TradeAction.HOLD
+        assert result.confidence == 0
+        assert result.provider == LLMProvider.CLAUDE
+
+    def test_call_claude_success(self):
+        service = AIService()
+        settings = MagicMock()
+        settings.anthropic_api_key = "sk-test"
+        settings.claude_model = "claude-sonnet-4-20250514"
+
+        mock_anthropic_module = MagicMock()
+        mock_client = MagicMock()
+        mock_block = MagicMock()
+        mock_block.text = '{"action":"BUY","confidence":80,"reason":"bullish"}'
+        mock_response = MagicMock()
+        mock_response.content = [mock_block]
+        mock_client.messages.create.return_value = mock_response
+        mock_anthropic_module.Anthropic.return_value = mock_client
+
+        import sys
+        with patch.dict(sys.modules, {"anthropic": mock_anthropic_module}):
+            result = service._call_claude("test prompt", settings)
+        assert result.action == TradeAction.BUY
+        assert result.confidence == 80
+        assert result.provider == LLMProvider.CLAUDE
+
+    def test_call_claude_api_error_returns_hold(self):
+        service = AIService()
+        settings = MagicMock()
+        settings.anthropic_api_key = "sk-test"
+        settings.claude_model = "claude-sonnet-4-20250514"
+
+        mock_anthropic_module = MagicMock()
+        mock_anthropic_module.Anthropic.side_effect = Exception("Connection refused")
+
+        import sys
+        with patch.dict(sys.modules, {"anthropic": mock_anthropic_module}):
+            result = service._call_claude("test prompt", settings)
+        assert result.action == TradeAction.HOLD
+        assert result.confidence == 0
+        assert result.provider == LLMProvider.CLAUDE
+
+    def test_call_claude_response_block_without_text_attr(self):
+        """Block without text attribute → raw_text stays empty → parse error → HOLD."""
+        service = AIService()
+        settings = MagicMock()
+        settings.anthropic_api_key = "sk-test"
+        settings.claude_model = "claude-sonnet-4-20250514"
+
+        mock_anthropic_module = MagicMock()
+        mock_client = MagicMock()
+        mock_block = MagicMock(spec=[])  # no attributes at all
+        mock_response = MagicMock()
+        mock_response.content = [mock_block]
+        mock_client.messages.create.return_value = mock_response
+        mock_anthropic_module.Anthropic.return_value = mock_client
+
+        import sys
+        with patch.dict(sys.modules, {"anthropic": mock_anthropic_module}):
+            result = service._call_claude("test prompt", settings)
+        # empty string → JSON parse fails → HOLD
+        assert result.action == TradeAction.HOLD
+        assert result.provider == LLMProvider.CLAUDE
+
+
+class TestCallOpenAI:
+    def test_call_openai_no_api_key_returns_hold(self):
+        service = AIService()
+        settings = MagicMock()
+        settings.openai_api_key = None
+
+        result = service._call_openai("test prompt", settings)
+        assert result.action == TradeAction.HOLD
+        assert result.confidence == 0
+        assert result.provider == LLMProvider.OPENAI
+
+    def test_call_openai_success(self):
+        service = AIService()
+        settings = MagicMock()
+        settings.openai_api_key = "sk-test"
+        settings.openai_model = "gpt-4o"
+
+        mock_openai_module = MagicMock()
+        mock_openai_cls = MagicMock()
+        mock_client = MagicMock()
+        mock_msg = MagicMock()
+        mock_msg.content = '{"action":"SELL","confidence":70,"reason":"bearish"}'
+        mock_choice = MagicMock()
+        mock_choice.message = mock_msg
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[mock_choice]
+        )
+        mock_openai_cls.return_value = mock_client
+        mock_openai_module.OpenAI = mock_openai_cls
+
+        import sys
+        with patch.dict(sys.modules, {"openai": mock_openai_module}):
+            result = service._call_openai("test prompt", settings)
+        assert result.action == TradeAction.SELL
+        assert result.confidence == 70
+        assert result.provider == LLMProvider.OPENAI
+
+    def test_call_openai_api_error_returns_hold(self):
+        service = AIService()
+        settings = MagicMock()
+        settings.openai_api_key = "sk-test"
+        settings.openai_model = "gpt-4o"
+
+        mock_openai_module = MagicMock()
+        mock_openai_cls = MagicMock()
+        mock_openai_cls.side_effect = Exception("API quota exceeded")
+        mock_openai_module.OpenAI = mock_openai_cls
+
+        import sys
+        with patch.dict(sys.modules, {"openai": mock_openai_module}):
+            result = service._call_openai("test prompt", settings)
+        assert result.action == TradeAction.HOLD
+        assert result.confidence == 0
+        assert result.provider == LLMProvider.OPENAI
+
+    def test_call_openai_none_content_returns_hold(self):
+        """When message.content is None, parse error → HOLD."""
+        service = AIService()
+        settings = MagicMock()
+        settings.openai_api_key = "sk-test"
+        settings.openai_model = "gpt-4o"
+
+        mock_openai_module = MagicMock()
+        mock_openai_cls = MagicMock()
+        mock_client = MagicMock()
+        mock_msg = MagicMock()
+        mock_msg.content = None
+        mock_choice = MagicMock()
+        mock_choice.message = mock_msg
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[mock_choice]
+        )
+        mock_openai_cls.return_value = mock_client
+        mock_openai_module.OpenAI = mock_openai_cls
+
+        import sys
+        with patch.dict(sys.modules, {"openai": mock_openai_module}):
+            result = service._call_openai("test prompt", settings)
+        assert result.action == TradeAction.HOLD
+        assert result.provider == LLMProvider.OPENAI
+
+
+class TestAnalyzeSingleWithLLMAnalyzer:
+    def test_analyze_single_llm_analyzer_success(self):
+        """_analyze_single uses llm_analyzer when provided and it succeeds."""
+        from datetime import datetime, timezone
+
+        from app.notion.schemas import NotionNewsItem
+
+        item = NotionNewsItem(
+            id="item-1",
+            url="https://example.com/news/1",
+            summary="Record profits reported by crypto firms",
+            sentiment=None,
+            action=None,
+            confidence=None,
+            status="unprocessed",
+            timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        )
+
+        def fake_analyzer(news_item: NotionNewsItem):
+            from datetime import datetime, timezone
+
+            from app.ai.schemas import AIAnalysisResult, TradeAction
+
+            return AIAnalysisResult(
+                id=news_item.id,
+                url=news_item.url,
+                action=TradeAction.BUY,
+                confidence=90,
+                sentiment="positive",
+                summary="Test summary",
+                reason="Strong buy signal",
+                timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            )
+
+        service = AIService(llm_analyzer=fake_analyzer)
+        result = service._analyze_single(item)
+        assert result.action == TradeAction.BUY
+        assert result.confidence == 90
+
+    def test_analyze_single_llm_analyzer_exception_falls_back_to_rule_based(self):
+        """When llm_analyzer raises, _analyze_single falls back to rule-based."""
+        from datetime import datetime, timezone
+
+        from app.notion.schemas import NotionNewsItem
+
+        item = NotionNewsItem(
+            id="item-2",
+            url="https://example.com/news/bullish-news",
+            summary="record profit announced",
+            sentiment=None,
+            action=None,
+            confidence=None,
+            status="unprocessed",
+            timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        )
+
+        def failing_analyzer(news_item: NotionNewsItem):
+            raise RuntimeError("LLM unavailable")
+
+        service = AIService(llm_analyzer=failing_analyzer)
+        result = service._analyze_single(item)
+        # Falls back to rule-based: "record profit" → BUY
+        assert result.action == TradeAction.BUY
+
+    def test_analyze_single_no_llm_uses_now_default(self):
+        """When now is None, _analyze_single uses current UTC time."""
+        from app.notion.schemas import NotionNewsItem
+
+        item = NotionNewsItem(
+            id="item-3",
+            url="https://example.com",
+            summary="neutral market conditions",
+            sentiment=None,
+            action=None,
+            confidence=None,
+            status="unprocessed",
+            timestamp=None,
+        )
+
+        service = AIService()
+        result = service._analyze_single(item, now=None)
+        assert result.action == TradeAction.HOLD  # neutral → HOLD

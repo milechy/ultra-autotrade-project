@@ -20,6 +20,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytest.importorskip("web3")
+
 from app.aave.client import (
     AaveClientError,
     DummyAaveClient,
