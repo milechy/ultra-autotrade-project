@@ -110,12 +110,12 @@ jobs:
         if: always() && steps.review.outcome == 'success'
         run: |
           if [ -f /tmp/review_result.json ]; then
-            python -c "
-            import json, sys
-            result = json.load(open('/tmp/review_result.json'))
-            critical = [i for i in result.get('issues', []) if i.get('severity') == 'critical']
-            if critical:
-                print(f'::error::{len(critical)} critical issue(s) found by Codex review')
-                sys.exit(1)
-            "
+            python3 -c "
+          import json, sys
+          result = json.load(open('/tmp/review_result.json'))
+          critical = [i for i in result.get('issues', []) if i.get('severity') == 'critical']
+          if critical:
+              print(f'::error::{len(critical)} critical issue(s) found by Codex review')
+              sys.exit(1)
+          "
           fi
