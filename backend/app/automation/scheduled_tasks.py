@@ -39,6 +39,13 @@ WEEKLY_REPORT_DAY = 0  # Monday (0 = Monday, 6 = Sunday)
 # RSS フェッチ間隔（秒）
 RSS_FETCH_INTERVAL_SECONDS = 1800  # 30 分
 
+# DCA 頻度→秒数マッピング
+DCA_FREQUENCY_SECONDS = {
+    "hourly": 3600,
+    "daily": 86400,
+    "weekly": 604800,
+}
+
 
 def _calculate_seconds_until(
     target_time: time,
@@ -287,6 +294,86 @@ async def rss_fetch_loop(
             await asyncio.sleep(600)
 
 
+async def dca_loop(
+    *,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """
+    DCA（ドルコスト平均法）積立の定期実行ループ。
+
+    DCAConfig.frequency に従った間隔で DCAService.execute() を実行する。
+
+    Args:
+        on_error: エラー発生時のコールバック
+
+    Note:
+        - このコルーチンは無限ループで動作する
+        - 停止は asyncio.CancelledError で行う
+        - enabled=False の場合は 60 秒待機してリチェックする
+        - エラー発生時もループは継続（fail-safe）
+    """
+    logger.info("Starting DCA loop")
+
+    while True:
+        try:
+            from app.dca.config import load_dca_config
+            from app.dca.service import DCAService
+            from app.exchange.client import DummyExchangeClient
+            from app.exchange.service import ExchangeService
+
+            config = load_dca_config()
+
+            if not config.enabled:
+                logger.debug("DCA disabled, waiting 60s before recheck")
+                await asyncio.sleep(60)
+                continue
+
+            interval = DCA_FREQUENCY_SECONDS.get(config.frequency.value, 86400)
+            logger.info(
+                "DCA loop: symbol=%s, amount_usd=%s, frequency=%s, interval=%ds, dry_run=%s",
+                config.symbol,
+                config.amount_usd,
+                config.frequency.value,
+                interval,
+                config.dry_run,
+            )
+
+            # DCA 実行
+            def _run_dca() -> None:
+                client = DummyExchangeClient()
+                exchange_service = ExchangeService(client=client)
+                dca_service = DCAService(exchange_service=exchange_service)
+                result = dca_service.execute(config)
+                logger.info(
+                    "DCA executed: executed=%s, symbol=%s, order_id=%s, message=%s",
+                    result.executed,
+                    result.symbol,
+                    result.order_id,
+                    result.message,
+                )
+
+            await asyncio.to_thread(_run_dca)
+
+            # インターバル待機
+            logger.debug("DCA loop: sleeping %ds until next execution", interval)
+            await asyncio.sleep(interval)
+
+        except asyncio.CancelledError:
+            logger.info("DCA loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in DCA loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            # エラー発生時は 60 秒待機後に再試行
+            await asyncio.sleep(60)
+
+
 class ScheduledTaskManager:
     """
     スケジュールタスクのライフサイクル管理。
@@ -301,6 +388,7 @@ class ScheduledTaskManager:
         self._daily_task: Optional[asyncio.Task[None]] = None
         self._weekly_task: Optional[asyncio.Task[None]] = None
         self._rss_task: Optional[asyncio.Task[None]] = None
+        self._dca_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -316,6 +404,11 @@ class ScheduledTaskManager:
     def is_rss_running(self) -> bool:
         """RSS フェッチタスクが動作中かどうか。"""
         return self._rss_task is not None and not self._rss_task.done()
+
+    @property
+    def is_dca_running(self) -> bool:
+        """DCA タスクが動作中かどうか。"""
+        return self._dca_task is not None and not self._dca_task.done()
 
     async def start_daily_reports(
         self,
@@ -503,6 +596,64 @@ class ScheduledTaskManager:
         self._rss_task = None
         logger.info("RSS fetch task stopped")
 
+    async def start_dca(
+        self,
+        *,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """
+        DCA タスクを開始する。
+
+        Args:
+            on_error: エラー時コールバック
+
+        Raises:
+            RuntimeError: 既に DCA タスクが開始されている場合
+        """
+        if self.is_dca_running:
+            raise RuntimeError("DCA already running")
+
+        logger.info("Starting DCA task")
+
+        self._dca_task = asyncio.create_task(
+            dca_loop(
+                on_error=on_error,
+            )
+        )
+
+        logger.info("DCA task started")
+
+    async def stop_dca(self, timeout: float = 5.0) -> None:
+        """
+        DCA タスクを停止する。
+
+        Args:
+            timeout: キャンセル待機のタイムアウト秒数
+        """
+        if not self.is_dca_running:
+            logger.debug("DCA not running - nothing to stop")
+            return
+
+        logger.info("Stopping DCA task")
+
+        assert self._dca_task is not None  # noqa: S101
+        self._dca_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._dca_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("DCA task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "DCA task did not stop within %.1fs timeout",
+                timeout,
+            )
+        except Exception as exc:
+            logger.error("Error while stopping DCA task: %s", exc)
+
+        self._dca_task = None
+        logger.info("DCA task stopped")
+
     async def stop_all(self, timeout: float = 5.0) -> None:
         """
         全てのスケジュールタスクを停止する。
@@ -516,6 +667,7 @@ class ScheduledTaskManager:
             self.stop_daily_reports(timeout=timeout),
             self.stop_weekly_reports(timeout=timeout),
             self.stop_rss_fetch(timeout=timeout),
+            self.stop_dca(timeout=timeout),
             return_exceptions=True,
         )
 

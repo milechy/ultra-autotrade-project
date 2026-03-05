@@ -32,6 +32,7 @@ from app.auth.router import router as auth_router
 from app.automation.automation_router import router as automation_router
 from app.bots.router import router as octobot_router
 from app.database import init_db
+from app.dca.router import router as dca_router
 from app.exchange.router import router as exchange_router
 from app.knowledge.router import router as knowledge_router
 from app.notion.router import router as notion_router
@@ -67,6 +68,7 @@ def create_app() -> FastAPI:
     app.include_router(octobot_router)  # OctoBot (Phase3)
     app.include_router(aave_router)  # Aave (Phase4)
     app.include_router(knowledge_router)  # Knowledge Hub (PoC Pivot Step 2)
+    app.include_router(dca_router)  # DCA Bot
     app.include_router(exchange_router)  # Exchange (PoC Pivot Step 3)
     app.include_router(rss_router)  # RSS auto-fetch
     app.include_router(webhook_router)  # Webhook receiver
