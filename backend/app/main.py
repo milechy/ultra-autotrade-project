@@ -37,6 +37,7 @@ from app.knowledge.router import router as knowledge_router
 from app.notion.router import router as notion_router
 from app.rss.router import router as rss_router
 from app.users.router import router as users_router
+from app.webhook.router import router as webhook_router
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ def create_app() -> FastAPI:
     app.include_router(knowledge_router)  # Knowledge Hub (PoC Pivot Step 2)
     app.include_router(exchange_router)  # Exchange (PoC Pivot Step 3)
     app.include_router(rss_router)  # RSS auto-fetch
+    app.include_router(webhook_router)  # Webhook receiver
     app.include_router(automation_router)  # Automation workflow
     app.include_router(
         automation_dashboard_router,
