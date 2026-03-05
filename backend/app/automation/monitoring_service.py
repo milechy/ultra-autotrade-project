@@ -24,6 +24,9 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Callable, Deque, Dict, List, Optional, Tuple
 
+from app.notifications.schemas import NotificationChannel, NotificationMessage, NotificationSeverity
+from app.notifications.service import CompositeNotificationService
+
 from .schemas import (
     AlertLevel,
     AutomationStatus,
@@ -64,6 +67,7 @@ class MonitoringService:
         max_trade_records: int = 1000,
         max_healthfactor_records: int = 1000,
         enable_state_sync: bool = True,
+        notification_service: Optional[CompositeNotificationService] = None,
     ) -> None:
         # 閾値
         self._latency_warning_threshold_s = float(latency_warning_threshold_s)
@@ -74,6 +78,7 @@ class MonitoringService:
 
         # state.json 同期設定
         self._enable_state_sync = enable_state_sync
+        self._notification_service = notification_service
 
         # 状態
         self._events: Deque[MonitoringEvent] = deque(maxlen=max_events)
@@ -216,6 +221,26 @@ class MonitoringService:
 
         except Exception as exc:
             logger.warning("Failed to sync state file: %s", exc)
+
+    def _notify(
+        self,
+        severity: NotificationSeverity,
+        title: str,
+        body: str,
+    ) -> None:
+        """通知を送信する。未設定時や失敗時はスキップ（fail-safe）。"""
+        if self._notification_service is None:
+            return
+        try:
+            message = NotificationMessage(
+                channel=NotificationChannel.SLACK,
+                severity=severity,
+                title=title,
+                body=body,
+            )
+            self._notification_service.send(message)
+        except Exception as exc:
+            logger.warning("Failed to send notification: %s", exc)
 
     # ------------------------------------------------------------------
     # 公開 API: メトリクス登録
@@ -475,6 +500,17 @@ class MonitoringService:
             code="EMERGENCY_STOP",
             message=reason,
         )
+
+        # Slack通知
+        hf_info = ""
+        if self._last_health_factor is not None:
+            hf_info = f"\nHealth Factor: {self._last_health_factor}"
+        self._notify(
+            NotificationSeverity.EMERGENCY,
+            "🚨 緊急停止が発動されました",
+            f"{reason}{hf_info}",
+        )
+
         return self._append_event(event)
 
     def clear_emergency_stop(self) -> None:
@@ -486,6 +522,13 @@ class MonitoringService:
         """
         self._trading_paused = False
         self._emergency_reason = None
+
+        # Slack通知
+        self._notify(
+            NotificationSeverity.INFO,
+            "✅ 緊急停止が解除されました",
+            "緊急停止状態が手動で解除されました。取引を再開します。",
+        )
 
         # state.json も同期
         if self._enable_state_sync:

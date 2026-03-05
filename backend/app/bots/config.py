@@ -1,7 +1,10 @@
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
 from app.utils.config import get_env
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -32,7 +35,12 @@ def _get_env_int(name: str, default: int) -> int:
     try:
         return int(raw)
     except (TypeError, ValueError):
-        # TODO: ログに warning を出すなど（現時点では黙って default を使う）
+        logger.warning(
+            "環境変数 %s のパース失敗（value=%r）。デフォルト値 %d を使用します。",
+            name,
+            raw,
+            default,
+        )
         return default
 
 

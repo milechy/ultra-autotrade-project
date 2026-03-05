@@ -12,8 +12,10 @@ from __future__ import annotations
 
 from typing import Optional
 
+from .config import load_notification_settings
 from .schemas import NotificationChannel, NotificationMessage, NotificationSeverity
 from .service import CompositeNotificationService, LoggingNotificationSender
+from .slack_sender import SlackNotificationSender
 
 _notification_service: Optional[CompositeNotificationService] = None
 
@@ -26,8 +28,17 @@ def get_notification_service() -> CompositeNotificationService:
     """
     global _notification_service
     if _notification_service is None:
+        senders: list[LoggingNotificationSender | SlackNotificationSender] = []
+
         logging_sender = LoggingNotificationSender()
-        _notification_service = CompositeNotificationService([logging_sender])
+        senders.append(logging_sender)
+
+        settings = load_notification_settings()
+        if settings.is_slack_configured and settings.slack_webhook_url:
+            slack_sender = SlackNotificationSender(webhook_url=settings.slack_webhook_url)
+            senders.append(slack_sender)
+
+        _notification_service = CompositeNotificationService(senders)
     return _notification_service
 
 
@@ -37,5 +48,6 @@ __all__ = [
     "NotificationMessage",
     "CompositeNotificationService",
     "LoggingNotificationSender",
+    "SlackNotificationSender",
     "get_notification_service",
 ]

@@ -3,9 +3,6 @@
 """
 バックエンドアプリケーションのエントリーポイント。
 
-Phase1 の主な責務:
-- /notion/ingest エンドポイントを公開する
-
 Phase2 で追加された責務:
 - /ai/analyze エンドポイントを公開する
 
@@ -32,10 +29,12 @@ from app.auth.router import router as auth_router
 from app.automation.automation_router import router as automation_router
 from app.bots.router import router as octobot_router
 from app.database import init_db
+from app.dca.router import router as dca_router
 from app.exchange.router import router as exchange_router
 from app.knowledge.router import router as knowledge_router
-from app.notion.router import router as notion_router
+from app.rss.router import router as rss_router
 from app.users.router import router as users_router
+from app.webhook.router import router as webhook_router
 
 logger = logging.getLogger(__name__)
 
@@ -60,12 +59,14 @@ def create_app() -> FastAPI:
     # --- ルーター登録 ---
     app.include_router(auth_router)  # Auth (Phase12)
     app.include_router(users_router)  # Users (Phase12)
-    app.include_router(notion_router)  # Notion (Phase1)
     app.include_router(ai_router)  # AI (Phase2)
     app.include_router(octobot_router)  # OctoBot (Phase3)
     app.include_router(aave_router)  # Aave (Phase4)
     app.include_router(knowledge_router)  # Knowledge Hub (PoC Pivot Step 2)
+    app.include_router(dca_router)  # DCA Bot
     app.include_router(exchange_router)  # Exchange (PoC Pivot Step 3)
+    app.include_router(rss_router)  # RSS auto-fetch
+    app.include_router(webhook_router)  # Webhook receiver
     app.include_router(automation_router)  # Automation workflow
     app.include_router(
         automation_dashboard_router,
