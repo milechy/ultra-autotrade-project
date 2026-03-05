@@ -63,7 +63,7 @@ def _parse_published_at(entry: object) -> Optional[datetime]:
             ts = calendar.timegm(published_parsed)
             return datetime.fromtimestamp(ts, tz=timezone.utc)
         except Exception:
-            pass
+            logger.debug("Failed to parse published_parsed for RSS entry")
 
     # published (RFC 2822 文字列)
     published = getattr(entry, "published", None)
@@ -71,7 +71,7 @@ def _parse_published_at(entry: object) -> Optional[datetime]:
         try:
             return cast(datetime, parsedate_to_datetime(published))
         except Exception:
-            pass
+            logger.debug("Failed to parse published date string for RSS entry")
 
     # updated_parsed (time.struct_time)
     updated_parsed = getattr(entry, "updated_parsed", None)
@@ -82,7 +82,7 @@ def _parse_published_at(entry: object) -> Optional[datetime]:
             ts = calendar.timegm(updated_parsed)
             return datetime.fromtimestamp(ts, tz=timezone.utc)
         except Exception:
-            pass
+            logger.debug("Failed to parse updated_parsed for RSS entry")
 
     return None
 
