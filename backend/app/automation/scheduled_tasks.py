@@ -7,6 +7,7 @@ Phase 6 で導入された日次・週次レポートの自動生成を担当す
 
 - daily_report_loop(): 毎日 00:30 (JST) に日次レポート生成
 - weekly_report_loop(): 毎週月曜 01:00 (JST) に週次レポート生成
+- rss_fetch_loop(): 30 分ごとに RSS フィード取得・登録
 - ScheduledTaskManager: タスクのライフサイクル管理
 
 Pattern: python-async-patterns.md の「Pattern 2: Background Tasks」を適用。
@@ -22,6 +23,7 @@ from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
 from app.automation.jobs import run_daily_jobs, run_weekly_jobs
+from app.database import SessionLocal
 from app.notifications.schemas import NotificationChannel
 
 logger = logging.getLogger(__name__)
@@ -33,6 +35,9 @@ DEFAULT_TIMEZONE = ZoneInfo("Asia/Tokyo")
 DAILY_REPORT_TIME = time(0, 30)  # 00:30 JST
 WEEKLY_REPORT_TIME = time(1, 0)  # 01:00 JST
 WEEKLY_REPORT_DAY = 0  # Monday (0 = Monday, 6 = Sunday)
+
+# RSS フェッチ間隔（秒）
+RSS_FETCH_INTERVAL_SECONDS = 1800  # 30 分
 
 
 def _calculate_seconds_until(
@@ -214,6 +219,74 @@ async def weekly_report_loop(
             await asyncio.sleep(600)
 
 
+async def rss_fetch_loop(
+    *,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """
+    RSS フィード取得の定期実行ループ。
+
+    30 分ごとに RSSFetcher.fetch_and_register() を実行する。
+
+    Args:
+        on_error: エラー発生時のコールバック
+
+    Note:
+        - このコルーチンは無限ループで動作する
+        - 停止は asyncio.CancelledError で行う
+        - エラー発生時もループは継続（fail-safe）
+    """
+    from app.knowledge.service import KnowledgeService
+    from app.rss.fetcher import RSSFetcher
+
+    logger.info(
+        "Starting RSS fetch loop (interval: %ds)",
+        RSS_FETCH_INTERVAL_SECONDS,
+    )
+
+    while True:
+        try:
+            # インターバル待機
+            logger.debug(
+                "Waiting %ds until next RSS fetch",
+                RSS_FETCH_INTERVAL_SECONDS,
+            )
+            await asyncio.sleep(RSS_FETCH_INTERVAL_SECONDS)
+
+            # RSS フェッチ実行
+            logger.info("Running RSS fetch job")
+
+            def _run_fetch() -> dict[str, int]:
+                db = SessionLocal()
+                try:
+                    service = KnowledgeService()
+                    fetcher = RSSFetcher(knowledge_service=service)
+                    return fetcher.fetch_and_register(db)
+                finally:
+                    db.close()
+
+            results = await asyncio.to_thread(_run_fetch)
+            logger.info("RSS fetch job completed", extra={"results": results})
+
+            # 重複実行防止のため少し待機
+            await asyncio.sleep(60)
+
+        except asyncio.CancelledError:
+            logger.info("RSS fetch loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in RSS fetch loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            # エラー発生時は 10 分待機後に再試行
+            await asyncio.sleep(600)
+
+
 class ScheduledTaskManager:
     """
     スケジュールタスクのライフサイクル管理。
@@ -227,6 +300,7 @@ class ScheduledTaskManager:
     def __init__(self) -> None:
         self._daily_task: Optional[asyncio.Task[None]] = None
         self._weekly_task: Optional[asyncio.Task[None]] = None
+        self._rss_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -237,6 +311,11 @@ class ScheduledTaskManager:
     def is_weekly_running(self) -> bool:
         """週次レポートタスクが動作中かどうか。"""
         return self._weekly_task is not None and not self._weekly_task.done()
+
+    @property
+    def is_rss_running(self) -> bool:
+        """RSS フェッチタスクが動作中かどうか。"""
+        return self._rss_task is not None and not self._rss_task.done()
 
     async def start_daily_reports(
         self,
@@ -366,6 +445,64 @@ class ScheduledTaskManager:
         self._weekly_task = None
         logger.info("Weekly report task stopped")
 
+    async def start_rss_fetch(
+        self,
+        *,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """
+        RSS フェッチタスクを開始する。
+
+        Args:
+            on_error: エラー時コールバック
+
+        Raises:
+            RuntimeError: 既に RSS フェッチが開始されている場合
+        """
+        if self.is_rss_running:
+            raise RuntimeError("RSS fetch already running")
+
+        logger.info("Starting RSS fetch task")
+
+        self._rss_task = asyncio.create_task(
+            rss_fetch_loop(
+                on_error=on_error,
+            )
+        )
+
+        logger.info("RSS fetch task started")
+
+    async def stop_rss_fetch(self, timeout: float = 5.0) -> None:
+        """
+        RSS フェッチタスクを停止する。
+
+        Args:
+            timeout: キャンセル待機のタイムアウト秒数
+        """
+        if not self.is_rss_running:
+            logger.debug("RSS fetch not running - nothing to stop")
+            return
+
+        logger.info("Stopping RSS fetch task")
+
+        assert self._rss_task is not None  # noqa: S101
+        self._rss_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._rss_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("RSS fetch task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "RSS fetch task did not stop within %.1fs timeout",
+                timeout,
+            )
+        except Exception as exc:
+            logger.error("Error while stopping RSS fetch task: %s", exc)
+
+        self._rss_task = None
+        logger.info("RSS fetch task stopped")
+
     async def stop_all(self, timeout: float = 5.0) -> None:
         """
         全てのスケジュールタスクを停止する。
@@ -378,6 +515,7 @@ class ScheduledTaskManager:
         await asyncio.gather(
             self.stop_daily_reports(timeout=timeout),
             self.stop_weekly_reports(timeout=timeout),
+            self.stop_rss_fetch(timeout=timeout),
             return_exceptions=True,
         )
 
