@@ -1,0 +1,112 @@
+# Ultra AutoTrade — Cursor Rules
+
+## Project Context
+You are developing Ultra AutoTrade: a cryptocurrency automated trading system combining
+OctoBot, AI (Claude + GPT-4o), Aave V3, and Bybit exchange via ccxt.
+Notion has been removed. A self-hosted Knowledge Hub (PostgreSQL + pgvector) replaces it.
+
+## Mandatory Document References
+Before ANY code change, check these docs:
+- `docs/13_security_design.md` — Security rules (ABSOLUTE, never override)
+- `docs/07_aave_operation_logic.md` — Aave risk management
+- `docs/08_automation_rules.md` — Trading limits and cooldowns
+- `docs/14_test_strategy.md` — Testing requirements
+- `docs/05_ai_judgement_rules.md` — BUY/SELL/HOLD logic
+
+## Absolute Security Rules
+1. NO secrets in code — all via environment variables
+2. NO .env files in Git — .gitignore enforced
+3. NO tokens/keys in logs — mask to first 6 + last 4 chars
+4. Aave operations MUST check: Health Factor, cooldown (10min), daily limit (30%)
+5. Emergency stop flag uses OR logic — manual stop can NEVER be overwritten by automation
+6. Max single trade: 10% of total assets
+7. LLM output MUST be JSON Schema validated — parse failure → HOLD
+
+## Architecture Decisions
+- Backend: FastAPI (Python 3.11), Hetzner VPS, Docker Compose
+- Frontend: Next.js App Router, Cloudflare Pages
+- DB: PostgreSQL + pgvector (HNSW index, NOT IVFFlat)
+- Exchange: Bybit primary (ccxt), OKX backup
+- AI Judge: Claude Opus 4.6 primary → GPT-4o cross-verify (BUY/SELL only)
+- Rule engine executes BEFORE LLM calls (saves cost, enforces safety)
+
+## Coding Standards
+- Python: ruff + mypy strict mode
+- TypeScript: strict + ESLint
+- Financial calculations: Decimal type ONLY (never float)
+- All new features require tests (coverage 80%+)
+- Imports: absolute paths from `app.*`
+
+## Multi-LLM Development Roles
+This project uses multiple LLMs. Cursor models should follow these patterns:
+
+### Tab / Inline Edit (Sonnet 4.5 — fast implementation)
+- CRUD, boilerplate, test code, docs
+- Single-file changes, refactoring
+- Frontend components
+
+### Composer Agent (Opus 4.6 — architecture)
+- New module design, multi-file changes
+- Aave / security-critical code (ALWAYS Opus)
+- Cross-module integration
+- When prompt includes "@codebase" scope
+
+### Automated Review (Codex 5.3 — GitHub Actions)
+- Every PR is auto-reviewed by `.github/workflows/codex-review.yml`
+- Checks: security, type errors, dead code, test coverage
+- Critical issues block merge
+
+### Escalation Rule
+If Sonnet cannot resolve a bug in 2 attempts → switch to Opus in Composer.
+If the change touches Aave, exchange, or auth code → use Opus from the start.
+
+## Module Structure
+```
+backend/app/
+├── knowledge/  # NEW: replaces notion/ — PostgreSQL + pgvector
+├── exchange/   # NEW: ccxt abstraction (Bybit/OKX)
+├── ai/         # ENHANCED: multi-LLM judge with JSON Schema
+├── aave/       # UPGRADE: DummyClient → web3.py
+├── bots/       # KEEP: OctoBot signal integration
+├── automation/ # KEEP: monitoring, reporting, emergency stop
+└── notifications/ # KEEP: Slack/LINE
+```
+
+## API Naming Convention
+- Old: POST /notion/ingest → New: POST /knowledge/items
+- Old: Notion write-back → New: PUT /knowledge/items/{id}/status
+- New: POST /knowledge/search (RAG vector search)
+- New: POST /exchange/order (ccxt → Bybit)
+
+## When Writing Aave Code
+- ALWAYS check Health Factor before any operation
+- ALWAYS enforce 10-minute cooldown
+- ALWAYS use Decimal, never float
+- ALWAYS handle AaveClientError gracefully (return NOOP, not crash)
+- ALWAYS log operations with masked addresses
+
+## When Writing AI/LLM Code
+- ALWAYS use structured JSON output
+- ALWAYS validate with Pydantic before acting on LLM response
+- ALWAYS fall back to HOLD on any error/timeout/parse failure
+- NEVER log full prompts (may contain sensitive market data)
+- NEVER call LLM if rule engine already determined HOLD
+
+## When Writing Exchange Code
+- ALWAYS use ccxt async (ccxt.async_support)
+- ALWAYS use sandbox mode for PoC/MVP (sandbox=True)
+- ALWAYS handle rate limits with exponential backoff
+- NEVER hardcode exchange-specific logic — abstract via ccxt
+
+## When Writing Tests
+- Unit tests: test one function, mock external calls
+- VCR tests for LLM: record real response once, replay in CI
+- Aave tests: use Sepolia testnet stubs
+- Exchange tests: use Bybit Sandbox or ccxt mock
+- Coverage: 80% minimum, enforced in CI
+
+## Branch Rules
+- feature/* → dev → staging → main
+- No direct push to main
+- All PRs require: CI pass + Codex review + human approval
+- Aave/security PRs require Opus review before merge

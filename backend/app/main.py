@@ -3,9 +3,6 @@
 """
 バックエンドアプリケーションのエントリーポイント。
 
-Phase1 の主な責務:
-- /notion/ingest エンドポイントを公開する
-
 Phase2 で追加された責務:
 - /ai/analyze エンドポイントを公開する
 
@@ -35,7 +32,6 @@ from app.database import init_db
 from app.dca.router import router as dca_router
 from app.exchange.router import router as exchange_router
 from app.knowledge.router import router as knowledge_router
-from app.notion.router import router as notion_router
 from app.rss.router import router as rss_router
 from app.users.router import router as users_router
 from app.webhook.router import router as webhook_router
@@ -63,7 +59,6 @@ def create_app() -> FastAPI:
     # --- ルーター登録 ---
     app.include_router(auth_router)  # Auth (Phase12)
     app.include_router(users_router)  # Users (Phase12)
-    app.include_router(notion_router)  # Notion (Phase1)
     app.include_router(ai_router)  # AI (Phase2)
     app.include_router(octobot_router)  # OctoBot (Phase3)
     app.include_router(aave_router)  # Aave (Phase4)
