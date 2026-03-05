@@ -13,7 +13,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from app.ai.schemas import TradeAction
 
@@ -70,11 +70,17 @@ class AaveSystemState(BaseModel):
         description="状態が古いとみなす閾値（秒）。",
     )
 
-    class Config:
-        json_encoders = {
-            Decimal: lambda v: str(v),
-            datetime: lambda v: v.isoformat(),
-        }
+    model_config = ConfigDict()
+
+    @field_serializer("health_factor")
+    @classmethod
+    def serialize_decimal(cls, v: Optional[Decimal]) -> Optional[str]:
+        return str(v) if v is not None else None
+
+    @field_serializer("last_update")
+    @classmethod
+    def serialize_datetime(cls, v: datetime) -> str:
+        return v.isoformat()
 
 
 # ===== Aave 操作用 =====

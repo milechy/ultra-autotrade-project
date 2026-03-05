@@ -20,7 +20,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class NotificationChannel(str, Enum):
@@ -82,6 +82,4 @@ class NotificationMessage(BaseModel):
         description="通知生成時刻（UTC）。",
     )
 
-    class Config:
-        # ログ用途で使うため、repr を簡潔にしておく
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
