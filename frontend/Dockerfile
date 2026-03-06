@@ -28,6 +28,7 @@ RUN if ! grep -q "output.*standalone" next.config.* 2>/dev/null; then \
   fi
 
 RUN mkdir -p public && npm run build
+RUN ls -la /app/.next/ || echo "NO .next DIRECTORY"
 
 # Stage 3: Production runner
 FROM node:20-alpine AS runner
