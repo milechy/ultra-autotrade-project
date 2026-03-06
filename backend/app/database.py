@@ -25,11 +25,25 @@ def get_database_url() -> str:
     """
     データベース URL を取得する。
 
-    環境変数 DATABASE_URL が設定されていればそれを使用、
-    なければデフォルトの SQLite パスを使用。
+    優先順位:
+    1. DATABASE_URL 環境変数
+    2. POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB から組み立て
+    3. デフォルトの SQLite パス
     """
+    url = os.getenv("DATABASE_URL", "")
+    if url:
+        return url
+
+    pg_user = os.getenv("POSTGRES_USER")
+    pg_password = os.getenv("POSTGRES_PASSWORD")
+    pg_db = os.getenv("POSTGRES_DB")
+    if pg_user and pg_password and pg_db:
+        pg_host = os.getenv("POSTGRES_HOST", "db")
+        pg_port = os.getenv("POSTGRES_PORT", "5432")
+        return f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_db}"
+
     default_path = Path(__file__).parent.parent / "data" / "users.db"
-    return os.getenv("DATABASE_URL", f"sqlite:///{default_path}")
+    return f"sqlite:///{default_path}"
 
 
 # データベースディレクトリを作成（SQLite の場合のみ）
