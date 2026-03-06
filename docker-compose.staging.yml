@@ -58,3 +58,23 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+
+  frontend:
+    container_name: ultra-autotrade-frontend-staging
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://77.42.46.155:8000}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://77.42.46.155:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
