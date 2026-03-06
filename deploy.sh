@@ -22,17 +22,18 @@ fi
 
 # Pull latest
 echo "--- Pulling latest code ---"
-git pull origin "$(git branch --show-current)"
+git fetch origin
+git reset --hard origin/main
 
 # Build and deploy
 echo "--- Building containers ---"
-docker compose -f "$COMPOSE_FILE" build --no-cache
+docker compose -f "$COMPOSE_FILE" --env-file ".env.${ENV}" build --no-cache
 
 echo "--- Stopping old containers ---"
-docker compose -f "$COMPOSE_FILE" down
+docker compose -f "$COMPOSE_FILE" --env-file ".env.${ENV}" down
 
 echo "--- Starting new containers ---"
-docker compose -f "$COMPOSE_FILE" up -d
+docker compose -f "$COMPOSE_FILE" --env-file ".env.${ENV}" up -d
 
 # Wait for health check
 echo "--- Waiting for backend health check ---"
@@ -50,4 +51,4 @@ for i in $(seq 1 30); do
 done
 
 echo "--- Deploy complete ---"
-docker compose -f "$COMPOSE_FILE" ps
+docker compose -f "$COMPOSE_FILE" --env-file ".env.${ENV}" ps
