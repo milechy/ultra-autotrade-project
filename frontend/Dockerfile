@@ -27,7 +27,9 @@ RUN if ! grep -q "output.*standalone" next.config.* 2>/dev/null; then \
   mv next.config.mjs.bak next.config.mjs; \
   fi
 
-RUN npm run build
+RUN mkdir -p /app/public && npm run build
+RUN ls -la /app/.next/ || echo "NO .next DIRECTORY"
+RUN ls /app/.next/standalone && ls /app/ || echo "PATH ISSUE"
 
 # Stage 3: Production runner
 FROM node:20-alpine AS runner
@@ -39,10 +41,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
+RUN mkdir -p /app/public /app/.next
+COPY --from=builder /app/public/ /app/public/
 
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone/ /app/
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static/ /app/.next/static/
 
 USER nextjs
 
