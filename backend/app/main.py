@@ -53,7 +53,7 @@ def create_app() -> FastAPI:
         allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
-        allow_headers=["content-type", "authorization", "x-requested-with"],
+        allow_headers=["*"],
     )
 
     # --- ルーター登録 ---
