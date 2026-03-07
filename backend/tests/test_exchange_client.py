@@ -2,9 +2,10 @@
 """Exchange client tests."""
 
 import importlib
+from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-from app.exchange.client import BybitSandboxClient, DummyExchangeClient
+from app.exchange.client import BitFlyerClient, BybitSandboxClient, DummyExchangeClient
 
 
 class TestDummyExchangeClient:
@@ -284,3 +285,155 @@ class TestBybitHostnameSetting:
             settings = cfg.get_exchange_settings()
 
         assert settings.hostname == "bybit.com"
+
+
+class TestBitFlyerClient:
+    """Test BitFlyerClient in dry-run mode."""
+
+    def _make_settings(self, api_key: str = "", api_secret: str = "secret") -> MagicMock:
+        settings = MagicMock()
+        settings.api_key = api_key
+        settings.api_secret = api_secret
+        settings.sandbox = True
+        settings.timeout_seconds = 30
+        settings.default_symbol = "BTC/JPY"
+        settings.hostname = "bitflyer.com"
+        settings.usd_to_jpy_rate = 150.0
+        return settings
+
+    def test_bitflyer_dry_run_create_order(self):
+        """DRY-RUN で create_market_order が bitflyer-dry-run-XXXX の order_id を返す。"""
+        settings = self._make_settings(api_key="")
+        client = BitFlyerClient(settings=settings)
+        assert client._dry_run is True
+
+        result = client.create_market_order("BTC/JPY", "buy", 0.001)
+        assert result["id"].startswith("bitflyer-dry-run-")
+        assert result["symbol"] == "BTC/JPY"
+        assert result["side"] == "buy"
+        assert result["amount"] == 0.001
+        assert result["status"] == "closed"
+        assert result["filled"] == 0.001
+        assert result["type"] == "market"
+
+    def test_bitflyer_dry_run_order_id_increments(self):
+        """各注文が連番の ID を持つ。"""
+        settings = self._make_settings(api_key="dry-run")
+        client = BitFlyerClient(settings=settings)
+
+        r1 = client.create_market_order("BTC/JPY", "buy", 0.001)
+        r2 = client.create_market_order("BTC/JPY", "sell", 0.002)
+
+        assert r1["id"] == "bitflyer-dry-run-0001"
+        assert r2["id"] == "bitflyer-dry-run-0002"
+
+    def test_bitflyer_dry_run_fetch_balance(self):
+        """DRY-RUN で JPY 残高が返る。"""
+        settings = self._make_settings(api_key="")
+        client = BitFlyerClient(settings=settings)
+        balance = client.fetch_balance()
+
+        assert "JPY" in balance
+        assert balance["JPY"]["free"] == 1_000_000.0
+        assert balance["JPY"]["total"] == 1_000_000.0
+        assert "BTC" in balance
+        assert balance["BTC"]["free"] == 0.01
+
+    def test_bitflyer_dry_run_fetch_ticker(self):
+        """DRY-RUN で BTC/JPY のティッカーが返る。"""
+        settings = self._make_settings(api_key="dry-run")
+        client = BitFlyerClient(settings=settings)
+        ticker = client.fetch_ticker("BTC/JPY")
+
+        assert ticker["symbol"] == "BTC/JPY"
+        assert ticker["last"] == BitFlyerClient._DRY_RUN_TICKER_PRICE
+        assert ticker["bid"] < ticker["ask"]
+        assert ticker["last"] > 0
+
+    def test_bitflyer_api_key_dry_run_string(self):
+        """api_key == 'dry-run' でも dry_run モードになる。"""
+        settings = self._make_settings(api_key="dry-run")
+        client = BitFlyerClient(settings=settings)
+        assert client._dry_run is True
+
+    def test_bitflyer_api_key_fallback(self):
+        """BITFLYER_API_KEY が EXCHANGE_API_KEY の3番目フォールバックとして機能する。"""
+        import app.exchange.config as cfg
+
+        env = {
+            "BITFLYER_API_KEY": "bitflyer-key-xyz",
+            "BITFLYER_API_SECRET": "bitflyer-secret-xyz",
+        }
+        with patch.dict("os.environ", env, clear=False):
+            # Clear EXCHANGE_API_KEY and BYBIT_API_KEY to test BITFLYER fallback
+            original_get_env = cfg.get_env
+
+            def patched_get_env(name: str, required: bool = True) -> str | None:
+                if name in ("EXCHANGE_API_KEY", "BYBIT_API_KEY"):
+                    return None
+                if name in ("EXCHANGE_API_SECRET", "BYBIT_API_SECRET"):
+                    return None
+                return original_get_env(name, required=required)
+
+            with patch.object(cfg, "get_env", patched_get_env):
+                settings = cfg.get_exchange_settings()
+
+        assert settings.api_key == "bitflyer-key-xyz"
+        assert settings.api_secret == "bitflyer-secret-xyz"
+
+
+class TestBtcJpyQuantityCalculation:
+    """Test BTC/JPY quantity calculation in ExchangeService."""
+
+    def test_btc_jpy_quantity_calculation(self):
+        """amount_usd=100, usd_to_jpy_rate=150, BTC/JPY price=10_000_000 → quantity=0.0015."""
+        from app.ai.schemas import TradeAction
+        from app.exchange.schemas import OrderRequest
+        from app.exchange.service import ExchangeService
+
+        # Mock client that returns a BTC/JPY ticker
+        mock_client = MagicMock()
+        mock_client.fetch_ticker.return_value = {
+            "symbol": "BTC/JPY",
+            "last": 10_000_000.0,
+            "bid": 9_999_000.0,
+            "ask": 10_001_000.0,
+            "timestamp": None,
+        }
+        mock_client.create_market_order.return_value = {
+            "id": "test-order-0001",
+            "symbol": "BTC/JPY",
+            "type": "market",
+            "side": "buy",
+            "amount": 0.0015,
+            "price": 10_000_000.0,
+            "status": "closed",
+            "filled": 0.0015,
+            "cost": 15000.0,
+        }
+
+        settings = MagicMock()
+        settings.default_symbol = "BTC/JPY"
+        settings.max_order_usd = Decimal("1000")
+        settings.daily_trade_limit = 10
+        settings.cooldown_seconds = 0
+        settings.sandbox = True
+        settings.usd_to_jpy_rate = 150.0
+
+        service = ExchangeService(client=mock_client, settings=settings)
+
+        request = OrderRequest(
+            action=TradeAction.BUY,
+            symbol="BTC/JPY",
+            amount_usd=Decimal("100"),
+            dry_run=False,
+        )
+
+        service.execute_trade(request)
+
+        # Verify create_market_order was called with the correct quantity
+        # 100 USD * 150 JPY/USD = 15,000 JPY / 10,000,000 JPY/BTC = 0.0015 BTC
+        call_args = mock_client.create_market_order.call_args
+        assert call_args is not None
+        _, _, quantity = call_args[0]
+        assert abs(quantity - 0.0015) < 1e-10

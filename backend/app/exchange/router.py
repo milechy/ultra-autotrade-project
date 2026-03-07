@@ -14,7 +14,7 @@ from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from .client import BybitSandboxClient, DummyExchangeClient
+from .client import BitFlyerClient, BybitSandboxClient, DummyExchangeClient
 from .config import get_exchange_settings
 from .schemas import ExchangeStatusResponse, OrderRequest, OrderResult
 from .service import ExchangeService
@@ -29,6 +29,7 @@ def get_exchange_service() -> ExchangeService:
 
     環境変数 EXCHANGE_CLIENT_TYPE で切り替え可能:
     - "dummy": DummyExchangeClient（テスト・開発用）
+    - "bitflyer": BitFlyerClient（bitFlyer、sandbox なし・dry_run 強制）
     - それ以外（デフォルト）: BybitSandboxClient（サンドボックス環境）
 
     NOTE:
@@ -39,8 +40,11 @@ def get_exchange_service() -> ExchangeService:
 
     client_type = os.getenv("EXCHANGE_CLIENT_TYPE", "sandbox")
     if client_type == "dummy":
-        client: DummyExchangeClient | BybitSandboxClient = DummyExchangeClient()
+        client: DummyExchangeClient | BybitSandboxClient | BitFlyerClient = DummyExchangeClient()
+    elif client_type == "bitflyer":
+        client = BitFlyerClient(settings=settings)
     else:
+        # "sandbox" or "bybit" → BybitSandboxClient
         client = BybitSandboxClient(settings=settings)
 
     return ExchangeService(client=client, settings=settings)

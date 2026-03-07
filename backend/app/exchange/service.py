@@ -20,14 +20,14 @@ from typing import List, Optional, Tuple, Union
 
 from app.ai.schemas import TradeAction
 
-from .client import BybitSandboxClient, DummyExchangeClient, ExchangeClientError
+from .client import BitFlyerClient, BybitSandboxClient, DummyExchangeClient, ExchangeClientError
 from .config import ExchangeSettings, get_exchange_settings
 from .schemas import ExchangeStatusResponse, OrderRequest, OrderResult, OrderSide, OrderStatus
 
 logger = logging.getLogger(__name__)
 
 # クライアントの型エイリアス（Protocol を使わずに Union で表現）
-_ExchangeClient = Union[BybitSandboxClient, DummyExchangeClient]
+_ExchangeClient = Union[BybitSandboxClient, BitFlyerClient, DummyExchangeClient]
 
 
 class ExchangeService:
@@ -166,7 +166,12 @@ class ExchangeService:
         try:
             ticker = self._client.fetch_ticker(symbol)
             price = Decimal(str(ticker["last"]))
-            quantity = float(request.amount_usd / price)
+            # BTC/JPY の場合: amount_usd → JPY に換算してから BTC 数量を計算
+            if "/JPY" in symbol:
+                amount_jpy = request.amount_usd * Decimal(str(self._settings.usd_to_jpy_rate))
+                quantity = float(amount_jpy / price)
+            else:
+                quantity = float(request.amount_usd / price)
         except ExchangeClientError as exc:
             logger.error(
                 "Failed to fetch ticker for price conversion: %s",

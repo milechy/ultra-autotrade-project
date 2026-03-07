@@ -119,7 +119,7 @@ class ExchangeStatusResponse(BaseModel):
     )
     balance_usdt: Optional[Decimal] = Field(
         None,
-        description="USDT 建ての残高。接続失敗時は None。",
+        description="残高（USDT 建て、または bitFlyer 使用時は JPY 建て）。接続失敗時は None。",
     )
     daily_trades_used: int = Field(
         ...,
