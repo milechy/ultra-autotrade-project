@@ -83,16 +83,28 @@ export default function KnowledgeIndexPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitting(true);
     setSubmitError(null);
     setSubmitSuccess(null);
+    const trimmedSourceUrl = sourceUrl.trim();
+    if (itemType === "url" && !trimmedSourceUrl) {
+      setSubmitError("URLを入力してください。");
+      return;
+    }
+
+    const trimmedRawText = rawText.trim();
+    if (itemType === "text" && !trimmedRawText) {
+      setSubmitError("テキストを入力してください。");
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       const req = {
         item_type: itemType,
         title: title.trim() || undefined,
-        source_url: itemType === "url" ? sourceUrl.trim() : undefined,
-        raw_text: itemType === "text" ? rawText.trim() : undefined,
+        source_url: itemType === "url" ? trimmedSourceUrl : undefined,
+        raw_text: itemType === "text" ? trimmedRawText : undefined,
       };
       const created = await createKnowledgeItem(req);
       setSubmitSuccess(`登録しました（ID: ${created.id}）`);
@@ -179,7 +191,6 @@ export default function KnowledgeIndexPage() {
                   value={sourceUrl}
                   onChange={(e) => setSourceUrl(e.target.value)}
                   placeholder="https://example.com/article"
-                  required
                   style={inputStyle}
                 />
               </div>
