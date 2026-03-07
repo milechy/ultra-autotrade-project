@@ -84,21 +84,34 @@ def get_exchange_settings() -> ExchangeSettings:
     ExchangeSettings を構築して返す。
 
     必須:
-      - EXCHANGE_API_KEY
-      - EXCHANGE_API_SECRET
+      - EXCHANGE_API_KEY（未設定時は BYBIT_API_KEY にフォールバック）
+      - EXCHANGE_API_SECRET（未設定時は BYBIT_API_SECRET にフォールバック）
 
     任意（デフォルト値あり）:
-      - EXCHANGE_SANDBOX（デフォルト: True）
+      - EXCHANGE_SANDBOX（未設定時は BYBIT_SANDBOX にフォールバック、デフォルト: True）
       - EXCHANGE_DEFAULT_SYMBOL（デフォルト: "BTC/USDT"）
       - EXCHANGE_MAX_ORDER_USD（デフォルト: 100）
       - EXCHANGE_DAILY_TRADE_LIMIT（デフォルト: 10）
       - EXCHANGE_COOLDOWN_SECONDS（デフォルト: 300 = 5分）
       - EXCHANGE_TIMEOUT_SECONDS（デフォルト: 30）
     """
-    api_key = get_env("EXCHANGE_API_KEY", required=False) or ""
-    api_secret = get_env("EXCHANGE_API_SECRET", required=False) or ""
+    # EXCHANGE_API_KEY が未設定の場合は BYBIT_API_KEY にフォールバック
+    api_key = (
+        get_env("EXCHANGE_API_KEY", required=False)
+        or get_env("BYBIT_API_KEY", required=False)
+        or ""
+    )
+    api_secret = (
+        get_env("EXCHANGE_API_SECRET", required=False)
+        or get_env("BYBIT_API_SECRET", required=False)
+        or ""
+    )
 
-    sandbox = _get_env_bool("EXCHANGE_SANDBOX", default=True)
+    # EXCHANGE_SANDBOX が未設定の場合は BYBIT_SANDBOX にフォールバック
+    raw_sandbox = get_env("EXCHANGE_SANDBOX", required=False) or get_env(
+        "BYBIT_SANDBOX", required=False
+    )
+    sandbox = raw_sandbox.lower() in ("true", "1", "yes") if raw_sandbox else True
     default_symbol = get_env("EXCHANGE_DEFAULT_SYMBOL", required=False) or "BTC/USDT"
 
     max_order_usd = _get_env_decimal(

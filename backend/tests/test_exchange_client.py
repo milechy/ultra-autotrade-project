@@ -1,7 +1,8 @@
 # backend/tests/test_exchange_client.py
 """Exchange client tests."""
 
-from unittest.mock import MagicMock
+import importlib
+from unittest.mock import MagicMock, patch
 
 from app.exchange.client import BybitSandboxClient, DummyExchangeClient
 
@@ -174,3 +175,78 @@ class TestBybitSandboxClientDryRun:
         assert result["symbol"] == "ETH/USDT"
         assert result["amount"] == 1.5
         assert result["status"] == "closed"
+
+
+class TestGetExchangeSettingsFallback:
+    """Test BYBIT_* env var fallback in get_exchange_settings()."""
+
+    def test_bybit_api_key_used_when_exchange_api_key_missing(self):
+        """BYBIT_API_KEY is used when EXCHANGE_API_KEY is not set."""
+        import app.exchange.config as cfg
+
+        env = {
+            "BYBIT_API_KEY": "bybit-key-123",
+            "BYBIT_API_SECRET": "bybit-secret-456",
+        }
+        with patch.dict("os.environ", env, clear=False):
+            # Reload to clear any cached state (get_env reads os.environ directly)
+            importlib.reload(cfg)
+            settings = cfg.get_exchange_settings()
+
+        assert settings.api_key == "bybit-key-123"
+        assert settings.api_secret == "bybit-secret-456"
+
+    def test_exchange_api_key_takes_priority_over_bybit(self):
+        """EXCHANGE_API_KEY takes priority over BYBIT_API_KEY when both are set."""
+        import app.exchange.config as cfg
+
+        env = {
+            "EXCHANGE_API_KEY": "exchange-key",
+            "EXCHANGE_API_SECRET": "exchange-secret",
+            "BYBIT_API_KEY": "bybit-key",
+            "BYBIT_API_SECRET": "bybit-secret",
+        }
+        with patch.dict("os.environ", env, clear=False):
+            importlib.reload(cfg)
+            settings = cfg.get_exchange_settings()
+
+        assert settings.api_key == "exchange-key"
+        assert settings.api_secret == "exchange-secret"
+
+    def test_bybit_sandbox_fallback(self):
+        """BYBIT_SANDBOX is used when EXCHANGE_SANDBOX is not set."""
+        import app.exchange.config as cfg
+
+        env = {
+            "BYBIT_API_KEY": "key",
+            "BYBIT_API_SECRET": "secret",
+            "BYBIT_SANDBOX": "true",
+        }
+        with patch.dict("os.environ", env, clear=False):
+            importlib.reload(cfg)
+            settings = cfg.get_exchange_settings()
+
+        assert settings.sandbox is True
+
+    def test_empty_keys_trigger_dry_run(self):
+        """When no API key env vars are set, api_key is empty (dry-run mode)."""
+        import app.exchange.config as cfg
+
+        # Patch get_env to return None for all key-related vars
+        original_get_env = cfg.get_env
+
+        def patched_get_env(name: str, required: bool = True) -> str | None:
+            if name in (
+                "EXCHANGE_API_KEY",
+                "EXCHANGE_API_SECRET",
+                "BYBIT_API_KEY",
+                "BYBIT_API_SECRET",
+            ):
+                return None
+            return original_get_env(name, required=required)
+
+        with patch.object(cfg, "get_env", patched_get_env):
+            settings = cfg.get_exchange_settings()
+
+        assert settings.api_key == ""
+        assert settings.api_secret == ""
