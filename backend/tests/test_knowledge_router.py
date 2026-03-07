@@ -7,6 +7,8 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
+from app.auth.dependencies import require_editor, require_viewer
+from app.auth.models import UserRole
 from app.knowledge.router import get_knowledge_service
 from app.knowledge.schemas import (
     KnowledgeItem,
@@ -16,6 +18,17 @@ from app.knowledge.schemas import (
 )
 from app.knowledge.service import KnowledgeServiceError
 from app.main import create_app
+
+
+def _make_admin_user() -> MagicMock:
+    """テスト用 admin ユーザーを返す。"""
+    user = MagicMock()
+    user.id = 1
+    user.email = "admin@example.com"
+    user.username = "admin"
+    user.role = UserRole.ADMIN.value
+    user.is_active = True
+    return user
 
 
 def _make_knowledge_item(
@@ -45,8 +58,11 @@ def mock_service() -> MagicMock:
 
 @pytest.fixture()
 def client(mock_service: MagicMock) -> TestClient:
+    admin_user = _make_admin_user()
     app = create_app()
     app.dependency_overrides[get_knowledge_service] = lambda: mock_service
+    app.dependency_overrides[require_editor] = lambda: admin_user
+    app.dependency_overrides[require_viewer] = lambda: admin_user
     return TestClient(app)
 
 

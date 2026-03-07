@@ -138,3 +138,43 @@ async def require_admin(
             detail="Admin access required",
         )
     return user
+
+
+async def require_editor(
+    user: User = Depends(require_active_user),
+) -> User:
+    """
+    Editor 以上（Editor または Admin）を要求する。
+
+    Args:
+        user: アクティブなユーザー
+
+    Returns:
+        Editor 以上のユーザー
+
+    Raises:
+        HTTPException: ユーザーが Editor 以上でない場合
+    """
+    if user.role not in (UserRole.ADMIN.value, UserRole.EDITOR.value):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Editor access required",
+        )
+    return user
+
+
+async def require_viewer(
+    user: User = Depends(require_active_user),
+) -> User:
+    """
+    Viewer 以上（全ロール）を要求する。
+
+    require_active_user で認証済み = Viewer 以上。
+
+    Args:
+        user: アクティブなユーザー
+
+    Returns:
+        認証済みユーザー
+    """
+    return user

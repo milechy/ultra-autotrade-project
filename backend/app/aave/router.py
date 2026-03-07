@@ -11,6 +11,9 @@ from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.auth.dependencies import require_admin
+from app.auth.models import User
+
 from .schemas import AaveRebalanceRequest, AaveRebalanceResponse
 from .service import AaveService
 
@@ -37,6 +40,7 @@ def get_aave_service() -> AaveService:
 def rebalance(
     body: AaveRebalanceRequest,
     service: AaveService = Depends(get_aave_service),
+    current_user: User = Depends(require_admin),
 ) -> AaveRebalanceResponse:
     """
     BUY/SELL/HOLD に応じて deposit / withdraw / NOOP を実行する。

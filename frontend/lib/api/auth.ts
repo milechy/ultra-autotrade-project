@@ -26,7 +26,7 @@ export interface UserResponse {
   id: number;
   email: string;
   username: string;
-  role: "admin" | "viewer";
+  role: "admin" | "editor" | "viewer";
   is_active: boolean;
   created_at: string;
   updated_at: string;

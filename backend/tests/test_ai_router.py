@@ -1,16 +1,31 @@
 # backend/tests/test_ai_router.py
 
 from datetime import datetime, timezone
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
 from app.ai.schemas import AIAnalysisResult, TradeAction
+from app.auth.dependencies import require_editor
+from app.auth.models import UserRole
 from app.main import create_app
 
 
+def _make_admin_user() -> MagicMock:
+    """テスト用 admin ユーザーを返す。"""
+    user = MagicMock()
+    user.id = 1
+    user.email = "admin@example.com"
+    user.username = "admin"
+    user.role = UserRole.ADMIN.value
+    user.is_active = True
+    return user
+
+
 def create_test_client() -> TestClient:
+    admin_user = _make_admin_user()
     app = create_app()
+    app.dependency_overrides[require_editor] = lambda: admin_user
     return TestClient(app)
 
 

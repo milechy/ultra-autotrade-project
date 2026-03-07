@@ -1,6 +1,7 @@
 # backend/tests/test_aave_router.py
 
 from decimal import Decimal
+from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
@@ -10,7 +11,20 @@ from app.aave.schemas import (
     AaveOperationStatus,
     AaveOperationType,
 )
+from app.auth.dependencies import require_admin
+from app.auth.models import UserRole
 from app.main import create_app
+
+
+def _make_admin_user() -> MagicMock:
+    """テスト用 admin ユーザーを返す。"""
+    user = MagicMock()
+    user.id = 1
+    user.email = "admin@example.com"
+    user.username = "admin"
+    user.role = UserRole.ADMIN.value
+    user.is_active = True
+    return user
 
 
 class DummyAaveService:
@@ -42,8 +56,10 @@ class DummyAaveService:
 
 
 def _create_client_with_dummy_service(service: DummyAaveService) -> TestClient:
+    admin_user = _make_admin_user()
     app = create_app()
     app.dependency_overrides[get_aave_service] = lambda: service
+    app.dependency_overrides[require_admin] = lambda: admin_user
     return TestClient(app)
 
 
@@ -69,7 +85,10 @@ def test_aave_rebalance_buy_returns_200() -> None:
 
 def test_aave_rebalance_validation_error_for_negative_amount() -> None:
     # Pydantic バリデーションで 422 になるケース
-    client = TestClient(create_app())
+    admin_user = _make_admin_user()
+    app = create_app()
+    app.dependency_overrides[require_admin] = lambda: admin_user
+    client = TestClient(app)
 
     payload = {
         "action": "BUY",
@@ -86,8 +105,10 @@ def test_aave_rebalance_value_error_from_service_returns_400() -> None:
         def execute_rebalance(self, *args, **kwargs):
             raise ValueError("invalid amount")
 
+    admin_user = _make_admin_user()
     app = create_app()
     app.dependency_overrides[get_aave_service] = ErrorService  # type: ignore[arg-type]
+    app.dependency_overrides[require_admin] = lambda: admin_user
     client = TestClient(app)
 
     payload = {
@@ -106,8 +127,10 @@ def test_aave_rebalance_unexpected_error_returns_500() -> None:
         def execute_rebalance(self, *args, **kwargs):
             raise RuntimeError("boom")
 
+    admin_user = _make_admin_user()
     app = create_app()
     app.dependency_overrides[get_aave_service] = CrashService  # type: ignore[arg-type]
+    app.dependency_overrides[require_admin] = lambda: admin_user
     client = TestClient(app)
 
     payload = {

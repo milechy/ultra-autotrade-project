@@ -2,12 +2,26 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, get_args, get_origin
+from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
 from app.api.automation_dashboard import get_monitoring_service, get_reporting_service
+from app.auth.dependencies import require_viewer
+from app.auth.models import UserRole
 from app.automation.schemas import AutomationReportSummary, AutomationStatus, DashboardSnapshot
 from app.main import create_app
+
+
+def _make_admin_user() -> MagicMock:
+    """テスト用 admin ユーザーを返す。"""
+    user = MagicMock()
+    user.id = 1
+    user.email = "admin@example.com"
+    user.username = "admin"
+    user.role = UserRole.ADMIN.value
+    user.is_active = True
+    return user
 
 
 def _placeholder_for_type(tp: Any) -> Any:
@@ -103,9 +117,11 @@ class _StubReportingService:
 
 
 def _make_client() -> TestClient:
+    admin_user = _make_admin_user()
     app = create_app()
     app.dependency_overrides[get_monitoring_service] = lambda: _StubMonitoringService()
     app.dependency_overrides[get_reporting_service] = lambda: _StubReportingService()
+    app.dependency_overrides[require_viewer] = lambda: admin_user
     return TestClient(app)
 
 

@@ -141,15 +141,7 @@ function UsersManagementContent() {
                   <td style={tdStyle}>{user.email}</td>
                   <td style={tdStyle}>{user.username}</td>
                   <td style={tdStyle}>
-                    <span style={{
-                      padding: "2px 8px",
-                      borderRadius: 4,
-                      fontSize: 12,
-                      background: user.role === "admin" ? "#e8f5e9" : "#e3f2fd",
-                      color: user.role === "admin" ? "#2e7d32" : "#1565c0",
-                    }}>
-                      {user.role === "admin" ? "管理者" : "閲覧者"}
-                    </span>
+                    <RoleBadge role={user.role} />
                   </td>
                   <td style={tdStyle}>
                     <span style={{
@@ -231,7 +223,7 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
   const [email, setEmail] = useState(user?.email || "");
   const [username, setUsername] = useState(user?.username || "");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "viewer">(user?.role || "viewer");
+  const [role, setRole] = useState<"admin" | "editor" | "viewer">(user?.role || "viewer");
   const [isActive, setIsActive] = useState(user?.is_active ?? true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -319,10 +311,11 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
                 <label style={inputLabelStyle}>ロール</label>
                 <select
                   value={role}
-                  onChange={(e) => setRole(e.target.value as "admin" | "viewer")}
+                  onChange={(e) => setRole(e.target.value as "admin" | "editor" | "viewer")}
                   style={inputStyle}
                 >
                   <option value="viewer">閲覧者</option>
+                  <option value="editor">編集者</option>
                   <option value="admin">管理者</option>
                 </select>
               </div>
@@ -353,6 +346,21 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
         </form>
       </div>
     </div>
+  );
+}
+
+// Role Badge Component
+function RoleBadge({ role }: { role: "admin" | "editor" | "viewer" }) {
+  const styles: Record<string, { background: string; color: string; label: string }> = {
+    admin: { background: "#ffebee", color: "#c62828", label: "管理者" },
+    editor: { background: "#e3f2fd", color: "#1565c0", label: "編集者" },
+    viewer: { background: "#f5f5f5", color: "#616161", label: "閲覧者" },
+  };
+  const s = styles[role] ?? styles.viewer;
+  return (
+    <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 12, background: s.background, color: s.color }}>
+      {s.label}
+    </span>
   );
 }
 
