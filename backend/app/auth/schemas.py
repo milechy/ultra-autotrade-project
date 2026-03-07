@@ -14,6 +14,7 @@ class UserRole(str, Enum):
     """ユーザーロール。"""
 
     ADMIN = "admin"
+    EDITOR = "editor"
     VIEWER = "viewer"
 
 

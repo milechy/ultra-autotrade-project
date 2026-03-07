@@ -645,3 +645,125 @@ class TestUsernameValidation:
             },
         )
         assert response.status_code == 201
+
+
+class TestEditorRolePermissions:
+    """Editor ロールの権限テスト。"""
+
+    def _setup_admin(self, client: TestClient) -> str:
+        """admin ユーザーを作成しトークンを返す。"""
+        client.post(
+            "/auth/register",
+            json={
+                "email": "admin@example.com",
+                "username": "admin",
+                "password": "adminpassword123",
+            },
+        )
+        login_response = client.post(
+            "/auth/login",
+            json={"email": "admin@example.com", "password": "adminpassword123"},
+        )
+        return login_response.json()["access_token"]
+
+    def _create_user_and_login(
+        self, client: TestClient, admin_token: str, email: str, username: str, role: str
+    ) -> str:
+        """指定ロールのユーザーを作成してトークンを返す。"""
+        client.post(
+            "/users",
+            json={
+                "email": email,
+                "username": username,
+                "password": "password123",
+                "role": role,
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        login_response = client.post(
+            "/auth/login",
+            json={"email": email, "password": "password123"},
+        )
+        return login_response.json()["access_token"]
+
+    def test_editor_can_create_knowledge_item(self, client: TestClient):
+        """Editor は POST /knowledge/items できる。"""
+        admin_token = self._setup_admin(client)
+        editor_token = self._create_user_and_login(
+            client, admin_token, "editor@example.com", "editor", "editor"
+        )
+        response = client.post(
+            "/knowledge/items",
+            json={"item_type": "text", "raw_text": "テスト記事の内容", "title": "テスト"},
+            headers={"Authorization": f"Bearer {editor_token}"},
+        )
+        # 認証エラー(401/403) でなければ Editor の権限確認は通っている
+        assert response.status_code != 403
+        assert response.status_code != 401
+
+    def test_viewer_cannot_create_knowledge_item(self, client: TestClient):
+        """Viewer は POST /knowledge/items で 403 になる。"""
+        admin_token = self._setup_admin(client)
+        viewer_token = self._create_user_and_login(
+            client, admin_token, "viewer@example.com", "viewer", "viewer"
+        )
+        response = client.post(
+            "/knowledge/items",
+            json={"item_type": "text", "raw_text": "テスト記事の内容", "title": "テスト"},
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert response.status_code == 403
+
+    def test_viewer_can_search_knowledge(self, client: TestClient):
+        """Viewer は POST /knowledge/search できる。"""
+        admin_token = self._setup_admin(client)
+        viewer_token = self._create_user_and_login(
+            client, admin_token, "viewer@example.com", "viewer", "viewer"
+        )
+        response = client.post(
+            "/knowledge/search",
+            json={"query": "テスト", "top_k": 3},
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        # 認証エラー(401/403) でなければ Viewer の権限確認は通っている
+        assert response.status_code != 403
+        assert response.status_code != 401
+
+    def test_viewer_cannot_analyze(self, client: TestClient):
+        """Viewer は POST /ai/analyze で 403 になる。"""
+        admin_token = self._setup_admin(client)
+        viewer_token = self._create_user_and_login(
+            client, admin_token, "viewer@example.com", "viewer", "viewer"
+        )
+        response = client.post(
+            "/ai/analyze",
+            json={"items": []},
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert response.status_code == 403
+
+    def test_viewer_cannot_rebalance(self, client: TestClient):
+        """Viewer は POST /aave/rebalance で 403 になる。"""
+        admin_token = self._setup_admin(client)
+        viewer_token = self._create_user_and_login(
+            client, admin_token, "viewer@example.com", "viewer", "viewer"
+        )
+        response = client.post(
+            "/aave/rebalance",
+            json={"action": "HOLD", "amount": "100", "asset_symbol": "USDC", "dry_run": True},
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert response.status_code == 403
+
+    def test_editor_cannot_rebalance(self, client: TestClient):
+        """Editor は POST /aave/rebalance で 403 になる。"""
+        admin_token = self._setup_admin(client)
+        editor_token = self._create_user_and_login(
+            client, admin_token, "editor@example.com", "editor", "editor"
+        )
+        response = client.post(
+            "/aave/rebalance",
+            json={"action": "HOLD", "amount": "100", "asset_symbol": "USDC", "dry_run": True},
+            headers={"Authorization": f"Bearer {editor_token}"},
+        )
+        assert response.status_code == 403

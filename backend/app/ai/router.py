@@ -5,7 +5,10 @@ AI 解析用の FastAPI ルーター定義。
 - /ai/analyze
 """
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.auth.dependencies import require_editor
+from app.auth.models import User
 
 from .schemas import AIAnalysisRequest, AIAnalysisResponse
 from .service import AIService
@@ -25,7 +28,10 @@ _service = AIService()
         "各ニュースに対する BUY/SELL/HOLD 判定を返す。"
     ),
 )
-def analyze_news(request: AIAnalysisRequest) -> AIAnalysisResponse:
+def analyze_news(
+    request: AIAnalysisRequest,
+    current_user: User = Depends(require_editor),
+) -> AIAnalysisResponse:
     """
     ニュース配列を受け取り、AI 判定結果を返すエンドポイント。
 

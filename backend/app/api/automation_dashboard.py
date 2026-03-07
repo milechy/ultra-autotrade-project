@@ -4,6 +4,8 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.auth.dependencies import require_viewer
+from app.auth.models import User
 from app.automation.monitoring_service import MonitoringService
 from app.automation.reporting_service import ReportingService
 from app.automation.schemas import (
@@ -68,6 +70,7 @@ def get_dashboard_snapshot(
 )
 def get_automation_status(
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
+    current_user: User = Depends(require_viewer),
 ) -> AutomationStatus:
     """
     Phase10までに確立した AutomationStatus 契約をそのまま返す。

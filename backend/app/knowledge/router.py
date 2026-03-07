@@ -15,6 +15,8 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.auth.dependencies import require_editor, require_viewer
+from app.auth.models import User
 from app.database import get_db
 
 from .schemas import (
@@ -51,6 +53,7 @@ def create_item(
     request: KnowledgeCreateRequest,
     db: Session = Depends(get_db),
     service: KnowledgeService = Depends(get_knowledge_service),
+    current_user: User = Depends(require_editor),
 ) -> KnowledgeItem:
     """
     URL またはテキストを取り込み、チャンク分割・埋め込み生成を行い DB に保存する。
@@ -87,6 +90,7 @@ def get_items(
     status: Optional[str] = None,
     db: Session = Depends(get_db),
     service: KnowledgeService = Depends(get_knowledge_service),
+    current_user: User = Depends(require_viewer),
 ) -> List[KnowledgeItem]:
     """
     登録済みナレッジアイテムの一覧を取得する。
@@ -112,6 +116,7 @@ def search(
     request: KnowledgeSearchRequest,
     db: Session = Depends(get_db),
     service: KnowledgeService = Depends(get_knowledge_service),
+    current_user: User = Depends(require_viewer),
 ) -> KnowledgeSearchResponse:
     """
     クエリを埋め込みベクトルに変換し、pgvector コサイン類似度で検索する。
@@ -148,6 +153,7 @@ def update_status(
     new_status: KnowledgeItemStatus,
     db: Session = Depends(get_db),
     service: KnowledgeService = Depends(get_knowledge_service),
+    current_user: User = Depends(require_editor),
 ) -> KnowledgeItem:
     """
     指定した ID のアイテムのステータスを更新する。
