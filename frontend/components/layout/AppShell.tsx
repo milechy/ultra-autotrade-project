@@ -25,6 +25,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <nav style={{ display: "flex", gap: 12, fontSize: 14, alignItems: "center" }}>
             <Link href="/dashboard/automation" style={navLinkStyle}>自動売買</Link>
             <Link href="/dashboard/reports" style={navLinkStyle}>レポート</Link>
+            <Link href="/knowledge" style={navLinkStyle}>ナレッジ</Link>
             {!isLoading && user && (
               <>
                 <span style={{ color: "#999" }}>|</span>
