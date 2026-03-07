@@ -1,7 +1,7 @@
 # backend/app/exchange/config.py
 
 """
-Exchange（Bybit Sandbox）関連の設定値読み出しモジュール。
+Exchange（Bybit Sandbox / bitFlyer）関連の設定値読み出しモジュール。
 
 - 環境変数から API キーやリスク管理パラメータを取得する
 - デフォルト値は「安全側（小さく・保守的）」に倒す
@@ -16,11 +16,12 @@ from app.utils.config import get_env
 @dataclass
 class ExchangeSettings:
     """
-    Bybit Sandbox 取引に関する設定値のまとまり。
+    Bybit Sandbox / bitFlyer 取引に関する設定値のまとまり。
 
     NOTE:
     - sandbox=True がデフォルトであり、本番環境への誤送信を防止する
     - max_order_usd は安全側に小さく設定する
+    - usd_to_jpy_rate は bitFlyer（BTC/JPY）使用時に amount_usd を JPY 換算するレート
     """
 
     api_key: str
@@ -32,6 +33,7 @@ class ExchangeSettings:
     cooldown_seconds: int
     timeout_seconds: int
     hostname: str
+    usd_to_jpy_rate: float  # USD/JPY 換算レート（bitFlyer 使用時）
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -85,8 +87,8 @@ def get_exchange_settings() -> ExchangeSettings:
     ExchangeSettings を構築して返す。
 
     必須:
-      - EXCHANGE_API_KEY（未設定時は BYBIT_API_KEY にフォールバック）
-      - EXCHANGE_API_SECRET（未設定時は BYBIT_API_SECRET にフォールバック）
+      - EXCHANGE_API_KEY（未設定時は BYBIT_API_KEY → BITFLYER_API_KEY にフォールバック）
+      - EXCHANGE_API_SECRET（未設定時は BYBIT_API_SECRET → BITFLYER_API_SECRET にフォールバック）
 
     任意（デフォルト値あり）:
       - EXCHANGE_SANDBOX（未設定時は BYBIT_SANDBOX にフォールバック、デフォルト: True）
@@ -96,16 +98,19 @@ def get_exchange_settings() -> ExchangeSettings:
       - EXCHANGE_COOLDOWN_SECONDS（デフォルト: 300 = 5分）
       - EXCHANGE_TIMEOUT_SECONDS（デフォルト: 30）
       - BYBIT_HOSTNAME（デフォルト: "bybit.com"、EU テストネットは "bybit.eu"）
+      - USD_TO_JPY_RATE（デフォルト: 150.0、bitFlyer 使用時の JPY 換算レート）
     """
-    # EXCHANGE_API_KEY が未設定の場合は BYBIT_API_KEY にフォールバック
+    # EXCHANGE_API_KEY が未設定の場合は BYBIT_API_KEY → BITFLYER_API_KEY にフォールバック
     api_key = (
         get_env("EXCHANGE_API_KEY", required=False)
         or get_env("BYBIT_API_KEY", required=False)
+        or get_env("BITFLYER_API_KEY", required=False)
         or ""
     )
     api_secret = (
         get_env("EXCHANGE_API_SECRET", required=False)
         or get_env("BYBIT_API_SECRET", required=False)
+        or get_env("BITFLYER_API_SECRET", required=False)
         or ""
     )
 
@@ -133,6 +138,7 @@ def get_exchange_settings() -> ExchangeSettings:
         default=30,
     )
     hostname = get_env("BYBIT_HOSTNAME", required=False) or "bybit.com"
+    usd_to_jpy_rate = float(get_env("USD_TO_JPY_RATE", required=False) or "150.0")
 
     return ExchangeSettings(
         api_key=api_key,
@@ -144,4 +150,5 @@ def get_exchange_settings() -> ExchangeSettings:
         cooldown_seconds=cooldown_seconds,
         timeout_seconds=timeout_seconds,
         hostname=hostname,
+        usd_to_jpy_rate=usd_to_jpy_rate,
     )
