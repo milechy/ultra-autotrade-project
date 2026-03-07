@@ -89,12 +89,19 @@ class BybitSandboxClient:
                 "secret": self._settings.api_secret,
                 "timeout": self._settings.timeout_seconds * 1000,  # ccxt はミリ秒
                 "enableRateLimit": True,
+                "hostname": self._settings.hostname,
+                "options": {
+                    "defaultType": "spot",
+                },
             }
         )
 
         if self._settings.sandbox:
             self._exchange.set_sandbox_mode(True)
-            logger.info("Bybit sandbox mode enabled")
+            logger.info(
+                "Bybit sandbox mode enabled (endpoint: https://api-testnet.%s)",
+                self._settings.hostname,
+            )
 
     def create_market_order(self, symbol: str, side: str, amount: float) -> Dict[str, Any]:
         """
