@@ -31,6 +31,7 @@ class ExchangeSettings:
     daily_trade_limit: int
     cooldown_seconds: int
     timeout_seconds: int
+    hostname: str
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -94,6 +95,7 @@ def get_exchange_settings() -> ExchangeSettings:
       - EXCHANGE_DAILY_TRADE_LIMIT（デフォルト: 10）
       - EXCHANGE_COOLDOWN_SECONDS（デフォルト: 300 = 5分）
       - EXCHANGE_TIMEOUT_SECONDS（デフォルト: 30）
+      - BYBIT_HOSTNAME（デフォルト: "bybit.com"、EU テストネットは "bybit.eu"）
     """
     # EXCHANGE_API_KEY が未設定の場合は BYBIT_API_KEY にフォールバック
     api_key = (
@@ -130,6 +132,7 @@ def get_exchange_settings() -> ExchangeSettings:
         "EXCHANGE_TIMEOUT_SECONDS",
         default=30,
     )
+    hostname = get_env("BYBIT_HOSTNAME", required=False) or "bybit.com"
 
     return ExchangeSettings(
         api_key=api_key,
@@ -140,4 +143,5 @@ def get_exchange_settings() -> ExchangeSettings:
         daily_trade_limit=daily_trade_limit,
         cooldown_seconds=cooldown_seconds,
         timeout_seconds=timeout_seconds,
+        hostname=hostname,
     )

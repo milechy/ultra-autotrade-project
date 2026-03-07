@@ -69,6 +69,7 @@ class TestBybitSandboxClientDryRun:
         settings.sandbox = True
         settings.timeout_seconds = 30
         settings.default_symbol = "BTC/USDT"
+        settings.hostname = "bybit.com"
         return settings
 
     def test_dry_run_when_api_key_empty(self):
@@ -250,3 +251,36 @@ class TestGetExchangeSettingsFallback:
 
         assert settings.api_key == ""
         assert settings.api_secret == ""
+
+
+class TestBybitHostnameSetting:
+    """Test BYBIT_HOSTNAME env var in get_exchange_settings()."""
+
+    def test_bybit_eu_hostname_is_set(self):
+        """BYBIT_HOSTNAME=bybit.eu results in settings.hostname == 'bybit.eu'."""
+        import app.exchange.config as cfg
+
+        env = {
+            "BYBIT_HOSTNAME": "bybit.eu",
+        }
+        with patch.dict("os.environ", env, clear=False):
+            importlib.reload(cfg)
+            settings = cfg.get_exchange_settings()
+
+        assert settings.hostname == "bybit.eu"
+
+    def test_bybit_default_hostname(self):
+        """When BYBIT_HOSTNAME is not set, hostname defaults to 'bybit.com'."""
+        import app.exchange.config as cfg
+
+        original_get_env = cfg.get_env
+
+        def patched_get_env(name: str, required: bool = True) -> str | None:
+            if name == "BYBIT_HOSTNAME":
+                return None
+            return original_get_env(name, required=required)
+
+        with patch.object(cfg, "get_env", patched_get_env):
+            settings = cfg.get_exchange_settings()
+
+        assert settings.hostname == "bybit.com"
