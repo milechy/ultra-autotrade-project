@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
 
+from app.ai.service import AIService
 from app.auth.dependencies import require_viewer
 from app.auth.models import User
 from app.automation.monitoring_service import MonitoringService
@@ -12,7 +14,12 @@ from app.automation.schemas import (
     AutomationReportSummary,
     AutomationStatus,
     DashboardSnapshot,
+    WorkflowRunResult,
 )
+from app.automation.workflow import process_pending_knowledge
+from app.database import get_db
+from app.exchange.router import get_exchange_service
+from app.knowledge.service import KnowledgeService
 
 router = APIRouter(tags=["automation-dashboard"])
 
@@ -106,3 +113,33 @@ def get_latest_report(
             status_code=500,
             detail=f"Failed to generate summary report: {e}",
         ) from e
+
+
+@router.post(
+    "/workflow/run",
+    response_model=WorkflowRunResult,
+    summary="ペンディング知識アイテムに対して E2E ワークフローを実行",
+)
+def run_workflow(
+    dry_run: bool = Query(default=True, description="If true, simulate trades"),
+    db: Session = Depends(get_db),
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+) -> WorkflowRunResult:
+    """Knowledge Hub の pending アイテムを RAG→AI→Exchange の E2E パイプラインで処理する。"""
+    knowledge_service = KnowledgeService()
+    ai_service = AIService()
+    exchange_service = get_exchange_service()
+
+    run_result = process_pending_knowledge(
+        db,
+        knowledge_service=knowledge_service,
+        ai_service=ai_service,
+        exchange_service=exchange_service,
+        monitoring_service=monitoring_service,
+        dry_run=dry_run,
+    )
+
+    sanitized_errors = [
+        err.model_copy(update={"message": err.message[:200]}) for err in run_result.errors
+    ]
+    return run_result.model_copy(update={"errors": sanitized_errors})

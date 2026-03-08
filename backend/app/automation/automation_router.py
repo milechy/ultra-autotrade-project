@@ -3,22 +3,23 @@
 自動化ワークフロー用 API エンドポイント。
 
 POST /automation/process-news:
-  Notion → AI → OctoBot → Notion書き戻し の全フローを実行
+  Knowledge Hub → RAG → AI Judge → Exchange の全フローを実行
 """
 
 import logging
-from functools import lru_cache
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from app.ai.service import AIService
-from app.bots.router import get_octobot_service
-from app.bots.service import OctoBotService
-from app.notion.service import NotionService
-
-from .workflow import WorkflowResult, WorkflowService
+from app.automation.monitoring_service import MonitoringService
+from app.automation.state import get_monitoring_service
+from app.automation.workflow import process_pending_knowledge
+from app.database import get_db
+from app.exchange.router import get_exchange_service
+from app.knowledge.service import KnowledgeService
 
 logger = logging.getLogger(__name__)
 
@@ -28,97 +29,73 @@ router = APIRouter(tags=["automation"])
 class ProcessNewsResponse(BaseModel):
     """POST /automation/process-news のレスポンス。"""
 
-    fetched_count: int = Field(..., description="Notionから取得した未処理ニュース件数")
-    analyzed_count: int = Field(..., description="AI判定した件数")
-    octobot_success_count: int = Field(..., description="OctoBot送信成功件数")
-    octobot_skipped_count: int = Field(..., description="OctoBotスキップ件数")
-    octobot_failed_count: int = Field(..., description="OctoBot送信失敗件数")
-    notion_updated_count: int = Field(..., description="Notion書き戻し成功件数")
+    fetched_count: int = Field(..., description="Knowledge Hub から取得した pending アイテム数")
+    analyzed_count: int = Field(..., description="AI 判定した件数")
+    octobot_success_count: int = Field(..., description="取引成功件数")
+    octobot_skipped_count: int = Field(..., description="取引スキップ件数（HOLD含む）")
+    octobot_failed_count: int = Field(..., description="取引失敗件数")
+    notion_updated_count: int = Field(default=0, description="（廃止）常に 0")
     errors: List[str] = Field(default_factory=list, description="エラーメッセージ一覧")
     status: str = Field(
         ...,
-        description="処理ステータス (completed / completed_with_errors / failed)",
-    )
-
-
-@lru_cache()
-def get_notion_service() -> NotionService:
-    """NotionService のシングルトンインスタンスを取得する。"""
-    return NotionService()
-
-
-@lru_cache()
-def get_ai_service() -> AIService:
-    """AIService のシングルトンインスタンスを取得する。"""
-    return AIService()
-
-
-def get_workflow_service(
-    notion_service: NotionService = Depends(get_notion_service),
-    ai_service: AIService = Depends(get_ai_service),
-    octobot_service: OctoBotService = Depends(get_octobot_service),
-) -> WorkflowService:
-    """WorkflowService のインスタンスを取得する。"""
-    return WorkflowService(
-        notion_service=notion_service,
-        ai_service=ai_service,
-        octobot_service=octobot_service,
+        description="処理ステータス (completed / completed_with_errors / failed / no_items)",
     )
 
 
 @router.post(
     "/automation/process-news",
     response_model=ProcessNewsResponse,
-    summary="Notion → AI → OctoBot → Notion書き戻し の自動フローを実行",
+    summary="Knowledge Hub → RAG → AI Judge → Exchange の自動フローを実行",
 )
 def process_news(
-    service: WorkflowService = Depends(get_workflow_service),
+    dry_run: bool = Query(default=True, description="If true, simulate trades"),
+    db: Session = Depends(get_db),
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
 ) -> ProcessNewsResponse:
     """
-    未処理ニュースを取得し、AI判定→OctoBot送信→Notion書き戻しを行う。
-
-    このエンドポイントは cron や手動トリガーで呼び出されることを想定。
+    Knowledge Hub の pending アイテムを取得し、
+    RAG 検索 → AI Judge → Exchange 注文 を実行する。
     """
     logger.info("POST /automation/process-news called")
 
     try:
-        result: WorkflowResult = service.process_pending_news()
+        run_result = process_pending_knowledge(
+            db,
+            knowledge_service=KnowledgeService(),
+            ai_service=AIService(),
+            exchange_service=get_exchange_service(),
+            monitoring_service=monitoring_service,
+            dry_run=dry_run,
+        )
     except Exception as exc:
-        # 詳細はログに記録（デバッグ用）、レスポンスには一般的なメッセージのみ
         logger.error("Workflow execution failed: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during news processing",
         ) from exc
 
-    # ステータスの決定
-    # - completed: 全て成功
-    # - completed_with_errors: 一部失敗（OctoBot送信失敗、Notion書き戻し失敗など）
-    # - failed: 全て失敗
-    has_errors = bool(result.errors) or result.octobot_failed_count > 0
-
+    has_errors = bool(run_result.errors)
     if has_errors:
-        if result.notion_updated_count > 0 or result.octobot_success_count > 0:
-            status_str = "completed_with_errors"
-        else:
-            status_str = "failed"
+        status_str = "completed_with_errors" if run_result.fetched_count > 0 else "failed"
+    elif run_result.status == "no_items":
+        status_str = "no_items"
     else:
         status_str = "completed"
 
     logger.info(
         "POST /automation/process-news completed: status=%s, fetched=%d, analyzed=%d",
         status_str,
-        result.fetched_count,
-        result.analyzed_count,
+        run_result.fetched_count,
+        run_result.analyzed_count,
     )
 
     return ProcessNewsResponse(
-        fetched_count=result.fetched_count,
-        analyzed_count=result.analyzed_count,
-        octobot_success_count=result.octobot_success_count,
-        octobot_skipped_count=result.octobot_skipped_count,
-        octobot_failed_count=result.octobot_failed_count,
-        notion_updated_count=result.notion_updated_count,
-        errors=result.errors,
+        fetched_count=run_result.fetched_count,
+        analyzed_count=run_result.analyzed_count,
+        octobot_success_count=run_result.traded_count,
+        octobot_skipped_count=(run_result.skipped_count or 0) + (run_result.hold_count or 0),
+        octobot_failed_count=len(run_result.errors),
+        notion_updated_count=0,
+        errors=[e.message for e in run_result.errors],
         status=status_str,
     )
