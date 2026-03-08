@@ -239,7 +239,7 @@ class TestKnowledgeServiceCRUD:
     """Test create_item, get_pending, get_items, update_status with mocked DB."""
 
     def test_create_item_from_text(self):
-        """create_item with raw_text should create source, document, chunks and return ANALYZED."""
+        """create_item with raw_text should create source, document, chunks and return PENDING."""
         service = _make_service()
 
         request = KnowledgeCreateRequest(
@@ -248,7 +248,7 @@ class TestKnowledgeServiceCRUD:
             title="Test Title",
         )
 
-        fake_source = _fake_source(id_=42, status="analyzed")
+        fake_source = _fake_source(id_=42, status="pending")
 
         db = MagicMock()
 
@@ -280,7 +280,7 @@ class TestKnowledgeServiceCRUD:
             source_url="https://example.com/article",
         )
 
-        fake_source = _fake_source(id_=7, status="analyzed")
+        fake_source = _fake_source(id_=7, status="pending")
 
         db = MagicMock()
 

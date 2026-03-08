@@ -17,10 +17,10 @@ class KnowledgeItemStatus(str, Enum):
     """
     ナレッジアイテムの処理状態。
 
-    - PENDING:  登録済み・未処理
-    - ANALYZED: チャンク分割・埋め込み生成完了
-    - SKIPPED:  処理をスキップした（コンテンツ取得不可など）
-    - ERROR:    処理中にエラーが発生した
+    - PENDING:  登録済み・embedding生成済み・AI判定未実施
+    - ANALYZED: AI判定・取引処理完了
+    - SKIPPED:  ルールエンジンにより取引スキップ / HOLD判定
+    - ERROR:    処理中にエラー発生
     """
 
     PENDING = "pending"

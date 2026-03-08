@@ -33,7 +33,7 @@ def _make_admin_user() -> MagicMock:
 
 def _make_knowledge_item(
     id_: int = 1,
-    status: KnowledgeItemStatus = KnowledgeItemStatus.ANALYZED,
+    status: KnowledgeItemStatus = KnowledgeItemStatus.PENDING,
     item_type: KnowledgeItemType = KnowledgeItemType.TEXT,
     title: str = "Test Item",
     raw_text: str = "Some content",
@@ -82,7 +82,7 @@ class TestCreateItemEndpoint:
         assert response.status_code == 201
         data = response.json()
         assert data["id"] == 10
-        assert data["status"] == "analyzed"
+        assert data["status"] == "pending"
         mock_service.create_item.assert_called_once()
 
     def test_create_item_url_success(self, client: TestClient, mock_service: MagicMock) -> None:
