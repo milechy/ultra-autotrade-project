@@ -6,7 +6,7 @@ test('トップページが表示される', async ({ page }) => {
 });
 
 test('ログインページが表示される', async ({ page }) => {
-  const response = await page.goto('/auth/login');
+  const response = await page.goto('/login');
   expect(response?.status()).toBe(200);
 });
 
