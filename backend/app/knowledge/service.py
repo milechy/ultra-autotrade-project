@@ -155,8 +155,7 @@ class KnowledgeService:
             )
             db.add(chunk)
 
-        # 7. ステータスを ANALYZED に更新してコミット
-        source.status = KnowledgeItemStatus.ANALYZED.value
+        # 7. チャンク・埋め込みを保存してコミット（ステータスは PENDING のまま）
         db.commit()
         db.refresh(source)
 
