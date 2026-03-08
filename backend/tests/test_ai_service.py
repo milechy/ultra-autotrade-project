@@ -2,7 +2,9 @@
 
 from datetime import datetime, timezone
 
-from app.ai.schemas import AIAnalysisResult, TradeAction
+import pytest
+
+from app.ai.schemas import AIAnalysisResult, RAGContext, TradeAction
 from app.ai.service import AIService
 from app.notion.schemas import NotionNewsItem
 
@@ -67,3 +69,17 @@ def test_ai_service_uses_llm_analyzer_when_provided():
     assert result.action == TradeAction.BUY
     assert result.confidence == 90
     assert result.sentiment == "positive"
+
+
+@pytest.mark.vcr()
+def test_judge_with_rag_vcr():
+    """VCR カセットを使って judge_with_rag() が BUY/SELL/HOLD を返すことを確認。"""
+    service = AIService()
+    rag_context = RAGContext(
+        chunks=["Bitcoin price surged 10% on strong institutional demand."],
+        query="BTC price analysis",
+        source_count=1,
+    )
+    result = service.judge_with_rag("BTC price analysis", rag_context)
+    assert result.final_action in (TradeAction.BUY, TradeAction.SELL, TradeAction.HOLD)
+    assert 0 <= result.final_confidence <= 100

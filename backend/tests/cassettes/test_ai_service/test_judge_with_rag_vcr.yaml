@@ -1,0 +1,22 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: '{"id":"msg_vcr_test_001","type":"message","role":"assistant","content":[{"type":"text","text":"{\"action\":
+        \"BUY\", \"confidence\": 75, \"reason\": \"Strong institutional demand driving
+        price surge\"}"}],"model":"claude-opus-4-6","stop_reason":"end_turn","usage":{"input_tokens":120,"output_tokens":45}}'
+    headers:
+      Content-Type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+version: 1
