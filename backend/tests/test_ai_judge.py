@@ -452,3 +452,106 @@ class TestAnalyzeSingleWithLLMAnalyzer:
         service = AIService()
         result = service._analyze_single(item, now=None)
         assert result.action == TradeAction.HOLD  # neutral → HOLD
+
+
+# ------------------------------------------------------------------ #
+# TestPromptVersioning                                                 #
+# ------------------------------------------------------------------ #
+
+
+class TestPromptVersioning:
+    """プロンプトバージョン管理のテスト。"""
+
+    def test_get_prompt_template_v1(self):
+        from app.ai.prompts import get_prompt_template
+
+        tmpl = get_prompt_template("v1")
+        assert tmpl.version == "v1"
+        assert "BUY" in tmpl.system_prompt
+
+    def test_get_prompt_template_v2(self):
+        from app.ai.prompts import get_prompt_template
+
+        tmpl = get_prompt_template("v2")
+        assert tmpl.version == "v2"
+        assert tmpl.description != ""
+
+    def test_unknown_version_falls_back_to_v1(self):
+        from app.ai.prompts import get_prompt_template
+
+        tmpl = get_prompt_template("v99")
+        assert tmpl.version == "v1"
+
+    def test_list_versions(self):
+        from app.ai.prompts import list_versions
+
+        versions = list_versions()
+        assert "v1" in versions
+        assert "v2" in versions
+
+    def test_prompt_version_default_in_llm_decision(self):
+        from app.ai.schemas import LLMDecision, LLMProvider, TradeAction
+
+        decision = LLMDecision(
+            provider=LLMProvider.CLAUDE,
+            action=TradeAction.HOLD,
+            confidence=0,
+            reason="no key",
+        )
+        assert decision.prompt_version == "v1"
+
+    def test_prompt_version_custom_in_llm_decision(self):
+        from app.ai.schemas import LLMDecision, LLMProvider, TradeAction
+
+        decision = LLMDecision(
+            provider=LLMProvider.CLAUDE,
+            action=TradeAction.BUY,
+            confidence=80,
+            reason="test",
+            prompt_version="v2",
+        )
+        assert decision.prompt_version == "v2"
+
+    def test_judge_with_rag_propagates_prompt_version(self):
+        """judge_with_rag() がAPIキー未設定でもprompt_versionをレスポンスに含める。"""
+        from unittest.mock import MagicMock
+
+        from app.ai.config import AISettings
+        from app.ai.schemas import RAGContext
+        from app.ai.service import AIService
+
+        service = AIService()
+        rag_context = RAGContext(chunks=["BTC up 10%"], query="BTC analysis", source_count=1)
+
+        settings = MagicMock(spec=AISettings)
+        settings.anthropic_api_key = None
+        settings.openai_api_key = None
+        settings.cross_validation_enabled = False
+        settings.prompt_version = "v2"
+
+        result = service.judge_with_rag("BTC analysis", rag_context, settings=settings)
+        assert result.prompt_version == "v2"
+        assert result.primary.prompt_version == "v2"
+
+    def test_settings_default_prompt_version(self):
+        """get_ai_settings() のデフォルトは v1。"""
+        import os
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AI_PROMPT_VERSION", None)
+            from app.ai.config import get_ai_settings
+
+            settings = get_ai_settings()
+        assert settings.prompt_version == "v1"
+
+    def test_settings_custom_prompt_version(self):
+        """AI_PROMPT_VERSION=v2 を設定すると v2 になる。"""
+        import os
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, {"AI_PROMPT_VERSION": "v2"}):
+            from app.ai.config import get_ai_settings
+
+            settings = get_ai_settings()
+        assert settings.prompt_version == "v2"
