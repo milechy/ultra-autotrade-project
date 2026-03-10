@@ -15,7 +15,7 @@ from functools import lru_cache
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from .client import BitFlyerClient, BybitSandboxClient, DummyExchangeClient
-from .config import get_exchange_settings
+from .config import get_bitflyer_settings, get_exchange_settings
 from .schemas import ExchangeStatusResponse, OrderRequest, OrderResult
 from .service import ExchangeService
 
@@ -35,6 +35,7 @@ def get_exchange_service() -> ExchangeService:
     NOTE:
     - テストでは monkeypatch で環境変数をセットしてから呼び出す。
     - lru_cache により同一プロセス内でシングルトンとして動作する。
+    - APP_ENV=prod の場合、Bybit は本番モード（sandbox=False）で動作する
     """
     settings = get_exchange_settings()
 
@@ -42,7 +43,9 @@ def get_exchange_service() -> ExchangeService:
     if client_type == "dummy":
         client: DummyExchangeClient | BybitSandboxClient | BitFlyerClient = DummyExchangeClient()
     elif client_type == "bitflyer":
-        client = BitFlyerClient(settings=settings)
+        bitflyer_settings = get_bitflyer_settings()
+        client = BitFlyerClient(settings=bitflyer_settings)
+        return ExchangeService(client=client, settings=bitflyer_settings)
     else:
         # "sandbox" or "bybit" → BybitSandboxClient
         client = BybitSandboxClient(settings=settings)

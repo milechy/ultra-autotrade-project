@@ -103,6 +103,10 @@ class BybitSandboxClient:
                 "Bybit sandbox mode enabled (endpoint: https://api-testnet.%s)",
                 self._settings.hostname,
             )
+        else:
+            logger.warning(
+                "BybitSandboxClient running in PRODUCTION mode (sandbox=False) — real funds at risk"
+            )
 
     def create_market_order(self, symbol: str, side: str, amount: float) -> Dict[str, Any]:
         """
