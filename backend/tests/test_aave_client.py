@@ -540,3 +540,99 @@ class TestMakeAaveClient:
     def test_unknown_type_raises(self) -> None:
         with pytest.raises(ValueError, match="不明な"):
             make_aave_client("invalid_type")
+
+
+class TestFlashbotsProtect:
+    """Flashbots Protect RPC のテスト。"""
+
+    @patch("app.aave.client.Web3")
+    def test_flashbots_rpc_creates_separate_w3_tx(self, mock_web3_cls: MagicMock) -> None:
+        """Flashbots RPC 設定時に _w3_tx が _w3 と異なるインスタンスであること。"""
+        mock_w3_regular = MagicMock()
+        mock_w3_regular.is_connected.return_value = True
+        mock_w3_flashbots = MagicMock()
+
+        mock_web3_cls.side_effect = [mock_w3_regular, mock_w3_flashbots]
+        mock_web3_cls.HTTPProvider = MagicMock()
+        mock_web3_cls.to_checksum_address = lambda x: x
+
+        client = Web3AaveClient(
+            rpc_url="https://mock-rpc.example.com",
+            flashbots_rpc_url="https://rpc.flashbots.net",
+        )
+
+        assert client._w3 is mock_w3_regular
+        assert client._w3_tx is mock_w3_flashbots
+
+    @patch("app.aave.client.Web3")
+    def test_no_flashbots_uses_same_w3(self, mock_web3_cls: MagicMock) -> None:
+        """Flashbots URL 未設定時は _w3_tx == _w3。"""
+        mock_w3 = MagicMock()
+        mock_w3.is_connected.return_value = True
+        mock_web3_cls.return_value = mock_w3
+        mock_web3_cls.HTTPProvider = MagicMock()
+        mock_web3_cls.to_checksum_address = lambda x: x
+
+        client = Web3AaveClient(rpc_url="https://mock-rpc.example.com")
+
+        assert client._w3_tx is client._w3
+
+    @patch("app.aave.client.Web3")
+    def test_deposit_uses_flashbots_for_send(self, mock_web3_cls: MagicMock) -> None:
+        """deposit() が Flashbots RPC 経由で send_raw_transaction を呼ぶこと。"""
+        mock_w3_regular = MagicMock()
+        mock_w3_regular.is_connected.return_value = True
+        mock_w3_flashbots = MagicMock()
+
+        pool_mock = MagicMock()
+        pool_mock.address = "0xPoolAddress"
+        pool_mock.functions.supply.return_value.build_transaction.return_value = {}
+
+        mock_token = MagicMock()
+        mock_token.functions.decimals.return_value.call.return_value = 6
+        mock_token.functions.approve.return_value.build_transaction.return_value = {}
+
+        # __init__: Web3(regular) → pool contract; Web3(flashbots)
+        mock_web3_cls.side_effect = [mock_w3_regular, mock_w3_flashbots]
+        mock_web3_cls.HTTPProvider = MagicMock()
+        mock_web3_cls.to_checksum_address = lambda x: x
+
+        mock_w3_regular.eth.contract.return_value = pool_mock
+        mock_w3_regular.eth.get_transaction_count.return_value = 0
+        mock_w3_regular.eth.gas_price = 20000000000
+
+        signed_mock = MagicMock()
+        signed_mock.raw_transaction = b"signed"
+        mock_w3_regular.eth.account.sign_transaction.return_value = signed_mock
+
+        mock_w3_flashbots.eth.send_raw_transaction.side_effect = [
+            b"\xaa" * 32,
+            b"\xbb" * 32,
+        ]
+        mock_receipt = MagicMock()
+        mock_receipt.transactionHash = b"\xcc" * 32
+        mock_w3_regular.eth.wait_for_transaction_receipt.return_value = mock_receipt
+
+        client = Web3AaveClient(
+            rpc_url="https://mock-rpc.example.com",
+            flashbots_rpc_url="https://rpc.flashbots.net",
+        )
+
+        mock_w3_regular.eth.contract.side_effect = None
+        mock_w3_regular.eth.contract.return_value = mock_token
+
+        mock_account_obj = MagicMock()
+        mock_account_obj.address = "0xabc0000000000def"
+        mock_account_obj.key = b"\xab" * 32
+        client.account = mock_account_obj
+
+        result = client.deposit(
+            asset_address="0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8",
+            amount=Decimal("10.0"),
+            wallet_address="0xabc0000000000def",
+            private_key="0x" + "ab" * 32,
+        )
+
+        assert result["dry_run"] is False
+        assert mock_w3_flashbots.eth.send_raw_transaction.call_count == 2
+        mock_w3_regular.eth.send_raw_transaction.assert_not_called()

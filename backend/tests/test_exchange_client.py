@@ -437,3 +437,134 @@ class TestBtcJpyQuantityCalculation:
         assert call_args is not None
         _, _, quantity = call_args[0]
         assert abs(quantity - 0.0015) < 1e-10
+
+
+class TestAppEnvProdMode:
+    """Test APP_ENV=prod forces sandbox=False in get_exchange_settings()."""
+
+    def test_app_env_prod_forces_sandbox_false(self):
+        """APP_ENV=prod → settings.sandbox is False."""
+        import importlib
+
+        import app.exchange.config as cfg
+
+        env = {"APP_ENV": "prod"}
+        with patch.dict("os.environ", env, clear=False):
+            importlib.reload(cfg)
+            settings = cfg.get_exchange_settings()
+
+        assert settings.sandbox is False
+        assert settings.app_env == "prod"
+
+    def test_app_env_prod_overrides_exchange_sandbox_true(self):
+        """APP_ENV=prod overrides EXCHANGE_SANDBOX=true."""
+        import importlib
+
+        import app.exchange.config as cfg
+
+        env = {"APP_ENV": "prod", "EXCHANGE_SANDBOX": "true"}
+        with patch.dict("os.environ", env, clear=False):
+            importlib.reload(cfg)
+            settings = cfg.get_exchange_settings()
+
+        assert settings.sandbox is False
+
+    def test_app_env_non_prod_keeps_sandbox_true(self):
+        """APP_ENV=staging (non-prod) → sandbox defaults to True."""
+        import app.exchange.config as cfg
+
+        original_get_env = cfg.get_env
+
+        def patched_get_env(name: str, required: bool = True) -> str | None:
+            if name == "APP_ENV":
+                return "staging"
+            if name in ("EXCHANGE_SANDBOX", "BYBIT_SANDBOX"):
+                return None
+            return original_get_env(name, required=required)
+
+        with patch.object(cfg, "get_env", patched_get_env):
+            settings = cfg.get_exchange_settings()
+
+        assert settings.sandbox is True
+
+    def test_app_env_field_set_correctly(self):
+        """settings.app_env matches APP_ENV env var."""
+        import importlib
+
+        import app.exchange.config as cfg
+
+        env = {"APP_ENV": "prod"}
+        with patch.dict("os.environ", env, clear=False):
+            importlib.reload(cfg)
+            settings = cfg.get_exchange_settings()
+
+        assert settings.app_env == "prod"
+
+
+class TestGetBitflyerSettings:
+    """Test get_bitflyer_settings() uses BITFLYER_* keys directly."""
+
+    def test_bitflyer_settings_uses_bitflyer_api_key(self):
+        """BITFLYER_API_KEY → settings.api_key (not BYBIT_API_KEY)."""
+        import app.exchange.config as cfg
+
+        original_get_env = cfg.get_env
+
+        def patched_get_env(name: str, required: bool = True) -> str | None:
+            if name == "BITFLYER_API_KEY":
+                return "bitflyer-real-key"
+            if name == "BITFLYER_API_SECRET":
+                return "bitflyer-real-secret"
+            return original_get_env(name, required=required)
+
+        with patch.object(cfg, "get_env", patched_get_env):
+            settings = cfg.get_bitflyer_settings()
+
+        assert settings.api_key == "bitflyer-real-key"
+        assert settings.api_secret == "bitflyer-real-secret"
+
+    def test_bitflyer_settings_default_symbol_is_btc_jpy(self):
+        """get_bitflyer_settings() defaults default_symbol to 'BTC/JPY'."""
+        import app.exchange.config as cfg
+
+        original_get_env = cfg.get_env
+
+        def patched_get_env(name: str, required: bool = True) -> str | None:
+            if name == "EXCHANGE_DEFAULT_SYMBOL":
+                return None
+            return original_get_env(name, required=required)
+
+        with patch.object(cfg, "get_env", patched_get_env):
+            settings = cfg.get_bitflyer_settings()
+
+        assert settings.default_symbol == "BTC/JPY"
+
+    def test_bitflyer_settings_sandbox_always_true(self):
+        """bitFlyer settings sandbox is always True (no sandbox available)."""
+        import app.exchange.config as cfg
+
+        settings = cfg.get_bitflyer_settings()
+        assert settings.sandbox is True
+
+    def test_bitflyer_settings_ignores_bybit_key(self):
+        """When BYBIT_API_KEY is set, bitFlyer settings uses BITFLYER_API_KEY instead."""
+        import app.exchange.config as cfg
+
+        original_get_env = cfg.get_env
+
+        def patched_get_env(name: str, required: bool = True) -> str | None:
+            if name == "BYBIT_API_KEY":
+                return "bybit-key-should-be-ignored"
+            if name == "BITFLYER_API_KEY":
+                return "bitflyer-correct-key"
+            if name == "BYBIT_API_SECRET":
+                return "bybit-secret-should-be-ignored"
+            if name == "BITFLYER_API_SECRET":
+                return "bitflyer-correct-secret"
+            return original_get_env(name, required=required)
+
+        with patch.object(cfg, "get_env", patched_get_env):
+            settings = cfg.get_bitflyer_settings()
+
+        assert settings.api_key == "bitflyer-correct-key"
+        assert settings.api_secret == "bitflyer-correct-secret"

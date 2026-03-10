@@ -44,6 +44,7 @@ class AaveSettings:
     pool_data_provider_address: Optional[str] = None
     wallet_private_key: Optional[str] = None
     usdc_address: Optional[str] = None
+    flashbots_rpc_url: Optional[str] = None
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -132,6 +133,7 @@ def get_aave_settings() -> AaveSettings:
     pool_data_provider_address = get_env("AAVE_POOL_DATA_PROVIDER_ADDRESS", required=False)
     wallet_private_key = get_env("AAVE_WALLET_PRIVATE_KEY", required=False)
     usdc_address = get_env("AAVE_USDC_ADDRESS", required=False)
+    flashbots_rpc_url = get_env("AAVE_FLASHBOTS_RPC_URL", required=False)
 
     return AaveSettings(
         network=network,
@@ -150,4 +152,5 @@ def get_aave_settings() -> AaveSettings:
         pool_data_provider_address=pool_data_provider_address,
         wallet_private_key=wallet_private_key,
         usdc_address=usdc_address,
+        flashbots_rpc_url=flashbots_rpc_url,
     )

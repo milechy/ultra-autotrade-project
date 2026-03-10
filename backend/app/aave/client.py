@@ -101,6 +101,18 @@ _POOL_ADDRESS_SEPOLIA = "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951"
 # Sepolia USDC アドレス
 _USDC_ADDRESS_SEPOLIA = "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8"
 
+# Aave V3 Pool アドレス（Arbitrum Mainnet）
+_POOL_ADDRESS_ARBITRUM = "0x794a61358D6845594F94dc1DB02A252b5b4814aD"
+
+# Arbitrum USDC.e アドレス
+_USDC_ADDRESS_ARBITRUM = "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
+
+# Aave V3 Pool アドレス（Arbitrum Sepolia）
+_POOL_ADDRESS_ARBITRUM_SEPOLIA = "0xBfC91D59fdAA134A4ED45f7B584cAf96D7792Eff"
+
+# Arbitrum Sepolia USDC
+_USDC_ADDRESS_ARBITRUM_SEPOLIA = "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"
+
 
 class AaveClientBase(ABC):
     """Aave クライアントの抽象基底クラス。"""
@@ -268,6 +280,7 @@ class Web3AaveClient(AaveClientBase):
         rpc_url: Optional[str] = None,
         pool_address: str = _POOL_ADDRESS_SEPOLIA,
         settings: Optional[AaveSettings] = None,
+        flashbots_rpc_url: Optional[str] = None,
     ) -> None:
         # web3 はモジュールレベルで参照（テスト時にモックしやすくするため）
         if Web3 is None:
@@ -300,6 +313,18 @@ class Web3AaveClient(AaveClientBase):
             address=Web3.to_checksum_address(effective_pool_address),
             abi=_POOL_ABI_MINIMAL,
         )
+
+        # Flashbots Protect RPC（MEV対策）
+        _fb_url: Optional[str] = None
+        if settings is not None:
+            _fb_url = getattr(settings, "flashbots_rpc_url", None)
+        if flashbots_rpc_url is not None:
+            _fb_url = flashbots_rpc_url
+        if _fb_url:
+            self._w3_tx = Web3(Web3.HTTPProvider(_fb_url))
+            logger.info("Flashbots Protect RPC 設定完了 (endpoint=%s...)", _fb_url[:30])
+        else:
+            self._w3_tx = self._w3
 
         # 後方互換: settings が渡された場合はウォレット情報を保持
         if settings is not None:
@@ -491,7 +516,7 @@ class Web3AaveClient(AaveClientBase):
             signed_approve = self._w3.eth.account.sign_transaction(
                 approve_tx, private_key=account.key
             )
-            approve_hash = self._w3.eth.send_raw_transaction(signed_approve.raw_transaction)
+            approve_hash = self._w3_tx.eth.send_raw_transaction(signed_approve.raw_transaction)
             self._w3.eth.wait_for_transaction_receipt(approve_hash)
 
             logger.info("approve tx confirmed: %s", approve_hash.hex())
@@ -513,7 +538,7 @@ class Web3AaveClient(AaveClientBase):
             signed_supply = self._w3.eth.account.sign_transaction(
                 supply_tx, private_key=account.key
             )
-            supply_hash = self._w3.eth.send_raw_transaction(signed_supply.raw_transaction)
+            supply_hash = self._w3_tx.eth.send_raw_transaction(signed_supply.raw_transaction)
             receipt = self._w3.eth.wait_for_transaction_receipt(supply_hash)
 
             tx_hash_hex = receipt["transactionHash"].hex()
@@ -647,7 +672,7 @@ class Web3AaveClient(AaveClientBase):
                 }
             )
             signed_tx = self._w3.eth.account.sign_transaction(withdraw_tx, private_key=account.key)
-            tx_hash = self._w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+            tx_hash = self._w3_tx.eth.send_raw_transaction(signed_tx.raw_transaction)
             receipt = self._w3.eth.wait_for_transaction_receipt(tx_hash)
 
             tx_hash_hex = receipt["transactionHash"].hex()
@@ -678,6 +703,8 @@ def make_aave_client(
     client_type: str,
     rpc_url: Optional[str] = None,
     pool_address: str = _POOL_ADDRESS_SEPOLIA,
+    network: str = "sepolia",
+    flashbots_rpc_url: Optional[str] = None,
 ) -> AaveClientBase:
     """
     環境変数 AAVE_CLIENT_TYPE に基づいてクライアントを生成するファクトリ。
@@ -686,13 +713,26 @@ def make_aave_client(
         client_type: "dummy" または "web3"
         rpc_url: web3 の場合は必須
         pool_address: Aave V3 Pool コントラクトアドレス
+        network: ネットワーク名 ("sepolia", "arbitrum", "arbitrum-sepolia")
+        flashbots_rpc_url: Flashbots Protect RPC URL（MEV対策、オプション）
     """
     if client_type == "dummy":
         return DummyAaveClient()
     if client_type == "web3":
         if not rpc_url:
             raise ValueError("AAVE_CLIENT_TYPE=web3 の場合は AAVE_RPC_URL が必須です")
-        return Web3AaveClient(rpc_url=rpc_url, pool_address=pool_address)
+        _network_pool = {
+            "sepolia": _POOL_ADDRESS_SEPOLIA,
+            "arbitrum": _POOL_ADDRESS_ARBITRUM,
+            "arbitrum-sepolia": _POOL_ADDRESS_ARBITRUM_SEPOLIA,
+        }
+        if pool_address == _POOL_ADDRESS_SEPOLIA and network in _network_pool:
+            pool_address = _network_pool[network]
+        return Web3AaveClient(
+            rpc_url=rpc_url,
+            pool_address=pool_address,
+            flashbots_rpc_url=flashbots_rpc_url,
+        )
     raise ValueError(f"不明な AAVE_CLIENT_TYPE: {client_type!r} (dummy | web3)")
 
 
