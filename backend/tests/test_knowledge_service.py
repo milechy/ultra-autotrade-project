@@ -595,11 +595,10 @@ class TestKnowledgeConfig:
 
 
 class TestKnowledgeServiceEmbeddingVCR:
-    """VCR カセットを使った OpenAI Embedding API テスト。"""
+    """OpenAI Embedding API の応答をモックして _embed_texts() の動作を検証。"""
 
-    @pytest.mark.vcr()
     def test_embed_texts_with_vcr(self):
-        """VCR カセットを使って _embed_texts() が正しい次元数のベクトルを返すことを確認。"""
+        """_embed_texts() が正しい次元数のベクトルを返すことを確認。"""
         from unittest.mock import MagicMock, patch
 
         from app.knowledge.service import KnowledgeService
@@ -611,9 +610,25 @@ class TestKnowledgeServiceEmbeddingVCR:
         settings.chunk_size_tokens = 500
         settings.chunk_overlap_tokens = 50
 
-        with patch("app.knowledge.service.tiktoken") as mock_tiktoken:
+        # OpenAI embeddings.create をモック — 1536次元のゼロベクトルを返す
+        fake_vector = [0.1] * 1536
+        mock_embedding = MagicMock()
+        mock_embedding.embedding = fake_vector
+
+        mock_response = MagicMock()
+        mock_response.data = [mock_embedding]
+
+        with (
+            patch("app.knowledge.service.tiktoken") as mock_tiktoken,
+            patch("app.knowledge.service.OpenAI") as mock_openai_cls,
+        ):
             mock_enc = MagicMock()
             mock_tiktoken.encoding_for_model.return_value = mock_enc
+
+            mock_client = MagicMock()
+            mock_client.embeddings.create.return_value = mock_response
+            mock_openai_cls.return_value = mock_client
+
             service = KnowledgeService(settings=settings)
             vectors = service._embed_texts(["hello world"])
 
