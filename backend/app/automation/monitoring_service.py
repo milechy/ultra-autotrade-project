@@ -68,6 +68,8 @@ class MonitoringService:
         max_healthfactor_records: int = 1000,
         enable_state_sync: bool = True,
         notification_service: Optional[CompositeNotificationService] = None,
+        error_rate_window_size: int = 100,
+        ai_error_rate_threshold: float = 0.20,
     ) -> None:
         # 閾値
         self._latency_warning_threshold_s = float(latency_warning_threshold_s)
@@ -79,6 +81,11 @@ class MonitoringService:
         # state.json 同期設定
         self._enable_state_sync = enable_state_sync
         self._notification_service = notification_service
+
+        # エラー率監視設定
+        self._error_rate_window_size = error_rate_window_size
+        self._ai_error_rate_threshold = ai_error_rate_threshold
+        self._error_timestamps: Dict[str, Deque[datetime]] = {}
 
         # 状態
         self._events: Deque[MonitoringEvent] = deque(maxlen=max_events)
@@ -459,6 +466,58 @@ class MonitoringService:
                 value=Decimal(str(percent_change)),
                 unit="percent",
                 labels={"window": "24h"},
+                recorded_at=now,
+            )
+            return self._append_event(event)
+
+        return None
+
+    def record_error(
+        self,
+        component: ComponentType,
+        *,
+        at: Optional[datetime] = None,
+    ) -> Optional[MonitoringEvent]:
+        """
+        コンポーネントのAPIエラーを記録し、エラー率が閾値を超えた場合にアラートを発行する。
+
+        docs/08_automation_rules.md:
+        - AI API エラー率 > 20% → アラート（取引停止）
+
+        Args:
+            component: エラーが発生したコンポーネント
+            at: 記録時刻（None の場合は現在時刻）
+
+        Returns:
+            エラー率が閾値を超えた場合は MonitoringEvent、それ以外は None
+        """
+        now = self._now(at)
+        key = component.value
+        if key not in self._error_timestamps:
+            self._error_timestamps[key] = deque(maxlen=self._error_rate_window_size)
+        self._error_timestamps[key].append(now)
+
+        total = len(self._error_timestamps[key])
+        if total == 0:
+            return None
+
+        error_rate = total / self._error_rate_window_size
+        if error_rate > self._ai_error_rate_threshold:
+            event = MonitoringEvent(
+                timestamp=now,
+                component=component,
+                level=AlertLevel.ALERT,
+                code="ERROR_RATE_HIGH",
+                message=(
+                    f"Error rate {error_rate:.1%} for {component.value} "
+                    f"exceeds threshold {self._ai_error_rate_threshold:.1%}."
+                ),
+            )
+            event.metric = MetricPoint(
+                metric_id=f"error_rate_{component.name.lower()}",
+                value=Decimal(str(round(error_rate, 4))),
+                unit="ratio",
+                labels={"component": component.name},
                 recorded_at=now,
             )
             return self._append_event(event)
