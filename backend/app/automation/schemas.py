@@ -324,5 +324,6 @@ class WorkflowRunResult(BaseModel):
     traded_count: int = 0
     skipped_count: int = 0
     hold_count: int = 0
+    shadow_logged_count: int = 0
     errors: List[WorkflowStepError] = []
     status: str  # "completed", "completed_with_errors", "failed", "no_items"

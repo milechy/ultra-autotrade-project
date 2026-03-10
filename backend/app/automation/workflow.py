@@ -17,7 +17,8 @@ from sqlalchemy.orm import Session
 from app.ai.schemas import AIAnalysisResult, RAGContext, TradeAction
 from app.ai.service import AIService
 from app.automation.monitoring_service import MonitoringService
-from app.automation.schemas import WorkflowRunResult, WorkflowStepError
+from app.automation.schemas import ComponentType, WorkflowRunResult, WorkflowStepError
+from app.automation.shadow_mode_service import ShadowModeService
 from app.bots.schemas import (
     OctoBotSignal,
     OctoBotSignalRequest,
@@ -273,12 +274,14 @@ class _SingleItemResult:
         confidence: int,
         order_result: Optional[OrderResult],
         reason: str,
+        shadow_logged: bool = False,
     ) -> None:
         self.item_id = item_id
         self.action = action
         self.confidence = confidence
         self.order_result = order_result
         self.reason = reason
+        self.shadow_logged = shadow_logged
 
 
 def check_rule_engine(
@@ -314,6 +317,7 @@ def process_pending_knowledge(
     ai_service: AIService,
     exchange_service: ExchangeService,
     monitoring_service: Optional[MonitoringService] = None,
+    shadow_mode_service: Optional[ShadowModeService] = None,
     trade_amount_usd: Decimal = Decimal("50"),
     dry_run: bool = False,
 ) -> WorkflowRunResult:
@@ -353,6 +357,7 @@ def process_pending_knowledge(
     traded_count = 0
     hold_count = 0
     skipped_count = 0
+    shadow_logged_count = 0
 
     for item in pending:
         try:
@@ -364,9 +369,14 @@ def process_pending_knowledge(
                 exchange_service=exchange_service,
                 trade_amount_usd=trade_amount_usd,
                 dry_run=dry_run,
+                shadow_mode_service=shadow_mode_service,
             )
 
-            if (
+            if result.shadow_logged:
+                # Shadow Modeで記録のみ（実トレードなし）
+                shadow_logged_count += 1
+                knowledge_service.update_status(db, item.id, KnowledgeItemStatus.SKIPPED)
+            elif (
                 result.order_result is not None
                 and result.order_result.status == OrderStatus.SUCCESS
             ):
@@ -380,6 +390,12 @@ def process_pending_knowledge(
                 knowledge_service.update_status(db, item.id, KnowledgeItemStatus.SKIPPED)
         except Exception as exc:
             logger.error("Failed to process item %d: %s", item.id, exc)
+            # エラー率監視に記録
+            if monitoring_service is not None:
+                try:
+                    monitoring_service.record_error(ComponentType.SYSTEM)
+                except Exception:
+                    pass
             errors.append(
                 WorkflowStepError(
                     item_id=item.id,
@@ -399,20 +415,22 @@ def process_pending_knowledge(
         )
 
     logger.info(
-        "Workflow completed: fetched=%d, traded=%d, hold=%d, skipped=%d, errors=%d",
+        "Workflow completed: fetched=%d, traded=%d, hold=%d, skipped=%d, shadow=%d, errors=%d",
         len(pending),
         traded_count,
         hold_count,
         skipped_count,
+        shadow_logged_count,
         len(errors),
     )
 
     return WorkflowRunResult(
         fetched_count=len(pending),
-        analyzed_count=traded_count + hold_count + skipped_count,
+        analyzed_count=traded_count + hold_count + skipped_count + shadow_logged_count,
         traded_count=traded_count,
         skipped_count=skipped_count,
         hold_count=hold_count,
+        shadow_logged_count=shadow_logged_count,
         errors=errors,
         status=status,
     )
@@ -427,6 +445,7 @@ def _process_single_item(
     exchange_service: ExchangeService,
     trade_amount_usd: Decimal,
     dry_run: bool,
+    shadow_mode_service: Optional[ShadowModeService] = None,
 ) -> _SingleItemResult:
     """Process a single knowledge item through the full pipeline."""
     query = item.title or item.source_url or "analyze market conditions"
@@ -451,6 +470,19 @@ def _process_single_item(
         confidence,
         cross_result.agreed,
     )
+
+    # Shadow Mode: 記録のみ、実トレードなし
+    if shadow_mode_service is not None and shadow_mode_service.is_enabled():
+        shadow_mode_service.record(cross_result, str(item.id))
+        logger.info("Shadow Mode: recorded item %d, skipping actual trade", item.id)
+        return _SingleItemResult(
+            item_id=item.id,
+            action=action,
+            confidence=confidence,
+            order_result=None,
+            reason=reason,
+            shadow_logged=True,
+        )
 
     order_result: Optional[OrderResult] = None
     if action in (TradeAction.BUY, TradeAction.SELL) and confidence >= 40:
