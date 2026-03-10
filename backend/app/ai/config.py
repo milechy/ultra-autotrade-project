@@ -31,6 +31,7 @@ class AISettings:
     openai_model: str
     min_confidence_threshold: int
     cross_validation_enabled: bool
+    prompt_version: str
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -73,6 +74,7 @@ def get_ai_settings() -> AISettings:
       - AI_OPENAI_MODEL（デフォルト: gpt-4o）
       - AI_MIN_CONFIDENCE_THRESHOLD（デフォルト: 40）
       - AI_CROSS_VALIDATION_ENABLED（デフォルト: True）
+      - AI_PROMPT_VERSION（デフォルト: v1）
     """
     anthropic_api_key = get_env("ANTHROPIC_API_KEY", required=False)
     openai_api_key = get_env("OPENAI_API_KEY", required=False)
@@ -88,6 +90,7 @@ def get_ai_settings() -> AISettings:
         "AI_CROSS_VALIDATION_ENABLED",
         default=True,
     )
+    prompt_version = get_env("AI_PROMPT_VERSION", required=False) or "v1"
 
     return AISettings(
         anthropic_api_key=anthropic_api_key,
@@ -96,4 +99,5 @@ def get_ai_settings() -> AISettings:
         openai_model=openai_model,
         min_confidence_threshold=min_confidence_threshold,
         cross_validation_enabled=cross_validation_enabled,
+        prompt_version=prompt_version,
     )

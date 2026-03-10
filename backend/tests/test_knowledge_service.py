@@ -595,11 +595,10 @@ class TestKnowledgeConfig:
 
 
 class TestKnowledgeServiceEmbeddingVCR:
-    """VCR カセットを使った OpenAI Embedding API テスト。"""
+    """OpenAI Embedding API の応答をモックして _embed_texts() の動作を検証。"""
 
-    @pytest.mark.vcr()
     def test_embed_texts_with_vcr(self):
-        """VCR カセットを使って _embed_texts() が正しい次元数のベクトルを返すことを確認。"""
+        """_embed_texts() が正しい次元数のベクトルを返すことを確認。"""
         from unittest.mock import MagicMock, patch
 
         from app.knowledge.service import KnowledgeService
@@ -611,9 +610,23 @@ class TestKnowledgeServiceEmbeddingVCR:
         settings.chunk_size_tokens = 500
         settings.chunk_overlap_tokens = 50
 
-        with patch("app.knowledge.service.tiktoken") as mock_tiktoken:
+        # OpenAI embeddings.create をモック — 1536次元のゼロベクトルを返す
+        fake_vector = [0.1] * 1536
+        mock_embedding = MagicMock()
+        mock_embedding.embedding = fake_vector
+        mock_embedding.index = 0
+        mock_response = MagicMock()
+        mock_response.data = [mock_embedding]
+
+        with (
+            patch("app.knowledge.service.tiktoken") as mock_tiktoken,
+            patch("app.knowledge.service.OpenAI") as mock_openai_cls,
+        ):
             mock_enc = MagicMock()
             mock_tiktoken.encoding_for_model.return_value = mock_enc
+            mock_client = MagicMock()
+            mock_client.embeddings.create.return_value = mock_response
+            mock_openai_cls.return_value = mock_client
             service = KnowledgeService(settings=settings)
             vectors = service._embed_texts(["hello world"])
 
@@ -643,3 +656,93 @@ class TestChunkTextFallback:
         assert len(chunks) >= 2
         for chunk in chunks:
             assert chunk.strip()  # no empty chunks
+
+
+# ------------------------------------------------------------------ #
+# TestKnowledgeQualityScoring                                          #
+# ------------------------------------------------------------------ #
+
+
+class TestKnowledgeQualityScoring:
+    """_compute_quality_score() のユニットテスト。"""
+
+    def _make_service(self) -> "KnowledgeService":
+        from unittest.mock import MagicMock, patch
+
+        from app.knowledge.service import KnowledgeService
+
+        with (
+            patch("app.knowledge.service.OpenAI"),
+            patch("app.knowledge.service.tiktoken") as mock_tiktoken,
+        ):
+            mock_enc = MagicMock()
+            mock_tiktoken.encoding_for_model.return_value = mock_enc
+            settings = MagicMock()
+            settings.openai_api_key = "test-key"
+            settings.chunk_size_tokens = 500
+            settings.chunk_overlap_tokens = 50
+            return KnowledgeService(settings=settings)
+
+    def test_empty_text_returns_zero(self):
+        """空文字列のスコアは 0。"""
+        service = self._make_service()
+        score = service._compute_quality_score("", 0)
+        assert score == 0.0
+
+    def test_score_is_in_range(self):
+        """スコアは常に 0〜100 の範囲内。"""
+        service = self._make_service()
+        long_text = "Bitcoin ETF approval boosts market. " * 200
+        score = service._compute_quality_score(long_text, 10)
+        assert 0.0 <= score <= 100.0
+
+    def test_longer_text_scores_higher(self):
+        """長いテキストほど高スコア。"""
+        service = self._make_service()
+        short_score = service._compute_quality_score("hello", 1)
+        long_score = service._compute_quality_score("hello world " * 100, 5)
+        assert long_score > short_score
+
+    def test_more_chunks_scores_higher(self):
+        """チャンク数が多いほど高スコア（テキスト長を固定して比較）。"""
+        service = self._make_service()
+        text = "Some financial news content. " * 20
+        score_1 = service._compute_quality_score(text, 1)
+        score_5 = service._compute_quality_score(text, 5)
+        assert score_5 > score_1
+
+    def test_chunk_score_caps_at_20(self):
+        """チャンク数が 5 を超えてもチャンクスコアは 20 点を超えない。"""
+        service = self._make_service()
+        text = "x" * 100
+        score_5 = service._compute_quality_score(text, 5)
+        score_100 = service._compute_quality_score(text, 100)
+        # 5チャンクで既にチャンクスコア上限なので、チャンクスコア部分は同じ
+        # (テキスト長とrichness は同一なので total も同じ)
+        assert score_100 == score_5
+
+    def test_number_rich_text_scores_higher(self):
+        """数値（価格・パーセント等）が多いほど高スコア。"""
+        service = self._make_service()
+        plain = "The market moved today in a significant way."
+        numeric = "BTC rose 12.5% to $68,000. Volume: 45,000 BTC. RSI: 72.3. MACD: 0.5."
+        plain_score = service._compute_quality_score(plain, 1)
+        numeric_score = service._compute_quality_score(numeric, 1)
+        assert numeric_score > plain_score
+
+    def test_score_is_rounded_to_two_decimals(self):
+        """スコアは小数点以下 2 桁に丸められる。"""
+        service = self._make_service()
+        text = "Some content with numbers 123 and sentences. More text here!"
+        score = service._compute_quality_score(text, 2)
+        assert score == round(score, 2)
+
+    def test_max_score_does_not_exceed_100(self):
+        """どんなに長くて豊富なテキストでも 100 を超えない。"""
+        service = self._make_service()
+        # 数値・文章・多様語彙に富んだ長文
+        rich_text = " ".join(
+            [f"Item {i}: price {i * 1.5:.2f} USD, gain {i % 10}%." for i in range(1, 500)]
+        )
+        score = service._compute_quality_score(rich_text, 20)
+        assert score <= 100.0

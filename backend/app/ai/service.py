@@ -17,6 +17,7 @@ from typing import Callable, Iterable, List, Optional
 from app.notion.schemas import NotionNewsItem
 
 from .config import AISettings, get_ai_settings
+from .prompts import get_prompt_template
 from .schemas import (
     AIAnalysisResult,
     CrossValidationResult,
@@ -31,28 +32,6 @@ logger = logging.getLogger(__name__)
 
 # LLM クライアントの型（NotionNewsItem -> AIAnalysisResult を返す callable を想定）
 LLMAnalyzer = Callable[[NotionNewsItem], AIAnalysisResult]
-
-
-# docs/05_ai_judgement_rules.md を踏まえたガイドラインとなる説明文。
-# 実際の LLM プロンプトとして利用する場合は、この定数をベースに system / user プロンプトを組み立てる想定。
-LLM_SYSTEM_PROMPT = """
-あなたは暗号資産の自動運用システム Ultra AutoTrade の AI 判定モジュールです。
-
-入力として 1 件のニュース（タイトル・サマリ・URL など）が与えられます。
-あなたの役割は、そのニュースが「市場に対してポジティブか / ネガティブか / 中立か」を判断し、
-以下の情報を JSON 形式で返すことです。
-
-- action: "BUY" / "SELL" / "HOLD" のいずれか
-- confidence: 0〜100 の整数（80以上はかなり自信あり）
-- sentiment: "positive" / "negative" / "neutral" などの短い文字列
-- summary: ニュースの要約（日本語、最大 200 文字程度）
-- reason: なぜそのアクションになったのかの説明（日本語、最大 200 文字程度）
-
-重要な制約:
-- docs/05_ai_judgement_rules.md に基づき、過剰な売買は避け、迷ったら HOLD を選ぶ
-- confidence < 40 の場合は基本的に HOLD を推奨する
-- BUY/SELL を返すのは「強いポジティブ/ネガティブニュース」で、整合性も取れている場合のみ
-"""
 
 
 class AIService:
@@ -236,38 +215,40 @@ class AIService:
         Two-phase AI judge with RAG context.
         Phase 1: Claude (primary)
         Phase 2: GPT-4o (secondary, cross-validation)
+        プロンプトバージョンはsettings.prompt_versionで制御し、結果に含める。
         """
         ai_settings = settings or get_ai_settings()
-        prompt = self._build_rag_prompt(query, rag_context)
+        version = ai_settings.prompt_version
+        prompt = self._build_rag_prompt(query, rag_context, version)
 
         # Phase 1: Primary (Claude)
-        primary = self._call_claude(prompt, ai_settings)
+        primary = self._call_claude(prompt, ai_settings, version)
 
         # Phase 2: Secondary (OpenAI) - only if enabled and key available
         secondary = None
         if ai_settings.cross_validation_enabled and ai_settings.openai_api_key:
-            secondary = self._call_openai(prompt, ai_settings)
+            secondary = self._call_openai(prompt, ai_settings, version)
 
         return self._cross_validate(primary, secondary)
 
-    def _build_rag_prompt(self, query: str, rag_context: RAGContext) -> str:
-        """Build prompt with RAG context chunks."""
+    def _build_rag_prompt(self, query: str, rag_context: RAGContext, version: str = "v1") -> str:
+        """Build prompt with RAG context chunks using the specified prompt version."""
         chunks_text = (
             "\n---\n".join(rag_context.chunks)
             if rag_context.chunks
             else "(No relevant context found)"
         )
-        return f"""{LLM_SYSTEM_PROMPT}
+        template = get_prompt_template(version)
+        return (
+            template.system_prompt
+            + "\n\n"
+            + template.user_template.format(
+                context=chunks_text,
+                query=query,
+            )
+        )
 
-## Retrieved Context (from Knowledge Hub):
-{chunks_text}
-
-## Analysis Request:
-{query}
-
-Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-100, "reason": "..."}}"""
-
-    def _call_claude(self, prompt: str, settings: AISettings) -> LLMDecision:
+    def _call_claude(self, prompt: str, settings: AISettings, version: str = "v1") -> LLMDecision:
         """Call Claude API. Fail-closed: error→HOLD."""
         if not settings.anthropic_api_key:
             logger.warning("ANTHROPIC_API_KEY not set; falling back to HOLD")
@@ -276,6 +257,7 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
                 action=TradeAction.HOLD,
                 confidence=0,
                 reason="API key not configured",
+                prompt_version=version,
             )
         try:
             import anthropic
@@ -291,7 +273,8 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
                 if hasattr(block, "text"):
                     raw_text = block.text
                     break
-            return self._parse_llm_response(raw_text, LLMProvider.CLAUDE)
+            decision = self._parse_llm_response(raw_text, LLMProvider.CLAUDE)
+            return decision.model_copy(update={"prompt_version": version})
         except Exception as exc:
             logger.error("Claude API call failed: %s", exc)
             return LLMDecision(
@@ -299,9 +282,10 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
                 action=TradeAction.HOLD,
                 confidence=0,
                 reason=f"API error: {exc}",
+                prompt_version=version,
             )
 
-    def _call_openai(self, prompt: str, settings: AISettings) -> LLMDecision:
+    def _call_openai(self, prompt: str, settings: AISettings, version: str = "v1") -> LLMDecision:
         """Call OpenAI API. Fail-closed: error→HOLD."""
         if not settings.openai_api_key:
             logger.warning("OPENAI_API_KEY not set; falling back to HOLD")
@@ -310,6 +294,7 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
                 action=TradeAction.HOLD,
                 confidence=0,
                 reason="API key not configured",
+                prompt_version=version,
             )
         try:
             from openai import OpenAI
@@ -322,7 +307,8 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
                 response_format={"type": "json_object"},
             )
             content = response.choices[0].message.content or ""
-            return self._parse_llm_response(content, LLMProvider.OPENAI)
+            decision = self._parse_llm_response(content, LLMProvider.OPENAI)
+            return decision.model_copy(update={"prompt_version": version})
         except Exception as exc:
             logger.error("OpenAI API call failed: %s", exc)
             return LLMDecision(
@@ -330,6 +316,7 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
                 action=TradeAction.HOLD,
                 confidence=0,
                 reason=f"API error: {exc}",
+                prompt_version=version,
             )
 
     def _parse_llm_response(self, raw: str, provider: LLMProvider) -> LLMDecision:
@@ -383,6 +370,7 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
                 final_action=primary.action,
                 final_confidence=primary.confidence,
                 final_reason=primary.reason,
+                prompt_version=primary.prompt_version,
             )
 
         agreed = primary.action == secondary.action
@@ -395,6 +383,7 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
                 final_action=primary.action,
                 final_confidence=avg_confidence,
                 final_reason=f"Both LLMs agree: {primary.reason}",
+                prompt_version=primary.prompt_version,
             )
         else:
             min_confidence = min(primary.confidence, secondary.confidence)
@@ -404,5 +393,9 @@ Respond in JSON format only: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-10
                 agreed=False,
                 final_action=TradeAction.HOLD,
                 final_confidence=min(min_confidence, 30),
-                final_reason=f"LLMs disagree ({primary.action.value} vs {secondary.action.value}); defaulting to HOLD",
+                final_reason=(
+                    f"LLMs disagree ({primary.action.value} vs {secondary.action.value});"
+                    " defaulting to HOLD"
+                ),
+                prompt_version=primary.prompt_version,
             )

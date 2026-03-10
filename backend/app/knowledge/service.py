@@ -12,6 +12,8 @@ Knowledge Hub サービス層。
 """
 
 import logging
+import math
+import re
 from typing import List, Optional
 
 from openai import OpenAI
@@ -155,7 +157,10 @@ class KnowledgeService:
             )
             db.add(chunk)
 
-        # 7. チャンク・埋め込みを保存してコミット（ステータスは PENDING のまま）
+        # 7. 品質スコアを計算して設定
+        source.quality_score = self._compute_quality_score(raw_text, len(chunks_text))
+
+        # 8. チャンク・埋め込みを保存してコミット（ステータスは PENDING のまま）
         db.commit()
         db.refresh(source)
 
@@ -165,6 +170,7 @@ class KnowledgeService:
                 "source_id": source.id,
                 "status": source.status,
                 "chunk_count": len(chunks_text),
+                "quality_score": source.quality_score,
             },
         )
 
@@ -400,6 +406,47 @@ class KnowledgeService:
         sorted_data = sorted(response.data, key=lambda d: d.index)
         return [item.embedding for item in sorted_data]
 
+    def _compute_quality_score(self, text: str, chunk_count: int) -> float:
+        """
+        コンテンツ品質スコアを 0〜100 で計算する。
+
+        スコア構成:
+          - テキスト長 (log スケール): 0〜40 点
+          - チャンク数: 0〜20 点
+          - コンテンツ豊富さ（数値・文章・語彙多様性）: 0〜40 点
+        """
+        score = 0.0
+
+        # テキスト長スコア（log スケール、5000 文字で満点）
+        length = len(text)
+        if length > 0:
+            length_score = min(40.0, 40.0 * math.log10(max(1, length)) / math.log10(5000))
+            score += length_score
+
+        # チャンク数スコア（5 チャンクで満点）
+        score += min(20.0, chunk_count * 4.0)
+
+        # コンテンツ豊富さスコア
+        richness = 0.0
+
+        # 数値の多さ（情報密度の代理指標）
+        numbers = len(re.findall(r"\d+\.?\d*", text))
+        richness += min(15.0, numbers * 1.5)
+
+        # 文章数（20 文字超の文）
+        sentences = [s.strip() for s in re.split(r"[.!?。！？]", text) if len(s.strip()) > 20]
+        richness += min(15.0, float(len(sentences)))
+
+        # 語彙多様性（ユニーク語 / 総語数）
+        words = text.lower().split()
+        if words:
+            unique_ratio = len(set(words)) / len(words)
+            richness += unique_ratio * 10.0
+
+        score += richness
+
+        return round(min(100.0, max(0.0, score)), 2)
+
     def _to_schema(self, source: KnowledgeSource) -> KnowledgeItem:
         """
         KnowledgeSource ORM オブジェクトを KnowledgeItem スキーマに変換する。
@@ -415,6 +462,7 @@ class KnowledgeService:
             status=KnowledgeItemStatus(source.status),
             chunk_count=chunk_count,
             item_type=KnowledgeItemType(source.item_type),
+            quality_score=source.quality_score,
             created_at=source.created_at,
             updated_at=source.updated_at,
         )

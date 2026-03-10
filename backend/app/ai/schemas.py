@@ -104,6 +104,7 @@ class LLMDecision(BaseModel):
     confidence: int = Field(..., ge=0, le=100, description="信頼度スコア（0〜100）。")
     reason: Optional[str] = Field(None, description="判定理由の短い説明。")
     raw_response: Optional[str] = Field(None, description="LLM からの生レスポンス文字列。")
+    prompt_version: str = Field("v1", description="使用したプロンプトテンプレートのバージョン。")
 
 
 class CrossValidationResult(BaseModel):
@@ -121,6 +122,7 @@ class CrossValidationResult(BaseModel):
     final_action: TradeAction = Field(..., description="最終アクション（BUY / SELL / HOLD）。")
     final_confidence: int = Field(..., ge=0, le=100, description="最終信頼度スコア（0〜100）。")
     final_reason: Optional[str] = Field(None, description="最終判定理由。")
+    prompt_version: str = Field("v1", description="使用したプロンプトテンプレートのバージョン。")
 
 
 class RAGContext(BaseModel):
