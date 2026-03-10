@@ -1,0 +1,149 @@
+name: Path Check
+
+on:
+  pull_request:
+    branches: [main, staging, dev]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  path-check:
+    name: Path Access Control
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0  # v2.12.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD")
+          echo "Changed files:"
+          echo "$CHANGED"
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGED" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Check path restrictions
+        id: check
+        env:
+          TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
+          CHANGED_FILES: ${{ steps.changed.outputs.files }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+
+          VIOLATIONS=""
+          WARNINGS=""
+
+          # ─── 凍結ファイル: 全ブランチ共通 ───────────────────────────
+          FROZEN_PATTERNS=(
+            "backend/app/shared/"
+            "backend/app/main.py"
+            "backend/app/database.py"
+            "backend/conftest.py"
+            "backend/requirements.txt"
+          )
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+
+            # docs/integration/*.md は全ブランチで許可
+            if echo "$file" | grep -qE '^docs/integration/.*\.md$'; then
+              continue
+            fi
+
+            # 凍結ファイルチェック
+            for pattern in "${FROZEN_PATTERNS[@]}"; do
+              if echo "$file" | grep -q "^$pattern"; then
+                VIOLATIONS="${VIOLATIONS}\n- ❌ 凍結ファイル変更: \`$file\` (申請が必要)"
+              fi
+            done
+
+            # main ブランチへの直接 push チェック (feature/* 以外からのマージ)
+            if [ "$TARGET_BRANCH" = "main" ]; then
+              if ! echo "$HEAD_REF" | grep -qE '^(staging|hotfix/)'; then
+                WARNINGS="${WARNINGS}\n- ⚠️ main への直接マージ: \`$HEAD_REF\` → staging 経由が推奨"
+              fi
+            fi
+
+            # staging ブランチ: frontend/ 変更は要注意
+            if [ "$TARGET_BRANCH" = "staging" ]; then
+              if echo "$file" | grep -qE '^frontend/'; then
+                WARNINGS="${WARNINGS}\n- ⚠️ frontend 変更: \`$file\` (E2E テストが必須)"
+              fi
+            fi
+
+          done <<< "$CHANGED_FILES"
+
+          # 結果を出力
+          if [ -n "$VIOLATIONS" ]; then
+            echo "violations<<EOF" >> "$GITHUB_OUTPUT"
+            echo -e "$VIOLATIONS" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+            echo "has_violations=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_violations=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [ -n "$WARNINGS" ]; then
+            echo "warnings<<EOF" >> "$GITHUB_OUTPUT"
+            echo -e "$WARNINGS" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+            echo "has_warnings=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_warnings=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post path check result
+        if: always()
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+        env:
+          HAS_VIOLATIONS: ${{ steps.check.outputs.has_violations }}
+          HAS_WARNINGS: ${{ steps.check.outputs.has_warnings }}
+          VIOLATIONS: ${{ steps.check.outputs.violations }}
+          WARNINGS: ${{ steps.check.outputs.warnings }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const hasViolations = process.env.HAS_VIOLATIONS === 'true';
+            const hasWarnings = process.env.HAS_WARNINGS === 'true';
+
+            if (!hasViolations && !hasWarnings) return;
+
+            let body = `## 🛡️ Path Access Control\n\n`;
+
+            if (hasViolations) {
+              body += `### ❌ 違反 (マージブロック)\n\n`;
+              body += process.env.VIOLATIONS + '\n\n';
+              body += `> 凍結ファイルを変更する場合は \`docs/integration/backend_deps.md\` に申請を記載してください。\n`;
+            }
+
+            if (hasWarnings) {
+              body += `### ⚠️ 警告 (要確認)\n\n`;
+              body += process.env.WARNINGS + '\n';
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body,
+            });
+
+      - name: Fail on violations
+        if: steps.check.outputs.has_violations == 'true'
+        run: |
+          echo "::error::凍結ファイルへの変更が検出されました。docs/integration/backend_deps.md を参照してください。"
+          exit 1

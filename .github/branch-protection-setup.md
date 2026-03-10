@@ -1,0 +1,132 @@
+# Branch Protection 設定手順
+
+## ブランチ戦略
+
+```
+feature/* (各Stream担当) → dev (統合) → staging (最終レビュー) → main (本番)
+```
+
+---
+
+## 保護対象ブランチと設定値
+
+### `main` ブランチ (最高レベル保護)
+
+| 設定項目 | 値 |
+|---------|-----|
+| Require a pull request before merging | ✅ ON |
+| Required approvals | **2** |
+| Dismiss stale pull request approvals | ✅ ON |
+| Require review from Code Owners | ✅ ON |
+| Require status checks to pass | ✅ ON |
+| Required status checks | `lint`, `test`, `security-check` |
+| Require branches to be up to date | ✅ ON |
+| Require conversation resolution | ✅ ON |
+| Restrict who can push | ✅ ON (管理者のみ) |
+| Allow force pushes | ❌ OFF |
+| Allow deletions | ❌ OFF |
+| Block direct pushes | ✅ ON |
+
+### `staging` ブランチ
+
+| 設定項目 | 値 |
+|---------|-----|
+| Require a pull request before merging | ✅ ON |
+| Required approvals | **1** |
+| Require status checks to pass | ✅ ON |
+| Required status checks | `lint`, `test`, `security-check` |
+| Require branches to be up to date | ✅ ON |
+| Allow force pushes | ❌ OFF |
+| Allow deletions | ❌ OFF |
+| Block direct pushes | ✅ ON |
+
+### `dev` ブランチ
+
+| 設定項目 | 値 |
+|---------|-----|
+| Require a pull request before merging | ✅ ON |
+| Required approvals | **1** |
+| Require status checks to pass | ✅ ON |
+| Required status checks | `lint`, `test` |
+| Allow force pushes | ❌ OFF |
+| Allow deletions | ❌ OFF |
+| Block direct pushes | ✅ ON |
+
+---
+
+## GitHub UI での設定手順
+
+1. GitHub リポジトリ → **Settings** → **Branches**
+2. **Add branch protection rule** をクリック
+3. **Branch name pattern** に対象ブランチ名を入力 (例: `main`)
+4. 上記テーブルの設定値を入力
+5. **Create** をクリック
+
+同じ手順を `staging`、`dev` に対して繰り返す。
+
+---
+
+## CODEOWNERS 設定
+
+`.github/CODEOWNERS` ファイルでコードオーナーを指定する:
+
+```
+# デフォルトオーナー
+*                           @team-lead
+
+# セキュリティ関連
+docs/13_security_design.md  @security-team @team-lead
+backend/app/aave/           @security-team
+
+# インフラ関連
+.github/workflows/          @devops-team
+docker-compose*.yml         @devops-team
+Dockerfile*                 @devops-team
+
+# AIロジック
+backend/app/ai/             @ai-team
+```
+
+---
+
+## ワークフロー定義 (PRマージ経路)
+
+```
+feature/*
+    │
+    │ PR (1 approval required, CI必須)
+    ▼
+   dev ─── 統合テスト実行
+    │
+    │ PR (1 approval required, CI + security必須)
+    ▼
+ staging ── E2E テスト + Codex レビュー
+    │
+    │ PR (2 approvals required, 全CI必須)
+    ▼
+  main ───── 本番デプロイ
+```
+
+---
+
+## 直接push禁止の徹底
+
+以下のブランチへの直接 push は CI で `path-check.yml` によっても検出されます:
+- `main` への直接 push → 自動ブロック
+- `staging` への直接 push → 自動ブロック
+
+`feature/` ブランチから必ずPR経由でマージしてください。
+
+---
+
+## 緊急時の手順 (Break-glass)
+
+本番障害など緊急時に直接 main へ push が必要な場合:
+
+1. Slack `#incident` チャンネルに宣言
+2. 管理者が一時的に Branch Protection を無効化
+3. 修正 push + 即座にタグ打ち (`git tag hotfix/YYYYMMDD-description`)
+4. Branch Protection を即座に再有効化
+5. 事後 postmortem を GitHub Issue に記録
+
+> **注意:** Break-glass は月1回以下を目安。乱用しないこと。
