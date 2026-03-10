@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.ai.service import AIService
-from app.auth.dependencies import require_viewer
+from app.auth.dependencies import require_admin, require_viewer
 from app.auth.models import User
 from app.automation.monitoring_service import MonitoringService
 from app.automation.reporting_service import ReportingService
@@ -47,6 +47,7 @@ def get_dashboard_snapshot(
         description="Lookback window in hours for dashboard metrics",
     ),
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
+    current_user: User = Depends(require_viewer),
 ) -> DashboardSnapshot:
     """
     Phase10までに確立した DashboardSnapshot 契約をそのまま返す。
@@ -98,6 +99,7 @@ def get_automation_status(
 )
 def get_latest_report(
     reporting_service: ReportingService = Depends(get_reporting_service),
+    current_user: User = Depends(require_viewer),
 ) -> AutomationReportSummary:
     """
     Phase10までに確立した AutomationReportSummary 契約をそのまま返す。
@@ -124,6 +126,7 @@ def run_workflow(
     dry_run: bool = Query(default=True, description="If true, simulate trades"),
     db: Session = Depends(get_db),
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
+    current_user: User = Depends(require_admin),
 ) -> WorkflowRunResult:
     """Knowledge Hub の pending アイテムを RAG→AI→Exchange の E2E パイプラインで処理する。"""
     knowledge_service = KnowledgeService()
