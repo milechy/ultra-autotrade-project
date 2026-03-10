@@ -34,6 +34,7 @@ class ExchangeSettings:
     timeout_seconds: int
     hostname: str
     usd_to_jpy_rate: float  # USD/JPY 換算レート（bitFlyer 使用時）
+    app_env: str
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -114,11 +115,17 @@ def get_exchange_settings() -> ExchangeSettings:
         or ""
     )
 
+    # APP_ENV=prod → 強制的に本番モード（sandbox=False）
+    app_env = get_env("APP_ENV", required=False) or "local"
+
     # EXCHANGE_SANDBOX が未設定の場合は BYBIT_SANDBOX にフォールバック
-    raw_sandbox = get_env("EXCHANGE_SANDBOX", required=False) or get_env(
-        "BYBIT_SANDBOX", required=False
-    )
-    sandbox = raw_sandbox.lower() in ("true", "1", "yes") if raw_sandbox else True
+    if app_env == "prod":
+        sandbox = False
+    else:
+        raw_sandbox = get_env("EXCHANGE_SANDBOX", required=False) or get_env(
+            "BYBIT_SANDBOX", required=False
+        )
+        sandbox = raw_sandbox.lower() in ("true", "1", "yes") if raw_sandbox else True
     default_symbol = get_env("EXCHANGE_DEFAULT_SYMBOL", required=False) or "BTC/USDT"
 
     max_order_usd = _get_env_decimal(
@@ -151,4 +158,39 @@ def get_exchange_settings() -> ExchangeSettings:
         timeout_seconds=timeout_seconds,
         hostname=hostname,
         usd_to_jpy_rate=usd_to_jpy_rate,
+        app_env=app_env,
+    )
+
+
+def get_bitflyer_settings() -> ExchangeSettings:
+    """
+    bitFlyer 専用の ExchangeSettings を構築して返す。
+
+    - BITFLYER_API_KEY / BITFLYER_API_SECRET を直接使用する（フォールバックチェーンなし）
+    - default_symbol は "BTC/JPY"（bitFlyer は USDT 建てなし）
+    - sandbox は常に True（bitFlyer にサンドボックスなし、dry_run で安全動作）
+    """
+    api_key = get_env("BITFLYER_API_KEY", required=False) or ""
+    api_secret = get_env("BITFLYER_API_SECRET", required=False) or ""
+    app_env = get_env("APP_ENV", required=False) or "local"
+    default_symbol = get_env("EXCHANGE_DEFAULT_SYMBOL", required=False) or "BTC/JPY"
+
+    max_order_usd = _get_env_decimal("EXCHANGE_MAX_ORDER_USD", default="100")
+    daily_trade_limit = _get_env_int("EXCHANGE_DAILY_TRADE_LIMIT", default=10)
+    cooldown_seconds = _get_env_int("EXCHANGE_COOLDOWN_SECONDS", default=300)
+    timeout_seconds = _get_env_int("EXCHANGE_TIMEOUT_SECONDS", default=30)
+    usd_to_jpy_rate = float(get_env("USD_TO_JPY_RATE", required=False) or "150.0")
+
+    return ExchangeSettings(
+        api_key=api_key,
+        api_secret=api_secret,
+        sandbox=True,  # bitFlyer にサンドボックスなし → 常に dry_run で安全動作
+        default_symbol=default_symbol,
+        max_order_usd=max_order_usd,
+        daily_trade_limit=daily_trade_limit,
+        cooldown_seconds=cooldown_seconds,
+        timeout_seconds=timeout_seconds,
+        hostname="bitflyer.com",
+        usd_to_jpy_rate=usd_to_jpy_rate,
+        app_env=app_env,
     )
