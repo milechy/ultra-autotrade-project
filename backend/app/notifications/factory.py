@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Optional
 
 from .config import load_notification_settings
+from .line_sender import LINENotificationSender
 from .schemas import NotificationChannel, NotificationMessage, NotificationSeverity
 from .service import CompositeNotificationService, LoggingNotificationSender
 from .slack_sender import SlackNotificationSender
@@ -28,7 +29,9 @@ def get_notification_service() -> CompositeNotificationService:
     """
     global _notification_service
     if _notification_service is None:
-        senders: list[LoggingNotificationSender | SlackNotificationSender] = []
+        senders: list[
+            LoggingNotificationSender | SlackNotificationSender | LINENotificationSender
+        ] = []
 
         logging_sender = LoggingNotificationSender()
         senders.append(logging_sender)
@@ -37,6 +40,13 @@ def get_notification_service() -> CompositeNotificationService:
         if settings.is_slack_configured and settings.slack_webhook_url:
             slack_sender = SlackNotificationSender(webhook_url=settings.slack_webhook_url)
             senders.append(slack_sender)
+
+        if settings.is_line_messaging_configured:
+            line_sender = LINENotificationSender(
+                channel_access_token=settings.line_channel_access_token,
+                user_id=settings.line_user_id,
+            )
+            senders.append(line_sender)
 
         _notification_service = CompositeNotificationService(senders)
     return _notification_service
@@ -49,5 +59,6 @@ __all__ = [
     "CompositeNotificationService",
     "LoggingNotificationSender",
     "SlackNotificationSender",
+    "LINENotificationSender",
     "get_notification_service",
 ]
