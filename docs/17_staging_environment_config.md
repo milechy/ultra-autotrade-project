@@ -154,3 +154,36 @@ staging 環境でも、本番と同じ種類のメトリクスを取得できる
  - その他通知 / AI 系キー
 - 切り替え前に、15_rollback_procedures.md を参照し、
   ロールバック手順が機能することを staging で確認しておくこと
+
+---
+
+## Shadow Mode と .env.staging / .env.production の差分
+
+### .env.staging（必須設定）
+```
+AI_SHADOW_MODE=true          # 判定記録のみ、実際のトレードは実行しない
+APP_ENV=staging
+EXCHANGE_SANDBOX=true
+EXCHANGE_MAX_ORDER_USD=50    # Phase 1 上限
+EXCHANGE_DAILY_TRADE_LIMIT=5
+AI_CROSS_VALIDATION_ENABLED=false  # staging ではコスト節約のため無効
+```
+
+### .env.production（必須設定）
+```
+AI_SHADOW_MODE=false         # 実際のトレードを実行する
+APP_ENV=prod
+EXCHANGE_SANDBOX=false
+EXCHANGE_MAX_ORDER_USD=100   # Phase 1 初期上限（段階的に引き上げ）
+EXCHANGE_DAILY_TRADE_LIMIT=10
+AI_CROSS_VALIDATION_ENABLED=true
+```
+
+### 重要な差分
+| 項目 | staging | production |
+|------|---------|------------|
+| AI_SHADOW_MODE | true | false |
+| APP_ENV | staging | prod |
+| EXCHANGE_SANDBOX | true | false |
+| EXCHANGE_MAX_ORDER_USD | 50 | 100〜 |
+| APIキー | **物理的に異なるキーを使用** | **物理的に異なるキーを使用** |

@@ -35,6 +35,7 @@ class ExchangeSettings:
     hostname: str
     usd_to_jpy_rate: float  # USD/JPY 換算レート（bitFlyer 使用時）
     app_env: str
+    phase: int  # 段階的資金投入フェーズ (1=マイクロテスト, 2=小規模本番, 3=本格運用)
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -128,10 +129,17 @@ def get_exchange_settings() -> ExchangeSettings:
         sandbox = raw_sandbox.lower() in ("true", "1", "yes") if raw_sandbox else True
     default_symbol = get_env("EXCHANGE_DEFAULT_SYMBOL", required=False) or "BTC/USDT"
 
+    phase = _get_env_int("EXCHANGE_PHASE", default=1)
+    # フェーズに基づいてmax_order_usdの上限を設定
+    phase_limits = {1: Decimal("50"), 2: Decimal("100"), 3: Decimal("1000")}
+    phase_max = phase_limits.get(phase, Decimal("50"))
+
     max_order_usd = _get_env_decimal(
         "EXCHANGE_MAX_ORDER_USD",
         default="100",  # 1注文あたり 100 USD 相当を上限にする（デフォルト）
     )
+    if max_order_usd > phase_max:
+        max_order_usd = phase_max
     daily_trade_limit = _get_env_int(
         "EXCHANGE_DAILY_TRADE_LIMIT",
         default=10,
@@ -159,6 +167,7 @@ def get_exchange_settings() -> ExchangeSettings:
         hostname=hostname,
         usd_to_jpy_rate=usd_to_jpy_rate,
         app_env=app_env,
+        phase=phase,
     )
 
 
@@ -175,7 +184,13 @@ def get_bitflyer_settings() -> ExchangeSettings:
     app_env = get_env("APP_ENV", required=False) or "local"
     default_symbol = get_env("EXCHANGE_DEFAULT_SYMBOL", required=False) or "BTC/JPY"
 
+    phase = _get_env_int("EXCHANGE_PHASE", default=1)
+    phase_limits = {1: Decimal("50"), 2: Decimal("100"), 3: Decimal("1000")}
+    phase_max = phase_limits.get(phase, Decimal("50"))
+
     max_order_usd = _get_env_decimal("EXCHANGE_MAX_ORDER_USD", default="100")
+    if max_order_usd > phase_max:
+        max_order_usd = phase_max
     daily_trade_limit = _get_env_int("EXCHANGE_DAILY_TRADE_LIMIT", default=10)
     cooldown_seconds = _get_env_int("EXCHANGE_COOLDOWN_SECONDS", default=300)
     timeout_seconds = _get_env_int("EXCHANGE_TIMEOUT_SECONDS", default=30)
@@ -193,4 +208,5 @@ def get_bitflyer_settings() -> ExchangeSettings:
         hostname="bitflyer.com",
         usd_to_jpy_rate=usd_to_jpy_rate,
         app_env=app_env,
+        phase=phase,
     )

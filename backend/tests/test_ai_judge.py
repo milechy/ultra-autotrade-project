@@ -528,6 +528,7 @@ class TestPromptVersioning:
         settings.openai_api_key = None
         settings.cross_validation_enabled = False
         settings.prompt_version = "v2"
+        settings.shadow_mode = False
 
         result = service.judge_with_rag("BTC analysis", rag_context, settings=settings)
         assert result.prompt_version == "v2"

@@ -32,6 +32,7 @@ class AISettings:
     min_confidence_threshold: int
     cross_validation_enabled: bool
     prompt_version: str
+    shadow_mode: bool  # True=判定記録のみ、実行しない
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -91,6 +92,7 @@ def get_ai_settings() -> AISettings:
         default=True,
     )
     prompt_version = get_env("AI_PROMPT_VERSION", required=False) or "v1"
+    shadow_mode = _get_env_bool("AI_SHADOW_MODE", default=False)
 
     return AISettings(
         anthropic_api_key=anthropic_api_key,
@@ -100,4 +102,5 @@ def get_ai_settings() -> AISettings:
         min_confidence_threshold=min_confidence_threshold,
         cross_validation_enabled=cross_validation_enabled,
         prompt_version=prompt_version,
+        shadow_mode=shadow_mode,
     )

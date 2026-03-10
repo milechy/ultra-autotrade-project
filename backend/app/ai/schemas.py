@@ -123,6 +123,22 @@ class CrossValidationResult(BaseModel):
     final_confidence: int = Field(..., ge=0, le=100, description="最終信頼度スコア（0〜100）。")
     final_reason: Optional[str] = Field(None, description="最終判定理由。")
     prompt_version: str = Field("v1", description="使用したプロンプトテンプレートのバージョン。")
+    shadow_mode: bool = Field(
+        False, description="Shadow Modeで記録された判定かどうか。True=実行しない。"
+    )
+
+
+class ShadowModeLog(BaseModel):
+    """Shadow Mode: 判定結果のログ記録（実行なし）"""
+
+    item_id: str = Field(..., description="判定対象のID")
+    action: TradeAction
+    confidence: int = Field(..., ge=0, le=100)
+    reason: Optional[str] = None
+    timestamp: datetime
+    prompt_version: str = Field("v1")
+    shadow_mode: bool = Field(True, description="常にTrue（Shadow Modeで記録されたことを示す）")
+    provider: Optional[str] = Field(None, description="判定に使ったLLMプロバイダー")
 
 
 class RAGContext(BaseModel):
