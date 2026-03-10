@@ -229,7 +229,21 @@ class AIService:
         if ai_settings.cross_validation_enabled and ai_settings.openai_api_key:
             secondary = self._call_openai(prompt, ai_settings, version)
 
-        return self._cross_validate(primary, secondary)
+        result = self._cross_validate(primary, secondary)
+
+        # Shadow Mode: 判定を記録するが、shadow_mode フラグを付加して返す
+        # 呼び出し元は shadow_mode=True の場合、実際のトレードを実行しない
+        if ai_settings.shadow_mode:
+            logger.info(
+                "SHADOW_MODE | action=%s confidence=%s reason=%s prompt_version=%s",
+                result.final_action.value,
+                result.final_confidence,
+                result.final_reason,
+                result.prompt_version,
+            )
+            return result.model_copy(update={"shadow_mode": True})
+
+        return result
 
     def _build_rag_prompt(self, query: str, rag_context: RAGContext, version: str = "v1") -> str:
         """Build prompt with RAG context chunks using the specified prompt version."""
