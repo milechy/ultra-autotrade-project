@@ -263,7 +263,14 @@ class AIService:
         )
 
     def _call_claude(self, prompt: str, settings: AISettings, version: str = "v1") -> LLMDecision:
-        """Call Claude API. Fail-closed: error→HOLD."""
+        """
+        Call Claude API with Opus→Sonnet fallback.
+
+        Retry logic:
+        - Opusで最大2回試行する
+        - 2回とも失敗した場合はSonnet（AI_FALLBACK_MODEL）に切り替える
+        - フォールバック時はconfidenceを0.8倍に減衰し、provider="claude_fallback"とする
+        """
         if not settings.anthropic_api_key:
             logger.warning("ANTHROPIC_API_KEY not set; falling back to HOLD")
             return LLMDecision(
@@ -273,12 +280,49 @@ class AIService:
                 reason="API key not configured",
                 prompt_version=version,
             )
+
+        # Opusで最大2回試行
+        _MAX_OPUS_RETRIES = 2
+        last_exc: Optional[Exception] = None
+        for attempt in range(1, _MAX_OPUS_RETRIES + 1):
+            try:
+                import anthropic
+
+                client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+                response = client.messages.create(
+                    model=settings.claude_model,
+                    max_tokens=500,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                raw_text = ""
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        raw_text = block.text
+                        break
+                decision = self._parse_llm_response(raw_text, LLMProvider.CLAUDE)
+                return decision.model_copy(update={"prompt_version": version})
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "Claude API call failed (attempt %d/%d): %s",
+                    attempt,
+                    _MAX_OPUS_RETRIES,
+                    exc,
+                )
+
+        # Opusが2回失敗 → Sonnetフォールバック
+        fallback_model = getattr(settings, "ai_fallback_model", "claude-sonnet-4-20250514")
+        logger.warning(
+            "Claude Opus failed after %d attempts; switching to fallback model=%s",
+            _MAX_OPUS_RETRIES,
+            fallback_model,
+        )
         try:
             import anthropic
 
             client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
             response = client.messages.create(
-                model=settings.claude_model,
+                model=fallback_model,
                 max_tokens=500,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -287,15 +331,23 @@ class AIService:
                 if hasattr(block, "text"):
                     raw_text = block.text
                     break
-            decision = self._parse_llm_response(raw_text, LLMProvider.CLAUDE)
-            return decision.model_copy(update={"prompt_version": version})
+            decision = self._parse_llm_response(raw_text, LLMProvider.CLAUDE_FALLBACK)
+            # フォールバック時はconfidenceを0.8倍に減衰（Sonnetの判定精度が低い前提）
+            decayed_confidence = int(decision.confidence * 0.8)
+            return decision.model_copy(
+                update={
+                    "confidence": decayed_confidence,
+                    "provider": LLMProvider.CLAUDE_FALLBACK,
+                    "prompt_version": version,
+                }
+            )
         except Exception as exc:
-            logger.error("Claude API call failed: %s", exc)
+            logger.error("Claude fallback API call also failed: %s (original: %s)", exc, last_exc)
             return LLMDecision(
-                provider=LLMProvider.CLAUDE,
+                provider=LLMProvider.CLAUDE_FALLBACK,
                 action=TradeAction.HOLD,
                 confidence=0,
-                reason=f"API error: {exc}",
+                reason=f"Opus error: {last_exc}; Fallback error: {exc}",
                 prompt_version=version,
             )
 

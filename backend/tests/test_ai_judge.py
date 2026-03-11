@@ -263,7 +263,8 @@ class TestCallClaude:
             result = service._call_claude("test prompt", settings)
         assert result.action == TradeAction.HOLD
         assert result.confidence == 0
-        assert result.provider == LLMProvider.CLAUDE
+        # Opus失敗→フォールバックも失敗→CLAUDE_FALLBACKとして記録される
+        assert result.provider == LLMProvider.CLAUDE_FALLBACK
 
     def test_call_claude_response_block_without_text_attr(self):
         """Block without text attribute → raw_text stays empty → parse error → HOLD."""

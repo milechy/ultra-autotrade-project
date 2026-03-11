@@ -33,6 +33,7 @@ class AISettings:
     cross_validation_enabled: bool
     prompt_version: str
     shadow_mode: bool  # True=判定記録のみ、実行しない
+    ai_fallback_model: str  # Opus失敗時のフォールバックモデル（環境変数: AI_FALLBACK_MODEL）
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -82,6 +83,7 @@ def get_ai_settings() -> AISettings:
 
     claude_model = get_env("AI_CLAUDE_MODEL", required=False) or "claude-sonnet-4-20250514"
     openai_model = get_env("AI_OPENAI_MODEL", required=False) or "gpt-4o"
+    ai_fallback_model = get_env("AI_FALLBACK_MODEL", required=False) or "claude-sonnet-4-20250514"
 
     min_confidence_threshold = _get_env_int(
         "AI_MIN_CONFIDENCE_THRESHOLD",
@@ -103,4 +105,5 @@ def get_ai_settings() -> AISettings:
         cross_validation_enabled=cross_validation_enabled,
         prompt_version=prompt_version,
         shadow_mode=shadow_mode,
+        ai_fallback_model=ai_fallback_model,
     )

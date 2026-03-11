@@ -92,6 +92,7 @@ class LLMProvider(str, Enum):
     CLAUDE = "claude"
     OPENAI = "openai"
     RULE_BASED = "rule_based"
+    CLAUDE_FALLBACK = "claude_fallback"  # Opus失敗時のSonnetフォールバック
 
 
 class LLMDecision(BaseModel):
