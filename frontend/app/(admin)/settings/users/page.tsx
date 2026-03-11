@@ -1,18 +1,9 @@
-// frontend/pages/settings/users.tsx
-/**
- * ユーザー管理ページ（管理者専用）。
- *
- * - ユーザー一覧表示
- * - ユーザー作成
- * - ユーザー編集
- * - ユーザー削除
- */
+'use client'
 
-import Head from "next/head";
+// frontend/app/(admin)/settings/users/page.tsx
 import React, { useState, useEffect, useCallback } from "react";
-import AppShell from "../../components/layout/AppShell";
-import AuthGuard from "../../components/AuthGuard";
-import { useAuth } from "../../lib/auth";
+import AuthGuard from "@/components/AuthGuard";
+import { useAuth } from "@/lib/auth";
 import {
   listUsers,
   createUser,
@@ -20,8 +11,8 @@ import {
   deleteUser,
   type CreateUserRequest,
   type UpdateUserRequest,
-} from "../../lib/api/users";
-import type { UserResponse } from "../../lib/api/auth";
+} from "@/lib/api/users";
+import type { UserResponse } from "@/lib/api/auth";
 
 export default function UsersManagementPage() {
   return (
@@ -99,10 +90,8 @@ function UsersManagementContent() {
   }
 
   return (
-    <AppShell>
-      <Head>
-        <title>ユーザー管理 - Ultra AutoTrade</title>
-      </Head>
+    <>
+      <title>ユーザー管理 - Ultra AutoTrade</title>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
         <div>
@@ -206,7 +195,7 @@ function UsersManagementContent() {
           onClose={() => setDeleteConfirm(null)}
         />
       )}
-    </AppShell>
+    </>
   );
 }
 

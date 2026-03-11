@@ -1,17 +1,10 @@
-// frontend/pages/settings/account.tsx
-/**
- * アカウント設定ページ。
- *
- * - プロフィール情報表示
- * - パスワード変更
- */
+'use client'
 
-import Head from "next/head";
+// frontend/app/(admin)/settings/account/page.tsx
 import React, { useState } from "react";
-import AppShell from "../../components/layout/AppShell";
-import AuthGuard from "../../components/AuthGuard";
-import { useAuth } from "../../lib/auth";
-import { changePassword } from "../../lib/api/auth";
+import AuthGuard from "@/components/AuthGuard";
+import { useAuth } from "@/lib/auth";
+import { changePassword } from "@/lib/api/auth";
 
 export default function AccountSettingsPage() {
   return (
@@ -73,10 +66,8 @@ function AccountSettingsContent() {
   }
 
   return (
-    <AppShell>
-      <Head>
-        <title>アカウント設定 - Ultra AutoTrade</title>
-      </Head>
+    <>
+      <title>アカウント設定 - Ultra AutoTrade</title>
 
       <h1 style={{ marginBottom: 6 }}>アカウント設定</h1>
       <p style={{ marginTop: 0, color: "#555" }}>
@@ -185,7 +176,7 @@ function AccountSettingsContent() {
           </button>
         </form>
       </section>
-    </AppShell>
+    </>
   );
 }
 

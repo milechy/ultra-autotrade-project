@@ -1,18 +1,15 @@
-// frontend/pages/login.tsx
-/**
- * ログインページ。
- */
+'use client'
 
-import Head from "next/head";
-import { useRouter } from "next/router";
-import { useState, useEffect, FormEvent } from "react";
-import { useAuth } from "../lib/auth";
+// frontend/app/login/page.tsx
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, FormEvent, Suspense } from "react";
+import { useAuth, AuthProvider } from "@/lib/auth";
 
 /**
  * リダイレクト先を検証し、安全なパスのみ許可する。
  * Open Redirect 攻撃を防ぐため、同一オリジンのパスのみ許可。
  */
-function getSafeRedirect(redirect: string | undefined): string {
+function getSafeRedirect(redirect: string | null): string {
   const defaultPath = "/dashboard";
 
   if (!redirect) {
@@ -27,20 +24,17 @@ function getSafeRedirect(redirect: string | undefined): string {
   return defaultPath;
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const { login, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // router.query.redirect は string | string[] | undefined のため正規化
-  const rawRedirect = router.query.redirect;
-  const redirect = getSafeRedirect(
-    Array.isArray(rawRedirect) ? rawRedirect[0] : rawRedirect
-  );
+  const redirect = getSafeRedirect(searchParams.get("redirect"));
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -76,67 +70,71 @@ export default function LoginPage() {
   }
 
   return (
-    <>
-      <Head>
-        <title>ログイン - Ultra AutoTrade</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </Head>
+    <main style={mainStyle}>
+      <div style={cardStyle}>
+        <h1 style={{ margin: 0, marginBottom: 8 }}>Ultra AutoTrade</h1>
+        <p style={{ margin: 0, marginBottom: 24, color: "#666" }}>
+          運用ダッシュボード
+        </p>
 
-      <main style={mainStyle}>
-        <div style={cardStyle}>
-          <h1 style={{ margin: 0, marginBottom: 8 }}>Ultra AutoTrade</h1>
-          <p style={{ margin: 0, marginBottom: 24, color: "#666" }}>
-            運用ダッシュボード
-          </p>
-
-          <form onSubmit={handleSubmit}>
-            {error && (
-              <div style={errorStyle}>
-                {error}
-              </div>
-            )}
-
-            <div style={fieldStyle}>
-              <label style={labelStyle}>メールアドレス</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                style={inputStyle}
-                disabled={submitting}
-              />
+        <form onSubmit={handleSubmit}>
+          {error && (
+            <div style={errorStyle}>
+              {error}
             </div>
+          )}
 
-            <div style={fieldStyle}>
-              <label style={labelStyle}>パスワード</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                style={inputStyle}
-                disabled={submitting}
-              />
-            </div>
-
-            <button
-              type="submit"
-              style={buttonStyle}
+          <div style={fieldStyle}>
+            <label style={labelStyle}>メールアドレス</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              style={inputStyle}
               disabled={submitting}
-            >
-              {submitting ? "ログイン中..." : "ログイン"}
-            </button>
-          </form>
+            />
+          </div>
 
-          <p style={{ marginTop: 24, fontSize: 12, color: "#999", textAlign: "center" }}>
-            初期設定が必要な場合は管理者にお問い合わせください。
-          </p>
-        </div>
-      </main>
-    </>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>パスワード</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              style={inputStyle}
+              disabled={submitting}
+            />
+          </div>
+
+          <button
+            type="submit"
+            style={buttonStyle}
+            disabled={submitting}
+          >
+            {submitting ? "ログイン中..." : "ログイン"}
+          </button>
+        </form>
+
+        <p style={{ marginTop: 24, fontSize: 12, color: "#999", textAlign: "center" }}>
+          初期設定が必要な場合は管理者にお問い合わせください。
+        </p>
+      </div>
+    </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <AuthProvider>
+      <title>ログイン - Ultra AutoTrade</title>
+      <Suspense fallback={<div style={{ padding: 40, textAlign: "center" }}>読み込み中...</div>}>
+        <LoginForm />
+      </Suspense>
+    </AuthProvider>
   );
 }
 

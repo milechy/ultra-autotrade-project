@@ -1,3 +1,5 @@
+'use client'
+
 // frontend/lib/auth.ts
 /**
  * 認証状態管理。

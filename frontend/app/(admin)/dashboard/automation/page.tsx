@@ -1,11 +1,12 @@
-import Head from "next/head";
+'use client'
+
 import React from "react";
-import AppShell from "../../components/layout/AppShell";
-import KpiCards from "../../components/dashboard/KpiCards";
-import StatusPanel from "../../components/dashboard/StatusPanel";
-import SnapshotCharts from "../../components/dashboard/SnapshotCharts";
-import { fetchAutomationStatus, fetchDashboardSnapshot } from "../../lib/api/automation";
-import type { AutomationStatus, DashboardSnapshot } from "../../lib/types";
+import AppShell from "@/components/layout/AppShell";
+import KpiCards from "@/components/dashboard/KpiCards";
+import StatusPanel from "@/components/dashboard/StatusPanel";
+import SnapshotCharts from "@/components/dashboard/SnapshotCharts";
+import { fetchAutomationStatus, fetchDashboardSnapshot } from "@/lib/api/automation";
+import type { AutomationStatus, DashboardSnapshot } from "@/lib/types";
 
 export default function AutomationPage() {
   const [lookbackHours, setLookbackHours] = React.useState<number>(6);
@@ -35,9 +36,9 @@ export default function AutomationPage() {
 
   return (
     <AppShell>
-      <Head>
+      <>
         <title>自動売買 - Ultra AutoTrade</title>
-      </Head>
+      </>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
         <div>

@@ -1,13 +1,12 @@
-// frontend/pages/knowledge/search.tsx
-import Head from "next/head";
+'use client'
+
 import Link from "next/link";
 import React from "react";
-import AppShell from "../../components/layout/AppShell";
-import AuthGuard from "../../components/AuthGuard";
+import AuthGuard from "@/components/AuthGuard";
 import {
   searchKnowledge,
   type KnowledgeSearchResult,
-} from "../../lib/api/knowledge";
+} from "@/lib/api/knowledge";
 
 export default function KnowledgeSearchPage() {
   const [query, setQuery] = React.useState("");
@@ -51,10 +50,8 @@ export default function KnowledgeSearchPage() {
 
   return (
     <AuthGuard>
-      <AppShell>
-        <Head>
-          <title>RAG検索 - ナレッジ Hub - Ultra AutoTrade</title>
-        </Head>
+      <>
+        <title>RAG検索 - ナレッジ Hub - Ultra AutoTrade</title>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 12 }}>
           <div>
@@ -202,7 +199,7 @@ export default function KnowledgeSearchPage() {
             )}
           </section>
         )}
-      </AppShell>
+      </>
     </AuthGuard>
   );
 }
