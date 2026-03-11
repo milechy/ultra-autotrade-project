@@ -1,12 +1,13 @@
+'use client'
+
 import { useEffect, useState } from "react";
 import Head from "next/head";
-import AppShell from "../../components/layout/AppShell";
-import AuthGuard from "../../components/AuthGuard";
-import { useAuth } from "../../lib/auth";
-import { fetchAutomationStatus } from "../../lib/api/automation";
-import { fetchExchangeStatus } from "../../lib/api/exchange";
-import type { AutomationStatus } from "../../lib/types";
-import type { ExchangeStatusResponse } from "../../lib/api/exchange";
+import AuthGuard from "@/components/AuthGuard";
+import { useAuth } from "@/lib/auth";
+import { fetchAutomationStatus } from "@/lib/api/automation";
+import { fetchExchangeStatus } from "@/lib/api/exchange";
+import type { AutomationStatus } from "@/lib/types";
+import type { ExchangeStatusResponse } from "@/lib/api/exchange";
 
 function getHfColor(hf: number): string {
   if (hf >= 1.8) return "#16a34a"; // green-600
@@ -238,12 +239,10 @@ function DashboardContent() {
 export default function DashboardIndex() {
   return (
     <AuthGuard>
-      <AppShell>
-        <Head>
-          <title>運用ダッシュボード - Ultra AutoTrade</title>
-        </Head>
+      <>
+        <title>運用ダッシュボード - Ultra AutoTrade</title>
         <DashboardContent />
-      </AppShell>
+      </>
     </AuthGuard>
   );
 }

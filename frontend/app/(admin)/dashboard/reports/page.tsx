@@ -1,9 +1,10 @@
-import Head from "next/head";
+'use client'
+
 import React from "react";
-import AppShell from "../../components/layout/AppShell";
-import ReportSummaryPanel from "../../components/dashboard/ReportSummaryPanel";
-import { fetchLatestReport } from "../../lib/api/automation";
-import type { AutomationReportSummary } from "../../lib/types";
+import AppShell from "@/components/layout/AppShell";
+import ReportSummaryPanel from "@/components/dashboard/ReportSummaryPanel";
+import { fetchLatestReport } from "@/lib/api/automation";
+import type { AutomationReportSummary } from "@/lib/types";
 
 export default function ReportsPage() {
   const [report, setReport] = React.useState<AutomationReportSummary | null>(null);
@@ -27,9 +28,9 @@ export default function ReportsPage() {
 
   return (
     <AppShell>
-      <Head>
+      <>
         <title>レポート - Ultra AutoTrade</title>
-      </Head>
+      </>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
         <div>

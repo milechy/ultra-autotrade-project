@@ -1,16 +1,15 @@
-// frontend/pages/knowledge/index.tsx
-import Head from "next/head";
+'use client'
+
 import Link from "next/link";
 import React from "react";
-import AppShell from "../../components/layout/AppShell";
-import AuthGuard from "../../components/AuthGuard";
+import AuthGuard from "@/components/AuthGuard";
 import {
   fetchKnowledgeItems,
   createKnowledgeItem,
   type KnowledgeItem,
   type KnowledgeItemStatus,
   type KnowledgeItemType,
-} from "../../lib/api/knowledge";
+} from "@/lib/api/knowledge";
 
 const STATUS_COLORS: Record<KnowledgeItemStatus, { bg: string; color: string; label: string }> = {
   pending:  { bg: "#fff8e1", color: "#b45309", label: "待機中" },
@@ -110,10 +109,8 @@ export default function KnowledgeIndexPage() {
 
   return (
     <AuthGuard>
-      <AppShell>
-        <Head>
-          <title>ナレッジ Hub - Ultra AutoTrade</title>
-        </Head>
+      <>
+        <title>ナレッジ Hub - Ultra AutoTrade</title>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 12 }}>
           <div>
@@ -272,7 +269,7 @@ export default function KnowledgeIndexPage() {
             </div>
           )}
         </section>
-      </AppShell>
+      </>
     </AuthGuard>
   );
 }

@@ -1,3 +1,5 @@
+'use client'
+
 // frontend/components/AuthGuard.tsx
 /**
  * 認証ガードコンポーネント。
@@ -7,7 +9,7 @@
  */
 
 import { useEffect } from "react";
-import { useRouter } from "next/router";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "../lib/auth";
 
 interface AuthGuardProps {
@@ -18,13 +20,14 @@ interface AuthGuardProps {
 export default function AuthGuard({ children, adminOnly = false }: AuthGuardProps) {
   const { isAuthenticated, isAdmin, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (isLoading) return;
 
     if (!isAuthenticated) {
       // 現在のパスをクエリに含めてリダイレクト
-      router.replace(`/login?redirect=${encodeURIComponent(router.asPath)}`);
+      router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
       return;
     }
 
@@ -33,7 +36,7 @@ export default function AuthGuard({ children, adminOnly = false }: AuthGuardProp
       router.replace("/dashboard");
       return;
     }
-  }, [isAuthenticated, isAdmin, isLoading, adminOnly, router]);
+  }, [isAuthenticated, isAdmin, isLoading, adminOnly, router, pathname]);
 
   if (isLoading) {
     return (

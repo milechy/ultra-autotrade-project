@@ -3,23 +3,42 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "next dev -p 3000",
-    "build": "next build",
-    "start": "next start -p 3000",
-    "lint": "next lint",
+    "dev": "node ./node_modules/next/dist/bin/next dev -p 3000",
+    "build": "node ./node_modules/next/dist/bin/next build",
+    "start": "node ./node_modules/next/dist/bin/next start -p 3000",
+    "lint": "node ./node_modules/next/dist/bin/next lint",
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "next": "14.2.5",
+    "@radix-ui/react-alert-dialog": "^1.1.15",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@tanstack/react-query": "^5.90.21",
+    "@walletconnect/web3wallet": "^1.16.1",
+    "@web3modal/wagmi": "^5.1.11",
+    "autoprefixer": "^10.4.27",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.577.0",
+    "next": "^14.2.5",
+    "porto": "^0.2.37",
+    "postcss": "^8.5.8",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^3.4.19",
+    "tailwindcss-animate": "^1.0.7",
+    "viem": "^2.47.1",
+    "wagmi": "^3.5.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "wait-on": "^8.0.3",
     "@types/node": "20.14.10",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
-    "typescript": "5.5.4"
+    "typescript": "5.5.4",
+    "wait-on": "^8.0.3"
   }
 }
