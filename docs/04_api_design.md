@@ -1,38 +1,201 @@
 # 04_api_design.md
 # API設計書
 
-## API一覧
+> **最終更新:** 2026-03-11 (Stream K)
+> **対応バージョン:** Wave 0〜3 実装済みエンドポイントを反映
 
-### 1. /notion/ingest
-Notionから「未処理(Status: 未処理)」のニュースレコードを取得し、  
-AI解析フェーズ（/ai/analyze）へ渡すためのデータ構造で返す。
+---
 
-- Method: POST
-- Path: `/notion/ingest`
-- 認証: （Phase1時点では未実装 / 今後追加予定）
-- 用途: Notion → AI の入口となるAPI
+## 概要
 
-### 2. /ai/analyze
+本ドキュメントは Ultra AutoTrade バックエンド（FastAPI）の全 API エンドポイントを定義する。
+スキーマの真実は `backend/app/*/schemas.py` にある。本書はそのドキュメント化版。
 
-ニュースを解析し、売買アクション（BUY / SELL / HOLD）と信頼度などを返す。
+### ベース URL
 
-- Method: POST
-- Path: `/ai/analyze`
-- 認証: （Phase2時点では未実装 / 今後追加予定）
-- 用途: Notion から取得したニュース（`NotionNewsItem`）を AI に渡し、売買判定を得るための API
+| 環境 | URL |
+|------|-----|
+| ローカル開発 | `http://localhost:8000` |
+| Staging | `http://77.42.46.155:8000` |
+| 本番 | Cloudflare Tunnel 経由（別途設定） |
 
-#### リクエスト
+### 認証
 
-- Content-Type: `application/json`
-- Body スキーマ: `AIAnalysisRequest`
+全エンドポイントは Bearer トークン認証が必要（`Authorization: Bearer <token>`）。
+ロール: `viewer`（読み取り）、`editor`（作成・更新）、`admin`（危険操作）
+
+---
+
+## 1. Knowledge Hub (`/knowledge/*`)
+
+> **旧 `/notion/*` エンドポイントを完全置換。** Notion 依存を撤廃し PostgreSQL + pgvector による内部 Knowledge Hub に移行。
+
+### 1.1 POST /knowledge/items — ナレッジアイテム登録
+
+URL またはテキストを取り込み、チャンク分割・埋め込み生成を行い DB に保存する。
+
+- **Method:** POST
+- **Path:** `/knowledge/items`
+- **Auth:** `editor` ロール必須
+- **Status:** `201 Created`
+
+#### リクエスト (`KnowledgeCreateRequest`)
+
+```json
+{
+  "title": "BTC急騰ニュース（任意）",
+  "item_type": "url",
+  "source_url": "https://example.com/btc-news",
+  "raw_text": null
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `title` | string \| null | 任意 | アイテムのタイトル |
+| `item_type` | `"url"` \| `"text"` | 必須 | 入力種別 |
+| `source_url` | string \| null | `item_type=url` 時必須 | スクレイピング対象の URL |
+| `raw_text` | string \| null | `item_type=text` 時必須 | 登録するテキスト |
+
+#### レスポンス (`KnowledgeItem`)
+
+```json
+{
+  "id": 1,
+  "source_url": "https://example.com/btc-news",
+  "title": "BTC急騰ニュース",
+  "raw_text": null,
+  "status": "pending",
+  "chunk_count": 5,
+  "item_type": "url",
+  "quality_score": 87.5,
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z"
+}
+```
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `id` | int | DB 自動採番 ID |
+| `status` | `pending` \| `analyzed` \| `skipped` \| `error` | 処理状態 |
+| `chunk_count` | int | 生成されたチャンク数 |
+| `quality_score` | float \| null | コンテンツ品質スコア（0〜100） |
+
+#### エラー
+
+| コード | 条件 |
+|---|---|
+| 422 | バリデーションエラー（item_type と source_url/raw_text の不整合など） |
+| 500 | サーバ内部エラー |
+
+---
+
+### 1.2 GET /knowledge/items — アイテム一覧取得
+
+- **Method:** GET
+- **Path:** `/knowledge/items`
+- **Auth:** `viewer` ロール必須
+- **Query:** `status` (optional): `pending` / `analyzed` / `skipped` / `error`
+
+#### レスポンス
+
+`KnowledgeItem` の配列を返す。
+
+```json
+[
+  {
+    "id": 1,
+    "status": "pending",
+    "item_type": "url",
+    ...
+  }
+]
+```
+
+---
+
+### 1.3 POST /knowledge/search — ベクトル検索
+
+pgvector コサイン類似度でナレッジを検索する（RAG 用）。
+
+- **Method:** POST
+- **Path:** `/knowledge/search`
+- **Auth:** `viewer` ロール必須
+
+#### リクエスト (`KnowledgeSearchRequest`)
+
+```json
+{
+  "query": "BTC price trend bullish",
+  "top_k": 5
+}
+```
+
+| フィールド | 型 | デフォルト | 説明 |
+|---|---|---|---|
+| `query` | string | — | 検索クエリ文字列（1文字以上） |
+| `top_k` | int | 5 | 返却する最大件数（1〜20） |
+
+#### レスポンス (`KnowledgeSearchResponse`)
+
+```json
+{
+  "results": [
+    {
+      "chunk_id": 12,
+      "document_id": 1,
+      "content": "BTC が 50,000 USD を突破...",
+      "similarity": 0.923,
+      "source_url": "https://example.com/btc-news",
+      "title": "BTC急騰ニュース"
+    }
+  ],
+  "count": 1,
+  "query": "BTC price trend bullish"
+}
+```
+
+---
+
+### 1.4 PUT /knowledge/items/{item_id}/status — ステータス更新
+
+- **Method:** PUT
+- **Path:** `/knowledge/items/{item_id}/status`
+- **Auth:** `editor` ロール必須
+
+リクエストボディに `KnowledgeItemStatus` の値（`"pending"` / `"analyzed"` / `"skipped"` / `"error"`）を指定する。
+
+---
+
+## 2. AI 解析 (`/ai/*`)
+
+### 2.1 POST /ai/analyze — Two-Phase AI 判定
+
+ニュースを解析し BUY / SELL / HOLD を判定する。
+
+**Two-Phase フロー:**
+1. **Phase A（必須）:** Claude Opus 4.6 による一次判定
+2. **Phase B（条件付き）:** BUY または SELL 判定、かつ `AI_CROSS_VALIDATION_ENABLED=true` の場合のみ GPT-4o による二次判定
+3. **Shadow Mode:** `AI_SHADOW_MODE=true` の場合は判定結果をログに記録するだけで実取引は行わない
+
+**ルールエンジン（LLM 呼び出し前に評価）:**
+1. HF < 1.6 → HOLD（LLM 呼び出しなし）
+2. クールダウン中 → HOLD
+3. 日次上限（30%）到達 → HOLD
+
+- **Method:** POST
+- **Path:** `/ai/analyze`
+- **Auth:** `editor` ロール必須
+
+#### リクエスト (`AIAnalysisRequest`)
 
 ```json
 {
   "items": [
     {
-      "id": "page-1",
+      "id": "item-001",
       "url": "https://example.com/news1",
-      "summary": "The company reported record profit and strong growth.",
+      "summary": "The company reported record profit.",
       "sentiment": null,
       "action": null,
       "confidence": null,
@@ -41,309 +204,309 @@ AI解析フェーズ（/ai/analyze）へ渡すためのデータ構造で返す�
     }
   ]
 }
+```
 
-フィールド	型	説明
-items	NotionNewsItem[]	解析対象ニュースの配列。/notion/ingest と同じ形式
-NotionNewsItem の詳細な定義は docs/09_notion_schema.md を参照。
-通常は /notion/ingest のレスポンスの items をそのまま渡す。
-レスポンス（200 OK）
-Body スキーマ: AIAnalysisResponse
+#### レスポンス (`AIAnalysisResponse`)
 
+```json
 {
   "results": [
     {
-      "id": "page-1",
+      "id": "item-001",
       "url": "https://example.com/news1",
       "action": "BUY",
       "confidence": 80,
       "sentiment": "positive",
-      "summary": "The company reported record profit and strong growth.",
-      "reason": "好材料が多く、市場にポジティブな影響が見込まれるため BUY 判定としました。",
-      "timestamp": "2025-12-07T08:09:35.007682Z"
+      "summary": "The company reported record profit.",
+      "reason": "好材料多く、BUY判定。",
+      "timestamp": "2026-01-01T08:00:00Z"
     }
   ],
   "count": 1
 }
+```
 
-| フィールド   | 型                  | 説明                            |
-| ------- | ------------------ | ----------------------------- |
-| results | AIAnalysisResult[] | 各ニュースに対する AI 判定結果の配列          |
-| count   | integer            | `results` の件数（`len(results)`） |
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `action` | `BUY` \| `SELL` \| `HOLD` | AI 最終判定 |
+| `confidence` | int (0〜100) | 信頼度スコア。40未満は HOLD に倒す |
+| `reason` | string \| null | 判定理由（日本語） |
 
-##### `AIAnalysisResult` スキーマ
+#### Shadow Mode
 
-| フィールド      | 型               | 説明                                                    |
-| ---------- | --------------- | ----------------------------------------------------- |
-| id         | string          | 入力 `NotionNewsItem.id` をそのまま引き継ぐ                      |
-| url        | string          | 対象ニュースの URL                                           |
-| action     | string          | `BUY` / `SELL` / `HOLD` のいずれか                         |
-| confidence | integer         | 信頼度スコア（0〜100）。閾値は `docs/05_ai_judgement_rules.md` を参照 |
-| sentiment  | string          | ニュース全体のセンチメント（例: `positive` / `negative` / `neutral`） |
-| summary    | string          | ニュース内容の要約（入力 summary を補正またはそのまま利用）                    |
-| reason     | string          | 当該アクションになった理由の短い説明（日本語）                               |
-| timestamp  | string(ISO8601) | 判定実施時刻（UTC, 例: `2025-12-07T08:09:35.007682Z`）         |
+`AI_SHADOW_MODE=true` 時は `/ai/analyze` は通常通りレスポンスを返すが、
+後続の `/exchange/order` / `/aave/rebalance` は実行されない（`ShadowModeLog` に記録のみ）。
 
-#### エラーレスポンス（概要）
+#### エラー
 
-* 422 Unprocessable Entity
-
-  * 条件: リクエスト JSON がスキーマと一致しない場合（必須項目の欠落、型不一致など）
-  * 例: `items` が配列でない / `id` が string でない 等
-
-* 500 Internal Server Error
-
-  * 条件: AIService 内での予期しない例外（LLM 呼び出し失敗、想定外のエラーなど）
-  * 備考: Phase2 実装では、内部例外は FastAPI の例外ハンドリングを通じて 500 として返却される。
-
-````
+| コード | 条件 |
+|---|---|
+| 422 | リクエスト JSON スキーマ不整合 |
+| 500 | LLM 呼び出し失敗など |
 
 ---
 
-## 2. `docs/03_directory_structure.md` 修正案
+## 3. Exchange (`/exchange/*`)
 
-### 対象
+Bybit（本番・Sandbox 切替可）または bitFlyer を抽象化した取引所 API。
 
-- ファイル: `docs/03_directory_structure.md`
-- セクション: `backend/app/` 配下のツリーのうち `ai/` 行
+**クライアント切替（`EXCHANGE_CLIENT_TYPE` 環境変数）:**
+| 値 | クライアント | 用途 |
+|---|---|---|
+| `dummy` | DummyExchangeClient | テスト・開発用 |
+| `bitflyer` | BitFlyerClient | bitFlyer（dry_run 強制） |
+| `sandbox` / `bybit`（デフォルト） | BybitSandboxClient | Bybit Sandbox / 本番 |
 
-### 修正方針（概要）
+`APP_ENV=prod` 時は Bybit が本番モード（`sandbox=False`）で動作する。
 
-- 実際に実装された `backend/app/ai/` 配下のファイル構成を明示。
-- AI モジュールの責務が一目で分かるようにする。
+### 3.1 POST /exchange/order — 取引注文実行
 
-### 具体的な修正文案
+- **Method:** POST
+- **Path:** `/exchange/order`
+- **Auth:** 認証あり
 
-> 既存の `│ │ ├── ai/                     # AI解析ロジック（Phase2以降）` を、以下のブロックに置き換え
+#### リクエスト (`OrderRequest`)
 
-```markdown
-project root/
-├── backend/
-│ ├── app/
-│ │ ├── main.py                 # FastAPIエントリーポイント
-│ │ ├── ai/                     # AI解析ロジック（Phase2）
-│ │ │ ├── __init__.py           # AIモジュールパッケージマーカー
-│ │ │ ├── schemas.py            # AIAnalysisRequest/Response, AIAnalysisResult, TradeAction 定義
-│ │ │ ├── service.py            # LLM呼び出し＋ルールベース判定ロジック（BUY/SELL/HOLD 判定）
-│ │ │ └── router.py             # /ai/analyze エンドポイント定義
-│ │ ├── notion/                 # Notion連携モジュール（Phase1）
-│ │ │ ├── __init__.py           # Notion連携パッケージマーカー
-│ │ │ ├── config.py             # Notion API設定（環境変数読み取り）
-│ │ │ ├── client.py             # Notion APIクライアント（HTTP通信）
-│ │ │ ├── service.py            # Notionレコード取得・内部モデル変換サービス層
-│ │ │ ├── schemas.py            # NotionNewsItem / NotionIngestResponse スキーマ
-│ │ │ └── router.py             # /notion/ingest エンドポイント定義
+```json
+{
+  "action": "BUY",
+  "symbol": "BTC/USDT",
+  "amount_usd": "100.00",
+  "reason": "AI判定 BUY: 信頼度80",
+  "dry_run": false
+}
+```
 
-### 3. /octobot/signal
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `action` | `BUY` \| `SELL` \| `HOLD` | AI 判定アクション |
+| `symbol` | string \| null | 取引シンボル。未指定時は設定のデフォルト |
+| `amount_usd` | Decimal (>0) | 注文金額（USD）|
+| `reason` | string \| null | 注文根拠（ログ用） |
+| `dry_run` | bool | true の場合は実注文なし |
 
-AI が出した判定結果（AIAnalysisResult相当）をもとに、OctoBot 外部シグナルAPIへ送るための窓口。
+#### レスポンス (`OrderResult`)
 
-- Method: `POST`
-- Path: `/octobot/signal`
+```json
+{
+  "order_id": "ORDER-12345",
+  "status": "success",
+  "side": "buy",
+  "symbol": "BTC/USDT",
+  "amount_usd": "100.00",
+  "price": "45000.00",
+  "message": null,
+  "timestamp": "2026-01-01T08:00:00Z"
+}
+```
 
-#### 3.1 Request
+| `status` | 説明 |
+|---|---|
+| `success` | 注文成功 |
+| `skipped` | HOLD またはルールチェック（日次上限・クールダウン・最大金額）に引っかかった |
+| `failed` | 取引所エラー |
+
+---
+
+### 3.2 GET /exchange/status — 接続状態確認
+
+- **Method:** GET
+- **Path:** `/exchange/status`
+- **Auth:** 認証あり
+
+#### レスポンス (`ExchangeStatusResponse`)
+
+```json
+{
+  "sandbox_mode": true,
+  "connected": true,
+  "balance_usdt": "1500.00",
+  "daily_trades_used": 2,
+  "daily_trade_limit": 5,
+  "last_trade_at": "2026-01-01T07:30:00Z"
+}
+```
+
+---
+
+## 4. Aave (`/aave/*`)
+
+### 4.1 POST /aave/rebalance — Aave ポジション調整
+
+BUY/SELL/HOLD アクションを受け取り、Aave に対して deposit / withdraw / NOOP を実行する。
+
+**安全ガード（優先順位順）:**
+1. `emergency_stop=true` → NOOP（HARD_STOP）
+2. HF < `AAVE_MIN_HEALTH_FACTOR`（デフォルト 1.6） → NOOP
+3. クールダウン中（10分以内に操作済み）→ NOOP（BUY のみ）
+4. `amount > AAVE_MAX_SINGLE_TRADE_USD` → `AAVE_MAX_SINGLE_TRADE_USD` にクリップ
+
+**アクションマッピング:**
+| AI アクション | Aave 操作 |
+|---|---|
+| `BUY` | `DEPOSIT`（安全ガードを満たした場合） |
+| `SELL` | `WITHDRAW` |
+| `HOLD` | `NOOP` |
+
+**Flashbots 対応:**
+`AAVE_FLASHBOTS_RPC_URL` を設定すると MEV 対策として Flashbots RPC 経由でトランザクションを送信する。
+未設定の場合は通常の RPC を使用。
+
+- **Method:** POST
+- **Path:** `/aave/rebalance`
+- **Auth:** `admin` ロール必須
+
+#### リクエスト (`AaveRebalanceRequest`)
+
+```json
+{
+  "action": "BUY",
+  "amount": "10.00",
+  "asset_symbol": "USDC",
+  "dry_run": false
+}
+```
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `action` | `BUY` \| `SELL` \| `HOLD` | AI 判定アクション |
+| `amount` | Decimal (>0) | 対象資産の金額（USD 相当）|
+| `asset_symbol` | string \| null | トークンシンボル。未指定時は設定デフォルト（USDC） |
+| `dry_run` | bool | true の場合は実トランザクション送信なし |
+
+#### レスポンス (`AaveRebalanceResponse`)
+
+```json
+{
+  "result": {
+    "operation": "DEPOSIT",
+    "status": "success",
+    "asset_symbol": "USDC",
+    "amount": "10.00",
+    "tx_hash": "0xabc123...",
+    "message": null,
+    "before_health_factor": "2.10",
+    "after_health_factor": "2.05"
+  }
+}
+```
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `operation` | `DEPOSIT` \| `WITHDRAW` \| `NOOP` | 実行された操作 |
+| `status` | `success` \| `skipped` \| `error` | 結果ステータス |
+| `tx_hash` | string \| null | トランザクションハッシュ。NOOP / dry_run 時は null |
+| `before_health_factor` | Decimal \| null | 操作前 HF |
+| `after_health_factor` | Decimal \| null | 操作後 HF |
+
+#### エラー
+
+| コード | 条件 |
+|---|---|
+| 400 | `amount <= 0` など入力異常 |
+| 422 | Pydantic バリデーションエラー |
+| 500 | サービス層の予期しない例外 |
+
+---
+
+## 5. OctoBot (`/octobot/signal`)
+
+### 5.1 POST /octobot/signal — シグナル送信
+
+AI 判定結果を OctoBot 外部シグナル API へ送信する。
+
+- **Method:** POST
+- **Path:** `/octobot/signal`
+
+#### リクエスト
 
 ```json
 {
   "signals": [
     {
-      "id": "string",              // シグナルの一意なID（NotionレコードIDなど）
-      "url": "string | null",      // ニュースURL（任意）
-      "action": "BUY | SELL | HOLD",
-      "confidence": 85,            // 0〜100
-      "reason": "string",          // なぜそのアクションになったか
-      "timestamp": "2025-01-01T00:00:00Z"
-    }
-  ],
-  "count": 1                        // signals配列の件数（整合チェック用）
-}
-count と signals.length が一致しない場合、400 Bad Request。
-
-3.2 Response
-
-{
-  "success_count": 1,              // OctoBotヘの送信成功件数
-  "skipped_count": 0,              // 安全弁によりスキップされた件数
-  "failed_count": 0,               // 送信エラー件数
-  "details": [
-    {
-      "id": "string",
-      "status": "sent | skipped | failed",
-      "message": "string | null"   // エラー内容やスキップ理由
-    }
-  ]
-}
-
-- 200: リクエスト自体は正常に処理された（success/skipped/failed の内訳は details 参照）。
-- 400: count と signals.length が不整合など、クライアント入力エラー。
-- 500: サーバ内部エラー（OctoBot APIのエラーなど詳細はログで追跡）。
-
-### 4. /aave/rebalance
-AI または OctoBot シグナルからの `BUY/SELL/HOLD` アクションを受け取り、  
-Aave 上のポジションを `deposit/withdraw/NOOP` で調整する。
-
-- Method: POST
-- Path: `/aave/rebalance`
-- 認証: （Phase4 時点では未実装 / 今後追加予定）
-- 用途:
-  - BUY → deposit
-  - SELL → withdraw
-  - HOLD → 何もしない（NOOP）
-  - リスク制御（ヘルスファクター・最大ポジション・クールダウン）を満たさない場合は NOOP
-
-#### Request Body: `AaveRebalanceRequest`
-
-```json
-{
-  "action": "BUY" | "SELL" | "HOLD",
-  "amount": "10.0",
-  "asset_symbol": "USDC",   // 省略時は設定のデフォルト資産（例: USDC）
-  "dry_run": false          // true の場合は実トランザクション送信無し
-}
-
-- action: TradeAction と同じ意味（BUY/SELL/HOLD）
-- amount: 0 より大きい数値。上限はサーバ側で AAVE_MAX_SINGLE_TRADE_USD にクリップされる
-- asset_symbol: 任意。省略時は AAVE_DEFAULT_ASSET_SYMBOL
-- dry_run: true の場合、Aave には送信せず「実行した場合の結果」を返す
-
-Response Body: AaveRebalanceResponse
-{
-  "result": {
-    "operation": "DEPOSIT" | "WITHDRAW" | "NOOP",
-    "status": "success" | "skipped" | "error",
-    "asset_symbol": "USDC",
-    "amount": "10.0",
-    "tx_hash": "0x....",          // NOOP と dry_run では null
-    "message": "human readable",
-    "before_health_factor": "2.0",
-    "after_health_factor": "2.0"
-  }
-}
-
-エラーレスポンス
-- 400: amount <= 0 など、入力値の異常
-- 422: Pydantic でのバリデーションエラー
-- 500: サービス層の予期しない例外
-
-
----
-
-### 3. `docs/07_aave_operation_logic.md`
-
-**更新対象セクション案**
-
-- `# 1. 基本行動` の後に **「3. Phase4 実装ルール」** を追加
-
-**修正案テキスト（追記）**
-
-```md
-# 3. Phase4 実装ルール（/aave/rebalance）
-
-Phase4 では、Aave 運用ロジックを以下のルールで実装した：
-
-- BUY → 基本は `DEPOSIT`
-  - ただし、以下の条件のいずれかに該当する場合は **NOOP（skipped）**
-    - ヘルスファクター < `AAVE_MIN_HEALTH_FACTOR`（デフォルト 1.6）
-    - 10分以内にすでにトレードが行われている（クールダウンルール）
-- SELL → `WITHDRAW`
-  - withdraw は「ポジションを減らす」方向なので、BUY より優先的に許可
-- HOLD → 常に `NOOP`
-- 不正な action 値（BUY/SELL/HOLD 以外）はログを残して `NOOP`
-
-### 金額制御
-
-- リクエストの `amount` が 0 以下の場合は 400 エラー
-- `amount > AAVE_MAX_SINGLE_TRADE_USD` の場合は、
-  `AAVE_MAX_SINGLE_TRADE_USD`（デフォルト 100 USD）にクリップして実行する
-
-### クライアントエラー時のポリシー
-
-- Aave クライアントがエラーを返した場合：
-  - `status = "error"` として結果を返す
-  - 実際のポジションは **変更しない**（amount=0 として扱う）
-  - 「ポジションを増やさない」を最優先とし、自動リトライは別レイヤー（監視・運用）で判断する
-
-### 5. /report/daily
-日次レポート生成。
-
-#### リクエスト
-
-- Body: なし（Phase1時点ではリクエストボディ不要）
-- Queryパラメータ: なし（将来、件数制限やページングを追加する余地あり）
-
-#### レスポンス
-
-- HTTP 200 OK
-
-```json
-{
-  "items": [
-    {
-      "id": "ページID",
-      "url": "https://example.com/news",
-      "summary": "ニュースの要約テキスト",
-      "sentiment": "Positive",
+      "id": "item-001",
+      "url": "https://example.com/news1",
       "action": "BUY",
-      "confidence": 78.0,
-      "status": "未処理",
-      "timestamp": "2025-01-01T12:34:56+00:00"
+      "confidence": 85,
+      "reason": "好材料多く BUY 判定",
+      "timestamp": "2026-01-01T08:00:00Z"
     }
   ],
   "count": 1
 }
+```
 
-#### レスポンススキーマ
+`count` と `signals` の件数が不一致の場合は 400 Bad Request。
 
-* `items`: NotionNewsItem の配列
-* `count`: `items` の件数（int）
+#### レスポンス
 
-##### NotionNewsItem
-
-| フィールド名     | 型           | 説明                                                    |
-| ---------- | ----------- | ----------------------------------------------------- |
-| id         | string      | NotionページID                                           |
-| url        | string      | ニュースURL（必須／空の場合は内部的にスキップされる）                          |
-| summary    | string|null | ニュース本文の要約（Notionの Summary プロパティ）                      |
-| sentiment  | string|null | Sentiment select の name（例: Positive/Negative/Neutral） |
-| action     | string|null | Action select の name（例: BUY/SELL/HOLD）                |
-| confidence | number|null | 信頼度スコア（0〜100）                                         |
-| status     | string|null | Status select の name（例: 未処理 / 処理済）                    |
-| timestamp  | string|null | Timestamp date の start（ISO8601文字列）                    |
-
-#### エラーレスポンス（概要）
-
-* 502 Bad Gateway
-
-  * 条件: Notion API 呼び出し失敗（ネットワークエラー / 4xx,5xx）
-  * 例: Notion API キー不正、権限不足、タイムアウト など
-
-* 500 Internal Server Error
-
-  * 条件: 上記以外の予期しないエラー
+```json
+{
+  "success_count": 1,
+  "skipped_count": 0,
+  "failed_count": 0,
+  "details": [
+    {
+      "id": "item-001",
+      "status": "sent",
+      "message": null
+    }
+  ]
+}
+```
 
 ---
 
-## 追加: Automation Dashboard APIs（Phase11 実装済み）
+## 6. Automation (`/api/automation/*`)
 
-本フェーズ（Phase12）では **契約変更を行わず**、以下の API を UI/Grafana/Runbook と整合させて運用可能にする。
+自動運用基盤のモニタリング API。
 
-### GET /api/automation/dashboard
+### 6.1 GET /api/automation/dashboard — ダッシュボードスナップショット
 
-- 用途: ダッシュボード用スナップショット（一定期間の集計 + 現在ステータス）
-- Query:
-  - `lookback_hours` (int): 1..24（集計対象期間）
-- Response: `DashboardSnapshot`
+- **Query:** `lookback_hours` (int, 1〜24): 集計対象期間
+- **Response:** `DashboardSnapshot`
 
-### GET /api/automation/status
+### 6.2 GET /api/automation/status — 自動運用ステータス
 
-- 用途: 自動運用基盤のステータスサマリ（緊急停止・HF・直近イベントなど）
-- Response: `AutomationStatus`
+緊急停止フラグ・HF・直近イベントなど。
+- **Response:** `AutomationStatus`（`is_trading_paused` フィールド含む）
 
-### GET /api/automation/reports/latest
+### 6.3 GET /api/automation/reports/latest — 最新レポート
 
-- 用途: 直近のサマリレポート（定例確認用）
-- Response: `AutomationReportSummary`
+直近のサマリレポートを返す。
+- **Response:** `AutomationReportSummary`
 
-### 備考（契約に関する運用ルール）
+> **注意:** これら 3 API のレスポンススキーマは backend 側定義を真実とする。
+> フロントエンド / Grafana は未知フィールドを Raw JSON で吸収すること。
 
-- これら 3 API の **レスポンススキーマは backend 側の定義を真実**とする。
-- フロントエンド/Grafana 側は、既知フィールドを表示しつつ、未知フィールドは Raw JSON 表示で吸収する（契約破壊を防ぐ）。
+---
+
+## 7. Auth (`/auth/*`)
+
+| Method | Path | 説明 |
+|---|---|---|
+| POST | `/auth/login` | JWT トークン発行 |
+| POST | `/auth/logout` | トークン無効化 |
+| GET | `/auth/me` | 現在のユーザー情報取得 |
+
+---
+
+## 8. 廃止エンドポイント
+
+以下のエンドポイントは **廃止済み**。移行先を参照すること。
+
+| 廃止エンドポイント | 移行先 | 廃止バージョン |
+|---|---|---|
+| `POST /notion/ingest` | `POST /knowledge/items` | Wave 1 |
+| `GET /notion/items` | `GET /knowledge/items` | Wave 1 |
+| `POST /report/daily` | `GET /api/automation/reports/latest` | Wave 2 |
+
+---
+
+## 関連ドキュメント
+
+- [05_ai_judgement_rules.md](./05_ai_judgement_rules.md) — AI 判定ルール詳細
+- [07_aave_operation_logic.md](./07_aave_operation_logic.md) — Aave 運用ロジック
+- [09_knowledge_hub_schema.md](./09_knowledge_hub_schema.md) — Knowledge Hub DB スキーマ
+- [13_security_design.md](./13_security_design.md) — セキュリティ設計
+- [14_test_strategy.md](./14_test_strategy.md) — テスト戦略
