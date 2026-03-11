@@ -78,6 +78,24 @@ Based on:
 
 ---
 
+## Frontend 開発ルール
+
+### package.json に依存を追加した場合
+`package.json` に依存を追加したら、必ず以下を実行して `package-lock.json` も一緒にコミットすること:
+
+```bash
+cd frontend
+npm install --legacy-peer-deps
+git add package.json package-lock.json
+git commit -m "chore(frontend): ..."
+```
+
+**理由:** 並行開発で `package.json` が更新されると `package-lock.json` が同期されず、
+Docker ビルド・CI が失敗する。`npm install` は `package.json` ベースで解決するため同期問題が起きない。
+（`npm ci` は `package-lock.json` との完全一致を要求するため並行開発と相性が悪い）
+
+---
+
 ## Security Rules (ABSOLUTE — docs/13_security_design.md)
 
 1. Private keys: environment variables ONLY. Never hardcode. Never log.
