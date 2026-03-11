@@ -34,9 +34,7 @@ RSI_OVERBOUGHT_THRESHOLD = 70.0
 class OHLCVClient(Protocol):
     """OHLCVデータを提供できるクライアントのプロトコル定義。"""
 
-    def fetch_ohlcv(
-        self, symbol: str, timeframe: str = "1h", limit: int = 100
-    ) -> List[List[Any]]:
+    def fetch_ohlcv(self, symbol: str, timeframe: str = "1h", limit: int = 100) -> List[List[Any]]:
         """[[timestamp, open, high, low, close, volume], ...] 形式で返す。"""
         ...
 
