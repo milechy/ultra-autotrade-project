@@ -600,6 +600,7 @@ class TestLlmFailClosed:
             cross_validation_enabled=False,
             shadow_mode=False,
             prompt_version="v1",
+            ai_fallback_model="claude-sonnet-4-20250514",
         )
 
         decision = service._call_claude("some prompt", settings)

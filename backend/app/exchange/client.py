@@ -10,6 +10,8 @@ Exchange クライアント層（Bybit Sandbox / bitFlyer）。
 """
 
 import logging
+import math
+import time
 from typing import Any, Dict, List
 
 from .config import ExchangeSettings, get_exchange_settings
@@ -222,6 +224,53 @@ class BybitSandboxClient:
         except Exception as exc:
             logger.error("Failed to fetch ticker for %s: %s", symbol, exc)
             raise ExchangeConnectionError(f"Failed to fetch ticker for {symbol}: {exc}") from exc
+
+    def fetch_ohlcv(self, symbol: str, timeframe: str = "1h", limit: int = 100) -> List[List[Any]]:
+        """
+        OHLCVデータを取得する（テクニカル指標計算用）。
+
+        Args:
+            symbol: 取引シンボル（例: "BTC/USDT"）
+            timeframe: タイムフレーム（例: "1h", "4h", "1d"）
+            limit: 取得件数（デフォルト: 100）
+
+        Returns:
+            [[timestamp, open, high, low, close, volume], ...] の形式のリスト
+            DRY-RUN 時はサイン波ベースのダミーデータを返す
+
+        Raises:
+            ExchangeConnectionError: データ取得に失敗した場合（非 DRY-RUN 時）
+        """
+        if self._dry_run:
+            # DRY-RUN: サイン波ベースのダミーOHLCVデータを生成
+            now_ms = int(time.time() * 1000)
+            interval_ms = 3600 * 1000  # 1時間 = 3600000ms
+            base_price = self._DRY_RUN_TICKER_PRICE
+            candles: List[List[Any]] = []
+            for i in range(limit):
+                ts = now_ms - (limit - i) * interval_ms
+                # サイン波で価格変動をシミュレート（振幅1000、周期50）
+                wave = math.sin(i * 2 * math.pi / 50) * 1000.0
+                close = base_price + wave
+                open_p = close - 50.0
+                high = close + 100.0
+                low = close - 100.0
+                volume = 10.0 + i % 5
+                candles.append([ts, open_p, high, low, close, volume])
+            return candles
+
+        try:
+            ohlcv = self._exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
+            logger.info(
+                "OHLCV fetched: symbol=%s, timeframe=%s, count=%d",
+                symbol,
+                timeframe,
+                len(ohlcv),
+            )
+            return [list(candle) for candle in ohlcv]
+        except Exception as exc:
+            logger.error("Failed to fetch OHLCV for %s: %s", symbol, exc)
+            raise ExchangeConnectionError(f"Failed to fetch OHLCV for {symbol}: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -465,3 +514,16 @@ class DummyExchangeClient:
             "ask": self.DUMMY_TICKER_PRICE + 10.0,
             "timestamp": None,
         }
+
+    def fetch_ohlcv(self, symbol: str, timeframe: str = "1h", limit: int = 100) -> List[List[Any]]:
+        """
+        ダミーのOHLCVデータを返す（固定価格の連続データ）。
+        """
+        now_ms = int(time.time() * 1000)
+        interval_ms = 3600 * 1000
+        candles: List[List[Any]] = []
+        for i in range(limit):
+            ts = now_ms - (limit - i) * interval_ms
+            close = self.DUMMY_TICKER_PRICE
+            candles.append([ts, close - 50.0, close + 100.0, close - 100.0, close, 10.0])
+        return candles

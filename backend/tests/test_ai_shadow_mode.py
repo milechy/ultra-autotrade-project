@@ -110,6 +110,7 @@ class TestJudgeWithRagShadowMode:
             cross_validation_enabled=False,
             prompt_version="v1",
             shadow_mode=True,
+            ai_fallback_model="claude-sonnet-4-20250514",
         )
         rag_context = RAGContext(chunks=[], query="BTC price", source_count=0)
         service = AIService()
@@ -133,6 +134,7 @@ class TestJudgeWithRagShadowMode:
             cross_validation_enabled=False,
             prompt_version="v1",
             shadow_mode=False,
+            ai_fallback_model="claude-sonnet-4-20250514",
         )
         rag_context = RAGContext(chunks=[], query="BTC price", source_count=0)
         service = AIService()
