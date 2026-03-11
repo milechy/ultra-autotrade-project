@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import os
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Optional, Protocol
 
@@ -114,6 +115,16 @@ _POOL_ADDRESS_ARBITRUM_SEPOLIA = "0xBfC91D59fdAA134A4ED45f7B584cAf96D7792Eff"
 _USDC_ADDRESS_ARBITRUM_SEPOLIA = "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"
 
 
+@dataclass
+class AccountData:
+    """Aave V3 account data from getUserAccountData()."""
+
+    total_collateral_usd: Decimal
+    total_debt_usd: Decimal
+    available_borrows_usd: Decimal
+    health_factor: Decimal
+
+
 class AaveClientBase(ABC):
     """Aave クライアントの抽象基底クラス。"""
 
@@ -172,6 +183,9 @@ class AaveClientBase(ABC):
         HF < 1.6 の場合は AaveClientError を raise する（docs/13 rule 2）。
         """
 
+    @abstractmethod
+    def get_account_data(self, wallet_address: str) -> AccountData: ...
+
 
 class AaveClientError(Exception):
     """Aave クライアントの基底例外。"""
@@ -199,6 +213,9 @@ class AaveClient(Protocol):
     def withdraw(self, asset_symbol: str, amount: Decimal) -> str:
         """指定したトークンを Aave から withdraw する。"""
 
+    def get_account_data(self, wallet_address: str) -> "AccountData":
+        """Aave V3 Pool のアカウントデータを取得する。"""
+
 
 class DummyAaveClient(AaveClientBase):
     """
@@ -217,6 +234,14 @@ class DummyAaveClient(AaveClientBase):
     def get_health_factor(self, wallet_address: str = "") -> Decimal:
         logger.info("DummyAaveClient.get_health_factor called (no RPC)")
         return Decimal("2.5")  # 安全な値を返す
+
+    def get_account_data(self, wallet_address: str) -> AccountData:
+        return AccountData(
+            total_collateral_usd=Decimal("10000"),
+            total_debt_usd=Decimal("3000"),
+            available_borrows_usd=Decimal("5000"),
+            health_factor=Decimal("2.5"),
+        )
 
     def deposit(
         self,
@@ -405,6 +430,44 @@ class Web3AaveClient(AaveClientBase):
             raise
         except Exception as exc:
             raise AaveClientError(f"get_health_factor 失敗: {exc}") from exc
+
+    def get_account_data(self, wallet_address: str) -> AccountData:
+        """
+        Aave V3 Pool.getUserAccountData() から口座データを取得。
+
+        totalCollateralBase / totalDebtBase / availableBorrowsBase は 8 decimals (USD base unit)。
+        healthFactor は 18 decimals。
+        """
+        if Web3 is None:
+            raise AaveClientError("web3 package is required. Install with: pip install web3")
+
+        if not wallet_address and hasattr(self, "account"):
+            wallet_address = self.account.address
+
+        try:
+            checksum_addr = Web3.to_checksum_address(wallet_address)
+            result = self._pool.functions.getUserAccountData(checksum_addr).call()
+            # result: [totalCollateralBase, totalDebtBase, availableBorrowsBase,
+            #          currentLiquidationThreshold, ltv, healthFactor]
+            _BASE = Decimal(10**8)
+            total_collateral_usd = Decimal(result[0]) / _BASE
+            total_debt_usd = Decimal(result[1]) / _BASE
+            available_borrows_usd = Decimal(result[2]) / _BASE
+            hf_raw: int = result[5]
+            if hf_raw >= 2**256 - 1 or (hf_raw == 0 and result[1] == 0):
+                health_factor = Decimal("inf")
+            else:
+                health_factor = Decimal(hf_raw) / Decimal(10**18)
+            return AccountData(
+                total_collateral_usd=total_collateral_usd,
+                total_debt_usd=total_debt_usd,
+                available_borrows_usd=available_borrows_usd,
+                health_factor=health_factor,
+            )
+        except AaveClientError:
+            raise
+        except Exception as exc:
+            raise AaveClientError(f"get_account_data 失敗: {exc}") from exc
 
     def deposit(
         self,

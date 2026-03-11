@@ -22,6 +22,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.aave.rebalance_router import router as rebalance_router
 from app.aave.router import router as aave_router
 from app.ai.router import router as ai_router
 from app.api.automation_dashboard import router as automation_dashboard_router
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
     app.include_router(ai_router)  # AI (Phase2)
     app.include_router(octobot_router)  # OctoBot (Phase3)
     app.include_router(aave_router)  # Aave (Phase4)
+    app.include_router(rebalance_router)  # Aave Rebalance (Stream-T)
     app.include_router(knowledge_router)  # Knowledge Hub (PoC Pivot Step 2)
     app.include_router(dca_router)  # DCA Bot
     app.include_router(exchange_router)  # Exchange (PoC Pivot Step 3)

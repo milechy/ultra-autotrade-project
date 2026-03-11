@@ -389,6 +389,7 @@ class ScheduledTaskManager:
         self._weekly_task: Optional[asyncio.Task[None]] = None
         self._rss_task: Optional[asyncio.Task[None]] = None
         self._dca_task: Optional[asyncio.Task[None]] = None
+        self._rebalance_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -409,6 +410,11 @@ class ScheduledTaskManager:
     def is_dca_running(self) -> bool:
         """DCA タスクが動作中かどうか。"""
         return self._dca_task is not None and not self._dca_task.done()
+
+    @property
+    def is_rebalance_running(self) -> bool:
+        """リバランスチェックタスクが動作中かどうか。"""
+        return self._rebalance_task is not None and not self._rebalance_task.done()
 
     async def start_daily_reports(
         self,
@@ -654,6 +660,66 @@ class ScheduledTaskManager:
         self._dca_task = None
         logger.info("DCA task stopped")
 
+    async def start_rebalance_check(
+        self,
+        *,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """
+        リバランスチェックタスクを開始する。
+
+        Args:
+            on_error: エラー時コールバック
+
+        Raises:
+            RuntimeError: 既にリバランスチェックが開始されている場合
+        """
+        if self.is_rebalance_running:
+            raise RuntimeError("Rebalance check already running")
+
+        logger.info("Starting rebalance check task")
+
+        from app.automation.rebalance_job import rebalance_check_loop
+
+        self._rebalance_task = asyncio.create_task(
+            rebalance_check_loop(
+                on_error=on_error,
+            )
+        )
+
+        logger.info("Rebalance check task started")
+
+    async def stop_rebalance_check(self, timeout: float = 5.0) -> None:
+        """
+        リバランスチェックタスクを停止する。
+
+        Args:
+            timeout: キャンセル待機のタイムアウト秒数
+        """
+        if not self.is_rebalance_running:
+            logger.debug("Rebalance check not running - nothing to stop")
+            return
+
+        logger.info("Stopping rebalance check task")
+
+        assert self._rebalance_task is not None  # noqa: S101
+        self._rebalance_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._rebalance_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Rebalance check task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Rebalance check task did not stop within %.1fs timeout",
+                timeout,
+            )
+        except Exception as exc:
+            logger.error("Error while stopping rebalance check task: %s", exc)
+
+        self._rebalance_task = None
+        logger.info("Rebalance check task stopped")
+
     async def stop_all(self, timeout: float = 5.0) -> None:
         """
         全てのスケジュールタスクを停止する。
@@ -668,6 +734,7 @@ class ScheduledTaskManager:
             self.stop_weekly_reports(timeout=timeout),
             self.stop_rss_fetch(timeout=timeout),
             self.stop_dca(timeout=timeout),
+            self.stop_rebalance_check(timeout=timeout),
             return_exceptions=True,
         )
 
