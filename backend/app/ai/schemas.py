@@ -153,3 +153,34 @@ class RAGContext(BaseModel):
     )
     query: str = Field(..., description="検索クエリ文字列。")
     source_count: int = Field(0, description="取得元ドキュメント数。")
+
+
+# ---------------------------------------------------------------------------
+# Trend / Analytics スキーマ（Stream S 追加分）
+# ---------------------------------------------------------------------------
+
+
+class ConfidenceDataPoint(BaseModel):
+    """信頼度トレンドの1データポイント。"""
+
+    timestamp: str = Field(..., description="ISO8601 日時文字列")
+    action: TradeAction = Field(..., description="BUY / SELL / HOLD")
+    confidence: float = Field(..., ge=0, le=100, description="信頼度 (0-100)")
+    prompt_version: str = Field("v1", description="プロンプトバージョン")
+
+
+class PromptVersionSummary(BaseModel):
+    """プロンプトバージョン別の平均信頼度サマリー。"""
+
+    version: str
+    avg_confidence: float
+    count: int
+
+
+class ConfidenceTrendResponse(BaseModel):
+    """GET /ai/trend/confidence のレスポンス。"""
+
+    data_points: List[ConfidenceDataPoint]
+    by_version: List[PromptVersionSummary]
+    is_mock: bool = Field(False, description="モックデータを返しているか")
+    total_count: int
