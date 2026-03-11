@@ -133,7 +133,9 @@ function AiMonitorContent() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getJson<AiDecisionRecord[]>("/api/ai/history", token);
+      const data = await getJson<AiDecisionRecord[]>("/api/ai/history", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setRecords(data);
       setIsFeatureReady(true);
       setLastUpdated(new Date());
