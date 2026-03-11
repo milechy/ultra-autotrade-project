@@ -4,6 +4,9 @@ import React, { useState, useEffect, useCallback } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { getJson } from "@/lib/api/http";
+import ConfidenceTrendChart, { ConfidencePoint } from "@/components/charts/ConfidenceTrendChart";
+import ActionDistributionChart, { ActionRecord } from "@/components/charts/ActionDistributionChart";
+import AccuracyChart, { AccuracyPoint } from "@/components/charts/AccuracyChart";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -127,6 +130,8 @@ function AiMonitorContent() {
   const [isFeatureReady, setIsFeatureReady] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [countdown, setCountdown] = useState(POLL_INTERVAL_SEC);
+  const [trendData, setTrendData] = useState<ConfidencePoint[]>([]);
+  const [isTrendMock, setIsTrendMock] = useState(false);
 
   const fetchHistory = useCallback(async () => {
     if (!token) return;
@@ -155,6 +160,24 @@ function AiMonitorContent() {
       setIsLoading(false);
     }
   }, [token]);
+
+  const fetchTrend = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await getJson<{ data_points: ConfidencePoint[]; is_mock: boolean }>(
+        "/api/ai/trend/confidence?days=7",
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setTrendData(data.data_points);
+      setIsTrendMock(data.is_mock);
+    } catch {
+      // silent fail — charts show empty state
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchTrend();
+  }, [fetchTrend]);
 
   // Initial fetch + polling
   useEffect(() => {
@@ -357,6 +380,41 @@ function AiMonitorContent() {
           ※ 行にカーソルを当てると判断理由が表示されます。
         </p>
       </section>
+
+      {/* Charts section */}
+      <section style={{ marginTop: 32 }}>
+        <h2 style={{ fontSize: 15, marginBottom: 16, marginTop: 0 }}>
+          トレンド分析
+          {isTrendMock && (
+            <span style={{ fontWeight: 400, color: "#f59e0b", fontSize: 11, marginLeft: 8 }}>
+              サンプルデータ
+            </span>
+          )}
+        </h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
+          <div style={chartCardStyle}>
+            <h3 style={chartTitleStyle}>信頼度トレンド（直近7日）</h3>
+            <ConfidenceTrendChart data={trendData} />
+          </div>
+          <div style={chartCardStyle}>
+            <h3 style={chartTitleStyle}>判定アクション分布</h3>
+            <ActionDistributionChart
+              data={(records as AiDecisionRecord[]).map((r) => ({ timestamp: r.timestamp, action: r.final_decision } as ActionRecord))}
+            />
+          </div>
+          <div style={chartCardStyle}>
+            <h3 style={chartTitleStyle}>Two-Phase一致率</h3>
+            <AccuracyChart
+              data={(records as AiDecisionRecord[]).map((r) => ({
+                timestamp: r.timestamp,
+                phase_a: r.phase_a,
+                phase_b: r.phase_b,
+                agreed: r.phase_b != null && r.phase_a === r.phase_b,
+              } as AccuracyPoint))}
+            />
+          </div>
+        </div>
+      </section>
     </>
   );
 }
@@ -437,4 +495,20 @@ const tdStyle: React.CSSProperties = {
   padding: "10px 12px",
   borderBottom: "1px solid #f3f4f6",
   verticalAlign: "middle",
+};
+
+const chartCardStyle: React.CSSProperties = {
+  padding: "16px 20px",
+  border: "1px solid #e5e7eb",
+  borderRadius: 10,
+  background: "#fff",
+  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+};
+
+const chartTitleStyle: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 600,
+  color: "#374151",
+  marginTop: 0,
+  marginBottom: 12,
 };
