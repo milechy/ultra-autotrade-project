@@ -87,7 +87,9 @@ def _make_db_and_ks(items=None, search_results=None):
     mock_db = MagicMock()
     mock_ks = MagicMock()
     mock_ks.get_pending.return_value = items if items is not None else [_make_item()]
-    mock_ks.search.return_value = search_results if search_results is not None else _make_search_results()
+    mock_ks.search.return_value = (
+        search_results if search_results is not None else _make_search_results()
+    )
     return mock_db, mock_ks
 
 

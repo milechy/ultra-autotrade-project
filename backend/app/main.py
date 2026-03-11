@@ -26,6 +26,7 @@ from app.aave.router import router as aave_router
 from app.ai.router import router as ai_router
 from app.api.automation_dashboard import router as automation_dashboard_router
 from app.auth.router import router as auth_router
+from app.auth.service import AuthService
 from app.automation.automation_router import router as automation_router
 from app.bots.router import router as octobot_router
 from app.database import init_db
@@ -88,6 +89,9 @@ def create_app() -> FastAPI:
             logger.info("Database initialized successfully")
         except Exception as exc:
             logger.error("Failed to initialize database: %s", exc)
+
+        # JWT シークレットキーの強度検証（staging/production では弱いキーを拒否）
+        AuthService.validate_secret_key()
 
     # --- バックグラウンド監視タスク (Phase5) ---
     @app.on_event("startup")
