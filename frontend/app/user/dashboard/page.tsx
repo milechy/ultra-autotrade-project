@@ -8,10 +8,13 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { HealthFactorGauge } from '@/components/shared/HealthFactorGauge'
 import { StatusBadge } from '@/components/user/StatusBadge'
 import { fetchAutomationStatus } from '@/lib/api/automation'
+import { getJson } from '@/lib/api/http'
 import type { AutomationStatus } from '@/lib/types'
+import type { RebalanceStatusResponse } from '@/lib/api/rebalance'
 
 function DashboardContent() {
   const [autoStatus, setAutoStatus] = useState<AutomationStatus | null>(null)
+  const [rebalanceStatus, setRebalanceStatus] = useState<RebalanceStatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -25,6 +28,12 @@ function DashboardContent() {
         setError(e instanceof Error ? e.message : '取得エラー')
       } finally {
         setLoading(false)
+      }
+      try {
+        const rb = await getJson<RebalanceStatusResponse>('/api/aave/rebalance/status')
+        setRebalanceStatus(rb)
+      } catch {
+        // rebalance status is best-effort; ignore errors
       }
     }
     load()
@@ -127,6 +136,44 @@ function DashboardContent() {
                 {autoStatus.emergency_reason}
               </div>
             )}
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* リバランス */}
+      <section>
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+          リバランス
+        </h2>
+        <Card>
+          <CardContent className="pt-4 space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">最終リバランス日時</span>
+              <span className="font-mono text-xs">
+                {rebalanceStatus?.last_rebalance_at
+                  ? new Date(rebalanceStatus.last_rebalance_at).toLocaleString('ja-JP')
+                  : '---'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">ステータス</span>
+              {rebalanceStatus != null ? (
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${
+                    rebalanceStatus.needs_rebalance
+                      ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                      : 'bg-green-100 text-green-800 border-green-200'
+                  }`}
+                >
+                  {rebalanceStatus.needs_rebalance ? '要リバランス' : '正常'}
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-xs">
+                  ---
+                </Badge>
+              )}
+            </div>
           </CardContent>
         </Card>
       </section>
