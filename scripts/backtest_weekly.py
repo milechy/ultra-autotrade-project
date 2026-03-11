@@ -21,8 +21,9 @@ import math
 import os
 import random
 import sys
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
+from pathlib import Path
 from typing import Any
 
 try:
@@ -37,26 +38,27 @@ except ImportError:
 # ---------------------------------------------------------------------------
 SIMULATION_DAYS = 90
 INITIAL_PORTFOLIO_USDT = Decimal("10000")
-TRADE_MEAN_RETURN = 0.002   # slight positive drift per trade
-TRADE_STD_RETURN = 0.03     # realistic crypto volatility
+TRADE_MEAN_RETURN = 0.002  # slight positive drift per trade
+TRADE_STD_RETURN = 0.03  # realistic crypto volatility
 RISK_FREE_RATE_DAILY = 0.02 / 252  # annualised 2% → daily
 
 HF_INITIAL = Decimal("2.0")
 HF_THRESHOLD = Decimal("1.6")
-HF_DRIFT = 0.0              # no systematic drift
-HF_VOLATILITY = 0.08        # random walk step size
+HF_DRIFT = 0.0  # no systematic drift
+HF_VOLATILITY = 0.08  # random walk step size
 
 
 # ---------------------------------------------------------------------------
 # Mock data generation
 # ---------------------------------------------------------------------------
 
+
 def generate_trades(seed: int = 42) -> list[dict[str, Any]]:
     """Generate simulated trades over SIMULATION_DAYS days."""
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # noqa: S311
     trades: list[dict[str, Any]] = []
 
-    start_date = date.today() - timedelta(days=SIMULATION_DAYS)
+    start_date = datetime.now(tz=UTC).date() - timedelta(days=SIMULATION_DAYS)
     portfolio_value = INITIAL_PORTFOLIO_USDT
 
     # Produce 50–100 trades spread across the window
@@ -90,10 +92,10 @@ def generate_hf_series(seed: int = 42) -> list[dict[str, Any]]:
 
     Occasionally dips below 1.6 to test violation detection.
     """
-    rng = random.Random(seed + 1)
+    rng = random.Random(seed + 1)  # noqa: S311
     series: list[dict[str, Any]] = []
 
-    start_date = date.today() - timedelta(days=SIMULATION_DAYS)
+    start_date = datetime.now(tz=UTC).date() - timedelta(days=SIMULATION_DAYS)
     hf = float(HF_INITIAL)
 
     for day in range(SIMULATION_DAYS):
@@ -117,11 +119,13 @@ def generate_hf_series(seed: int = 42) -> list[dict[str, Any]]:
 # Metric calculations (Decimal for financial figures)
 # ---------------------------------------------------------------------------
 
+
 def calculate_win_rate(trades: list[dict[str, Any]]) -> Decimal:
     if not trades:
         return Decimal("0")
     wins = sum(1 for t in trades if t["is_win"])
-    return (Decimal(wins) / Decimal(len(trades))).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    ratio = Decimal(wins) / Decimal(len(trades))
+    return ratio.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
 
 def calculate_max_drawdown(trades: list[dict[str, Any]]) -> Decimal:
@@ -175,6 +179,7 @@ def count_hf_violations(hf_series: list[dict[str, Any]]) -> int:
 # ---------------------------------------------------------------------------
 # Slack notification (Block Kit)
 # ---------------------------------------------------------------------------
+
 
 def _status_emoji_and_color(
     sharpe: Decimal,
@@ -315,6 +320,7 @@ def send_slack_notification(payload: dict[str, Any]) -> bool:
 # Results serialisation
 # ---------------------------------------------------------------------------
 
+
 def build_results_dict(
     date_start: str,
     date_end: str,
@@ -353,6 +359,7 @@ def build_results_dict(
 # Entry point
 # ---------------------------------------------------------------------------
 
+
 def main() -> int:
     print(f"Running weekly backtest — {SIMULATION_DAYS}-day simulation ...")
 
@@ -372,8 +379,9 @@ def main() -> int:
     final_portfolio = Decimal(str(trades[-1]["portfolio_value"]))
     n_trades = len(trades)
 
-    date_end = date.today().isoformat()
-    date_start = (date.today() - timedelta(days=SIMULATION_DAYS)).isoformat()
+    today = datetime.now(tz=UTC).date()
+    date_end = today.isoformat()
+    date_start = (today - timedelta(days=SIMULATION_DAYS)).isoformat()
 
     # Print summary to stdout
     print(f"  Period       : {date_start} → {date_end}")
@@ -386,12 +394,18 @@ def main() -> int:
 
     # Save results to JSON
     results = build_results_dict(
-        date_start, date_end, win_rate, sharpe, max_drawdown,
-        hf_violations, n_trades, final_portfolio,
+        date_start,
+        date_end,
+        win_rate,
+        sharpe,
+        max_drawdown,
+        hf_violations,
+        n_trades,
+        final_portfolio,
     )
-    results_path = "backtest_results.json"
+    results_path = Path("backtest_results.json")
     try:
-        with open(results_path, "w", encoding="utf-8") as f:
+        with results_path.open("w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
         print(f"Results saved to {results_path}")
     except OSError as exc:
@@ -399,8 +413,14 @@ def main() -> int:
 
     # Send Slack notification
     payload = build_slack_payload(
-        date_start, date_end, win_rate, sharpe, max_drawdown,
-        hf_violations, n_trades, final_portfolio,
+        date_start,
+        date_end,
+        win_rate,
+        sharpe,
+        max_drawdown,
+        hf_violations,
+        n_trades,
+        final_portfolio,
     )
     success = send_slack_notification(payload)
 
