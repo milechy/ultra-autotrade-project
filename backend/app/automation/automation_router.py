@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session
 
 from app.ai.service import AIService
 from app.automation.monitoring_service import MonitoringService
+from app.automation.rate_limiter import RateLimiterService, get_rate_limiter
+from app.automation.rate_limiter_schemas import RateLimitStatus
 from app.automation.state import get_monitoring_service
 from app.automation.workflow import process_pending_knowledge
 from app.database import get_db
@@ -40,6 +42,18 @@ class ProcessNewsResponse(BaseModel):
         ...,
         description="処理ステータス (completed / completed_with_errors / failed / no_items)",
     )
+
+
+@router.get(
+    "/automation/rate-limits",
+    response_model=RateLimitStatus,
+    summary="APIレート制限の使用状況を取得",
+)
+def get_rate_limits(
+    limiter: RateLimiterService = Depends(get_rate_limiter),
+) -> RateLimitStatus:
+    """各APIのレート制限使用状況（インメモリスライディングウィンドウ）を返す。"""
+    return limiter.get_status()
 
 
 @router.post(
