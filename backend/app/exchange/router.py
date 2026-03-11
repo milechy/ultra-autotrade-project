@@ -15,7 +15,12 @@ from functools import lru_cache
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from .client import BitFlyerClient, BybitSandboxClient, DummyExchangeClient
-from .config import get_bitflyer_settings, get_exchange_settings
+from .config import (
+    get_bitflyer_settings,
+    get_exchange_settings,
+    get_kraken_settings,
+    get_okx_settings,
+)
 from .schemas import ExchangeStatusResponse, OrderRequest, OrderResult
 from .service import ExchangeService
 
@@ -46,6 +51,18 @@ def get_exchange_service() -> ExchangeService:
         bitflyer_settings = get_bitflyer_settings()
         client = BitFlyerClient(settings=bitflyer_settings)
         return ExchangeService(client=client, settings=bitflyer_settings)
+    elif client_type == "okx":
+        from .okx_client import OKXClient
+
+        okx_settings = get_okx_settings()
+        okx_client = OKXClient(settings=okx_settings)
+        return ExchangeService(client=okx_client, settings=okx_settings)
+    elif client_type == "kraken":
+        from .kraken_client import KrakenClient
+
+        kraken_settings = get_kraken_settings()
+        kraken_client = KrakenClient(settings=kraken_settings)
+        return ExchangeService(client=kraken_client, settings=kraken_settings)
     else:
         # "sandbox" or "bybit" → BybitSandboxClient
         client = BybitSandboxClient(settings=settings)
