@@ -25,7 +25,7 @@ function getSafeRedirect(redirect: string | null): string {
 }
 
 function LoginForm() {
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -34,13 +34,15 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const redirect = getSafeRedirect(searchParams.get("redirect"));
+  const redirectParam = searchParams.get("redirect")
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace(redirect);
-    }
-  }, [isAuthenticated, isLoading, redirect, router]);
+    if (isLoading || !isAuthenticated || !user) return
+    const dest = redirectParam
+      ? getSafeRedirect(redirectParam)
+      : user.role === "admin" ? "/dashboard" : "/user/dashboard"
+    router.replace(dest)
+  }, [isAuthenticated, isLoading, user, redirectParam, router]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -49,7 +51,7 @@ function LoginForm() {
 
     try {
       await login(email, password);
-      router.replace(redirect);
+      // redirect は useEffect が user 更新後に処理する
     } catch (err: any) {
       setError(err?.message || "ログインに失敗しました");
     } finally {
