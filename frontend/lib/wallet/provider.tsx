@@ -1,36 +1,16 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { ReactNode } from 'react'
-import { WagmiProvider } from 'wagmi'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createWeb3Modal } from '@web3modal/wagmi/react'
-import { wagmiConfig, projectId } from './config'
-import { useState, useEffect } from 'react'
 
-let web3ModalInitialized = false
+const WalletProviderClient = dynamic(
+  () => import('./WalletProviderClient').then(m => m.WalletProviderClient),
+  {
+    ssr: false,
+    loading: () => <></>,
+  }
+)
 
 export function WalletProvider({ children }: { children: ReactNode }) {
-  if (typeof window === 'undefined') {
-    return <>{children}</>
-  }
-
-  const [queryClient] = useState(() => new QueryClient())
-
-  useEffect(() => {
-    if (!web3ModalInitialized) {
-      createWeb3Modal({
-        wagmiConfig,
-        projectId,
-      })
-      web3ModalInitialized = true
-    }
-  }, [])
-
-  return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
-    </WagmiProvider>
-  )
+  return <WalletProviderClient>{children}</WalletProviderClient>
 }

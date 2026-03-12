@@ -1,11 +1,6 @@
 import type { Metadata } from 'next'
 import '../styles/globals.css'
-import dynamic from 'next/dynamic'
-
-const WalletProvider = dynamic(
-  () => import('@/lib/wallet/provider').then(m => m.WalletProvider),
-  { ssr: false }
-)
+import { WalletProvider } from '@/lib/wallet/provider'
 
 export const metadata: Metadata = {
   title: 'Ultra AutoTrade',
