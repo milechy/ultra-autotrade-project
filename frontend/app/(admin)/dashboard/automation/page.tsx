@@ -1,7 +1,6 @@
 'use client'
 
 import React from "react";
-import AppShell from "@/components/layout/AppShell";
 import KpiCards from "@/components/dashboard/KpiCards";
 import StatusPanel from "@/components/dashboard/StatusPanel";
 import SnapshotCharts from "@/components/dashboard/SnapshotCharts";
@@ -37,10 +36,8 @@ export default function AutomationPage() {
   React.useEffect(() => { load(); /* eslint-disable-line */ }, [lookbackHours]);
 
   return (
-    <AppShell>
-      <>
-        <title>自動売買 - Ultra AutoTrade</title>
-      </>
+    <>
+      <title>自動売買 - Ultra AutoTrade</title>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
         <div>
@@ -91,6 +88,6 @@ export default function AutomationPage() {
           <li>エラーが継続する場合、バックエンドログと依存関係の状態を確認。</li>
         </ul>
       </section>
-    </AppShell>
+    </>
   );
 }
