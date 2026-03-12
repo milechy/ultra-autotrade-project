@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
-from app.aave.router import get_aave_service
+from app.aave.router import get_aave_service, get_multi_chain_aave_service
 from app.aave.schemas import (
     AaveOperationResult,
     AaveOperationStatus,
@@ -55,6 +55,40 @@ class DummyAaveService:
         )
 
 
+class DummyMultiChainService:
+    """
+    /aave/rebalance ルーター用のマルチチェーンダミーサービス。
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, object, object, object, object]] = []
+
+    def execute_rebalance(
+        self,
+        chain_name: str,
+        action=None,
+        amount=None,
+        asset_symbol=None,
+        dry_run=False,
+    ) -> AaveOperationResult:
+        self.calls.append((chain_name, action, amount, asset_symbol, dry_run))
+        return AaveOperationResult(
+            operation=AaveOperationType.DEPOSIT,
+            status=AaveOperationStatus.SUCCESS,
+            asset_symbol=asset_symbol or "USDC",
+            amount=Decimal(amount) if amount is not None else Decimal("0"),
+            tx_hash="dummy-tx",
+            message="ok",
+            chain_name=chain_name,
+        )
+
+    def get_all_health_factors(self) -> dict:
+        return {"arbitrum": Decimal("2.5"), "optimism": Decimal("1.8")}
+
+    def get_chain_names(self) -> list:
+        return ["arbitrum", "optimism"]
+
+
 def _create_client_with_dummy_service(service: DummyAaveService) -> TestClient:
     admin_user = _make_admin_user()
     app = create_app()
@@ -63,9 +97,17 @@ def _create_client_with_dummy_service(service: DummyAaveService) -> TestClient:
     return TestClient(app)
 
 
+def _create_client_with_multi_chain_service(service: DummyMultiChainService) -> TestClient:
+    admin_user = _make_admin_user()
+    app = create_app()
+    app.dependency_overrides[get_multi_chain_aave_service] = lambda: service
+    app.dependency_overrides[require_admin] = lambda: admin_user
+    return TestClient(app)
+
+
 def test_aave_rebalance_buy_returns_200() -> None:
-    service = DummyAaveService()
-    client = _create_client_with_dummy_service(service)
+    service = DummyMultiChainService()
+    client = _create_client_with_multi_chain_service(service)
 
     payload = {
         "action": "BUY",
@@ -80,15 +122,15 @@ def test_aave_rebalance_buy_returns_200() -> None:
     data = resp.json()
     assert data["result"]["operation"] == "DEPOSIT"
     assert data["result"]["status"] == "success"
-    assert service.calls  # 少なくとも 1 回は呼ばれていること
+    assert service.calls  # at least 1 call
+    # Default chain should be arbitrum
+    assert service.calls[0][0] == "arbitrum"
 
 
 def test_aave_rebalance_validation_error_for_negative_amount() -> None:
     # Pydantic バリデーションで 422 になるケース
-    admin_user = _make_admin_user()
-    app = create_app()
-    app.dependency_overrides[require_admin] = lambda: admin_user
-    client = TestClient(app)
+    service = DummyMultiChainService()
+    client = _create_client_with_multi_chain_service(service)
 
     payload = {
         "action": "BUY",
@@ -101,13 +143,13 @@ def test_aave_rebalance_validation_error_for_negative_amount() -> None:
 
 
 def test_aave_rebalance_value_error_from_service_returns_400() -> None:
-    class ErrorService:
+    class ErrorMultiChainService:
         def execute_rebalance(self, *args, **kwargs):
             raise ValueError("invalid amount")
 
     admin_user = _make_admin_user()
     app = create_app()
-    app.dependency_overrides[get_aave_service] = ErrorService  # type: ignore[arg-type]
+    app.dependency_overrides[get_multi_chain_aave_service] = ErrorMultiChainService  # type: ignore[arg-type]
     app.dependency_overrides[require_admin] = lambda: admin_user
     client = TestClient(app)
 
@@ -123,13 +165,13 @@ def test_aave_rebalance_value_error_from_service_returns_400() -> None:
 
 
 def test_aave_rebalance_unexpected_error_returns_500() -> None:
-    class CrashService:
+    class CrashMultiChainService:
         def execute_rebalance(self, *args, **kwargs):
             raise RuntimeError("boom")
 
     admin_user = _make_admin_user()
     app = create_app()
-    app.dependency_overrides[get_aave_service] = CrashService  # type: ignore[arg-type]
+    app.dependency_overrides[get_multi_chain_aave_service] = CrashMultiChainService  # type: ignore[arg-type]
     app.dependency_overrides[require_admin] = lambda: admin_user
     client = TestClient(app)
 
@@ -141,3 +183,33 @@ def test_aave_rebalance_unexpected_error_returns_500() -> None:
 
     resp = client.post("/aave/rebalance", json=payload)
     assert resp.status_code == 500
+
+
+def test_aave_rebalance_with_chain_name() -> None:
+    """chain_name 指定時に正しいチェーンに委譲される。"""
+    service = DummyMultiChainService()
+    client = _create_client_with_multi_chain_service(service)
+
+    payload = {
+        "action": "SELL",
+        "amount": "25",
+        "asset_symbol": "USDC",
+        "chain_name": "optimism",
+    }
+
+    resp = client.post("/aave/rebalance", json=payload)
+    assert resp.status_code == 200
+    assert service.calls[0][0] == "optimism"
+
+
+def test_aave_chains_health_returns_200() -> None:
+    """GET /aave/chains/health が全チェーンの HF を返す。"""
+    service = DummyMultiChainService()
+    client = _create_client_with_multi_chain_service(service)
+
+    resp = client.get("/aave/chains/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "chains" in data
+    assert "arbitrum" in data["chains"]
+    assert "optimism" in data["chains"]

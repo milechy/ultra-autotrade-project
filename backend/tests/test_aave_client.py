@@ -636,3 +636,62 @@ class TestFlashbotsProtect:
         assert result["dry_run"] is False
         assert mock_w3_flashbots.eth.send_raw_transaction.call_count == 2
         mock_w3_regular.eth.send_raw_transaction.assert_not_called()
+
+
+class TestMakeAaveClientWithChainName:
+    """make_aave_client の chain_name パラメータのテスト。"""
+
+    def test_dummy_ignores_chain_name(self) -> None:
+        """dummy クライアントは chain_name を無視する。"""
+        client = make_aave_client(client_type="dummy", chain_name="arbitrum")
+        assert isinstance(client, DummyAaveClient)
+
+    @patch("app.aave.client.Web3")
+    @patch.dict("os.environ", {"AAVE_RPC_URL_ARBITRUM": "https://arb-rpc.example.com"})
+    def test_web3_with_chain_name_uses_chain_config(self, mock_web3_cls: MagicMock) -> None:
+        """chain_name 指定時に chains.py の設定を使用する。"""
+        mock_w3 = MagicMock()
+        mock_w3.is_connected.return_value = True
+        mock_web3_cls.return_value = mock_w3
+        mock_web3_cls.HTTPProvider = MagicMock()
+
+        client = make_aave_client(client_type="web3", chain_name="arbitrum")
+        assert isinstance(client, Web3AaveClient)
+
+    def test_web3_with_unknown_chain_name_raises(self) -> None:
+        """未知のチェーン名で ValueError が発生する。"""
+        with pytest.raises(ValueError, match="未知のチェーン名"):
+            make_aave_client(client_type="web3", chain_name="unknown")
+
+
+class TestMakeMultiChainClients:
+    """make_multi_chain_clients のテスト。"""
+
+    @patch.dict("os.environ", {"AAVE_ACTIVE_CHAINS": "arbitrum,optimism"})
+    def test_dummy_returns_dict_of_clients(self) -> None:
+        from app.aave.client import make_multi_chain_clients
+
+        clients = make_multi_chain_clients(client_type="dummy")
+        assert isinstance(clients, dict)
+        assert set(clients.keys()) == {"arbitrum", "optimism"}
+        for client in clients.values():
+            assert isinstance(client, DummyAaveClient)
+
+    @patch.dict("os.environ", {"AAVE_ACTIVE_CHAINS": "arbitrum"})
+    def test_default_single_chain(self) -> None:
+        from app.aave.client import make_multi_chain_clients
+
+        clients = make_multi_chain_clients(client_type="dummy")
+        assert len(clients) == 1
+        assert "arbitrum" in clients
+
+    @patch.dict(
+        "os.environ",
+        {"AAVE_ACTIVE_CHAINS": "arbitrum", "AAVE_CLIENT_TYPE": "dummy"},
+    )
+    def test_auto_detects_client_type_from_env(self) -> None:
+        from app.aave.client import make_multi_chain_clients
+
+        clients = make_multi_chain_clients()  # client_type=None
+        assert "arbitrum" in clients
+        assert isinstance(clients["arbitrum"], DummyAaveClient)

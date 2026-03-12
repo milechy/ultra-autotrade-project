@@ -130,6 +130,10 @@ class AaveRebalanceRequest(BaseModel):
             "実行されるであろう結果のみを返す。"
         ),
     )
+    chain_name: Optional[str] = Field(
+        None,
+        description="対象チェーン名。未指定時はプライマリチェーン（arbitrum）を使用する。",
+    )
 
 
 class AaveOperationResult(BaseModel):
@@ -166,6 +170,10 @@ class AaveOperationResult(BaseModel):
         None,
         ge=0,
         description="操作後のヘルスファクター（取得できなかった場合は None）。",
+    )
+    chain_name: Optional[str] = Field(
+        None,
+        description="操作が実行されたチェーン名。",
     )
 
 
