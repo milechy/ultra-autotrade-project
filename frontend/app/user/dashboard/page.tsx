@@ -21,18 +21,22 @@ function DashboardContent() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!token) return
     const load = async () => {
       try {
-        const auto = await fetchAutomationStatus(token ?? undefined)
+        const auto = await fetchAutomationStatus(token)
         setAutoStatus(auto)
         setError(null)
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : '取得エラー')
+        const msg = (e as { message?: string })?.message ?? '取得エラー'
+        setError(msg)
       } finally {
         setLoading(false)
       }
       try {
-        const rb = await getJson<RebalanceStatusResponse>('/api/aave/rebalance/status')
+        const rb = await getJson<RebalanceStatusResponse>('/api/aave/rebalance/status', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
         setRebalanceStatus(rb)
       } catch {
         // rebalance status is best-effort; ignore errors
@@ -41,7 +45,7 @@ function DashboardContent() {
     load()
     const interval = setInterval(load, 30_000)
     return () => clearInterval(interval)
-  }, [])
+  }, [token])
 
   if (loading) return <LoadingPage />
 

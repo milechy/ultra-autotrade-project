@@ -14,14 +14,16 @@ function AiFeedContent() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!token) return
     const load = async () => {
       try {
-        const status = await fetchAutomationStatus(token ?? undefined)
+        const status = await fetchAutomationStatus(token)
         const raw = (status.recent_events as unknown[]) ?? []
         setEvents(raw as AiEvent[])
         setError(null)
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : '取得エラー')
+        const msg = (e as { message?: string })?.message ?? '取得エラー'
+        setError(msg)
       } finally {
         setLoading(false)
       }
@@ -29,7 +31,7 @@ function AiFeedContent() {
     load()
     const interval = setInterval(load, 60_000)
     return () => clearInterval(interval)
-  }, [])
+  }, [token])
 
   if (loading) return <LoadingPage />
 
