@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -39,3 +39,41 @@ class DCAExecutionResult(BaseModel):
     amount_usd: Decimal
     order_id: Optional[str] = None
     message: str
+
+
+class GridConfigRequest(BaseModel):
+    """グリッドボット設定リクエスト。"""
+
+    upper_price: Decimal = Field(..., gt=0, description="グリッド上限価格")
+    lower_price: Decimal = Field(..., gt=0, description="グリッド下限価格")
+    grid_count: int = Field(10, ge=2, le=100, description="グリッド数")
+    symbol: str = Field("BTC/USDT", description="取引シンボル")
+    amount_per_grid_usd: Decimal = Field(
+        Decimal("10"), gt=0, description="各グリッドの取引金額(USD)"
+    )
+    enabled: bool = Field(True)
+    dry_run: bool = Field(True)
+
+
+class GridLevelResponse(BaseModel):
+    """グリッドレベルの状態レスポンス。"""
+
+    price: Decimal
+    side: str
+    order_id: Optional[str] = None
+    filled: bool
+
+
+class GridStatusResponse(BaseModel):
+    """グリッドボットのステータスレスポンス。"""
+
+    enabled: bool
+    symbol: str
+    upper_price: Decimal
+    lower_price: Decimal
+    grid_count: int
+    current_price: Optional[Decimal] = None
+    levels: List[GridLevelResponse]
+    total_orders: int
+    filled_orders: int
+    pnl_usd: Decimal

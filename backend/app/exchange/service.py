@@ -16,18 +16,20 @@ Exchange サービス層（ルールエンジン）。
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple
 
 from app.ai.schemas import TradeAction
 
-from .client import BitFlyerClient, BybitSandboxClient, DummyExchangeClient, ExchangeClientError
+from .client import ExchangeClientError
 from .config import ExchangeSettings, get_exchange_settings
 from .schemas import ExchangeStatusResponse, OrderRequest, OrderResult, OrderSide, OrderStatus
 
 logger = logging.getLogger(__name__)
 
-# クライアントの型エイリアス（Protocol を使わずに Union で表現）
-_ExchangeClient = Union[BybitSandboxClient, BitFlyerClient, DummyExchangeClient]
+# クライアントの型エイリアス（OKXClient / KrakenClient は循環インポート回避のため Any を使用）
+_ExchangeClient = (
+    Any  # BybitSandboxClient | BitFlyerClient | DummyExchangeClient | OKXClient | KrakenClient
+)
 
 
 class ExchangeService:
