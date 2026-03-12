@@ -5,8 +5,10 @@ import { LoadingPage } from '@/components/shared/LoadingSpinner'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { AiFeedItem, type AiEvent } from '@/components/user/AiFeedItem'
 import { fetchAutomationStatus } from '@/lib/api/automation'
+import { useAuth } from '@/lib/auth'
 
 function AiFeedContent() {
+  const { token } = useAuth()
   const [events, setEvents] = useState<AiEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -14,7 +16,7 @@ function AiFeedContent() {
   useEffect(() => {
     const load = async () => {
       try {
-        const status = await fetchAutomationStatus()
+        const status = await fetchAutomationStatus(token ?? undefined)
         const raw = (status.recent_events as unknown[]) ?? []
         setEvents(raw as AiEvent[])
         setError(null)

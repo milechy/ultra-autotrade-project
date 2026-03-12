@@ -37,7 +37,7 @@ function DashboardContent() {
     if (!token) return;
     try {
       const [auto, exchange] = await Promise.all([
-        fetchAutomationStatus(),
+        fetchAutomationStatus(token ?? undefined),
         fetchExchangeStatus(token),
       ]);
       setAutomationStatus(auto);

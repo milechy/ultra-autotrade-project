@@ -62,7 +62,7 @@ function SystemSettingsContent() {
     setFetchError(null);
     try {
       const [auto, exch] = await Promise.all([
-        fetchAutomationStatus(),
+        fetchAutomationStatus(token ?? undefined),
         fetchExchangeStatus(token),
       ]);
       setAutomationStatus(auto);

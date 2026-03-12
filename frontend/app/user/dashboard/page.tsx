@@ -8,11 +8,13 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { HealthFactorGauge } from '@/components/shared/HealthFactorGauge'
 import { StatusBadge } from '@/components/user/StatusBadge'
 import { fetchAutomationStatus } from '@/lib/api/automation'
+import { useAuth } from '@/lib/auth'
 import { getJson } from '@/lib/api/http'
 import type { AutomationStatus } from '@/lib/types'
 import type { RebalanceStatusResponse } from '@/lib/api/rebalance'
 
 function DashboardContent() {
+  const { token } = useAuth()
   const [autoStatus, setAutoStatus] = useState<AutomationStatus | null>(null)
   const [rebalanceStatus, setRebalanceStatus] = useState<RebalanceStatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -21,7 +23,7 @@ function DashboardContent() {
   useEffect(() => {
     const load = async () => {
       try {
-        const auto = await fetchAutomationStatus()
+        const auto = await fetchAutomationStatus(token ?? undefined)
         setAutoStatus(auto)
         setError(null)
       } catch (e: unknown) {

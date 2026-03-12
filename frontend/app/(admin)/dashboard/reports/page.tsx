@@ -4,9 +4,11 @@ import React from "react";
 import AppShell from "@/components/layout/AppShell";
 import ReportSummaryPanel from "@/components/dashboard/ReportSummaryPanel";
 import { fetchLatestReport } from "@/lib/api/automation";
+import { useAuth } from "@/lib/auth";
 import type { AutomationReportSummary } from "@/lib/types";
 
 export default function ReportsPage() {
+  const { token } = useAuth();
   const [report, setReport] = React.useState<AutomationReportSummary | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState<boolean>(false);
@@ -15,7 +17,7 @@ export default function ReportsPage() {
     setLoading(true);
     setError(null);
     try {
-      const r = await fetchLatestReport();
+      const r = await fetchLatestReport(token ?? undefined);
       setReport(r);
     } catch (e: any) {
       setError(e?.message || String(e));

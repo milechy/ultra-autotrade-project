@@ -6,9 +6,11 @@ import KpiCards from "@/components/dashboard/KpiCards";
 import StatusPanel from "@/components/dashboard/StatusPanel";
 import SnapshotCharts from "@/components/dashboard/SnapshotCharts";
 import { fetchAutomationStatus, fetchDashboardSnapshot } from "@/lib/api/automation";
+import { useAuth } from "@/lib/auth";
 import type { AutomationStatus, DashboardSnapshot } from "@/lib/types";
 
 export default function AutomationPage() {
+  const { token } = useAuth();
   const [lookbackHours, setLookbackHours] = React.useState<number>(6);
   const [status, setStatus] = React.useState<AutomationStatus | null>(null);
   const [snapshot, setSnapshot] = React.useState<DashboardSnapshot | null>(null);
@@ -20,8 +22,8 @@ export default function AutomationPage() {
     setError(null);
     try {
       const [s, snap] = await Promise.all([
-        fetchAutomationStatus(),
-        fetchDashboardSnapshot(lookbackHours),
+        fetchAutomationStatus(token ?? undefined),
+        fetchDashboardSnapshot(lookbackHours, token ?? undefined),
       ]);
       setStatus(s);
       setSnapshot(snap);
