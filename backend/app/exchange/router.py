@@ -16,10 +16,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from .client import BitFlyerClient, BybitSandboxClient, DummyExchangeClient
 from .config import get_bitflyer_settings, get_exchange_settings
+from .copy_trading import router as copy_trading_router
 from .schemas import ExchangeStatusResponse, OrderRequest, OrderResult
 from .service import ExchangeService
 
 router = APIRouter(prefix="/exchange", tags=["exchange"])
+router.include_router(copy_trading_router)
 
 
 @lru_cache()
