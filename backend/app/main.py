@@ -49,7 +49,9 @@ def create_app() -> FastAPI:
 
     # --- CORS 設定 ---
     # フロントエンドからのアクセスを許可
-    cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+    # CORS_ORIGINS 環境変数でカンマ区切りで指定可能（空白は自動トリム）
+    _default_origins = "https://app.ultra-auto-trade.com,http://localhost:3000"
+    cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
