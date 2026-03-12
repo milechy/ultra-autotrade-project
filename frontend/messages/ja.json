@@ -1,0 +1,36 @@
+{
+  "Common": {
+    "loading": "読み込み中...",
+    "error": "エラーが発生しました",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "subscribe": "フォローする",
+    "unsubscribe": "フォロー解除",
+    "language": "言語"
+  },
+  "LanguageToggle": {
+    "label": "言語切替"
+  },
+  "CopyTrading": {
+    "title": "コピートレード",
+    "subtitle": "プロのストラテジストをフォローして自動コピー",
+    "strategies": "公開戦略",
+    "mySubscriptions": "フォロー中",
+    "noStrategies": "公開戦略がありません",
+    "noSubscriptions": "フォロー中の戦略はありません",
+    "winRate": "勝率",
+    "sharpeRatio": "シャープレシオ",
+    "totalPnl": "累積損益",
+    "trades": "取引回数",
+    "riskLevel": "リスク",
+    "copyRatio": "コピー比率",
+    "copyRatioHelp": "ストラテジストの注文量に対する割合 (0.1 〜 1.0)",
+    "subscribeSuccess": "フォローしました",
+    "unsubscribeSuccess": "フォロー解除しました",
+    "riskLow": "低",
+    "riskMedium": "中",
+    "riskHigh": "高",
+    "strategist": "ストラテジスト"
+  }
+}

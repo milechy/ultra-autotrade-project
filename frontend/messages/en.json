@@ -1,0 +1,36 @@
+{
+  "Common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "subscribe": "Follow",
+    "unsubscribe": "Unfollow",
+    "language": "Language"
+  },
+  "LanguageToggle": {
+    "label": "Language"
+  },
+  "CopyTrading": {
+    "title": "Copy Trading",
+    "subtitle": "Follow professional strategists and auto-copy their trades",
+    "strategies": "Public Strategies",
+    "mySubscriptions": "Following",
+    "noStrategies": "No public strategies available",
+    "noSubscriptions": "You are not following any strategies",
+    "winRate": "Win Rate",
+    "sharpeRatio": "Sharpe Ratio",
+    "totalPnl": "Total PnL",
+    "trades": "Trades",
+    "riskLevel": "Risk",
+    "copyRatio": "Copy Ratio",
+    "copyRatioHelp": "Ratio relative to the strategist's order size (0.1 – 1.0)",
+    "subscribeSuccess": "Successfully followed",
+    "unsubscribeSuccess": "Successfully unfollowed",
+    "riskLow": "Low",
+    "riskMedium": "Medium",
+    "riskHigh": "High",
+    "strategist": "Strategist"
+  }
+}

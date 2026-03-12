@@ -21,10 +21,12 @@ from .config import (
     get_kraken_settings,
     get_okx_settings,
 )
+from .copy_trading import router as copy_trading_router
 from .schemas import ExchangeStatusResponse, OrderRequest, OrderResult
 from .service import ExchangeService
 
 router = APIRouter(prefix="/exchange", tags=["exchange"])
+router.include_router(copy_trading_router)
 
 
 @lru_cache()
