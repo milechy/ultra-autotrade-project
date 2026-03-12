@@ -28,7 +28,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<UserResponse>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -88,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt));
       setToken(newToken);
       setUser(userInfo);
+      return userInfo;
     } catch (error) {
       // getMe 失敗時はトークンを保存しない
       localStorage.removeItem(TOKEN_KEY);

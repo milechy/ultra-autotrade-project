@@ -25,7 +25,7 @@ function getSafeRedirect(redirect: string | null): string {
 }
 
 function LoginForm() {
-  const { login, user, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -37,12 +37,11 @@ function LoginForm() {
   const redirectParam = searchParams.get("redirect")
 
   useEffect(() => {
-    if (isLoading || !isAuthenticated || !user) return
-    const dest = redirectParam
-      ? getSafeRedirect(redirectParam)
-      : user.role === "admin" ? "/dashboard" : "/user/dashboard"
-    router.replace(dest)
-  }, [isAuthenticated, isLoading, user, redirectParam, router]);
+    if (!isLoading && isAuthenticated) {
+      // すでに認証済みでアクセスした場合。role は user state から取得できないため /dashboard にフォールバック
+      router.replace(getSafeRedirect(redirectParam))
+    }
+  }, [isAuthenticated, isLoading, redirectParam, router]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -50,8 +49,11 @@ function LoginForm() {
     setSubmitting(true);
 
     try {
-      await login(email, password);
-      // redirect は useEffect が user 更新後に処理する
+      const loggedInUser = await login(email, password);
+      const dest = redirectParam
+        ? getSafeRedirect(redirectParam)
+        : loggedInUser.role === "admin" ? "/dashboard" : "/user/dashboard";
+      router.replace(dest);
     } catch (err: any) {
       setError(err?.message || "ログインに失敗しました");
     } finally {
