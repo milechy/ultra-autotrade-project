@@ -12,7 +12,8 @@ from app.main import create_app
 @pytest.fixture(autouse=True)
 def clear_storage() -> None:
     """Reset in-memory storage before each test."""
-    from app.exchange.copy_trading import _strategies, _subscriptions, _performance
+    from app.exchange.copy_trading import _performance, _strategies, _subscriptions
+
     _strategies.clear()
     _subscriptions.clear()
     _performance.clear()

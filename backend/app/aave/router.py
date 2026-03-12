@@ -47,8 +47,8 @@ def get_multi_chain_aave_service() -> MultiChainAaveService:
 )
 def rebalance(
     body: AaveRebalanceRequest,
-    multi_service: MultiChainAaveService = Depends(get_multi_chain_aave_service),
     current_user: User = Depends(require_admin),
+    multi_service: MultiChainAaveService = Depends(get_multi_chain_aave_service),
 ) -> AaveRebalanceResponse:
     """
     BUY/SELL/HOLD に応じて deposit / withdraw / NOOP を実行する。
@@ -88,8 +88,8 @@ def rebalance(
     summary="全アクティブチェーンの Health Factor を取得する",
 )
 def get_chains_health(
-    multi_service: MultiChainAaveService = Depends(get_multi_chain_aave_service),
     current_user: User = Depends(require_admin),
+    multi_service: MultiChainAaveService = Depends(get_multi_chain_aave_service),
 ) -> dict[str, dict[str, str | None]]:
     """全アクティブチェーンの Health Factor を一覧で返す。"""
     health_factors = multi_service.get_all_health_factors()

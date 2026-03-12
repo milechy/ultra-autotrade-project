@@ -386,9 +386,14 @@ class MultiChainAaveService:
         self,
         services: dict[str, AaveService] | None = None,
     ) -> None:
-        if services is not None:
-            self._services = services
-        else:
+        # services が明示的に渡された場合はそのまま使用する。
+        # None の場合は初回アクセス時に遅延初期化する（lazy init）。
+        # これにより、RPC URL 未設定環境でも __init__ 時点では ValueError が発生しない。
+        self._services: dict[str, AaveService] | None = services
+
+    def _get_services(self) -> dict[str, AaveService]:
+        """チェーンサービスマップを遅延初期化して返す。"""
+        if self._services is None:
             from .client import make_multi_chain_clients
             from .config import get_multi_chain_settings
 
@@ -398,10 +403,11 @@ class MultiChainAaveService:
                 name: AaveService(client=client, settings=settings_map[name])  # type: ignore[arg-type]
                 for name, client in clients.items()
             }
+        return self._services
 
     def get_chain_names(self) -> list[str]:
         """アクティブなチェーン名の一覧を返す。"""
-        return list(self._services.keys())
+        return list(self._get_services().keys())
 
     def get_service(self, chain_name: str) -> AaveService:
         """
@@ -409,10 +415,11 @@ class MultiChainAaveService:
 
         :raises KeyError: 存在しないチェーン名の場合
         """
-        if chain_name not in self._services:
-            available = ", ".join(sorted(self._services.keys()))
+        services = self._get_services()
+        if chain_name not in services:
+            available = ", ".join(sorted(services.keys()))
             raise KeyError(f"チェーン {chain_name!r} は存在しません。利用可能: {available}")
-        return self._services[chain_name]
+        return services[chain_name]
 
     def execute_rebalance(
         self,
@@ -443,7 +450,7 @@ class MultiChainAaveService:
         他のチェーンに影響しない。失敗したチェーンの値は None。
         """
         result: dict[str, Optional[Decimal]] = {}
-        for name, service in self._services.items():
+        for name, service in self._get_services().items():
             try:
                 hf = service._client.get_health_factor()
                 result[name] = hf

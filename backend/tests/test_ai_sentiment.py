@@ -64,6 +64,7 @@ class TestGenerateMockSentiment:
 class TestSentimentSchemas:
     def test_xpost_valid(self):
         from app.ai.schemas import SentimentLabel, XPost
+
         post = XPost(
             post_id="1",
             text="BTC to the moon!",
@@ -76,6 +77,7 @@ class TestSentimentSchemas:
 
     def test_sentiment_data_point_valid(self):
         from app.ai.schemas import SentimentDataPoint, SentimentLabel, TradeAction
+
         dp = SentimentDataPoint(
             timestamp="2026-01-01T00:00:00Z",
             score=0.5,
@@ -88,7 +90,9 @@ class TestSentimentSchemas:
     def test_sentiment_data_point_score_bounds(self):
         import pytest
         from pydantic import ValidationError
+
         from app.ai.schemas import SentimentDataPoint, SentimentLabel
+
         with pytest.raises(ValidationError):
             SentimentDataPoint(
                 timestamp="2026-01-01T00:00:00Z",

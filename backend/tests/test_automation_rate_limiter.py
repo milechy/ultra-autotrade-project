@@ -126,19 +126,20 @@ class TestRateLimiterService:
         assert claude_entry.usage_pct == pytest.approx(10 / 50 * 100, rel=0.01)
 
     def test_get_status_generated_at_is_utc(self):
-        from datetime import timezone
         service = RateLimiterService()
         status = service.get_status()
         assert status.generated_at.tzinfo is not None
 
     def test_singleton(self):
         from app.automation.rate_limiter import get_rate_limiter
+
         r1 = get_rate_limiter()
         r2 = get_rate_limiter()
         assert r1 is r2
 
     def test_reset_creates_new_singleton(self):
         from app.automation.rate_limiter import get_rate_limiter
+
         r1 = get_rate_limiter()
         reset_rate_limiter()
         r2 = get_rate_limiter()
