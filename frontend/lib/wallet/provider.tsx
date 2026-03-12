@@ -1,5 +1,6 @@
 'use client'
 
+import { ReactNode } from 'react'
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createWeb3Modal } from '@web3modal/wagmi/react'
@@ -8,7 +9,11 @@ import { useState, useEffect } from 'react'
 
 let web3ModalInitialized = false
 
-export function WalletProvider({ children }: { children: React.ReactNode }) {
+export function WalletProvider({ children }: { children: ReactNode }) {
+  if (typeof window === 'undefined') {
+    return <>{children}</>
+  }
+
   const [queryClient] = useState(() => new QueryClient())
 
   useEffect(() => {
