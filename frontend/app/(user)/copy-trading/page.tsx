@@ -102,37 +102,47 @@ function CopyTradingPage() {
       </div>
 
       <div className="space-y-4 px-4 py-4 pb-8">
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        {successMsg && (
-          <Alert>
-            <AlertDescription>{successMsg}</AlertDescription>
-          </Alert>
-        )}
-
-        <section>
-          <h2 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            {t('strategies')}
-          </h2>
-          {strategies.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('noStrategies')}</p>
-          ) : (
-            <div className="space-y-3">
-              {strategies.map(strategy => (
-                <CopyTradingCard
-                  key={strategy.id}
-                  strategy={strategy}
-                  isSubscribed={subscribedStrategyIds.has(strategy.id)}
-                  onSubscribe={handleSubscribe}
-                  onUnsubscribe={handleUnsubscribe}
-                />
-              ))}
+        <div className="relative">
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center rounded-lg">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-gray-700 mb-2">Coming Soon</p>
+              <p className="text-gray-500">Phase 2で対応予定</p>
             </div>
-          )}
-        </section>
+          </div>
+          <div className="pointer-events-none select-none">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            {successMsg && (
+              <Alert>
+                <AlertDescription>{successMsg}</AlertDescription>
+              </Alert>
+            )}
+
+            <section>
+              <h2 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                {t('strategies')}
+              </h2>
+              {strategies.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t('noStrategies')}</p>
+              ) : (
+                <div className="space-y-3">
+                  {strategies.map(strategy => (
+                    <CopyTradingCard
+                      key={strategy.id}
+                      strategy={strategy}
+                      isSubscribed={subscribedStrategyIds.has(strategy.id)}
+                      onSubscribe={handleSubscribe}
+                      onUnsubscribe={handleUnsubscribe}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
       </div>
     </div>
   )

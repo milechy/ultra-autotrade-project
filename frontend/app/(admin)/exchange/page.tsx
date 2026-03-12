@@ -194,22 +194,25 @@ function ExchangeContent() {
       {/* 接続テストセクション */}
       <section style={{ marginTop: 32 }}>
         <h2 style={{ fontSize: 16, marginBottom: 12 }}>接続テスト</h2>
-        <button
-          onClick={fetchData}
-          disabled={isLoading}
-          style={{
-            padding: "10px 24px",
-            borderRadius: 8,
-            border: "none",
-            background: isLoading ? "#9ca3af" : "#2563eb",
-            color: "#fff",
-            fontWeight: 600,
-            fontSize: 14,
-            cursor: isLoading ? "not-allowed" : "pointer",
-          }}
-        >
-          {isLoading ? "確認中..." : "接続テスト"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <button
+            onClick={fetchData}
+            disabled
+            style={{
+              padding: "10px 24px",
+              borderRadius: 8,
+              border: "none",
+              background: "#9ca3af",
+              color: "#fff",
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: "not-allowed",
+            }}
+          >
+            {isLoading ? "確認中..." : "接続テスト"}
+          </button>
+          <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full ml-2">Coming Soon</span>
+        </div>
         {status && !error && (
           <div style={{ marginTop: 12, color: "#16a34a", fontSize: 14, fontWeight: 600 }}>
             テスト成功 — {status.connected ? "取引所へ正常に接続できました" : "取引所が切断状態です"}

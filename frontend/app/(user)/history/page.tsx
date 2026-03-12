@@ -122,6 +122,7 @@ function HistoryTable({ records }: { records: TradeRecord[] }) {
 
 function HistoryPage() {
   const { token } = useAuth()
+  const [activeTab, setActiveTab] = useState<'exchange' | 'aave'>('aave')
   const [records, setRecords] = useState<TradeRecord[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -205,102 +206,135 @@ function HistoryPage() {
       </div>
 
       <div className="px-4 py-4 space-y-4">
-        {showFilters && (
-          <div className="rounded-lg border p-4 space-y-3">
-            <h2 className="text-sm font-medium">フィルター</h2>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">開始日</label>
-                <Input
-                  type="date"
-                  value={dateFrom}
-                  onChange={e => setDateFrom(e.target.value)}
-                  className="text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">終了日</label>
-                <Input
-                  type="date"
-                  value={dateTo}
-                  onChange={e => setDateTo(e.target.value)}
-                  className="text-sm"
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">アクション</label>
-              <div className="flex gap-2">
-                {(['', 'BUY', 'SELL'] as const).map(v => (
-                  <button
-                    key={v}
-                    onClick={() => setActionFilter(v as TradeAction | '')}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                      actionFilter === v
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    }`}
-                  >
-                    {v === '' ? '全て' : v}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" className="flex-1" onClick={handleFilterApply}>
-                適用
-              </Button>
-              <Button size="sm" variant="outline" className="flex-1" onClick={handleFilterReset}>
-                リセット
-              </Button>
+        {/* Tab switcher */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setActiveTab('aave')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'aave' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+          >
+            Aave操作履歴
+          </button>
+          <button
+            onClick={() => setActiveTab('exchange')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'exchange' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+          >
+            取引所履歴（Coming Soon）
+          </button>
+        </div>
+
+        {activeTab === 'aave' && (
+          <div className="space-y-3">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-600">Aave操作履歴はリバランス実行後に表示されます</p>
             </div>
           </div>
         )}
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <RefreshCw className="mb-3 h-8 w-8 animate-spin" />
-            <p className="text-sm">読み込み中...</p>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>全 {total} 件</span>
-              <span>ページ {page} / {totalPages}</span>
+        {activeTab === 'exchange' && (
+          <div className="relative">
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+              <p className="text-gray-500 font-medium">Coming Soon — Phase 2で対応予定</p>
             </div>
+            <div className="pointer-events-none select-none opacity-50">
+              {showFilters && (
+                <div className="rounded-lg border p-4 space-y-3">
+                  <h2 className="text-sm font-medium">フィルター</h2>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">開始日</label>
+                      <Input
+                        type="date"
+                        value={dateFrom}
+                        onChange={e => setDateFrom(e.target.value)}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">終了日</label>
+                      <Input
+                        type="date"
+                        value={dateTo}
+                        onChange={e => setDateTo(e.target.value)}
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">アクション</label>
+                    <div className="flex gap-2">
+                      {(['', 'BUY', 'SELL'] as const).map(v => (
+                        <button
+                          key={v}
+                          onClick={() => setActionFilter(v as TradeAction | '')}
+                          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                            actionFilter === v
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          }`}
+                        >
+                          {v === '' ? '全て' : v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="flex-1" onClick={handleFilterApply}>
+                      適用
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1" onClick={handleFilterReset}>
+                      リセット
+                    </Button>
+                  </div>
+                </div>
+              )}
 
-            <HistoryTable records={records} />
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm">
-                  {page} / {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          </>
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                  <RefreshCw className="mb-3 h-8 w-8 animate-spin" />
+                  <p className="text-sm">読み込み中...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>全 {total} 件</span>
+                    <span>ページ {page} / {totalPages}</span>
+                  </div>
+
+                  <HistoryTable records={records} />
+
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page <= 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm">
+                        {page} / {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page >= totalPages}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>
