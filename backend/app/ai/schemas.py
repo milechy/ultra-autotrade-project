@@ -184,3 +184,53 @@ class ConfidenceTrendResponse(BaseModel):
     by_version: List[PromptVersionSummary]
     is_mock: bool = Field(False, description="モックデータを返しているか")
     total_count: int
+
+
+# ---------------------------------------------------------------------------
+# Sentiment History スキーマ（Stream U 追加分）
+# ---------------------------------------------------------------------------
+
+
+class SentimentLabel(str, Enum):
+    """センチメントラベル。"""
+
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
+    NEUTRAL = "neutral"
+
+
+class XPost(BaseModel):
+    """X（Twitter）投稿のサンプル。"""
+
+    post_id: str = Field(..., description="投稿ID（モックの場合は連番）")
+    text: str = Field(..., description="投稿テキスト")
+    sentiment: SentimentLabel = Field(..., description="このポストのセンチメント")
+    score: float = Field(
+        ...,
+        ge=-1.0,
+        le=1.0,
+        description="センチメントスコア（-1:完全ネガティブ〜+1:完全ポジティブ）",
+    )
+    created_at: str = Field(..., description="投稿時刻（ISO8601）")
+    likes: int = Field(0, ge=0, description="いいね数")
+
+
+class SentimentDataPoint(BaseModel):
+    """センチメント時系列の1データポイント。"""
+
+    timestamp: str = Field(..., description="ISO8601 日時文字列")
+    score: float = Field(..., ge=-1.0, le=1.0, description="センチメントスコア（-1〜+1）")
+    label: SentimentLabel = Field(..., description="positive/negative/neutral")
+    post_count: int = Field(0, ge=0, description="この時間帯の投稿数")
+    ai_action: Optional[TradeAction] = Field(None, description="この時点のAI判定アクション")
+
+
+class SentimentHistoryResponse(BaseModel):
+    """GET /ai/sentiment/history のレスポンス。"""
+
+    data_points: List[SentimentDataPoint] = Field(..., description="時系列データポイント")
+    latest_posts: List[XPost] = Field(default_factory=list, description="直近10件の投稿サンプル")
+    current_score: float = Field(..., ge=-1.0, le=1.0, description="現在のセンチメントスコア")
+    current_label: SentimentLabel = Field(..., description="現在のセンチメントラベル")
+    is_mock: bool = Field(False, description="モックデータを返しているか")
+    hours: int = Field(24, description="取得期間（時間）")
