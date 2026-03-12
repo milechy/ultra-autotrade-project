@@ -71,12 +71,12 @@ function ConfirmDialog({
             キャンセル
           </Button>
           <Button
-            className="flex-1"
+            className="flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
             variant={signal.action === 'BUY' ? 'default' : 'destructive'}
             onClick={onConfirm}
-            disabled={isLoading}
+            disabled={true}
           >
-            {isLoading ? '実行中...' : '承認して実行'}
+            承認して実行
           </Button>
         </div>
       </div>
@@ -150,9 +150,9 @@ function SignalCard({
         )}
         <div className="flex gap-2 pt-1">
           <Button
-            className="flex-1"
+            className="flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
             variant={isBuy ? 'default' : 'destructive'}
-            disabled={shadowMode}
+            disabled={true}
             onClick={() => onApprove(signal)}
           >
             <CheckCircle className="mr-1 h-4 w-4" />
@@ -267,6 +267,11 @@ function TradePage() {
       </div>
 
       <div className="space-y-3 px-4 py-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4 flex items-center gap-3">
+          <span className="text-amber-600 font-medium">⚠️ Bot売買は現在無効です（Coming Soon）</span>
+          <span className="text-amber-500 text-sm">AI判定結果は参考情報として表示しています</span>
+        </div>
+
         {shadowMode && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />

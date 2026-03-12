@@ -201,6 +201,7 @@ function GridContent() {
                 onChange={(e) => setUpperPrice(e.target.value)}
                 placeholder="例: 50000"
                 style={inputStyle}
+                disabled
               />
             </div>
 
@@ -213,6 +214,7 @@ function GridContent() {
                 onChange={(e) => setLowerPrice(e.target.value)}
                 placeholder="例: 40000"
                 style={inputStyle}
+                disabled
               />
             </div>
 
@@ -226,6 +228,7 @@ function GridContent() {
                 max={100}
                 onChange={(e) => setGridCount(Math.min(100, Math.max(2, parseInt(e.target.value) || 10)))}
                 style={inputStyle}
+                disabled
               />
             </div>
 
@@ -236,6 +239,7 @@ function GridContent() {
                 value={symbol}
                 onChange={(e) => setSymbol(e.target.value)}
                 style={{ ...inputStyle, cursor: "pointer" }}
+                disabled
               >
                 {SYMBOLS.map((s) => (
                   <option key={s} value={s}>{s}</option>
@@ -252,6 +256,7 @@ function GridContent() {
                 onChange={(e) => setAmountPerGrid(e.target.value)}
                 placeholder="例: 100"
                 style={inputStyle}
+                disabled
               />
             </div>
           </div>
@@ -264,6 +269,7 @@ function GridContent() {
               checked={dryRun}
               onChange={(e) => setDryRun(e.target.checked)}
               style={{ width: 16, height: 16, cursor: "pointer" }}
+              disabled
             />
             <label htmlFor="dry-run-toggle" style={{ fontSize: 14, color: "#374151", cursor: "pointer" }}>
               ドライランモード（実際の注文は発行しない）
@@ -291,32 +297,32 @@ function GridContent() {
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <button
             onClick={handleExecute}
-            disabled={isExecuting}
+            disabled={true}
             style={{
               padding: "10px 24px",
               borderRadius: 8,
               border: "none",
-              background: isExecuting ? "#9ca3af" : "#16a34a",
+              background: "#9ca3af",
               color: "#fff",
               fontWeight: 600,
               fontSize: 14,
-              cursor: isExecuting ? "not-allowed" : "pointer",
+              cursor: "not-allowed",
             }}
           >
             {isExecuting ? "起動中..." : "Bot起動"}
           </button>
           <button
             onClick={handleFetchStatus}
-            disabled={isFetchingStatus}
+            disabled={true}
             style={{
               padding: "10px 24px",
               borderRadius: 8,
               border: "none",
-              background: isFetchingStatus ? "#9ca3af" : "#2563eb",
+              background: "#9ca3af",
               color: "#fff",
               fontWeight: 600,
               fontSize: 14,
-              cursor: isFetchingStatus ? "not-allowed" : "pointer",
+              cursor: "not-allowed",
             }}
           >
             {isFetchingStatus ? "取得中..." : "ステータス取得"}
@@ -392,7 +398,18 @@ export default function GridPage() {
     <AuthGuard>
       <>
         <title>Grid Trading Bot - Ultra AutoTrade</title>
-        <GridContent />
+        {/* Coming Soon overlay */}
+        <div className="relative">
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center rounded-lg">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-gray-700 mb-2">Coming Soon</p>
+              <p className="text-gray-500">Phase 2で対応予定</p>
+            </div>
+          </div>
+          <div className="pointer-events-none select-none">
+            <GridContent />
+          </div>
+        </div>
       </>
     </AuthGuard>
   );

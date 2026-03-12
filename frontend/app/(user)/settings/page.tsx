@@ -254,6 +254,18 @@ function SettingsPage() {
                 onChange={e => set('leverage', Number(e.target.value))}
               />
             </div>
+
+            {/* Bot売買設定 */}
+            <div className="flex items-center justify-between p-4 border rounded-lg opacity-60">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">Bot売買</span>
+                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">Coming Soon</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">Phase 2で対応予定</p>
+              </div>
+              <input type="checkbox" disabled checked={false} className="w-5 h-5 cursor-not-allowed" />
+            </div>
           </CardContent>
         </Card>
 
