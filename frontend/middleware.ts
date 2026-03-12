@@ -1,12 +1,15 @@
-import createMiddleware from 'next-intl/middleware';
+import { NextRequest, NextResponse } from 'next/server'
 
-export default createMiddleware({
-  locales: ['ja', 'en'],
-  defaultLocale: 'ja',
-  localeDetection: true,
-  localePrefix: 'never',
-});
+export function middleware(request: NextRequest) {
+  // Detect locale from Accept-Language header, default to 'ja'
+  const acceptLang = request.headers.get('accept-language') || ''
+  const locale = acceptLang.toLowerCase().startsWith('en') ? 'en' : 'ja'
+
+  const response = NextResponse.next()
+  response.headers.set('x-locale', locale)
+  return response
+}
 
 export const config = {
   matcher: ['/((?!api|_next|.*\\..*).*)'],
-};
+}
