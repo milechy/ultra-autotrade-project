@@ -15,7 +15,7 @@ from app.auth.dependencies import require_admin
 from app.auth.models import User
 
 from .schemas import AaveRebalanceRequest, AaveRebalanceResponse
-from .service import AaveService
+from .service import AaveService, MultiChainAaveService
 
 router = APIRouter(prefix="/aave", tags=["aave"])
 
@@ -32,6 +32,14 @@ def get_aave_service() -> AaveService:
     return AaveService()
 
 
+@lru_cache()
+def get_multi_chain_aave_service() -> MultiChainAaveService:
+    """
+    MultiChainAaveService のシングルトンインスタンスを取得する。
+    """
+    return MultiChainAaveService()
+
+
 @router.post(
     "/rebalance",
     response_model=AaveRebalanceResponse,
@@ -39,24 +47,29 @@ def get_aave_service() -> AaveService:
 )
 def rebalance(
     body: AaveRebalanceRequest,
-    service: AaveService = Depends(get_aave_service),
+    multi_service: MultiChainAaveService = Depends(get_multi_chain_aave_service),
     current_user: User = Depends(require_admin),
 ) -> AaveRebalanceResponse:
     """
     BUY/SELL/HOLD に応じて deposit / withdraw / NOOP を実行する。
 
-    - amount <= 0 の場合は 400
-    - サービス層の想定外エラーは 500
+    chain_name 未指定時はプライマリチェーン（arbitrum）を使用する。
     """
+    chain = body.chain_name or "arbitrum"
     try:
-        result = service.execute_rebalance(
+        result = multi_service.execute_rebalance(
+            chain_name=chain,
             action=body.action,
             amount=Decimal(body.amount),
             asset_symbol=body.asset_symbol,
             dry_run=body.dry_run,
         )
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     except ValueError as exc:
-        # バリデーションをすり抜けた異常値など
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
@@ -68,3 +81,18 @@ def rebalance(
         ) from exc
 
     return AaveRebalanceResponse(result=result)
+
+
+@router.get(
+    "/chains/health",
+    summary="全アクティブチェーンの Health Factor を取得する",
+)
+def get_chains_health(
+    multi_service: MultiChainAaveService = Depends(get_multi_chain_aave_service),
+    current_user: User = Depends(require_admin),
+) -> dict[str, dict[str, str | None]]:
+    """全アクティブチェーンの Health Factor を一覧で返す。"""
+    health_factors = multi_service.get_all_health_factors()
+    return {
+        "chains": {name: str(hf) if hf is not None else None for name, hf in health_factors.items()}
+    }

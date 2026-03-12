@@ -372,3 +372,82 @@ class AaveService:
             before_health_factor=before_hf,
             after_health_factor=before_hf,
         )
+
+
+class MultiChainAaveService:
+    """
+    チェーンごとに独立した AaveService を管理するマルチチェーンサービス。
+
+    各チェーンの Health Factor は独立して管理され、
+    1 つのチェーンの HARD_STOP が他チェーンに影響しない。
+    """
+
+    def __init__(
+        self,
+        services: dict[str, AaveService] | None = None,
+    ) -> None:
+        if services is not None:
+            self._services = services
+        else:
+            from .client import make_multi_chain_clients
+            from .config import get_multi_chain_settings
+
+            clients = make_multi_chain_clients()
+            settings_map = get_multi_chain_settings()
+            self._services = {
+                name: AaveService(client=client, settings=settings_map[name])  # type: ignore[arg-type]
+                for name, client in clients.items()
+            }
+
+    def get_chain_names(self) -> list[str]:
+        """アクティブなチェーン名の一覧を返す。"""
+        return list(self._services.keys())
+
+    def get_service(self, chain_name: str) -> AaveService:
+        """
+        指定チェーンの AaveService を取得する。
+
+        :raises KeyError: 存在しないチェーン名の場合
+        """
+        if chain_name not in self._services:
+            available = ", ".join(sorted(self._services.keys()))
+            raise KeyError(f"チェーン {chain_name!r} は存在しません。利用可能: {available}")
+        return self._services[chain_name]
+
+    def execute_rebalance(
+        self,
+        chain_name: str,
+        action: TradeAction,
+        amount: Decimal,
+        asset_symbol: str | None = None,
+        dry_run: bool = False,
+    ) -> AaveOperationResult:
+        """
+        指定チェーンでリバランスを実行する。
+
+        :param chain_name: 対象チェーン名
+        """
+        service = self.get_service(chain_name)
+        return service.execute_rebalance(
+            action=action,
+            amount=amount,
+            asset_symbol=asset_symbol,
+            dry_run=dry_run,
+        )
+
+    def get_all_health_factors(self) -> dict[str, Optional[Decimal]]:
+        """
+        全アクティブチェーンの Health Factor を取得する。
+
+        各チェーンは独立して問い合わせ、1 つのチェーンの失敗が
+        他のチェーンに影響しない。失敗したチェーンの値は None。
+        """
+        result: dict[str, Optional[Decimal]] = {}
+        for name, service in self._services.items():
+            try:
+                hf = service._client.get_health_factor()
+                result[name] = hf
+            except Exception:
+                logger.error("Failed to get health factor for chain %s", name, exc_info=True)
+                result[name] = None
+        return result

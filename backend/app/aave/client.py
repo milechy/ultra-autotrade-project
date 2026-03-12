@@ -768,6 +768,7 @@ def make_aave_client(
     pool_address: str = _POOL_ADDRESS_SEPOLIA,
     network: str = "sepolia",
     flashbots_rpc_url: Optional[str] = None,
+    chain_name: Optional[str] = None,
 ) -> AaveClientBase:
     """
     環境変数 AAVE_CLIENT_TYPE に基づいてクライアントを生成するファクトリ。
@@ -778,10 +779,22 @@ def make_aave_client(
         pool_address: Aave V3 Pool コントラクトアドレス
         network: ネットワーク名 ("sepolia", "arbitrum", "arbitrum-sepolia")
         flashbots_rpc_url: Flashbots Protect RPC URL（MEV対策、オプション）
+        chain_name: チェーン名（chains.py のレジストリから設定を解決する、オプション）
     """
     if client_type == "dummy":
         return DummyAaveClient()
     if client_type == "web3":
+        if chain_name is not None:
+            from .chains import get_chain_config, get_rpc_url_for_chain
+
+            chain_config = get_chain_config(chain_name)
+            rpc_url = get_rpc_url_for_chain(chain_config)
+            pool_address = chain_config.pool_address
+            flashbots_rpc_url = (
+                os.getenv(chain_config.flashbots_rpc_env_var)
+                if chain_config.flashbots_rpc_env_var is not None
+                else None
+            )
         if not rpc_url:
             raise ValueError("AAVE_CLIENT_TYPE=web3 の場合は AAVE_RPC_URL が必須です")
         _network_pool = {
@@ -829,3 +842,30 @@ def get_default_aave_client() -> AaveClient:
         else:
             logger.info("Using DummyAaveClient for %s environment", env)
             return DummyAaveClient(settings=settings)  # type: ignore[return-value]
+
+
+def make_multi_chain_clients(
+    client_type: Optional[str] = None,
+) -> dict[str, AaveClientBase]:
+    """
+    AAVE_ACTIVE_CHAINS の全チェーンに対してクライアントを生成する。
+
+    :param client_type: "dummy" | "web3"。未指定時は AAVE_CLIENT_TYPE env var を参照。
+    :returns: chain_name -> AaveClientBase のマッピング
+    """
+    from .chains import get_active_chains
+
+    if client_type is None:
+        client_type = os.getenv("AAVE_CLIENT_TYPE")
+        if client_type is None:
+            env = os.getenv("APP_ENV", "dev")
+            client_type = "web3" if env == "staging" else "dummy"
+
+    active_chains = get_active_chains()
+    return {
+        chain.chain_name: make_aave_client(
+            client_type=client_type,
+            chain_name=chain.chain_name,
+        )
+        for chain in active_chains
+    }
