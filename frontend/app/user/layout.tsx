@@ -1,4 +1,5 @@
 import { UserProviders } from '@/components/user/UserProviders'
+import { UserHeader } from '@/components/user/UserHeader'
 import { BottomNav } from '@/components/shared/BottomNav'
 
 export default function UserLayout({
@@ -8,10 +9,11 @@ export default function UserLayout({
 }) {
   return (
     <UserProviders>
+      <UserHeader />
       <div className="min-h-screen pb-16">
         {children}
-        <BottomNav />
       </div>
+      <BottomNav />
     </UserProviders>
   )
 }

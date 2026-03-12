@@ -6,10 +6,10 @@ import { Home, TrendingUp, Brain, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-  { href: '/', label: 'ホーム', icon: Home },
-  { href: '/trade', label: '取引', icon: TrendingUp },
-  { href: '/ai', label: 'AI判定', icon: Brain },
-  { href: '/settings/account', label: '設定', icon: Settings },
+  { href: '/user/dashboard', label: 'ホーム', icon: Home },
+  { href: '/user/trade', label: '取引', icon: TrendingUp },
+  { href: '/user/ai-feed', label: 'AI判定', icon: Brain },
+  { href: '/user/settings', label: '設定', icon: Settings },
 ]
 
 export function BottomNav() {

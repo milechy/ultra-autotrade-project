@@ -29,6 +29,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/dashboard/reports" style={navLinkStyle}>レポート</Link>
             <Link href="/knowledge" style={navLinkStyle}>ナレッジ</Link>
             <Link href="/exchange" style={navLinkStyle}>取引所管理</Link>
+            <Link href="/user/dashboard" style={{ ...navLinkStyle, color: "#2563eb" }}>ユーザーアプリ →</Link>
             {!isLoading && user && (
               <>
                 <span style={{ color: "#999" }}>|</span>
