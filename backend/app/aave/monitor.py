@@ -58,7 +58,7 @@ def get_health_factor(wallet_address: Optional[str] = None) -> Optional[Decimal]
                         省略時は AAVE_WALLET_ADDRESS 環境変数を使用。
 
     Returns:
-        Health Factor の Decimal 値。取得失敗または設定不足の場合は None。
+        Health Factor の Decimal 値。取得失敗、設定不足、またはポジションなし (Infinity) の場合は None。
     """
     addr = wallet_address or os.getenv("AAVE_WALLET_ADDRESS", "")
     if not addr:
@@ -67,12 +67,14 @@ def get_health_factor(wallet_address: Optional[str] = None) -> Optional[Decimal]
 
     ctype = _client_type()
 
+    raw: Optional[Decimal] = None
+
     if ctype == "dummy":
         from .client import DummyAaveClient  # noqa: PLC0415
 
-        return DummyAaveClient().get_health_factor(addr)
+        raw = DummyAaveClient().get_health_factor(addr)
 
-    if ctype == "web3":
+    elif ctype == "web3":
         rpc_url = os.getenv("AAVE_RPC_URL", "")
         pool_address = os.getenv("AAVE_POOL_ADDRESS", "")
         if not rpc_url:
@@ -85,13 +87,22 @@ def get_health_factor(wallet_address: Optional[str] = None) -> Optional[Decimal]
             from .client import Web3AaveClient  # noqa: PLC0415
 
             client = Web3AaveClient(rpc_url=rpc_url, pool_address=pool_address)
-            return client.get_health_factor(addr)
+            raw = client.get_health_factor(addr)
         except Exception as exc:  # noqa: BLE001
             logger.warning("[monitor] get_health_factor failed: %s", exc)
             return None
 
-    logger.warning("[monitor] Unknown AAVE_CLIENT_TYPE=%r; returning None", ctype)
-    return None
+    else:
+        logger.warning("[monitor] Unknown AAVE_CLIENT_TYPE=%r; returning None", ctype)
+        return None
+
+    # Decimal('Infinity') はポジションなし（借入ゼロ）を表す。
+    # JSON シリアライズ不可のため None に正規化する。
+    if raw is not None and not raw.is_finite():
+        logger.info("[monitor] HF is Infinity (no borrow position); returning None")
+        return None
+
+    return raw
 
 
 def get_aave_balance(wallet_address: Optional[str] = None) -> AaveBalanceInfo:

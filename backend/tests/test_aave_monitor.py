@@ -102,6 +102,41 @@ class TestGetHealthFactor:
             result = get_health_factor()
         assert result is None
 
+    def test_infinity_hf_returns_none(self) -> None:
+        """Decimal('Infinity')（ポジションなし）は None に正規化される。"""
+        mock_client: Any = MagicMock()
+        mock_client.get_health_factor.return_value = Decimal("Infinity")
+
+        env = {
+            "AAVE_CLIENT_TYPE": "web3",
+            "AAVE_WALLET_ADDRESS": "0x" + "a" * 40,
+            "AAVE_RPC_URL": "http://localhost:8545",
+            "AAVE_POOL_ADDRESS": "0x" + "b" * 40,
+        }
+        with (
+            patch.dict(os.environ, env),
+            patch("app.aave.client.Web3AaveClient", return_value=mock_client),
+        ):
+            result = get_health_factor()
+
+        assert result is None
+
+    def test_dummy_infinity_returns_none(self) -> None:
+        """DummyAaveClient が Infinity を返した場合も None に正規化される。"""
+        mock_dummy: Any = MagicMock()
+        mock_dummy.get_health_factor.return_value = Decimal("Infinity")
+
+        with (
+            patch.dict(
+                os.environ,
+                {"AAVE_CLIENT_TYPE": "dummy", "AAVE_WALLET_ADDRESS": "0x" + "a" * 40},
+            ),
+            patch("app.aave.client.DummyAaveClient", return_value=mock_dummy),
+        ):
+            result = get_health_factor()
+
+        assert result is None
+
 
 class TestGetAaveBalance:
     """get_aave_balance() のテスト。"""
