@@ -338,6 +338,17 @@ def process_pending_knowledge(
 
     logger.info("Processing %d pending knowledge items", len(pending))
 
+    # HF をリフレッシュして MonitoringService に記録 (rule engine の判定に使用)
+    if monitoring_service is not None:
+        try:
+            from app.aave.monitor import get_health_factor as _aave_get_hf  # noqa: PLC0415
+
+            hf = _aave_get_hf()
+            if hf is not None:
+                monitoring_service.record_health_factor(hf)
+        except Exception as _exc:  # noqa: BLE001
+            logger.warning("Failed to refresh health factor from Aave: %s", _exc)
+
     can_trade, rule_reason = check_rule_engine(monitoring_service)
 
     if not can_trade:

@@ -186,3 +186,32 @@ class AaveRebalanceResponse(BaseModel):
         ...,
         description="今回のリバランスで行われた操作結果。",
     )
+
+
+class AaveBalanceInfo(BaseModel):
+    """ウォレットの Aave 関連残高情報。"""
+
+    wallet_address: str = Field(description="監視対象のウォレットアドレス。")
+    usdc_balance: Decimal = Field(ge=0, description="USDC 残高（人間単位）。")
+    a_usdc_balance: Decimal = Field(ge=0, description="aUSDC 残高（人間単位）。")
+
+    @field_serializer("usdc_balance", "a_usdc_balance")
+    @classmethod
+    def _serialize_decimal(cls, v: Decimal) -> str:
+        return str(v)
+
+
+class AaveMonitorStatus(BaseModel):
+    """GET /aave/status のレスポンス。"""
+
+    health_factor: Optional[Decimal] = Field(
+        None, description="最新の Health Factor。取得失敗時は None。"
+    )
+    balance: AaveBalanceInfo = Field(description="USDC / aUSDC 残高。")
+    client_type: str = Field(description="AAVE_CLIENT_TYPE 環境変数の値。")
+    fetched_at: str = Field(description="取得日時 (ISO 8601)。")
+
+    @field_serializer("health_factor")
+    @classmethod
+    def _serialize_hf(cls, v: Optional[Decimal]) -> Optional[str]:
+        return str(v) if v is not None else None

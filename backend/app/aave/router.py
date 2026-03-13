@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth.dependencies import require_admin
 from app.auth.models import User
 
-from .schemas import AaveRebalanceRequest, AaveRebalanceResponse
+from .schemas import AaveMonitorStatus, AaveRebalanceRequest, AaveRebalanceResponse
 from .service import AaveService, MultiChainAaveService
 
 router = APIRouter(prefix="/aave", tags=["aave"])
@@ -96,3 +96,42 @@ def get_chains_health(
     return {
         "chains": {name: str(hf) if hf is not None else None for name, hf in health_factors.items()}
     }
+
+
+@router.get(
+    "/health-factor",
+    summary="Aave V3 Health Factor をリアルタイム取得する",
+)
+def get_health_factor(
+    current_user: User = Depends(require_admin),
+) -> dict[str, str | None]:
+    """AAVE_CLIENT_TYPE に応じて HF をリアルタイム取得して返す。"""
+    from .monitor import get_health_factor as _get_hf  # noqa: PLC0415
+
+    hf = _get_hf()
+    return {"health_factor": str(hf) if hf is not None else None}
+
+
+@router.get(
+    "/status",
+    response_model=AaveMonitorStatus,
+    summary="Aave ポジション状態（HF + 残高）をリアルタイム取得する",
+)
+def get_monitor_status(
+    current_user: User = Depends(require_admin),
+) -> AaveMonitorStatus:
+    """AAVE_CLIENT_TYPE に応じて HF + USDC/aUSDC 残高をリアルタイム取得して返す。"""
+    import os  # noqa: PLC0415
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    from .monitor import get_aave_balance  # noqa: PLC0415
+    from .monitor import get_health_factor as _get_hf  # noqa: PLC0415
+
+    hf = _get_hf()
+    balance = get_aave_balance()
+    return AaveMonitorStatus(
+        health_factor=hf,
+        balance=balance,
+        client_type=os.getenv("AAVE_CLIENT_TYPE", "dummy"),
+        fetched_at=datetime.now(timezone.utc).isoformat(),
+    )
