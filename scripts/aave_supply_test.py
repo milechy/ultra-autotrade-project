@@ -186,13 +186,16 @@ def aave_supply(asset: str, amount: Decimal, dry_run: bool) -> dict:
         logger.info("[DRY RUN] No transaction sent.")
         return {"dry_run": True, "hf_before": str(hf_before)}
 
+    # Fetch nonce once; increment manually to avoid RPC lag between transactions
+    nonce = w3.eth.get_transaction_count(checksum_wallet)
+
     # Step 1: Approve
     approve_tx = token.functions.approve(
         Web3.to_checksum_address(AAVE_POOL_BASE_SEPOLIA),
         amount_raw,
     ).build_transaction({
         "from": checksum_wallet,
-        "nonce": w3.eth.get_transaction_count(checksum_wallet),
+        "nonce": nonce,
         "gas": 100000,
         "gasPrice": w3.eth.gas_price,
     })
@@ -210,7 +213,7 @@ def aave_supply(asset: str, amount: Decimal, dry_run: bool) -> dict:
         0,  # referralCode
     ).build_transaction({
         "from": checksum_wallet,
-        "nonce": w3.eth.get_transaction_count(checksum_wallet),
+        "nonce": nonce + 1,
         "gas": 300000,
         "gasPrice": w3.eth.gas_price,
     })
