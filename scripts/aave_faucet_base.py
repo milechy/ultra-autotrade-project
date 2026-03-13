@@ -24,10 +24,10 @@ logger = logging.getLogger(__name__)
 
 # Aave V3 Base Sepolia contract addresses
 # Verify: https://docs.aave.com/developers/deployed-contracts/v3-testnet-addresses
-AAVE_FAUCET_BASE_SEPOLIA = "0xC959483DBa39aa9E78757139af0e9a2EDEb3f42D"
+AAVE_FAUCET_BASE_SEPOLIA = "0xD9145b5F45Ad4519c7ACcD6E0A4A82e83bB8A6Dc"
 
 ASSET_ADDRESSES = {
-    "usdc": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    "usdc": "0xba50cd2a20f6da35d788639e581bca8d0b5d4d5f",
     "weth": "0x4200000000000000000000000000000000000006",
 }
 

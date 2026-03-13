@@ -36,8 +36,8 @@ logger = logging.getLogger(__name__)
 # Contract addresses (Base Sepolia)
 # Verify: https://docs.aave.com/developers/deployed-contracts/v3-testnet-addresses
 AAVE_POOL_BASE_SEPOLIA = "0x8bAB6d1b75f19e9eD9fCe8b9BD338844fF79aE27"
-AAVE_FAUCET_BASE_SEPOLIA = "0xC959483DBa39aa9E78757139af0e9a2EDEb3f42D"
-USDC_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+AAVE_FAUCET_BASE_SEPOLIA = "0xD9145b5F45Ad4519c7ACcD6E0A4A82e83bB8A6Dc"
+USDC_BASE_SEPOLIA = "0xba50cd2a20f6da35d788639e581bca8d0b5d4d5f"
 USDC_DECIMALS = 6
 
 # L1StandardBridge on Ethereum Sepolia
