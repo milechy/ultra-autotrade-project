@@ -6,8 +6,10 @@ import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { fetchAutomationStatus } from "@/lib/api/automation";
 import { fetchExchangeStatus } from "@/lib/api/exchange";
+import { fetchAaveStatus } from "@/lib/api/aave";
 import type { AutomationStatus } from "@/lib/types";
 import type { ExchangeStatusResponse } from "@/lib/api/exchange";
+import type { AaveMonitorStatus } from "@/lib/api/aave";
 
 function getHfColor(hf: number): string {
   if (hf >= 1.8) return "#16a34a"; // green-600
@@ -30,6 +32,7 @@ function DashboardContent() {
   const { token } = useAuth();
   const [automationStatus, setAutomationStatus] = useState<AutomationStatus | null>(null);
   const [exchangeStatus, setExchangeStatus] = useState<ExchangeStatusResponse | null>(null);
+  const [aaveStatus, setAaveStatus] = useState<AaveMonitorStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -48,6 +51,13 @@ function DashboardContent() {
       const msg = e instanceof Error ? e.message : String(e);
       setError(`データ取得エラー: ${msg}`);
     }
+    // Aave ステータスはベストエフォート（失敗しても他カードに影響しない）
+    try {
+      const aave = await fetchAaveStatus(token);
+      setAaveStatus(aave);
+    } catch {
+      // ignore
+    }
   };
 
   useEffect(() => {
@@ -57,12 +67,17 @@ function DashboardContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const hfRaw = automationStatus?.last_health_factor;
-  const hfNum = hfRaw != null ? parseFloat(String(hfRaw)) : null;
+  // Aave HF: /aave/status から取得。null = 借入ポジションなし
+  const hfRaw = aaveStatus?.health_factor ?? null;
+  const hfNum = hfRaw != null ? parseFloat(hfRaw) : null;
 
-  const balanceUsdt = exchangeStatus?.balance_usdt
-    ? parseFloat(exchangeStatus.balance_usdt).toFixed(2)
-    : null;
+  // Aave 残高: USDC + aUSDC の合計
+  const aaveUsdcRaw = aaveStatus?.balance.usdc_balance;
+  const aaveAUsdcRaw = aaveStatus?.balance.a_usdc_balance;
+  const aaveTotal =
+    aaveUsdcRaw != null && aaveAUsdcRaw != null
+      ? (parseFloat(aaveUsdcRaw) + parseFloat(aaveAUsdcRaw)).toFixed(2)
+      : null;
 
   return (
     <>
@@ -88,7 +103,9 @@ function DashboardContent() {
         {/* 2-1. Aave Health Factor カード */}
         <div style={cardStyle}>
           <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Aave Health Factor</div>
-          {hfNum != null && !isNaN(hfNum) ? (
+          {aaveStatus == null ? (
+            <div style={{ fontSize: 24, color: "#9ca3af" }}>取得中...</div>
+          ) : hfNum != null && !isNaN(hfNum) ? (
             <>
               <div style={{ fontSize: 40, fontWeight: 700, color: getHfColor(hfNum), lineHeight: 1.1 }}>
                 {hfNum.toFixed(2)}
@@ -107,15 +124,15 @@ function DashboardContent() {
               </span>
             </>
           ) : (
-            <div style={{ fontSize: 24, color: "#9ca3af" }}>取得中...</div>
+            <div style={{ fontSize: 20, color: "#6b7280", marginTop: 4 }}>借入なし</div>
           )}
         </div>
 
-        {/* 2-2. PnL（残高）カード */}
+        {/* 2-2. Aave 残高カード */}
         <div style={cardStyle}>
-          <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>残高 (USDT)</div>
+          <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>残高 (USDC+aUSDC)</div>
           <div style={{ fontSize: 36, fontWeight: 700, color: "#111" }}>
-            {balanceUsdt != null ? `$${balanceUsdt}` : <span style={{ color: "#9ca3af", fontSize: 24 }}>取得中...</span>}
+            {aaveTotal != null ? `$${aaveTotal}` : <span style={{ color: "#9ca3af", fontSize: 24 }}>取得中...</span>}
           </div>
           <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
             {exchangeStatus != null && (

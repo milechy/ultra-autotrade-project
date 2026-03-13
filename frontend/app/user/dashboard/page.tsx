@@ -8,15 +8,18 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { HealthFactorGauge } from '@/components/shared/HealthFactorGauge'
 import { StatusBadge } from '@/components/user/StatusBadge'
 import { fetchAutomationStatus } from '@/lib/api/automation'
+import { fetchAaveStatus } from '@/lib/api/aave'
 import { useAuth } from '@/lib/auth'
 import { getJson } from '@/lib/api/http'
 import type { AutomationStatus } from '@/lib/types'
 import type { RebalanceStatusResponse } from '@/lib/api/rebalance'
+import type { AaveMonitorStatus } from '@/lib/api/aave'
 
 function DashboardContent() {
   const { token } = useAuth()
   const [autoStatus, setAutoStatus] = useState<AutomationStatus | null>(null)
   const [rebalanceStatus, setRebalanceStatus] = useState<RebalanceStatusResponse | null>(null)
+  const [aaveStatus, setAaveStatus] = useState<AaveMonitorStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -41,6 +44,13 @@ function DashboardContent() {
       } catch {
         // rebalance status is best-effort; ignore errors
       }
+      // Aave ステータス: HF + 残高をリアルタイム取得（ベストエフォート）
+      try {
+        const aave = await fetchAaveStatus(token)
+        setAaveStatus(aave)
+      } catch {
+        // ignore
+      }
     }
     load()
     const interval = setInterval(load, 30_000)
@@ -49,8 +59,9 @@ function DashboardContent() {
 
   if (loading) return <LoadingPage />
 
-  const hfRaw = autoStatus?.last_health_factor
-  const hfNum = hfRaw != null ? parseFloat(String(hfRaw)) : null
+  // Aave HF: /aave/status から取得。null = 借入ポジションなし
+  const hfRaw = aaveStatus?.health_factor ?? null
+  const hfNum = hfRaw != null ? parseFloat(hfRaw) : null
   const hf = hfNum != null && !isNaN(hfNum) ? hfNum : null
 
   const systemStatus = autoStatus?.is_trading_paused
