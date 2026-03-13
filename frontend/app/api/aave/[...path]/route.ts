@@ -11,7 +11,7 @@ export async function GET(
   }
 
   const path = params.path.join('/')
-  const url = `${BACKEND_BASE_URL.replace(/\/$/, '')}/api/aave/${path}`
+  const url = `${BACKEND_BASE_URL.replace(/\/$/, '')}/aave/${path}`
   const searchParams = request.nextUrl.searchParams.toString()
   const fullUrl = searchParams ? `${url}?${searchParams}` : url
 
@@ -46,7 +46,7 @@ export async function POST(
   }
 
   const path = params.path.join('/')
-  const url = `${BACKEND_BASE_URL.replace(/\/$/, '')}/api/aave/${path}`
+  const url = `${BACKEND_BASE_URL.replace(/\/$/, '')}/aave/${path}`
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
