@@ -157,7 +157,7 @@ def test_rebalance_status_returns_200() -> None:
     service = DummyRebalanceService()
     client = _create_client(service)
 
-    resp = client.get("/aave/rebalance/status")
+    resp = client.get("/api/aave/rebalance/status")
 
     assert resp.status_code == 200
     data = resp.json()
@@ -178,7 +178,7 @@ def test_rebalance_simulate_returns_200_with_proposal() -> None:
     service = DummyRebalanceService()
     client = _create_client(service)
 
-    resp = client.post("/aave/rebalance/simulate")
+    resp = client.post("/api/aave/rebalance/simulate")
 
     assert resp.status_code == 200
     data = resp.json()
@@ -204,7 +204,7 @@ def test_rebalance_execute_returns_200_on_valid_request() -> None:
         "confirmation_token": "valid-token-abc",
     }
 
-    resp = client.post("/aave/rebalance/execute", json=payload)
+    resp = client.post("/api/aave/rebalance/execute", json=payload)
 
     assert resp.status_code == 200
     data = resp.json()
@@ -224,7 +224,7 @@ def test_rebalance_execute_returns_400_on_invalid_token() -> None:
         "confirmation_token": "WRONG-TOKEN",
     }
 
-    resp = client.post("/aave/rebalance/execute", json=payload)
+    resp = client.post("/api/aave/rebalance/execute", json=payload)
 
     assert resp.status_code == 400
     assert "Invalid confirmation token" in resp.json()["detail"]
@@ -240,7 +240,7 @@ def test_rebalance_history_returns_200_with_list() -> None:
     service = DummyRebalanceService()
     client = _create_client(service)
 
-    resp = client.get("/aave/rebalance/history")
+    resp = client.get("/api/aave/rebalance/history")
 
     assert resp.status_code == 200
     data = resp.json()
@@ -257,7 +257,7 @@ def test_rebalance_history_respects_limit_param() -> None:
     service = DummyRebalanceService()
     client = _create_client(service)
 
-    resp = client.get("/aave/rebalance/history?limit=5")
+    resp = client.get("/api/aave/rebalance/history?limit=5")
 
     assert resp.status_code == 200
     data = resp.json()
@@ -275,7 +275,7 @@ def test_status_requires_admin_auth() -> None:
     app = create_app()
     client = TestClient(app, raise_server_exceptions=False)
 
-    resp = client.get("/aave/rebalance/status")
+    resp = client.get("/api/aave/rebalance/status")
 
     assert resp.status_code in (401, 403)
 
@@ -285,7 +285,7 @@ def test_simulate_requires_admin_auth() -> None:
     app = create_app()
     client = TestClient(app, raise_server_exceptions=False)
 
-    resp = client.post("/aave/rebalance/simulate")
+    resp = client.post("/api/aave/rebalance/simulate")
 
     assert resp.status_code in (401, 403)
 
@@ -300,7 +300,7 @@ def test_execute_requires_admin_auth() -> None:
         "confirmation_token": "valid-token-abc",
     }
 
-    resp = client.post("/aave/rebalance/execute", json=payload)
+    resp = client.post("/api/aave/rebalance/execute", json=payload)
 
     assert resp.status_code in (401, 403)
 
@@ -310,6 +310,6 @@ def test_history_requires_admin_auth() -> None:
     app = create_app()
     client = TestClient(app, raise_server_exceptions=False)
 
-    resp = client.get("/aave/rebalance/history")
+    resp = client.get("/api/aave/rebalance/history")
 
     assert resp.status_code in (401, 403)

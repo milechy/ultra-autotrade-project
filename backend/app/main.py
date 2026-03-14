@@ -51,7 +51,9 @@ def create_app() -> FastAPI:
     # フロントエンドからのアクセスを許可
     # CORS_ORIGINS 環境変数でカンマ区切りで指定可能（空白は自動トリム）
     _default_origins = "https://app.ultra-auto-trade.com,http://localhost:3000"
-    cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
+    cors_origins = [
+        o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()
+    ]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
@@ -65,8 +67,8 @@ def create_app() -> FastAPI:
     app.include_router(users_router)  # Users (Phase12)
     app.include_router(ai_router)  # AI (Phase2)
     app.include_router(octobot_router)  # OctoBot (Phase3)
-    app.include_router(aave_router)  # Aave (Phase4)
-    app.include_router(rebalance_router)  # Aave Rebalance (Stream-T)
+    app.include_router(aave_router, prefix="/api")  # Aave (Phase4)
+    app.include_router(rebalance_router, prefix="/api")  # Aave Rebalance (Stream-T)
     app.include_router(knowledge_router)  # Knowledge Hub (PoC Pivot Step 2)
     app.include_router(dca_router)  # DCA Bot
     app.include_router(exchange_router)  # Exchange (PoC Pivot Step 3)

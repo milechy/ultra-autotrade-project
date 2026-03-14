@@ -749,7 +749,7 @@ class TestEditorRolePermissions:
             client, admin_token, "viewer@example.com", "viewer", "viewer"
         )
         response = client.post(
-            "/aave/rebalance",
+            "/api/aave/rebalance",
             json={"action": "HOLD", "amount": "100", "asset_symbol": "USDC", "dry_run": True},
             headers={"Authorization": f"Bearer {viewer_token}"},
         )
@@ -762,7 +762,7 @@ class TestEditorRolePermissions:
             client, admin_token, "editor@example.com", "editor", "editor"
         )
         response = client.post(
-            "/aave/rebalance",
+            "/api/aave/rebalance",
             json={"action": "HOLD", "amount": "100", "asset_symbol": "USDC", "dry_run": True},
             headers={"Authorization": f"Bearer {editor_token}"},
         )

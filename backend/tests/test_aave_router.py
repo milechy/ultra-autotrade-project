@@ -116,7 +116,7 @@ def test_aave_rebalance_buy_returns_200() -> None:
         "dry_run": False,
     }
 
-    resp = client.post("/aave/rebalance", json=payload)
+    resp = client.post("/api/aave/rebalance", json=payload)
     assert resp.status_code == 200
 
     data = resp.json()
@@ -138,7 +138,7 @@ def test_aave_rebalance_validation_error_for_negative_amount() -> None:
         "asset_symbol": "USDC",
     }
 
-    resp = client.post("/aave/rebalance", json=payload)
+    resp = client.post("/api/aave/rebalance", json=payload)
     assert resp.status_code == 422
 
 
@@ -159,7 +159,7 @@ def test_aave_rebalance_value_error_from_service_returns_400() -> None:
         "asset_symbol": "USDC",
     }
 
-    resp = client.post("/aave/rebalance", json=payload)
+    resp = client.post("/api/aave/rebalance", json=payload)
     assert resp.status_code == 400
     assert "invalid amount" in resp.json()["detail"]
 
@@ -181,7 +181,7 @@ def test_aave_rebalance_unexpected_error_returns_500() -> None:
         "asset_symbol": "USDC",
     }
 
-    resp = client.post("/aave/rebalance", json=payload)
+    resp = client.post("/api/aave/rebalance", json=payload)
     assert resp.status_code == 500
 
 
@@ -197,7 +197,7 @@ def test_aave_rebalance_with_chain_name() -> None:
         "chain_name": "optimism",
     }
 
-    resp = client.post("/aave/rebalance", json=payload)
+    resp = client.post("/api/aave/rebalance", json=payload)
     assert resp.status_code == 200
     assert service.calls[0][0] == "optimism"
 
@@ -207,7 +207,7 @@ def test_aave_chains_health_returns_200() -> None:
     service = DummyMultiChainService()
     client = _create_client_with_multi_chain_service(service)
 
-    resp = client.get("/aave/chains/health")
+    resp = client.get("/api/aave/chains/health")
     assert resp.status_code == 200
     data = resp.json()
     assert "chains" in data
