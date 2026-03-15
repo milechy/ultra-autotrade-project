@@ -39,5 +39,20 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  frontend:
+    container_name: ultra-autotrade-frontend-local
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BACKEND_BASE_URL: http://localhost:8000
+    environment:
+      NEXT_PUBLIC_BACKEND_BASE_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   pgdata:
