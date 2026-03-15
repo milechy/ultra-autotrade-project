@@ -11,7 +11,7 @@ from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth.dependencies import require_admin
+from app.auth.dependencies import require_admin, require_viewer
 from app.auth.models import User
 
 from .schemas import AaveMonitorStatus, AaveRebalanceRequest, AaveRebalanceResponse
@@ -88,7 +88,7 @@ def rebalance(
     summary="全アクティブチェーンの Health Factor を取得する",
 )
 def get_chains_health(
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_viewer),
     multi_service: MultiChainAaveService = Depends(get_multi_chain_aave_service),
 ) -> dict[str, dict[str, str | None]]:
     """全アクティブチェーンの Health Factor を一覧で返す。"""
@@ -103,7 +103,7 @@ def get_chains_health(
     summary="Aave V3 Health Factor をリアルタイム取得する",
 )
 def get_health_factor(
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_viewer),
 ) -> dict[str, str | None]:
     """AAVE_CLIENT_TYPE に応じて HF をリアルタイム取得して返す。"""
     from .monitor import get_health_factor as _get_hf  # noqa: PLC0415
@@ -118,7 +118,7 @@ def get_health_factor(
     summary="Aave ポジション状態（HF + 残高）をリアルタイム取得する",
 )
 def get_monitor_status(
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_viewer),
 ) -> AaveMonitorStatus:
     """AAVE_CLIENT_TYPE に応じて HF + USDC/aUSDC 残高をリアルタイム取得して返す。"""
     import os  # noqa: PLC0415

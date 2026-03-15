@@ -16,7 +16,7 @@ from app.aave.rebalance_schemas import (
     RebalanceStatusResponse,
 )
 from app.aave.schemas import AaveOperationResult, AaveOperationStatus, AaveOperationType
-from app.auth.dependencies import require_admin
+from app.auth.dependencies import require_admin, require_viewer
 from app.auth.models import UserRole
 from app.main import create_app
 
@@ -32,6 +32,17 @@ def _make_admin_user() -> MagicMock:
     user.email = "admin@example.com"
     user.username = "admin"
     user.role = UserRole.ADMIN.value
+    user.is_active = True
+    return user
+
+
+def _make_viewer_user() -> MagicMock:
+    """テスト用 viewer ユーザーを返す。"""
+    user = MagicMock()
+    user.id = 2
+    user.email = "viewer@example.com"
+    user.username = "viewer"
+    user.role = UserRole.VIEWER.value
     user.is_active = True
     return user
 
@@ -144,6 +155,7 @@ def _create_client(
         app.dependency_overrides[get_rebalance_service] = lambda: service
     if override_auth:
         app.dependency_overrides[require_admin] = lambda: admin_user
+        app.dependency_overrides[require_viewer] = lambda: admin_user
     return TestClient(app)
 
 
@@ -311,5 +323,41 @@ def test_history_requires_admin_auth() -> None:
     client = TestClient(app, raise_server_exceptions=False)
 
     resp = client.get("/api/aave/rebalance/history")
+
+    assert resp.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# テスト: viewer ロールによるアクセス制御
+# ---------------------------------------------------------------------------
+
+
+def test_rebalance_status_accessible_by_viewer() -> None:
+    """GET /api/aave/rebalance/status は viewer ロールでも 200 を返す。"""
+    viewer_user = _make_viewer_user()
+    service = DummyRebalanceService()
+    app = create_app()
+    app.dependency_overrides[get_rebalance_service] = lambda: service
+    app.dependency_overrides[require_viewer] = lambda: viewer_user
+    client = TestClient(app)
+
+    resp = client.get("/api/aave/rebalance/status")
+
+    assert resp.status_code == 200
+    assert "health_factor" in resp.json()
+
+
+def test_rebalance_execute_requires_admin_for_viewer() -> None:
+    """POST /api/aave/rebalance/execute は viewer ロールでは 401/403 になる。"""
+    viewer_user = _make_viewer_user()
+    app = create_app()
+    app.dependency_overrides[require_viewer] = lambda: viewer_user
+    client = TestClient(app, raise_server_exceptions=False)
+
+    payload = {
+        "proposal_id": "test-proposal-id-001",
+        "confirmation_token": "valid-token-abc",
+    }
+    resp = client.post("/api/aave/rebalance/execute", json=payload)
 
     assert resp.status_code in (401, 403)

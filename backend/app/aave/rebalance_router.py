@@ -3,7 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.auth.dependencies import require_admin
+from app.auth.dependencies import require_admin, require_viewer
 from app.automation.state import get_monitoring_service
 
 from .client import get_default_aave_client
@@ -38,7 +38,7 @@ def get_rebalance_service() -> RebalanceService:
 @router.get("/status", response_model=RebalanceStatusResponse)
 def rebalance_status(
     service: RebalanceService = Depends(get_rebalance_service),
-    current_user: Any = Depends(require_admin),
+    current_user: Any = Depends(require_viewer),
 ) -> RebalanceStatusResponse:
     try:
         return service.get_current_status()

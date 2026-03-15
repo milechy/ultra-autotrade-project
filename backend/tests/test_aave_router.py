@@ -11,7 +11,7 @@ from app.aave.schemas import (
     AaveOperationStatus,
     AaveOperationType,
 )
-from app.auth.dependencies import require_admin
+from app.auth.dependencies import require_admin, require_viewer
 from app.auth.models import UserRole
 from app.main import create_app
 
@@ -23,6 +23,17 @@ def _make_admin_user() -> MagicMock:
     user.email = "admin@example.com"
     user.username = "admin"
     user.role = UserRole.ADMIN.value
+    user.is_active = True
+    return user
+
+
+def _make_viewer_user() -> MagicMock:
+    """テスト用 viewer ユーザーを返す。"""
+    user = MagicMock()
+    user.id = 2
+    user.email = "viewer@example.com"
+    user.username = "viewer"
+    user.role = UserRole.VIEWER.value
     user.is_active = True
     return user
 
@@ -94,6 +105,7 @@ def _create_client_with_dummy_service(service: DummyAaveService) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_aave_service] = lambda: service
     app.dependency_overrides[require_admin] = lambda: admin_user
+    app.dependency_overrides[require_viewer] = lambda: admin_user
     return TestClient(app)
 
 
@@ -102,6 +114,7 @@ def _create_client_with_multi_chain_service(service: DummyMultiChainService) -> 
     app = create_app()
     app.dependency_overrides[get_multi_chain_aave_service] = lambda: service
     app.dependency_overrides[require_admin] = lambda: admin_user
+    app.dependency_overrides[require_viewer] = lambda: admin_user
     return TestClient(app)
 
 
@@ -213,3 +226,29 @@ def test_aave_chains_health_returns_200() -> None:
     assert "chains" in data
     assert "arbitrum" in data["chains"]
     assert "optimism" in data["chains"]
+
+
+def test_aave_chains_health_accessible_by_viewer() -> None:
+    """GET /api/aave/chains/health は viewer ロールでも 200 を返す。"""
+    viewer_user = _make_viewer_user()
+    service = DummyMultiChainService()
+    app = create_app()
+    app.dependency_overrides[get_multi_chain_aave_service] = lambda: service
+    app.dependency_overrides[require_viewer] = lambda: viewer_user
+    client = TestClient(app)
+
+    resp = client.get("/api/aave/chains/health")
+    assert resp.status_code == 200
+    assert "chains" in resp.json()
+
+
+def test_aave_rebalance_requires_admin_for_viewer() -> None:
+    """POST /api/aave/rebalance は viewer ロールでは 403 になる。"""
+    viewer_user = _make_viewer_user()
+    app = create_app()
+    app.dependency_overrides[require_viewer] = lambda: viewer_user
+    client = TestClient(app, raise_server_exceptions=False)
+
+    payload = {"action": "BUY", "amount": "10", "asset_symbol": "USDC"}
+    resp = client.post("/api/aave/rebalance", json=payload)
+    assert resp.status_code in (401, 403)
