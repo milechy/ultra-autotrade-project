@@ -14,6 +14,11 @@ import { getJson } from '@/lib/api/http'
 import type { AutomationStatus } from '@/lib/types'
 import type { RebalanceStatusResponse } from '@/lib/api/rebalance'
 import type { AaveMonitorStatus } from '@/lib/api/aave'
+import { Skeleton } from '@/components/ui/skeleton'
+import { SignalLight, SafetyScore, PerformanceCard } from '@/components/transparency'
+import type { SignalData, SafetyScoreData, PerformanceData } from '@/components/transparency'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.ultra-auto-trade.com'
 
 function DashboardContent() {
   const { token } = useAuth()
@@ -22,6 +27,10 @@ function DashboardContent() {
   const [aaveStatus, setAaveStatus] = useState<AaveMonitorStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [signal, setSignal] = useState<SignalData | null>(null)
+  const [safetyScore, setSafetyScore] = useState<SafetyScoreData | null>(null)
+  const [performance, setPerformance] = useState<PerformanceData | null>(null)
+  const [transparencyLoading, setTransparencyLoading] = useState(true)
 
   useEffect(() => {
     if (!token) return
@@ -51,6 +60,17 @@ function DashboardContent() {
       } catch (e: unknown) {
         console.warn('[Dashboard] /api/aave/status fetch failed:', e)
       }
+      // 透明性データ（ベストエフォート）
+      setTransparencyLoading(true)
+      Promise.all([
+        fetch(`${API_URL}/api/transparency/signal`).then(r => r.json()).catch(() => null),
+        fetch(`${API_URL}/api/transparency/safety-score`).then(r => r.json()).catch(() => null),
+        fetch(`${API_URL}/api/transparency/performance?period_days=30`).then(r => r.json()).catch(() => null),
+      ]).then(([sig, safety, perf]) => {
+        if (sig) setSignal(sig)
+        if (safety) setSafetyScore(safety)
+        if (perf) setPerformance(perf)
+      }).finally(() => setTransparencyLoading(false))
     }
     load()
     const interval = setInterval(load, 30_000)
@@ -125,6 +145,25 @@ function DashboardContent() {
           <HealthFactorGauge value={hf} />
         </CardContent>
       </Card>
+
+      {/* 透明性 */}
+      <section>
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+          透明性
+        </h2>
+        {transparencyLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-32 w-full rounded-xl" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {signal && <SignalLight signal={signal} />}
+            {safetyScore && <SafetyScore data={safetyScore} />}
+            {performance && <PerformanceCard data={performance} />}
+          </div>
+        )}
+      </section>
 
       {/* 運用ステータス */}
       <section>

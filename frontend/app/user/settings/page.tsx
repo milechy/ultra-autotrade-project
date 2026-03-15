@@ -4,6 +4,9 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
 import { Bell, TrendingUp, ShieldAlert, Save, RefreshCw, Info } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { RiskModeSelector } from '@/components/transparency'
+import type { RiskProfile } from '@/components/transparency'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,6 +16,8 @@ import { EmergencyStop } from '@/components/user/EmergencyStop'
 import { useAuth } from '@/lib/auth'
 import { UserProviders } from '@/components/user/UserProviders'
 import { getJson, putJson } from '@/lib/api/http'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.ultra-auto-trade.com'
 
 type NotificationLevel = 'all' | 'alert' | 'emergency'
 
@@ -87,6 +92,9 @@ function SettingsPage() {
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [isStopped, setIsStopped] = useState(false)
+  const [riskProfiles, setRiskProfiles] = useState<RiskProfile[]>([])
+  const [selectedRiskProfile, setSelectedRiskProfile] = useState<string>('')
+  const [riskProfileLoading, setRiskProfileLoading] = useState(true)
 
   const fetchSettings = useCallback(async () => {
     if (!token) return
@@ -109,6 +117,15 @@ function SettingsPage() {
   useEffect(() => {
     fetchSettings()
   }, [fetchSettings])
+
+  useEffect(() => {
+    setRiskProfileLoading(true)
+    fetch(`${API_URL}/api/transparency/risk-profile`)
+      .then(r => r.json())
+      .then((data: RiskProfile[]) => setRiskProfiles(data))
+      .catch(() => {})
+      .finally(() => setRiskProfileLoading(false))
+  }, [])
 
   const handleSave = async () => {
     if (!token) return
@@ -327,6 +344,31 @@ function SettingsPage() {
                 disabled={!isAdmin}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* リスクモード */}
+        <Card>
+          <CardHeader className="pb-3">
+            <SectionHeader icon={ShieldAlert} title="リスクモード" />
+            <CardTitle className="text-base">リスクモード選択</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {riskProfileLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full rounded-lg" />
+                <Skeleton className="h-16 w-full rounded-lg" />
+                <Skeleton className="h-16 w-full rounded-lg" />
+              </div>
+            ) : riskProfiles.length > 0 ? (
+              <RiskModeSelector
+                profiles={riskProfiles}
+                current={selectedRiskProfile}
+                onSelect={setSelectedRiskProfile}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">リスクプロファイルを取得できませんでした</p>
+            )}
           </CardContent>
         </Card>
 

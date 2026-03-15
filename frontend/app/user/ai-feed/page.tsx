@@ -6,12 +6,19 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { AiFeedItem, type AiEvent } from '@/components/user/AiFeedItem'
 import { fetchAutomationStatus } from '@/lib/api/automation'
 import { useAuth } from '@/lib/auth'
+import { Skeleton } from '@/components/ui/skeleton'
+import { PerformanceCard } from '@/components/transparency'
+import type { PerformanceData } from '@/components/transparency'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.ultra-auto-trade.com'
 
 function AiFeedContent() {
   const { token } = useAuth()
   const [events, setEvents] = useState<AiEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [performance, setPerformance] = useState<PerformanceData | null>(null)
+  const [perfLoading, setPerfLoading] = useState(true)
 
   useEffect(() => {
     if (!token) return
@@ -28,6 +35,13 @@ function AiFeedContent() {
         setLoading(false)
       }
     }
+    // 実績データ（ベストエフォート）
+    setPerfLoading(true)
+    fetch(`${API_URL}/api/transparency/performance?period_days=30`)
+      .then(r => r.json())
+      .then(data => setPerformance(data))
+      .catch(() => {})
+      .finally(() => setPerfLoading(false))
     load()
     const interval = setInterval(load, 60_000)
     return () => clearInterval(interval)
@@ -37,6 +51,12 @@ function AiFeedContent() {
 
   return (
     <div className="space-y-3">
+      {/* 実績サマリー */}
+      {perfLoading ? (
+        <Skeleton className="h-28 w-full rounded-xl" />
+      ) : performance ? (
+        <PerformanceCard data={performance} />
+      ) : null}
       {error && (
         <div className="rounded-md bg-destructive/10 text-destructive px-4 py-2 text-sm">
           {error}
