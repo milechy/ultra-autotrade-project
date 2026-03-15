@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import '../styles/globals.css'
-import { WalletProvider } from '@/lib/wallet/provider'
+import { WagmiRootProvider } from '@/lib/wallet/WagmiRootProvider'
 
 export const metadata: Metadata = {
   title: 'Ultra AutoTrade',
@@ -15,9 +15,9 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body>
-        <WalletProvider>
+        <WagmiRootProvider>
           {children}
-        </WalletProvider>
+        </WagmiRootProvider>
       </body>
     </html>
   )

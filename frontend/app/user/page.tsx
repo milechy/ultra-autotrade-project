@@ -1,6 +1,5 @@
 'use client'
 
-import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -30,8 +29,6 @@ const steps = [
 ]
 
 export default function LandingPage() {
-  const { open } = useWeb3Modal()
-
   return (
     <main className="min-h-[calc(100vh-4rem)] px-4 py-8">
       <div className="max-w-md mx-auto space-y-8">
@@ -40,13 +37,11 @@ export default function LandingPage() {
           <h1 className="text-2xl font-bold tracking-tight leading-snug">
             AIが最適なタイミングで、<br />あなたの資産を運用します
           </h1>
-          <Button
-            size="lg"
-            className="w-full text-base font-semibold"
-            onClick={() => open()}
-          >
-            <Wallet className="mr-2 h-5 w-5" />
-            Connect Wallet
+          <Button size="lg" className="w-full text-base font-semibold" asChild>
+            <Link href="/user/wallet">
+              <Wallet className="mr-2 h-5 w-5" />
+              Connect Wallet
+            </Link>
           </Button>
           <p className="text-xs text-muted-foreground">
             Non-custodial — あなたのウォレット、あなたの資産

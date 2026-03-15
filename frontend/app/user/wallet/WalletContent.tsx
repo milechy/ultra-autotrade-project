@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { useAccount, useBalance } from 'wagmi'
 import { arbitrum } from 'wagmi/chains'
@@ -10,8 +11,32 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ConnectWalletButton } from '@/components/shared/ConnectWalletButton'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 
+let web3ModalReady = false
+
 export function WalletContent() {
   const { address, isConnected, chain } = useAccount()
+
+  useEffect(() => {
+    if (web3ModalReady) return
+    import('@web3modal/wagmi/react').then(({ createWeb3Modal }) => {
+      import('@/lib/wallet/config').then(({ wagmiConfig, projectId }) => {
+        try {
+          createWeb3Modal({
+            wagmiConfig,
+            projectId,
+            themeMode: 'dark',
+            themeVariables: {
+              '--w3m-color-mix': '#000000',
+              '--w3m-color-mix-strength': 40,
+            },
+          })
+          web3ModalReady = true
+        } catch (e) {
+          console.warn('[WalletContent] web3modal init failed (non-fatal):', e)
+        }
+      })
+    })
+  }, [])
   const { data: balance } = useBalance({ address })
   const isCorrectChain = chain?.id === arbitrum.id
 
