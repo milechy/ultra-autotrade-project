@@ -34,8 +34,10 @@ import argparse
 import logging
 import os
 import sys
+import time
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -54,9 +56,9 @@ ASSET_ADDRESSES = {
 }
 
 # HF 閾値 (backend/app/aave/config.py の AAVE_MIN_HEALTH_FACTOR / AAVE_WARN_HEALTH_FACTOR と同じ)
-HF_SAFE_MODE_THRESHOLD = Decimal("1.8")   # HF < 1.8 → SAFE_MODE (BUY blocked)
-HF_HARD_STOP_THRESHOLD = Decimal("1.6")   # HF < 1.6 → HARD_STOP (all blocked)
-HF_SAFETY_FLOOR = Decimal("1.55")         # 絶対安全フロア — これを下回る Borrow は拒否
+HF_SAFE_MODE_THRESHOLD = Decimal("1.8")  # HF < 1.8 → SAFE_MODE (BUY blocked)
+HF_HARD_STOP_THRESHOLD = Decimal("1.6")  # HF < 1.6 → HARD_STOP (all blocked)
+HF_SAFETY_FLOOR = Decimal("1.55")  # 絶対安全フロア — これを下回る Borrow は拒否
 
 # Variable rate mode
 INTEREST_RATE_MODE_VARIABLE = 2
@@ -117,17 +119,41 @@ _POOL_ABI = [
                     {"internalType": "uint128", "name": "liquidityIndex", "type": "uint128"},
                     {"internalType": "uint128", "name": "currentLiquidityRate", "type": "uint128"},
                     {"internalType": "uint128", "name": "variableBorrowIndex", "type": "uint128"},
-                    {"internalType": "uint128", "name": "currentVariableBorrowRate", "type": "uint128"},
-                    {"internalType": "uint128", "name": "currentStableBorrowRate", "type": "uint128"},
+                    {
+                        "internalType": "uint128",
+                        "name": "currentVariableBorrowRate",
+                        "type": "uint128",
+                    },  # noqa: E501
+                    {
+                        "internalType": "uint128",
+                        "name": "currentStableBorrowRate",
+                        "type": "uint128",
+                    },  # noqa: E501
                     {"internalType": "uint40", "name": "lastUpdateTimestamp", "type": "uint40"},
                     {"internalType": "uint16", "name": "id", "type": "uint16"},
                     {"internalType": "address", "name": "aTokenAddress", "type": "address"},
-                    {"internalType": "address", "name": "stableDebtTokenAddress", "type": "address"},
-                    {"internalType": "address", "name": "variableDebtTokenAddress", "type": "address"},
-                    {"internalType": "address", "name": "interestRateStrategyAddress", "type": "address"},
+                    {
+                        "internalType": "address",
+                        "name": "stableDebtTokenAddress",
+                        "type": "address",
+                    },  # noqa: E501
+                    {
+                        "internalType": "address",
+                        "name": "variableDebtTokenAddress",
+                        "type": "address",
+                    },  # noqa: E501
+                    {
+                        "internalType": "address",
+                        "name": "interestRateStrategyAddress",
+                        "type": "address",
+                    },  # noqa: E501
                     {"internalType": "uint128", "name": "accruedToTreasury", "type": "uint128"},
                     {"internalType": "uint128", "name": "unbacked", "type": "uint128"},
-                    {"internalType": "uint128", "name": "isolationModeTotalDebt", "type": "uint128"},
+                    {
+                        "internalType": "uint128",
+                        "name": "isolationModeTotalDebt",
+                        "type": "uint128",
+                    },  # noqa: E501
                 ],
                 "internalType": "struct DataTypes.ReserveData",
                 "name": "",
@@ -179,16 +205,17 @@ def mask_address(addr: str) -> str:
     return f"{addr[:6]}...{addr[-4:]}"
 
 
-def get_token_balance(w3, token_address: str, wallet_address: str) -> tuple[Decimal, int]:
+def get_token_balance(w3: Any, token_address: str, wallet_address: str) -> tuple[Decimal, int]:
     """Return (balance in human units, decimals)."""
     from web3 import Web3
+
     token = w3.eth.contract(address=Web3.to_checksum_address(token_address), abi=_ERC20_ABI)
     decimals = token.functions.decimals().call()
     balance_raw = token.functions.balanceOf(Web3.to_checksum_address(wallet_address)).call()
     return Decimal(balance_raw) / Decimal(10**decimals), decimals
 
 
-def get_account_data(pool, wallet_address: str) -> dict:
+def get_account_data(pool: Any, wallet_address: str) -> dict[str, Any]:
     """
     getUserAccountData の結果を dict で返す。
 
@@ -202,6 +229,7 @@ def get_account_data(pool, wallet_address: str) -> dict:
         }
     """
     from web3 import Web3
+
     result = pool.functions.getUserAccountData(Web3.to_checksum_address(wallet_address)).call()
 
     total_collateral_base: int = result[0]
@@ -251,19 +279,23 @@ def log_hf_status(hf: Decimal, label: str) -> None:
     if mode == "HARD_STOP":
         logger.warning(
             "[%s] HF=%s → MODE=HARD_STOP (< %.1f) — 全操作ブロック",
-            label, hf_str, HF_HARD_STOP_THRESHOLD,
+            label,
+            hf_str,
+            HF_HARD_STOP_THRESHOLD,
         )
     elif mode == "SAFE_MODE":
         logger.warning(
             "[%s] HF=%s → MODE=SAFE_MODE (< %.1f) — BUY ブロック、SELL のみ許可",
-            label, hf_str, HF_SAFE_MODE_THRESHOLD,
+            label,
+            hf_str,
+            HF_SAFE_MODE_THRESHOLD,
         )
     else:
         logger.info("[%s] HF=%s → MODE=%s", label, hf_str, mode)
 
 
 def compute_safe_borrow_amount(
-    account_data: dict,
+    account_data: dict[str, Any],
     requested_amount: Decimal,
     safety_floor: Decimal = HF_SAFETY_FLOOR,
 ) -> Decimal:
@@ -316,17 +348,18 @@ def compute_safe_borrow_amount(
     return requested_amount
 
 
-def get_variable_debt_token_address(pool, asset_address: str) -> str:
+def get_variable_debt_token_address(pool: Any, asset_address: str) -> str:
     """Pool.getReserveData() から variableDebtTokenAddress を取得する (index 10)。"""
     from web3 import Web3
+
     reserve_data = pool.functions.getReserveData(Web3.to_checksum_address(asset_address)).call()
-    return reserve_data[10]
+    return str(reserve_data[10])
 
 
 def send_borrow_tx(
-    pool,
-    w3,
-    account,
+    pool: Any,
+    w3: Any,
+    account: Any,
     token_address: str,
     amount: Decimal,
     decimals: int,
@@ -335,20 +368,23 @@ def send_borrow_tx(
 ) -> str:
     """Pool.borrow() を送信してレシートを確認し、tx_hash を返す。"""
     from web3 import Web3
+
     amount_raw = int(amount * Decimal(10**decimals))
-    nonce = w3.eth.get_transaction_count(checksum_wallet)
+    nonce = w3.eth.get_transaction_count(checksum_wallet, "pending")
     borrow_tx = pool.functions.borrow(
         Web3.to_checksum_address(token_address),
         amount_raw,
         INTEREST_RATE_MODE_VARIABLE,
         0,
         checksum_wallet,
-    ).build_transaction({
-        "from": checksum_wallet,
-        "nonce": nonce,
-        "gas": 400000,
-        "gasPrice": w3.eth.gas_price,
-    })
+    ).build_transaction(
+        {
+            "from": checksum_wallet,
+            "nonce": nonce,
+            "gas": 400000,
+            "gasPrice": w3.eth.gas_price,
+        }
+    )
     signed = w3.eth.account.sign_transaction(borrow_tx, private_key=private_key)
     tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
     logger.info("Borrow tx sent: 0x%s", tx_hash.hex())
@@ -359,14 +395,16 @@ def send_borrow_tx(
     if receipt["status"] != 1:
         logger.error("Borrow transaction failed")
         sys.exit(1)
-    return tx_hash.hex()
+    logger.info("RPC 反映待機 (3s)...")
+    time.sleep(3)
+    return str(tx_hash.hex())
 
 
 def send_repay_all_tx(
-    pool,
-    token,
-    w3,
-    account,
+    pool: Any,
+    token: Any,
+    w3: Any,
+    account: Any,
     token_address: str,
     decimals: int,
     total_debt_usd: Decimal,
@@ -389,7 +427,8 @@ def send_repay_all_tx(
     if usdc_balance < required:
         logger.error(
             "USDC 残高 %s が Repay に必要な %s を下回っています。Repay できません。",
-            usdc_balance, required,
+            usdc_balance,
+            required,
         )
         sys.exit(1)
 
@@ -398,18 +437,19 @@ def send_repay_all_tx(
     # Approve: total_debt_raw に小さなマージンを加えた値
     approve_amount_raw = usdc_balance_raw  # 全残高を approve して確実に全 debt をカバー
 
-    nonce = w3.eth.get_transaction_count(checksum_wallet)
-
-    # Step 1: Approve
+    # Step 1: Approve — nonce は 'pending' で取得（前の tx が pending 中でも正しい値を得る）
+    approve_nonce = w3.eth.get_transaction_count(checksum_wallet, "pending")
     approve_tx = token.functions.approve(
         Web3.to_checksum_address(AAVE_POOL_BASE_SEPOLIA),
         approve_amount_raw,
-    ).build_transaction({
-        "from": checksum_wallet,
-        "nonce": nonce,
-        "gas": 100000,
-        "gasPrice": w3.eth.gas_price,
-    })
+    ).build_transaction(
+        {
+            "from": checksum_wallet,
+            "nonce": approve_nonce,
+            "gas": 100000,
+            "gasPrice": w3.eth.gas_price,
+        }
+    )
     signed_approve = w3.eth.account.sign_transaction(approve_tx, private_key=private_key)
     approve_hash = w3.eth.send_raw_transaction(signed_approve.raw_transaction)
     logger.info("Repay approve tx sent: 0x%s", approve_hash.hex())
@@ -417,17 +457,21 @@ def send_repay_all_tx(
     logger.info("Repay approve confirmed")
 
     # Step 2: Repay all (uint256 max)
+    # approve 確定後に nonce を再取得（手動インクリメント不要）
+    repay_nonce = w3.eth.get_transaction_count(checksum_wallet, "pending")
     repay_tx = pool.functions.repay(
         Web3.to_checksum_address(token_address),
         REPAY_ALL,
         INTEREST_RATE_MODE_VARIABLE,
         checksum_wallet,
-    ).build_transaction({
-        "from": checksum_wallet,
-        "nonce": nonce + 1,
-        "gas": 400000,
-        "gasPrice": w3.eth.gas_price,
-    })
+    ).build_transaction(
+        {
+            "from": checksum_wallet,
+            "nonce": repay_nonce,
+            "gas": 400000,
+            "gasPrice": w3.eth.gas_price,
+        }
+    )
     signed_repay = w3.eth.account.sign_transaction(repay_tx, private_key=private_key)
     repay_hash = w3.eth.send_raw_transaction(signed_repay.raw_transaction)
     logger.info("Repay tx sent: 0x%s", repay_hash.hex())
@@ -438,7 +482,9 @@ def send_repay_all_tx(
     if receipt["status"] != 1:
         logger.error("Repay transaction failed")
         sys.exit(1)
-    return repay_hash.hex()
+    logger.info("RPC 反映待機 (3s)...")
+    time.sleep(3)
+    return str(repay_hash.hex())
 
 
 # ---------------------------------------------------------------------------
@@ -451,15 +497,15 @@ def run_hf_monitor_test(
     step1_amount: Decimal,
     step2_amount: Decimal,
     dry_run: bool,
-) -> dict:
+) -> dict[str, Any]:
     """
     HF 監視テストのメインフロー。
 
     Returns: テスト結果の dict
     """
     try:
-        from web3 import Web3
         from eth_account import Account
+        from web3 import Web3
     except ImportError as exc:
         logger.error("Missing dependency: %s. Install: pip install web3 eth-account", exc)
         sys.exit(1)
@@ -509,8 +555,12 @@ def run_hf_monitor_test(
     logger.info("Pool:       %s", mask_address(AAVE_POOL_BASE_SEPOLIA))
     logger.info("Asset:      %s (%s)", asset.upper(), mask_address(token_address))
     logger.info("aUSDC:      %s", mask_address(a_usdc_address))
-    logger.info("Thresholds: SAFE_MODE < %.1f | HARD_STOP < %.1f | FLOOR=%.2f",
-                HF_SAFE_MODE_THRESHOLD, HF_HARD_STOP_THRESHOLD, HF_SAFETY_FLOOR)
+    logger.info(
+        "Thresholds: SAFE_MODE < %.1f | HARD_STOP < %.1f | FLOOR=%.2f",
+        HF_SAFE_MODE_THRESHOLD,
+        HF_HARD_STOP_THRESHOLD,
+        HF_SAFETY_FLOOR,
+    )
     logger.info("Dry-run:    %s", dry_run)
 
     # variableDebtToken アドレスを取得
@@ -564,14 +614,21 @@ def run_hf_monitor_test(
     elif dry_run:
         logger.info(
             "[DRY RUN] Would call Pool.borrow(asset, %s %s, interestRateMode=2, ...)",
-            safe_step1, asset.upper(),
+            safe_step1,
+            asset.upper(),
         )
         hf1 = hf0  # dry-run では HF は変わらない（表示のみ）
         step1_tx = None
     else:
         step1_tx = send_borrow_tx(
-            pool, w3, account, token_address, safe_step1,
-            usdc_decimals, checksum_wallet, account.key,
+            pool,
+            w3,
+            account,
+            token_address,
+            safe_step1,
+            usdc_decimals,
+            checksum_wallet,
+            account.key,
         )
         acc1_after = get_account_data(pool, checksum_wallet)
         hf1 = acc1_after["health_factor"]
@@ -581,9 +638,9 @@ def run_hf_monitor_test(
     log_hf_status(hf1, "Step 1")
     if hf1 != Decimal("inf") and hf1 < HF_SAFE_MODE_THRESHOLD:
         logger.warning(
-            "⚠ SAFE_MODE トリガー確認: HF %s < %.1f "
-            "→ backend では BUY がブロックされます",
-            hf1, HF_SAFE_MODE_THRESHOLD,
+            "⚠ SAFE_MODE トリガー確認: HF %s < %.1f → backend では BUY がブロックされます",
+            hf1,
+            HF_SAFE_MODE_THRESHOLD,
         )
 
     # ----------------------------------------------------------------
@@ -602,14 +659,21 @@ def run_hf_monitor_test(
     elif dry_run:
         logger.info(
             "[DRY RUN] Would call Pool.borrow(asset, %s %s, interestRateMode=2, ...)",
-            safe_step2, asset.upper(),
+            safe_step2,
+            asset.upper(),
         )
         hf2 = hf1
         step2_tx = None
     else:
         step2_tx = send_borrow_tx(
-            pool, w3, account, token_address, safe_step2,
-            usdc_decimals, checksum_wallet, account.key,
+            pool,
+            w3,
+            account,
+            token_address,
+            safe_step2,
+            usdc_decimals,
+            checksum_wallet,
+            account.key,
         )
         acc2_after = get_account_data(pool, checksum_wallet)
         hf2 = acc2_after["health_factor"]
@@ -619,15 +683,15 @@ def run_hf_monitor_test(
     log_hf_status(hf2, "Step 2")
     if hf2 != Decimal("inf") and hf2 < HF_HARD_STOP_THRESHOLD:
         logger.warning(
-            "⚠ HARD_STOP トリガー確認: HF %s < %.1f "
-            "→ backend では全操作がブロックされます",
-            hf2, HF_HARD_STOP_THRESHOLD,
+            "⚠ HARD_STOP トリガー確認: HF %s < %.1f → backend では全操作がブロックされます",
+            hf2,
+            HF_HARD_STOP_THRESHOLD,
         )
     elif hf2 != Decimal("inf") and hf2 < HF_SAFE_MODE_THRESHOLD:
         logger.warning(
-            "⚠ SAFE_MODE トリガー確認: HF %s < %.1f "
-            "→ backend では BUY がブロックされます",
-            hf2, HF_SAFE_MODE_THRESHOLD,
+            "⚠ SAFE_MODE トリガー確認: HF %s < %.1f → backend では BUY がブロックされます",
+            hf2,
+            HF_SAFE_MODE_THRESHOLD,
         )
 
     # ----------------------------------------------------------------
@@ -645,15 +709,23 @@ def run_hf_monitor_test(
         hf_final = Decimal("inf")
     elif dry_run:
         logger.info(
-            "[DRY RUN] Would approve %s USDC to Pool, then call Pool.repay(asset, MAX_UINT256, 2, wallet)",
+            "[DRY RUN] Would approve %s USDC to Pool, then call"
+            " Pool.repay(asset, MAX_UINT256, 2, wallet)",
             total_debt_usd,
         )
         repay_tx = None
         hf_final = hf2  # dry-run では変わらない
     else:
         repay_tx = send_repay_all_tx(
-            pool, token, w3, account, token_address,
-            usdc_decimals, total_debt_usd, checksum_wallet, account.key,
+            pool,
+            token,
+            w3,
+            account,
+            token_address,
+            usdc_decimals,
+            total_debt_usd,
+            checksum_wallet,
+            account.key,
         )
         acc_after_repay = get_account_data(pool, checksum_wallet)
         hf_final = acc_after_repay["health_factor"]
@@ -683,7 +755,8 @@ def run_hf_monitor_test(
         logger.info("  Repay tx:  0x%s", repay_tx or "skipped")
 
     passed = hf_final == Decimal("inf") or hf_final > HF_SAFE_MODE_THRESHOLD
-    logger.info("  Overall:   %s", "PASS (HF restored to safe level)" if passed else "WARN (HF not fully restored)")
+    overall = "PASS (HF restored to safe level)" if passed else "WARN (HF not fully restored)"
+    logger.info("  Overall:   %s", overall)
     logger.info("=" * 60)
 
     return {
