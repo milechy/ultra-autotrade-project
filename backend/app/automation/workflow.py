@@ -405,8 +405,8 @@ def process_pending_knowledge(
             if monitoring_service is not None:
                 try:
                     monitoring_service.record_error(ComponentType.SYSTEM)
-                except Exception:
-                    pass
+                except Exception as _exc:  # noqa: BLE001
+                    logger.debug("record_error failed: %s", _exc)
             errors.append(
                 WorkflowStepError(
                     item_id=item.id,

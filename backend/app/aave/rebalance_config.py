@@ -16,7 +16,7 @@ from app.utils.config import get_env
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_TOKEN_SECRET = "change-me-in-production"
+_DEFAULT_TOKEN_SECRET = ""  # noqa: S105
 
 
 @dataclass

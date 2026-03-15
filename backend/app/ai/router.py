@@ -106,7 +106,7 @@ def get_confidence_trend(
 
 def _generate_mock_trend(days: int) -> list[ConfidenceDataPoint]:
     """モックトレンドデータ生成（決定論的）。"""
-    rng = random.Random(42)
+    rng = random.Random(42)  # noqa: S311
     actions = [TradeAction.BUY, TradeAction.SELL, TradeAction.HOLD]
     versions = ["v1", "v2"]
     now = datetime.now(timezone.utc)
@@ -152,7 +152,7 @@ def get_sentiment_history(
 
 def _generate_mock_sentiment(hours: int) -> SentimentHistoryResponse:
     """モックセンチメントデータ生成（決定論的）。"""
-    rng = random.Random(99)
+    rng = random.Random(99)  # noqa: S311
     now = datetime.now(timezone.utc)
     data_points: list[SentimentDataPoint] = []
 

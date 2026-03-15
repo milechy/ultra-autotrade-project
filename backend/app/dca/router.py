@@ -81,7 +81,8 @@ def _to_grid_status_response(status: object) -> GridStatusResponse:
     """GridStatus → GridStatusResponse に変換する。"""
     from .grid_bot import GridStatus
 
-    assert isinstance(status, GridStatus)
+    if not isinstance(status, GridStatus):
+        raise TypeError(f"Expected GridStatus, got {type(status)}")
     return GridStatusResponse(
         enabled=status.enabled,
         symbol=status.symbol,
