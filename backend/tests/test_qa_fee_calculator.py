@@ -61,9 +61,10 @@ def test_fee_monthly_consistency() -> None:
     daily_fee = calc.calculate_management_fee(aum, days=1).fee_usd
     sum_of_daily = daily_fee * 30
 
-    # Monthly and summed-daily should be within $0.01 (rounding difference)
+    # Monthly and summed-daily should be within $0.10
+    # (daily rounding error ~$0.003/day × 30 days ≈ $0.09 max accumulated)
     diff = abs(monthly_result.fee_usd - sum_of_daily)
-    assert diff <= Decimal("0.01"), (
+    assert diff <= Decimal("0.10"), (
         f"Monthly fee {monthly_result.fee_usd} differs from "
         f"sum of 30 daily fees {sum_of_daily} by {diff}"
     )

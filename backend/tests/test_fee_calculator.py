@@ -10,15 +10,10 @@ FeeCalculator のユニットテスト。
 
 from decimal import Decimal
 
-import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from app.aave.fee_calculator import (
-    FeeCalculator,
-    ManagementFeeResult,
-    PerformanceFeeResult,
-)
+from app.aave.fee_calculator import FeeCalculator
 from app.aave.fee_router import router as fee_router
 
 

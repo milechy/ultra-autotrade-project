@@ -22,6 +22,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.aave.fee_router import router as fee_router
 from app.aave.rebalance_router import router as rebalance_router
 from app.aave.router import router as aave_router
 from app.aave.transparency_router import router as transparency_router
@@ -77,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(webhook_router)  # Webhook receiver
     app.include_router(automation_router)  # Automation workflow
     app.include_router(transparency_router)  # Transparency (Wave 2)
+    app.include_router(fee_router)  # Fee calculation (CSV)
     app.include_router(
         automation_dashboard_router,
         prefix="/api/automation",
