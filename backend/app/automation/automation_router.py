@@ -7,13 +7,14 @@ POST /automation/process-news:
 """
 
 import logging
-from typing import List
+from typing import Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.ai.service import AIService
+from app.auth.dependencies import require_admin
 from app.automation.monitoring_service import MonitoringService
 from app.automation.rate_limiter import RateLimiterService, get_rate_limiter
 from app.automation.rate_limiter_schemas import RateLimitStatus
@@ -112,4 +113,33 @@ def process_news(
         notion_updated_count=0,
         errors=[e.message for e in run_result.errors],
         status=status_str,
+    )
+
+
+class EmergencyStopResponse(BaseModel):
+    """POST /automation/emergency-stop のレスポンス。"""
+
+    status: str = Field(..., description="always 'stopped'")
+    message: str = Field(..., description="緊急停止の確認メッセージ")
+
+
+@router.post(
+    "/automation/emergency-stop",
+    response_model=EmergencyStopResponse,
+    summary="全自動取引を即時停止する（管理者専用）",
+)
+def emergency_stop(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+    current_user: Any = Depends(require_admin),
+) -> EmergencyStopResponse:
+    """
+    全ての自動取引を即時停止する。一度停止すると clear_emergency_stop() を明示的に
+    呼ぶまで再開されない（OR 条件で維持される）。
+    """
+    monitoring_service.activate_emergency_stop(
+        reason=f"Manual emergency stop by admin (user_id={current_user.id})",
+    )
+    return EmergencyStopResponse(
+        status="stopped",
+        message="緊急停止が実行されました。全ての自動取引が停止されています。",
     )
