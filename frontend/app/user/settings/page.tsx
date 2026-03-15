@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Bell, TrendingUp, ShieldAlert, Save, RefreshCw } from 'lucide-react'
+import { Bell, TrendingUp, ShieldAlert, Save, RefreshCw, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -152,14 +152,22 @@ function SettingsPage() {
       <div className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
         <div className="flex items-center justify-between px-4 py-3">
           <h1 className="text-lg font-semibold">設定</h1>
-          <Button size="sm" onClick={handleSave} disabled={isSaving}>
-            <Save className="mr-1.5 h-3.5 w-3.5" />
-            {isSaving ? '保存中...' : '保存'}
-          </Button>
+          {isAdmin && (
+            <Button size="sm" onClick={handleSave} disabled={isSaving}>
+              <Save className="mr-1.5 h-3.5 w-3.5" />
+              {isSaving ? '保存中...' : '保存'}
+            </Button>
+          )}
         </div>
       </div>
 
       <div className="space-y-4 px-4 py-4 pb-8">
+        {!isAdmin && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>設定の変更は管理者のみ可能です</AlertDescription>
+          </Alert>
+        )}
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -186,6 +194,7 @@ function SettingsPage() {
               <Toggle
                 checked={settings.slack_enabled}
                 onChange={v => set('slack_enabled', v)}
+                disabled={!isAdmin}
               />
             </div>
             <div className="flex items-center justify-between">
@@ -196,6 +205,7 @@ function SettingsPage() {
               <Toggle
                 checked={settings.line_enabled}
                 onChange={v => set('line_enabled', v)}
+                disabled={!isAdmin}
               />
             </div>
             <div className="space-y-2">
@@ -204,8 +214,9 @@ function SettingsPage() {
                 {notificationLevelOptions.map(opt => (
                   <button
                     key={opt.value}
-                    onClick={() => set('notification_level', opt.value)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    onClick={() => isAdmin && set('notification_level', opt.value)}
+                    disabled={!isAdmin}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                       settings.notification_level === opt.value
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -234,6 +245,7 @@ function SettingsPage() {
               <Toggle
                 checked={settings.shadow_mode}
                 onChange={v => set('shadow_mode', v)}
+                disabled={!isAdmin}
               />
             </div>
             <div className="space-y-1.5">
@@ -242,6 +254,7 @@ function SettingsPage() {
                 value={settings.exchange_symbol}
                 onChange={e => set('exchange_symbol', e.target.value)}
                 placeholder="例: BTC/USDT"
+                disabled={!isAdmin}
               />
             </div>
             <div className="space-y-1.5">
@@ -252,6 +265,7 @@ function SettingsPage() {
                 max={20}
                 value={settings.leverage}
                 onChange={e => set('leverage', Number(e.target.value))}
+                disabled={!isAdmin}
               />
             </div>
 
@@ -286,6 +300,7 @@ function SettingsPage() {
                 step={1}
                 value={settings.max_position_pct}
                 onChange={e => set('max_position_pct', Number(e.target.value))}
+                disabled={!isAdmin}
               />
             </div>
             <div className="space-y-1.5">
@@ -296,6 +311,7 @@ function SettingsPage() {
                 max={100}
                 value={settings.max_daily_trades}
                 onChange={e => set('max_daily_trades', Number(e.target.value))}
+                disabled={!isAdmin}
               />
             </div>
             <div className="space-y-1.5">
@@ -308,6 +324,7 @@ function SettingsPage() {
                 step={0.1}
                 value={settings.hf_threshold}
                 onChange={e => set('hf_threshold', Number(e.target.value))}
+                disabled={!isAdmin}
               />
             </div>
           </CardContent>
@@ -321,10 +338,12 @@ function SettingsPage() {
           />
         )}
 
-        <Button className="w-full" onClick={handleSave} disabled={isSaving}>
-          <Save className="mr-2 h-4 w-4" />
-          {isSaving ? '保存中...' : '設定を保存'}
-        </Button>
+        {isAdmin && (
+          <Button className="w-full" onClick={handleSave} disabled={isSaving}>
+            <Save className="mr-2 h-4 w-4" />
+            {isSaving ? '保存中...' : '設定を保存'}
+          </Button>
+        )}
       </div>
     </div>
   )
