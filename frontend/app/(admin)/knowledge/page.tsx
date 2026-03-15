@@ -3,6 +3,8 @@
 import Link from "next/link";
 import React from "react";
 import AuthGuard from "@/components/AuthGuard";
+import { useAuth } from "@/lib/auth";
+import { postJson } from "@/lib/api/http";
 import {
   fetchKnowledgeItems,
   createKnowledgeItem,
@@ -10,6 +12,20 @@ import {
   type KnowledgeItemStatus,
   type KnowledgeItemType,
 } from "@/lib/api/knowledge";
+
+// ─── RAG search types ────────────────────────────────────────────────────────
+
+type RagChunk = {
+  content: string;
+  similarity: number;
+  source?: string;
+};
+
+type RagSearchResult = {
+  chunks: RagChunk[];
+  query: string;
+  total: number;
+};
 
 const STATUS_COLORS: Record<KnowledgeItemStatus, { bg: string; color: string; label: string }> = {
   pending:  { bg: "#fff8e1", color: "#b45309", label: "待機中" },
@@ -47,6 +63,7 @@ function formatDate(iso: string): string {
 }
 
 export default function KnowledgeIndexPage() {
+  const { token } = useAuth();
   const [items, setItems] = React.useState<KnowledgeItem[]>([]);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -59,6 +76,18 @@ export default function KnowledgeIndexPage() {
   const [submitting, setSubmitting] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = React.useState<string | null>(null);
+
+  // RAG検索
+  const [ragQuery, setRagQuery] = React.useState("");
+  const [ragTopK, setRagTopK] = React.useState("3");
+  const [ragSearching, setRagSearching] = React.useState(false);
+  const [ragResult, setRagResult] = React.useState<RagSearchResult | null>(null);
+  const [ragError, setRagError] = React.useState<string | null>(null);
+
+  // ワークフロー実行
+  const [workflowRunning, setWorkflowRunning] = React.useState(false);
+  const [workflowMsg, setWorkflowMsg] = React.useState<string | null>(null);
+  const [workflowIsError, setWorkflowIsError] = React.useState(false);
 
   async function loadItems() {
     setIsLoading(true);
@@ -104,6 +133,49 @@ export default function KnowledgeIndexPage() {
       setSubmitError(msg);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleRagSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ragQuery.trim()) return;
+    setRagSearching(true);
+    setRagError(null);
+    setRagResult(null);
+    try {
+      const result = await postJson<RagSearchResult>(
+        "/api/knowledge/search",
+        { query: ragQuery.trim(), top_k: Number(ragTopK) },
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      );
+      setRagResult(result);
+    } catch (e: unknown) {
+      const msg = (e as { message?: string })?.message ?? String(e);
+      setRagError(msg);
+    } finally {
+      setRagSearching(false);
+    }
+  }
+
+  async function handleWorkflowRun() {
+    setWorkflowRunning(true);
+    setWorkflowMsg(null);
+    setWorkflowIsError(false);
+    try {
+      const result = await postJson<{ status: string; message?: string }>(
+        "/api/automation/workflow/run",
+        { dry_run: false },
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      );
+      setWorkflowMsg(result.message ?? `完了しました (status: ${result.status})`);
+      setWorkflowIsError(false);
+      loadItems();
+    } catch (e: unknown) {
+      const msg = (e as { message?: string })?.message ?? String(e);
+      setWorkflowMsg(`エラー: ${msg}`);
+      setWorkflowIsError(true);
+    } finally {
+      setWorkflowRunning(false);
     }
   }
 
@@ -268,6 +340,128 @@ export default function KnowledgeIndexPage() {
               </table>
             </div>
           )}
+        </section>
+        {/* ─── RAG検索テスト ─────────────────────────────────────────── */}
+        <section className="mt-8">
+          <h2 className="text-base font-semibold mb-3 text-gray-900 dark:text-gray-100">
+            RAG検索テスト
+          </h2>
+          <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-5 bg-white dark:bg-gray-900">
+            <form onSubmit={handleRagSearch} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  検索クエリ
+                </label>
+                <textarea
+                  value={ragQuery}
+                  onChange={(e) => setRagQuery(e.target.value)}
+                  placeholder="例: BTC/USDT の強気トレンドについて"
+                  rows={3}
+                  required
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex items-center gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    取得件数 (top_k)
+                  </label>
+                  <select
+                    value={ragTopK}
+                    onChange={(e) => setRagTopK(e.target.value)}
+                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="1">1件</option>
+                    <option value="3">3件</option>
+                    <option value="5">5件</option>
+                    <option value="10">10件</option>
+                  </select>
+                </div>
+                <div className="flex-1" />
+                <button
+                  type="submit"
+                  disabled={ragSearching || !ragQuery.trim()}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                >
+                  {ragSearching ? "検索中..." : "RAG検索を実行"}
+                </button>
+              </div>
+            </form>
+
+            {ragError && (
+              <div className="mt-3 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm">
+                {ragError}
+              </div>
+            )}
+
+            {ragResult && (
+              <div className="mt-4">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  検索クエリ: <span className="font-medium text-gray-700 dark:text-gray-300">{ragResult.query}</span>
+                  　取得: {ragResult.chunks.length} チャンク
+                </p>
+                <div className="space-y-2">
+                  {ragResult.chunks.length === 0 && (
+                    <p className="text-sm text-gray-400 dark:text-gray-600">該当するチャンクが見つかりませんでした。</p>
+                  )}
+                  {ragResult.chunks.map((chunk, i) => (
+                    <div
+                      key={i}
+                      className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800"
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          チャンク #{i + 1}{chunk.source ? ` — ${chunk.source}` : ""}
+                        </span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          chunk.similarity >= 0.8
+                            ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                            : chunk.similarity >= 0.6
+                            ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300"
+                            : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                        }`}>
+                          類似度 {(chunk.similarity * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+                        {chunk.content}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ─── 手動ワークフロー実行 ──────────────────────────────────── */}
+        <section className="mt-6 mb-8">
+          <h2 className="text-base font-semibold mb-3 text-gray-900 dark:text-gray-100">
+            手動ワークフロー実行
+          </h2>
+          <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-5 bg-white dark:bg-gray-900">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Pendingステータスのナレッジアイテムをバックエンドで処理します（スクレイピング → チャンク化 → ベクトル化）。
+            </p>
+            <div className="flex items-center gap-4 flex-wrap">
+              <button
+                onClick={handleWorkflowRun}
+                disabled={workflowRunning}
+                className="px-5 py-2 text-sm bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
+              >
+                {workflowRunning ? "処理中..." : "Pendingアイテムを処理"}
+              </button>
+              {workflowMsg && (
+                <span className={`text-sm font-medium ${
+                  workflowIsError
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-green-600 dark:text-green-400"
+                }`}>
+                  {workflowMsg}
+                </span>
+              )}
+            </div>
+          </div>
         </section>
       </>
     </AuthGuard>
