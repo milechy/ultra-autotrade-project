@@ -12,6 +12,11 @@ import AuthGuard from '@/components/AuthGuard'
 import { useAuth } from '@/lib/auth'
 import { UserProviders } from '@/components/user/UserProviders'
 import { postJson, getJson } from '@/lib/api/http'
+import { Skeleton } from '@/components/ui/skeleton'
+import { SignalLight, ReasonCard, ImpactCard, WhatIfSimulation } from '@/components/transparency'
+import type { SignalData, ExplanationData, ImpactData, SimulationData } from '@/components/transparency'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.ultra-auto-trade.com'
 
 type TradeAction = 'BUY' | 'SELL'
 
@@ -177,6 +182,11 @@ function TradePage() {
   const [error, setError] = useState<string | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<PendingSignal | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [transparencySignal, setTransparencySignal] = useState<SignalData | null>(null)
+  const [explanation, setExplanation] = useState<ExplanationData | null>(null)
+  const [impact, setImpact] = useState<ImpactData | null>(null)
+  const [simulation, setSimulation] = useState<SimulationData | null>(null)
+  const [transparencyLoading, setTransparencyLoading] = useState(true)
 
   const fetchData = useCallback(async () => {
     if (!token) return
@@ -211,6 +221,23 @@ function TradePage() {
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  useEffect(() => {
+    if (!token) return
+    const decisionId = 'latest'
+    setTransparencyLoading(true)
+    Promise.all([
+      fetch(`${API_URL}/api/transparency/signal`).then(r => r.json()).catch(() => null),
+      fetch(`${API_URL}/api/transparency/explanation/${decisionId}`).then(r => r.json()).catch(() => null),
+      fetch(`${API_URL}/api/transparency/impact?current_symbol=BTC%2FUSDT`).then(r => r.json()).catch(() => null),
+      fetch(`${API_URL}/api/transparency/simulation?decision_id=${decisionId}`).then(r => r.json()).catch(() => null),
+    ]).then(([sig, exp, imp, sim]) => {
+      if (sig) setTransparencySignal(sig)
+      if (exp) setExplanation(exp)
+      if (imp) setImpact(imp)
+      if (sim) setSimulation(sim)
+    }).finally(() => setTransparencyLoading(false))
+  }, [token])
 
   const handleApprove = async (signal: PendingSignal) => {
     if (!token) return
@@ -271,6 +298,21 @@ function TradePage() {
           <span className="text-amber-600 font-medium">⚠️ Bot売買は現在無効です（Coming Soon）</span>
           <span className="text-amber-500 text-sm">AI判定結果は参考情報として表示しています</span>
         </div>
+
+        {/* 透明性コンポーネント */}
+        {transparencyLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-28 w-full rounded-xl" />
+            <Skeleton className="h-40 w-full rounded-xl" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {transparencySignal && <SignalLight signal={transparencySignal} />}
+            {explanation && <ReasonCard explanation={explanation} />}
+            {impact && <ImpactCard data={impact} />}
+            {simulation && <WhatIfSimulation data={simulation} />}
+          </div>
+        )}
 
         {shadowMode && (
           <Alert variant="destructive">
