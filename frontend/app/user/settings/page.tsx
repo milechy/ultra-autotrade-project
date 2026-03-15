@@ -80,7 +80,7 @@ function SectionHeader({ icon: Icon, title }: { icon: React.ElementType; title: 
 }
 
 function SettingsPage() {
-  const { token } = useAuth()
+  const { token, isAdmin } = useAuth()
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -313,11 +313,13 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* 緊急停止 */}
-        <EmergencyStop
-          isStopped={isStopped}
-          onStopped={() => setIsStopped(true)}
-        />
+        {/* 緊急停止 (admin のみ表示) */}
+        {isAdmin && (
+          <EmergencyStop
+            isStopped={isStopped}
+            onStopped={() => setIsStopped(true)}
+          />
+        )}
 
         <Button className="w-full" onClick={handleSave} disabled={isSaving}>
           <Save className="mr-2 h-4 w-4" />

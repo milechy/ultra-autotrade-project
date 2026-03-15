@@ -48,8 +48,8 @@ function DashboardContent() {
       try {
         const aave = await fetchAaveStatus(token)
         setAaveStatus(aave)
-      } catch {
-        // ignore
+      } catch (e: unknown) {
+        console.warn('[Dashboard] /api/aave/status fetch failed:', e)
       }
     }
     load()
