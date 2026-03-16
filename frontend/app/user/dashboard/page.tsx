@@ -107,6 +107,24 @@ function DashboardContent() {
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
           ポートフォリオ
         </h2>
+        {/* 総資産額 */}
+        <Card className="mb-3">
+          <CardHeader className="pb-1 pt-3 px-3">
+            <CardTitle className="text-xs text-muted-foreground">総資産額</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            {aaveStatus?.balance != null ? (
+              <>
+                <p className="text-2xl font-bold">
+                  ${(parseFloat(aaveStatus.balance.a_usdc_balance) + parseFloat(aaveStatus.balance.usdc_balance)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-muted-foreground">USDC相当</p>
+              </>
+            ) : (
+              <p className="text-2xl font-bold">—</p>
+            )}
+          </CardContent>
+        </Card>
         <div className="grid grid-cols-2 gap-3">
           <Card>
             <CardHeader className="pb-1 pt-3 px-3">
@@ -195,6 +213,30 @@ function DashboardContent() {
           </CardContent>
         </Card>
       </section>
+
+      {/* ポジション */}
+      {aaveStatus?.balance != null && (
+        <section>
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            ポジション
+          </h2>
+          <Card>
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">USDC（ウォレット）</span>
+                <span className="font-mono text-sm">{parseFloat(aaveStatus.balance.usdc_balance).toFixed(6)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">aUSDC（運用中）</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm">{parseFloat(aaveStatus.balance.a_usdc_balance).toFixed(6)}</span>
+                  <Badge className="text-xs bg-green-100 text-green-800 border-green-200" variant="outline">運用中</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* リバランス */}
       <section>
