@@ -151,7 +151,9 @@ class AuthService:
             ペイロード辞書、または無効な場合は None
         """
         try:
-            payload: dict[str, Any] = pyjwt.decode(token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM])
+            payload: dict[str, Any] = pyjwt.decode(
+                token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM]
+            )
             return payload
         except JWTError as e:
             logger.warning("JWT decode error: %s", e)
