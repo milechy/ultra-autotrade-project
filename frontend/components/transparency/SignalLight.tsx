@@ -41,7 +41,8 @@ const WEATHER_CONFIG = {
 }
 
 export function SignalLight({ signal, className }: SignalLightProps) {
-  const config = WEATHER_CONFIG[signal.weather]
+  if (!signal || !signal.weather) return null
+  const config = WEATHER_CONFIG[signal.weather as keyof typeof WEATHER_CONFIG] ?? WEATHER_CONFIG.cloudy
 
   return (
     <Card className={cn(config.bg, config.border, 'border-2', className)}>

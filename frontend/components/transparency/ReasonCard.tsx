@@ -52,6 +52,7 @@ function StepItem({ step }: { step: ExplanationStep }) {
 }
 
 export function ReasonCard({ explanation, className }: ReasonCardProps) {
+  if (!explanation || typeof explanation !== 'object') return null
   return (
     <Card className={className}>
       <CardHeader className="pb-2">
@@ -61,7 +62,7 @@ export function ReasonCard({ explanation, className }: ReasonCardProps) {
       </CardHeader>
       <CardContent>
         <div className="divide-y divide-border">
-          {explanation.steps.map((step) => (
+          {(explanation.steps ?? []).map((step) => (
             <StepItem key={step.step} step={step} />
           ))}
         </div>

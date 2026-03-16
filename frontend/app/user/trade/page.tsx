@@ -68,7 +68,7 @@ function ConfirmDialog({
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">推定価格</span>
-            <span className="font-medium">${parseFloat(signal.estimated_price).toFixed(2)}</span>
+            <span className="font-medium">${(parseFloat(signal.estimated_price) || 0).toFixed(2)}</span>
           </div>
         </div>
         <div className="flex gap-3">
@@ -101,7 +101,7 @@ function SignalCard({
   onSkip: (signal: PendingSignal) => void
 }) {
   const isBuy = signal.action === 'BUY'
-  const createdAt = new Date(signal.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+  const createdAt = signal.created_at ? new Date(signal.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'
 
   return (
     <Card>
@@ -127,7 +127,7 @@ function SignalCard({
           </div>
           <div>
             <span className="text-muted-foreground">推定価格</span>
-            <p className="font-medium">${parseFloat(signal.estimated_price).toFixed(2)}</p>
+            <p className="font-medium">${(parseFloat(signal.estimated_price) || 0).toFixed(2)}</p>
           </div>
           <div className="col-span-2">
             <span className="text-muted-foreground">信頼度</span>

@@ -32,7 +32,7 @@ function ScenarioCard({ scenario, isBest }: { scenario: ScenarioResult; isBest: 
         <div className="flex justify-between">
           <span className="text-muted-foreground">収益変化</span>
           <span className={cn('font-medium', changePositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
-            {changePositive ? '+' : ''}{scenario.yield_change_pct.toFixed(1)}%
+            {changePositive ? '+' : ''}{(scenario.yield_change_pct ?? 0).toFixed(1)}%
           </span>
         </div>
         <div className="flex justify-between">
@@ -45,6 +45,7 @@ function ScenarioCard({ scenario, isBest }: { scenario: ScenarioResult; isBest: 
 }
 
 export function WhatIfSimulation({ data, className }: WhatIfSimulationProps) {
+  if (!data) return null
   const colCount = data.scenarios.length
 
   return (

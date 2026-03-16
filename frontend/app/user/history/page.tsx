@@ -60,7 +60,7 @@ function PnlCell({ pnl }: { pnl: string | null }) {
   const val = parseFloat(pnl)
   const colored = val >= 0 ? 'text-green-600' : 'text-red-600'
   const prefix = val >= 0 ? '+' : ''
-  return <span className={`font-medium ${colored}`}>{prefix}{val.toFixed(2)}</span>
+  return <span className={`font-medium ${colored}`}>{prefix}{(isNaN(val) ? 0 : val).toFixed(2)}</span>
 }
 
 function HistoryTable({ records }: { records: TradeRecord[] }) {
@@ -90,13 +90,15 @@ function HistoryTable({ records }: { records: TradeRecord[] }) {
           {records.map(r => (
             <tr key={r.id} className="hover:bg-muted/30 transition-colors">
               <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                {new Date(r.created_at).toLocaleString('ja-JP', {
-                  timeZone: 'Asia/Tokyo',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {r.created_at
+                  ? new Date(r.created_at).toLocaleString('ja-JP', {
+                      timeZone: 'Asia/Tokyo',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : '—'}
               </td>
               <td className="px-3 py-2.5 font-medium whitespace-nowrap">{r.symbol}</td>
               <td className="px-3 py-2.5">

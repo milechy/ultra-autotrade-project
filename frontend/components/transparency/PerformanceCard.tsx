@@ -22,6 +22,7 @@ function getWinRateTextColor(rate: number): string {
 }
 
 export function PerformanceCard({ data, className }: PerformanceCardProps) {
+  if (!data) return null
   const gainPositive = data.total_gain_jpy >= 0
 
   return (
@@ -37,7 +38,7 @@ export function PerformanceCard({ data, className }: PerformanceCardProps) {
               {data.total_proposals}回提案、{data.positive_results}回でプラス
             </span>
             <span className={cn('text-lg font-bold', getWinRateTextColor(data.win_rate))}>
-              {data.win_rate.toFixed(1)}%
+              {(data.win_rate ?? 0).toFixed(1)}%
             </span>
           </div>
           <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
@@ -52,10 +53,10 @@ export function PerformanceCard({ data, className }: PerformanceCardProps) {
         <div className="rounded-lg bg-muted p-4 flex flex-col gap-1">
           <p className="text-sm text-muted-foreground">累計損益</p>
           <p className={cn('text-3xl font-bold', gainPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
-            {gainPositive ? '+' : ''}¥{data.total_gain_jpy.toLocaleString('ja-JP')}
+            {gainPositive ? '+' : ''}¥{(data.total_gain_jpy ?? 0).toLocaleString('ja-JP')}
           </p>
           <p className="text-sm text-muted-foreground">
-            平均 {gainPositive ? '+' : ''}¥{data.avg_gain_per_trade_jpy.toLocaleString('ja-JP')} / 回
+            平均 {gainPositive ? '+' : ''}¥{(data.avg_gain_per_trade_jpy ?? 0).toLocaleString('ja-JP')} / 回
           </p>
         </div>
 

@@ -23,6 +23,7 @@ function getBarColor(score: number): string {
 }
 
 export function SafetyScore({ data, className }: SafetyScoreProps) {
+  if (!data || typeof data !== 'object') return null
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -69,7 +70,7 @@ export function SafetyScore({ data, className }: SafetyScoreProps) {
         {/* Breakdown items */}
         {expanded && (
           <div className="flex flex-col gap-3">
-            {data.breakdown.map((item) => (
+            {(data.breakdown ?? []).map((item) => (
               <div key={item.name} className="flex flex-col gap-1">
                 <div className="flex items-center justify-between text-sm">
                   <span>{item.name}</span>

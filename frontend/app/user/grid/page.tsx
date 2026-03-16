@@ -31,8 +31,8 @@ function GridVisualization({ gridStatus }: { gridStatus: GridStatusResponse }) {
     <div style={{ position: "relative", width: "100%", maxWidth: 480 }}>
       {/* Price axis labels */}
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 11, color: "#666" }}>
-        <span>上限: ${upper.toLocaleString()}</span>
-        <span>下限: ${lower.toLocaleString()}</span>
+        <span>上限: ${(upper || 0).toLocaleString()}</span>
+        <span>下限: ${(lower || 0).toLocaleString()}</span>
       </div>
 
       {/* Grid levels container */}
