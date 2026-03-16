@@ -10,6 +10,8 @@ import json
 import logging
 import os
 import time
+import urllib.parse as _up
+import urllib.request as _ur
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -68,9 +70,29 @@ async def slack_interaction(request: Request) -> Response:
 
     action = actions[0]
     action_id: str = action.get("action_id", "")
-    value: str = action.get("value", "")
 
-    # action_id format: "approve_{session_id}" or "deny_{session_id}"
+    # PR review actions (review_*) → forward to Flask app on port 5000
+    if action_id.startswith("review_"):
+        flask_url = os.getenv("SLACK_FLASK_URL", "http://localhost:5000/slack/interactions")
+        try:
+            encoded = _up.urlencode({"payload": json.dumps(data)}).encode()
+            fwd = _ur.Request(flask_url, data=encoded, method="POST")
+            fwd.add_header("Content-Type", "application/x-www-form-urlencoded")
+            # Forward original Slack headers for signature verification
+            if timestamp:
+                fwd.add_header("X-Slack-Request-Timestamp", timestamp)
+            if signature:
+                fwd.add_header("X-Slack-Signature", signature)
+            with _ur.urlopen(fwd, timeout=10) as r:
+                flask_body = r.read()
+            return Response(content=flask_body, media_type="application/json")
+        except Exception as e:
+            logger.warning("Flask forward failed: %s", e)
+            return Response(
+                content='{"text":"PR action forwarding failed"}', media_type="application/json"
+            )
+
+    # Claude Code approval: "approve_{session_id}" or "deny_{session_id}"
     if action_id.startswith("approve_"):
         session_id = action_id[len("approve_") :]
         decision = "YES"
@@ -78,11 +100,11 @@ async def slack_interaction(request: Request) -> Response:
         session_id = action_id[len("deny_") :]
         decision = "NO"
     else:
-        # fallback: value field contains session_id
-        session_id = value
-        decision = "YES" if "approve" in action_id else "NO"
+        logger.warning("Unknown action_id: %s", action_id)
+        return Response(content="ok")
 
     if not session_id:
+        logger.warning("Empty session_id for action_id: %s", action_id)
         return Response(content="ok")
 
     _purge_expired()
