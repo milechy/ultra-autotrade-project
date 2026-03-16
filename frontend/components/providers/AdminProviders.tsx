@@ -10,7 +10,6 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    console.log('[AdminGuard] effect:', { isLoading, isAuthenticated, isAdmin });
     if (isLoading) return
     if (!isAuthenticated) {
       router.replace('/login')

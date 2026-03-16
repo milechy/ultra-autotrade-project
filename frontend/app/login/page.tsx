@@ -50,14 +50,9 @@ function LoginForm() {
 
     try {
       const loggedInUser = await login(email, password);
-      // DEBUG: ログイン戻り値を確認
-      console.log('[Login] loggedInUser:', loggedInUser);
-      console.log('[Login] loggedInUser.role:', loggedInUser?.role);
-      console.log('[Login] role === admin?', loggedInUser?.role === 'admin');
       const dest = redirectParam
         ? getSafeRedirect(redirectParam)
         : loggedInUser.role === "admin" ? "/dashboard" : "/user/dashboard";
-      console.log('[Login] redirect dest:', dest);
       router.replace(dest);
     } catch (err: any) {
       setError(err?.message || "ログインに失敗しました");
