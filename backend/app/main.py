@@ -38,6 +38,7 @@ from app.exchange.router import router as exchange_router
 from app.knowledge.router import router as knowledge_router
 from app.rss.router import router as rss_router
 from app.users.router import router as users_router
+from app.hooks.router import router as hooks_router
 from app.webhook.router import router as webhook_router
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(exchange_router)  # Exchange (PoC Pivot Step 3)
     app.include_router(rss_router)  # RSS auto-fetch
     app.include_router(webhook_router)  # Webhook receiver
+    app.include_router(hooks_router)   # Slack approval gate (Claude Code hooks)
     app.include_router(automation_router)  # Automation workflow
     app.include_router(transparency_router)  # Transparency (Wave 2)
     app.include_router(fee_router)  # Fee calculation (CSV)
