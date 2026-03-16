@@ -11,7 +11,7 @@ export function LanguageToggle() {
 
   const toggleLocale = () => {
     const next = locale === 'ja' ? 'en' : 'ja'
-    document.cookie = `NEXT_LOCALE=${next}; path=/; max-age=31536000`
+    document.cookie = `NEXT_LOCALE=${next}; path=/; max-age=31536000; Secure; SameSite=Strict`
     startTransition(() => {
       router.refresh()
     })

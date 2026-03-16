@@ -7,7 +7,10 @@ Usage:
     python ../scripts/seed_staging_users.py
 
 環境変数:
-    DATABASE_URL (省略時: SQLite fallback)
+    DATABASE_URL        (省略時: SQLite fallback)
+    SEED_ADMIN_PASSWORD (必須: admin ユーザーのパスワード)
+    SEED_PARTNER_PASSWORD (必須: partner ユーザーのパスワード)
+    SEED_TEST_PASSWORD  (必須: test ユーザーのパスワード)
 """
 from __future__ import annotations
 
@@ -22,23 +25,32 @@ from app.auth.models import UserRole
 from app.auth.service import AuthService
 from app.auth.schemas import UserCreateRequest
 
+
+def _require_env(name: str) -> str:
+    val = os.environ.get(name)
+    if not val:
+        print(f"ERROR: {name} is required", file=sys.stderr)
+        sys.exit(1)
+    return val
+
+
 USERS = [
     {
         "email": "hkobayashi@ultra-autotrade.com",
         "username": "hkobayashi",
-        "password": "#GJyd9@16H1$RTpZZins",
+        "password": _require_env("SEED_ADMIN_PASSWORD"),
         "role": UserRole.ADMIN,
     },
     {
         "email": "partner@ultra-autotrade.com",
         "username": "partner",
-        "password": "CRJBuG#54cO7TEHA4fYO",
+        "password": _require_env("SEED_PARTNER_PASSWORD"),
         "role": UserRole.EDITOR,
     },
     {
         "email": "test@ultra-autotrade.com",
         "username": "testuser",
-        "password": "NQcAKhk#WewCfX%^6htF",
+        "password": _require_env("SEED_TEST_PASSWORD"),
         "role": UserRole.VIEWER,
     },
 ]
