@@ -46,7 +46,8 @@ function ScenarioCard({ scenario, isBest }: { scenario: ScenarioResult; isBest: 
 
 export function WhatIfSimulation({ data, className }: WhatIfSimulationProps) {
   if (!data) return null
-  const colCount = data.scenarios.length
+  const scenarios = data.scenarios ?? []
+  const colCount = scenarios.length
 
   return (
     <Card className={className}>
@@ -62,7 +63,7 @@ export function WhatIfSimulation({ data, className }: WhatIfSimulationProps) {
             colCount >= 3 && 'grid-cols-1 md:grid-cols-3'
           )}
         >
-          {data.scenarios.map((scenario) => (
+          {scenarios.map((scenario) => (
             <ScenarioCard
               key={scenario.scenario}
               scenario={scenario}

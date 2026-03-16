@@ -22,6 +22,7 @@ function PortfolioColumn({
   label: string
   highlighted?: boolean
 }) {
+  if (!state || typeof state !== 'object') return null
   return (
     <div
       className={cn(
@@ -71,8 +72,8 @@ export function ImpactCard({ data, className }: ImpactCardProps) {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <PortfolioColumn state={data.before} label="実行しない場合" />
-          <PortfolioColumn state={data.after} label="実行した場合" highlighted />
+          {data.before != null && <PortfolioColumn state={data.before} label="実行しない場合" />}
+          {data.after != null && <PortfolioColumn state={data.after} label="実行した場合" highlighted />}
         </div>
 
         {/* Diff summary */}
