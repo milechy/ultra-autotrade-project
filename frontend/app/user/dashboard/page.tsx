@@ -137,8 +137,8 @@ function DashboardContent() {
                     autoStatus.last_price_change_24h >= 0 ? 'text-green-600' : 'text-red-600'
                   }`}
                 >
-                  {autoStatus.last_price_change_24h >= 0 ? '+' : ''}
-                  {autoStatus.last_price_change_24h.toFixed(2)}%
+                  {Number(autoStatus.last_price_change_24h ?? 0) >= 0 ? '+' : ''}
+                  {Number(autoStatus.last_price_change_24h ?? 0).toFixed(2)}%
                 </p>
               ) : (
                 <p className="text-muted-foreground text-base">—</p>

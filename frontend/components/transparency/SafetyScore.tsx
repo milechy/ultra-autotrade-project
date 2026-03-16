@@ -10,15 +10,17 @@ interface SafetyScoreProps {
   className?: string
 }
 
-function getScoreColor(score: number): string {
-  if (score >= 70) return 'text-green-600 dark:text-green-400'
-  if (score >= 50) return 'text-yellow-600 dark:text-yellow-400'
+function getScoreColor(score: number | string): string {
+  const n = Number(score ?? 0)
+  if (n >= 70) return 'text-green-600 dark:text-green-400'
+  if (n >= 50) return 'text-yellow-600 dark:text-yellow-400'
   return 'text-red-600 dark:text-red-400'
 }
 
-function getBarColor(score: number): string {
-  if (score >= 70) return 'bg-green-500'
-  if (score >= 50) return 'bg-yellow-500'
+function getBarColor(score: number | string): string {
+  const n = Number(score ?? 0)
+  if (n >= 70) return 'bg-green-500'
+  if (n >= 50) return 'bg-yellow-500'
   return 'bg-red-600'
 }
 
@@ -45,7 +47,7 @@ export function SafetyScore({ data, className }: SafetyScoreProps) {
           <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
             <div
               className={cn('h-full rounded-full transition-all duration-500', getBarColor(data.total_score))}
-              style={{ width: `${data.total_score}%` }}
+              style={{ width: `${Number(data.total_score ?? 0)}%` }}
             />
           </div>
           <p className="text-sm text-muted-foreground">{data.summary}</p>
@@ -79,7 +81,7 @@ export function SafetyScore({ data, className }: SafetyScoreProps) {
                 <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                   <div
                     className={cn('h-full rounded-full transition-all duration-500', getBarColor(item.score))}
-                    style={{ width: `${item.score}%` }}
+                    style={{ width: `${Number(item.score ?? 0)}%` }}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">{item.description}</p>

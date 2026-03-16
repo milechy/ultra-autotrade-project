@@ -10,7 +10,7 @@ interface WhatIfSimulationProps {
 }
 
 function ScenarioCard({ scenario, isBest }: { scenario: ScenarioResult; isBest: boolean }) {
-  const changePositive = scenario.yield_change_pct >= 0
+  const changePositive = Number(scenario.yield_change_pct ?? 0) >= 0
 
   return (
     <div
@@ -32,7 +32,7 @@ function ScenarioCard({ scenario, isBest }: { scenario: ScenarioResult; isBest: 
         <div className="flex justify-between">
           <span className="text-muted-foreground">収益変化</span>
           <span className={cn('font-medium', changePositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
-            {changePositive ? '+' : ''}{(scenario.yield_change_pct ?? 0).toFixed(1)}%
+            {changePositive ? '+' : ''}{Number(scenario.yield_change_pct ?? 0).toFixed(1)}%
           </span>
         </div>
         <div className="flex justify-between">

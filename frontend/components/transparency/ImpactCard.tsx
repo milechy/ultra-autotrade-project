@@ -10,7 +10,7 @@ interface ImpactCardProps {
 }
 
 function formatJpy(amount: number): string {
-  return (amount ?? 0).toLocaleString('ja-JP')
+  return Number(amount ?? 0).toLocaleString('ja-JP')
 }
 
 function PortfolioColumn({
@@ -34,15 +34,15 @@ function PortfolioColumn({
       <div className="flex flex-col gap-1 text-sm">
         <div className="flex justify-between">
           <span className="text-muted-foreground">預け入れ</span>
-          <span>${(state.deposit_usd ?? 0).toLocaleString()}</span>
+          <span>${Number(state.deposit_usd ?? 0).toLocaleString()}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">借入</span>
-          <span>${(state.borrow_usd ?? 0).toLocaleString()}</span>
+          <span>${Number(state.borrow_usd ?? 0).toLocaleString()}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">年利</span>
-          <span>{(state.net_apy ?? 0).toFixed(2)}%</span>
+          <span>{Number(state.net_apy ?? 0).toFixed(2)}%</span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">年間収益</span>
@@ -51,7 +51,7 @@ function PortfolioColumn({
         {state.health_factor !== null && (
           <div className="flex justify-between">
             <span className="text-muted-foreground">健全度</span>
-            <span>{(state.health_factor ?? 0).toFixed(2)}</span>
+            <span>{Number(state.health_factor ?? 0).toFixed(2)}</span>
           </div>
         )}
       </div>
@@ -61,13 +61,13 @@ function PortfolioColumn({
 
 export function ImpactCard({ data, className }: ImpactCardProps) {
   if (!data) return null
-  const diffPositive = data.diff_yield_annual_jpy >= 0
+  const diffPositive = Number(data.diff_yield_annual_jpy ?? 0) >= 0
 
   return (
     <Card className={className}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">
-          {data.action_type} ${(data.amount_usd ?? 0).toLocaleString()} の影響
+          {data.action_type} ${Number(data.amount_usd ?? 0).toLocaleString()} の影響
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
