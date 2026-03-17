@@ -2,32 +2,26 @@
 fail_on_findings: false
 
 exclude_paths:
-  - node_modules
-  - .next
-  - __pycache__
-  - .venv
-  - "*.pyc"
-  # OctoBot upstream code (not our responsibility)
-  - octobot/
-  - tentacles/
-  - user/
-  - layout.html
+  # Build artifacts & caches
+  - "**/.next/**"
+  - "**/.mypy_cache/**"
+  - "**/node_modules/**"
+  - "**/__pycache__/**"
+  - "**/.venv/**"
+  - "**/*.pyc"
+  # OctoBot upstream (not our code)
+  - "octobot/**"
+  - "tentacles/**"
+  - "user/**"
+  - "**/layout.html"
   # Test fixtures
-  - tests/cassettes/
-  - "*/test_exchange_client.py"
+  - "tests/cassettes/**"
+  # ASH output
+  - ".ash/ash_output/**"
 
-# detect-secrets baseline（false positive除外）
-scanners:
-  bandit:
-    enabled: true
-  semgrep:
-    enabled: true
-  grype:
-    enabled: true
-  checkov:
-    enabled: true
-  detect-secrets:
-    enabled: true
+reporters:
+  junitxml:
+    enabled: false
 
 reports:
   formats:

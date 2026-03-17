@@ -56,3 +56,4 @@ phase*_seed_files.zip
 # ASH Security Scanner output
 .ash/ash_output/
 .claude/settings.local.json
+.mypy_cache/
