@@ -52,3 +52,6 @@ phase*_seed_files.zip
 
 # Claude Code
 .mcp/
+
+# ASH Security Scanner output
+.ash/ash_output/

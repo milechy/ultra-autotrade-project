@@ -1,0 +1,39 @@
+name: ASH Security Scan
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev]
+
+jobs:
+  ash-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install UV
+        run: curl -sSfL https://astral.sh/uv/install.sh | sh
+
+      - name: Run ASH Security Scan
+        run: |
+          uvx --from git+https://github.com/awslabs/automated-security-helper.git@v3 ash \
+            --mode local \
+            --source-dir . \
+            --output-dir .ash/ash_output
+
+      - name: Upload ASH Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ash-security-report
+          path: .ash/ash_output/reports/
+          retention-days: 30
+
+      - name: Check for Critical Findings
+        if: always()
+        run: |
+          if [ -f .ash/ash_output/reports/ash.summary.txt ]; then
+            cat .ash/ash_output/reports/ash.summary.txt
+          fi

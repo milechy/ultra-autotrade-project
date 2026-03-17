@@ -50,3 +50,34 @@ description: Run security audit checklist for Ultra AutoTrade. Use when reviewin
 - [ ] #8: ログのトークン/キーマスク（先頭6文字+末尾4文字）
 - [ ] #9: main ブランチへの直接push禁止
 - [ ] #10: LLM出力 — JSON Schema バリデーション必須
+
+## ASH (Automated Security Helper) Integration
+
+### Running ASH Locally
+```bash
+# Quick scan (precommit mode)
+ash --mode precommit --source-dir .
+
+# Full scan (local mode)
+ash --mode local --source-dir .
+
+# View results
+cat .ash/ash_output/reports/ash.summary.txt
+open .ash/ash_output/reports/ash.html
+```
+
+### ASH Scanners
+- **Bandit**: Python SAST（SQLi、ハードコードパスワード、exec呼び出し）
+- **Semgrep**: 多言語パターンマッチング
+- **Grype**: SCA（依存関係の脆弱性）
+- **Checkov**: IaC セキュリティ（Dockerfile、docker-compose）
+
+### CI/CD Integration
+- GitHub Actions: `.github/workflows/ash-security-scan.yml`
+- pre-commit: `.pre-commit-config.yaml`
+- MCP: `.claude/mcp-ash.json`
+
+### Excluded from Scan
+- `octobot/` — OctoBot upstream code（責任範囲外）
+- `tests/cassettes/` — VCR テストフィクスチャ
+- `node_modules/`, `.next/`, `__pycache__/`

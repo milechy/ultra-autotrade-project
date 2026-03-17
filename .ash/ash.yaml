@@ -1,0 +1,26 @@
+# ASH Configuration for Ultra AutoTrade
+fail_on_findings: false  # staging: false, production: true
+
+scanners:
+  bandit:
+    enabled: true
+  semgrep:
+    enabled: true
+  grype:
+    enabled: true
+  checkov:
+    enabled: true
+
+exclude_paths:
+  - node_modules
+  - .next
+  - __pycache__
+  - .venv
+  - octobot/
+  - tests/cassettes/
+
+reports:
+  formats:
+    - json
+    - markdown
+    - html
