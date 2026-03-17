@@ -72,7 +72,7 @@ Based on:
 - DB: PostgreSQL 16 + pgvector (HNSW index, NOT IVFFlat)
 - Exchange: Bybit (primary, via ccxt) + OKX (backup)
 - Aave: V3 on Polygon/Arbitrum (web3.py)
-- AI: Claude Opus 4.6 (primary judge) + GPT-4o (cross-verify on BUY/SELL only)
+- AI: Claude Sonnet 4.6 (primary judge) + GPT-4o (cross-verify on BUY/SELL only)
 - Proxy/DNS: Cloudflare Tunnel → Hetzner backend
 - Notion: 完全撤去 → Knowledge Hub (PostgreSQL + pgvector)
 
@@ -118,7 +118,7 @@ Docker ビルド・CI が失敗する。`npm install` は `package.json` ベー�
 2. Rule engine: cooldown active? → HOLD
 3. Rule engine: daily limit 30% reached? → HOLD
 4. RAG: Knowledge Hub → context generation
-5. Phase A: Claude Opus judgment → JSON
+5. Phase A: Claude Sonnet 4.6 judgment → JSON
 6. Phase B: (conditional) GPT-4o cross-verify on BUY/SELL
 7. Rule engine: final guardrail check
 8. Execution: ccxt → Bybit
