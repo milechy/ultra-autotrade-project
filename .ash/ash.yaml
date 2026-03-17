@@ -1,6 +1,22 @@
 # ASH Configuration for Ultra AutoTrade
-fail_on_findings: false  # staging: false, production: true
+fail_on_findings: false
 
+exclude_paths:
+  - node_modules
+  - .next
+  - __pycache__
+  - .venv
+  - "*.pyc"
+  # OctoBot upstream code (not our responsibility)
+  - octobot/
+  - tentacles/
+  - user/
+  - layout.html
+  # Test fixtures
+  - tests/cassettes/
+  - "*/test_exchange_client.py"
+
+# detect-secrets baseline（false positive除外）
 scanners:
   bandit:
     enabled: true
@@ -10,14 +26,8 @@ scanners:
     enabled: true
   checkov:
     enabled: true
-
-exclude_paths:
-  - node_modules
-  - .next
-  - __pycache__
-  - .venv
-  - octobot/
-  - tests/cassettes/
+  detect-secrets:
+    enabled: true
 
 reports:
   formats:
