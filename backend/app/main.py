@@ -33,6 +33,7 @@ from app.auth.router import router as auth_router
 from app.auth.service import AuthService
 from app.automation.automation_router import router as automation_router
 from app.bots.router import router as octobot_router
+from app.data_feeds.finance_feed import start_finance_background_task
 from app.data_feeds.geopolitical import start_geo_risk_background_task
 from app.data_feeds.news_feed import start_news_background_task
 from app.data_feeds.router import router as data_feeds_router
@@ -204,6 +205,9 @@ def create_app() -> FastAPI:
             logger.info("GeoRisk background task started (interval=%dmin)", geo_interval)
             asyncio.create_task(start_news_background_task(interval_minutes=news_interval))
             logger.info("News background task started (interval=%dmin)", news_interval)
+            finance_interval = int(os.getenv("FINANCE_INTERVAL_MINUTES", "60"))
+            asyncio.create_task(start_finance_background_task(interval_minutes=finance_interval))
+            logger.info("Finance background task started (interval=%dmin)", finance_interval)
         except Exception as exc:
             logger.error("Failed to start data feed background tasks: %s", exc)
 

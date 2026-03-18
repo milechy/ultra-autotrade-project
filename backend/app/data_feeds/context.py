@@ -9,6 +9,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from app.data_feeds.finance_feed import FinanceFeedResult, get_cached_finance
 from app.data_feeds.geopolitical import GeoRiskResult, get_cached_geo_risk
 from app.data_feeds.news_feed import NewsFeedResult, get_cached_news
 
@@ -31,8 +32,8 @@ class MarketContext(BaseModel):
     # News context (Perplexity Sonar — 15min cache)
     news: NewsFeedResult = Field(default_factory=get_cached_news)
 
-    # Macro context (Phase 2 Week 4 — Perplexity Finance)
-    macro_summary: Optional[str] = None
+    # Macro context (Perplexity Finance Sonar Pro — 60min cache)
+    finance: FinanceFeedResult = Field(default_factory=get_cached_finance)
 
     # Social sentiment (Phase 2 optional — Santiment)
     social_sentiment_score: Optional[Decimal] = None
@@ -64,8 +65,14 @@ class MarketContext(BaseModel):
             if self.news.key_events:
                 parts.append("[Key Events] " + " | ".join(self.news.key_events))
 
-        if self.macro_summary:
-            parts.append(f"[Macro] {self.macro_summary}")
+        if "No finance data" not in self.finance.macro_summary:
+            parts.append(
+                f"[Macro] {self.finance.macro_summary}"
+                f" (FED: {self.finance.fed_stance},"
+                f" Stablecoin risk: {self.finance.stablecoin_risk})"
+            )
+            if self.finance.key_indicators:
+                parts.append("[Macro Indicators] " + " | ".join(self.finance.key_indicators))
 
         if self.social_sentiment_score is not None:
             parts.append(f"[Social Sentiment] {self.social_sentiment_score}/100")

@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from app.data_feeds.finance_feed import FinanceFeedResult, get_cached_finance, update_finance_cache
 from app.data_feeds.geopolitical import GeoRiskResult, get_cached_geo_risk, update_geo_risk_cache
 from app.data_feeds.news_feed import NewsFeedResult, get_cached_news, update_news_cache
 
@@ -30,3 +31,15 @@ async def get_news() -> NewsFeedResult:
 async def refresh_news() -> NewsFeedResult:
     """Force refresh news data (admin only)."""
     return await update_news_cache()
+
+
+@router.get("/finance")
+async def get_finance() -> FinanceFeedResult:
+    """Get current macro-economic finance data (from cache)."""
+    return get_cached_finance()
+
+
+@router.post("/finance/refresh")
+async def refresh_finance() -> FinanceFeedResult:
+    """Force refresh finance data (admin only)."""
+    return await update_finance_cache()
