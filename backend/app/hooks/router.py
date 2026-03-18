@@ -10,10 +10,9 @@ import json
 import logging
 import os
 import time
-import urllib.parse as _up
-import urllib.request as _ur
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request, Response
 
 logger = logging.getLogger(__name__)
@@ -75,17 +74,19 @@ async def slack_interaction(request: Request) -> Response:
     if action_id.startswith("review_"):
         flask_url = os.getenv("SLACK_FLASK_URL", "http://localhost:5000/slack/interactions")
         try:
-            encoded = _up.urlencode({"payload": json.dumps(data)}).encode()
-            fwd = _ur.Request(flask_url, data=encoded, method="POST")
-            fwd.add_header("Content-Type", "application/x-www-form-urlencoded")
-            # Forward original Slack headers for signature verification
+            headers: dict[str, str] = {"Content-Type": "application/x-www-form-urlencoded"}
             if timestamp:
-                fwd.add_header("X-Slack-Request-Timestamp", timestamp)
+                headers["X-Slack-Request-Timestamp"] = timestamp
             if signature:
-                fwd.add_header("X-Slack-Signature", signature)
-            with _ur.urlopen(fwd, timeout=10) as r:
-                flask_body = r.read()
-            return Response(content=flask_body, media_type="application/json")
+                headers["X-Slack-Signature"] = signature
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    flask_url,
+                    data={"payload": json.dumps(data)},
+                    headers=headers,
+                    timeout=10.0,
+                )
+            return Response(content=resp.content, media_type="application/json")
         except Exception as e:
             logger.warning("Flask forward failed: %s", e)
             return Response(
@@ -113,27 +114,18 @@ async def slack_interaction(request: Request) -> Response:
 
     # Update the Slack message to reflect the decision
     response_url: str = data.get("response_url", "")
-    if response_url:
+    if response_url and response_url.startswith("https://"):
         label = "✅ 承認しました" if decision == "YES" else "❌ 拒否しました"
         user = data.get("user", {}).get("name", "?")
-        import urllib.request
-
-        msg = json.dumps(
-            {
-                "replace_original": True,
-                "text": f"{label} (by @{user})",
-            }
-        ).encode()
         try:
-            req = urllib.request.Request(
-                response_url,
-                data=msg,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            urllib.request.urlopen(req, timeout=5)
-        except Exception:
-            pass
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    response_url,
+                    json={"replace_original": True, "text": f"{label} (by @{user})"},
+                    timeout=5.0,
+                )
+        except Exception as exc:
+            logger.warning("Failed to update Slack message via response_url: %s", exc)
 
     return Response(content="")
 
