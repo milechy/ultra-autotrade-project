@@ -133,6 +133,17 @@ def create_app() -> FastAPI:
         # JWT シークレットキーの強度検証（staging/production では弱いキーを拒否）
         AuthService.validate_secret_key()
 
+    @app.on_event("startup")
+    async def startup_judgment_logger() -> None:
+        """Initialize AI judgment logger (JSONL + cognitive state)."""
+        try:
+            from app.ai.judgment_log import get_judgment_logger
+
+            await get_judgment_logger().initialize()
+            logger.info("JudgmentLogger initialized")
+        except Exception as exc:
+            logger.error("Failed to initialize JudgmentLogger: %s", exc)
+
     # --- バックグラウンド監視タスク (Phase5) ---
     @app.on_event("startup")
     async def startup_event() -> None:

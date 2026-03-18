@@ -14,6 +14,7 @@ from typing import List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from app.ai.judgment_log import JudgmentRecord, get_judgment_logger
 from app.ai.schemas import AIAnalysisResult, RAGContext, TradeAction
 from app.ai.service import AIService
 from app.automation.monitoring_service import MonitoringService
@@ -474,10 +475,27 @@ def _process_single_item(
     )
 
     ctx = build_market_context(health_factor=health_factor)
-    cross_result = ai_service.judge_with_rag(query, rag_context, market_context=ctx)
+    _judgment_logger = get_judgment_logger()
+    _cognitive = _judgment_logger.get_cognitive_state()
+    cross_result = ai_service.judge_with_rag(
+        query, rag_context, market_context=ctx, cognitive_state=_cognitive
+    )
     action = cross_result.final_action
     confidence = cross_result.final_confidence
     reason = cross_result.final_reason or ""
+
+    _judgment_logger.record_nowait(
+        JudgmentRecord(
+            action=action.value,
+            confidence=confidence,
+            reason=reason,
+            primary_action=cross_result.primary.action.value,
+            secondary_action=cross_result.secondary.action.value
+            if cross_result.secondary
+            else None,
+            agreed=cross_result.agreed,
+        )
+    )
 
     logger.info(
         "AI judge for item %d: action=%s, confidence=%d, agreed=%s",

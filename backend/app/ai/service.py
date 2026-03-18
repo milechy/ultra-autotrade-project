@@ -14,6 +14,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Callable, Iterable, List, Optional
 
+from app.ai.judgment_log import CognitiveState
 from app.data_feeds.context import MarketContext
 from app.notion.schemas import NotionNewsItem
 
@@ -211,6 +212,7 @@ class AIService:
         rag_context: RAGContext,
         *,
         market_context: Optional[MarketContext] = None,
+        cognitive_state: Optional[CognitiveState] = None,
         settings: Optional[AISettings] = None,
     ) -> CrossValidationResult:
         """
@@ -221,7 +223,9 @@ class AIService:
         """
         ai_settings = settings or get_ai_settings()
         version = ai_settings.prompt_version
-        prompt = self._build_rag_prompt(query, rag_context, version, market_context)
+        prompt = self._build_rag_prompt(
+            query, rag_context, version, market_context, cognitive_state
+        )
 
         # Phase 1: Primary (Claude)
         primary = self._call_claude(prompt, ai_settings, version)
@@ -253,6 +257,7 @@ class AIService:
         rag_context: RAGContext,
         version: str = "v1",
         market_context: Optional[MarketContext] = None,
+        cognitive_state: Optional[CognitiveState] = None,
     ) -> str:
         """Build prompt with RAG context chunks using the specified prompt version."""
         chunks_text = (
@@ -272,6 +277,8 @@ class AIService:
         if market_context is not None:
             ctx_text = market_context.to_prompt_context()
             base = base + f"\n\n## Market Context (Real-time Data):\n{ctx_text}"
+        if cognitive_state is not None:
+            base = base + f"\n\n{cognitive_state.to_prompt_context()}"
         return base
 
     def _call_claude(self, prompt: str, settings: AISettings, version: str = "v1") -> LLMDecision:

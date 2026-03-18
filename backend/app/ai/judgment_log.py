@@ -191,6 +191,18 @@ class JudgmentLogger:
         """Get the most recent N judgments."""
         return list(self._recent)[-count:]
 
+    def record_nowait(self, record: JudgmentRecord) -> None:
+        """Sync record for use in non-async contexts. No lock (caller ensures single-writer)."""
+        try:
+            with open(self._log_path, "a") as f:
+                f.write(record.model_dump_json() + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception as exc:
+            logger.error("Failed to write judgment log: %s", exc)
+        self._recent.append(record)
+        self._update_cognitive(record)
+
     async def update_outcome(
         self,
         timestamp: datetime,
