@@ -18,8 +18,9 @@ Phase12 で追加された責務:
 
 import logging
 import os
+from typing import Awaitable, Callable
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.aave.fee_router import router as fee_router
@@ -75,8 +76,11 @@ def create_app() -> FastAPI:
 
     # Remove server info headers in production
     @app.middleware("http")
-    async def remove_server_header(request, call_next):
-        response = await call_next(request)
+    async def remove_server_header(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        response: Response = await call_next(request)
         if "server" in response.headers:
             del response.headers["server"]
         if "x-powered-by" in response.headers:
