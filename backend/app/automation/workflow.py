@@ -26,6 +26,7 @@ from app.bots.schemas import (
     OctoBotSignalStatus,
 )
 from app.bots.service import OctoBotService
+from app.data_feeds.context import build_market_context
 from app.exchange.schemas import OrderRequest, OrderResult, OrderStatus
 from app.exchange.service import ExchangeService
 from app.knowledge.schemas import (
@@ -339,6 +340,7 @@ def process_pending_knowledge(
     logger.info("Processing %d pending knowledge items", len(pending))
 
     # HF をリフレッシュして MonitoringService に記録 (rule engine の判定に使用)
+    hf: Optional[Decimal] = None  # Initialize before try block
     if monitoring_service is not None:
         try:
             from app.aave.monitor import get_health_factor as _aave_get_hf  # noqa: PLC0415
@@ -381,6 +383,7 @@ def process_pending_knowledge(
                 trade_amount_usd=trade_amount_usd,
                 dry_run=dry_run,
                 shadow_mode_service=shadow_mode_service,
+                health_factor=hf,
             )
 
             if result.shadow_logged:
@@ -457,6 +460,7 @@ def _process_single_item(
     trade_amount_usd: Decimal,
     dry_run: bool,
     shadow_mode_service: Optional[ShadowModeService] = None,
+    health_factor: Optional[Decimal] = None,
 ) -> _SingleItemResult:
     """Process a single knowledge item through the full pipeline."""
     query = item.title or item.source_url or "analyze market conditions"
@@ -469,7 +473,8 @@ def _process_single_item(
         source_count=len(search_results),
     )
 
-    cross_result = ai_service.judge_with_rag(query, rag_context)
+    ctx = build_market_context(health_factor=health_factor)
+    cross_result = ai_service.judge_with_rag(query, rag_context, market_context=ctx)
     action = cross_result.final_action
     confidence = cross_result.final_confidence
     reason = cross_result.final_reason or ""
