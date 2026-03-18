@@ -32,17 +32,17 @@ from app.auth.router import router as auth_router
 from app.auth.service import AuthService
 from app.automation.automation_router import router as automation_router
 from app.bots.router import router as octobot_router
+from app.data_feeds.geopolitical import start_geo_risk_background_task
+from app.data_feeds.router import router as data_feeds_router
 from app.database import init_db
 from app.dca.router import router as dca_router
+from app.error_handlers import register_error_handlers
 from app.exchange.router import router as exchange_router
 from app.hooks.router import router as hooks_router
 from app.knowledge.router import router as knowledge_router
 from app.rss.router import router as rss_router
 from app.users.router import router as users_router
 from app.webhook.router import router as webhook_router
-from app.data_feeds.geopolitical import start_geo_risk_background_task
-from app.data_feeds.router import router as data_feeds_router
-from app.error_handlers import register_error_handlers
 
 logger = logging.getLogger(__name__)
 

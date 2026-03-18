@@ -1,8 +1,6 @@
 """Tests for geopolitical risk feed module."""
 from decimal import Decimal
 
-import pytest
-
 from app.data_feeds.geopolitical import (
     GDELTEvent,
     GeoRiskResult,
