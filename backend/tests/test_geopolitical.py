@@ -1,4 +1,5 @@
 """Tests for geopolitical risk feed module."""
+
 from decimal import Decimal
 
 from app.data_feeds.geopolitical import (
@@ -25,10 +26,7 @@ class TestGeoRiskScoreCalculator:
         gdelt = GDELTEvent(avg_tone=Decimal("-8.0"), event_count=400)
         result = calculate_geo_risk_score(gdelt, [])
         assert result.geo_risk_score >= 40
-        assert any(
-            word in result.summary.lower()
-            for word in ("conflict", "events", "tension")
-        )
+        assert any(word in result.summary.lower() for word in ("conflict", "events", "tension"))
 
     def test_extreme_with_earthquake(self):
         """Extreme: very negative tone + major earthquake."""

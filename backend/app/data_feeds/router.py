@@ -1,4 +1,5 @@
 """API endpoints for external data feeds."""
+
 from fastapi import APIRouter
 
 from app.data_feeds.geopolitical import get_cached_geo_risk, update_geo_risk_cache

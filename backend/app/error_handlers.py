@@ -2,6 +2,7 @@
 Global error handlers for production safety.
 Prevents internal error details from leaking to clients.
 """
+
 import logging
 import os
 

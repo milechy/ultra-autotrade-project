@@ -10,6 +10,7 @@ Architecture:
   - Background task updates cache every 30 minutes
   - AI judgment reads from cache (0.01s) not live API (2-3s)
 """
+
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
@@ -46,9 +47,7 @@ class USGSEarthquake(BaseModel):
 class GeoRiskResult(BaseModel):
     """Combined geopolitical risk assessment."""
 
-    geo_risk_score: int = Field(
-        default=50, ge=0, le=100, description="0=safe, 100=extreme risk"
-    )
+    geo_risk_score: int = Field(default=50, ge=0, le=100, description="0=safe, 100=extreme risk")
     gdelt_tone: Decimal = Field(default=Decimal("0"))
     gdelt_event_count: int = Field(default=0)
     earthquake_count: int = Field(default=0)

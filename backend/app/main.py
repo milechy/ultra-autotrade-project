@@ -53,7 +53,9 @@ def create_app() -> FastAPI:
         version="0.1.0",
         docs_url=None if os.getenv("APP_ENV", "development") == "production" else "/docs",
         redoc_url=None if os.getenv("APP_ENV", "development") == "production" else "/redoc",
-        openapi_url=None if os.getenv("APP_ENV", "development") == "production" else "/openapi.json",
+        openapi_url=None
+        if os.getenv("APP_ENV", "development") == "production"
+        else "/openapi.json",
     )
 
     # --- CORS 設定 ---
@@ -93,7 +95,7 @@ def create_app() -> FastAPI:
     app.include_router(exchange_router)  # Exchange (PoC Pivot Step 3)
     app.include_router(rss_router)  # RSS auto-fetch
     app.include_router(webhook_router)  # Webhook receiver
-    app.include_router(hooks_router)   # Slack approval gate (Claude Code hooks)
+    app.include_router(hooks_router)  # Slack approval gate (Claude Code hooks)
     app.include_router(automation_router)  # Automation workflow
     app.include_router(transparency_router)  # Transparency (Wave 2)
     app.include_router(fee_router)  # Fee calculation (CSV)
