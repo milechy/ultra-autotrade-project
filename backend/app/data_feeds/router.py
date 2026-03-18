@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from app.automation.howl_review import HOWLReport, run_howl_review
 from app.data_feeds.finance_feed import FinanceFeedResult, get_cached_finance, update_finance_cache
 from app.data_feeds.geopolitical import GeoRiskResult, get_cached_geo_risk, update_geo_risk_cache
 from app.data_feeds.news_feed import NewsFeedResult, get_cached_news, update_news_cache
@@ -43,3 +44,9 @@ async def get_finance() -> FinanceFeedResult:
 async def refresh_finance() -> FinanceFeedResult:
     """Force refresh finance data (admin only)."""
     return await update_finance_cache()
+
+
+@router.post("/howl/review")
+async def trigger_howl_review() -> HOWLReport:
+    """Trigger HOWL self-improvement review (admin only)."""
+    return await run_howl_review()
