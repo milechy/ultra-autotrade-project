@@ -129,7 +129,8 @@ class JudgmentLogger:
                     try:
                         record = JudgmentRecord.model_validate_json(line.strip())
                         self._recent.append(record)
-                    except Exception:
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("Skipping malformed JSONL line: %s", exc)
                         continue
                 self._rebuild_cognitive_state()
             self._initialized = True

@@ -97,8 +97,8 @@ def evaluate_judgment(
         try:
             hf_then = Decimal(record.health_factor)
             review.hf_improved = current_hf >= hf_then
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not parse health_factor for HF comparison: %s", exc)
 
     if record.action == "HOLD":
         if record.geo_risk_score is not None and record.geo_risk_score >= 60:
