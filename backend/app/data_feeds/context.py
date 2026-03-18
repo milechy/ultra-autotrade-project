@@ -10,6 +10,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from app.data_feeds.geopolitical import GeoRiskResult, get_cached_geo_risk
+from app.data_feeds.news_feed import NewsFeedResult, get_cached_news
 
 
 class MarketContext(BaseModel):
@@ -27,9 +28,8 @@ class MarketContext(BaseModel):
     aave_borrow_apy: Optional[Decimal] = None
     health_factor: Optional[Decimal] = None
 
-    # News context (Phase 2 Week 3 — Perplexity)
-    news_summary: Optional[str] = None
-    news_sentiment: Optional[str] = None  # "positive" / "neutral" / "negative"
+    # News context (Perplexity Sonar — 15min cache)
+    news: NewsFeedResult = Field(default_factory=get_cached_news)
 
     # Macro context (Phase 2 Week 4 — Perplexity Finance)
     macro_summary: Optional[str] = None
@@ -59,8 +59,10 @@ class MarketContext(BaseModel):
         if self.health_factor is not None:
             parts.append(f"[Health Factor] {self.health_factor}")
 
-        if self.news_summary:
-            parts.append(f"[News] {self.news_summary} (Sentiment: {self.news_sentiment})")
+        if self.news.summary and "No news" not in self.news.summary:
+            parts.append(f"[News] {self.news.summary} (Sentiment: {self.news.sentiment})")
+            if self.news.key_events:
+                parts.append("[Key Events] " + " | ".join(self.news.key_events))
 
         if self.macro_summary:
             parts.append(f"[Macro] {self.macro_summary}")

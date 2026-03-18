@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.data_feeds.geopolitical import GeoRiskResult, get_cached_geo_risk, update_geo_risk_cache
+from app.data_feeds.news_feed import NewsFeedResult, get_cached_news, update_news_cache
 
 router = APIRouter(prefix="/api/data-feeds", tags=["data-feeds"])
 
@@ -17,3 +18,15 @@ async def get_geo_risk() -> GeoRiskResult:
 async def refresh_geo_risk() -> GeoRiskResult:
     """Force refresh geopolitical risk data (admin only)."""
     return await update_geo_risk_cache()
+
+
+@router.get("/news")
+async def get_news() -> NewsFeedResult:
+    """Get latest crypto/DeFi news summary (from cache)."""
+    return get_cached_news()
+
+
+@router.post("/news/refresh")
+async def refresh_news() -> NewsFeedResult:
+    """Force refresh news data (admin only)."""
+    return await update_news_cache()

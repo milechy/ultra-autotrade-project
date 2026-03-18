@@ -116,15 +116,20 @@ class TestMarketContext:
     def test_prompt_context_includes_news(self):
         """News fields appear in prompt when provided."""
         from app.data_feeds.context import build_market_context
+        from app.data_feeds.news_feed import NewsFeedResult
 
         ctx = build_market_context(
-            news_summary="FED signals rate cut",
-            news_sentiment="positive",
+            news=NewsFeedResult(
+                summary="FED signals rate cut",
+                sentiment="positive",
+                key_events=["FED dovish pivot", "ETH +5%"],
+            ),
         )
         prompt = ctx.to_prompt_context()
         assert "[News]" in prompt
         assert "FED" in prompt
         assert "positive" in prompt
+        assert "[Key Events]" in prompt
 
     def test_prompt_context_minimal(self):
         """Minimal context only contains geo-risk line."""

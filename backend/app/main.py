@@ -34,6 +34,7 @@ from app.auth.service import AuthService
 from app.automation.automation_router import router as automation_router
 from app.bots.router import router as octobot_router
 from app.data_feeds.geopolitical import start_geo_risk_background_task
+from app.data_feeds.news_feed import start_news_background_task
 from app.data_feeds.router import router as data_feeds_router
 from app.database import init_db
 from app.dca.router import router as dca_router
@@ -193,15 +194,18 @@ def create_app() -> FastAPI:
     # --- 外部データフィード バックグラウンドタスク (Phase 2 Data Intelligence) ---
     @app.on_event("startup")
     async def startup_data_feeds() -> None:
-        """Start geo-risk background feed (GDELT + USGS, every 30min)."""
+        """Start data feed background tasks (geo-risk + news)."""
         import asyncio
 
-        interval = int(os.getenv("GEO_RISK_INTERVAL_MINUTES", "30"))
+        geo_interval = int(os.getenv("GEO_RISK_INTERVAL_MINUTES", "30"))
+        news_interval = int(os.getenv("NEWS_INTERVAL_MINUTES", "15"))
         try:
-            asyncio.create_task(start_geo_risk_background_task(interval_minutes=interval))
-            logger.info("GeoRisk background task started (interval=%dmin)", interval)
+            asyncio.create_task(start_geo_risk_background_task(interval_minutes=geo_interval))
+            logger.info("GeoRisk background task started (interval=%dmin)", geo_interval)
+            asyncio.create_task(start_news_background_task(interval_minutes=news_interval))
+            logger.info("News background task started (interval=%dmin)", news_interval)
         except Exception as exc:
-            logger.error("Failed to start GeoRisk background task: %s", exc)
+            logger.error("Failed to start data feed background tasks: %s", exc)
 
     # --- スケジュールタスク (Phase6) ---
     @app.on_event("startup")
