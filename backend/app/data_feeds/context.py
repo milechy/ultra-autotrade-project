@@ -9,6 +9,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from app.ai.judgment_log import CognitiveState
 from app.data_feeds.finance_feed import FinanceFeedResult, get_cached_finance
 from app.data_feeds.geopolitical import GeoRiskResult, get_cached_geo_risk
 from app.data_feeds.news_feed import NewsFeedResult, get_cached_news
@@ -37,6 +38,9 @@ class MarketContext(BaseModel):
 
     # Social sentiment (Phase 2 optional — Santiment)
     social_sentiment_score: Optional[Decimal] = None
+
+    # AI cognitive state (recent judgment history for pattern detection)
+    cognitive_state: Optional[CognitiveState] = None
 
     # Metadata
     collected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -1,0 +1,290 @@
+"""Tests for multi-agent AI judgment system."""
+
+from decimal import Decimal
+
+from app.ai.agents import (
+    AgentSignal,
+    Bias,
+    MultiAgentContext,
+    indicator_agent,
+    macro_agent,
+    pattern_agent,
+    risk_agent,
+    run_all_agents,
+)
+from app.ai.judgment_log import CognitiveState
+from app.data_feeds.context import build_market_context
+from app.data_feeds.finance_feed import FinanceFeedResult
+from app.data_feeds.geopolitical import GeoRiskResult
+from app.data_feeds.news_feed import NewsFeedResult
+
+
+class TestIndicatorAgent:
+    def test_low_hf_is_bearish(self) -> None:
+        ctx = build_market_context(health_factor=Decimal("1.45"))
+        signal = indicator_agent(ctx)
+        assert signal.bias == Bias.BEARISH
+        assert "critically low" in signal.reasoning.lower()
+
+    def test_high_hf_is_bullish(self) -> None:
+        ctx = build_market_context(health_factor=Decimal("2.5"))
+        signal = indicator_agent(ctx)
+        assert signal.bias == Bias.BULLISH
+        assert "buffer" in signal.reasoning.lower()
+
+    def test_no_data_is_neutral(self) -> None:
+        ctx = build_market_context()
+        signal = indicator_agent(ctx)
+        assert signal.bias == Bias.NEUTRAL
+
+    def test_high_utilization_is_bearish(self) -> None:
+        ctx = build_market_context(
+            health_factor=Decimal("1.9"),
+            aave_utilization_rate=Decimal("92"),
+        )
+        signal = indicator_agent(ctx)
+        assert "liquidity pressure" in signal.reasoning.lower()
+
+    def test_attractive_supply_apy(self) -> None:
+        ctx = build_market_context(
+            health_factor=Decimal("2.1"),
+            aave_supply_apy=Decimal("6.5"),
+        )
+        signal = indicator_agent(ctx)
+        assert "attractive yield" in signal.reasoning.lower()
+
+
+class TestPatternAgent:
+    def test_no_history_is_neutral(self) -> None:
+        ctx = build_market_context(cognitive_state=CognitiveState())
+        signal = pattern_agent(ctx)
+        assert signal.bias == Bias.NEUTRAL
+        assert signal.confidence <= 40
+
+    def test_no_cognitive_state_is_neutral(self) -> None:
+        ctx = build_market_context()
+        signal = pattern_agent(ctx)
+        assert signal.bias == Bias.NEUTRAL
+        assert "No judgment history" in signal.reasoning
+
+    def test_consecutive_holds_suggests_action(self) -> None:
+        cs = CognitiveState(
+            total_judgments=10,
+            consecutive_holds=6,
+            recent_actions=["HOLD", "HOLD", "HOLD", "HOLD", "HOLD"],
+        )
+        ctx = build_market_context(cognitive_state=cs)
+        signal = pattern_agent(ctx)
+        assert signal.bias == Bias.BULLISH
+        assert "normalized" in signal.reasoning.lower()
+
+    def test_flip_flop_detected(self) -> None:
+        cs = CognitiveState(
+            total_judgments=5,
+            consecutive_holds=0,
+            recent_actions=["BUY", "SELL", "HOLD"],
+        )
+        ctx = build_market_context(cognitive_state=cs)
+        signal = pattern_agent(ctx)
+        assert signal.bias == Bias.NEUTRAL
+        assert "flip-flopping" in signal.reasoning.lower()
+
+    def test_low_win_rate_increases_caution(self) -> None:
+        cs = CognitiveState(
+            total_judgments=20,
+            consecutive_holds=1,
+            win_rate=0.3,
+            recent_actions=["HOLD"],
+        )
+        ctx = build_market_context(cognitive_state=cs)
+        signal = pattern_agent(ctx)
+        assert "below target" in signal.reasoning.lower()
+
+    def test_high_win_rate_increases_confidence(self) -> None:
+        cs = CognitiveState(
+            total_judgments=20,
+            consecutive_holds=0,
+            win_rate=0.8,
+            recent_actions=["BUY"],
+        )
+        ctx = build_market_context(cognitive_state=cs)
+        signal = pattern_agent(ctx)
+        assert "strong" in signal.reasoning.lower()
+
+
+class TestRiskAgent:
+    def test_high_geo_risk_is_bearish(self) -> None:
+        geo = GeoRiskResult(geo_risk_score=85, summary="Major conflict in Middle East")
+        ctx = build_market_context(geo_risk=geo)
+        signal = risk_agent(ctx)
+        assert signal.bias == Bias.BEARISH
+        assert signal.confidence >= 50
+
+    def test_low_risk_is_bullish(self) -> None:
+        geo = GeoRiskResult(geo_risk_score=15, summary="Stable environment")
+        fin = FinanceFeedResult(stablecoin_risk="low")
+        ctx = build_market_context(geo_risk=geo, finance=fin)
+        signal = risk_agent(ctx)
+        assert signal.bias == Bias.BULLISH
+
+    def test_compound_risk(self) -> None:
+        geo = GeoRiskResult(geo_risk_score=75, summary="Elevated tensions")
+        ctx = build_market_context(geo_risk=geo, health_factor=Decimal("1.65"))
+        signal = risk_agent(ctx)
+        assert signal.bias == Bias.BEARISH
+        assert "compound risk" in signal.reasoning.lower()
+
+    def test_high_stablecoin_risk(self) -> None:
+        fin = FinanceFeedResult(stablecoin_risk="high")
+        ctx = build_market_context(finance=fin)
+        signal = risk_agent(ctx)
+        assert "depeg" in signal.reasoning.lower()
+
+    def test_stable_environment_is_bullish(self) -> None:
+        geo = GeoRiskResult(geo_risk_score=20, summary="Calm markets")
+        fin = FinanceFeedResult(stablecoin_risk="low")
+        ctx = build_market_context(geo_risk=geo, finance=fin)
+        signal = risk_agent(ctx)
+        assert signal.bias == Bias.BULLISH
+
+
+class TestMacroAgent:
+    def test_dovish_fed_is_bullish(self) -> None:
+        fin = FinanceFeedResult(
+            fed_stance="dovish",
+            macro_summary="FED cuts rates to support growth",
+        )
+        ctx = build_market_context(finance=fin)
+        signal = macro_agent(ctx)
+        assert signal.bias == Bias.BULLISH
+        assert "dovish" in signal.reasoning.lower()
+
+    def test_hawkish_fed_with_negative_news_is_bearish(self) -> None:
+        fin = FinanceFeedResult(
+            fed_stance="hawkish",
+            macro_summary="FED raises rates to fight inflation",
+        )
+        news = NewsFeedResult(sentiment="negative", summary="Markets drop on rate hike fears")
+        ctx = build_market_context(finance=fin, news=news)
+        signal = macro_agent(ctx)
+        assert signal.bias == Bias.BEARISH
+
+    def test_positive_news_is_bullish(self) -> None:
+        news = NewsFeedResult(
+            sentiment="positive", summary="ETH rally continues amid institutional buying"
+        )
+        ctx = build_market_context(news=news)
+        signal = macro_agent(ctx)
+        assert "positive" in signal.reasoning.lower()
+
+    def test_no_data_is_neutral(self) -> None:
+        ctx = build_market_context()
+        signal = macro_agent(ctx)
+        assert signal.bias == Bias.NEUTRAL
+
+
+class TestMultiAgentOrchestrator:
+    def test_run_all_agents_returns_all_signals(self) -> None:
+        geo = GeoRiskResult(geo_risk_score=40, summary="Moderate tensions")
+        fin = FinanceFeedResult(fed_stance="neutral", stablecoin_risk="low")
+        ctx = build_market_context(
+            health_factor=Decimal("1.85"),
+            geo_risk=geo,
+            finance=fin,
+        )
+        result = run_all_agents(ctx)
+        assert result.indicator_signal is not None
+        assert result.pattern_signal is not None
+        assert result.risk_signal is not None
+        assert result.macro_signal is not None
+
+    def test_consensus_bias_bullish(self) -> None:
+        mac = MultiAgentContext(
+            indicator_signal=AgentSignal(
+                agent_name="I", bias=Bias.BULLISH, confidence=70, reasoning=""
+            ),
+            pattern_signal=AgentSignal(
+                agent_name="P", bias=Bias.BULLISH, confidence=60, reasoning=""
+            ),
+            risk_signal=AgentSignal(agent_name="R", bias=Bias.BULLISH, confidence=65, reasoning=""),
+            macro_signal=AgentSignal(
+                agent_name="M", bias=Bias.NEUTRAL, confidence=50, reasoning=""
+            ),
+        )
+        assert mac.consensus_bias() == Bias.BULLISH
+
+    def test_consensus_bias_bearish(self) -> None:
+        mac = MultiAgentContext(
+            indicator_signal=AgentSignal(
+                agent_name="I", bias=Bias.BEARISH, confidence=70, reasoning=""
+            ),
+            pattern_signal=AgentSignal(
+                agent_name="P", bias=Bias.BEARISH, confidence=60, reasoning=""
+            ),
+            risk_signal=AgentSignal(agent_name="R", bias=Bias.NEUTRAL, confidence=50, reasoning=""),
+            macro_signal=AgentSignal(
+                agent_name="M", bias=Bias.BEARISH, confidence=50, reasoning=""
+            ),
+        )
+        assert mac.consensus_bias() == Bias.BEARISH
+
+    def test_consensus_bias_neutral_when_mixed(self) -> None:
+        mac = MultiAgentContext(
+            indicator_signal=AgentSignal(
+                agent_name="I", bias=Bias.BULLISH, confidence=70, reasoning=""
+            ),
+            macro_signal=AgentSignal(
+                agent_name="M", bias=Bias.BEARISH, confidence=70, reasoning=""
+            ),
+        )
+        assert mac.consensus_bias() == Bias.NEUTRAL
+
+    def test_decision_prompt_format(self) -> None:
+        mac = MultiAgentContext(
+            indicator_signal=AgentSignal(
+                agent_name="Indicator Agent",
+                bias=Bias.BULLISH,
+                confidence=70,
+                reasoning="HF is healthy",
+                key_data={"health_factor": "1.85"},
+            ),
+            risk_signal=AgentSignal(
+                agent_name="Risk Agent",
+                bias=Bias.NEUTRAL,
+                confidence=50,
+                reasoning="Moderate risk",
+            ),
+        )
+        prompt = mac.to_decision_prompt()
+        assert "Indicator Agent" in prompt
+        assert "Risk Agent" in prompt
+        assert "bullish" in prompt
+        assert "1.85" in prompt
+
+    def test_average_confidence(self) -> None:
+        mac = MultiAgentContext(
+            indicator_signal=AgentSignal(
+                agent_name="I", bias=Bias.BULLISH, confidence=80, reasoning=""
+            ),
+            risk_signal=AgentSignal(agent_name="R", bias=Bias.NEUTRAL, confidence=60, reasoning=""),
+        )
+        assert mac.average_confidence() == 70
+
+    def test_empty_context_average_confidence(self) -> None:
+        mac = MultiAgentContext()
+        assert mac.average_confidence() == 50
+
+    def test_cognitive_state_in_prompt(self) -> None:
+        cs = CognitiveState(
+            total_judgments=5,
+            last_action="BUY",
+            last_confidence=75,
+        )
+        mac = MultiAgentContext(
+            indicator_signal=AgentSignal(
+                agent_name="I", bias=Bias.BULLISH, confidence=70, reasoning="test"
+            ),
+            cognitive_state=cs,
+        )
+        prompt = mac.to_decision_prompt()
+        assert "Decision History" in prompt
