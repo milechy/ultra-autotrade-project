@@ -40,6 +40,8 @@ from app.knowledge.router import router as knowledge_router
 from app.rss.router import router as rss_router
 from app.users.router import router as users_router
 from app.webhook.router import router as webhook_router
+from app.data_feeds.geopolitical import start_geo_risk_background_task
+from app.data_feeds.router import router as data_feeds_router
 from app.error_handlers import register_error_handlers
 
 logger = logging.getLogger(__name__)
@@ -99,6 +101,7 @@ def create_app() -> FastAPI:
         automation_dashboard_router,
         prefix="/api/automation",
     )
+    app.include_router(data_feeds_router)  # External data feeds (Phase 2)
 
     # Register global error handlers (production safety)
     register_error_handlers(app)
@@ -180,6 +183,19 @@ def create_app() -> FastAPI:
 
         except Exception as exc:
             logger.error("Error during shutdown: %s", exc)
+
+    # --- 外部データフィード バックグラウンドタスク (Phase 2 Data Intelligence) ---
+    @app.on_event("startup")
+    async def startup_data_feeds() -> None:
+        """Start geo-risk background feed (GDELT + USGS, every 30min)."""
+        import asyncio
+
+        interval = int(os.getenv("GEO_RISK_INTERVAL_MINUTES", "30"))
+        try:
+            asyncio.create_task(start_geo_risk_background_task(interval_minutes=interval))
+            logger.info("GeoRisk background task started (interval=%dmin)", interval)
+        except Exception as exc:
+            logger.error("Failed to start GeoRisk background task: %s", exc)
 
     # --- スケジュールタスク (Phase6) ---
     @app.on_event("startup")

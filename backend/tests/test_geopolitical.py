@@ -90,3 +90,51 @@ class TestGeoRiskSchemas:
         result = calculate_geo_risk_score(gdelt, quakes)
         assert result.max_earthquake_magnitude == Decimal("6.8")
         assert result.earthquake_count == 3
+
+
+class TestMarketContext:
+    """Test the aggregated market context."""
+
+    def test_build_context_defaults(self):
+        """Default context has geo_risk, other fields are None."""
+        from app.data_feeds.context import build_market_context
+
+        ctx = build_market_context()
+        assert ctx.geo_risk is not None
+        assert ctx.aave_utilization_rate is None
+
+    def test_build_context_with_aave_data(self):
+        """Aave fields are included when provided."""
+        from app.data_feeds.context import build_market_context
+
+        ctx = build_market_context(
+            aave_utilization_rate=Decimal("87.5"),
+            aave_supply_apy=Decimal("3.2"),
+            health_factor=Decimal("1.72"),
+        )
+        assert ctx.aave_utilization_rate == Decimal("87.5")
+        prompt = ctx.to_prompt_context()
+        assert "87.5" in prompt
+        assert "Geopolitical Risk" in prompt
+
+    def test_prompt_context_includes_news(self):
+        """News fields appear in prompt when provided."""
+        from app.data_feeds.context import build_market_context
+
+        ctx = build_market_context(
+            news_summary="FED signals rate cut",
+            news_sentiment="positive",
+        )
+        prompt = ctx.to_prompt_context()
+        assert "[News]" in prompt
+        assert "FED" in prompt
+        assert "positive" in prompt
+
+    def test_prompt_context_minimal(self):
+        """Minimal context only contains geo-risk line."""
+        from app.data_feeds.context import build_market_context
+
+        ctx = build_market_context()
+        prompt = ctx.to_prompt_context()
+        assert "[Geopolitical Risk]" in prompt
+        assert "[Aave Market]" not in prompt
