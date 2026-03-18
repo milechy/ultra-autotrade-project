@@ -138,3 +138,68 @@ class TestMarketContext:
         prompt = ctx.to_prompt_context()
         assert "[Geopolitical Risk]" in prompt
         assert "[Aave Market]" not in prompt
+
+
+class TestMarketContextInJudgment:
+    """Test that MarketContext integrates with AI judgment pipeline."""
+
+    def test_prompt_includes_market_context(self):
+        """Verify market context text contains all provided fields."""
+        from app.data_feeds.context import build_market_context
+
+        ctx = build_market_context(
+            aave_utilization_rate=Decimal("87.5"),
+            aave_supply_apy=Decimal("3.2"),
+            health_factor=Decimal("1.72"),
+        )
+        prompt_text = ctx.to_prompt_context()
+        assert "Geopolitical Risk" in prompt_text
+        assert "87.5" in prompt_text
+        assert "1.72" in prompt_text
+
+    def test_prompt_without_optional_fields(self):
+        """Verify prompt works without optional fields (backward compat)."""
+        from app.data_feeds.context import build_market_context
+
+        ctx = build_market_context()
+        prompt_text = ctx.to_prompt_context()
+        assert "Geopolitical Risk" in prompt_text
+        assert "Utilization" not in prompt_text
+
+    def test_high_geo_risk_appears_in_prompt(self):
+        """High geo risk score and summary appear in prompt text."""
+        from app.data_feeds.context import build_market_context
+        from app.data_feeds.geopolitical import GeoRiskResult
+
+        high_risk = GeoRiskResult(
+            geo_risk_score=85,
+            summary="Major military conflict detected in Middle East",
+        )
+        ctx = build_market_context(geo_risk=high_risk)
+        prompt_text = ctx.to_prompt_context()
+        assert "85/100" in prompt_text
+        assert "Middle East" in prompt_text
+
+    def test_build_rag_prompt_with_market_context(self):
+        """_build_rag_prompt appends market context section when provided."""
+        from app.ai.schemas import RAGContext
+        from app.ai.service import AIService
+        from app.data_feeds.context import build_market_context
+
+        service = AIService()
+        rag = RAGContext(chunks=["chunk1"], query="test")
+        ctx = build_market_context(health_factor=Decimal("1.5"))
+        prompt = service._build_rag_prompt("test query", rag, market_context=ctx)
+        assert "## Market Context (Real-time Data):" in prompt
+        assert "1.5" in prompt
+
+    def test_build_rag_prompt_without_market_context(self):
+        """_build_rag_prompt works unchanged when market_context is None."""
+        from app.ai.schemas import RAGContext
+        from app.ai.service import AIService
+
+        service = AIService()
+        rag = RAGContext(chunks=["chunk1"], query="test")
+        prompt = service._build_rag_prompt("test query", rag)
+        assert "## Market Context" not in prompt
+        assert "chunk1" in prompt

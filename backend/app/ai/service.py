@@ -14,6 +14,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Callable, Iterable, List, Optional
 
+from app.data_feeds.context import MarketContext
 from app.notion.schemas import NotionNewsItem
 
 from .config import AISettings, get_ai_settings
@@ -209,6 +210,7 @@ class AIService:
         query: str,
         rag_context: RAGContext,
         *,
+        market_context: Optional[MarketContext] = None,
         settings: Optional[AISettings] = None,
     ) -> CrossValidationResult:
         """
@@ -219,7 +221,7 @@ class AIService:
         """
         ai_settings = settings or get_ai_settings()
         version = ai_settings.prompt_version
-        prompt = self._build_rag_prompt(query, rag_context, version)
+        prompt = self._build_rag_prompt(query, rag_context, version, market_context)
 
         # Phase 1: Primary (Claude)
         primary = self._call_claude(prompt, ai_settings, version)
@@ -245,7 +247,13 @@ class AIService:
 
         return result
 
-    def _build_rag_prompt(self, query: str, rag_context: RAGContext, version: str = "v1") -> str:
+    def _build_rag_prompt(
+        self,
+        query: str,
+        rag_context: RAGContext,
+        version: str = "v1",
+        market_context: Optional[MarketContext] = None,
+    ) -> str:
         """Build prompt with RAG context chunks using the specified prompt version."""
         chunks_text = (
             "\n---\n".join(rag_context.chunks)
@@ -253,7 +261,7 @@ class AIService:
             else "(No relevant context found)"
         )
         template = get_prompt_template(version)
-        return (
+        base = (
             template.system_prompt
             + "\n\n"
             + template.user_template.format(
@@ -261,6 +269,10 @@ class AIService:
                 query=query,
             )
         )
+        if market_context is not None:
+            ctx_text = market_context.to_prompt_context()
+            base = base + f"\n\n## Market Context (Real-time Data):\n{ctx_text}"
+        return base
 
     def _call_claude(self, prompt: str, settings: AISettings, version: str = "v1") -> LLMDecision:
         """
