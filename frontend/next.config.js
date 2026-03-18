@@ -4,6 +4,7 @@ const withNextIntl = createNextIntlPlugin('./lib/i18n.ts');
 
 const nextConfig = {
   reactStrictMode: true,
+  productionBrowserSourceMaps: false,
   output: 'standalone',
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },

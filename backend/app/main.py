@@ -35,11 +35,12 @@ from app.bots.router import router as octobot_router
 from app.database import init_db
 from app.dca.router import router as dca_router
 from app.exchange.router import router as exchange_router
+from app.hooks.router import router as hooks_router
 from app.knowledge.router import router as knowledge_router
 from app.rss.router import router as rss_router
 from app.users.router import router as users_router
-from app.hooks.router import router as hooks_router
 from app.webhook.router import router as webhook_router
+from app.error_handlers import register_error_handlers
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,9 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Ultra AutoTrade API",
         version="0.1.0",
+        docs_url=None if os.getenv("APP_ENV", "development") == "production" else "/docs",
+        redoc_url=None if os.getenv("APP_ENV", "development") == "production" else "/redoc",
+        openapi_url=None if os.getenv("APP_ENV", "development") == "production" else "/openapi.json",
     )
 
     # --- CORS 設定 ---
@@ -64,6 +68,16 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Remove server info headers in production
+    @app.middleware("http")
+    async def remove_server_header(request, call_next):
+        response = await call_next(request)
+        if "server" in response.headers:
+            del response.headers["server"]
+        if "x-powered-by" in response.headers:
+            del response.headers["x-powered-by"]
+        return response
 
     # --- ルーター登録 ---
     app.include_router(auth_router)  # Auth (Phase12)
@@ -85,6 +99,9 @@ def create_app() -> FastAPI:
         automation_dashboard_router,
         prefix="/api/automation",
     )
+
+    # Register global error handlers (production safety)
+    register_error_handlers(app)
 
     @app.get("/health", tags=["health"])
     def health_check() -> dict[str, str]:
