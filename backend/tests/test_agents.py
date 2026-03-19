@@ -288,3 +288,65 @@ class TestMultiAgentOrchestrator:
         )
         prompt = mac.to_decision_prompt()
         assert "Decision History" in prompt
+
+
+class TestV3PromptIntegration:
+    """Test that multi-agent signals flow into the LLM prompt."""
+
+    def test_decision_prompt_all_agents(self) -> None:
+        geo = GeoRiskResult(geo_risk_score=45, summary="Moderate tensions")
+        fin = FinanceFeedResult(fed_stance="dovish", stablecoin_risk="low")
+        news = NewsFeedResult(sentiment="positive", summary="ETH rally continues")
+        cs = CognitiveState(
+            total_judgments=10,
+            last_action="HOLD",
+            last_confidence=40,
+            consecutive_holds=3,
+            recent_actions=["HOLD", "HOLD", "HOLD"],
+        )
+        ctx = build_market_context(
+            health_factor=Decimal("1.85"),
+            geo_risk=geo,
+            finance=fin,
+            news=news,
+            cognitive_state=cs,
+        )
+        mac = run_all_agents(ctx)
+        prompt = mac.to_decision_prompt()
+
+        assert "Indicator Agent" in prompt
+        assert "Pattern Agent" in prompt
+        assert "Risk Agent" in prompt
+        assert "Macro Agent" in prompt
+        assert "dovish" in prompt
+
+    def test_bearish_consensus_detected(self) -> None:
+        geo = GeoRiskResult(geo_risk_score=85, summary="Major conflict")
+        fin = FinanceFeedResult(fed_stance="hawkish", stablecoin_risk="high")
+        news = NewsFeedResult(sentiment="negative", summary="Market crash fears")
+        ctx = build_market_context(
+            health_factor=Decimal("1.55"),
+            geo_risk=geo,
+            finance=fin,
+            news=news,
+        )
+        mac = run_all_agents(ctx)
+        assert mac.risk_signal is not None and mac.risk_signal.bias == Bias.BEARISH
+        assert mac.indicator_signal is not None and mac.indicator_signal.bias == Bias.BEARISH
+        assert mac.macro_signal is not None and mac.macro_signal.bias == Bias.BEARISH
+        assert mac.consensus_bias() == Bias.BEARISH
+
+    def test_bullish_consensus_detected(self) -> None:
+        geo = GeoRiskResult(geo_risk_score=15, summary="Stable environment")
+        fin = FinanceFeedResult(fed_stance="dovish", stablecoin_risk="low")
+        news = NewsFeedResult(sentiment="positive", summary="Bull run confirmed")
+        ctx = build_market_context(
+            health_factor=Decimal("2.5"),
+            geo_risk=geo,
+            finance=fin,
+            news=news,
+        )
+        mac = run_all_agents(ctx)
+        assert mac.indicator_signal is not None and mac.indicator_signal.bias == Bias.BULLISH
+        assert mac.macro_signal is not None and mac.macro_signal.bias == Bias.BULLISH
+        assert mac.consensus_bias() == Bias.BULLISH

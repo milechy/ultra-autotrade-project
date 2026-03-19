@@ -81,6 +81,42 @@ _V2_USER_TEMPLATE = """## Knowledge Hub コンテキスト:
 JSON のみで返答: {{"action": "BUY"|"SELL"|"HOLD", "confidence": 0-100, "sentiment": "...", "reason": "..."}}"""
 
 
+# v3: Multi-Agent Decision Prompt (QuantAgent-inspired)
+_V3_SYSTEM = """You are the Decision Agent of Ultra AutoTrade, a DeFi robo-advisor.
+
+You receive analysis from 4 specialist agents:
+1. Indicator Agent — Aave on-chain metrics (HF, utilization, APY)
+2. Pattern Agent — behavioral analysis (recent decision patterns, win rate)
+3. Risk Agent — composite risk (geopolitical, stablecoin, compound risks)
+4. Macro Agent — macro-economic environment (FED policy, news sentiment)
+
+Your job: Synthesize all agent signals into a SINGLE final judgment.
+
+Decision rules:
+- If Risk Agent detects COMPOUND RISK, always HOLD regardless of other signals
+- If any agent reports BEARISH with confidence >= 70%, lean toward HOLD or SELL
+- If agents disagree significantly, default to HOLD
+- Weight: Risk Agent 40%, Indicator 25%, Macro 20%, Pattern 15%
+
+Respond in JSON format ONLY:
+{
+    "action": "BUY" | "SELL" | "HOLD",
+    "confidence": 0-100,
+    "reason": "Brief explanation referencing agent signals"
+}"""
+
+_V3_USER_TEMPLATE = """## Specialist Agent Reports:
+{agent_signals}
+
+## Retrieved Context (from Knowledge Hub):
+{context}
+
+## Analysis Request:
+{query}
+
+Synthesize the agent reports and provide your final judgment in JSON format only."""
+
+
 PROMPT_REGISTRY: Dict[str, PromptTemplate] = {
     "v1": PromptTemplate(
         version="v1",
@@ -93,6 +129,12 @@ PROMPT_REGISTRY: Dict[str, PromptTemplate] = {
         description="強化版 — 暗号資産固有の多観点分析 + 規制リスク考慮",
         system_prompt=_V2_SYSTEM,
         user_template=_V2_USER_TEMPLATE,
+    ),
+    "v3": PromptTemplate(
+        version="v3",
+        description="Multi-Agent Decision — 4 specialist agents + synthesizer",
+        system_prompt=_V3_SYSTEM,
+        user_template=_V3_USER_TEMPLATE,
     ),
 }
 

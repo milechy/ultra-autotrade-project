@@ -14,6 +14,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Callable, Iterable, List, Optional
 
+from app.ai.agents import MultiAgentContext, run_all_agents
 from app.ai.judgment_log import CognitiveState
 from app.data_feeds.context import MarketContext
 from app.notion.schemas import NotionNewsItem
@@ -259,26 +260,54 @@ class AIService:
         market_context: Optional[MarketContext] = None,
         cognitive_state: Optional[CognitiveState] = None,
     ) -> str:
-        """Build prompt with RAG context chunks using the specified prompt version."""
+        """Build prompt with RAG context chunks using the specified prompt version.
+
+        For v3: runs multi-agent analysis and injects agent_signals into template.
+        For v1/v2: appends agent analysis + market context as extra sections.
+        """
         chunks_text = (
             "\n---\n".join(rag_context.chunks)
             if rag_context.chunks
             else "(No relevant context found)"
         )
         template = get_prompt_template(version)
-        base = (
-            template.system_prompt
-            + "\n\n"
-            + template.user_template.format(
-                context=chunks_text,
-                query=query,
-            )
-        )
+
+        # Run multi-agent analysis if market context available (zero LLM cost)
+        agent_ctx: Optional[MultiAgentContext] = None
         if market_context is not None:
-            ctx_text = market_context.to_prompt_context()
-            base = base + f"\n\n## Market Context (Real-time Data):\n{ctx_text}"
+            agent_ctx = run_all_agents(market_context)
+
+        # Build base prompt — v3 injects agent_signals into the template itself
+        if version == "v3" and agent_ctx is not None:
+            agent_signals_text = agent_ctx.to_decision_prompt()
+            base = (
+                template.system_prompt
+                + "\n\n"
+                + template.user_template.format(
+                    agent_signals=agent_signals_text,
+                    context=chunks_text,
+                    query=query,
+                )
+            )
+        else:
+            base = (
+                template.system_prompt
+                + "\n\n"
+                + template.user_template.format(
+                    context=chunks_text,
+                    query=query,
+                )
+            )
+            # For v1/v2: append agent analysis and market context as extra sections
+            if agent_ctx is not None:
+                base = base + f"\n\n## Agent Analysis:\n{agent_ctx.to_decision_prompt()}"
+            if market_context is not None:
+                ctx_text = market_context.to_prompt_context()
+                base = base + f"\n\n## Market Context (Real-time Data):\n{ctx_text}"
+
         if cognitive_state is not None:
             base = base + f"\n\n{cognitive_state.to_prompt_context()}"
+
         return base
 
     def _call_claude(self, prompt: str, settings: AISettings, version: str = "v1") -> LLMDecision:
