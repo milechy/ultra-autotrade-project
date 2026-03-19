@@ -57,3 +57,9 @@ phase*_seed_files.zip
 .ash/ash_output/
 .claude/settings.local.json
 .mypy_cache/
+
+# OctoBot user config (contains API tokens)
+user/config.json*
+
+# Claude settings backup (contains Slack tokens)
+.claude/settings.local.json.bak
