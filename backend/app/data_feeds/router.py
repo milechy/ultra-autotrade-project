@@ -3,9 +3,10 @@
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.ai.agents import run_all_agents
+from app.auth.dependencies import get_current_user, require_admin
 from app.automation.howl_review import HOWLReport, run_howl_review
 from app.data_feeds.context import build_market_context
 from app.data_feeds.finance_feed import FinanceFeedResult, get_cached_finance, update_finance_cache
@@ -16,49 +17,49 @@ router = APIRouter(prefix="/api/data-feeds", tags=["data-feeds"])
 
 
 @router.get("/geo-risk")
-async def get_geo_risk() -> GeoRiskResult:
+async def get_geo_risk(_user: object = Depends(get_current_user)) -> GeoRiskResult:
     """Get current geopolitical risk score (from cache)."""
     return get_cached_geo_risk()
 
 
 @router.post("/geo-risk/refresh")
-async def refresh_geo_risk() -> GeoRiskResult:
+async def refresh_geo_risk(_user: object = Depends(require_admin)) -> GeoRiskResult:
     """Force refresh geopolitical risk data (admin only)."""
     return await update_geo_risk_cache()
 
 
 @router.get("/news")
-async def get_news() -> NewsFeedResult:
+async def get_news(_user: object = Depends(get_current_user)) -> NewsFeedResult:
     """Get latest crypto/DeFi news summary (from cache)."""
     return get_cached_news()
 
 
 @router.post("/news/refresh")
-async def refresh_news() -> NewsFeedResult:
+async def refresh_news(_user: object = Depends(require_admin)) -> NewsFeedResult:
     """Force refresh news data (admin only)."""
     return await update_news_cache()
 
 
 @router.get("/finance")
-async def get_finance() -> FinanceFeedResult:
+async def get_finance(_user: object = Depends(get_current_user)) -> FinanceFeedResult:
     """Get current macro-economic finance data (from cache)."""
     return get_cached_finance()
 
 
 @router.post("/finance/refresh")
-async def refresh_finance() -> FinanceFeedResult:
+async def refresh_finance(_user: object = Depends(require_admin)) -> FinanceFeedResult:
     """Force refresh finance data (admin only)."""
     return await update_finance_cache()
 
 
 @router.post("/howl/review")
-async def trigger_howl_review() -> HOWLReport:
+async def trigger_howl_review(_user: object = Depends(require_admin)) -> HOWLReport:
     """Trigger HOWL self-improvement review (admin only)."""
     return await run_howl_review()
 
 
 @router.get("/agents")
-async def get_agent_signals() -> dict[str, Any]:
+async def get_agent_signals(_user: object = Depends(get_current_user)) -> dict[str, Any]:
     """Run all multi-agent signals with current market context."""
     context = build_market_context()
     mac = run_all_agents(context)
@@ -77,6 +78,7 @@ async def get_agent_signals() -> dict[str, Any]:
 
 @router.post("/agents/simulate")
 async def simulate_agent_signals(
+    _user: object = Depends(get_current_user),
     health_factor: float = 1.72,
     utilization_rate: float = 78.5,
     supply_apy: float = 3.2,

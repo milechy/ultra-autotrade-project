@@ -162,8 +162,12 @@ async def update_news_cache() -> NewsFeedResult:
     async with httpx.AsyncClient() as client:
         result = await fetch_crypto_news(client)
 
-    async with _news_lock:
-        _news_cache = result
+    # last-known-good: only update if we got real data or have no cache yet
+    if result.updated_at is not None or _news_cache is None:
+        async with _news_lock:
+            _news_cache = result
+    else:
+        logger.warning("News: API failed. Keeping last-known-good cache.")
 
     logger.info(
         "News updated: sentiment=%s, events=%d, sources=%d",

@@ -228,8 +228,12 @@ async def update_geo_risk_cache() -> GeoRiskResult:
 
     result = calculate_geo_risk_score(gdelt, earthquakes)
 
-    async with _cache_lock:
-        _cache = result
+    # last-known-good: only update if we got real data or have no cache yet
+    if gdelt.event_count > 0 or len(earthquakes) > 0 or _cache is None:
+        async with _cache_lock:
+            _cache = result
+    else:
+        logger.warning("GeoRisk: Both APIs returned empty data. Keeping last-known-good cache.")
 
     logger.info(
         "GeoRisk updated: score=%d, tone=%s, events=%d, quakes=%d",

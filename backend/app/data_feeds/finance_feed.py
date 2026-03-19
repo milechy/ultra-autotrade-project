@@ -180,8 +180,12 @@ async def update_finance_cache() -> FinanceFeedResult:
     async with httpx.AsyncClient() as client:
         result = await fetch_finance_data(client)
 
-    async with _finance_lock:
-        _finance_cache = result
+    # last-known-good: only update if we got real data or have no cache yet
+    if result.updated_at is not None or _finance_cache is None:
+        async with _finance_lock:
+            _finance_cache = result
+    else:
+        logger.warning("Finance: API failed. Keeping last-known-good cache.")
 
     logger.info(
         "Finance updated: fed=%s, stablecoin_risk=%s, indicators=%d",

@@ -277,6 +277,25 @@ class AIService:
         if market_context is not None:
             agent_ctx = run_all_agents(market_context)
 
+            # Rule engine: COMPOUND RISK → force HOLD before LLM call
+            if agent_ctx.has_compound_risk():
+                logger.warning("COMPOUND RISK detected by Risk Agent. Forcing HOLD.")
+                compound_decision = LLMDecision(
+                    provider=LLMProvider.RULE_BASED,
+                    action=TradeAction.HOLD,
+                    confidence=95,
+                    reason="COMPOUND RISK: Low HF + elevated geo risk. Forced HOLD by rule engine.",
+                    prompt_version=version,
+                )
+                return CrossValidationResult(
+                    primary=compound_decision,
+                    secondary=None,
+                    agreed=True,
+                    final_action=TradeAction.HOLD,
+                    final_confidence=95,
+                    final_reason="COMPOUND RISK detected. Rule engine forced HOLD before LLM call.",
+                )
+
         # Build base prompt — v3 injects agent_signals into the template itself
         if version == "v3" and agent_ctx is not None:
             agent_signals_text = agent_ctx.to_decision_prompt()

@@ -84,6 +84,15 @@ class MultiAgentContext(BaseModel):
 
         return "\n\n".join(sections)
 
+    def has_compound_risk(self) -> bool:
+        """Return True if Risk Agent detected COMPOUND RISK.
+
+        If True, the rule engine MUST force HOLD before LLM call.
+        """
+        if self.risk_signal and "COMPOUND RISK" in self.risk_signal.reasoning.upper():
+            return True
+        return False
+
     def consensus_bias(self) -> Bias:
         """Quick check: what's the majority bias among agents?"""
         biases = [
