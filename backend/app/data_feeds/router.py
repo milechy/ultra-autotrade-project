@@ -1,6 +1,7 @@
 """API endpoints for external data feeds."""
 
 from decimal import Decimal
+from typing import Any
 
 from fastapi import APIRouter
 
@@ -57,7 +58,7 @@ async def trigger_howl_review() -> HOWLReport:
 
 
 @router.get("/agents")
-async def get_agent_signals() -> dict:
+async def get_agent_signals() -> dict[str, Any]:
     """Run all multi-agent signals with current market context."""
     context = build_market_context()
     mac = run_all_agents(context)
@@ -79,7 +80,7 @@ async def simulate_agent_signals(
     health_factor: float = 1.72,
     utilization_rate: float = 78.5,
     supply_apy: float = 3.2,
-) -> dict:
+) -> dict[str, Any]:
     """Run all multi-agent signals with simulated market context."""
     context = build_market_context(
         health_factor=Decimal(str(health_factor)),
