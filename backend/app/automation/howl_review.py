@@ -112,9 +112,15 @@ def evaluate_judgment(
         ):
             review.was_correct = True
             review.reason_correct = "Low confidence HOLD was appropriate"
-        elif review.hf_improved is True and record.geo_risk_score is not None and record.geo_risk_score < 30:
+        elif (
+            review.hf_improved is True
+            and record.geo_risk_score is not None
+            and record.geo_risk_score < 30
+        ):
             review.was_correct = False
-            review.reason_correct = "HOLD during low risk + improving HF — missed opportunity to act"
+            review.reason_correct = (
+                "HOLD during low risk + improving HF — missed opportunity to act"
+            )
         else:
             review.was_correct = None
             review.reason_correct = "Inconclusive — APY data not yet available for evaluation"
@@ -127,10 +133,14 @@ def evaluate_judgment(
             hf_drop = (hf_then - current_hf) if current_hf is not None else Decimal("0")
             if hf_drop > Decimal("0.3"):
                 review.was_correct = False
-                review.reason_correct = f"BUY was incorrect — HF dropped by {hf_drop} (significant deterioration)"
+                review.reason_correct = (
+                    f"BUY was incorrect — HF dropped by {hf_drop} (significant deterioration)"
+                )
             else:
                 review.was_correct = None
-                review.reason_correct = "HF dropped slightly after BUY — inconclusive without APY data"
+                review.reason_correct = (
+                    "HF dropped slightly after BUY — inconclusive without APY data"
+                )
         else:
             review.was_correct = None
             review.reason_correct = "Inconclusive — no HF comparison available"
