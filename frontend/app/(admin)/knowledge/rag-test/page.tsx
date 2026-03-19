@@ -466,7 +466,7 @@ export default function RagTestPage() {
                     {r.source_url && (
                       <div style={{ marginBottom: 8 }}>
                         <a
-                          href={r.source_url}
+                          href={r.source_url?.startsWith("http") ? r.source_url : "#"}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{

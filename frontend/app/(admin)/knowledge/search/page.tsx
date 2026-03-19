@@ -166,7 +166,7 @@ export default function KnowledgeSearchPage() {
                     {r.source_url && (
                       <div style={{ marginBottom: 8 }}>
                         <a
-                          href={r.source_url}
+                          href={r.source_url?.startsWith("http") ? r.source_url : "#"}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{ fontSize: 12, color: "#3b82f6", wordBreak: "break-all" }}
