@@ -21,6 +21,7 @@ from sqlalchemy.orm import sessionmaker
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-partner-tests")
 os.environ.setdefault("JWT_ALGORITHM", "HS256")
 os.environ.setdefault("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+os.environ.setdefault("INITIAL_ADMIN_EMAIL", "admin@example.com")
 
 from app.api.automation_dashboard import get_monitoring_service, get_reporting_service
 from app.automation.schemas import AutomationStatus, DashboardSnapshot, WorkflowRunResult
@@ -52,6 +53,7 @@ def test_db():
 @pytest.fixture()
 def client(test_db):
     override_get_db, _ = test_db
+    os.environ["INITIAL_ADMIN_EMAIL"] = "admin@example.com"
     app = create_app()
     app.dependency_overrides[get_db] = override_get_db
 
@@ -114,7 +116,7 @@ class TestAutomationViewerAccess:
 
     def test_viewer_can_get_automation_status(self, client: TestClient):
         """Viewer は GET /api/automation/status にアクセスできる。"""
-        admin_token = _register_and_login(client, "admin@test.com", "admin", "adminpass123")
+        admin_token = _register_and_login(client, "admin@example.com", "admin", "adminpassword123")
         viewer_token = _create_viewer_and_login(client, admin_token)
 
         response = client.get(
@@ -125,7 +127,7 @@ class TestAutomationViewerAccess:
 
     def test_viewer_can_get_dashboard(self, client: TestClient):
         """Viewer は GET /api/automation/dashboard にアクセスできる。"""
-        admin_token = _register_and_login(client, "admin@test.com", "admin", "adminpass123")
+        admin_token = _register_and_login(client, "admin@example.com", "admin", "adminpassword123")
         viewer_token = _create_viewer_and_login(client, admin_token)
 
         response = client.get(
@@ -136,7 +138,7 @@ class TestAutomationViewerAccess:
 
     def test_viewer_cannot_run_workflow(self, client: TestClient):
         """Viewer は POST /api/automation/workflow/run で 403 になる。"""
-        admin_token = _register_and_login(client, "admin@test.com", "admin", "adminpass123")
+        admin_token = _register_and_login(client, "admin@example.com", "admin", "adminpassword123")
         viewer_token = _create_viewer_and_login(client, admin_token)
 
         response = client.post(
@@ -162,7 +164,7 @@ class TestAutomationViewerAccess:
 
     def test_admin_can_run_workflow(self, client: TestClient):
         """Admin は POST /api/automation/workflow/run を実行できる。"""
-        admin_token = _register_and_login(client, "admin@test.com", "admin", "adminpass123")
+        admin_token = _register_and_login(client, "admin@example.com", "admin", "adminpassword123")
 
         with (
             patch("app.api.automation_dashboard.process_pending_knowledge") as mock_process,

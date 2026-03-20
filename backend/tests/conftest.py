@@ -38,6 +38,7 @@ def _ensure_test_env_vars() -> None:
     os.environ.setdefault("BYBIT_API_SECRET", "dummy-bybit-secret-for-tests")
     os.environ.setdefault("BYBIT_SANDBOX", "true")
     os.environ.setdefault("EXCHANGE_CLIENT_TYPE", "dummy")
+    os.environ.setdefault("INITIAL_ADMIN_EMAIL", "terms_admin@example.com")
 
 
 _ensure_project_root_in_sys_path()

@@ -9,6 +9,8 @@ GET  /auth/me       - 現在のユーザー情報取得
 """
 
 import logging
+import os
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -21,10 +23,14 @@ from .schemas import (
     LoginRequest,
     PasswordChangeRequest,
     RegisterRequest,
+    TermsAcceptRequest,
+    TermsStatusResponse,
     TokenResponse,
     UserResponse,
 )
 from .service import AuthService
+
+CURRENT_TERMS_VERSION = "2.0"
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +53,19 @@ def register(
     既にユーザーが存在する場合は 403 エラーを返す。
     初回登録のみ許可し、以降は管理者が /users エンドポイントで作成する。
     """
+    # INITIAL_ADMIN_EMAIL が未設定なら登録不可
+    initial_admin_email = os.getenv("INITIAL_ADMIN_EMAIL")
+    if not initial_admin_email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is disabled. INITIAL_ADMIN_EMAIL is not configured.",
+        )
+    if request.email != initial_admin_email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is disabled. Please contact an administrator.",
+        )
+
     if AuthService.user_exists(db):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -159,3 +178,46 @@ def change_password(
     AuthService.update_user(db, user, password=request.new_password)
     logger.info("User changed password: %s", user.email)
     return None
+
+
+@router.get(
+    "/terms/status",
+    response_model=TermsStatusResponse,
+    summary="利用規約同意状態確認",
+)
+def get_terms_status(
+    user: User = Depends(require_active_user),
+) -> TermsStatusResponse:
+    """現在のユーザーが最新の利用規約に同意済みかを確認する。"""
+    return TermsStatusResponse(
+        accepted=user.terms_version == CURRENT_TERMS_VERSION,
+        terms_version=user.terms_version,
+        terms_accepted_at=user.terms_accepted_at,
+        current_version=CURRENT_TERMS_VERSION,
+        needs_acceptance=user.terms_version != CURRENT_TERMS_VERSION,
+    )
+
+
+@router.post(
+    "/terms/accept",
+    response_model=TermsStatusResponse,
+    summary="利用規約に同意",
+)
+def accept_terms(
+    request: TermsAcceptRequest,
+    user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> TermsStatusResponse:
+    """利用規約に同意する。バージョンとタイムスタンプをDBに記録する。"""
+    user.terms_accepted_at = datetime.now(timezone.utc)
+    user.terms_version = request.version
+    db.commit()
+    db.refresh(user)
+    logger.info("User accepted terms v%s: %s", request.version, user.email)
+    return TermsStatusResponse(
+        accepted=True,
+        terms_version=user.terms_version,
+        terms_accepted_at=user.terms_accepted_at,
+        current_version=CURRENT_TERMS_VERSION,
+        needs_acceptance=False,
+    )

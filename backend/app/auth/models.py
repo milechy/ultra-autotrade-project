@@ -7,6 +7,7 @@ docs/13_security_design.md に準拠したセキュリティ要件を満たす�
 
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -53,6 +54,12 @@ class User(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+    )
+    terms_accepted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    terms_version: Mapped[Optional[str]] = mapped_column(
+        String(20), nullable=True, default=None
     )
 
     def __repr__(self) -> str:

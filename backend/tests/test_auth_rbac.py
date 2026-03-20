@@ -20,6 +20,7 @@ from sqlalchemy.orm import sessionmaker
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-for-rbac-tests"
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"
+os.environ["INITIAL_ADMIN_EMAIL"] = "admin@example.com"
 
 from app.database import Base, get_db
 from app.main import create_app
@@ -53,6 +54,7 @@ def test_db():
 def client(test_db) -> TestClient:
     """テスト用クライアントを作成する。"""
     override_get_db, _ = test_db
+    os.environ["INITIAL_ADMIN_EMAIL"] = "admin@example.com"
     app = create_app()
     app.dependency_overrides[get_db] = override_get_db
     return TestClient(app)

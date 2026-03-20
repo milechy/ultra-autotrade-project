@@ -69,8 +69,26 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    terms_accepted_at: Optional[datetime] = None
+    terms_version: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TermsAcceptRequest(BaseModel):
+    """利用規約同意リクエスト。"""
+
+    version: str = Field(..., description="Terms version being accepted (e.g. '2.0')", max_length=20)
+
+
+class TermsStatusResponse(BaseModel):
+    """利用規約同意状態レスポンス。"""
+
+    accepted: bool
+    terms_version: Optional[str] = None
+    terms_accepted_at: Optional[datetime] = None
+    current_version: str = "2.0"
+    needs_acceptance: bool = True
 
 
 class UserCreateRequest(BaseModel):
