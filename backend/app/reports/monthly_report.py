@@ -148,7 +148,7 @@ def generate_monthly_report_pdf(data: MonthlyReportData) -> tuple[bytes, str]:
         (bytes, content_type) のタプル
     """
     try:
-        import reportlab  # noqa: F401
+        import reportlab  # type: ignore[import-untyped]  # noqa: F401
 
         return _generate_pdf(data), "application/pdf"
     except ImportError:
