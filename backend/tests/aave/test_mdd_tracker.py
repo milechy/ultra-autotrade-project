@@ -2,10 +2,11 @@
 
 """Tests for MddTracker (Max Drawdown Tracker)."""
 
-import pytest
 from decimal import Decimal
 
-from app.aave.mdd_tracker import MddTracker, MddStatus, MDD_THRESHOLDS
+import pytest
+
+from app.aave.mdd_tracker import MddTracker
 
 
 class TestMddTrackerNoDrawdown:
