@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -59,8 +62,8 @@ def _generate_pdf(data: MonthlyReportData) -> bytes:
                 pdfmetrics.registerFont(TTFont("JapaneseFont", fc))
                 _FONT_NAME = "JapaneseFont"
                 break
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to register Japanese font for PDF: %s", exc)
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=20 * mm, rightMargin=20 * mm)
