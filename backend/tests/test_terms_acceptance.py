@@ -1,4 +1,5 @@
 """Tests for terms of service acceptance flow."""
+
 import os
 import tempfile
 from typing import Generator

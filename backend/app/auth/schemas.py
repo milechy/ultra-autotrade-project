@@ -79,7 +79,9 @@ class UserResponse(BaseModel):
 class TermsAcceptRequest(BaseModel):
     """利用規約同意リクエスト。"""
 
-    version: str = Field(..., description="Terms version being accepted (e.g. '2.0')", max_length=20)
+    version: str = Field(
+        ..., description="Terms version being accepted (e.g. '2.0')", max_length=20
+    )
 
 
 class TermsStatusResponse(BaseModel):

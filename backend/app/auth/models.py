@@ -58,9 +58,7 @@ class User(Base):
     terms_accepted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
-    terms_version: Mapped[Optional[str]] = mapped_column(
-        String(20), nullable=True, default=None
-    )
+    terms_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default=None)
     risk_mode: Mapped[Optional[str]] = mapped_column(
         String(20), nullable=True, default="conservative"
     )
