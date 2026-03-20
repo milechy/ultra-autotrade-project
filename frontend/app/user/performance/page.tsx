@@ -21,6 +21,7 @@ import { useAuth } from '@/lib/auth'
 import type { PerformanceData, MonthlyPnl } from '@/components/transparency'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const TRANSPARENCY_BASE = '/api/transparency'
 
 function MonthlyReportDownloadButton() {
   const { token } = useAuth()
@@ -99,10 +100,10 @@ function PerformanceContent() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API_URL}/api/transparency/performance?period_days=90`)
+      fetch(`${TRANSPARENCY_BASE}/performance?period_days=90`)
         .then(r => r.json())
         .catch(() => null),
-      fetch(`${API_URL}/api/transparency/performance/monthly`)
+      fetch(`${TRANSPARENCY_BASE}/performance/monthly`)
         .then(r => r.json())
         .catch(() => []),
     ]).then(async ([perfData, monthlyData]) => {

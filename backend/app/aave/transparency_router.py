@@ -142,6 +142,22 @@ def get_performance() -> dict[str, Any]:
     return {k: str(v) if isinstance(v, Decimal) else v for k, v in raw.items()}
 
 
+@router.get("/performance/monthly")
+def get_performance_monthly() -> list[dict[str, Any]]:
+    """Return mock monthly P&L data for the last 6 months (no DB required)."""
+    from datetime import date, timedelta
+
+    today = date.today()
+    months = []
+    for i in range(5, -1, -1):
+        first = (today.replace(day=1) - timedelta(days=i * 28)).replace(day=1)
+        months.append(first.strftime("%Y-%m"))
+
+    # Mock data: alternating positive/negative to show chart shape
+    mock_gains = [12000, -3500, 8200, 5100, -1800, 14300]
+    return [{"month": m, "gain_jpy": g} for m, g in zip(months, mock_gains)]
+
+
 # ── 7. Risk Profiles (list) ──────────────────────────────────────────────────
 
 
