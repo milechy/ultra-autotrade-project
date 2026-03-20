@@ -18,7 +18,7 @@ import {
 /* ───── helpers ───── */
 function getToken(): string {
   if (typeof window === "undefined") return "";
-  return localStorage.getItem("access_token") ?? "";
+  return localStorage.getItem("ultra_auth_token") ?? "";
 }
 
 function timeAgo(iso: string | null): string {
