@@ -198,3 +198,20 @@ feature/* (各LLM担当) → dev (Opus統合) → staging (Codex最終レビュ�
 - NO frontend needed yet — curl + pytest only
 - Bybit: Sandbox mode (sandbox=True)
 - AI: Claude Opus → JSON → validate → execute OR hold
+## Agent Teams 運用ルール
+
+### Slack通知（必須）
+タスクを1つ完了するたびに、以下のコマンドでSlack通知を送ること：
+```bash
+WEBHOOK=$(grep SLACK_WEBHOOK_URL .env.staging | cut -d= -f2-)
+curl -s -X POST "$WEBHOOK" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "✅ [チームメイト名] 完了: [タスク名]\n結果: [1行サマリー]\nファイル: [変更したファイル一覧]"}'
+```
+
+### エラー時の通知
+```bash
+curl -s -X POST "$WEBHOOK" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "❌ [チームメイト名] エラー: [タスク名]\n原因: [エラー内容]"}'
+```
