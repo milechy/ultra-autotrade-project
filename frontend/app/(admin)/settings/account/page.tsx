@@ -5,6 +5,7 @@ import React, { useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { changePassword } from "@/lib/api/auth";
+import RiskModeSelector from "@/components/settings/RiskModeSelector";
 
 export default function AccountSettingsPage() {
   return (
@@ -175,6 +176,10 @@ function AccountSettingsContent() {
             {isSubmitting ? "変更中..." : "パスワードを変更"}
           </button>
         </form>
+      </section>
+
+      <section className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
+        <RiskModeSelector />
       </section>
     </>
   );

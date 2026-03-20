@@ -23,6 +23,7 @@ from .schemas import (
     LoginRequest,
     PasswordChangeRequest,
     RegisterRequest,
+    RiskModeUpdateRequest,
     TermsAcceptRequest,
     TermsStatusResponse,
     TokenResponse,
@@ -221,3 +222,65 @@ def accept_terms(
         current_version=CURRENT_TERMS_VERSION,
         needs_acceptance=False,
     )
+
+
+_RISK_OPTIONS = [
+    {
+        "mode": "conservative",
+        "label": "保守（初心者向け）",
+        "description": "低頻度・ステーブルコインのみ。安全重視。",
+        "max_utilization": 60,
+        "min_health_factor": "2.0",
+        "allowed_assets": ["USDC", "USDT", "DAI"],
+        "min_confidence": 80,
+    },
+    {
+        "mode": "balanced",
+        "label": "バランス（標準）",
+        "description": "標準頻度。ステーブル＋ETHで運用。",
+        "max_utilization": 75,
+        "min_health_factor": "1.7",
+        "allowed_assets": ["USDC", "USDT", "DAI", "ETH", "WBTC"],
+        "min_confidence": 65,
+    },
+    {
+        "mode": "aggressive",
+        "label": "積極（経験者向け）",
+        "description": "高頻度・多様な資産。リスク許容度が高い方向け。",
+        "max_utilization": 90,
+        "min_health_factor": "1.5",
+        "allowed_assets": ["USDC", "USDT", "DAI", "ETH", "WBTC", "MATIC", "LINK"],
+        "min_confidence": 50,
+    },
+]
+
+
+@router.get(
+    "/risk-mode",
+    summary="リスクモード取得",
+)
+def get_risk_mode(
+    user: User = Depends(require_active_user),
+) -> dict:
+    """現在のユーザーのリスクモードと選択肢を返す。"""
+    return {
+        "mode": user.risk_mode or "conservative",
+        "options": _RISK_OPTIONS,
+    }
+
+
+@router.put(
+    "/risk-mode",
+    summary="リスクモード変更",
+)
+def update_risk_mode(
+    request: RiskModeUpdateRequest,
+    user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """ユーザーのリスクモードを変更する（conservative / balanced / aggressive）。"""
+    user.risk_mode = request.mode
+    db.commit()
+    db.refresh(user)
+    logger.info("User changed risk mode to %s: %s", request.mode, user.email)
+    return {"mode": user.risk_mode, "message": f"Risk mode updated to {request.mode}"}

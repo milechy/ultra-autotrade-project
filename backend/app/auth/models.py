@@ -61,6 +61,9 @@ class User(Base):
     terms_version: Mapped[Optional[str]] = mapped_column(
         String(20), nullable=True, default=None
     )
+    risk_mode: Mapped[Optional[str]] = mapped_column(
+        String(20), nullable=True, default="conservative"
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"

@@ -71,6 +71,7 @@ class UserResponse(BaseModel):
     updated_at: datetime
     terms_accepted_at: Optional[datetime] = None
     terms_version: Optional[str] = None
+    risk_mode: Optional[str] = "conservative"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -139,3 +140,13 @@ class PasswordChangeRequest(BaseModel):
 
     current_password: str
     new_password: str = Field(min_length=8, max_length=100)
+
+
+class RiskModeUpdateRequest(BaseModel):
+    """リスクモード変更リクエスト。"""
+
+    mode: str = Field(
+        ...,
+        description="conservative / balanced / aggressive",
+        pattern="^(conservative|balanced|aggressive)$",
+    )
