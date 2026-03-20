@@ -6,6 +6,14 @@ export interface SignalData {
   description: string
   action: 'BUY' | 'SELL' | 'HOLD'
   confidence: number  // 0-100
+  updated_at?: string  // ISO8601
+}
+
+export interface MonthlyPnl {
+  month: string  // "YYYY-MM"
+  gain_jpy: number
+  proposals: number
+  win_rate: number
 }
 
 export interface SafetyBreakdownItem {

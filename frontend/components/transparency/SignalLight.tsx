@@ -62,6 +62,11 @@ export function SignalLight({ signal, className }: SignalLightProps) {
           <span>確信度:</span>
           <span className="font-semibold">{signal.confidence}%</span>
         </div>
+        {signal.updated_at && (
+          <p className="text-xs text-muted-foreground">
+            更新: {new Date(signal.updated_at).toLocaleString('ja-JP')}
+          </p>
+        )}
       </CardContent>
     </Card>
   )

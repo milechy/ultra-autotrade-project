@@ -28,6 +28,7 @@ from app.automation.monitoring_service import MonitoringService
 
 from .client import AaveClient, AaveClientError
 from .config import AaveSettings
+from .mdd_tracker import MddTracker
 from .rebalance_config import RebalanceSettings
 from .rebalance_schemas import (
     AssetAllocation,
@@ -186,6 +187,7 @@ class RebalanceService:
         self._pending_proposals: dict[str, RebalanceProposal] = {}
         self._history: list[RebalanceHistoryEntry] = []
         self._last_rebalance_at: Optional[datetime] = None
+        self._mdd_tracker = MddTracker()
 
     # ---- 内部ヘルパー --------------------------------------------------
 
@@ -440,16 +442,17 @@ class RebalanceService:
             cooldown_remaining_seconds=cooldown_remaining,
         )
 
-    def simulate(self) -> RebalanceProposal:
+    def simulate(self, risk_mode: str = "balanced") -> RebalanceProposal:
         """
         リバランス提案を生成する。
 
         1. 現在の配分状態を取得
-        2. リバランス不要の場合 → 非実行可能な提案を返す
-        3. 操作リストを計算（WITHDRAW → DEPOSIT の順）
-        4. 安全制約チェック
-        5. UUID proposal_id と HMAC 確認トークンを生成
-        6. _pending_proposals に保存して返す
+        2. MDD チェック（risk_mode に応じた hard_stop 判定）
+        3. リバランス不要の場合 → 非実行可能な提案を返す
+        4. 操作リストを計算（WITHDRAW → DEPOSIT の順）
+        5. 安全制約チェック
+        6. UUID proposal_id と HMAC 確認トークンを生成
+        7. _pending_proposals に保存して返す
         """
         wallet = self._get_wallet_address()
         now = self._now()
@@ -462,6 +465,21 @@ class RebalanceService:
             logger.error("Failed to fetch account data for simulate: %s", exc)
             total_usd = Decimal("0")
             health_factor = Decimal("0")
+
+        # MDD チェック: ポートフォリオ価値を更新し、hard_stop 判定を行う
+        self._mdd_tracker.update(total_usd)
+        mdd_status = self._mdd_tracker.check_limits(risk_mode)
+        if mdd_status.hard_stop:
+            raise RuntimeError(
+                f"MDD hard_stop triggered for risk_mode={risk_mode}, "
+                f"drawdown={mdd_status.drawdown_pct:.1%}"
+            )
+        if mdd_status.warning:
+            logger.warning(
+                "simulate: MDD warning for risk_mode=%s, drawdown=%.1f%%",
+                risk_mode,
+                float(mdd_status.drawdown_pct * 100),
+            )
 
         default_symbol = self._aave_settings.default_asset_symbol
         balances: dict[str, Decimal] = {default_symbol: total_usd}
