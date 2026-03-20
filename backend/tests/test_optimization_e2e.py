@@ -9,8 +9,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-import pytest
-
 from app.aave.net_benefit_calculator import NetBenefitCalculator, NetBenefitParams
 from app.aave.optimization_rules import (
     CurrentPosition,
@@ -48,12 +46,16 @@ def _make_util_data(**kwargs) -> UtilizationData:
 def _make_stress_data(**kwargs) -> MarketStressData:
     """Factory for MarketStressData. Defaults: normal market conditions."""
     defaults: dict = dict(
-        price_change_24h=0.0,
-        health_factor=2.5,
+        price_change_24h=Decimal("0.0"),
+        health_factor=Decimal("2.5"),
         manual_stop=False,
         current_mode="normal",
         current_stage=0,
     )
+    # Convert float kwargs to Decimal for Decimal fields
+    for key in ("price_change_24h", "health_factor"):
+        if key in kwargs and not isinstance(kwargs[key], Decimal):
+            kwargs[key] = Decimal(str(kwargs[key]))
     defaults.update(kwargs)
     return MarketStressData(**defaults)
 
@@ -172,8 +174,8 @@ def test_e2e_stress_stage3_withdraw() -> None:
     assert "USDT" in symbols
     usdc_step = next(s for s in plan.steps if s.asset_symbol == "USDC")
     usdt_step = next(s for s in plan.steps if s.asset_symbol == "USDT")
-    assert usdc_step.amount == pytest.approx(0.60)
-    assert usdt_step.amount == pytest.approx(0.40)
+    assert usdc_step.amount == Decimal("0.60")
+    assert usdt_step.amount == Decimal("0.40")
 
     # Step 3: ExplanationService — withdraw explanation
     svc = ExplanationService()
@@ -288,7 +290,7 @@ def test_e2e_hf_emergency_stop() -> None:
     # Stage 4 withdraw plan is NOOP (no steps)
     plan = sc.get_withdraw_plan(4)
     assert plan.steps == []
-    assert plan.total_withdraw == pytest.approx(0.0)
+    assert plan.total_withdraw == Decimal("0.0")
 
 
 # ---------------------------------------------------------------------------

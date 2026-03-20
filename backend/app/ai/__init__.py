@@ -13,4 +13,3 @@ from .schemas import (  # noqa: F401
     AIAnalysisResult,
     TradeAction,
 )
-from .service import AIService  # noqa: F401

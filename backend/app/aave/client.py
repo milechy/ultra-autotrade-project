@@ -585,24 +585,48 @@ class Web3AaveClient(AaveClientBase):
             logger.info("approve tx confirmed: %s", approve_hash.hex())
 
             # Step 2: Pool.supply
-            supply_tx = self._pool.functions.supply(
-                Web3.to_checksum_address(asset_address),
-                amount_wei,
-                checksum_wallet,
-                0,  # referralCode
-            ).build_transaction(
-                {
-                    "from": checksum_wallet,
-                    "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
-                    "gas": 300000,
-                    "gasPrice": self._w3.eth.gas_price,
-                }
-            )
-            signed_supply = self._w3.eth.account.sign_transaction(
-                supply_tx, private_key=account.key
-            )
-            supply_hash = self._w3_tx.eth.send_raw_transaction(signed_supply.raw_transaction)
-            receipt = self._w3.eth.wait_for_transaction_receipt(supply_hash)
+            try:
+                supply_tx = self._pool.functions.supply(
+                    Web3.to_checksum_address(asset_address),
+                    amount_wei,
+                    checksum_wallet,
+                    0,  # referralCode
+                ).build_transaction(
+                    {
+                        "from": checksum_wallet,
+                        "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                        "gas": 300000,
+                        "gasPrice": self._w3.eth.gas_price,
+                    }
+                )
+                signed_supply = self._w3.eth.account.sign_transaction(
+                    supply_tx, private_key=account.key
+                )
+                supply_hash = self._w3_tx.eth.send_raw_transaction(signed_supply.raw_transaction)
+                receipt = self._w3.eth.wait_for_transaction_receipt(supply_hash)
+            except Exception as supply_exc:
+                # supply 失敗時は allowance を revoke して部分成功状態を解消
+                logger.error("supply 失敗: %s — allowance を revoke します", supply_exc)
+                try:
+                    revoke_tx = token_contract.functions.approve(pool_address, 0).build_transaction(
+                        {
+                            "from": checksum_wallet,
+                            "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                            "gas": 100000,
+                            "gasPrice": self._w3.eth.gas_price,
+                        }
+                    )
+                    signed_revoke = self._w3.eth.account.sign_transaction(
+                        revoke_tx, private_key=account.key
+                    )
+                    revoke_hash = self._w3_tx.eth.send_raw_transaction(
+                        signed_revoke.raw_transaction
+                    )
+                    self._w3.eth.wait_for_transaction_receipt(revoke_hash)
+                    logger.info("allowance revoke 完了: %s", revoke_hash.hex())
+                except Exception as revoke_exc:
+                    logger.error("allowance revoke 失敗: %s", revoke_exc)
+                raise AaveClientError(f"deposit 失敗 (supply error): {supply_exc}") from supply_exc
 
             tx_hash_hex = receipt["transactionHash"].hex()
             logger.info(
@@ -619,8 +643,6 @@ class Web3AaveClient(AaveClientBase):
 
         except (AaveClientError, ValueError):
             raise
-        except Exception as exc:
-            raise AaveClientError(f"deposit 失敗: {exc}") from exc
 
     def withdraw(
         self,

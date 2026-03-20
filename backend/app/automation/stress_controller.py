@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel
@@ -10,14 +11,14 @@ from app.aave.schemas import AaveOperationMode
 
 @dataclass
 class StressStage:
-    trigger_pct: Optional[float]  # None = no price trigger (e.g. stage 4)
+    trigger_pct: Optional[Decimal]  # None = no price trigger (e.g. stage 4)
     action: str
     mode: AaveOperationMode
 
 
 class MarketStressData(BaseModel):
-    price_change_24h: float  # negative = drop, e.g. -0.12 for -12%
-    health_factor: float
+    price_change_24h: Decimal  # negative = drop, e.g. -0.12 for -12%
+    health_factor: Decimal
     manual_stop: bool
     current_mode: AaveOperationMode
     current_stage: int = 0
@@ -32,24 +33,30 @@ class StressEvaluation(BaseModel):
 
 class WithdrawStep(BaseModel):
     asset_symbol: str
-    amount: float  # percentage of position (0.0–1.0)
+    amount: Decimal  # percentage of position (0.0–1.0)
     priority: int
 
 
 class WithdrawPlan(BaseModel):
     stage: int
     steps: list[WithdrawStep]
-    total_withdraw: float  # estimated total withdrawal ratio
+    total_withdraw: Decimal  # estimated total withdrawal ratio
 
 
 class StressController:
     STAGES: dict[int, StressStage] = {
-        1: StressStage(trigger_pct=-0.10, action="pause_deposit", mode=AaveOperationMode.SAFE_MODE),
+        1: StressStage(
+            trigger_pct=Decimal("-0.10"), action="pause_deposit", mode=AaveOperationMode.SAFE_MODE
+        ),
         2: StressStage(
-            trigger_pct=-0.15, action="partial_withdraw", mode=AaveOperationMode.SAFE_MODE
+            trigger_pct=Decimal("-0.15"),
+            action="partial_withdraw",
+            mode=AaveOperationMode.SAFE_MODE,
         ),
         3: StressStage(
-            trigger_pct=-0.20, action="safe_asset_retreat", mode=AaveOperationMode.SAFE_MODE
+            trigger_pct=Decimal("-0.20"),
+            action="safe_asset_retreat",
+            mode=AaveOperationMode.SAFE_MODE,
         ),
         4: StressStage(trigger_pct=None, action="hard_stop", mode=AaveOperationMode.HARD_STOP),
     }
@@ -62,11 +69,11 @@ class StressController:
         No-relaxation: result stage = max(computed, current_stage).
         """
         # Stage 4: hard stop conditions
-        if data.manual_stop or data.health_factor < 1.6:
+        if data.manual_stop or data.health_factor < Decimal("1.6"):
             reason_parts = []
             if data.manual_stop:
                 reason_parts.append("manual_stop=True")
-            if data.health_factor < 1.6:
+            if data.health_factor < Decimal("1.6"):
                 reason_parts.append(f"health_factor={data.health_factor} < 1.6")
             stage4 = self.STAGES[4]
             return StressEvaluation(
@@ -123,23 +130,23 @@ class StressController:
             return WithdrawPlan(
                 stage=stage,
                 steps=[
-                    WithdrawStep(asset_symbol="USDC", amount=0.25, priority=1),
+                    WithdrawStep(asset_symbol="USDC", amount=Decimal("0.25"), priority=1),
                 ],
-                total_withdraw=0.25,
+                total_withdraw=Decimal("0.25"),
             )
         elif stage == 3:
             return WithdrawPlan(
                 stage=stage,
                 steps=[
-                    WithdrawStep(asset_symbol="USDC", amount=0.60, priority=1),
-                    WithdrawStep(asset_symbol="USDT", amount=0.40, priority=2),
+                    WithdrawStep(asset_symbol="USDC", amount=Decimal("0.60"), priority=1),
+                    WithdrawStep(asset_symbol="USDT", amount=Decimal("0.40"), priority=2),
                 ],
-                total_withdraw=1.0,
+                total_withdraw=Decimal("1.0"),
             )
         else:
             # Stage 1, 4, or 0: NOOP
             return WithdrawPlan(
                 stage=stage,
                 steps=[],
-                total_withdraw=0.0,
+                total_withdraw=Decimal("0.0"),
             )

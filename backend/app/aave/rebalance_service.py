@@ -511,6 +511,29 @@ class RebalanceService:
         rejection_reasons = self._check_safety_constraints(
             operations, total_usd, health_factor, now
         )
+
+        # HF 事後推定: WITHDRAW 操作がある場合は担保減少を考慮した推定HFを計算
+        withdraw_ops = [op for op in operations if op.operation == AaveOperationType.WITHDRAW]
+        estimated_hf_after: Optional[Decimal]
+        if withdraw_ops and health_factor != Decimal("inf") and total_usd > _MIN_TOTAL_USD:
+            total_withdraw_usd = sum(op.amount_usd for op in withdraw_ops)
+            new_collateral_ratio = (total_usd - total_withdraw_usd) / total_usd
+            if new_collateral_ratio > Decimal("0"):
+                estimated_hf_after = (health_factor * new_collateral_ratio).quantize(
+                    Decimal("0.0001")
+                )
+            else:
+                estimated_hf_after = Decimal("0")
+            if estimated_hf_after < self._rb_settings.min_health_factor_post:
+                rejection_reasons.append(
+                    f"Estimated health factor after withdraw ({estimated_hf_after}) "
+                    f"is below minimum ({self._rb_settings.min_health_factor_post})"
+                )
+        elif health_factor != Decimal("inf"):
+            estimated_hf_after = health_factor
+        else:
+            estimated_hf_after = None
+
         is_executable = len(rejection_reasons) == 0
 
         if not is_executable:
@@ -520,11 +543,6 @@ class RebalanceService:
             )
         else:
             logger.info("simulate: proposal passed all safety checks, is_executable=True")
-
-        # HF 事後推定（簡易: WITHDRAW で担保が減るため保守的に現在値を使用）
-        estimated_hf_after: Optional[Decimal] = (
-            health_factor if health_factor != Decimal("inf") else None
-        )
 
         # 確認トークン生成
         exp_ts = (

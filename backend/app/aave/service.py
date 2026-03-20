@@ -129,6 +129,11 @@ class AaveService:
         if action_val == "HOLD":
             return AaveOperationType.NOOP
 
+        # HF 取得失敗時は安全側に倒す
+        if health_factor is None:
+            logger.warning("health_factor is None (fetch failed); returning NOOP for safety.")
+            return AaveOperationType.NOOP
+
         # 連続トレード制限（10分以内に 1回まで）
         if self._is_in_cooldown(now):
             logger.info("Trade skipped by cooldown rule.")
