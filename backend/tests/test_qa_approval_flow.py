@@ -22,7 +22,7 @@ from app.aave.schemas import (
     AaveOperationType,
     AaveSystemState,
 )
-from app.auth.dependencies import require_admin, require_viewer
+from app.auth.dependencies import get_current_user, require_admin, require_viewer
 from app.auth.models import UserRole
 from app.main import create_app
 
@@ -121,6 +121,7 @@ def _create_client(service, override_admin: bool = True) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_multi_chain_aave_service] = lambda: service
     if override_admin:
+        app.dependency_overrides[get_current_user] = lambda: admin_user
         app.dependency_overrides[require_admin] = lambda: admin_user
         app.dependency_overrides[require_viewer] = lambda: admin_user
     return TestClient(app)

@@ -1,5 +1,6 @@
 # backend/requirements.txt
 
+slowapi>=0.1.9
 fastapi
 uvicorn[standard]
 httpx

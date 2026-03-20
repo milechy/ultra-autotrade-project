@@ -12,13 +12,14 @@ import dataclasses
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.aave.impact_calculator import ImpactCalculator, ImpactParams
 from app.aave.risk_profile import RiskProfileManager
 from app.aave.safety_score import SafetyScoreCalculator, SafetyScoreParams
 from app.aave.simulation_service import SimulationParams, SimulationService
 from app.ai.explanation_service import ExplanationContext, ExplanationService
+from app.auth.dependencies import get_current_user
 from app.automation.performance_tracker import PerformanceTracker
 
 router = APIRouter(prefix="/api/transparency", tags=["transparency"])
@@ -50,7 +51,7 @@ def _risk_profile_to_dict(profile: Any) -> dict[str, Any]:
 
 
 @router.get("/safety-score")
-def get_safety_score() -> dict[str, Any]:
+def get_safety_score(_: object = Depends(get_current_user)) -> dict[str, Any]:
     """Return a safety score using fallback market parameters."""
     params = SafetyScoreParams(
         utilization_rate=Decimal("0.50"),  # 50 %

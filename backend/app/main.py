@@ -24,6 +24,9 @@ from typing import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app.aave.fee_router import router as fee_router
 from app.aave.rebalance_router import router as rebalance_router
@@ -55,14 +58,13 @@ logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
+    _is_dev = os.getenv("APP_ENV", "development") == "development"
     app = FastAPI(
         title="Ultra AutoTrade API",
         version="0.1.0",
-        docs_url=None if os.getenv("APP_ENV", "development") == "production" else "/docs",
-        redoc_url=None if os.getenv("APP_ENV", "development") == "production" else "/redoc",
-        openapi_url=None
-        if os.getenv("APP_ENV", "development") == "production"
-        else "/openapi.json",
+        docs_url="/docs" if _is_dev else None,
+        redoc_url="/redoc" if _is_dev else None,
+        openapi_url="/openapi.json" if _is_dev else None,
     )
 
     # --- CORS configuration ---
@@ -293,4 +295,7 @@ def create_app() -> FastAPI:
     return app
 
 
+limiter = Limiter(key_func=get_remote_address)
 app = create_app()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]

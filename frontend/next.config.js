@@ -4,6 +4,7 @@ const withNextIntl = createNextIntlPlugin('./lib/i18n.ts');
 
 const nextConfig = {
   reactStrictMode: true,
+  poweredByHeader: false,
   productionBrowserSourceMaps: false,
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error'] } : false,

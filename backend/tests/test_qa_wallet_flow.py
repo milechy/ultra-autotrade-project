@@ -55,14 +55,11 @@ def test_aave_rebalance_unauthenticated(anon_client: TestClient) -> None:
 
 
 def test_transparency_public() -> None:
-    """GET /api/transparency/safety-score returns 200 without auth."""
+    """GET /api/transparency/safety-score returns 401 without auth (auth required)."""
     app = create_app()
     client = TestClient(app)
     resp = client.get("/api/transparency/safety-score")
-    assert resp.status_code == 200
-    data = resp.json()
-    # Should contain a score field
-    assert "score" in data
+    assert resp.status_code == 401
 
 
 def test_transparency_signal_public() -> None:

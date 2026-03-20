@@ -15,7 +15,9 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -33,6 +35,10 @@ from .schemas import (
     UserResponse,
 )
 from .service import AuthService
+
+limiter = Limiter(key_func=get_remote_address)
+
+LOGIN_RATE_LIMIT = os.getenv("LOGIN_RATE_LIMIT", "5/minute")
 
 CURRENT_TERMS_VERSION = "2.0"
 
@@ -96,14 +102,16 @@ def register(
     response_model=TokenResponse,
     summary="Login",
 )
+@limiter.limit(LOGIN_RATE_LIMIT)
 def login(
-    request: LoginRequest,
+    request: Request,
+    credentials: LoginRequest,
     db: Session = Depends(get_db),
 ) -> TokenResponse:
     """
     Log in and obtain a JWT token.
     """
-    user = AuthService.authenticate_user(db, request.email, request.password)
+    user = AuthService.authenticate_user(db, credentials.email, credentials.password)
 
     if user is None:
         raise HTTPException(

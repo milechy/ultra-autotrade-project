@@ -8,12 +8,18 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.aave.transparency_router import router as transparency_router
+from app.auth.dependencies import get_current_user
+
+
+def _mock_user() -> dict:
+    return {"id": 1, "email": "test@example.com", "role": "admin"}
 
 
 @pytest.fixture()
 def client() -> TestClient:
     app = FastAPI()
     app.include_router(transparency_router)
+    app.dependency_overrides[get_current_user] = _mock_user
     return TestClient(app)
 
 
