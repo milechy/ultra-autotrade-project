@@ -215,3 +215,11 @@ curl -s -X POST "$WEBHOOK" \
   -H "Content-Type: application/json" \
   -d '{"text": "❌ [チームメイト名] エラー: [タスク名]\n原因: [エラー内容]"}'
 ```
+
+## 開発体制 v2（2026-03-20〜）
+
+- **claude.ai**: PM/アーキテクト/Asana管理
+- **Claude Code Agent Teams**: 並行開発の主力（tmux + iTerm2）
+- **Cursor**: 廃止（Agent Teamsに統合）
+- **Slack #ultra-auto-project**: 完了通知・CI・承認リクエスト
+- **Asana**: タスク管理（プロジェクトGID: 1213741124336104）
