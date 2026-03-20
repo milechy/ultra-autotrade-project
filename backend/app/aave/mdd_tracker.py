@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/aave/mdd_tracker.py
 
 """Max Drawdown Tracker for Aave portfolio risk management."""

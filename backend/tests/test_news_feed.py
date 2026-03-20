@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """Tests for Perplexity news feed module."""
 
 import json

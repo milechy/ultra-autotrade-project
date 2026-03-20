@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/automation/rate_limiter_schemas.py
 """レート制限 API レスポンススキーマ。"""
 

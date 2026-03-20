@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """E2E integration tests for Wave 1-3 modules.
 
 Tests pure module interaction without any external API or DB calls.

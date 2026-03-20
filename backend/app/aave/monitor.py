@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/aave/monitor.py
 """
 Aave V3 モニタリング — ヘルスファクタ・残高のリアルタイム取得。

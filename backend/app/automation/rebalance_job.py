@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/automation/rebalance_job.py
 
 """4時間ごとにアロケーション乖離をチェックし、閾値超過時はSlack通知する。自動実行はしない。"""

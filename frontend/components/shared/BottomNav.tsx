@@ -1,4 +1,6 @@
 'use client'
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'

@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 import { NextRequest, NextResponse } from 'next/server'
 
 export function middleware(request: NextRequest) {

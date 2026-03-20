@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """
 Global error handlers for production safety.
 Prevents internal error details from leaking to clients.

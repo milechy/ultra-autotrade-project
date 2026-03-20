@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_qa_wallet_flow.py
 """
 QA: Auth boundary tests for wallet connection flow.

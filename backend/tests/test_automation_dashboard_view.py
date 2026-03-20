@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_automation_dashboard_view.py
 
 from datetime import datetime, timedelta, timezone

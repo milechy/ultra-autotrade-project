@@ -1,4 +1,6 @@
 'use client'
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 
 // frontend/app/login/page.tsx
 import { useRouter, useSearchParams } from "next/navigation";

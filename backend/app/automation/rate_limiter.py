@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/automation/rate_limiter.py
 """
 APIレート制限トラッカー（インメモリ、スライディングウィンドウ）。

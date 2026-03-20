@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """tests/test_ai_trend.py — GET /ai/trend/confidence エンドポイントのテスト"""
 
 from datetime import datetime, timezone

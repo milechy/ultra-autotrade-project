@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_knowledge_service.py
 """Knowledge Hub service tests with mocked embeddings and HTTP."""
 

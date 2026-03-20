@@ -1,4 +1,6 @@
 'use client'
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 
 import { useEffect, useState } from "react";
 import Head from "next/head";

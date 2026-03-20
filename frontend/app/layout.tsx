@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 import type { Metadata } from 'next'
 import '../styles/globals.css'
 import { WagmiRootProvider } from '@/lib/wallet/WagmiRootProvider'

@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_aave_chains.py
 """
 Aave V3 マルチチェーン設定レジストリのテスト。

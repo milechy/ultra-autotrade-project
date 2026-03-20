@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """
 Market Context — Aggregated data for AI judgment.
 Combines all data feed caches into a single context object.

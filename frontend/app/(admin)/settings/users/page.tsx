@@ -1,4 +1,6 @@
 'use client'
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 
 // frontend/app/(admin)/settings/users/page.tsx
 import React, { useState, useEffect, useCallback } from "react";

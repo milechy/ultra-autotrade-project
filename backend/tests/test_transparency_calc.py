@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 from decimal import Decimal
 
 from app.aave.impact_calculator import ImpactCalculator, ImpactParams

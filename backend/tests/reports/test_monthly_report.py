@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """月次レポート生成のユニットテスト。"""
 
 from __future__ import annotations

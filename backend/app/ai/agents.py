@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """
 Multi-Agent AI Judgment — QuantAgent-inspired architecture.
 

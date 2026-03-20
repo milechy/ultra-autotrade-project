@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 import { NextRequest, NextResponse } from 'next/server'
 
 const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || ''
@@ -28,9 +30,9 @@ export async function GET(
         'Content-Type': response.headers.get('content-type') || 'application/json',
       },
     })
-  } catch (e: any) {
+  } catch {
     return NextResponse.json(
-      { detail: `Failed to reach backend: ${e?.message || String(e)}` },
+      { detail: 'Backend unavailable' },
       { status: 502 }
     )
   }
@@ -64,9 +66,9 @@ export async function POST(
         'Content-Type': response.headers.get('content-type') || 'application/json',
       },
     })
-  } catch (e: any) {
+  } catch {
     return NextResponse.json(
-      { detail: `Failed to reach backend: ${e?.message || String(e)}` },
+      { detail: 'Backend unavailable' },
       { status: 502 }
     )
   }

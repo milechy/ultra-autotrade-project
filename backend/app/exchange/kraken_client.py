@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/exchange/kraken_client.py
 """
 Kraken 取引クライアント（ccxt 経由）。

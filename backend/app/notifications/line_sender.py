@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """LINE Messaging API を使った通知送信実装。"""
 
 from __future__ import annotations

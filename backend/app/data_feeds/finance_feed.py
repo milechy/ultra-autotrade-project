@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """
 Finance Feed — Perplexity Finance (Sonar Pro)
 Provides macro-economic and financial data context for AI judgment.

@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 import { getJson, postJson, deleteJson, putJson } from './http'
 
 export type RiskLevel = 'low' | 'medium' | 'high'

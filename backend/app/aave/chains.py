@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/aave/chains.py
 """
 Aave V3 マルチチェーン対応のチェーンレジストリモジュール。

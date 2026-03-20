@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_flow_with_aave_stub.py
 """
 AI → OctoBot → Aave の統合フローテスト。

@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_automation_partner_boundaries.py
 """
 パートナー（viewer ロール）が見れる/見れないデータの境界テスト。

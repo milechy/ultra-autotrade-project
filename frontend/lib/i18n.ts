@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 import { getRequestConfig } from 'next-intl/server'
 import { headers } from 'next/headers'
 

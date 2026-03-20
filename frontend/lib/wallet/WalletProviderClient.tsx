@@ -1,4 +1,6 @@
 'use client'
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 
 import { ReactNode, useState } from 'react'
 import { WagmiProvider } from 'wagmi'

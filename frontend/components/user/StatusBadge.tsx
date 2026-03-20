@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 

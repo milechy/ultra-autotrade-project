@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 // NOTE: We intentionally model these as minimally-typed objects.
 // The source of truth is backend/app/automation/schemas.py.
 // We avoid “inventing” fields (contract change prohibited). UI renders known fields when present, and falls back to JSON.

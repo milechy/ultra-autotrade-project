@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/ai/prefilter.py
 """
 AIプレフィルタリング: テクニカル指標によるLLM呼び出し前の事前判定。

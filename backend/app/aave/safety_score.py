@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, field_serializer

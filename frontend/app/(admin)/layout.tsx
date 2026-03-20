@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 import { AdminProviders } from '@/components/providers/AdminProviders'
 import TermsGuard from '@/components/terms/TermsGuard'
 

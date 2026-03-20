@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/automation/automation_router.py
 """
 自動化ワークフロー用 API エンドポイント。

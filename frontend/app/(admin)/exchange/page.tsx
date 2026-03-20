@@ -1,4 +1,6 @@
 'use client'
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 
 import { useEffect, useState, useCallback } from "react";
 import AuthGuard from "@/components/AuthGuard";

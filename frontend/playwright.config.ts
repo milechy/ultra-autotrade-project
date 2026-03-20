@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({

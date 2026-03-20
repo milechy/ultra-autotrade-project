@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/exchange/okx_client.py
 """
 OKX 取引クライアント（ccxt 経由）。

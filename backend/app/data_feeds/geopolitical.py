@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """
 Geopolitical Risk Feed — GDELT + USGS
 Provides geoRiskScore (0-100) for AI judgment context.

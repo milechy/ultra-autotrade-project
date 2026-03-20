@@ -1,4 +1,6 @@
 'use client'
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'

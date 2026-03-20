@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """Reports Router — GET /api/reports/monthly
 
 月次レポートを PDF (reportlab 利用可) または CSV でダウンロードする。

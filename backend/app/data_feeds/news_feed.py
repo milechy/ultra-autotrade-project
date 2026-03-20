@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """
 News Feed — Perplexity Search API
 Provides real-time crypto/DeFi news context for AI judgment.

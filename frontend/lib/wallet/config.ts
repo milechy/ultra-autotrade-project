@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 import { createConfig, http } from 'wagmi'
 import { arbitrum } from 'wagmi/chains'
 import { injected } from 'wagmi/connectors'

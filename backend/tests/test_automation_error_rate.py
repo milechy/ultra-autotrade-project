@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_automation_error_rate.py
 """
 AI API エラー率 > 20% のルールベース制御テスト。

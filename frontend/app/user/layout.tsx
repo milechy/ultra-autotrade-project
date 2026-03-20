@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 import { UserProviders } from '@/components/user/UserProviders'
 import { UserHeader } from '@/components/user/UserHeader'
 import { BottomNav } from '@/components/shared/BottomNav'

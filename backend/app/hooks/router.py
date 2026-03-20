@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """Slack interactive approval endpoints for Claude Code CLI hooks.
 
 POST /api/hooks/slack-interaction  — Slack sends button-click payloads here

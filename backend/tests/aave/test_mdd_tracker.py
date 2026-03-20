@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/aave/test_mdd_tracker.py
 
 """Tests for MddTracker (Max Drawdown Tracker)."""

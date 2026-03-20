@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 /**
  * Data Feeds API client — connects to Phase 2 AI Data Intelligence Layer.
  */

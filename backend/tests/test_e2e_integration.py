@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_e2e_integration.py
 """Wave 3 E2E 統合テスト: Shadow Mode / 緊急停止 / HF / 取引所切り替え / プロンプトバージョン"""
 

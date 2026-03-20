@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 export type WeatherSignal = 'sunny' | 'partly_cloudy' | 'cloudy' | 'stormy'
 
 export interface SignalData {

@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 /// <reference types="next" />
 /// <reference types="next/image-types/global" />
 

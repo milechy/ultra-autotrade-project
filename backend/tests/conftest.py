@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/conftest.py
 """
 Pytest configuration for Ultra AutoTrade backend tests.

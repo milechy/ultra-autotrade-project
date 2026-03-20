@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """月次レポート生成モジュール。
 
 reportlab が利用可能な場合は PDF を、そうでない場合は CSV を返す。
