@@ -190,9 +190,9 @@ class TestMarketContextInJudgment:
         service = AIService()
         rag = RAGContext(chunks=["chunk1"], query="test")
         ctx = build_market_context(health_factor=Decimal("1.5"))
-        prompt = service._build_rag_prompt("test query", rag, market_context=ctx)
-        assert "## Market Context (Real-time Data):" in prompt
-        assert "1.5" in prompt
+        _system, user = service._build_rag_prompt("test query", rag, market_context=ctx)
+        assert "## Market Context (Real-time Data):" in user
+        assert "1.5" in user
 
     def test_build_rag_prompt_without_market_context(self):
         """_build_rag_prompt works unchanged when market_context is None."""
@@ -201,6 +201,6 @@ class TestMarketContextInJudgment:
 
         service = AIService()
         rag = RAGContext(chunks=["chunk1"], query="test")
-        prompt = service._build_rag_prompt("test query", rag)
-        assert "## Market Context" not in prompt
-        assert "chunk1" in prompt
+        _system, user = service._build_rag_prompt("test query", rag)
+        assert "## Market Context" not in user
+        assert "chunk1" in user

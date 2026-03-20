@@ -603,7 +603,7 @@ class TestLlmFailClosed:
             ai_fallback_model="claude-sonnet-4-20250514",
         )
 
-        decision = service._call_claude("some prompt", settings)
+        decision = service._call_claude("system", "some prompt", settings)
 
         assert decision.action == TradeAction.HOLD
         assert decision.confidence == 0

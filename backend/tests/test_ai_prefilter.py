@@ -204,7 +204,7 @@ class TestOpusSonnetFallback:
             '{"action": "BUY", "confidence": 80, "reason": "bullish"}'
         )
         with patch.dict(sys.modules, {"anthropic": mock_module}):
-            result = service._call_claude("test prompt", settings)
+            result = service._call_claude("system", "user prompt", settings)
         assert result.action == TradeAction.BUY
         assert result.provider == LLMProvider.CLAUDE
         assert result.confidence == 80
@@ -237,7 +237,7 @@ class TestOpusSonnetFallback:
         mock_module.Anthropic.return_value = mock_client
 
         with patch.dict(sys.modules, {"anthropic": mock_module}):
-            result = service._call_claude("test prompt", settings)
+            result = service._call_claude("system", "user prompt", settings)
 
         assert result.provider == LLMProvider.CLAUDE_FALLBACK
 
@@ -264,7 +264,7 @@ class TestOpusSonnetFallback:
         mock_module.Anthropic.return_value = mock_client
 
         with patch.dict(sys.modules, {"anthropic": mock_module}):
-            result = service._call_claude("test prompt", settings)
+            result = service._call_claude("system", "user prompt", settings)
 
         assert result.confidence == 80  # 100 * 0.8 = 80
         assert result.provider == LLMProvider.CLAUDE_FALLBACK
@@ -290,7 +290,7 @@ class TestOpusSonnetFallback:
         mock_module.Anthropic.return_value = mock_client
 
         with patch.dict(sys.modules, {"anthropic": mock_module}):
-            result = service._call_claude("test prompt", settings)
+            result = service._call_claude("system", "user prompt", settings)
 
         assert result.provider == LLMProvider.CLAUDE_FALLBACK
         assert result.provider == "claude_fallback"  # str比較も確認
@@ -306,7 +306,7 @@ class TestOpusSonnetFallback:
         mock_module.Anthropic.return_value = mock_client
 
         with patch.dict(sys.modules, {"anthropic": mock_module}):
-            result = service._call_claude("test prompt", settings)
+            result = service._call_claude("system", "user prompt", settings)
 
         assert result.action == TradeAction.HOLD
         assert result.confidence == 0
@@ -318,7 +318,7 @@ class TestOpusSonnetFallback:
         settings = MagicMock()
         settings.anthropic_api_key = None
 
-        result = service._call_claude("test prompt", settings)
+        result = service._call_claude("system", "user prompt", settings)
 
         assert result.action == TradeAction.HOLD
         assert result.provider == LLMProvider.CLAUDE

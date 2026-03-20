@@ -130,27 +130,27 @@ class TestBuildRAGPrompt:
             query="What is the bitcoin outlook?",
             source_count=2,
         )
-        prompt = service._build_rag_prompt("analyze bitcoin", context)
-        assert "BTC broke $100k" in prompt
-        assert "Market sentiment bullish" in prompt
+        _system, user = service._build_rag_prompt("analyze bitcoin", context)
+        assert "BTC broke $100k" in user
+        assert "Market sentiment bullish" in user
 
     def test_empty_chunks(self):
         service = AIService()
         context = RAGContext(chunks=[], query="test", source_count=0)
-        prompt = service._build_rag_prompt("test query", context)
-        assert "No relevant context" in prompt
+        _system, user = service._build_rag_prompt("test query", context)
+        assert "No relevant context" in user
 
     def test_prompt_contains_query(self):
         service = AIService()
         context = RAGContext(chunks=["some context"], query="bitcoin analysis", source_count=1)
-        prompt = service._build_rag_prompt("analyze bitcoin trends", context)
-        assert "analyze bitcoin trends" in prompt
+        _system, user = service._build_rag_prompt("analyze bitcoin trends", context)
+        assert "analyze bitcoin trends" in user
 
     def test_prompt_contains_json_instruction(self):
         service = AIService()
         context = RAGContext(chunks=["context"], query="test", source_count=1)
-        prompt = service._build_rag_prompt("test", context)
-        assert "JSON" in prompt or "json" in prompt
+        system, user = service._build_rag_prompt("test", context)
+        assert "JSON" in system or "json" in system or "JSON" in user or "json" in user
 
 
 class TestJudgeWithRAG:
@@ -220,7 +220,7 @@ class TestCallClaude:
         settings = MagicMock()
         settings.anthropic_api_key = None
 
-        result = service._call_claude("test prompt", settings)
+        result = service._call_claude("system", "user prompt", settings)
         assert result.action == TradeAction.HOLD
         assert result.confidence == 0
         assert result.provider == LLMProvider.CLAUDE
@@ -243,7 +243,7 @@ class TestCallClaude:
         import sys
 
         with patch.dict(sys.modules, {"anthropic": mock_anthropic_module}):
-            result = service._call_claude("test prompt", settings)
+            result = service._call_claude("system", "user prompt", settings)
         assert result.action == TradeAction.BUY
         assert result.confidence == 80
         assert result.provider == LLMProvider.CLAUDE
@@ -260,7 +260,7 @@ class TestCallClaude:
         import sys
 
         with patch.dict(sys.modules, {"anthropic": mock_anthropic_module}):
-            result = service._call_claude("test prompt", settings)
+            result = service._call_claude("system", "user prompt", settings)
         assert result.action == TradeAction.HOLD
         assert result.confidence == 0
         # Opus失敗→フォールバックも失敗→CLAUDE_FALLBACKとして記録される
@@ -284,7 +284,7 @@ class TestCallClaude:
         import sys
 
         with patch.dict(sys.modules, {"anthropic": mock_anthropic_module}):
-            result = service._call_claude("test prompt", settings)
+            result = service._call_claude("system", "user prompt", settings)
         # empty string → JSON parse fails → HOLD
         assert result.action == TradeAction.HOLD
         assert result.provider == LLMProvider.CLAUDE
@@ -296,7 +296,7 @@ class TestCallOpenAI:
         settings = MagicMock()
         settings.openai_api_key = None
 
-        result = service._call_openai("test prompt", settings)
+        result = service._call_openai("system", "user prompt", settings)
         assert result.action == TradeAction.HOLD
         assert result.confidence == 0
         assert result.provider == LLMProvider.OPENAI
@@ -321,7 +321,7 @@ class TestCallOpenAI:
         import sys
 
         with patch.dict(sys.modules, {"openai": mock_openai_module}):
-            result = service._call_openai("test prompt", settings)
+            result = service._call_openai("system", "user prompt", settings)
         assert result.action == TradeAction.SELL
         assert result.confidence == 70
         assert result.provider == LLMProvider.OPENAI
@@ -340,7 +340,7 @@ class TestCallOpenAI:
         import sys
 
         with patch.dict(sys.modules, {"openai": mock_openai_module}):
-            result = service._call_openai("test prompt", settings)
+            result = service._call_openai("system", "user prompt", settings)
         assert result.action == TradeAction.HOLD
         assert result.confidence == 0
         assert result.provider == LLMProvider.OPENAI
@@ -366,7 +366,7 @@ class TestCallOpenAI:
         import sys
 
         with patch.dict(sys.modules, {"openai": mock_openai_module}):
-            result = service._call_openai("test prompt", settings)
+            result = service._call_openai("system", "user prompt", settings)
         assert result.action == TradeAction.HOLD
         assert result.provider == LLMProvider.OPENAI
 

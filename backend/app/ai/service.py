@@ -246,17 +246,17 @@ class AIService:
                     final_reason="COMPOUND RISK detected. Rule engine forced HOLD before LLM call.",
                 )
 
-        prompt = self._build_rag_prompt(
+        system_prompt, user_content = self._build_rag_prompt(
             query, rag_context, version, market_context, cognitive_state
         )
 
         # Phase 1: Primary (Claude)
-        primary = self._call_claude(prompt, ai_settings, version)
+        primary = self._call_claude(system_prompt, user_content, ai_settings, version)
 
         # Phase 2: Secondary (OpenAI) - only if enabled and key available
         secondary = None
         if ai_settings.cross_validation_enabled and ai_settings.openai_api_key:
-            secondary = self._call_openai(prompt, ai_settings, version)
+            secondary = self._call_openai(system_prompt, user_content, ai_settings, version)
 
         result = self._cross_validate(primary, secondary)
 
@@ -281,10 +281,13 @@ class AIService:
         version: str = "v1",
         market_context: Optional[MarketContext] = None,
         cognitive_state: Optional[CognitiveState] = None,
-    ) -> str:
+    ) -> tuple[str, str]:
         """Build prompt with RAG context chunks using the specified prompt version.
 
-        For v3: runs multi-agent analysis and injects agent_signals into template.
+        Returns (system_prompt, user_content) tuple so callers can use proper
+        system/user role separation for each API (Anthropic system= param, OpenAI role=system).
+
+        For v3: runs multi-agent analysis and injects agent_signals into the template itself.
         For v1/v2: appends agent analysis + market context as extra sections.
         """
         chunks_text = (
@@ -299,40 +302,38 @@ class AIService:
         if market_context is not None:
             agent_ctx = run_all_agents(market_context)
 
-        # Build base prompt — v3 injects agent_signals into the template itself
+        # Build user content — v3 injects agent_signals into the template itself
         if version == "v3" and agent_ctx is not None:
             agent_signals_text = agent_ctx.to_decision_prompt()
-            base = (
-                template.system_prompt
-                + "\n\n"
-                + template.user_template.format(
-                    agent_signals=agent_signals_text,
-                    context=chunks_text,
-                    query=query,
-                )
+            user_content = template.user_template.format(
+                agent_signals=agent_signals_text,
+                context=chunks_text,
+                query=query,
             )
         else:
-            base = (
-                template.system_prompt
-                + "\n\n"
-                + template.user_template.format(
-                    context=chunks_text,
-                    query=query,
-                )
+            user_content = template.user_template.format(
+                context=chunks_text,
+                query=query,
             )
             # For v1/v2: append agent analysis and market context as extra sections
             if agent_ctx is not None:
-                base = base + f"\n\n## Agent Analysis:\n{agent_ctx.to_decision_prompt()}"
+                user_content = user_content + f"\n\n## Agent Analysis:\n{agent_ctx.to_decision_prompt()}"
             if market_context is not None:
                 ctx_text = market_context.to_prompt_context()
-                base = base + f"\n\n## Market Context (Real-time Data):\n{ctx_text}"
+                user_content = user_content + f"\n\n## Market Context (Real-time Data):\n{ctx_text}"
 
         if cognitive_state is not None:
-            base = base + f"\n\n{cognitive_state.to_prompt_context()}"
+            user_content = user_content + f"\n\n{cognitive_state.to_prompt_context()}"
 
-        return base
+        return template.system_prompt, user_content
 
-    def _call_claude(self, prompt: str, settings: AISettings, version: str = "v1") -> LLMDecision:
+    def _call_claude(
+        self,
+        system_prompt: str,
+        user_content: str,
+        settings: AISettings,
+        version: str = "v1",
+    ) -> LLMDecision:
         """
         Call Claude API with Opus→Sonnet fallback.
 
@@ -362,7 +363,8 @@ class AIService:
                 response = client.messages.create(
                     model=settings.claude_model,
                     max_tokens=500,
-                    messages=[{"role": "user", "content": prompt}],
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_content}],
                 )
                 raw_text = ""
                 for block in response.content:
@@ -394,7 +396,8 @@ class AIService:
             response = client.messages.create(
                 model=fallback_model,
                 max_tokens=500,
-                messages=[{"role": "user", "content": prompt}],
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_content}],
             )
             raw_text = ""
             for block in response.content:
@@ -421,7 +424,13 @@ class AIService:
                 prompt_version=version,
             )
 
-    def _call_openai(self, prompt: str, settings: AISettings, version: str = "v1") -> LLMDecision:
+    def _call_openai(
+        self,
+        system_prompt: str,
+        user_content: str,
+        settings: AISettings,
+        version: str = "v1",
+    ) -> LLMDecision:
         """Call OpenAI API. Fail-closed: error→HOLD."""
         if not settings.openai_api_key:
             logger.warning("OPENAI_API_KEY not set; falling back to HOLD")
@@ -438,7 +447,10 @@ class AIService:
             client = OpenAI(api_key=settings.openai_api_key)
             response = client.chat.completions.create(
                 model=settings.openai_model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content},
+                ],
                 max_tokens=500,
                 response_format={"type": "json_object"},
             )
