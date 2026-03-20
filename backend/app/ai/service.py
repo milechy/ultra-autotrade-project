@@ -317,7 +317,9 @@ class AIService:
             )
             # For v1/v2: append agent analysis and market context as extra sections
             if agent_ctx is not None:
-                user_content = user_content + f"\n\n## Agent Analysis:\n{agent_ctx.to_decision_prompt()}"
+                user_content = (
+                    user_content + f"\n\n## Agent Analysis:\n{agent_ctx.to_decision_prompt()}"
+                )
             if market_context is not None:
                 ctx_text = market_context.to_prompt_context()
                 user_content = user_content + f"\n\n## Market Context (Real-time Data):\n{ctx_text}"
