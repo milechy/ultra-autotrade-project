@@ -11,6 +11,6 @@ test('ログインページが表示される', async ({ page }) => {
 });
 
 test('API ヘルスチェックが 200 を返す', async ({ request }) => {
-  const response = await request.get('https://api.ultra-auto-trade.com/health');
+  const response = await request.get(`${process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:8000'}/health`);
   expect(response.status()).toBe(200);
 });

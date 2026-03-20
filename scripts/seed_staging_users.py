@@ -36,8 +36,8 @@ def _require_env(name: str) -> str:
 
 USERS = [
     {
-        "email": "hkobayashi@ultra-autotrade.com",
-        "username": "hkobayashi",
+        "email": "admin@example.com",
+        "username": "admin",
         "password": _require_env("SEED_ADMIN_PASSWORD"),
         "role": UserRole.ADMIN,
     },

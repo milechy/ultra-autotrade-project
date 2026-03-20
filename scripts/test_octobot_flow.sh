@@ -7,7 +7,7 @@
 #   ./scripts/test_octobot_flow.sh [--api-url URL] [--scenario SCENARIO]
 #
 # オプション:
-#   --api-url URL    バックエンド API の URL (デフォルト: http://77.42.46.155:8000)
+#   --api-url URL    バックエンド API の URL (デフォルト: ${API_BASE:-http://localhost:8000})
 #   --scenario NAME  実行するシナリオ (all|buy|sell|hold|low-confidence|rate-limit)
 #   --verbose        詳細出力
 #   --help           ヘルプ表示
@@ -19,7 +19,7 @@ set -euo pipefail
 # ========================================
 # 設定
 # ========================================
-API_URL="${API_URL:-http://77.42.46.155:8000}"
+API_URL="${API_URL:-${API_BASE:-http://localhost:8000}}"
 SCENARIO="all"
 VERBOSE=false
 LOG_FILE="/tmp/octobot_test_$(date +%Y%m%d_%H%M%S).log"

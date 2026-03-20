@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { SignalLight, SafetyScore, PerformanceCard } from '@/components/transparency'
 import type { SignalData, SafetyScoreData, PerformanceData } from '@/components/transparency'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.ultra-auto-trade.com'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 function DashboardContent() {
   const { token } = useAuth()

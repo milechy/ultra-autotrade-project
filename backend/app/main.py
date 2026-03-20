@@ -1,19 +1,19 @@
 # backend/app/main.py
 
 """
-バックエンドアプリケーションのエントリーポイント。
+Backend application entry point.
 
-Phase2 で追加された責務:
-- /ai/analyze エンドポイントを公開する
+Responsibilities added in Phase 2:
+- Expose /ai/analyze endpoint
 
-Phase5 で追加された責務:
-- バックグラウンド監視タスクの起動・停止
+Responsibilities added in Phase 5:
+- Start and stop background monitoring tasks
 
-Phase6 で追加された責務:
-- 日次・週次レポートの自動生成スケジューラ
+Responsibilities added in Phase 6:
+- Scheduler for automatic daily/weekly report generation
 
-Phase12 で追加された責務:
-- ユーザー認証・アカウント管理
+Responsibilities added in Phase 12:
+- User authentication and account management
 """
 
 import logging
@@ -44,6 +44,7 @@ from app.error_handlers import register_error_handlers
 from app.exchange.router import router as exchange_router
 from app.hooks.router import router as hooks_router
 from app.knowledge.router import router as knowledge_router
+from app.reports.router import router as reports_router
 from app.rss.router import router as rss_router
 from app.users.router import router as users_router
 from app.webhook.router import router as webhook_router
@@ -62,10 +63,10 @@ def create_app() -> FastAPI:
         else "/openapi.json",
     )
 
-    # --- CORS 設定 ---
-    # フロントエンドからのアクセスを許可
-    # CORS_ORIGINS 環境変数でカンマ区切りで指定可能（空白は自動トリム）
-    _default_origins = "https://app.ultra-auto-trade.com,http://localhost:3000"
+    # --- CORS configuration ---
+    # Allow access from frontend origins.
+    # CORS_ORIGINS env var accepts comma-separated origins (whitespace is auto-trimmed).
+    _default_origins = "http://localhost:3000"
     cors_origins = [
         o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()
     ]
@@ -90,7 +91,7 @@ def create_app() -> FastAPI:
             del response.headers["x-powered-by"]
         return response
 
-    # --- ルーター登録 ---
+    # --- Router registration ---
     app.include_router(auth_router)  # Auth (Phase12)
     app.include_router(users_router)  # Users (Phase12)
     app.include_router(ai_router)  # AI (Phase2)
@@ -111,6 +112,7 @@ def create_app() -> FastAPI:
         prefix="/api/automation",
     )
     app.include_router(data_feeds_router)  # External data feeds (Phase 2)
+    app.include_router(reports_router, prefix="/api/reports")  # Monthly reports
 
     # Register global error handlers (production safety)
     register_error_handlers(app)
@@ -119,11 +121,11 @@ def create_app() -> FastAPI:
     def health_check() -> dict[str, str]:
         return {"status": "ok", "env": os.getenv("APP_ENV", "dev")}
 
-    # --- データベース初期化 (Phase12) ---
+    # --- Database initialization (Phase12) ---
     @app.on_event("startup")
     async def startup_database() -> None:
         """
-        アプリケーション起動時にデータベースを初期化する。
+        Initialize the database on application startup.
         """
         try:
             init_db()
@@ -131,7 +133,7 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.error("Failed to initialize database: %s", exc)
 
-        # JWT シークレットキーの強度検証（staging/production では弱いキーを拒否）
+        # Validate JWT secret key strength (rejects weak keys in staging/production)
         AuthService.validate_secret_key()
 
     @app.on_event("startup")
@@ -145,14 +147,14 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.error("Failed to initialize JudgmentLogger: %s", exc)
 
-    # --- バックグラウンド監視タスク (Phase5) ---
+    # --- Background monitoring tasks (Phase5) ---
     @app.on_event("startup")
     async def startup_event() -> None:
         """
-        アプリケーション起動時にバックグラウンド監視を開始する。
+        Start background monitoring on application startup.
 
-        環境変数 ENABLE_BACKGROUND_MONITORING=1 で有効化。
-        開発環境ではデフォルト無効。
+        Enabled by setting ENABLE_BACKGROUND_MONITORING=1.
+        Disabled by default in development.
         """
         enable_monitoring = os.getenv("ENABLE_BACKGROUND_MONITORING", "0") == "1"
 
@@ -167,7 +169,7 @@ def create_app() -> FastAPI:
             from app.automation.background_tasks import get_task_manager
             from app.automation.state import get_monitoring_service
 
-            # サービスとクライアントの初期化（シングルトン）
+            # Initialize services and clients (singleton pattern)
             monitoring_service = get_monitoring_service()
             aave_client = get_default_aave_client()
 
@@ -175,8 +177,8 @@ def create_app() -> FastAPI:
 
             await task_manager.start_monitoring(
                 get_health_factor_func=aave_client.get_health_factor,
-                # HF=None も記録する（state.json の last_update を常に更新）
-                # MonitoringService.record_health_factor() は None を正しく処理する
+                # Record HF=None as well (always update last_update in state.json)
+                # MonitoringService.record_health_factor() handles None correctly
                 on_health_factor=lambda hf: (monitoring_service.record_health_factor(hf), None)[-1],
                 interval_seconds=float(os.getenv("MONITORING_INTERVAL_SECONDS", "60")),
             )
@@ -185,12 +187,12 @@ def create_app() -> FastAPI:
 
         except Exception as exc:
             logger.error("Failed to start background monitoring: %s", exc)
-            # 監視の起動失敗はアプリ起動をブロックしない（fail-safe）
+            # Monitoring startup failure does not block app startup (fail-safe)
 
     @app.on_event("shutdown")
     async def shutdown_event() -> None:
         """
-        アプリケーション終了時にバックグラウンド監視を停止する。
+        Stop background monitoring on application shutdown.
         """
         try:
             from app.automation.background_tasks import get_task_manager
@@ -204,7 +206,7 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.error("Error during shutdown: %s", exc)
 
-    # --- 外部データフィード バックグラウンドタスク (Phase 2 Data Intelligence) ---
+    # --- External data feed background tasks (Phase 2 Data Intelligence) ---
     @app.on_event("startup")
     async def startup_data_feeds() -> None:
         """Start data feed background tasks (geo-risk + news)."""
@@ -226,15 +228,15 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.error("Failed to start data feed background tasks: %s", exc)
 
-    # --- スケジュールタスク (Phase6) ---
+    # --- Scheduled tasks (Phase6) ---
     @app.on_event("startup")
     async def startup_scheduled_tasks() -> None:
         """
-        アプリケーション起動時にスケジュールタスクを開始する。
+        Start scheduled tasks on application startup.
 
-        環境変数で制御:
-            ENABLE_DAILY_REPORTS=1: 日次レポート有効化
-            ENABLE_WEEKLY_REPORTS=1: 週次レポート有効化
+        Controlled by environment variables:
+            ENABLE_DAILY_REPORTS=1: enable daily reports
+            ENABLE_WEEKLY_REPORTS=1: enable weekly reports
         """
         enable_daily = os.getenv("ENABLE_DAILY_REPORTS", "0") == "1"
         enable_weekly = os.getenv("ENABLE_WEEKLY_REPORTS", "0") == "1"
@@ -267,12 +269,12 @@ def create_app() -> FastAPI:
 
         except Exception as exc:
             logger.error("Failed to start scheduled tasks: %s", exc)
-            # スケジュールタスクの起動失敗はアプリ起動をブロックしない（fail-safe）
+            # Scheduled task startup failure does not block app startup (fail-safe)
 
     @app.on_event("shutdown")
     async def shutdown_scheduled_tasks() -> None:
         """
-        アプリケーション終了時にスケジュールタスクを停止する。
+        Stop scheduled tasks on application shutdown.
         """
         try:
             from app.automation.scheduled_tasks import get_scheduled_task_manager

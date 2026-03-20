@@ -15,9 +15,57 @@ import {
   Cell,
 } from 'recharts'
 import { convertUSDCtoJPY, formatJPY } from '@/lib/jpy-converter'
+import { useAuth } from '@/lib/auth'
 import type { PerformanceData, MonthlyPnl } from '@/components/transparency'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.ultra-auto-trade.com'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+function MonthlyReportDownloadButton() {
+  const { token } = useAuth()
+  const [downloading, setDownloading] = useState(false)
+
+  if (!token) return null
+
+  const handleDownload = async () => {
+    setDownloading(true)
+    try {
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = now.getMonth() + 1
+      const res = await fetch(
+        `${API_URL}/api/reports/monthly?year=${year}&month=${month}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      )
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const contentDisposition = res.headers.get('Content-Disposition') ?? ''
+      const filenameMatch = contentDisposition.match(/filename="([^"]+)"/)
+      const filename = filenameMatch ? filenameMatch[1] : `monthly_report_${year}_${String(month).padStart(2, '0')}.csv`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      // ダウンロード失敗時はコンソールのみ（UIは状態をリセット）
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleDownload}
+      disabled={downloading}
+      className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {downloading ? '取得中…' : '月次レポートDL'}
+    </button>
+  )
+}
 
 function WinRateBar({ rate }: { rate: number }) {
   const color = rate >= 70 ? 'bg-green-500' : rate >= 50 ? 'bg-yellow-500' : 'bg-red-500'
@@ -175,9 +223,12 @@ function PerformanceContent() {
 export default function PerformancePage() {
   return (
     <main className="px-4 py-6 max-w-md mx-auto">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold">パフォーマンス</h1>
-        <p className="text-xs text-muted-foreground mt-1">AI提案の実績サマリー</p>
+      <div className="mb-4 flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold">パフォーマンス</h1>
+          <p className="text-xs text-muted-foreground mt-1">AI提案の実績サマリー</p>
+        </div>
+        <MonthlyReportDownloadButton />
       </div>
       <ErrorBoundary>
         <PerformanceContent />

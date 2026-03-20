@@ -43,7 +43,7 @@ SSHEOF
 
 ## Known Pitfalls
 1. **`--no-cache` 必須** — 古いイメージがキャッシュされると変更が反映されない
-2. **SSH alias は `hetzner`** — `ssh ultra@77.42.46.155` ではなく `ssh hetzner` を使う
+2. **SSH alias は `hetzner`** — `ssh ultra@$STAGING_HOST` ではなく `ssh hetzner` を使う
 3. **docker compose down でDBデータは消えない** — named volume（postgres-data）。`down -v` のみ削除
 4. **POSTGRES_PASSWORD** — `.env.staging` に設定が必要（空だと警告）
 5. **ユーザーロール** — 再ビルド後もDBは維持されるが、初回は seed が必要

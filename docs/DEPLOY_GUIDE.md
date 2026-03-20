@@ -22,7 +22,7 @@ curl -sSL https://raw.githubusercontent.com/milechy/ultra-autotrade-project/stag
 
 ```bash
 cd /opt/ultra-autotrade
-git clone https://github.com/milechy/ultra-autotrade-project.git .
+git clone https://github.com/YOUR_ORG/ultra-autotrade-project.git .
 git checkout staging
 
 # Create environment file

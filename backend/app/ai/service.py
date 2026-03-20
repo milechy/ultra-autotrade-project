@@ -1,12 +1,12 @@
 # backend/app/ai/service.py
 """
-AI 解析ロジックのサービス層。
+Service layer for AI analysis logic.
 
-責務:
-- NotionNewsItem を入力として BUY / SELL / HOLD を決定する
-- docs/05_ai_judgement_rules.md のルールを満たす範囲で判定する
-- 外部の LLM クライアント（OpenAI 等）を差し替え可能な構造にする
-- エラー時・異常値時は HOLD 優先で安全側に倒す
+Responsibilities:
+- Accept a NotionNewsItem and determine BUY / SELL / HOLD
+- Apply judgment within the rules defined in docs/05_ai_judgement_rules.md
+- Allow external LLM clients (OpenAI, etc.) to be swapped in
+- Fail-safe to HOLD on errors or invalid values
 """
 
 import json
@@ -33,16 +33,16 @@ from .schemas import (
 logger = logging.getLogger(__name__)
 
 
-# LLM クライアントの型（NotionNewsItem -> AIAnalysisResult を返す callable を想定）
+# LLM client type (expects a callable: NotionNewsItem -> AIAnalysisResult)
 LLMAnalyzer = Callable[[NotionNewsItem], AIAnalysisResult]
 
 
 class AIService:
     """
-    ニュース一覧を受け取り、AI 判定結果一覧を返すサービスクラス。
+    Service class that accepts a list of news items and returns AI judgment results.
 
-    - コンストラクタで LLMAnalyzer を注入可能（テストではモックを渡す）
-    - デフォルトでは簡易なキーワードベースのルールで判定を行う
+    - LLMAnalyzer can be injected via constructor (pass a mock in tests)
+    - Defaults to a simple keyword-based rule judgment when no LLM is configured
     """
 
     def __init__(self, *, llm_analyzer: Optional[LLMAnalyzer] = None) -> None:
@@ -50,7 +50,7 @@ class AIService:
 
     def analyze_items(self, items: Iterable[NotionNewsItem]) -> List[AIAnalysisResult]:
         """
-        NotionNewsItem の反復可能オブジェクトを受け取り、AIAnalysisResult のリストを返す。
+        Accept an iterable of NotionNewsItem and return a list of AIAnalysisResult.
         """
         results: List[AIAnalysisResult] = []
         now = datetime.now(timezone.utc)
@@ -67,24 +67,24 @@ class AIService:
         now: Optional[datetime] = None,
     ) -> AIAnalysisResult:
         """
-        1件のニュースに対する判定を行う。
+        Run judgment for a single news item.
 
-        1. LLMAnalyzer が設定されていればそれを優先して利用
-        2. 例外発生 / 異常値の場合はログを残して HOLD にフォールバック
-        3. LLMAnalyzer が無い場合は簡易ルールベース判定を実施
+        1. Use LLMAnalyzer if configured (takes priority)
+        2. On exception or invalid values: log and fall back to HOLD
+        3. If no LLMAnalyzer is available: use simple rule-based judgment
         """
         if now is None:
             now = datetime.now(timezone.utc)
 
-        # まずは LLMAnalyzer があればそれを試す
+        # Try LLMAnalyzer first if available
         if self._llm_analyzer is not None:
             try:
                 llm_result = self._llm_analyzer(item)
                 safe_result = self._apply_safety_guards(llm_result)
                 return safe_result
             except Exception as exc:  # noqa: BLE001
-                # セキュリティ設計に基づき、ニュース本文などはログに直接書かず、
-                # ID や URL などの最低限の情報だけを記録する。
+                # Per security design: do not log news body text directly.
+                # Record only minimal identifiers such as ID and URL.
                 logger.warning(
                     "LLM analyzer failed; fallback to rule-based decision. id=%s url=%s error=%s",
                     getattr(item, "id", "unknown"),
@@ -92,17 +92,17 @@ class AIService:
                     exc,
                 )
 
-        # LLM を使わない / 使えない場合は簡易ルールベース
+        # Fall back to simple rule-based judgment when LLM is not used or unavailable
         rule_based = self._rule_based_decision(item, now)
         safe_result = self._apply_safety_guards(rule_based)
         return safe_result
 
     def _apply_safety_guards(self, result: AIAnalysisResult) -> AIAnalysisResult:
         """
-        docs/05_ai_judgement_rules.md の「安全弁」に基づき、
-        confidence が低すぎる場合や不正値の場合は HOLD に寄せる。
+        Apply safety guards per the "safety valve" rules in docs/05_ai_judgement_rules.md.
+        Converts to HOLD when confidence is too low or values are invalid.
         """
-        # 不正な信頼度は補正
+        # Clamp invalid confidence values
         confidence = result.confidence
         if confidence < 0:
             confidence = 0
@@ -111,11 +111,11 @@ class AIService:
 
         action = result.action
 
-        # 信頼度が 40 未満の場合は SELL/BUY は避け、HOLD にする
+        # Force HOLD if confidence is below 40 or action is invalid
         if confidence < 40 or action not in (TradeAction.BUY, TradeAction.SELL, TradeAction.HOLD):
             action = TradeAction.HOLD
 
-        # 修正した値を反映した新しいインスタンスを返す（元オブジェクトは変更しない）
+        # Return a new instance with corrected values (original object is unchanged)
         return AIAnalysisResult(
             id=result.id,
             url=result.url,
@@ -133,10 +133,10 @@ class AIService:
         now: Optional[datetime] = None,
     ) -> AIAnalysisResult:
         """
-        非LLM環境でも動作する簡易なキーワードベース判定。
+        Simple keyword-based judgment that works without an LLM.
 
-        - 非常にラフなロジックだが、Phase2 のたたき台として実装
-        - 本番運用では LLMAnalyzer による判定に徐々に置き換える前提
+        - Intentionally rough logic, implemented as a Phase 2 starting point
+        - Expected to be gradually replaced by LLMAnalyzer in production
         """
         if now is None:
             now = datetime.now(timezone.utc)
@@ -150,7 +150,7 @@ class AIService:
             if part
         ).lower()
 
-        # ごく簡単なキーワードリスト
+        # Very simple keyword lists
         positive_keywords = [
             "record profit",
             "record revenue",
@@ -260,8 +260,8 @@ class AIService:
 
         result = self._cross_validate(primary, secondary)
 
-        # Shadow Mode: 判定を記録するが、shadow_mode フラグを付加して返す
-        # 呼び出し元は shadow_mode=True の場合、実際のトレードを実行しない
+        # Shadow Mode: record judgment and attach shadow_mode flag before returning.
+        # Caller should skip actual trade execution when shadow_mode=True.
         if ai_settings.shadow_mode:
             logger.info(
                 "SHADOW_MODE | action=%s confidence=%s reason=%s prompt_version=%s",
@@ -340,9 +340,9 @@ class AIService:
         Call Claude API with Opus→Sonnet fallback.
 
         Retry logic:
-        - Opusで最大2回試行する
-        - 2回とも失敗した場合はSonnet（AI_FALLBACK_MODEL）に切り替える
-        - フォールバック時はconfidenceを0.8倍に減衰し、provider="claude_fallback"とする
+        - Try Opus up to 2 times
+        - If both attempts fail, switch to Sonnet (AI_FALLBACK_MODEL)
+        - On fallback: decay confidence by 0.8x and set provider="claude_fallback"
         """
         if not settings.anthropic_api_key:
             logger.warning("ANTHROPIC_API_KEY not set; falling back to HOLD")
@@ -354,7 +354,7 @@ class AIService:
                 prompt_version=version,
             )
 
-        # Opusで最大2回試行
+        # Try Opus up to 2 times
         _MAX_OPUS_RETRIES = 2
         last_exc: Optional[Exception] = None
         for attempt in range(1, _MAX_OPUS_RETRIES + 1):
@@ -384,7 +384,7 @@ class AIService:
                     exc,
                 )
 
-        # Opusが2回失敗 → Sonnetフォールバック
+        # Opus failed twice → fall back to Sonnet
         fallback_model = getattr(settings, "ai_fallback_model", "claude-sonnet-4-20250514")
         logger.warning(
             "Claude Opus failed after %d attempts; switching to fallback model=%s",
@@ -407,7 +407,7 @@ class AIService:
                     raw_text = block.text
                     break
             decision = self._parse_llm_response(raw_text, LLMProvider.CLAUDE_FALLBACK)
-            # フォールバック時はconfidenceを0.8倍に減衰（Sonnetの判定精度が低い前提）
+            # Decay confidence by 0.8x on fallback (assuming lower accuracy from Sonnet)
             decayed_confidence = int(decision.confidence * 0.8)
             return decision.model_copy(
                 update={

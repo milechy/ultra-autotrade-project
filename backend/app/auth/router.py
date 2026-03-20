@@ -1,11 +1,11 @@
 # backend/app/auth/router.py
 """
-認証 API エンドポイント。
+Authentication API endpoints.
 
-POST /auth/register - 初回管理者登録
-POST /auth/login    - ログイン
-POST /auth/logout   - ログアウト（フロントエンド側でトークン破棄）
-GET  /auth/me       - 現在のユーザー情報取得
+POST /auth/register - Initial admin registration
+POST /auth/login    - Login
+POST /auth/logout   - Logout (token discarded on the frontend side)
+GET  /auth/me       - Retrieve current user information
 """
 
 import logging
@@ -43,19 +43,19 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     "/register",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="初回管理者登録",
+    summary="Initial admin registration",
 )
 def register(
     request: RegisterRequest,
     db: Session = Depends(get_db),
 ) -> UserResponse:
     """
-    初回管理者アカウントを登録する。
+    Register the initial admin account.
 
-    既にユーザーが存在する場合は 403 エラーを返す。
-    初回登録のみ許可し、以降は管理者が /users エンドポイントで作成する。
+    Returns 403 if a user already exists.
+    Only the first registration is allowed; subsequent users must be created via /users by an admin.
     """
-    # INITIAL_ADMIN_EMAIL が未設定なら登録不可
+    # Registration disabled if INITIAL_ADMIN_EMAIL is not configured
     initial_admin_email = os.getenv("INITIAL_ADMIN_EMAIL")
     if not initial_admin_email:
         raise HTTPException(
@@ -78,7 +78,7 @@ def register(
         user = AuthService.create_user(
             db,
             request,
-            role=UserRole.ADMIN.value,  # 初回登録は常に管理者
+            role=UserRole.ADMIN.value,  # First registration is always admin
         )
         logger.info("Initial admin registered: %s", user.email)
         return UserResponse.model_validate(user)
@@ -92,14 +92,14 @@ def register(
 @router.post(
     "/login",
     response_model=TokenResponse,
-    summary="ログイン",
+    summary="Login",
 )
 def login(
     request: LoginRequest,
     db: Session = Depends(get_db),
 ) -> TokenResponse:
     """
-    ログインして JWT トークンを取得する。
+    Log in and obtain a JWT token.
     """
     user = AuthService.authenticate_user(db, request.email, request.password)
 
@@ -127,16 +127,16 @@ def login(
 @router.post(
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="ログアウト",
+    summary="Logout",
 )
 def logout(
     user: User = Depends(require_active_user),
 ) -> None:
     """
-    ログアウトする。
+    Log out.
 
-    サーバー側ではトークンの無効化は行わない（ステートレス）。
-    クライアント側でトークンを破棄する。
+    Token invalidation is not performed server-side (stateless).
+    The client is responsible for discarding the token.
     """
     logger.info("User logged out: %s", user.email)
     return None
@@ -145,13 +145,13 @@ def logout(
 @router.get(
     "/me",
     response_model=UserResponse,
-    summary="現在のユーザー情報取得",
+    summary="Get current user information",
 )
 def get_me(
     user: User = Depends(require_active_user),
 ) -> UserResponse:
     """
-    現在ログイン中のユーザー情報を取得する。
+    Retrieve the currently authenticated user's information.
     """
     return UserResponse.model_validate(user)
 
@@ -159,7 +159,7 @@ def get_me(
 @router.post(
     "/change-password",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="パスワード変更",
+    summary="Change password",
 )
 def change_password(
     request: PasswordChangeRequest,
@@ -167,16 +167,16 @@ def change_password(
     db: Session = Depends(get_db),
 ) -> None:
     """
-    自分のパスワードを変更する。
+    Change the current user's password.
     """
-    # 現在のパスワードを確認
+    # Verify current password
     if not AuthService.verify_password(request.current_password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect",
         )
 
-    # 新しいパスワードを設定
+    # Set new password
     AuthService.update_user(db, user, password=request.new_password)
     logger.info("User changed password: %s", user.email)
     return None
@@ -185,12 +185,12 @@ def change_password(
 @router.get(
     "/terms/status",
     response_model=TermsStatusResponse,
-    summary="利用規約同意状態確認",
+    summary="Check terms acceptance status",
 )
 def get_terms_status(
     user: User = Depends(require_active_user),
 ) -> TermsStatusResponse:
-    """現在のユーザーが最新の利用規約に同意済みかを確認する。"""
+    """Check whether the current user has accepted the latest terms of service."""
     return TermsStatusResponse(
         accepted=user.terms_version == CURRENT_TERMS_VERSION,
         terms_version=user.terms_version,
@@ -203,14 +203,14 @@ def get_terms_status(
 @router.post(
     "/terms/accept",
     response_model=TermsStatusResponse,
-    summary="利用規約に同意",
+    summary="Accept terms of service",
 )
 def accept_terms(
     request: TermsAcceptRequest,
     user: User = Depends(require_active_user),
     db: Session = Depends(get_db),
 ) -> TermsStatusResponse:
-    """利用規約に同意する。バージョンとタイムスタンプをDBに記録する。"""
+    """Accept the terms of service. Records version and timestamp in the DB."""
     user.terms_accepted_at = datetime.now(timezone.utc)
     user.terms_version = request.version
     db.commit()
@@ -258,12 +258,12 @@ _RISK_OPTIONS = [
 
 @router.get(
     "/risk-mode",
-    summary="リスクモード取得",
+    summary="Get risk mode",
 )
 def get_risk_mode(
     user: User = Depends(require_active_user),
 ) -> dict[str, Any]:
-    """現在のユーザーのリスクモードと選択肢を返す。"""
+    """Return the current user's risk mode and available options."""
     return {
         "mode": user.risk_mode or "conservative",
         "options": _RISK_OPTIONS,
@@ -272,14 +272,14 @@ def get_risk_mode(
 
 @router.put(
     "/risk-mode",
-    summary="リスクモード変更",
+    summary="Update risk mode",
 )
 def update_risk_mode(
     request: RiskModeUpdateRequest,
     user: User = Depends(require_active_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    """ユーザーのリスクモードを変更する（conservative / balanced / aggressive）。"""
+    """Update the user's risk mode (conservative / balanced / aggressive)."""
     user.risk_mode = request.mode
     db.commit()
     db.refresh(user)

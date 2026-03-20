@@ -17,7 +17,7 @@ import { useAuth } from '@/lib/auth'
 import { UserProviders } from '@/components/user/UserProviders'
 import { getJson, putJson } from '@/lib/api/http'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.ultra-auto-trade.com'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 type NotificationLevel = 'all' | 'alert' | 'emergency'
 

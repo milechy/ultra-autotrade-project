@@ -1,16 +1,16 @@
 # backend/app/aave/rebalance_service.py
 
 """
-Aave ポートフォリオ・リバランスのコアロジック。
+Core logic for Aave portfolio rebalancing.
 
-責務:
-- 現在の配分と目標配分の差分計算
-- リバランス提案 (RebalanceProposal) の生成
-- 確認トークン (HMAC + base64) の発行・検証
-- 提案実行 (execute) と結果記録
-- 全操作で Decimal のみ使用 (float 禁止)
-- WITHDRAW 操作を DEPOSIT より先に実行する
-- いずれかの操作が ERROR → 即座に中断
+Responsibilities:
+- Calculate deviation between current and target allocations
+- Generate rebalance proposals (RebalanceProposal)
+- Issue and verify confirmation tokens (HMAC + base64)
+- Execute proposals and record results
+- Use Decimal only for all calculations (no float)
+- Execute WITHDRAW operations before DEPOSIT
+- Abort immediately if any operation returns ERROR
 """
 
 import base64
@@ -47,23 +47,23 @@ from .state_manager import AaveStateManager
 
 logger = logging.getLogger(__name__)
 
-# 確認トークンのアルゴリズム
+# Algorithm for confirmation tokens
 _HMAC_ALGORITHM = "sha256"
 
-# ポートフォリオ総資産 0 の場合に除算ゼロを防ぐ最小値
+# Minimum value to prevent division by zero when total portfolio value is 0
 _MIN_TOTAL_USD = Decimal("0.000001")
 
 
 class RebalanceTokenError(Exception):
-    """確認トークンの検証失敗。"""
+    """Confirmation token verification failed."""
 
 
 class RebalanceProposalNotFoundError(Exception):
-    """指定された proposal_id が見つからない。"""
+    """The specified proposal_id was not found."""
 
 
 class RebalanceSafetyError(Exception):
-    """安全制約違反（緊急停止・HF 不足など）。"""
+    """Safety constraint violation (emergency stop, insufficient HF, etc.)."""
 
 
 def _make_confirmation_token(
@@ -72,12 +72,12 @@ def _make_confirmation_token(
     secret: str,
 ) -> str:
     """
-    HMAC-SHA256 ベースの確認トークンを生成する。
+    Generate an HMAC-SHA256 based confirmation token.
 
-    フォーマット: base64url(payload_json) + "." + base64url(hmac_signature)
+    Format: base64url(payload_json) + "." + base64url(hmac_signature)
 
-    NOTE: PyJWT を使わず hashlib + hmac + base64 のみを使用する。
-    秘密鍵・全トークンをログに出力してはいけない。
+    NOTE: Uses only hashlib + hmac + base64 (no PyJWT).
+    The secret key and full token must never be written to logs.
     """
     payload = {"proposal_id": proposal_id, "exp": exp_timestamp}
     payload_bytes = json.dumps(payload, separators=(",", ":")).encode("utf-8")
@@ -99,14 +99,14 @@ def _verify_confirmation_token(
     secret: str,
 ) -> None:
     """
-    確認トークンを検証する。
+    Verify a confirmation token.
 
-    - HMAC 署名の一致確認（定数時間比較）
-    - 有効期限チェック
-    - proposal_id の一致確認
+    - Validate HMAC signature (constant-time comparison)
+    - Check expiry timestamp
+    - Verify proposal_id match
 
     Raises:
-        RebalanceTokenError: 検証に失敗した場合。
+        RebalanceTokenError: If verification fails.
     """
     parts = token.split(".", 1)
     if len(parts) != 2:
@@ -114,7 +114,7 @@ def _verify_confirmation_token(
 
     payload_b64, provided_sig_b64 = parts
 
-    # 期待署名を計算
+    # Compute expected signature
     expected_sig = hmac.new(
         secret.encode("utf-8"),
         payload_b64.encode("ascii"),
@@ -122,12 +122,12 @@ def _verify_confirmation_token(
     ).digest()
     expected_sig_b64 = base64.urlsafe_b64encode(expected_sig).rstrip(b"=").decode("ascii")
 
-    # 定数時間比較（タイミング攻撃対策）
+    # Constant-time comparison (timing attack mitigation)
     if not hmac.compare_digest(provided_sig_b64, expected_sig_b64):
         raise RebalanceTokenError("Token signature mismatch")
 
-    # ペイロードデコード
-    # base64 パディングを補正
+    # Decode payload
+    # Restore base64 padding
     padding = 4 - len(payload_b64) % 4
     if padding != 4:
         payload_b64_padded = payload_b64 + "=" * padding
@@ -140,7 +140,7 @@ def _verify_confirmation_token(
     except Exception as exc:
         raise RebalanceTokenError(f"Token payload decode error: {exc}") from exc
 
-    # 有効期限チェック
+    # Expiry check
     exp = payload.get("exp")
     if exp is None:
         raise RebalanceTokenError("Token missing 'exp' field")
@@ -149,7 +149,7 @@ def _verify_confirmation_token(
     if now_ts > float(exp):
         raise RebalanceTokenError("Token has expired")
 
-    # proposal_id の一致確認
+    # proposal_id match check
     token_proposal_id = payload.get("proposal_id")
     if token_proposal_id != expected_proposal_id:
         raise RebalanceTokenError(
@@ -160,12 +160,12 @@ def _verify_confirmation_token(
 
 class RebalanceService:
     """
-    Aave ポートフォリオ・リバランスのコアサービス。
+    Core service for Aave portfolio rebalancing.
 
-    - simulate() でリバランス提案を生成し、確認トークンを発行する
-    - execute() でトークン検証後に実際の操作を実行する
-    - 全ての金額計算は Decimal を使用する (float 禁止)
-    - WITHDRAW は DEPOSIT より先に実行する
+    - simulate() generates a rebalance proposal and issues a confirmation token
+    - execute() verifies the token then runs the actual operations
+    - All monetary calculations use Decimal (no float)
+    - WITHDRAW is always executed before DEPOSIT
     """
 
     def __init__(
@@ -189,22 +189,22 @@ class RebalanceService:
         self._last_rebalance_at: Optional[datetime] = None
         self._mdd_tracker = MddTracker()
 
-    # ---- 内部ヘルパー --------------------------------------------------
+    # ---- Internal helpers --------------------------------------------------
 
     def _now(self) -> datetime:
-        """テストしやすさのために現在時刻取得をメソッド化。"""
+        """Wrap current time retrieval for testability."""
         return datetime.now(timezone.utc)
 
     def _get_wallet_address(self) -> str:
-        """ウォレットアドレスを環境変数または設定から取得する。"""
+        """Retrieve wallet address from environment variable or settings."""
         addr = os.environ.get("AAVE_WALLET_ADDRESS", "")
         if not addr:
-            # AaveSettings に wallet_address 相当のフィールドがある場合のフォールバック
+            # Fallback if AaveSettings has a wallet_address equivalent field
             addr = getattr(self._aave_settings, "wallet_address", "") or ""
         return addr
 
     def _cooldown_remaining_seconds(self, now: datetime) -> int:
-        """クールダウン残り秒数を返す。0 の場合は即時実行可能。"""
+        """Return remaining cooldown seconds. 0 means trade is immediately allowed."""
         if self._last_rebalance_at is None:
             return 0
 
@@ -222,9 +222,9 @@ class RebalanceService:
         total_usd: Decimal,
     ) -> list[AssetAllocation]:
         """
-        現在残高から AssetAllocation リストを計算する。
+        Calculate AssetAllocation list from current balances.
 
-        target_allocations にないアセットの target_pct は 0 として扱う。
+        Assets not in target_allocations are treated as target_pct = 0.
         """
         all_symbols = set(balances.keys()) | set(self._rb_settings.target_allocations.keys())
         result: list[AssetAllocation] = []
@@ -252,7 +252,7 @@ class RebalanceService:
         return result
 
     def _needs_rebalance(self, allocations: list[AssetAllocation]) -> bool:
-        """いずれかの資産が deviation_threshold_pct を超えているか判定する。"""
+        """Return True if any asset deviation exceeds deviation_threshold_pct."""
         threshold = self._rb_settings.deviation_threshold_pct
         return any(abs(a.deviation_pct) > threshold for a in allocations)
 
@@ -262,12 +262,12 @@ class RebalanceService:
         total_usd: Decimal,
     ) -> list[ProposedOperation]:
         """
-        配分乖離から操作リストを計算する。
+        Calculate operation list from allocation deviations.
 
-        - 乖離が threshold 以下のアセットはスキップ
-        - deviation > 0 (過剰) → WITHDRAW
-        - deviation < 0 (不足) → DEPOSIT
-        - 1 回の操作量は total_usd の max_rebalance_pct 以下に制限する
+        - Assets within threshold are skipped
+        - deviation > 0 (over-allocated) → WITHDRAW
+        - deviation < 0 (under-allocated) → DEPOSIT
+        - Each operation amount is capped at max_rebalance_pct of total_usd
         """
         ops: list[ProposedOperation] = []
         threshold = self._rb_settings.deviation_threshold_pct
@@ -279,7 +279,7 @@ class RebalanceService:
             if abs(dev) <= threshold:
                 continue
 
-            # 操作金額 = 乖離率 × 総資産
+            # Operation amount = deviation rate × total assets
             raw_amount = abs(dev) / Decimal("100") * total_usd
             amount = min(raw_amount, max_op_usd)
             amount = amount.quantize(Decimal("0.01"))
@@ -314,7 +314,7 @@ class RebalanceService:
                     )
                 )
 
-        # WITHDRAW を先、DEPOSIT を後に並び替える
+        # Sort: WITHDRAW first, then DEPOSIT
         withdrawals = [op for op in ops if op.operation == AaveOperationType.WITHDRAW]
         deposits = [op for op in ops if op.operation == AaveOperationType.DEPOSIT]
         return withdrawals + deposits
@@ -327,28 +327,28 @@ class RebalanceService:
         now: datetime,
     ) -> list[str]:
         """
-        安全制約を全て確認し、拒否理由のリストを返す。
+        Check all safety constraints and return a list of rejection reasons.
 
-        返値が空リストの場合 = 全ての制約をクリア。
+        Empty return list means all constraints passed.
         """
         reasons: list[str] = []
 
-        # state.json の鮮度チェック
+        # Check freshness of state.json
         if self._state_manager.is_stale():
             reasons.append("state.json is stale; cannot execute rebalance")
             return reasons  # stale なら他チェックも意味なし
 
         state = self._state_manager.read_state()
 
-        # emergency_stop
+        # Emergency stop check
         if state.emergency_stop:
             reasons.append("emergency_stop is True; all Aave operations are blocked")
 
-        # circuit_closed
+        # Circuit closed check
         if not state.circuit_closed:
             reasons.append("circuit_closed is False; all Aave operations are blocked")
 
-        # モード
+        # Operation mode check
         if state.mode == AaveOperationMode.HARD_STOP:
             reasons.append(f"Mode={state.mode.value}; all operations are blocked")
         elif state.mode == AaveOperationMode.SAFE_MODE:
@@ -356,11 +356,11 @@ class RebalanceService:
             if has_deposit:
                 reasons.append(f"Mode={state.mode.value}; DEPOSIT operations are blocked")
 
-        # MonitoringService の緊急停止
+        # MonitoringService emergency stop
         if not self._monitoring.is_trading_allowed():
             reasons.append("Trading is paused by MonitoringService emergency stop")
 
-        # クールダウン
+        # Cooldown check
         cooldown_remaining = self._cooldown_remaining_seconds(now)
         if cooldown_remaining > 0:
             reasons.append(
@@ -368,7 +368,7 @@ class RebalanceService:
                 f"(cooldown={self._rb_settings.cooldown_seconds}s)"
             )
 
-        # ヘルスファクター（提案時点）
+        # Health factor check (at proposal time)
         if (
             health_factor != Decimal("inf")
             and health_factor < self._rb_settings.min_health_factor_post
@@ -378,7 +378,7 @@ class RebalanceService:
                 f"{self._rb_settings.min_health_factor_post}"
             )
 
-        # 単一取引上限 10%
+        # Single trade cap: 10% of total assets
         if total_usd > _MIN_TOTAL_USD:
             max_single_usd = total_usd * Decimal("10") / Decimal("100")
             for op in operations:
@@ -391,17 +391,17 @@ class RebalanceService:
 
         return reasons
 
-    # ---- 公開メソッド --------------------------------------------------
+    # ---- Public methods --------------------------------------------------
 
     def get_current_status(self) -> RebalanceStatusResponse:
         """
-        現在のポートフォリオ状態を取得して RebalanceStatusResponse を返す。
+        Retrieve current portfolio state and return a RebalanceStatusResponse.
 
-        1. クライアントからアカウントデータを取得
-        2. 現在の配分割合を計算
-        3. 目標配分との乖離を計算
-        4. リバランスの要否を判定
-        5. クールダウン残り時間を計算
+        1. Fetch account data from client
+        2. Calculate current allocation percentages
+        3. Calculate deviation from target allocations
+        4. Determine whether rebalancing is needed
+        5. Calculate remaining cooldown time
         """
         wallet = self._get_wallet_address()
         now = self._now()
@@ -415,14 +415,14 @@ class RebalanceService:
             total_usd = Decimal("0")
             health_factor = Decimal("0")
 
-        # ダミー: 現在は collateral 全体を default_asset_symbol として扱う
-        # 実際の資産別残高取得は将来の拡張で対応
+        # Stub: treat entire collateral as default_asset_symbol for now.
+        # Per-asset balance retrieval is reserved for future extension.
         default_symbol = self._aave_settings.default_asset_symbol
         balances: dict[str, Decimal] = {default_symbol: total_usd}
 
         current_allocations = self._calculate_allocations(balances, total_usd)
 
-        # target_allocations に存在する全アセットの目標配分リスト（表示用）
+        # Target allocation list for all assets in target_allocations (for display)
         target_allocations = self._calculate_allocations(
             {sym: Decimal("0") for sym in self._rb_settings.target_allocations},
             Decimal("0"),
@@ -444,15 +444,15 @@ class RebalanceService:
 
     def simulate(self, risk_mode: str = "balanced") -> RebalanceProposal:
         """
-        リバランス提案を生成する。
+        Generate a rebalance proposal.
 
-        1. 現在の配分状態を取得
-        2. MDD チェック（risk_mode に応じた hard_stop 判定）
-        3. リバランス不要の場合 → 非実行可能な提案を返す
-        4. 操作リストを計算（WITHDRAW → DEPOSIT の順）
-        5. 安全制約チェック
-        6. UUID proposal_id と HMAC 確認トークンを生成
-        7. _pending_proposals に保存して返す
+        1. Retrieve current allocation state
+        2. MDD check (hard_stop decision based on risk_mode)
+        3. If rebalance is not needed, return a non-executable proposal
+        4. Calculate operation list (WITHDRAW → DEPOSIT order)
+        5. Safety constraint check
+        6. Generate UUID proposal_id and HMAC confirmation token
+        7. Store in _pending_proposals and return
         """
         wallet = self._get_wallet_address()
         now = self._now()
@@ -466,7 +466,7 @@ class RebalanceService:
             total_usd = Decimal("0")
             health_factor = Decimal("0")
 
-        # MDD チェック: ポートフォリオ価値を更新し、hard_stop 判定を行う
+        # MDD check: update portfolio value and evaluate hard_stop
         self._mdd_tracker.update(total_usd)
         mdd_status = self._mdd_tracker.check_limits(risk_mode)
         if mdd_status.hard_stop:
@@ -488,13 +488,13 @@ class RebalanceService:
         proposal_id = str(uuid.uuid4())
         created_at = now
 
-        # リバランス不要の場合
+        # No rebalance needed
         if not self._needs_rebalance(current_allocations):
             logger.info(
                 "simulate: no rebalance needed (all allocations within threshold=%s%%)",
                 self._rb_settings.deviation_threshold_pct,
             )
-            # 実行不可な提案を返す（トークンは発行するが is_executable=False）
+            # Return a non-executable proposal (token is issued but is_executable=False)
             exp_ts = (
                 now + timedelta(seconds=self._rb_settings.confirmation_token_ttl_seconds)
             ).timestamp()
@@ -518,19 +518,19 @@ class RebalanceService:
             self._pending_proposals[proposal_id] = proposal
             return proposal
 
-        # 操作リスト計算
+        # Calculate operation list
         operations = self._calculate_operations(current_allocations, total_usd)
         logger.info(
             "simulate: calculated %d operations for rebalance",
             len(operations),
         )
 
-        # 安全制約チェック
+        # Safety constraint check
         rejection_reasons = self._check_safety_constraints(
             operations, total_usd, health_factor, now
         )
 
-        # HF 事後推定: WITHDRAW 操作がある場合は担保減少を考慮した推定HFを計算
+        # Estimate post-operation HF: account for collateral reduction if WITHDRAW is present
         withdraw_ops = [op for op in operations if op.operation == AaveOperationType.WITHDRAW]
         estimated_hf_after: Optional[Decimal]
         if withdraw_ops and health_factor != Decimal("inf") and total_usd > _MIN_TOTAL_USD:
@@ -562,14 +562,14 @@ class RebalanceService:
         else:
             logger.info("simulate: proposal passed all safety checks, is_executable=True")
 
-        # 確認トークン生成
+        # Generate confirmation token
         exp_ts = (
             now + timedelta(seconds=self._rb_settings.confirmation_token_ttl_seconds)
         ).timestamp()
         token = _make_confirmation_token(
             proposal_id, exp_ts, self._rb_settings.confirmation_token_secret
         )
-        # トークン全体はログに出さない
+        # Do not log the full token
         logger.info(
             "simulate: confirmation token generated for proposal_id=%s (exp=%s)",
             proposal_id,
@@ -594,23 +594,23 @@ class RebalanceService:
 
     def execute(self, proposal_id: str, confirmation_token: str) -> RebalanceResult:
         """
-        リバランス提案を実行する。
+        Execute a rebalance proposal.
 
-        1. confirmation_token を検証（HMAC + 有効期限）
-        2. _pending_proposals から提案を取得
-        3. 全安全制約を再チェック
-        4. WITHDRAW → DEPOSIT の順で操作を実行
-        5. ERROR が発生した場合は即座に中断
-        6. 実行結果を _history に記録
-        7. _last_rebalance_at を更新
-        8. _pending_proposals から削除
+        1. Verify confirmation_token (HMAC + expiry)
+        2. Retrieve proposal from _pending_proposals
+        3. Re-check all safety constraints
+        4. Execute operations in WITHDRAW → DEPOSIT order
+        5. Abort immediately if any operation returns ERROR
+        6. Record execution result in _history
+        7. Update _last_rebalance_at
+        8. Remove from _pending_proposals
 
         Returns:
-            RebalanceResult: 実行結果
+            RebalanceResult: Execution result
         """
         now = self._now()
 
-        # 1. トークン検証
+        # 1. Token verification
         try:
             _verify_confirmation_token(
                 confirmation_token,
@@ -623,7 +623,7 @@ class RebalanceService:
             )
             raise
 
-        # 2. 提案取得
+        # 2. Retrieve proposal
         proposal = self._pending_proposals.get(proposal_id)
         if proposal is None:
             logger.warning("execute: proposal not found: proposal_id=%s", proposal_id)
@@ -637,7 +637,7 @@ class RebalanceService:
             )
             raise RebalanceSafetyError(f"Proposal is not executable: {proposal.rejection_reasons}")
 
-        # 3. 安全制約の再チェック（時間経過による状態変化を考慮）
+        # 3. Re-check safety constraints (account for state changes over time)
         wallet = self._get_wallet_address()
         try:
             account_data = self._client.get_account_data(wallet)
@@ -661,7 +661,7 @@ class RebalanceService:
 
         health_factor_before = current_hf
 
-        # 4. 操作を順次実行（WITHDRAW → DEPOSIT は simulate 時に保証済み）
+        # 4. Execute operations sequentially (WITHDRAW → DEPOSIT order guaranteed at simulate time)
         from app.aave.schemas import AaveOperationResult, AaveOperationStatus, AaveOperationType
 
         executed_results: list[AaveOperationResult] = []
@@ -671,7 +671,7 @@ class RebalanceService:
             if op.operation == AaveOperationType.NOOP:
                 continue
 
-            # TradeAction へのマッピング
+            # Map to TradeAction
             if op.operation == AaveOperationType.WITHDRAW:
                 action = TradeAction.SELL
             elif op.operation == AaveOperationType.DEPOSIT:
@@ -711,7 +711,7 @@ class RebalanceService:
                 aborted = True
                 break
 
-        # 5. 実行後の HF 取得
+        # 5. Fetch HF after execution
         health_factor_after: Optional[Decimal] = None
         try:
             post_account = self._client.get_account_data(wallet)
@@ -719,7 +719,7 @@ class RebalanceService:
         except AaveClientError as exc:
             logger.error("execute: failed to fetch health factor after execution: %s", exc)
 
-        # 6. 最終ステータス判定
+        # 6. Determine final status
         if aborted:
             if len(executed_results) > 1:
                 final_status = RebalanceExecutionStatus.PARTIAL
@@ -751,7 +751,7 @@ class RebalanceService:
             ),
         )
 
-        # 7. 履歴に記録
+        # 7. Record in history
         history_entry = RebalanceHistoryEntry(
             proposal_id=proposal_id,
             created_at=proposal.created_at,
@@ -769,7 +769,7 @@ class RebalanceService:
             final_status.value,
         )
 
-        # 8. _last_rebalance_at 更新
+        # 8. Update _last_rebalance_at
         if final_status in (RebalanceExecutionStatus.SUCCESS, RebalanceExecutionStatus.PARTIAL):
             self._last_rebalance_at = executed_at
             logger.info(
@@ -777,11 +777,11 @@ class RebalanceService:
                 executed_at.isoformat(),
             )
 
-        # 9. pending から削除
+        # 9. Remove from pending
         self._pending_proposals.pop(proposal_id, None)
 
         return result_obj
 
     def get_history(self, limit: int = 20) -> list[RebalanceHistoryEntry]:
-        """リバランス履歴を新しい順に最大 limit 件返す。"""
+        """Return up to `limit` rebalance history entries in reverse chronological order."""
         return self._history[-limit:]

@@ -1,6 +1,6 @@
 # Staging 手動デプロイ手順書
 
-対象: hkobayashi による Hetzner VPS への手動デプロイ
+対象: VPS operator による Hetzner VPS への手動デプロイ
 ブランチ: `dev`
 Compose ファイル: `docker-compose.staging.yml`
 

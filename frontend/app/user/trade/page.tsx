@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { SignalLight, ReasonCard, ImpactCard, WhatIfSimulation } from '@/components/transparency'
 import type { SignalData, ExplanationData, ImpactData, SimulationData } from '@/components/transparency'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.ultra-auto-trade.com'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 type TradeAction = 'BUY' | 'SELL'
 

@@ -15,9 +15,9 @@
 
 ## 環境
 - **Development**: Codespaces
-- **Staging**: 77.42.46.155 (Hetzner, testnet only)
-  - Frontend: http://77.42.46.155:3000
-  - Backend: http://77.42.46.155:8000
+- **Staging**: $STAGING_HOST (Hetzner, testnet only)
+  - Frontend: http://$STAGING_HOST:3000
+  - Backend: http://$STAGING_HOST:8000
 - **Production**: 未デプロイ
 
 ## コアな設計原則
@@ -108,7 +108,7 @@ pytest --cov=app backend/tests/
 ### Staging Deployment
 ```bash
 # SSH to staging
-ssh root@77.42.46.155
+ssh root@$STAGING_HOST
 
 # Update and restart
 cd /opt/ultra-autotrade
