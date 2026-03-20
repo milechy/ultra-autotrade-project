@@ -11,6 +11,7 @@ GET  /auth/me       - 現在のユーザー情報取得
 import logging
 import os
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -261,7 +262,7 @@ _RISK_OPTIONS = [
 )
 def get_risk_mode(
     user: User = Depends(require_active_user),
-) -> dict:
+) -> dict[str, Any]:
     """現在のユーザーのリスクモードと選択肢を返す。"""
     return {
         "mode": user.risk_mode or "conservative",
@@ -277,7 +278,7 @@ def update_risk_mode(
     request: RiskModeUpdateRequest,
     user: User = Depends(require_active_user),
     db: Session = Depends(get_db),
-) -> dict:
+) -> dict[str, Any]:
     """ユーザーのリスクモードを変更する（conservative / balanced / aggressive）。"""
     user.risk_mode = request.mode
     db.commit()

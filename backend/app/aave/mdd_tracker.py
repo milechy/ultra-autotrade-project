@@ -4,7 +4,7 @@
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 
 MDD_THRESHOLDS = {
     "conservative": {"warning": Decimal("-0.05"), "hard_stop": Decimal("-0.10")},
@@ -59,7 +59,7 @@ class MddTracker:
             risk_mode=risk_mode,
         )
 
-    def get_status(self) -> dict:
+    def get_status(self) -> dict[str, Any]:
         """Return current tracker state as dict."""
         return {
             "peak": str(self._peak) if self._peak is not None else None,
