@@ -1,11 +1,12 @@
 'use client'
-// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { cn } from '@/lib/utils'
 
-interface HealthFactorGaugeProps {
+export interface HealthFactorGaugeProps {
   value: number | null
+  size?: 'sm' | 'md' | 'lg'
   className?: string
 }
 
@@ -16,9 +17,9 @@ function getHealthColor(value: number): string {
 }
 
 function getHealthLabel(value: number): string {
-  if (value >= 2.0) return 'Safe'
-  if (value >= 1.6) return 'Caution'
-  return 'DANGER'
+  if (value >= 2.0) return '安全'
+  if (value >= 1.6) return '注意'
+  return '危険'
 }
 
 function getBarWidth(value: number): number {
@@ -26,15 +27,23 @@ function getBarWidth(value: number): number {
   return Math.min((value / 3) * 100, 100)
 }
 
-export function HealthFactorGauge({ value, className }: HealthFactorGaugeProps) {
+const sizeMap = {
+  sm: 'text-xl',
+  md: 'text-3xl',
+  lg: 'text-5xl',
+} as const
+
+export function HealthFactorGauge({ value, size = 'md', className }: HealthFactorGaugeProps) {
   if (value === null) {
     return (
       <div className={cn('flex flex-col gap-1', className)}>
         <span className="text-sm text-muted-foreground">Health Factor</span>
-        <span className="text-2xl font-bold text-muted-foreground">借入なし</span>
+        <span className={cn('font-bold text-muted-foreground', sizeMap[size])}>借入なし</span>
       </div>
     )
   }
+
+  const isDanger = value < 1.6
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
@@ -44,7 +53,14 @@ export function HealthFactorGauge({ value, className }: HealthFactorGaugeProps) 
           {getHealthLabel(value)}
         </span>
       </div>
-      <span className={cn('text-3xl font-bold', getHealthColor(value))}>
+      <span
+        className={cn(
+          'font-bold',
+          sizeMap[size],
+          getHealthColor(value),
+          isDanger && 'animate-pulse'
+        )}
+      >
         {value.toFixed(2)}
       </span>
       <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
