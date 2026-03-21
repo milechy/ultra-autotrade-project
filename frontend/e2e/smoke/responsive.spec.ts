@@ -5,9 +5,10 @@ import { test, expect } from '@playwright/test';
 test.describe('レスポンシブテスト', () => {
   test('モバイル（375px）: ボトムナビ表示', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/user/dashboard');
-    // BottomNav: md:hidden → 375px では表示
-    const nav = page.locator('nav').filter({ hasText: 'ダッシュボード' });
+    // BottomNav は (user) グループ内のページにのみ存在する
+    await page.goto('/decisions');
+    // BottomNav: fixed bottom-0, md:hidden → 375px では表示
+    const nav = page.locator('nav[class*="bottom-0"]');
     await expect(nav).toBeVisible();
   });
 
@@ -34,9 +35,10 @@ test.describe('レスポンシブテスト', () => {
 
   test('デスクトップ（1280px）: ボトムナビが非表示', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/user/dashboard');
+    // BottomNav は (user) グループ内のページにのみ存在する
+    await page.goto('/decisions');
     // BottomNav: md:hidden → 1280px では非表示
-    const nav = page.locator('nav').filter({ hasText: 'ダッシュボード' });
+    const nav = page.locator('nav[class*="bottom-0"]');
     await expect(nav).toBeHidden();
   });
 

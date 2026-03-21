@@ -25,8 +25,9 @@ test.describe('U-06 取引履歴 (/history)', () => {
   });
 
   test('フィルターボタン群（ALL/SUPPLY/WITHDRAW等）が表示される', async ({ page }) => {
-    // TransactionFilters コンポーネント
-    const allBtn = page.getByRole('button', { name: 'ALL' });
+    // TransactionFilters: SUPPLY/WITHDRAW は操作種別フィルターにのみ存在
+    // ALL は DateRangeFilter にも存在するため .first() で先頭を取得
+    const allBtn = page.getByRole('button', { name: 'ALL' }).first();
     await expect(allBtn).toBeVisible();
     const supplyBtn = page.getByRole('button', { name: 'SUPPLY' });
     await expect(supplyBtn).toBeVisible();

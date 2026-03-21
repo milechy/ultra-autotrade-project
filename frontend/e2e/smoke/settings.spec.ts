@@ -13,7 +13,8 @@ test.describe('U-07 設定 (/settings)', () => {
   });
 
   test('ページ見出し「設定」が表示される', async ({ page }) => {
-    const heading = page.getByRole('heading', { name: '設定' });
+    // exact: true で「リスク設定」「通知設定」を除外
+    const heading = page.getByRole('heading', { name: '設定', exact: true });
     await expect(heading).toBeVisible();
   });
 
@@ -36,8 +37,8 @@ test.describe('U-07 設定 (/settings)', () => {
   });
 
   test('ウォレット情報セクションが存在する', async ({ page }) => {
-    // WalletInfoCard
-    const section = page.getByText('ウォレット情報');
+    // WalletInfoCard: CardTitle は 'ウォレット'（'ウォレット情報' ではない）
+    const section = page.getByText('ウォレット', { exact: true });
     await expect(section.first()).toBeVisible();
   });
 
