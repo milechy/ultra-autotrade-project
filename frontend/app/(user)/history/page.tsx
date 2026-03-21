@@ -1,354 +1,213 @@
-'use client'
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
+'use client'
 
-export const dynamic = 'force-dynamic'
+import { useState, useMemo } from 'react'
+import {
+  StatsCards,
+  TransactionFilters,
+  TransactionList,
+} from './_components'
+import type { Transaction, OperationType } from './_components'
 
-import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import AuthGuard from '@/components/AuthGuard'
-import { useAuth } from '@/lib/auth'
-import { UserProviders } from '@/components/user/UserProviders'
-import { getJson } from '@/lib/api/http'
+// TODO: Replace with GET /api/transactions?page=1&limit=50
+const MOCK_TRANSACTIONS: Transaction[] = [
+  {
+    id: 'tx-001',
+    type: 'SUPPLY',
+    asset: 'USDC',
+    amount: 1500,
+    amountUSD: 1500,
+    status: 'success',
+    txHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+    chain: 'arbitrum',
+    timestamp: '2026-03-21T10:30:00Z',
+  },
+  {
+    id: 'tx-002',
+    type: 'BORROW',
+    asset: 'USDT',
+    amount: 800,
+    amountUSD: 800,
+    status: 'success',
+    txHash: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+    chain: 'arbitrum',
+    timestamp: '2026-03-21T08:15:00Z',
+  },
+  {
+    id: 'tx-003',
+    type: 'REPAY',
+    asset: 'USDT',
+    amount: 400,
+    amountUSD: 400,
+    status: 'success',
+    txHash: '0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba',
+    chain: 'arbitrum',
+    timestamp: '2026-03-20T20:45:00Z',
+  },
+  {
+    id: 'tx-004',
+    type: 'SUPPLY',
+    asset: 'WETH',
+    amount: 0.5,
+    amountUSD: 1650,
+    status: 'success',
+    txHash: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+    chain: 'arbitrum',
+    timestamp: '2026-03-20T15:00:00Z',
+  },
+  {
+    id: 'tx-005',
+    type: 'WITHDRAW',
+    asset: 'USDC',
+    amount: 500,
+    amountUSD: 500,
+    status: 'success',
+    txHash: '0xcafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe',
+    chain: 'arbitrum',
+    timestamp: '2026-03-20T11:30:00Z',
+  },
+  {
+    id: 'tx-006',
+    type: 'SUPPLY',
+    asset: 'DAI',
+    amount: 2000,
+    amountUSD: 2000,
+    status: 'pending',
+    txHash: '0x1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff',
+    chain: 'arbitrum',
+    timestamp: '2026-03-19T18:20:00Z',
+  },
+  {
+    id: 'tx-007',
+    type: 'BORROW',
+    asset: 'WBTC',
+    amount: 0.02,
+    amountUSD: 1200,
+    status: 'failed',
+    txHash: '0xffffeeeeddddccccbbbbaaaa0000999988887777666655554444333322221111',
+    chain: 'arbitrum',
+    timestamp: '2026-03-19T14:00:00Z',
+  },
+  {
+    id: 'tx-008',
+    type: 'REPAY',
+    asset: 'USDC',
+    amount: 300,
+    amountUSD: 300,
+    status: 'success',
+    txHash: '0x2222333344445555666677778888999900001111aaaabbbbccccddddeeeeffff',
+    chain: 'arbitrum',
+    timestamp: '2026-03-18T09:10:00Z',
+  },
+  {
+    id: 'tx-009',
+    type: 'WITHDRAW',
+    asset: 'WETH',
+    amount: 0.3,
+    amountUSD: 990,
+    status: 'success',
+    txHash: '0x3333444455556666777788889999000011112222aaaabbbbccccddddeeeeffff',
+    chain: 'arbitrum',
+    timestamp: '2026-03-17T22:00:00Z',
+  },
+  {
+    id: 'tx-010',
+    type: 'SUPPLY',
+    asset: 'AAVE',
+    amount: 10,
+    amountUSD: 950,
+    status: 'success',
+    txHash: '0x4444555566667777888899990000111122223333aaaabbbbccccddddeeeeffff',
+    chain: 'arbitrum',
+    timestamp: '2026-03-16T13:45:00Z',
+  },
+  {
+    id: 'tx-011',
+    type: 'BORROW',
+    asset: 'DAI',
+    amount: 1000,
+    amountUSD: 1000,
+    status: 'success',
+    txHash: '0x5555666677778888999900001111222233334444aaaabbbbccccddddeeeeffff',
+    chain: 'arbitrum',
+    timestamp: '2026-03-15T10:20:00Z',
+  },
+  {
+    id: 'tx-012',
+    type: 'REPAY',
+    asset: 'DAI',
+    amount: 600,
+    amountUSD: 600,
+    status: 'success',
+    txHash: '0x6666777788889999000011112222333344445555aaaabbbbccccddddeeeeffff',
+    chain: 'arbitrum',
+    timestamp: '2026-03-14T07:55:00Z',
+  },
+]
 
-type TradeStatus = 'SUCCESS' | 'FAILED' | 'SKIPPED'
-type TradeAction = 'BUY' | 'SELL'
+export default function HistoryPage() {
+  const [activeType, setActiveType] = useState<OperationType>('ALL')
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | 'all'>('all')
 
-type TradeRecord = {
-  id: string
-  created_at: string
-  symbol: string
-  action: TradeAction
-  quantity: string
-  filled_price: string | null
-  fee: string | null
-  status: TradeStatus
-  pnl: string | null
-}
+  // Compute stats from full mock list
+  const totalCount = MOCK_TRANSACTIONS.length
+  const totalProfitUSD = MOCK_TRANSACTIONS
+    .filter((tx) => tx.status === 'success' && (tx.type === 'SUPPLY' || tx.type === 'BORROW'))
+    .reduce((acc, tx) => acc + tx.amountUSD * 0.042 * (30 / 365), 0)
+  const totalFeeUSD = MOCK_TRANSACTIONS
+    .filter((tx) => tx.status === 'success')
+    .reduce((acc) => acc + 0.15, 0)
 
-type HistoryResponse = {
-  items: TradeRecord[]
-  total: number
-  page: number
-  page_size: number
-}
-
-const PAGE_SIZE = 20
-
-function StatusBadge({ status }: { status: TradeStatus }) {
-  const map: Record<TradeStatus, { label: string; variant: 'default' | 'destructive' | 'secondary' | 'outline' }> = {
-    SUCCESS: { label: '成功', variant: 'default' },
-    FAILED: { label: '失敗', variant: 'destructive' },
-    SKIPPED: { label: 'スキップ', variant: 'secondary' },
-  }
-  const { label, variant } = map[status]
-  return <Badge variant={variant}>{label}</Badge>
-}
-
-function ActionBadge({ action }: { action: TradeAction }) {
-  return (
-    <Badge variant={action === 'BUY' ? 'default' : 'destructive'} className="text-xs">
-      {action}
-    </Badge>
-  )
-}
-
-function PnlCell({ pnl }: { pnl: string | null }) {
-  if (pnl == null) return <span className="text-muted-foreground">—</span>
-  const val = parseFloat(pnl)
-  const colored = val >= 0 ? 'text-green-600' : 'text-red-600'
-  const prefix = val >= 0 ? '+' : ''
-  return <span className={`font-medium ${colored}`}>{prefix}{val.toFixed(2)}</span>
-}
-
-function HistoryTable({ records }: { records: TradeRecord[] }) {
-  if (records.length === 0) {
-    return (
-      <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">
-        該当する取引履歴がありません
-      </div>
+  const filtered = useMemo(() => {
+    let list = [...MOCK_TRANSACTIONS].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     )
-  }
 
-  return (
-    <div className="overflow-x-auto rounded-lg border">
-      <table className="min-w-full text-sm">
-        <thead className="border-b bg-muted/50">
-          <tr>
-            <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">日時</th>
-            <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">ペア</th>
-            <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">種別</th>
-            <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">数量</th>
-            <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">約定価格</th>
-            <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">損益</th>
-            <th className="px-3 py-2.5 text-center font-medium text-muted-foreground">状態</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {records.map(r => (
-            <tr key={r.id} className="hover:bg-muted/30 transition-colors">
-              <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                {new Date(r.created_at).toLocaleString('ja-JP', {
-                  timeZone: 'Asia/Tokyo',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </td>
-              <td className="px-3 py-2.5 font-medium whitespace-nowrap">{r.symbol}</td>
-              <td className="px-3 py-2.5">
-                <ActionBadge action={r.action} />
-              </td>
-              <td className="px-3 py-2.5 text-right">{r.quantity}</td>
-              <td className="px-3 py-2.5 text-right">
-                {r.filled_price ? `$${parseFloat(r.filled_price).toFixed(2)}` : '—'}
-              </td>
-              <td className="px-3 py-2.5 text-right">
-                <PnlCell pnl={r.pnl} />
-              </td>
-              <td className="px-3 py-2.5 text-center">
-                <StatusBadge status={r.status} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function HistoryPage() {
-  const { token } = useAuth()
-  const [activeTab, setActiveTab] = useState<'exchange' | 'aave'>('aave')
-  const [records, setRecords] = useState<TradeRecord[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-  const [actionFilter, setActionFilter] = useState<TradeAction | ''>('')
-  const [showFilters, setShowFilters] = useState(false)
-
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-
-  const fetchHistory = useCallback(async () => {
-    if (!token) return
-    setIsLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: String(PAGE_SIZE),
-      })
-      if (dateFrom) params.set('date_from', dateFrom)
-      if (dateTo) params.set('date_to', dateTo)
-      if (actionFilter) params.set('action', actionFilter)
-
-      const data = await getJson<HistoryResponse>(
-        `/exchange/history?${params.toString()}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      setRecords(data.items)
-      setTotal(data.total)
-    } catch {
-      // endpoint may not exist yet — show empty state
-      setRecords([])
-      setTotal(0)
-    } finally {
-      setIsLoading(false)
+    if (activeType !== 'ALL') {
+      list = list.filter((tx) => tx.type === activeType)
     }
-  }, [token, page, dateFrom, dateTo, actionFilter])
 
-  useEffect(() => {
-    fetchHistory()
-  }, [fetchHistory])
+    if (dateRange !== 'all') {
+      const from = dateRange.from.getTime()
+      const to = dateRange.to.getTime()
+      list = list.filter((tx) => {
+        const t = new Date(tx.timestamp).getTime()
+        return t >= from && t <= to
+      })
+    }
 
-  const handleFilterApply = () => {
-    setPage(1)
-    setShowFilters(false)
-    fetchHistory()
-  }
-
-  const handleFilterReset = () => {
-    setDateFrom('')
-    setDateTo('')
-    setActionFilter('')
-    setPage(1)
-  }
+    return list
+  }, [activeType, dateRange])
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
-        <div className="flex items-center justify-between px-4 py-3">
-          <h1 className="text-lg font-semibold">取引履歴</h1>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowFilters(v => !v)}
-              className="rounded-full p-1.5 text-muted-foreground hover:bg-muted"
-              aria-label="フィルター"
-            >
-              <Filter className="h-4 w-4" />
-            </button>
-            <button
-              onClick={fetchHistory}
-              disabled={isLoading}
-              className="rounded-full p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-50"
-              aria-label="更新"
-            >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="px-4 py-4 space-y-4">
-        {/* Tab switcher */}
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setActiveTab('aave')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'aave' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}
-          >
-            Aave操作履歴
-          </button>
-          <button
-            onClick={() => setActiveTab('exchange')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'exchange' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}
-          >
-            取引所履歴（Coming Soon）
-          </button>
+    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-xl font-bold text-zinc-100">取引履歴</h1>
+          <p className="text-sm text-zinc-400 mt-0.5">Aave操作の全履歴を確認できます</p>
         </div>
 
-        {activeTab === 'aave' && (
-          <div className="space-y-3">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-600">Aave操作履歴はリバランス実行後に表示されます</p>
-            </div>
-          </div>
-        )}
+        {/* Stats */}
+        <StatsCards
+          totalCount={totalCount}
+          totalProfitUSD={totalProfitUSD}
+          totalFeeUSD={totalFeeUSD}
+        />
 
-        {activeTab === 'exchange' && (
-          <div className="relative">
-            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
-              <p className="text-gray-500 font-medium">Coming Soon — Phase 2で対応予定</p>
-            </div>
-            <div className="pointer-events-none select-none opacity-50">
-              {showFilters && (
-                <div className="rounded-lg border p-4 space-y-3">
-                  <h2 className="text-sm font-medium">フィルター</h2>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">開始日</label>
-                      <Input
-                        type="date"
-                        value={dateFrom}
-                        onChange={e => setDateFrom(e.target.value)}
-                        className="text-sm"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">終了日</label>
-                      <Input
-                        type="date"
-                        value={dateTo}
-                        onChange={e => setDateTo(e.target.value)}
-                        className="text-sm"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">アクション</label>
-                    <div className="flex gap-2">
-                      {(['', 'BUY', 'SELL'] as const).map(v => (
-                        <button
-                          key={v}
-                          onClick={() => setActionFilter(v as TradeAction | '')}
-                          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                            actionFilter === v
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                          }`}
-                        >
-                          {v === '' ? '全て' : v}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" className="flex-1" onClick={handleFilterApply}>
-                      適用
-                    </Button>
-                    <Button size="sm" variant="outline" className="flex-1" onClick={handleFilterReset}>
-                      リセット
-                    </Button>
-                  </div>
-                </div>
-              )}
+        {/* Filters */}
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+          <TransactionFilters
+            activeType={activeType}
+            onTypeChange={setActiveType}
+            onDateRangeChange={setDateRange}
+          />
+        </div>
 
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                  <RefreshCw className="mb-3 h-8 w-8 animate-spin" />
-                  <p className="text-sm">読み込み中...</p>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>全 {total} 件</span>
-                    <span>ページ {page} / {totalPages}</span>
-                  </div>
-
-                  <HistoryTable records={records} />
-
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page <= 1}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <span className="text-sm">
-                        {page} / {totalPages}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        disabled={page >= totalPages}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Transaction list */}
+        <TransactionList transactions={filtered} />
       </div>
     </div>
-  )
-}
-
-export default function TradeHistoryPage() {
-  return (
-    <UserProviders>
-      <AuthGuard>
-        <HistoryPage />
-      </AuthGuard>
-    </UserProviders>
   )
 }
