@@ -9,8 +9,9 @@
     "lint": "node ./node_modules/next/dist/bin/next lint",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:mobile": "playwright test --project='Mobile Safari'",
-    "test:e2e:desktop": "playwright test --project='Desktop Chrome'"
+    "test:e2e:mobile": "playwright test --project='Mobile Chrome'",
+    "test:e2e:desktop": "playwright test --project='Desktop Chrome'",
+    "test:e2e:smoke": "playwright test e2e/smoke/"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
