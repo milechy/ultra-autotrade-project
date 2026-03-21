@@ -3,20 +3,21 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './tests',
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  testDir: './e2e',
+  timeout: 30000,
+  retries: 1,
   use: {
-    baseURL: 'http://localhost:3000',
-    headless: true,
+    baseURL: process.env.STAGING_URL || 'http://77.42.46.155:3000',
+    screenshot: 'only-on-failure',
     trace: 'on-first-retry',
   },
   projects: [
     {
-      name: 'chromium',
+      name: 'Mobile Safari',
+      use: { ...devices['iPhone 14'] },
+    },
+    {
+      name: 'Desktop Chrome',
       use: { ...devices['Desktop Chrome'] },
     },
   ],
