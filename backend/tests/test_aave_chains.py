@@ -21,9 +21,16 @@ from app.aave.chains import (
 class TestChainRegistry:
     """CHAIN_REGISTRY の静的データを検証する。"""
 
-    def test_registry_has_four_chains(self) -> None:
-        assert len(CHAIN_REGISTRY) == 4
-        assert set(CHAIN_REGISTRY.keys()) == {"arbitrum", "optimism", "base", "ethereum"}
+    def test_registry_has_six_chains(self) -> None:
+        assert len(CHAIN_REGISTRY) == 6
+        assert set(CHAIN_REGISTRY.keys()) == {
+            "arbitrum",
+            "optimism",
+            "base",
+            "ethereum",
+            "arbitrum_sepolia",
+            "base_sepolia",
+        }
 
     def test_arbitrum_config(self) -> None:
         config = CHAIN_REGISTRY["arbitrum"]
@@ -52,6 +59,20 @@ class TestChainRegistry:
         assert config.chain_id == 1
         assert config.pool_address == "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
         assert config.flashbots_rpc_env_var == "AAVE_FLASHBOTS_RPC_URL"
+
+    def test_arbitrum_sepolia_config(self) -> None:
+        config = CHAIN_REGISTRY["arbitrum_sepolia"]
+        assert config.chain_id == 421614
+        assert config.pool_address == "0xBfC91D59fdAA134A4ED45f7B584cAf96D7792Eff"
+        assert config.data_provider_address == "0x29F1d9A68B77D0e8BefE6D2Cb3eE8cB4Ad6FADE0"
+        assert config.oracle_address == "0x3E17d8C99b6e73Dc2bBe30AAC4A0C5Bd0e0D261B"
+        assert config.is_testnet is True
+
+    def test_base_sepolia_config(self) -> None:
+        config = CHAIN_REGISTRY["base_sepolia"]
+        assert config.chain_id == 84532
+        assert config.pool_address == "0x8bAB6d1b75f19e9eD9fCe8b9BD338844fF79aE27"
+        assert config.is_testnet is True
 
     def test_all_configs_are_frozen(self) -> None:
         for config in CHAIN_REGISTRY.values():

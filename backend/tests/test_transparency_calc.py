@@ -160,4 +160,4 @@ class TestRiskProfileManager:
     def test_invalid_mode_fallback(self) -> None:
         profile = self.mgr.get_profile("nonexistent")
         assert profile.mode == "conservative"
-        assert profile.max_utilization == Decimal("0.6")
+        assert profile.max_utilization == Decimal("0.75")

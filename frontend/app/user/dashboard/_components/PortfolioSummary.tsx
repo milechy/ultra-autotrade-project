@@ -9,10 +9,19 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { KPICard, HealthFactorGauge, StatusBadge } from '@/components/shared'
 import { useWallet } from '@/hooks/useWallet'
 import { useAaveV3 } from '@/hooks/useAaveV3'
+import { fetchAutomationStatus } from '@/lib/api/automation'
 import type { AaveUserAccountData } from '@/types/web3'
+import type { AutomationStatus } from '@/lib/types'
 
-// TODO: Replace with GET /api/automation/status when backend endpoint is ready
-const MOCK_STATUS = 'NORMAL' as const
+import type { StatusBadgeProps } from '@/components/shared'
+
+type SystemStatus = StatusBadgeProps['status']
+
+function toSystemStatus(s: AutomationStatus): SystemStatus {
+  if (s.emergency_reason) return 'HARD_STOP'
+  if (s.is_trading_paused) return 'PAUSED'
+  return 'NORMAL'
+}
 
 function formatUSD(raw: bigint): string {
   const usd = Number(raw) / 1e8
@@ -34,6 +43,7 @@ export function PortfolioSummary() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [systemStatus, setSystemStatus] = useState<SystemStatus>('NORMAL')
 
   const fetchData = useCallback(async (silent = false) => {
     if (!isConnected || !address) return
@@ -55,12 +65,27 @@ export function PortfolioSummary() {
     fetchData()
   }, [fetchData])
 
+  // U-03: Load automation status from GET /api/automation/status
+  const fetchStatus = useCallback(async () => {
+    try {
+      const status = await fetchAutomationStatus()
+      setSystemStatus(toSystemStatus(status))
+    } catch {/* keep current status on error */}
+  }, [])
+
+  useEffect(() => {
+    fetchStatus()
+  }, [fetchStatus])
+
   // 30-second auto-refresh (stale-while-revalidate)
   useEffect(() => {
     if (!isConnected) return
-    const id = setInterval(() => fetchData(true), 30_000)
+    const id = setInterval(() => {
+      fetchData(true)
+      fetchStatus()
+    }, 30_000)
     return () => clearInterval(id)
-  }, [isConnected, fetchData])
+  }, [isConnected, fetchData, fetchStatus])
 
   if (!isConnected) {
     return (
@@ -135,7 +160,7 @@ export function PortfolioSummary() {
             <CardTitle className="text-sm font-medium text-zinc-400">運用ステータス</CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <StatusBadge status={MOCK_STATUS} />
+            <StatusBadge status={systemStatus} />
           </CardContent>
         </Card>
       </div>

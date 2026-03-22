@@ -146,8 +146,7 @@ class BillingService:
         hwm = db.query(HighWaterMark).filter(HighWaterMark.user_id == user_id).first()
         if hwm is None:
             raise BillingServiceError(
-                f"HighWaterMark not found for user_id={user_id}. "
-                "Call get_or_create_hwm first."
+                f"HighWaterMark not found for user_id={user_id}. Call get_or_create_hwm first."
             )
         if new_value > hwm.hwm_value:
             hwm.hwm_value = new_value
@@ -252,9 +251,7 @@ class BillingService:
                 hwm_value = hwm_record.hwm_value
 
                 # 管理報酬計算
-                mgmt_fee = self.calculate_daily_management_fee(
-                    aum, fee_config.management_fee_rate
-                )
+                mgmt_fee = self.calculate_daily_management_fee(aum, fee_config.management_fee_rate)
 
                 # 成果報酬計算（HWM 有効時のみ）
                 if fee_config.high_water_mark_enabled:
@@ -354,9 +351,7 @@ class BillingService:
                 func.coalesce(func.sum(FeeCalculation.performance_fee), Decimal("0")).label(
                     "total_performance_fee"
                 ),
-                func.coalesce(func.sum(FeeCalculation.total_fee), Decimal("0")).label(
-                    "total_fee"
-                ),
+                func.coalesce(func.sum(FeeCalculation.total_fee), Decimal("0")).label("total_fee"),
                 func.count(FeeCalculation.id).label("calculation_count"),
             )
             .filter(FeeCalculation.user_id == user_id)

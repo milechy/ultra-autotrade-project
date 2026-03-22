@@ -41,6 +41,7 @@ from .rebalance_schemas import (
     RebalanceResult,
     RebalanceStatusResponse,
 )
+from .risk_profile import RiskProfileManager
 from .schemas import (
     AaveOperationMode,
     AaveOperationType,
@@ -54,6 +55,8 @@ _HMAC_ALGORITHM = "sha256"
 
 # Minimum value to prevent division by zero when total portfolio value is 0
 _MIN_TOTAL_USD = Decimal("0.000001")
+
+_VALID_RISK_MODES = frozenset({"conservative", "balanced", "aggressive"})
 
 
 class RebalanceTokenError(Exception):
@@ -178,6 +181,7 @@ class RebalanceService:
         aave_settings: AaveSettings,
         state_manager: AaveStateManager,
         monitoring_service: MonitoringService,
+        db_session_factory: Optional[Any] = None,
     ) -> None:
         self._client = aave_client
         self._aave_service = aave_service
@@ -190,6 +194,8 @@ class RebalanceService:
         self._history: list[RebalanceHistoryEntry] = []
         self._last_rebalance_at: Optional[datetime] = None
         self._mdd_tracker = MddTracker()
+        self._db_session_factory = db_session_factory
+        self._risk_profile_manager = RiskProfileManager()
 
     # ---- Internal helpers --------------------------------------------------
 
@@ -217,6 +223,49 @@ class RebalanceService:
         elapsed = (now - last).total_seconds()
         remaining = self._rb_settings.cooldown_seconds - elapsed
         return max(0, int(remaining))
+
+    def _resolve_risk_mode(self, user_id: Optional[str], fallback: str = "conservative") -> str:
+        """
+        Fetch user's risk_mode from DB. Falls back to 'conservative' on any error.
+
+        - No caching: always fetches from DB on each call (real-time)
+        - Invalid mode → 'conservative'
+        - DB failure → 'conservative'
+        """
+        safe_fallback = fallback if fallback in _VALID_RISK_MODES else "conservative"
+
+        if user_id is None or self._db_session_factory is None:
+            return safe_fallback
+
+        try:
+            from app.auth.models import User  # local import to avoid circular dep
+
+            db = self._db_session_factory()
+            user = db.query(User).filter(User.id == user_id).first()
+            if user is None:
+                logger.warning(
+                    "_resolve_risk_mode: user_id=%s not found; falling back to conservative",
+                    user_id,
+                )
+                return "conservative"
+            mode = user.risk_mode or "conservative"
+            if mode not in _VALID_RISK_MODES:
+                logger.warning(
+                    "_resolve_risk_mode: invalid risk_mode=%r for user_id=%s; "
+                    "falling back to conservative",
+                    mode,
+                    user_id,
+                )
+                return "conservative"
+            logger.info("_resolve_risk_mode: user_id=%s risk_mode=%s", user_id, mode)
+            return mode
+        except Exception as exc:
+            logger.warning(
+                "_resolve_risk_mode: DB error for user_id=%s: %s; falling back to conservative",
+                user_id,
+                exc,
+            )
+            return "conservative"
 
     def _calculate_allocations(
         self,
@@ -444,7 +493,12 @@ class RebalanceService:
             cooldown_remaining_seconds=cooldown_remaining,
         )
 
-    def simulate(self, risk_mode: str = "balanced") -> RebalanceProposal:
+    def simulate(
+        self,
+        risk_mode: str = "conservative",
+        user_id: Optional[str] = None,
+        confidence: Decimal = Decimal("1.0"),
+    ) -> RebalanceProposal:
         """
         Generate a rebalance proposal.
 
@@ -468,18 +522,21 @@ class RebalanceService:
             total_usd = Decimal("0")
             health_factor = Decimal("0")
 
+        # Resolve effective risk_mode from DB (fallback to parameter if no user_id or DB error)
+        effective_risk_mode = self._resolve_risk_mode(user_id, fallback=risk_mode)
+
         # MDD check: update portfolio value and evaluate hard_stop
         self._mdd_tracker.update(total_usd)
-        mdd_status = self._mdd_tracker.check_limits(risk_mode)
+        mdd_status = self._mdd_tracker.check_limits(effective_risk_mode)
         if mdd_status.hard_stop:
             raise RuntimeError(
-                f"MDD hard_stop triggered for risk_mode={risk_mode}, "
+                f"MDD hard_stop triggered for risk_mode={effective_risk_mode}, "
                 f"drawdown={mdd_status.drawdown_pct:.1%}"
             )
         if mdd_status.warning:
             logger.warning(
                 "simulate: MDD warning for risk_mode=%s, drawdown=%.1f%%",
-                risk_mode,
+                effective_risk_mode,
                 float(mdd_status.drawdown_pct * 100),
             )
 
@@ -531,6 +588,32 @@ class RebalanceService:
         rejection_reasons = self._check_safety_constraints(
             operations, total_usd, health_factor, now
         )
+
+        # Risk profile: Health Factor check using profile min_health_factor
+        risk_profile = self._risk_profile_manager.get_profile(effective_risk_mode)
+        if health_factor != Decimal("inf") and health_factor < risk_profile.min_health_factor:
+            rejection_reasons.append(
+                f"Health factor {health_factor} below {effective_risk_mode} profile "
+                f"minimum {risk_profile.min_health_factor}"
+            )
+
+        # Risk profile: per-operation asset + confidence gate
+        for op in operations:
+            action_result = self._risk_profile_manager.is_action_allowed(
+                effective_risk_mode, op.asset_symbol, confidence
+            )
+            logger.info(
+                "simulate: User %s risk_mode=%s, action=%s %s, allowed=%s",
+                user_id,
+                effective_risk_mode,
+                op.operation.value,
+                op.asset_symbol,
+                action_result.allowed,
+            )
+            if not action_result.allowed:
+                rejection_reasons.append(
+                    f"Skipped: risk_mode={effective_risk_mode}, {action_result.reason}"
+                )
 
         # Estimate post-operation HF: account for collateral reduction if WITHDRAW is present
         withdraw_ops = [op for op in operations if op.operation == AaveOperationType.WITHDRAW]

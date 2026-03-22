@@ -25,24 +25,24 @@ class ActionAllowedResult(BaseModel):
 _PROFILES: dict[str, RiskProfile] = {
     "conservative": RiskProfile(
         mode="conservative",
-        max_utilization=Decimal("0.6"),
+        max_utilization=Decimal("0.75"),
         min_health_factor=Decimal("2.0"),
         allowed_assets=["USDC", "USDT", "DAI"],
-        min_confidence=Decimal("0.8"),
+        min_confidence=Decimal("0.70"),
     ),
     "balanced": RiskProfile(
         mode="balanced",
-        max_utilization=Decimal("0.75"),
-        min_health_factor=Decimal("1.7"),
+        max_utilization=Decimal("0.85"),
+        min_health_factor=Decimal("1.8"),
         allowed_assets=["USDC", "USDT", "DAI", "ETH", "WBTC"],
-        min_confidence=Decimal("0.65"),
+        min_confidence=Decimal("0.55"),
     ),
     "aggressive": RiskProfile(
         mode="aggressive",
-        max_utilization=Decimal("0.9"),
+        max_utilization=Decimal("0.92"),
         min_health_factor=Decimal("1.5"),
         allowed_assets=["USDC", "USDT", "DAI", "ETH", "WBTC", "MATIC", "LINK"],
-        min_confidence=Decimal("0.5"),
+        min_confidence=Decimal("0.40"),
     ),
 }
 

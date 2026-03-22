@@ -520,7 +520,7 @@ class TestExecute:
         service, _, fake_aave_service = _make_service(
             total_collateral=Decimal("10000"),
             health_factor=Decimal("2.5"),
-            target_allocations={"USDC": Decimal("60"), "WETH": Decimal("40")},
+            target_allocations={"USDC": Decimal("60"), "USDT": Decimal("40")},
         )
 
         proposal = service.simulate()
@@ -539,10 +539,10 @@ class TestExecute:
         service, _, _ = _make_service(
             total_collateral=Decimal("10000"),
             health_factor=Decimal("2.5"),
-            target_allocations={"USDC": Decimal("60"), "WETH": Decimal("40")},
+            target_allocations={"USDC": Decimal("60"), "USDT": Decimal("40")},
             # 即時に期限切れにするため TTL を最小にする
             rb_settings=_make_rebalance_settings(
-                target_allocations={"USDC": Decimal("60"), "WETH": Decimal("40")},
+                target_allocations={"USDC": Decimal("60"), "USDT": Decimal("40")},
                 confirmation_token_ttl_seconds=300,
             ),
         )
@@ -596,7 +596,7 @@ class TestExecute:
 
     def test_execute_stops_on_first_error(self) -> None:
         """最初の操作でエラーが発生したとき、後続操作が実行されないこと。"""
-        # 2 つの操作が発生する配分（USDC 過剰 → WITHDRAW + WETH 不足 → DEPOSIT）
+        # 2 つの操作が発生する配分（USDC 過剰 → WITHDRAW + USDT 不足 → DEPOSIT）
         # 最初の操作で ERROR を返す
         error_result = _make_error_result(AaveOperationType.WITHDRAW)
         success_result = _make_success_result(AaveOperationType.DEPOSIT)
@@ -604,7 +604,7 @@ class TestExecute:
         service, _, fake_aave_service = _make_service(
             total_collateral=Decimal("10000"),
             health_factor=Decimal("2.5"),
-            target_allocations={"USDC": Decimal("60"), "WETH": Decimal("40")},
+            target_allocations={"USDC": Decimal("60"), "USDT": Decimal("40")},
             aave_service_results=[error_result, success_result],
         )
 

@@ -5,6 +5,7 @@
 Aave V3 マルチチェーン対応のチェーンレジストリモジュール。
 
 サポートするチェーン: Arbitrum One, Optimism, Base, Ethereum Mainnet
+                    Arbitrum Sepolia (testnet), Base Sepolia (testnet)
 各チェーンの Pool アドレス・トークンアドレス・RPC URL 環境変数名を一元管理する。
 
 NOTE: 新しいチェーンを追加する場合は、必ずテストネットで動作確認してから本番に反映すること。
@@ -33,6 +34,10 @@ class AaveChainConfig:
     rpc_url_env_var: str
     tokens: dict[str, str]
     flashbots_rpc_env_var: Optional[str]
+    data_provider_address: Optional[str] = None
+    oracle_address: Optional[str] = None
+    pool_addresses_provider: Optional[str] = None
+    is_testnet: bool = False
 
 
 # チェーンレジストリ
@@ -90,6 +95,41 @@ CHAIN_REGISTRY: dict[str, AaveChainConfig] = {
             "WBTC": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
         },
         flashbots_rpc_env_var="AAVE_FLASHBOTS_RPC_URL",
+    ),
+    # --- テストネット ---
+    "arbitrum_sepolia": AaveChainConfig(
+        chain_id=421614,
+        chain_name="arbitrum_sepolia",
+        display_name="Arbitrum Sepolia (Testnet)",
+        pool_address="0xBfC91D59fdAA134A4ED45f7B584cAf96D7792Eff",
+        rpc_url_env_var="ALCHEMY_RPC_URL_ARBITRUM_SEPOLIA",
+        tokens={
+            "USDC": "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
+            "WETH": "0x980B62Da83eFf3D4576C647993b0c1D7faf17c73",
+        },
+        flashbots_rpc_env_var=None,
+        pool_addresses_provider="0xd8f12BCDe1d1775D09a9e053C33ccAE7a53fE08c",
+        data_provider_address="0x29F1d9A68B77D0e8BefE6D2Cb3eE8cB4Ad6FADE0",
+        oracle_address="0x3E17d8C99b6e73Dc2bBe30AAC4A0C5Bd0e0D261B",
+        is_testnet=True,
+    ),
+    "base_sepolia": AaveChainConfig(
+        chain_id=84532,
+        chain_name="base_sepolia",
+        display_name="Base Sepolia (Testnet)",
+        pool_address="0x8bAB6d1b75f19e9eD9fCe8b9BD338844fF79aE27",
+        rpc_url_env_var="ALCHEMY_RPC_URL_BASE_SEPOLIA",
+        tokens={
+            "USDC": "0xba50cd2a20f6da35d788639e581bca8d0b5d4d5f",
+            "WETH": "0x4200000000000000000000000000000000000006",
+        },
+        flashbots_rpc_env_var=None,
+        pool_addresses_provider="0xd449FeD49d9C443688d6816fE6872F21402e41de",
+        # TODO: Base Sepolia の PoolDataProvider アドレスは未確認。Aave 公式ドキュメントで要検証。
+        data_provider_address=None,
+        # TODO: Base Sepolia の AaveOracle アドレスは未確認。Aave 公式ドキュメントで要検証。
+        oracle_address=None,
+        is_testnet=True,
     ),
 }
 
