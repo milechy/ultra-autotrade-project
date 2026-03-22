@@ -8,10 +8,11 @@ docs/13_security_design.md に準拠したセキュリティ要件を満たす�
 """
 
 from datetime import datetime, timezone
+from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import Boolean, DateTime, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -63,6 +64,18 @@ class User(Base):
     terms_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default=None)
     risk_mode: Mapped[Optional[str]] = mapped_column(
         String(20), nullable=True, default="conservative"
+    )
+    notification_email: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True, default=None
+    )
+    notification_frequency: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="important"
+    )
+    max_single_trade_usd: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(precision=20, scale=2), nullable=True, default=None
+    )
+    max_daily_trade_usd: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(precision=20, scale=2), nullable=True, default=None
     )
 
     def __repr__(self) -> str:

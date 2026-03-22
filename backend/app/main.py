@@ -32,6 +32,7 @@ from app.aave.fee_router import router as fee_router
 from app.aave.rebalance_router import router as rebalance_router
 from app.aave.router import router as aave_router
 from app.aave.transparency_router import router as transparency_router
+from app.ai.decisions_router import router as ai_decisions_router
 from app.ai.router import router as ai_router
 from app.api.automation_dashboard import router as automation_dashboard_router
 from app.auth.router import router as auth_router
@@ -54,6 +55,11 @@ from app.rss.router import router as rss_router
 from app.users.router import router as users_router
 from app.webhook.router import router as webhook_router
 from app.billing.router import router as billing_router
+from app.portfolio.router import router as portfolio_router
+from app.proposals.router import router as proposals_router
+from app.transactions.router import admin_router as admin_transactions_router
+from app.transactions.router import router as transactions_router
+from app.users.settings_router import router as user_settings_router
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +125,12 @@ def create_app() -> FastAPI:
     app.include_router(data_feeds_router)  # External data feeds (Phase 2)
     app.include_router(reports_router, prefix="/api/reports")  # Monthly reports
     app.include_router(billing_router)
+    app.include_router(ai_decisions_router)  # AI Decisions API
+    app.include_router(transactions_router)  # Transactions API
+    app.include_router(admin_transactions_router)  # Admin Transactions API
+    app.include_router(proposals_router)  # Proposals API
+    app.include_router(portfolio_router)  # Portfolio History API
+    app.include_router(user_settings_router)  # User Settings API
 
     # Register global error handlers (production safety)
     register_error_handlers(app)
