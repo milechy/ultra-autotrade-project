@@ -6,6 +6,12 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, FormEvent, Suspense } from "react";
 import { useAuth, AuthProvider } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 /**
  * リダイレクト先を検証し、安全なパスのみ許可する。
@@ -36,12 +42,11 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const redirectParam = searchParams.get("redirect")
+  const redirectParam = searchParams.get("redirect");
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      // すでに認証済みでアクセスした場合。role は user state から取得できないため /dashboard にフォールバック
-      router.replace(getSafeRedirect(redirectParam))
+      router.replace(getSafeRedirect(redirectParam));
     }
   }, [isAuthenticated, isLoading, redirectParam, router]);
 
@@ -56,8 +61,9 @@ function LoginForm() {
         ? getSafeRedirect(redirectParam)
         : loggedInUser.role === "admin" ? "/dashboard" : "/user/dashboard";
       router.replace(dest);
-    } catch (err: any) {
-      setError(err?.message || "ログインに失敗しました");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "ログインに失敗しました";
+      setError(message);
     } finally {
       setSubmitting(false);
     }
@@ -65,70 +71,69 @@ function LoginForm() {
 
   if (isLoading) {
     return (
-      <div style={{ padding: 40, textAlign: "center" }}>
-        <div>読み込み中...</div>
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground">読み込み中...</p>
       </div>
     );
   }
 
   if (isAuthenticated) {
-    return null; // リダイレクト中
+    return null;
   }
 
   return (
-    <main style={mainStyle}>
-      <div style={cardStyle}>
-        <h1 style={{ margin: 0, marginBottom: 8 }}>Ultra AutoTrade</h1>
-        <p style={{ margin: 0, marginBottom: 24, color: "#666" }}>
-          運用ダッシュボード
-        </p>
+    <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">Ultra AutoTrade</CardTitle>
+          <CardDescription>運用ダッシュボード</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-        <form onSubmit={handleSubmit}>
-          {error && (
-            <div style={errorStyle}>
-              {error}
+            <div className="space-y-2">
+              <Label htmlFor="email">メールアドレス</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                disabled={submitting}
+                placeholder="admin@example.com"
+              />
             </div>
-          )}
 
-          <div style={fieldStyle}>
-            <label style={labelStyle}>メールアドレス</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              style={inputStyle}
-              disabled={submitting}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">パスワード</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                disabled={submitting}
+              />
+            </div>
 
-          <div style={fieldStyle}>
-            <label style={labelStyle}>パスワード</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              style={inputStyle}
-              disabled={submitting}
-            />
-          </div>
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? "ログイン中..." : "ログイン"}
+            </Button>
+          </form>
 
-          <button
-            type="submit"
-            style={buttonStyle}
-            disabled={submitting}
-          >
-            {submitting ? "ログイン中..." : "ログイン"}
-          </button>
-        </form>
-
-        <p style={{ marginTop: 24, fontSize: 12, color: "#999", textAlign: "center" }}>
-          初期設定が必要な場合は管理者にお問い合わせください。
-        </p>
-      </div>
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            初期設定が必要な場合は管理者にお問い合わせください。
+          </p>
+        </CardContent>
+      </Card>
     </main>
   );
 }
@@ -137,71 +142,13 @@ export default function LoginPage() {
   return (
     <AuthProvider>
       <title>ログイン - Ultra AutoTrade</title>
-      <Suspense fallback={<div style={{ padding: 40, textAlign: "center" }}>読み込み中...</div>}>
+      <Suspense fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <p className="text-muted-foreground">読み込み中...</p>
+        </div>
+      }>
         <LoginForm />
       </Suspense>
     </AuthProvider>
   );
 }
-
-const mainStyle: React.CSSProperties = {
-  fontFamily: "system-ui, sans-serif",
-  minHeight: "100vh",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "#f5f5f5",
-  padding: 20,
-};
-
-const cardStyle: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 12,
-  padding: 32,
-  width: "100%",
-  maxWidth: 400,
-  boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-};
-
-const fieldStyle: React.CSSProperties = {
-  marginBottom: 16,
-};
-
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  marginBottom: 6,
-  fontSize: 14,
-  fontWeight: 500,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  fontSize: 14,
-  border: "1px solid #ddd",
-  borderRadius: 8,
-  boxSizing: "border-box",
-};
-
-const buttonStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "12px 16px",
-  fontSize: 14,
-  fontWeight: 600,
-  color: "#fff",
-  background: "#333",
-  border: "none",
-  borderRadius: 8,
-  cursor: "pointer",
-  marginTop: 8,
-};
-
-const errorStyle: React.CSSProperties = {
-  marginBottom: 16,
-  padding: 12,
-  background: "#fff5f5",
-  border: "1px solid #f1c0c0",
-  borderRadius: 8,
-  color: "#c00",
-  fontSize: 14,
-};
