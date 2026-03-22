@@ -24,22 +24,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
               <strong>Ultra AutoTrade</strong>
             </Link>
-            <span style={{ color: "#666", fontSize: 12 }}>運用ダッシュボード</span>
+            <Link href="/dashboard" style={{ textDecoration: "none", color: "#666", fontSize: 12 }}>運用ダッシュボード</Link>
           </div>
           <nav style={{ display: "flex", gap: 12, fontSize: 14, alignItems: "center" }}>
             <Link href="/dashboard/automation" style={navLinkStyle}>自動売買</Link>
-            <Link href="/dashboard/reports" style={navLinkStyle}>レポート</Link>
+            <Link href="/reports" style={navLinkStyle}>レポート</Link>
             <Link href="/knowledge" style={navLinkStyle}>ナレッジ</Link>
             <Link href="/ai-decisions" style={navLinkStyle}>AI判定</Link>
-            <Link href="/data-feeds" style={navLinkStyle}>データ</Link>
-            <Link href="/exchange" style={navLinkStyle}>取引所管理</Link>
+            <Link href="/events" style={navLinkStyle}>データ</Link>
+            <Link href="/trades" style={navLinkStyle}>取引所管理</Link>
             <Link href="/user/dashboard" style={{ ...navLinkStyle, color: "#2563eb" }}>ユーザーアプリ →</Link>
             {!isLoading && user && (
               <>
                 <span style={{ color: "#999" }}>|</span>
-                <Link href="/settings/account" style={navLinkStyle}>設定</Link>
+                <Link href="/settings/config" style={navLinkStyle}>設定</Link>
                 {user.role === "admin" && (
-                  <Link href="/settings/users" style={navLinkStyle}>ユーザー管理</Link>
+                  <Link href="/users" style={navLinkStyle}>ユーザー管理</Link>
                 )}
                 <span style={{ color: "#666", fontSize: 12 }}>{user.username}</span>
                 <button onClick={handleLogout} style={logoutButtonStyle}>ログアウト</button>
