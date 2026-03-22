@@ -10,7 +10,6 @@ import { fetchExchangeStatus } from "@/lib/api/exchange";
 import { fetchAaveStatus } from "@/lib/api/aave";
 import { apiPost } from "@/lib/api/client";
 import {
-  HealthFactorGauge,
   KPICard,
   StatusBadge,
   EmergencyStopButton,
@@ -18,68 +17,50 @@ import {
 import type { AutomationStatus } from "@/lib/types";
 import type { ExchangeStatusResponse } from "@/lib/api/exchange";
 import type { AaveMonitorStatus } from "@/lib/api/aave";
-import dynamic from "next/dynamic";
 import { Users, DollarSign, ArrowLeftRight, Bell } from "lucide-react";
 
-const HfLineChart = dynamic(() => import("./HfLineChart"), {
-  ssr: false,
-  loading: () => <div className="h-[200px] animate-pulse rounded bg-gray-100" />,
-});
+// 静的モックデータ（Math.random() を避けて hydration mismatch を防ぐ）
+const STATIC_VOLUME_DATA = [
+  { label: "3/16", trades: 8 },
+  { label: "3/17", trades: 12 },
+  { label: "3/18", trades: 5 },
+  { label: "3/19", trades: 17 },
+  { label: "3/20", trades: 9 },
+  { label: "3/21", trades: 14 },
+  { label: "3/22", trades: 6 },
+];
 
-const VolumeBarChart = dynamic(() => import("./VolumeBarChart"), {
-  ssr: false,
-  loading: () => <div className="h-[200px] animate-pulse rounded bg-gray-100" />,
-});
+// シンプルなバーグラフ（CSS のみ、recharts 不使用）
+function SimpleBarChart({ data }: { data: { label: string; trades: number }[] }) {
+  const maxVal = Math.max(...data.map((d) => d.trades), 1);
+  return (
+    <div className="flex h-[160px] items-end gap-2">
+      {data.map((d) => (
+        <div key={d.label} className="flex flex-1 flex-col items-center gap-1">
+          <div
+            className="w-full rounded-t bg-blue-500"
+            style={{ height: `${(d.trades / maxVal) * 120}px` }}
+          />
+          <span className="text-[10px] text-gray-500">{d.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-// -----------------------------------------------------------------------
-// Mock chart data helpers
-// -----------------------------------------------------------------------
-
-type HfTimeRange = "24h" | "7d" | "30d";
-
-function generateHfData(range: HfTimeRange) {
-  const now = Date.now();
-  let points: number;
-  let stepMs: number;
-  let labelFmt: (d: Date) => string;
-
-  if (range === "24h") {
-    points = 24;
-    stepMs = 60 * 60 * 1000;
-    labelFmt = (d) => `${d.getHours()}:00`;
-  } else if (range === "7d") {
-    points = 7;
-    stepMs = 24 * 60 * 60 * 1000;
-    labelFmt = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
-  } else {
-    points = 30;
-    stepMs = 24 * 60 * 60 * 1000;
-    labelFmt = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+// Health Factor 数値表示（HealthFactorGauge の代替）
+function HfDisplay({ value }: { value: number | null }) {
+  if (value === null) {
+    return <p className="text-4xl font-bold text-gray-300">—</p>;
   }
-
-  let hf = 2.1;
-  return Array.from({ length: points }, (_, i) => {
-    const ts = now - (points - 1 - i) * stepMs;
-    hf = Math.max(1.4, Math.min(3.5, hf + (Math.random() - 0.5) * 0.12));
-    return { label: labelFmt(new Date(ts)), hf: parseFloat(hf.toFixed(2)) };
-  });
+  const color = value >= 2.0 ? "text-green-600" : value >= 1.6 ? "text-yellow-500" : "text-red-600";
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <p className={`text-5xl font-bold ${color}`}>{value.toFixed(2)}</p>
+      <p className="text-xs text-gray-400">Health Factor</p>
+    </div>
+  );
 }
-
-function generateVolumeData() {
-  const now = new Date();
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() - (6 - i));
-    return {
-      label: `${d.getMonth() + 1}/${d.getDate()}`,
-      trades: Math.floor(Math.random() * 20) + 1,
-    };
-  });
-}
-
-// -----------------------------------------------------------------------
-// Dashboard content
-// -----------------------------------------------------------------------
 
 function DashboardContent() {
   const { token } = useAuth();
@@ -87,15 +68,7 @@ function DashboardContent() {
   const [exchangeStatus, setExchangeStatus] = useState<ExchangeStatusResponse | null>(null);
   const [aaveStatus, setAaveStatus] = useState<AaveMonitorStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  const [hfRange, setHfRange] = useState<HfTimeRange>("24h");
-  const [hfData] = useState(() => ({
-    "24h": generateHfData("24h"),
-    "7d": generateHfData("7d"),
-    "30d": generateHfData("30d"),
-  }));
-  const [volumeData] = useState(() => generateVolumeData());
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!token) return;
@@ -106,7 +79,7 @@ function DashboardContent() {
       ]);
       setAutomationStatus(auto);
       setExchangeStatus(exchange);
-      setLastUpdated(new Date());
+      setLastUpdated(new Date().toLocaleTimeString("ja-JP"));
       setError(null);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -129,7 +102,6 @@ function DashboardContent() {
   const hfNum =
     aaveStatus?.health_factor != null ? parseFloat(aaveStatus.health_factor) : null;
 
-  // Derive system status
   const systemStatus: "NORMAL" | "SAFE_MODE" | "HARD_STOP" = (() => {
     if (automationStatus?.is_trading_paused) return "HARD_STOP";
     if (hfNum != null && hfNum < 1.8) return "SAFE_MODE";
@@ -141,7 +113,6 @@ function DashboardContent() {
     await fetchData();
   }
 
-  // KPI values
   const totalTrades = exchangeStatus?.daily_trades_used ?? "—";
   const aaveUsdcRaw = aaveStatus?.balance?.usdc_balance;
   const aaveAUsdcRaw = aaveStatus?.balance?.a_usdc_balance;
@@ -158,7 +129,7 @@ function DashboardContent() {
           <h1 className="text-2xl font-bold text-gray-900">運用ダッシュボード</h1>
           {lastUpdated && (
             <p className="mt-0.5 text-xs text-gray-400">
-              最終更新: {lastUpdated.toLocaleTimeString("ja-JP")}（30秒自動更新）
+              最終更新: {lastUpdated}（30秒自動更新）
             </p>
           )}
         </div>
@@ -204,13 +175,13 @@ function DashboardContent() {
         />
       </div>
 
-      {/* HF Gauge + Chart */}
+      {/* HF Display + Volume Chart */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Health Factor Gauge */}
+        {/* Health Factor */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-gray-700">Health Factor</h2>
-          <div className="flex flex-col items-center gap-4">
-            <HealthFactorGauge value={hfNum} size="lg" />
+          <div className="flex flex-col items-center gap-4 py-4">
+            <HfDisplay value={hfNum} />
             {aaveStatus == null && (
               <p className="text-xs text-gray-400">取得中...</p>
             )}
@@ -220,34 +191,36 @@ function DashboardContent() {
           </div>
         </div>
 
-        {/* HF Line Chart */}
+        {/* Daily Volume */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-700">HF 推移</h2>
-            <div className="flex gap-1">
-              {(["24h", "7d", "30d"] as HfTimeRange[]).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setHfRange(r)}
-                  className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-                    hfRange === r
-                      ? "bg-blue-600 text-white"
-                      : "text-gray-500 hover:bg-gray-100"
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-          <HfLineChart data={hfData[hfRange]} />
+          <h2 className="mb-4 text-sm font-semibold text-gray-700">日別取引量（過去7日）</h2>
+          <SimpleBarChart data={STATIC_VOLUME_DATA} />
         </div>
       </div>
 
-      {/* Daily Volume Bar Chart */}
+      {/* System Status Detail */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-sm font-semibold text-gray-700">日別取引量（過去7日）</h2>
-        <VolumeBarChart data={volumeData} />
+        <h2 className="mb-4 text-sm font-semibold text-gray-700">システム状態</h2>
+        <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
+          <div>
+            <p className="text-xs text-gray-400">自動売買</p>
+            <p className={`font-medium ${automationStatus?.is_trading_paused ? "text-red-600" : "text-green-600"}`}>
+              {automationStatus == null ? "取得中..." : automationStatus.is_trading_paused ? "停止中" : "稼働中"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">取引所接続</p>
+            <p className={`font-medium ${exchangeStatus?.connected ? "text-green-600" : "text-gray-400"}`}>
+              {exchangeStatus == null ? "取得中..." : exchangeStatus.connected ? "接続済" : "未接続"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">日次残取引枠</p>
+            <p className="font-medium text-gray-700">
+              {exchangeStatus == null ? "取得中..." : `${exchangeStatus.daily_trades_used ?? "—"} 件使用`}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
