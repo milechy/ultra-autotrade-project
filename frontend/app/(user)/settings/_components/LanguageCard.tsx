@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useRouter } from 'next/navigation'
 
 type Language = 'ja' | 'en'
 
@@ -20,6 +21,14 @@ interface LanguageCardProps {
 }
 
 export function LanguageCard({ language, onLanguageChange }: LanguageCardProps) {
+  const router = useRouter()
+
+  const handleChange = (value: Language) => {
+    document.cookie = `NEXT_LOCALE=${value}; path=/; max-age=31536000; SameSite=Lax`
+    onLanguageChange(value)
+    router.refresh()
+  }
+
   return (
     <Card className="bg-zinc-900 border-zinc-800">
       <CardHeader className="pb-3">
@@ -30,7 +39,7 @@ export function LanguageCard({ language, onLanguageChange }: LanguageCardProps) 
           <Label className="text-zinc-300 text-sm">表示言語</Label>
           <Select
             value={language}
-            onValueChange={(v) => onLanguageChange(v as Language)}
+            onValueChange={(v) => handleChange(v as Language)}
           >
             <SelectTrigger className="bg-zinc-800 border-zinc-700 text-zinc-100">
               <SelectValue />
@@ -45,9 +54,6 @@ export function LanguageCard({ language, onLanguageChange }: LanguageCardProps) 
             </SelectContent>
           </Select>
         </div>
-        <p className="text-xs text-zinc-500">
-          * 言語切替は次回リリースで対応予定です
-        </p>
       </CardContent>
     </Card>
   )

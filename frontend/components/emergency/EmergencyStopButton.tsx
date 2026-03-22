@@ -7,12 +7,14 @@ import { AlertTriangle, ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth'
 import { postJson } from '@/lib/api/http'
+import { useTranslations } from 'next-intl'
 
 export function EmergencyStopButton() {
   const { token } = useAuth()
   const [showConfirm, setShowConfirm] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [stopped, setStopped] = useState(false)
+  const t = useTranslations('EmergencyStop')
 
   const handleConfirm = async () => {
     if (!token) return
@@ -41,8 +43,8 @@ export function EmergencyStopButton() {
             ? 'bg-destructive/40 cursor-not-allowed'
             : 'bg-destructive hover:bg-destructive/90 active:scale-95',
         ].join(' ')}
-        aria-label="緊急停止"
-        title={stopped ? '停止中' : '緊急停止'}
+        aria-label={t('buttonLabel')}
+        title={stopped ? t('stoppedLabel') : t('buttonLabel')}
       >
         {stopped ? (
           <ShieldAlert className="h-5 w-5 text-destructive-foreground/60" />
@@ -54,7 +56,7 @@ export function EmergencyStopButton() {
       {stopped && (
         <div className="fixed bottom-20 right-16 z-40">
           <span className="rounded bg-destructive/90 px-2 py-1 text-xs text-destructive-foreground font-medium">
-            停止中
+            {t('stoppedLabel')}
           </span>
         </div>
       )}
@@ -68,12 +70,12 @@ export function EmergencyStopButton() {
                 <AlertTriangle className="h-6 w-6 text-destructive" />
               </div>
               <div>
-                <h2 className="text-base font-semibold">本当に全ての運用を停止しますか？</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">この操作は取り消せません</p>
+                <h2 className="text-base font-semibold">{t('dialogTitle')}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('dialogSubtitle')}</p>
               </div>
             </div>
             <p className="mb-6 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-              全ての自動取引が即時停止されます。再開には管理者の操作が必要です。
+              {t('dialogDescription')}
             </p>
             <div className="flex gap-3">
               <Button
@@ -82,7 +84,7 @@ export function EmergencyStopButton() {
                 onClick={() => setShowConfirm(false)}
                 disabled={isLoading}
               >
-                キャンセル
+                {t('cancelButton')}
               </Button>
               <Button
                 variant="destructive"
@@ -90,7 +92,7 @@ export function EmergencyStopButton() {
                 onClick={handleConfirm}
                 disabled={isLoading}
               >
-                {isLoading ? '停止中...' : '停止する'}
+                {isLoading ? t('stoppingButton') : t('stopButton')}
               </Button>
             </div>
           </div>

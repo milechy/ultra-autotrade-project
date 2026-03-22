@@ -17,6 +17,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
 
 export interface EmergencyStopButtonProps {
   onStop: () => Promise<void>
@@ -25,6 +26,7 @@ export interface EmergencyStopButtonProps {
 
 export function EmergencyStopButton({ onStop, variant = 'floating' }: EmergencyStopButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const t = useTranslations('EmergencyStop')
 
   const handleStop = async () => {
     setIsLoading(true)
@@ -49,7 +51,7 @@ export function EmergencyStopButton({ onStop, variant = 'floating' }: EmergencyS
       ) : (
         <AlertOctagon className="h-4 w-4" />
       )}
-      緊急停止
+      {t('buttonLabel')}
     </Button>
   )
 
@@ -62,14 +64,14 @@ export function EmergencyStopButton({ onStop, variant = 'floating' }: EmergencyS
         <AlertDialogHeader>
           <AlertDialogTitle className="text-red-600 dark:text-red-400 flex items-center gap-2">
             <AlertOctagon className="h-5 w-5" />
-            緊急停止の確認
+            {t('dialogTitle')}
           </AlertDialogTitle>
           <AlertDialogDescription className="text-sm leading-relaxed">
-            本当に緊急停止しますか？全ての取引とAI判定が停止します。再開は手動でのみ可能です。
+            {t('dialogDescription')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoading}>キャンセル</AlertDialogCancel>
+          <AlertDialogCancel disabled={isLoading}>{t('cancelButton')}</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleStop}
             className="bg-red-600 hover:bg-red-700 text-white"
@@ -78,10 +80,10 @@ export function EmergencyStopButton({ onStop, variant = 'floating' }: EmergencyS
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                停止中...
+                {t('stoppingButton')}
               </>
             ) : (
-              '緊急停止を実行'
+              t('stopButton')
             )}
           </AlertDialogAction>
         </AlertDialogFooter>

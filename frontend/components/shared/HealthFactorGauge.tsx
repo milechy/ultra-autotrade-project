@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
 
 export interface HealthFactorGaugeProps {
   value: number | null
@@ -14,12 +15,6 @@ function getHealthColor(value: number): string {
   if (value >= 2.0) return 'text-green-600'
   if (value >= 1.6) return 'text-yellow-500'
   return 'text-red-600'
-}
-
-function getHealthLabel(value: number): string {
-  if (value >= 2.0) return '安全'
-  if (value >= 1.6) return '注意'
-  return '危険'
 }
 
 function getBarWidth(value: number): number {
@@ -34,11 +29,19 @@ const sizeMap = {
 } as const
 
 export function HealthFactorGauge({ value, size = 'md', className }: HealthFactorGaugeProps) {
+  const t = useTranslations('HealthFactor')
+
+  function getHealthLabel(v: number): string {
+    if (v >= 2.0) return t('safe')
+    if (v >= 1.6) return t('warning')
+    return t('danger')
+  }
+
   if (value === null) {
     return (
       <div className={cn('flex flex-col gap-1', className)}>
-        <span className="text-sm text-muted-foreground">Health Factor</span>
-        <span className={cn('font-bold text-muted-foreground', sizeMap[size])}>借入なし</span>
+        <span className="text-sm text-muted-foreground">{t('label')}</span>
+        <span className={cn('font-bold text-muted-foreground', sizeMap[size])}>{t('noBorrow')}</span>
       </div>
     )
   }
@@ -48,7 +51,7 @@ export function HealthFactorGauge({ value, size = 'md', className }: HealthFacto
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       <div className="flex items-baseline justify-between">
-        <span className="text-sm text-muted-foreground">Health Factor</span>
+        <span className="text-sm text-muted-foreground">{t('label')}</span>
         <span className={cn('text-xs font-medium', getHealthColor(value))}>
           {getHealthLabel(value)}
         </span>
@@ -78,7 +81,7 @@ export function HealthFactorGauge({ value, size = 'md', className }: HealthFacto
       </div>
       <div className="flex justify-between text-xs text-muted-foreground">
         <span>0</span>
-        <span className="text-red-500">1.6 limit</span>
+        <span className="text-red-500">{t('limit')}</span>
         <span>3+</span>
       </div>
     </div>
