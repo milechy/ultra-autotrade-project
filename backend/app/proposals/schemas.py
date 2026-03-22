@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/proposals/schemas.py
 """提案APIのスキーマ定義。"""
+
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional

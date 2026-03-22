@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/tests/test_portfolio_api.py
 """ポートフォリオ履歴APIのテスト。"""
+
 import os
 import tempfile
 from typing import Generator
@@ -55,9 +56,7 @@ def get_admin_token(client: TestClient) -> str:
             "password": "adminpassword123",
         },
     )
-    r = client.post(
-        "/auth/login", json={"email": email, "password": "adminpassword123"}
-    )
+    r = client.post("/auth/login", json={"email": email, "password": "adminpassword123"})
     return r.json()["access_token"]
 
 
@@ -131,9 +130,7 @@ class TestPortfolioAPI:
             json=SAMPLE_SNAPSHOT,
             headers={"Authorization": f"Bearer {token}"},
         )
-        r = client.get(
-            "/api/portfolio/current", headers={"Authorization": f"Bearer {token}"}
-        )
+        r = client.get("/api/portfolio/current", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         data = r.json()
         assert data["has_data"] is True
@@ -146,9 +143,7 @@ class TestPortfolioAPI:
             json=SAMPLE_SNAPSHOT,
             headers={"Authorization": f"Bearer {token}"},
         )
-        r = client.get(
-            "/api/portfolio/history", headers={"Authorization": f"Bearer {token}"}
-        )
+        r = client.get("/api/portfolio/history", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         assert r.json()["total"] == 1
 

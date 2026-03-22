@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/proposals/models.py
 """提案モデル定義。"""
+
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional

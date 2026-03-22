@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/transactions/schemas.py
 """取引履歴APIのスキーマ定義。"""
+
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional

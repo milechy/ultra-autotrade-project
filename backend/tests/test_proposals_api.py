@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/tests/test_proposals_api.py
 """提案APIのテスト。"""
+
 import os
 import tempfile
 from typing import Generator
@@ -55,9 +56,7 @@ def get_admin_token(client: TestClient) -> str:
             "password": "adminpassword123",
         },
     )
-    r = client.post(
-        "/auth/login", json={"email": email, "password": "adminpassword123"}
-    )
+    r = client.post("/auth/login", json={"email": email, "password": "adminpassword123"})
     return r.json()["access_token"]
 
 
@@ -74,9 +73,7 @@ SAMPLE_PROPOSAL = {
 class TestProposalsAPI:
     def test_list_pending_proposals_empty(self, client: TestClient) -> None:
         token = get_admin_token(client)
-        r = client.get(
-            "/api/proposals/pending", headers={"Authorization": f"Bearer {token}"}
-        )
+        r = client.get("/api/proposals/pending", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         assert r.json()["items"] == []
 
@@ -126,9 +123,7 @@ class TestProposalsAPI:
             json=SAMPLE_PROPOSAL,
             headers={"Authorization": f"Bearer {token}"},
         )
-        r = client.get(
-            "/api/proposals/pending", headers={"Authorization": f"Bearer {token}"}
-        )
+        r = client.get("/api/proposals/pending", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         assert r.json()["total"] == 1
 
@@ -193,9 +188,7 @@ class TestProposalsAPI:
             f"/api/proposals/{proposal_id}/approve",
             headers={"Authorization": f"Bearer {token}"},
         )
-        r = client.get(
-            "/api/proposals/history", headers={"Authorization": f"Bearer {token}"}
-        )
+        r = client.get("/api/proposals/history", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         assert r.json()["total"] == 1
 

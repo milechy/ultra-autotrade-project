@@ -1,10 +1,11 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/ai/models.py
 """AI判定結果の永続化モデル。"""
+
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import Boolean, DateTime, Integer, JSON, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base

@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/portfolio/schemas.py
 """ポートフォリオ履歴APIのスキーマ定義。"""
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, List, Optional

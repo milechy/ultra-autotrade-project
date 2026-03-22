@@ -8,16 +8,13 @@ conftest.py には触らず、このファイル内で fixture を定義する�
 DB 操作は MagicMock でモックする。
 """
 
-from datetime import date
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from app.billing.models import FeeCalculation, FeeConfig, HighWaterMark
-from app.billing.schemas import BatchResult, FeeSummaryResponse
-from app.billing.service import BillingService, BillingServiceError
-
+from app.billing.service import BillingService
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -64,9 +61,7 @@ class TestCalculateDailyManagementFee:
 
     def test_zero_aum(self, billing_service: BillingService) -> None:
         """AUM=0 の場合は 0 を返す。"""
-        result = billing_service.calculate_daily_management_fee(
-            Decimal("0"), Decimal("0.005")
-        )
+        result = billing_service.calculate_daily_management_fee(Decimal("0"), Decimal("0.005"))
         assert result == Decimal("0.000000")
 
     def test_decimal_precision(self, billing_service: BillingService) -> None:
@@ -82,9 +77,7 @@ class TestCalculateDailyManagementFee:
 
     def test_no_float_in_result(self, billing_service: BillingService) -> None:
         """結果が float でないこと（Decimal であること）を確認。"""
-        result = billing_service.calculate_daily_management_fee(
-            Decimal("50000"), Decimal("0.01")
-        )
+        result = billing_service.calculate_daily_management_fee(Decimal("50000"), Decimal("0.01"))
         assert isinstance(result, Decimal)
         assert not isinstance(result, float)
 
@@ -228,9 +221,7 @@ class TestRunDailyFeeBatch:
         mock_db.query.side_effect = query_side_effect
         return mock_db
 
-    def test_batch_processes_all_users(
-        self, billing_service: BillingService
-    ) -> None:
+    def test_batch_processes_all_users(self, billing_service: BillingService) -> None:
         """全ユーザーが処理されること。"""
         mock_db = self._make_mock_db_for_batch()
         fee_config = self._make_fee_config()
@@ -249,16 +240,14 @@ class TestRunDailyFeeBatch:
         assert result.processed_count == 2
         assert result.failed_count == 0
 
-    def test_batch_skips_users_below_minimum_aum(
-        self, billing_service: BillingService
-    ) -> None:
+    def test_batch_skips_users_below_minimum_aum(self, billing_service: BillingService) -> None:
         """minimum_aum 未満のユーザーはスキップされること。"""
         mock_db = self._make_mock_db_for_batch()
         fee_config = self._make_fee_config()  # minimum_aum = 3000
 
         user_aum_map = {
-            1: Decimal("5000"),   # 処理される
-            2: Decimal("2999"),   # スキップされる
+            1: Decimal("5000"),  # 処理される
+            2: Decimal("2999"),  # スキップされる
         }
 
         result = billing_service.run_daily_fee_batch(
@@ -270,9 +259,7 @@ class TestRunDailyFeeBatch:
         assert result.processed_count == 1
         assert result.failed_count == 0
 
-    def test_batch_returns_correct_counts(
-        self, billing_service: BillingService
-    ) -> None:
+    def test_batch_returns_correct_counts(self, billing_service: BillingService) -> None:
         """processed_count と failed_count が正しく返ること。"""
         mock_db = self._make_mock_db_for_batch()
         fee_config = self._make_fee_config()
@@ -306,9 +293,7 @@ class TestRunDailyFeeBatch:
         finally:
             billing_service.record_fee_calculation = original_record  # type: ignore[method-assign]
 
-    def test_batch_with_empty_user_map(
-        self, billing_service: BillingService
-    ) -> None:
+    def test_batch_with_empty_user_map(self, billing_service: BillingService) -> None:
         """空の user_aum_map では 0 件処理。"""
         mock_db = self._make_mock_db_for_batch()
         fee_config = self._make_fee_config()

@@ -24,7 +24,6 @@ from app.billing.router import router as billing_router
 from app.billing.schemas import BatchResult, FeeSummaryResponse
 from app.database import get_db
 
-
 # ---------------------------------------------------------------------------
 # Helper: テスト用ユーザー
 # ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/tests/test_ai_decisions_api.py
 """AI判定履歴APIのテスト。"""
+
 import os
 import tempfile
 from typing import Generator
@@ -55,9 +56,7 @@ def get_admin_token(client: TestClient) -> str:
             "password": "adminpassword123",
         },
     )
-    r = client.post(
-        "/auth/login", json={"email": email, "password": "adminpassword123"}
-    )
+    r = client.post("/auth/login", json={"email": email, "password": "adminpassword123"})
     return r.json()["access_token"]
 
 
@@ -162,17 +161,13 @@ class TestAIDecisionsAPI:
             json=SAMPLE_DECISION,
             headers={"Authorization": f"Bearer {token}"},
         )
-        r = client.get(
-            "/api/ai/decisions/latest", headers={"Authorization": f"Bearer {token}"}
-        )
+        r = client.get("/api/ai/decisions/latest", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         assert r.json()["action"] == "HOLD"
 
     def test_get_latest_decision_empty(self, client: TestClient) -> None:
         token = get_admin_token(client)
-        r = client.get(
-            "/api/ai/decisions/latest", headers={"Authorization": f"Bearer {token}"}
-        )
+        r = client.get("/api/ai/decisions/latest", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 404
 
     def test_filter_by_action(self, client: TestClient) -> None:

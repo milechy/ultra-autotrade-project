@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/transactions/router.py
 """取引履歴API ルーター定義。"""
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
@@ -93,9 +94,7 @@ def get_transaction(
     stmt = select(Transaction).where(Transaction.id == transaction_id)
     tx = db.scalars(stmt).first()
     if tx is None or (tx.user_id != current_user.id and not current_user.is_admin):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
     return TransactionResponse.model_validate(tx)
 
 

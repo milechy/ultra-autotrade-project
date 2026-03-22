@@ -39,6 +39,7 @@ from app.auth.router import router as auth_router
 from app.auth.service import AuthService
 from app.automation.automation_router import router as automation_router
 from app.automation.howl_review import start_howl_background_task
+from app.billing.router import router as billing_router
 from app.bots.router import router as octobot_router
 from app.data_feeds.finance_feed import start_finance_background_task
 from app.data_feeds.geopolitical import start_geo_risk_background_task
@@ -50,16 +51,15 @@ from app.error_handlers import register_error_handlers
 from app.exchange.router import router as exchange_router
 from app.hooks.router import router as hooks_router
 from app.knowledge.router import router as knowledge_router
-from app.reports.router import router as reports_router
-from app.rss.router import router as rss_router
-from app.users.router import router as users_router
-from app.webhook.router import router as webhook_router
-from app.billing.router import router as billing_router
 from app.portfolio.router import router as portfolio_router
 from app.proposals.router import router as proposals_router
+from app.reports.router import router as reports_router
+from app.rss.router import router as rss_router
 from app.transactions.router import admin_router as admin_transactions_router
 from app.transactions.router import router as transactions_router
+from app.users.router import router as users_router
 from app.users.settings_router import router as user_settings_router
+from app.webhook.router import router as webhook_router
 
 logger = logging.getLogger(__name__)
 

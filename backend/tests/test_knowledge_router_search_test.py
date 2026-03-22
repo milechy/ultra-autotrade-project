@@ -79,9 +79,7 @@ def client(mock_service: MagicMock) -> TestClient:
 class TestSearchTestEndpoint:
     """GET /knowledge/search/test"""
 
-    def test_search_test_returns_results(
-        self, client: TestClient, mock_service: MagicMock
-    ) -> None:
+    def test_search_test_returns_results(self, client: TestClient, mock_service: MagicMock) -> None:
         """GET /knowledge/search/test returns 200 with formatted results."""
         mock_service.search.return_value = [
             _make_search_result(chunk_id=1, content="BTC bullish trend", similarity=0.85),
@@ -98,9 +96,7 @@ class TestSearchTestEndpoint:
         assert data["results"][0]["similarity_score"] == 0.85
         assert data["results"][0]["content"] == "BTC bullish trend"
 
-    def test_search_test_empty_results(
-        self, client: TestClient, mock_service: MagicMock
-    ) -> None:
+    def test_search_test_empty_results(self, client: TestClient, mock_service: MagicMock) -> None:
         """GET /knowledge/search/test returns 200 with empty list when no matches."""
         mock_service.search.return_value = []
 
@@ -130,9 +126,7 @@ class TestSearchTestEndpoint:
         assert response.status_code == 422
         assert "embedding failed" in response.json()["detail"]
 
-    def test_search_test_source_mapping(
-        self, client: TestClient, mock_service: MagicMock
-    ) -> None:
+    def test_search_test_source_mapping(self, client: TestClient, mock_service: MagicMock) -> None:
         """GET /knowledge/search/test maps source_url to source field."""
         mock_service.search.return_value = [
             _make_search_result(source_url="https://example.com/btc", title="BTC Report"),
@@ -148,9 +142,7 @@ class TestSearchTestEndpoint:
 class TestWorkflowTriggerEndpoint:
     """POST /knowledge/workflow/trigger"""
 
-    def test_workflow_trigger_success(
-        self, client: TestClient, mock_service: MagicMock
-    ) -> None:
+    def test_workflow_trigger_success(self, client: TestClient, mock_service: MagicMock) -> None:
         """POST /knowledge/workflow/trigger returns 200 with WorkflowRunResult."""
         expected = WorkflowRunResult(
             status="completed",
@@ -159,9 +151,7 @@ class TestWorkflowTriggerEndpoint:
             skipped_count=2,
         )
 
-        with patch(
-            "app.automation.workflow.process_pending_knowledge", return_value=expected
-        ):
+        with patch("app.automation.workflow.process_pending_knowledge", return_value=expected):
             response = client.post("/knowledge/workflow/trigger")
 
         assert response.status_code == 200
@@ -169,15 +159,11 @@ class TestWorkflowTriggerEndpoint:
         assert data["status"] == "completed"
         assert data["fetched_count"] == 3
 
-    def test_workflow_trigger_no_items(
-        self, client: TestClient, mock_service: MagicMock
-    ) -> None:
+    def test_workflow_trigger_no_items(self, client: TestClient, mock_service: MagicMock) -> None:
         """POST /knowledge/workflow/trigger returns no_items when nothing pending."""
         expected = WorkflowRunResult(status="no_items")
 
-        with patch(
-            "app.automation.workflow.process_pending_knowledge", return_value=expected
-        ):
+        with patch("app.automation.workflow.process_pending_knowledge", return_value=expected):
             response = client.post("/knowledge/workflow/trigger")
 
         assert response.status_code == 200

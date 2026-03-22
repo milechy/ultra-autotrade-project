@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/users/settings_router.py
 """ユーザー設定API ルーター定義。"""
+
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status

@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/proposals/router.py
 """提案API ルーター定義。"""
+
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -39,10 +40,14 @@ def list_pending_proposals(
 ) -> ProposalListResponse:
     """自分の保留中（pending）提案リストを返す。"""
     _expire_old_proposals(db, current_user.id)
-    stmt = select(Proposal).where(
-        Proposal.user_id == current_user.id,
-        Proposal.status == "pending",
-    ).order_by(Proposal.created_at.desc())
+    stmt = (
+        select(Proposal)
+        .where(
+            Proposal.user_id == current_user.id,
+            Proposal.status == "pending",
+        )
+        .order_by(Proposal.created_at.desc())
+    )
     items = db.scalars(stmt).all()
     return ProposalListResponse(
         items=[ProposalResponse.model_validate(p) for p in items],
@@ -56,10 +61,14 @@ def list_proposal_history(
     db: Session = Depends(get_db),
 ) -> ProposalListResponse:
     """承認・拒否・実行済みの提案履歴を返す。"""
-    stmt = select(Proposal).where(
-        Proposal.user_id == current_user.id,
-        Proposal.status.in_(["approved", "rejected", "executed"]),
-    ).order_by(Proposal.created_at.desc())
+    stmt = (
+        select(Proposal)
+        .where(
+            Proposal.user_id == current_user.id,
+            Proposal.status.in_(["approved", "rejected", "executed"]),
+        )
+        .order_by(Proposal.created_at.desc())
+    )
     items = db.scalars(stmt).all()
     return ProposalListResponse(
         items=[ProposalResponse.model_validate(p) for p in items],
@@ -122,9 +131,7 @@ def get_proposal(
     """指定IDの提案詳細を返す（本人またはadmin）。"""
     stmt = select(Proposal).where(Proposal.id == proposal_id)
     proposal = db.scalars(stmt).first()
-    if proposal is None or (
-        proposal.user_id != current_user.id and not current_user.is_admin
-    ):
+    if proposal is None or (proposal.user_id != current_user.id and not current_user.is_admin):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
     return ProposalResponse.model_validate(proposal)
 

@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/ai/decisions_router.py
 """AI判定履歴API ルーター定義。"""
+
 from datetime import datetime
 from typing import Optional
 

@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/tests/test_user_settings_api.py
 """ユーザー設定APIのテスト。"""
+
 import os
 import tempfile
 from typing import Generator

@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/users/settings_schemas.py
 """ユーザー設定APIのスキーマ定義。"""
+
 from decimal import Decimal
 from typing import Optional
 

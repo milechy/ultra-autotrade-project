@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/portfolio/router.py
 """ポートフォリオ履歴API ルーター定義。"""
+
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -49,10 +50,7 @@ def get_current_portfolio(
     )
     snapshot = db.scalars(stmt).first()
     if snapshot is None:
-        from decimal import Decimal
-
         return PortfolioCurrentResponse(user_id=current_user.id, has_data=False)
-    from decimal import Decimal
 
     return PortfolioCurrentResponse(
         id=snapshot.id,

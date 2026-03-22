@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/tests/test_transactions_api.py
 """取引履歴APIのテスト。"""
+
 import os
 import tempfile
 from typing import Generator
@@ -55,9 +56,7 @@ def get_admin_token(client: TestClient) -> str:
             "password": "adminpassword123",
         },
     )
-    r = client.post(
-        "/auth/login", json={"email": email, "password": "adminpassword123"}
-    )
+    r = client.post("/auth/login", json={"email": email, "password": "adminpassword123"})
     return r.json()["access_token"]
 
 
@@ -137,24 +136,18 @@ class TestTransactionsAPI:
             headers={"Authorization": f"Bearer {token}"},
         )
         tx_id = create_r.json()["id"]
-        r = client.get(
-            f"/api/transactions/{tx_id}", headers={"Authorization": f"Bearer {token}"}
-        )
+        r = client.get(f"/api/transactions/{tx_id}", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         assert r.json()["id"] == tx_id
 
     def test_get_transaction_not_found(self, client: TestClient) -> None:
         token = get_admin_token(client)
-        r = client.get(
-            "/api/transactions/9999", headers={"Authorization": f"Bearer {token}"}
-        )
+        r = client.get("/api/transactions/9999", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 404
 
     def test_transaction_stats_empty(self, client: TestClient) -> None:
         token = get_admin_token(client)
-        r = client.get(
-            "/api/transactions/stats", headers={"Authorization": f"Bearer {token}"}
-        )
+        r = client.get("/api/transactions/stats", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         data = r.json()
         assert data["total_count"] == 0
@@ -167,9 +160,7 @@ class TestTransactionsAPI:
             json=SAMPLE_TX,
             headers={"Authorization": f"Bearer {token}"},
         )
-        r = client.get(
-            "/api/transactions/stats", headers={"Authorization": f"Bearer {token}"}
-        )
+        r = client.get("/api/transactions/stats", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         data = r.json()
         assert data["total_count"] == 1
@@ -182,9 +173,7 @@ class TestTransactionsAPI:
             json=SAMPLE_TX,
             headers={"Authorization": f"Bearer {token}"},
         )
-        r = client.get(
-            "/api/admin/transactions", headers={"Authorization": f"Bearer {token}"}
-        )
+        r = client.get("/api/admin/transactions", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         assert r.json()["total"] >= 1
 

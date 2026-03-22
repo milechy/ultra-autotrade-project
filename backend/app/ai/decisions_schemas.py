@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/ai/decisions_schemas.py
 """AI判定履歴APIのスキーマ定義。"""
+
 from datetime import datetime
 from typing import Any, List, Optional
 

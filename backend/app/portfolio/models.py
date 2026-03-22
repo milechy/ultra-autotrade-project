@@ -1,11 +1,12 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/portfolio/models.py
 """ポートフォリオスナップショットモデル定義。"""
+
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, List, Optional
 
-from sqlalchemy import DateTime, Integer, JSON, Numeric
+from sqlalchemy import JSON, DateTime, Integer, Numeric
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -19,8 +20,12 @@ class PortfolioSnapshot(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     total_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=2), nullable=False)
-    total_supply_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=2), nullable=False)
-    total_borrow_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=2), nullable=False)
+    total_supply_usd: Mapped[Decimal] = mapped_column(
+        Numeric(precision=20, scale=2), nullable=False
+    )
+    total_borrow_usd: Mapped[Decimal] = mapped_column(
+        Numeric(precision=20, scale=2), nullable=False
+    )
     health_factor: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(precision=10, scale=4), nullable=True
     )

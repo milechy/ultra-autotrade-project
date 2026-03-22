@@ -1,6 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/transactions/models.py
 """取引履歴モデル定義。"""
+
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
@@ -27,8 +28,12 @@ class Transaction(Base):
     chain: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
     ai_decision_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    gas_used: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=20, scale=0), nullable=True)
-    gas_price_gwei: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=20, scale=9), nullable=True)
+    gas_used: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(precision=20, scale=0), nullable=True
+    )
+    gas_price_gwei: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(precision=20, scale=9), nullable=True
+    )
     is_dry_run: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
