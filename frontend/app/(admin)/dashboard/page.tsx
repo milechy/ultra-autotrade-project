@@ -21,49 +21,15 @@ import type { AaveMonitorStatus } from "@/lib/api/aave";
 import dynamic from "next/dynamic";
 import { Users, DollarSign, ArrowLeftRight, Bell } from "lucide-react";
 
-// HF 推移チャート
-const HfLineChart = dynamic(
-  () => import("recharts").then((m) => {
-    const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = m;
-    function Chart({ data }: { data: { label: string; hf: number }[] }) {
-      return (
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-            <YAxis domain={[1.2, 3.5]} tick={{ fontSize: 10 }} />
-            <Tooltip formatter={(v: number) => v.toFixed(2)} />
-            <Line type="monotone" dataKey="hf" stroke="#2563eb" strokeWidth={2} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      );
-    }
-    return { default: Chart };
-  }),
-  { ssr: false, loading: () => <div className="h-[200px] animate-pulse rounded bg-gray-100" /> }
-);
+const HfLineChart = dynamic(() => import("./HfLineChart"), {
+  ssr: false,
+  loading: () => <div className="h-[200px] animate-pulse rounded bg-gray-100" />,
+});
 
-// 日別取引量チャート
-const VolumeBarChart = dynamic(
-  () => import("recharts").then((m) => {
-    const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = m;
-    function Chart({ data }: { data: { label: string; trades: number }[] }) {
-      return (
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 10 }} />
-            <Tooltip />
-            <Bar dataKey="trades" fill="#2563eb" radius={[4, 4, 0, 0]} name="取引数" />
-          </BarChart>
-        </ResponsiveContainer>
-      );
-    }
-    return { default: Chart };
-  }),
-  { ssr: false, loading: () => <div className="h-[200px] animate-pulse rounded bg-gray-100" /> }
-);
+const VolumeBarChart = dynamic(() => import("./VolumeBarChart"), {
+  ssr: false,
+  loading: () => <div className="h-[200px] animate-pulse rounded bg-gray-100" />,
+});
 
 // -----------------------------------------------------------------------
 // Mock chart data helpers
