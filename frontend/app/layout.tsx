@@ -2,7 +2,6 @@
 // Unauthorized copying or distribution is strictly prohibited.
 import type { Metadata } from 'next'
 import '../styles/globals.css'
-import { WagmiRootProvider } from '@/lib/wallet/WagmiRootProvider'
 
 export const metadata: Metadata = {
   title: 'Ultra AutoTrade',
@@ -17,9 +16,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body>
-        <WagmiRootProvider>
-          {children}
-        </WagmiRootProvider>
+        {children}
       </body>
     </html>
   )
