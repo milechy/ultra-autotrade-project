@@ -2,12 +2,13 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AssetIcon } from '@/components/shared'
 import { useWallet } from '@/hooks/useWallet'
+import { apiFetch } from '@/lib/api/client'
 
 interface Position {
   symbol: string
@@ -17,13 +18,19 @@ interface Position {
   usdValue: number
 }
 
-// TODO: Replace with useAaveV3().getUserReserveData() per asset when method is added to the hook
-function getMockPositions(isConnected: boolean): Position[] {
-  if (!isConnected) return []
-  return [
-    { symbol: 'USDC', supplied: 5000, borrowed: 0, supplyApr: 4.12, usdValue: 5000 },
-    { symbol: 'WETH', supplied: 0.8, borrowed: 0, supplyApr: 1.95, usdValue: 2640 },
-  ]
+interface PortfolioCurrentResponse {
+  total_value_usd: string
+  total_supply_usd: string
+  total_borrow_usd: string
+  health_factor: string | null
+  positions_json: Array<{
+    symbol: string
+    supplied: number
+    borrowed: number
+    supplyApr: number
+    usdValue: number
+  }> | null
+  has_data: boolean
 }
 
 function PositionCard({ pos }: { pos: Position }) {
@@ -58,21 +65,30 @@ export function PositionList() {
   const { isConnected } = useWallet()
   const [positions, setPositions] = useState<Position[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  const fetchPositions = useCallback(async () => {
+    setError(false)
+    try {
+      const res = await apiFetch<PortfolioCurrentResponse>('/api/portfolio/current')
+      setPositions(res.positions_json ?? [])
+    } catch {
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setPositions(getMockPositions(isConnected))
-      setLoading(false)
-    }, 600)
-    return () => clearTimeout(timer)
-  }, [isConnected])
+    fetchPositions()
+  }, [fetchPositions, isConnected])
 
   // 30-second auto-refresh
   useEffect(() => {
     if (!isConnected) return
-    const id = setInterval(() => setPositions(getMockPositions(true)), 30_000)
+    const id = setInterval(() => fetchPositions(), 30_000)
     return () => clearInterval(id)
-  }, [isConnected])
+  }, [isConnected, fetchPositions])
 
   if (loading) {
     return (
@@ -80,6 +96,12 @@ export function PositionList() {
         <Skeleton className="h-20 rounded-xl" />
         <Skeleton className="h-20 rounded-xl" />
       </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <p className="text-sm text-red-400 text-center">データ取得エラー</p>
     )
   }
 

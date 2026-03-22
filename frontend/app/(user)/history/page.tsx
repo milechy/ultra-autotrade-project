@@ -2,183 +2,195 @@
 // Unauthorized copying or distribution is strictly prohibited.
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   StatsCards,
   TransactionFilters,
   TransactionList,
 } from './_components'
 import type { Transaction, OperationType } from './_components'
+import { apiFetch } from '@/lib/api/client'
+import { Skeleton } from '@/components/ui/skeleton'
 
-// TODO: Replace with GET /api/transactions?page=1&limit=50
-const MOCK_TRANSACTIONS: Transaction[] = [
-  {
-    id: 'tx-001',
-    type: 'SUPPLY',
-    asset: 'USDC',
-    amount: 1500,
-    amountUSD: 1500,
-    status: 'success',
-    txHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-    chain: 'arbitrum',
-    timestamp: '2026-03-21T10:30:00Z',
-  },
-  {
-    id: 'tx-002',
-    type: 'BORROW',
-    asset: 'USDT',
-    amount: 800,
-    amountUSD: 800,
-    status: 'success',
-    txHash: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-    chain: 'arbitrum',
-    timestamp: '2026-03-21T08:15:00Z',
-  },
-  {
-    id: 'tx-003',
-    type: 'REPAY',
-    asset: 'USDT',
-    amount: 400,
-    amountUSD: 400,
-    status: 'success',
-    txHash: '0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba',
-    chain: 'arbitrum',
-    timestamp: '2026-03-20T20:45:00Z',
-  },
-  {
-    id: 'tx-004',
-    type: 'SUPPLY',
-    asset: 'WETH',
-    amount: 0.5,
-    amountUSD: 1650,
-    status: 'success',
-    txHash: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
-    chain: 'arbitrum',
-    timestamp: '2026-03-20T15:00:00Z',
-  },
-  {
-    id: 'tx-005',
-    type: 'WITHDRAW',
-    asset: 'USDC',
-    amount: 500,
-    amountUSD: 500,
-    status: 'success',
-    txHash: '0xcafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe',
-    chain: 'arbitrum',
-    timestamp: '2026-03-20T11:30:00Z',
-  },
-  {
-    id: 'tx-006',
-    type: 'SUPPLY',
-    asset: 'DAI',
-    amount: 2000,
-    amountUSD: 2000,
-    status: 'pending',
-    txHash: '0x1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff',
-    chain: 'arbitrum',
-    timestamp: '2026-03-19T18:20:00Z',
-  },
-  {
-    id: 'tx-007',
-    type: 'BORROW',
-    asset: 'WBTC',
-    amount: 0.02,
-    amountUSD: 1200,
-    status: 'failed',
-    txHash: '0xffffeeeeddddccccbbbbaaaa0000999988887777666655554444333322221111',
-    chain: 'arbitrum',
-    timestamp: '2026-03-19T14:00:00Z',
-  },
-  {
-    id: 'tx-008',
-    type: 'REPAY',
-    asset: 'USDC',
-    amount: 300,
-    amountUSD: 300,
-    status: 'success',
-    txHash: '0x2222333344445555666677778888999900001111aaaabbbbccccddddeeeeffff',
-    chain: 'arbitrum',
-    timestamp: '2026-03-18T09:10:00Z',
-  },
-  {
-    id: 'tx-009',
-    type: 'WITHDRAW',
-    asset: 'WETH',
-    amount: 0.3,
-    amountUSD: 990,
-    status: 'success',
-    txHash: '0x3333444455556666777788889999000011112222aaaabbbbccccddddeeeeffff',
-    chain: 'arbitrum',
-    timestamp: '2026-03-17T22:00:00Z',
-  },
-  {
-    id: 'tx-010',
-    type: 'SUPPLY',
-    asset: 'AAVE',
-    amount: 10,
-    amountUSD: 950,
-    status: 'success',
-    txHash: '0x4444555566667777888899990000111122223333aaaabbbbccccddddeeeeffff',
-    chain: 'arbitrum',
-    timestamp: '2026-03-16T13:45:00Z',
-  },
-  {
-    id: 'tx-011',
-    type: 'BORROW',
-    asset: 'DAI',
-    amount: 1000,
-    amountUSD: 1000,
-    status: 'success',
-    txHash: '0x5555666677778888999900001111222233334444aaaabbbbccccddddeeeeffff',
-    chain: 'arbitrum',
-    timestamp: '2026-03-15T10:20:00Z',
-  },
-  {
-    id: 'tx-012',
-    type: 'REPAY',
-    asset: 'DAI',
-    amount: 600,
-    amountUSD: 600,
-    status: 'success',
-    txHash: '0x6666777788889999000011112222333344445555aaaabbbbccccddddeeeeffff',
-    chain: 'arbitrum',
-    timestamp: '2026-03-14T07:55:00Z',
-  },
-]
+// ---------------------------------------------------------------------------
+// API response types
+// ---------------------------------------------------------------------------
+
+interface TransactionAPIResponse {
+  id: number
+  user_id: number
+  wallet_address: string | null
+  operation: string // 'SUPPLY'|'WITHDRAW'|'BORROW'|'REPAY'
+  asset: string
+  amount: string // Decimal as string
+  amount_usd: string // Decimal as string
+  tx_hash: string | null
+  chain: string
+  status: string // 'pending'|'success'|'failed'
+  gas_used: string | null
+  gas_price_gwei: string | null
+  is_dry_run: boolean
+  created_at: string
+}
+
+interface TransactionListResponse {
+  items: TransactionAPIResponse[]
+  total: number
+  limit: number
+  offset: number
+}
+
+interface TransactionStatsResponse {
+  total_count: number
+  success_count: number
+  total_amount_usd: string // Decimal as string
+  total_gas_usd: string // Decimal as string
+}
+
+// ---------------------------------------------------------------------------
+// Mapper
+// ---------------------------------------------------------------------------
+
+function mapToTransaction(item: TransactionAPIResponse): Transaction {
+  return {
+    id: String(item.id),
+    type: item.operation as Transaction['type'],
+    asset: item.asset,
+    amount: parseFloat(item.amount),
+    amountUSD: parseFloat(item.amount_usd),
+    status: item.status as Transaction['status'],
+    txHash: item.tx_hash ?? '',
+    chain: item.chain as Transaction['chain'],
+    timestamp: item.created_at,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
+const LIMIT = 20
 
 export default function HistoryPage() {
   const [activeType, setActiveType] = useState<OperationType>('ALL')
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | 'all'>('all')
 
-  // Compute stats from full mock list
-  const totalCount = MOCK_TRANSACTIONS.length
-  const totalProfitUSD = MOCK_TRANSACTIONS
-    .filter((tx) => tx.status === 'success' && (tx.type === 'SUPPLY' || tx.type === 'BORROW'))
-    .reduce((acc, tx) => acc + tx.amountUSD * 0.042 * (30 / 365), 0)
-  const totalFeeUSD = MOCK_TRANSACTIONS
-    .filter((tx) => tx.status === 'success')
-    .reduce((acc) => acc + 0.15, 0)
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalProfitUSD, setTotalProfitUSD] = useState(0)
+  const [totalFeeUSD, setTotalFeeUSD] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [offset, setOffset] = useState(0)
 
-  const filtered = useMemo(() => {
-    let list = [...MOCK_TRANSACTIONS].sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  const fetchStats = useCallback(async () => {
+    const stats = await apiFetch<TransactionStatsResponse>('/api/transactions/stats')
+    setTotalCount(stats.total_count)
+    setTotalProfitUSD(parseFloat(stats.total_amount_usd) * 0.042 * (30 / 365))
+    setTotalFeeUSD(parseFloat(stats.total_gas_usd))
+  }, [])
+
+  const buildQuery = useCallback(
+    (currentOffset: number) => {
+      const params = new URLSearchParams()
+      params.set('limit', String(LIMIT))
+      params.set('offset', String(currentOffset))
+      if (activeType !== 'ALL') params.set('operation', activeType)
+      if (dateRange !== 'all') {
+        params.set('date_from', dateRange.from.toISOString().split('T')[0])
+        params.set('date_to', dateRange.to.toISOString().split('T')[0])
+      }
+      return params.toString()
+    },
+    [activeType, dateRange]
+  )
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    setOffset(0)
+    try {
+      const [listRes] = await Promise.all([
+        apiFetch<TransactionListResponse>(`/api/transactions?${buildQuery(0)}`),
+        fetchStats(),
+      ])
+      setTransactions(listRes.items.map(mapToTransaction))
+      setTotalCount(listRes.total)
+    } catch {
+      setError('データを取得できません')
+    } finally {
+      setLoading(false)
+    }
+  }, [buildQuery, fetchStats])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  const handleLoadMore = async () => {
+    setLoadingMore(true)
+    try {
+      const newOffset = offset + LIMIT
+      const res = await apiFetch<TransactionListResponse>(
+        `/api/transactions?${buildQuery(newOffset)}`
+      )
+      setTransactions((prev) => [...prev, ...res.items.map(mapToTransaction)])
+      setOffset(newOffset)
+    } catch {
+      // silently ignore
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  const hasMore = transactions.length < totalCount
+
+  // -------------------------------------------------------------------------
+  // Loading state
+  // -------------------------------------------------------------------------
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100">
+        <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+          <Skeleton className="h-8 w-32" />
+          <div className="grid grid-cols-3 gap-4">
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+          </div>
+          <Skeleton className="h-16 rounded-xl" />
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-20 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </div>
     )
+  }
 
-    if (activeType !== 'ALL') {
-      list = list.filter((tx) => tx.type === activeType)
-    }
+  // -------------------------------------------------------------------------
+  // Error state
+  // -------------------------------------------------------------------------
 
-    if (dateRange !== 'all') {
-      const from = dateRange.from.getTime()
-      const to = dateRange.to.getTime()
-      list = list.filter((tx) => {
-        const t = new Date(tx.timestamp).getTime()
-        return t >= from && t <= to
-      })
-    }
+  if (error) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <p className="text-sm text-red-400">{error}</p>
+          <button onClick={fetchData} className="text-xs text-blue-400 underline">
+            再試行
+          </button>
+        </div>
+      </div>
+    )
+  }
 
-    return list
-  }, [activeType, dateRange])
+  // -------------------------------------------------------------------------
+  // Main render
+  // -------------------------------------------------------------------------
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -206,7 +218,18 @@ export default function HistoryPage() {
         </div>
 
         {/* Transaction list */}
-        <TransactionList transactions={filtered} />
+        <TransactionList transactions={transactions} />
+
+        {/* Load more */}
+        {hasMore && (
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="w-full py-3 text-sm text-zinc-400 hover:text-zinc-300 border border-zinc-800 rounded-xl"
+          >
+            {loadingMore ? '読み込み中...' : 'もっと見る'}
+          </button>
+        )}
       </div>
     </div>
   )

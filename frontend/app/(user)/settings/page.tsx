@@ -4,8 +4,12 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useAuth } from '@/lib/auth'
 import { useWallet } from '@/hooks/useWallet'
+import { apiFetch, apiPost, apiPut } from '@/lib/api/client'
+import { EmergencyStop } from '@/components/user/EmergencyStop'
+import type { AutomationStatus } from '@/lib/types'
 import {
   OperationModeCard,
   RiskSettingsCard,
@@ -18,6 +22,14 @@ import {
 type RiskMode = 'conservative' | 'balanced' | 'aggressive'
 type NotificationFrequency = 'all' | 'important' | 'emergency'
 type Language = 'ja' | 'en'
+
+interface UserSettingsResponse {
+  notification_email?: string
+  notification_frequency?: NotificationFrequency
+  max_single_trade_usd?: number
+  max_daily_trade_usd?: number
+  is_active?: boolean
+}
 
 interface SettingsState {
   isRunning: boolean
@@ -40,12 +52,79 @@ const DEFAULT_SETTINGS: SettingsState = {
 }
 
 export default function SettingsPage() {
+  const { token, isAdmin } = useAuth()
   const { address, chainId, disconnect } = useWallet()
   const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS)
+  const [isStopped, setIsStopped] = useState(false)
+
+  // U-07: Load risk mode from GET /auth/risk-mode
+  useEffect(() => {
+    if (!token) return
+    apiFetch<{ mode: RiskMode }>('/auth/risk-mode')
+      .then((data) => setSettings((prev) => ({ ...prev, riskMode: data.mode })))
+      .catch(() => {/* keep default on error */})
+  }, [token])
+
+  // Load user settings from GET /api/user/settings
+  useEffect(() => {
+    if (!token) return
+    apiFetch<UserSettingsResponse>('/api/user/settings')
+      .then((data) => {
+        setSettings((prev) => ({
+          ...prev,
+          ...(data.notification_email !== undefined && { email: data.notification_email }),
+          ...(data.notification_frequency !== undefined && { notificationFrequency: data.notification_frequency }),
+          ...(data.max_single_trade_usd !== undefined && { maxSingleTradeUsd: data.max_single_trade_usd }),
+          ...(data.max_daily_trade_usd !== undefined && { maxDailyTradeUsd: data.max_daily_trade_usd }),
+        }))
+      })
+      .catch(() => {/* keep defaults */})
+  }, [token])
+
+  // U-07: Load automation status from GET /api/automation/status (no auth required)
+  useEffect(() => {
+    apiFetch<AutomationStatus>('/api/automation/status')
+      .then((data) => {
+        setSettings((prev) => ({ ...prev, isRunning: !data.is_trading_paused }))
+        if (data.emergency_reason) setIsStopped(true)
+      })
+      .catch(() => {/* keep default on error */})
+  }, [])
 
   const set = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }))
-    // TODO: Save to backend PUT /api/user/settings
+
+    // U-07: Persist risk mode to PUT /auth/risk-mode
+    if (key === 'riskMode' && token) {
+      apiPut('/auth/risk-mode', { mode: value }).catch(() => {/* silently ignore */})
+    }
+
+    // Persist user settings to PUT /api/user/settings
+    if (token && (key === 'email' || key === 'notificationFrequency' || key === 'maxSingleTradeUsd' || key === 'maxDailyTradeUsd')) {
+      const fieldMap: Partial<Record<keyof SettingsState, string>> = {
+        email: 'notification_email',
+        notificationFrequency: 'notification_frequency',
+        maxSingleTradeUsd: 'max_single_trade_usd',
+        maxDailyTradeUsd: 'max_daily_trade_usd',
+      }
+      const apiKey = fieldMap[key]
+      if (apiKey) {
+        apiPut('/api/user/settings', { [apiKey]: value }).catch(() => {/* silently ignore */})
+      }
+    }
+  }
+
+  // Connect isRunning toggle to POST /api/user/pause | /api/user/resume
+  const handleToggleRunning = (value: boolean) => {
+    if (value) {
+      apiPost('/api/user/resume', {})
+        .then(() => setSettings((prev) => ({ ...prev, isRunning: true })))
+        .catch(() => {/* error: keep current state */})
+    } else {
+      apiPost('/api/user/pause', {})
+        .then(() => setSettings((prev) => ({ ...prev, isRunning: false })))
+        .catch(() => {/* error: keep current state */})
+    }
   }
 
   return (
@@ -58,13 +137,13 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-4 px-4 py-4 pb-24 max-w-2xl mx-auto">
-        {/* 1. 運用モード */}
+        {/* 1. 運用モード — state loaded from GET /api/automation/status */}
         <OperationModeCard
           isRunning={settings.isRunning}
-          onToggle={(value) => set('isRunning', value)}
+          onToggle={handleToggleRunning}
         />
 
-        {/* 2. リスク設定 */}
+        {/* 2. リスク設定 — riskMode synced with PUT /auth/risk-mode */}
         <RiskSettingsCard
           riskMode={settings.riskMode}
           onRiskModeChange={(mode) => set('riskMode', mode)}
@@ -74,7 +153,7 @@ export default function SettingsPage() {
           onMaxDailyTradeUsdChange={(value) => set('maxDailyTradeUsd', value)}
         />
 
-        {/* 3. 通知設定 */}
+        {/* 3. 通知設定 — synced with PUT /api/user/settings */}
         <NotificationCard
           email={settings.email}
           onEmailChange={(value) => set('email', value)}
@@ -97,6 +176,14 @@ export default function SettingsPage() {
 
         {/* 6. アプリ情報 */}
         <AppInfoCard />
+
+        {/* U-08: 緊急停止 — POST /api/automation/emergency-stop (admin only) */}
+        {isAdmin && (
+          <EmergencyStop
+            isStopped={isStopped}
+            onStopped={() => setIsStopped(true)}
+          />
+        )}
       </div>
     </div>
   )
