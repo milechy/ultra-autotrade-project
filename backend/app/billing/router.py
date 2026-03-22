@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin, require_viewer
+from app.auth.models import User
 from app.database import get_db
 
 from .schemas import BatchResult, FeeCalculationResponse, FeeConfigResponse, FeeSummaryResponse
@@ -36,7 +37,7 @@ async def get_fees(
     user_id: int,
     period: Optional[str] = None,
     db: Session = Depends(get_db),
-    _current_user=Depends(require_viewer),
+    _current_user: User = Depends(require_viewer),
 ) -> list[FeeCalculationResponse]:
     """
     ユーザーの手数料履歴を返す。
@@ -67,7 +68,7 @@ async def get_fees(
 async def get_summary(
     user_id: int,
     db: Session = Depends(get_db),
-    _current_user=Depends(require_viewer),
+    _current_user: User = Depends(require_viewer),
 ) -> FeeSummaryResponse:
     """
     ユーザーの手数料累計サマリーを返す。
@@ -92,7 +93,7 @@ async def get_summary(
 async def run_daily_batch(
     user_aum_map: dict[str, str],
     db: Session = Depends(get_db),
-    _current_user=Depends(require_admin),
+    _current_user: User = Depends(require_admin),
 ) -> BatchResult:
     """
     日次手数料バッチを実行する（管理者のみ）。
@@ -139,7 +140,7 @@ async def run_daily_batch(
 @router.get("/config", response_model=FeeConfigResponse)
 async def get_config(
     db: Session = Depends(get_db),
-    _current_user=Depends(require_viewer),
+    _current_user: User = Depends(require_viewer),
 ) -> FeeConfigResponse:
     """
     現在の手数料設定を返す。
