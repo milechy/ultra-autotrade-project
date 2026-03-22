@@ -30,3 +30,33 @@ app.include_router(transparency_router)  # Transparency (Wave 2)
 |-----------|------|---------|------------|
 | current_amount | float | 1000.0 | — |
 | action_amount | float | 500.0 | must be > 0 (else 422) |
+
+---
+
+## Billing Module
+
+Router: `from app.billing.router import router as billing_router`
+Registration: `app.include_router(billing_router)`
+Prefix: `/api/billing`
+Tags: `["billing"]`
+
+### Endpoints exposed after registration
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | /api/billing/fees | viewer | ユーザーの手数料履歴（?user_id=, ?period= オプション） |
+| GET | /api/billing/summary | viewer | ユーザーの手数料累計サマリー（?user_id=） |
+| POST | /api/billing/batch/daily | admin | 日次手数料バッチ実行（body: {"uid": "aum"} JSON） |
+| GET | /api/billing/config | viewer | 現在の手数料設定 |
+
+---
+
+## Knowledge Hub — Search Test & Workflow Trigger (already registered via knowledge router)
+
+The following endpoints are added to the existing knowledge router (already registered in `main.py`).
+No additional `app.include_router(...)` calls are needed.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | /api/knowledge/search/test | editor+ | Admin RAG search test with query params |
+| POST | /api/knowledge/workflow/trigger | admin | Trigger full pipeline for pending items |

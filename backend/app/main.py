@@ -53,6 +53,7 @@ from app.reports.router import router as reports_router
 from app.rss.router import router as rss_router
 from app.users.router import router as users_router
 from app.webhook.router import router as webhook_router
+from app.billing.router import router as billing_router
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +118,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(data_feeds_router)  # External data feeds (Phase 2)
     app.include_router(reports_router, prefix="/api/reports")  # Monthly reports
+    app.include_router(billing_router)
 
     # Register global error handlers (production safety)
     register_error_handlers(app)

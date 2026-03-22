@@ -6,7 +6,6 @@ import Link from "next/link";
 import React from "react";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
-import { postJson } from "@/lib/api/http";
 import {
   fetchKnowledgeItems,
   createKnowledgeItem,
@@ -17,16 +16,26 @@ import {
 
 // ─── RAG search types ────────────────────────────────────────────────────────
 
-type RagChunk = {
+type SearchTestItem = {
   content: string;
-  similarity: number;
-  source?: string;
+  source: string | null;
+  similarity_score: number;
+  created_at: string | null;
 };
 
-type RagSearchResult = {
-  chunks: RagChunk[];
+type SearchTestResponse = {
+  results: SearchTestItem[];
+  count: number;
   query: string;
-  total: number;
+};
+
+type WorkflowResult = {
+  fetched_count: number;
+  traded_count: number;
+  skipped_count: number;
+  hold_count: number;
+  errors: { item_id: number; step: string; message: string }[];
+  status: string;
 };
 
 const STATUS_COLORS: Record<KnowledgeItemStatus, { bg: string; color: string; label: string }> = {
@@ -65,7 +74,7 @@ function formatDate(iso: string): string {
 }
 
 export default function KnowledgeIndexPage() {
-  const { token } = useAuth();
+  const { token, isAdmin } = useAuth();
   const [items, setItems] = React.useState<KnowledgeItem[]>([]);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -83,12 +92,12 @@ export default function KnowledgeIndexPage() {
   const [ragQuery, setRagQuery] = React.useState("");
   const [ragTopK, setRagTopK] = React.useState("3");
   const [ragSearching, setRagSearching] = React.useState(false);
-  const [ragResult, setRagResult] = React.useState<RagSearchResult | null>(null);
+  const [ragResult, setRagResult] = React.useState<SearchTestResponse | null>(null);
   const [ragError, setRagError] = React.useState<string | null>(null);
 
   // ワークフロー実行
   const [workflowRunning, setWorkflowRunning] = React.useState(false);
-  const [workflowMsg, setWorkflowMsg] = React.useState<string | null>(null);
+  const [workflowResult, setWorkflowResult] = React.useState<WorkflowResult | null>(null);
   const [workflowIsError, setWorkflowIsError] = React.useState(false);
 
   async function loadItems() {
@@ -145,12 +154,20 @@ export default function KnowledgeIndexPage() {
     setRagError(null);
     setRagResult(null);
     try {
-      const result = await postJson<RagSearchResult>(
-        "/api/knowledge/search",
-        { query: ragQuery.trim(), top_k: Number(ragTopK) },
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
-      );
-      setRagResult(result);
+      const params = new URLSearchParams({
+        query: ragQuery.trim(),
+        top_k: ragTopK,
+      });
+      const headers: Record<string, string> = token
+        ? { Authorization: `Bearer ${token}` }
+        : {};
+      const res = await fetch(`/api/knowledge/search/test?${params}`, { headers });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { detail?: string }).detail ?? `HTTP ${res.status}`);
+      }
+      const data: SearchTestResponse = await res.json();
+      setRagResult(data);
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message ?? String(e);
       setRagError(msg);
@@ -160,22 +177,30 @@ export default function KnowledgeIndexPage() {
   }
 
   async function handleWorkflowRun() {
+    if (!window.confirm("pendingアイテムをすべて処理しますか？\nRAG → AI → 取引実行のフルパイプラインが実行されます。")) {
+      return;
+    }
     setWorkflowRunning(true);
-    setWorkflowMsg(null);
+    setWorkflowResult(null);
     setWorkflowIsError(false);
     try {
-      const result = await postJson<{ status: string; message?: string }>(
-        "/api/automation/workflow/run",
-        { dry_run: false },
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
-      );
-      setWorkflowMsg(result.message ?? `完了しました (status: ${result.status})`);
+      const res = await fetch("/api/knowledge/workflow/trigger", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { detail?: string }).detail ?? `HTTP ${res.status}`);
+      }
+      const data: WorkflowResult = await res.json();
+      setWorkflowResult(data);
       setWorkflowIsError(false);
       loadItems();
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message ?? String(e);
-      setWorkflowMsg(`エラー: ${msg}`);
+      setWorkflowResult({ fetched_count: 0, traded_count: 0, skipped_count: 0, hold_count: 0, errors: [], status: "error" });
       setWorkflowIsError(true);
+      console.error("Workflow error:", msg);
     } finally {
       setWorkflowRunning(false);
     }
@@ -373,7 +398,6 @@ export default function KnowledgeIndexPage() {
                     onChange={(e) => setRagTopK(e.target.value)}
                     className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="1">1件</option>
                     <option value="3">3件</option>
                     <option value="5">5件</option>
                     <option value="10">10件</option>
@@ -383,8 +407,14 @@ export default function KnowledgeIndexPage() {
                 <button
                   type="submit"
                   disabled={ragSearching || !ragQuery.trim()}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
                 >
+                  {ragSearching && (
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  )}
                   {ragSearching ? "検索中..." : "RAG検索を実行"}
                 </button>
               </div>
@@ -400,33 +430,44 @@ export default function KnowledgeIndexPage() {
               <div className="mt-4">
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                   検索クエリ: <span className="font-medium text-gray-700 dark:text-gray-300">{ragResult.query}</span>
-                  　取得: {ragResult.chunks.length} チャンク
+                  　取得: {ragResult.results.length} 件
                 </p>
                 <div className="space-y-2">
-                  {ragResult.chunks.length === 0 && (
-                    <p className="text-sm text-gray-400 dark:text-gray-600">該当するチャンクが見つかりませんでした。</p>
+                  {ragResult.results.length === 0 && (
+                    <div className="py-8 text-center text-gray-400 dark:text-gray-600">
+                      <p className="text-sm">該当するチャンクが見つかりませんでした。</p>
+                      <p className="text-xs mt-1">クエリを変えて再試行してください。</p>
+                    </div>
                   )}
-                  {ragResult.chunks.map((chunk, i) => (
+                  {ragResult.results.map((item, i) => (
                     <div
                       key={i}
                       className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800"
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                          チャンク #{i + 1}{chunk.source ? ` — ${chunk.source}` : ""}
+                          #{i + 1}{item.source ? ` — ${item.source}` : ""}
                         </span>
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                          chunk.similarity >= 0.8
+                          item.similarity_score >= 0.8
                             ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                            : chunk.similarity >= 0.6
+                            : item.similarity_score >= 0.6
                             ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300"
                             : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
                         }`}>
-                          類似度 {(chunk.similarity * 100).toFixed(1)}%
+                          {(item.similarity_score * 100).toFixed(1)}%
                         </span>
                       </div>
+                      <div className="mb-2">
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1">
+                          <div
+                            className="h-1 rounded-full bg-blue-500"
+                            style={{ width: `${Math.min(item.similarity_score * 100, 100)}%` }}
+                          />
+                        </div>
+                      </div>
                       <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-                        {chunk.content}
+                        {item.content}
                       </p>
                     </div>
                   ))}
@@ -437,15 +478,15 @@ export default function KnowledgeIndexPage() {
         </section>
 
         {/* ─── 手動ワークフロー実行 ──────────────────────────────────── */}
-        <section className="mt-6 mb-8">
-          <h2 className="text-base font-semibold mb-3 text-gray-900 dark:text-gray-100">
-            手動ワークフロー実行
-          </h2>
-          <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-5 bg-white dark:bg-gray-900">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Pendingステータスのナレッジアイテムをバックエンドで処理します（スクレイピング → チャンク化 → ベクトル化）。
-            </p>
-            <div className="flex items-center gap-4 flex-wrap">
+        {isAdmin && (
+          <section className="mt-6 mb-8">
+            <h2 className="text-base font-semibold mb-3 text-gray-900 dark:text-gray-100">
+              手動ワークフロー実行
+            </h2>
+            <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-5 bg-white dark:bg-gray-900">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Pendingステータスのナレッジアイテムをバックエンドで処理します（RAG → AI → 取引実行）。
+              </p>
               <button
                 onClick={handleWorkflowRun}
                 disabled={workflowRunning}
@@ -453,18 +494,27 @@ export default function KnowledgeIndexPage() {
               >
                 {workflowRunning ? "処理中..." : "Pendingアイテムを処理"}
               </button>
-              {workflowMsg && (
-                <span className={`text-sm font-medium ${
+              {workflowResult && (
+                <div className={`mt-3 p-3 rounded-lg text-sm ${
                   workflowIsError
-                    ? "text-red-600 dark:text-red-400"
-                    : "text-green-600 dark:text-green-400"
+                    ? "bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300"
+                    : "bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
                 }`}>
-                  {workflowMsg}
-                </span>
+                  <p className="font-medium mb-1">ステータス: {workflowResult.status}</p>
+                  <div className="flex gap-4 text-xs flex-wrap">
+                    <span>取得: {workflowResult.fetched_count}件</span>
+                    <span>取引: {workflowResult.traded_count}件</span>
+                    <span>スキップ: {workflowResult.skipped_count}件</span>
+                    <span>HOLD: {workflowResult.hold_count}件</span>
+                    {workflowResult.errors.length > 0 && (
+                      <span className="text-red-600">エラー: {workflowResult.errors.length}件</span>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
-          </div>
-        </section>
+          </section>
+        )}
       </>
     </AuthGuard>
   );

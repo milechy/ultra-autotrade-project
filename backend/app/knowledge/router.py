@@ -14,11 +14,13 @@ PUT  /knowledge/items/{item_id}/status - ステータス更新
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import require_editor, require_viewer
+from app.auth.dependencies import require_admin, require_editor, require_viewer
 from app.auth.models import User
+from app.automation.schemas import WorkflowRunResult
 from app.database import get_db
 
 from .schemas import (
@@ -31,6 +33,20 @@ from .schemas import (
 from .service import KnowledgeService, KnowledgeServiceError
 
 logger = logging.getLogger(__name__)
+
+
+class SearchTestItem(BaseModel):
+    content: str
+    source: Optional[str]
+    similarity_score: float
+    created_at: Optional[str]
+
+
+class SearchTestResponse(BaseModel):
+    results: List[SearchTestItem]
+    count: int
+    query: str
+
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -176,6 +192,85 @@ def update_status(
         )
     except Exception as exc:
         logger.error("Unexpected error in update_status: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
+
+
+@router.get(
+    "/search/test",
+    response_model=SearchTestResponse,
+    summary="管理者向けRAG検索テスト",
+)
+def search_test(
+    query: str = Query(..., min_length=1, description="検索クエリ文字列"),
+    top_k: int = Query(default=5, ge=1, le=20, description="返却する最大件数"),
+    db: Session = Depends(get_db),
+    service: KnowledgeService = Depends(get_knowledge_service),
+    current_user: User = Depends(require_editor),
+) -> SearchTestResponse:
+    """
+    クエリパラメータで指定した検索クエリを pgvector コサイン類似度で検索する（管理者テスト用）。
+    """
+    try:
+        search_request = KnowledgeSearchRequest(query=query, top_k=top_k)
+        results = service.search(db, search_request)
+        test_results = [
+            SearchTestItem(
+                content=r.content,
+                source=r.source_url or r.title,
+                similarity_score=r.similarity,
+                created_at=None,
+            )
+            for r in results
+        ]
+        return SearchTestResponse(results=test_results, count=len(test_results), query=query)
+    except KnowledgeServiceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        )
+    except Exception as exc:
+        logger.error("Unexpected error in search_test: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
+
+
+@router.post(
+    "/workflow/trigger",
+    response_model=WorkflowRunResult,
+    summary="手動ワークフロー実行（adminのみ）",
+)
+def workflow_trigger(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> WorkflowRunResult:
+    """
+    pending 状態のナレッジアイテムをすべて処理する（RAG → AI → Exchange）。
+    adminロールのみ実行可能。
+    """
+    from app.ai.service import AIService
+    from app.automation.workflow import process_pending_knowledge
+    from app.exchange.router import get_exchange_service
+
+    try:
+        result = process_pending_knowledge(
+            db,
+            knowledge_service=KnowledgeService(),
+            ai_service=AIService(),
+            exchange_service=get_exchange_service(),
+            monitoring_service=None,
+        )
+        logger.info(
+            "Workflow triggered via API",
+            extra={"status": result.status, "fetched": result.fetched_count},
+        )
+        return result
+    except Exception as exc:
+        logger.error("Unexpected error in workflow_trigger: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
