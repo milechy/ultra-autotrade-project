@@ -67,7 +67,7 @@ function Toggle({
       }`}
     >
       <span
-        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+        className={`inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-900 shadow ring-0 transition duration-200 ${
           checked ? 'translate-x-5' : 'translate-x-0'
         }`}
       />
@@ -104,7 +104,7 @@ function SettingsPage() {
     setError(null)
     try {
       const data = await getJson<UserSettings & { is_trading_paused?: boolean }>(
-        '/users/settings',
+        '/api/user/settings',
         { headers: { Authorization: `Bearer ${token}` } }
       )
       setSettings({ ...DEFAULT_SETTINGS, ...data })
@@ -134,7 +134,7 @@ function SettingsPage() {
     setIsSaving(true)
     setError(null)
     try {
-      await putJson('/users/settings', settings, {
+      await putJson('/api/user/settings', settings, {
         headers: { Authorization: `Bearer ${token}` },
       })
       setSuccessMsg('設定を保存しました')
