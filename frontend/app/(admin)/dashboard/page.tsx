@@ -18,18 +18,52 @@ import {
 import type { AutomationStatus } from "@/lib/types";
 import type { ExchangeStatusResponse } from "@/lib/api/exchange";
 import type { AaveMonitorStatus } from "@/lib/api/aave";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import dynamic from "next/dynamic";
 import { Users, DollarSign, ArrowLeftRight, Bell } from "lucide-react";
+
+// HF 推移チャート
+const HfLineChart = dynamic(
+  () => import("recharts").then((m) => {
+    const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = m;
+    function Chart({ data }: { data: { label: string; hf: number }[] }) {
+      return (
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+            <YAxis domain={[1.2, 3.5]} tick={{ fontSize: 10 }} />
+            <Tooltip formatter={(v: number) => v.toFixed(2)} />
+            <Line type="monotone" dataKey="hf" stroke="#2563eb" strokeWidth={2} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      );
+    }
+    return { default: Chart };
+  }),
+  { ssr: false, loading: () => <div className="h-[200px] animate-pulse rounded bg-gray-100" /> }
+);
+
+// 日別取引量チャート
+const VolumeBarChart = dynamic(
+  () => import("recharts").then((m) => {
+    const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = m;
+    function Chart({ data }: { data: { label: string; trades: number }[] }) {
+      return (
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} />
+            <Tooltip />
+            <Bar dataKey="trades" fill="#2563eb" radius={[4, 4, 0, 0]} name="取引数" />
+          </BarChart>
+        </ResponsiveContainer>
+      );
+    }
+    return { default: Chart };
+  }),
+  { ssr: false, loading: () => <div className="h-[200px] animate-pulse rounded bg-gray-100" /> }
+);
 
 // -----------------------------------------------------------------------
 // Mock chart data helpers
@@ -240,36 +274,14 @@ function DashboardContent() {
               ))}
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={hfData[hfRange]} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-              <YAxis domain={[1.2, 3.5]} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(v: number) => v.toFixed(2)} />
-              <Line
-                type="monotone"
-                dataKey="hf"
-                stroke="#2563eb"
-                strokeWidth={2}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <HfLineChart data={hfData[hfRange]} />
         </div>
       </div>
 
       {/* Daily Volume Bar Chart */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold text-gray-700">日別取引量（過去7日）</h2>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={volumeData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 10 }} />
-            <Tooltip />
-            <Bar dataKey="trades" fill="#2563eb" radius={[4, 4, 0, 0]} name="取引数" />
-          </BarChart>
-        </ResponsiveContainer>
+        <VolumeBarChart data={volumeData} />
       </div>
     </div>
   );
