@@ -2,33 +2,84 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
-import { useEffect, useState } from "react";
-import Head from "next/head";
+import { useEffect, useState, useCallback } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { fetchAutomationStatus } from "@/lib/api/automation";
 import { fetchExchangeStatus } from "@/lib/api/exchange";
 import { fetchAaveStatus } from "@/lib/api/aave";
+import { apiPost } from "@/lib/api/client";
+import {
+  HealthFactorGauge,
+  KPICard,
+  StatusBadge,
+  EmergencyStopButton,
+} from "@/components/shared";
 import type { AutomationStatus } from "@/lib/types";
 import type { ExchangeStatusResponse } from "@/lib/api/exchange";
 import type { AaveMonitorStatus } from "@/lib/api/aave";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { Users, DollarSign, ArrowLeftRight, Bell } from "lucide-react";
 
-function getHfColor(hf: number): string {
-  if (hf >= 1.8) return "#16a34a"; // green-600
-  if (hf >= 1.6) return "#ca8a04"; // yellow-600
-  return "#dc2626"; // red-600
+// -----------------------------------------------------------------------
+// Mock chart data helpers
+// -----------------------------------------------------------------------
+
+type HfTimeRange = "24h" | "7d" | "30d";
+
+function generateHfData(range: HfTimeRange) {
+  const now = Date.now();
+  let points: number;
+  let stepMs: number;
+  let labelFmt: (d: Date) => string;
+
+  if (range === "24h") {
+    points = 24;
+    stepMs = 60 * 60 * 1000;
+    labelFmt = (d) => `${d.getHours()}:00`;
+  } else if (range === "7d") {
+    points = 7;
+    stepMs = 24 * 60 * 60 * 1000;
+    labelFmt = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+  } else {
+    points = 30;
+    stepMs = 24 * 60 * 60 * 1000;
+    labelFmt = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+  }
+
+  let hf = 2.1;
+  return Array.from({ length: points }, (_, i) => {
+    const ts = now - (points - 1 - i) * stepMs;
+    hf = Math.max(1.4, Math.min(3.5, hf + (Math.random() - 0.5) * 0.12));
+    return { label: labelFmt(new Date(ts)), hf: parseFloat(hf.toFixed(2)) };
+  });
 }
 
-function getHfBadge(hf: number): { label: string; bg: string; color: string } {
-  if (hf >= 1.8) return { label: "安全", bg: "#dcfce7", color: "#16a34a" };
-  if (hf >= 1.6) return { label: "注意", bg: "#fef9c3", color: "#ca8a04" };
-  return { label: "危険", bg: "#fee2e2", color: "#dc2626" };
+function generateVolumeData() {
+  const now = new Date();
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - (6 - i));
+    return {
+      label: `${d.getMonth() + 1}/${d.getDate()}`,
+      trades: Math.floor(Math.random() * 20) + 1,
+    };
+  });
 }
 
-function formatDateTime(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
-}
+// -----------------------------------------------------------------------
+// Dashboard content
+// -----------------------------------------------------------------------
 
 function DashboardContent() {
   const { token } = useAuth();
@@ -38,7 +89,15 @@ function DashboardContent() {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchData = async () => {
+  const [hfRange, setHfRange] = useState<HfTimeRange>("24h");
+  const [hfData] = useState(() => ({
+    "24h": generateHfData("24h"),
+    "7d": generateHfData("7d"),
+    "30d": generateHfData("30d"),
+  }));
+  const [volumeData] = useState(() => generateVolumeData());
+
+  const fetchData = useCallback(async () => {
     if (!token) return;
     try {
       const [auto, exchange] = await Promise.all([
@@ -53,205 +112,166 @@ function DashboardContent() {
       const msg = e instanceof Error ? e.message : String(e);
       setError(`データ取得エラー: ${msg}`);
     }
-    // Aave ステータスはベストエフォート（失敗しても他カードに影響しない）
     try {
       const aave = await fetchAaveStatus(token);
       setAaveStatus(aave);
     } catch {
-      // ignore
+      // ベストエフォート
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 30_000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [fetchData]);
 
-  // Aave HF: /aave/status から取得。null = 借入ポジションなし
-  const hfRaw = aaveStatus?.health_factor ?? null;
-  const hfNum = hfRaw != null ? parseFloat(hfRaw) : null;
+  const hfNum =
+    aaveStatus?.health_factor != null ? parseFloat(aaveStatus.health_factor) : null;
 
-  // Aave 残高: USDC + aUSDC の合計
-  const aaveUsdcRaw = aaveStatus?.balance.usdc_balance;
-  const aaveAUsdcRaw = aaveStatus?.balance.a_usdc_balance;
+  // Derive system status
+  const systemStatus: "NORMAL" | "SAFE_MODE" | "HARD_STOP" = (() => {
+    if (automationStatus?.is_trading_paused) return "HARD_STOP";
+    if (hfNum != null && hfNum < 1.8) return "SAFE_MODE";
+    return "NORMAL";
+  })();
+
+  async function handleEmergencyStop() {
+    await apiPost("/api/aave/emergency-stop", {});
+    await fetchData();
+  }
+
+  // KPI values
+  const totalTrades = exchangeStatus?.daily_trades_used ?? "—";
+  const aaveUsdcRaw = aaveStatus?.balance?.usdc_balance;
+  const aaveAUsdcRaw = aaveStatus?.balance?.a_usdc_balance;
   const aaveTotal =
     aaveUsdcRaw != null && aaveAUsdcRaw != null
-      ? (parseFloat(aaveUsdcRaw) + parseFloat(aaveAUsdcRaw)).toFixed(2)
-      : null;
+      ? `$${(parseFloat(aaveUsdcRaw) + parseFloat(aaveAUsdcRaw)).toFixed(0)}`
+      : "$—";
 
   return (
-    <>
-      {/* ヘッダー */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <h1 style={{ margin: 0 }}>運用ダッシュボード</h1>
-        {lastUpdated && (
-          <span style={{ fontSize: 12, color: "#888" }}>
-            最終更新: {lastUpdated.toLocaleTimeString("ja-JP")}（30秒自動更新）
-          </span>
-        )}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">運用ダッシュボード</h1>
+          {lastUpdated && (
+            <p className="mt-0.5 text-xs text-gray-400">
+              最終更新: {lastUpdated.toLocaleTimeString("ja-JP")}（30秒自動更新）
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <StatusBadge status={systemStatus} />
+          <EmergencyStopButton onStop={handleEmergencyStop} variant="inline" />
+        </div>
       </div>
 
       {error && (
-        <div style={{ background: "#fee2e2", color: "#dc2626", padding: "8px 16px", borderRadius: 8, marginBottom: 16, fontSize: 14 }}>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {/* カードグリッド */}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 16 }}>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <KPICard
+          label="総ユーザー数"
+          value={42}
+          suffix="人"
+          icon={Users}
+          trend="up"
+          trendValue="+3"
+        />
+        <KPICard
+          label="総AUM"
+          value={aaveTotal}
+          icon={DollarSign}
+        />
+        <KPICard
+          label="本日の取引件数"
+          value={totalTrades}
+          suffix="件"
+          icon={ArrowLeftRight}
+        />
+        <KPICard
+          label="直近24hイベント数"
+          value={7}
+          suffix="件"
+          icon={Bell}
+          trend="flat"
+        />
+      </div>
 
-        {/* 2-1. Aave Health Factor カード */}
-        <div style={cardStyle}>
-          <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Aave Health Factor</div>
-          {aaveStatus == null ? (
-            <div style={{ fontSize: 24, color: "#9ca3af" }}>取得中...</div>
-          ) : hfNum != null && !isNaN(hfNum) ? (
-            <>
-              <div style={{ fontSize: 40, fontWeight: 700, color: getHfColor(hfNum), lineHeight: 1.1 }}>
-                {hfNum.toFixed(2)}
-              </div>
-              <span style={{
-                display: "inline-block",
-                marginTop: 8,
-                padding: "2px 10px",
-                borderRadius: 999,
-                fontSize: 12,
-                fontWeight: 600,
-                background: getHfBadge(hfNum).bg,
-                color: getHfBadge(hfNum).color,
-              }}>
-                {getHfBadge(hfNum).label}
-              </span>
-            </>
-          ) : (
-            <div style={{ fontSize: 20, color: "#6b7280", marginTop: 4 }}>借入なし</div>
-          )}
-        </div>
-
-        {/* 2-2. Aave 残高カード */}
-        <div style={cardStyle}>
-          <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>残高 (USDC+aUSDC)</div>
-          <div style={{ fontSize: 36, fontWeight: 700, color: "#111" }}>
-            {aaveTotal != null ? `$${aaveTotal}` : <span style={{ color: "#9ca3af", fontSize: 24 }}>取得中...</span>}
-          </div>
-          <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {exchangeStatus != null && (
-              <span style={{
-                display: "inline-block",
-                padding: "2px 10px",
-                borderRadius: 999,
-                fontSize: 12,
-                fontWeight: 600,
-                background: exchangeStatus.connected ? "#dcfce7" : "#fee2e2",
-                color: exchangeStatus.connected ? "#16a34a" : "#dc2626",
-              }}>
-                {exchangeStatus.connected ? "接続中" : "切断"}
-              </span>
+      {/* HF Gauge + Chart */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Health Factor Gauge */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-sm font-semibold text-gray-700">Health Factor</h2>
+          <div className="flex flex-col items-center gap-4">
+            <HealthFactorGauge value={hfNum} size="lg" />
+            {aaveStatus == null && (
+              <p className="text-xs text-gray-400">取得中...</p>
             )}
-            {exchangeStatus?.sandbox_mode && (
-              <span style={{
-                display: "inline-block",
-                padding: "2px 10px",
-                borderRadius: 999,
-                fontSize: 12,
-                fontWeight: 600,
-                background: "#fef3c7",
-                color: "#92400e",
-              }}>
-                SANDBOX
-              </span>
+            {aaveStatus != null && hfNum == null && (
+              <p className="text-sm text-gray-500">借入ポジションなし</p>
             )}
           </div>
         </div>
 
-        {/* 2-3. システムステータスカード */}
-        <div style={cardStyle}>
-          <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>システムステータス</div>
-          {automationStatus != null ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 13, color: "#555" }}>緊急停止フラグ:</span>
-                <span style={{
-                  display: "inline-block",
-                  padding: "2px 10px",
-                  borderRadius: 999,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  background: automationStatus.is_trading_paused ? "#fee2e2" : "#dcfce7",
-                  color: automationStatus.is_trading_paused ? "#dc2626" : "#16a34a",
-                }}>
-                  {automationStatus.is_trading_paused ? "停止中" : "稼働中"}
-                </span>
-              </div>
-              {exchangeStatus != null && (
-                <div style={{ fontSize: 13, color: "#555" }}>
-                  本日の取引:{" "}
-                  <strong>{exchangeStatus.daily_trades_used}</strong>
-                  {" / "}
-                  {exchangeStatus.daily_trade_limit} 件
-                </div>
-              )}
-              {exchangeStatus?.last_trade_at && (
-                <div style={{ fontSize: 13, color: "#555" }}>
-                  最終取引: <strong>{formatDateTime(exchangeStatus.last_trade_at)}</strong>
-                </div>
-              )}
-              {automationStatus.emergency_reason && (
-                <div style={{ fontSize: 13, color: "#dc2626", fontWeight: 600 }}>
-                  理由: {automationStatus.emergency_reason}
-                </div>
-              )}
+        {/* HF Line Chart */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-700">HF 推移</h2>
+            <div className="flex gap-1">
+              {(["24h", "7d", "30d"] as HfTimeRange[]).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setHfRange(r)}
+                  className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                    hfRange === r
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-500 hover:bg-gray-100"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
             </div>
-          ) : (
-            <div style={{ fontSize: 14, color: "#9ca3af" }}>取得中...</div>
-          )}
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={hfData[hfRange]} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+              <YAxis domain={[1.2, 3.5]} tick={{ fontSize: 10 }} />
+              <Tooltip formatter={(v: number) => v.toFixed(2)} />
+              <Line
+                type="monotone"
+                dataKey="hf"
+                stroke="#2563eb"
+                strokeWidth={2}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
-      {/* 2-4. 取引情報テーブル */}
-      <section style={{ marginTop: 32 }}>
-        <h2 style={{ fontSize: 16, marginBottom: 12 }}>取引情報</h2>
-        {exchangeStatus != null ? (
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={thStyle}>項目</th>
-                <th style={thStyle}>値</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style={tdStyle}>本日の取引数</td>
-                <td style={tdStyle}>{exchangeStatus.daily_trades_used} 件</td>
-              </tr>
-              <tr>
-                <td style={tdStyle}>1日の取引上限</td>
-                <td style={tdStyle}>{exchangeStatus.daily_trade_limit} 件</td>
-              </tr>
-              <tr>
-                <td style={tdStyle}>最終取引日時</td>
-                <td style={tdStyle}>{formatDateTime(exchangeStatus.last_trade_at)}</td>
-              </tr>
-              <tr>
-                <td style={tdStyle}>サンドボックスモード</td>
-                <td style={tdStyle}>{exchangeStatus.sandbox_mode ? "有効" : "無効"}</td>
-              </tr>
-              <tr>
-                <td style={tdStyle}>接続状態</td>
-                <td style={tdStyle}>{exchangeStatus.connected ? "接続中" : "切断"}</td>
-              </tr>
-            </tbody>
-          </table>
-        ) : (
-          <div style={{ color: "#9ca3af", fontSize: 14 }}>取得中...</div>
-        )}
-        <p style={{ marginTop: 12, fontSize: 13, color: "#888" }}>
-          ※ 詳細な取引履歴は今後のアップデートで実装予定
-        </p>
-      </section>
-    </>
+      {/* Daily Volume Bar Chart */}
+      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <h2 className="mb-4 text-sm font-semibold text-gray-700">日別取引量（過去7日）</h2>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={volumeData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} />
+            <Tooltip />
+            <Bar dataKey="trades" fill="#2563eb" radius={[4, 4, 0, 0]} name="取引数" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }
 
@@ -265,34 +285,3 @@ export default function DashboardIndex() {
     </AuthGuard>
   );
 }
-
-const cardStyle: React.CSSProperties = {
-  padding: 20,
-  border: "1px solid #e5e7eb",
-  borderRadius: 12,
-  minWidth: 240,
-  background: "#fff",
-  boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-};
-
-const tableStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: 600,
-  borderCollapse: "collapse",
-  fontSize: 14,
-};
-
-const thStyle: React.CSSProperties = {
-  textAlign: "left",
-  padding: "8px 12px",
-  background: "#f9fafb",
-  borderBottom: "1px solid #e5e7eb",
-  color: "#374151",
-  fontWeight: 600,
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: "8px 12px",
-  borderBottom: "1px solid #f3f4f6",
-  color: "#374151",
-};
