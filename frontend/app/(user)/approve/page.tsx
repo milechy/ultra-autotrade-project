@@ -2,10 +2,12 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 
 import { useState, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { apiFetch, apiPost } from '@/lib/api/client'
+import { useAuth } from '@/lib/auth'
 import {
   ProposalCard,
   RecentApprovals,
@@ -69,6 +71,8 @@ type ProposalState = {
 }
 
 export default function ApprovePage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const router = useRouter()
   const [proposals, setProposals] = useState<Proposal[]>([])
   const [recentApprovals, setRecentApprovals] = useState<RecentApproval[]>([])
   const [loading, setLoading] = useState(true)
@@ -94,7 +98,15 @@ export default function ApprovePage() {
     }
   }, [])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.replace('/login?redirect=/user/approve')
+    }
+  }, [authLoading, isAuthenticated, router])
+
+  useEffect(() => {
+    if (isAuthenticated) { fetchData() }
+  }, [fetchData, isAuthenticated])
 
   const handleApprove = useCallback(async (id: string) => {
     setProposalStates((prev) => ({ ...prev, [id]: { status: 'approving' } }))
@@ -132,7 +144,7 @@ export default function ApprovePage() {
     return s === 'pending' || s === 'approving' || s === 'confirming'
   }).length
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
