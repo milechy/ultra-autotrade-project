@@ -11,6 +11,7 @@ Also maintains the legacy Notion → AI → OctoBot flow (WorkflowService).
 
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Optional, Tuple
 
@@ -279,6 +280,7 @@ class _SingleItemResult:
         order_result: Optional[OrderResult],
         reason: str,
         shadow_logged: bool = False,
+        proposed: bool = False,
     ) -> None:
         self.item_id = item_id
         self.action = action
@@ -286,6 +288,7 @@ class _SingleItemResult:
         self.order_result = order_result
         self.reason = reason
         self.shadow_logged = shadow_logged
+        self.proposed = proposed
 
 
 def check_rule_engine(
@@ -324,6 +327,7 @@ def process_pending_knowledge(
     shadow_mode_service: Optional[ShadowModeService] = None,
     trade_amount_usd: Decimal = Decimal("50"),
     dry_run: bool = False,
+    execution_policy: str = "auto_execute",
 ) -> WorkflowRunResult:
     """Process pending knowledge items through the full pipeline.
 
@@ -374,6 +378,13 @@ def process_pending_knowledge(
     hold_count = 0
     skipped_count = 0
     shadow_logged_count = 0
+    proposed_count = 0
+
+    # HF emergency override: always auto_execute if HF < 1.6
+    effective_policy = execution_policy
+    if hf is not None and hf < Decimal("1.6"):
+        effective_policy = "auto_execute"
+        logger.info("HF emergency override: execution_policy forced to auto_execute (hf=%s)", hf)
 
     for item in pending:
         try:
@@ -387,11 +398,15 @@ def process_pending_knowledge(
                 dry_run=dry_run,
                 shadow_mode_service=shadow_mode_service,
                 health_factor=hf,
+                execution_policy=effective_policy,
             )
 
             if result.shadow_logged:
                 # Shadow Mode: record only, no actual trade
                 shadow_logged_count += 1
+                knowledge_service.update_status(db, item.id, KnowledgeItemStatus.SKIPPED)
+            elif result.proposed:
+                proposed_count += 1
                 knowledge_service.update_status(db, item.id, KnowledgeItemStatus.SKIPPED)
             elif (
                 result.order_result is not None
@@ -432,12 +447,14 @@ def process_pending_knowledge(
         )
 
     logger.info(
-        "Workflow completed: fetched=%d, traded=%d, hold=%d, skipped=%d, shadow=%d, errors=%d",
+        "Workflow completed: fetched=%d, traded=%d, hold=%d, skipped=%d, "
+        "shadow=%d, proposed=%d, errors=%d",
         len(pending),
         traded_count,
         hold_count,
         skipped_count,
         shadow_logged_count,
+        proposed_count,
         len(errors),
     )
 
@@ -448,8 +465,43 @@ def process_pending_knowledge(
         skipped_count=skipped_count,
         hold_count=hold_count,
         shadow_logged_count=shadow_logged_count,
+        proposed_count=proposed_count,
         errors=errors,
         status=status,
+    )
+
+
+def _create_proposal_from_judgment(
+    db: Session,
+    item_id: int,
+    action: TradeAction,
+    reason: str,
+    trade_amount_usd: Decimal,
+    user_id: int = 0,
+) -> None:
+    """Create a pending Proposal from AI judgment (require_approval / proposal_only)."""
+    from datetime import timedelta  # noqa: PLC0415
+
+    from app.proposals.models import Proposal  # noqa: PLC0415
+
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    proposal = Proposal(
+        user_id=user_id,
+        operation=action.value,
+        asset="USDC",
+        amount=trade_amount_usd,
+        amount_usd=trade_amount_usd,
+        reason=reason,
+        status="pending",
+        expires_at=expires_at,
+    )
+    db.add(proposal)
+    db.flush()
+    logger.info(
+        "Proposal created: item_id=%d, action=%s, expires_at=%s",
+        item_id,
+        action.value,
+        expires_at,
     )
 
 
@@ -464,6 +516,7 @@ def _process_single_item(
     dry_run: bool,
     shadow_mode_service: Optional[ShadowModeService] = None,
     health_factor: Optional[Decimal] = None,
+    execution_policy: str = "auto_execute",
 ) -> _SingleItemResult:
     """Process a single knowledge item through the full pipeline."""
     query = item.title or item.source_url or "analyze market conditions"
@@ -522,6 +575,23 @@ def _process_single_item(
 
     order_result: Optional[OrderResult] = None
     if action in (TradeAction.BUY, TradeAction.SELL) and confidence >= 40:
+        if execution_policy in ("require_approval", "proposal_only"):
+            _create_proposal_from_judgment(
+                db,
+                item_id=item.id,
+                action=action,
+                reason=reason,
+                trade_amount_usd=trade_amount_usd,
+            )
+            return _SingleItemResult(
+                item_id=item.id,
+                action=action,
+                confidence=confidence,
+                order_result=None,
+                reason=reason,
+                proposed=True,
+            )
+        # auto_execute: proceed with immediate trade
         order_request = OrderRequest(
             action=action,
             amount_usd=trade_amount_usd,

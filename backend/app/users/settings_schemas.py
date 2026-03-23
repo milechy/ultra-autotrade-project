@@ -19,6 +19,8 @@ class UserSettingsResponse(BaseModel):
     notification_frequency: str
     max_single_trade_usd: Optional[Decimal]
     max_daily_trade_usd: Optional[Decimal]
+    user_mode: str
+    execution_policy: str
 
 
 class UserSettingsUpdate(BaseModel):
@@ -26,3 +28,4 @@ class UserSettingsUpdate(BaseModel):
     notification_frequency: Optional[str] = None
     max_single_trade_usd: Optional[Decimal] = None
     max_daily_trade_usd: Optional[Decimal] = None
+    user_mode: Optional[str] = None

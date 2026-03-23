@@ -112,6 +112,67 @@ class LINENotifyClient:
         return f"\n{emoji} [{message.severity.value.upper()}] {message.title}\n{message.body}"
 
 
+def notify_auto_executed(
+    operation: str, asset: str, amount: float, apy: float, token: str | None = None
+) -> None:
+    """managed/auto_execute時: 自動実行通知。"""
+    from .schemas import NotificationChannel  # noqa: PLC0415
+
+    client = LINENotifyClient(token=token)
+    op_ja = "供給" if operation == "SUPPLY" else "引き出し"
+    msg = NotificationMessage(
+        channel=NotificationChannel.LINE,
+        title="自動取引実行",
+        body=f"AIが{amount:.0f} {asset}をAaveに{op_ja}しました。利回り{apy:.1f}%",
+        severity=NotificationSeverity.INFO,
+    )
+    client.send(msg)
+
+
+def notify_hf_protection(asset: str, amount: float, token: str | None = None) -> None:
+    """managed/HF危険時: 資産保護通知。"""
+    from .schemas import NotificationChannel  # noqa: PLC0415
+
+    client = LINENotifyClient(token=token)
+    msg = NotificationMessage(
+        channel=NotificationChannel.LINE,
+        title="資産保護実行",
+        body=f"AIがあなたの資産を保護しました。一時的に{amount:.0f} {asset}を引き出しました",
+        severity=NotificationSeverity.ALERT,
+    )
+    client.send(msg)
+
+
+def notify_proposal_created(
+    operation: str, asset: str, amount: float, token: str | None = None
+) -> None:
+    """active/提案作成時: 承認要求通知。"""
+    from .schemas import NotificationChannel  # noqa: PLC0415
+
+    client = LINENotifyClient(token=token)
+    msg = NotificationMessage(
+        channel=NotificationChannel.LINE,
+        title="新しい取引提案",
+        body=f"新しい取引提案: {amount:.0f} {asset} {operation}。アプリで確認→承認してください",
+        severity=NotificationSeverity.WARNING,
+    )
+    client.send(msg)
+
+
+def notify_proposal_timeout(operation: str, asset: str, token: str | None = None) -> None:
+    """active/タイムアウト時: 提案キャンセル通知。"""
+    from .schemas import NotificationChannel  # noqa: PLC0415
+
+    client = LINENotifyClient(token=token)
+    msg = NotificationMessage(
+        channel=NotificationChannel.LINE,
+        title="提案タイムアウト",
+        body=f"1時間以内に承認がなかったため、{operation} {asset}の提案をキャンセルしました",
+        severity=NotificationSeverity.INFO,
+    )
+    client.send(msg)
+
+
 def notify_health_factor(health_factor: Decimal, token: str | None = None) -> None:
     """Health Factor の値に応じて LINE Notify にアラートを送信する。
 

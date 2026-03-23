@@ -77,6 +77,10 @@ class User(Base):
     max_daily_trade_usd: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(precision=20, scale=2), nullable=True, default=None
     )
+    user_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="managed")
+    execution_policy: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="auto_execute"
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"

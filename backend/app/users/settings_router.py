@@ -31,6 +31,12 @@ def update_user_settings(
     db: Session = Depends(get_db),
 ) -> UserSettingsResponse:
     """ユーザー設定を更新する。"""
+    _USER_MODE_TO_POLICY = {
+        "managed": "auto_execute",
+        "active": "require_approval",
+        "pro": "proposal_only",
+    }
+
     if request.notification_frequency is not None:
         if request.notification_frequency not in ("all", "important", "none"):
             raise HTTPException(
@@ -54,6 +60,14 @@ def update_user_settings(
                 detail="max_daily_trade_usd must be positive",
             )
         current_user.max_daily_trade_usd = request.max_daily_trade_usd
+    if request.user_mode is not None:
+        if request.user_mode not in _USER_MODE_TO_POLICY:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="user_mode must be one of: managed, active, pro",
+            )
+        current_user.user_mode = request.user_mode
+        current_user.execution_policy = _USER_MODE_TO_POLICY[request.user_mode]
     db.add(current_user)
     db.commit()
     db.refresh(current_user)

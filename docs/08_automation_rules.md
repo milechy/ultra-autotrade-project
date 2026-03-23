@@ -269,3 +269,20 @@ cron の具体的な書式（`crontab -e` に書く 1 行ごとの設定例）�
 
 > 実際のダッシュボードツール（Grafana / CloudWatch 等）はプロジェクト外の前提とし、  
 > ここでは **「どのメトリクスを、どのように見ればよいか」** のルールのみを定義する。
+## managed モード自動通知ルール（2026-03-23追加）
+
+### 通知トリガー
+
+| イベント | 関数 | メッセージ例 |
+|---------|------|------------|
+| auto_execute 成功 | `notify_auto_executed()` | ✅ AIが500 USDCをAaveに供給しました。利回り3.4% |
+| HF危険 → 資産保護 | `notify_hf_protection()` | 🛡 AIがあなたの資産を保護しました。200 USDCを引き出しました |
+| 提案作成（active） | `notify_proposal_created()` | 📊 新しい取引提案: 500 USDC Supply。アプリで確認→承認してください |
+| 提案タイムアウト | `notify_proposal_timeout()` | ⏰ 1時間以内に承認がなかったため、提案をキャンセルしました |
+
+### 承認タイムアウトルール
+
+- `require_approval` モードで作成した提案は `expires_at = now + 1時間`
+- タイムアウト処理: `_expire_old_proposals()` が `/api/proposals/pending` 呼び出し時に自動実行
+- タイムアウト時は LINE で `notify_proposal_timeout()` 通知（将来実装）
+- conservative fallback: タイムアウト後は HOLD扱い（追加の自動操作なし）
