@@ -86,6 +86,7 @@ services:
       - .env.staging       # staging 用の環境変数ファイル（Git 管理外）
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade}
+      REBALANCE_SHADOW_MODE: "false"   # testnet 実行モード（dry-run を無効化）
     ports:
       - "8000:8000"
     volumes:
