@@ -63,7 +63,7 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 
 export default function ConnectPage() {
   const router = useRouter()
-  const { address, isConnected, chainId, connect, switchToArbitrum } = useWallet()
+  const { address, isConnected, chainId, connect, switchToArbitrum, switchToArbitrumSepolia } = useWallet()
   const { checkMinimum, minimumUSD } = useMinimumBalance()
 
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -82,7 +82,8 @@ export default function ConnectPage() {
   const balanceCheck = checkMinimum(mockAccountData)
 
   const isCorrectNetwork = chainId != null && ARBITRUM_CHAIN_IDS.includes(chainId)
-  const allChecksPass = isConnected && isCorrectNetwork && !balanceCheck.isBelowMinimum
+  // Balance check is informational only — do not block onboarding (testnet has no minimum)
+  const allChecksPass = isConnected && isCorrectNetwork
 
   // Calculate current step for indicator
   const currentStep = !isConnected ? 1 : !isCorrectNetwork ? 2 : 3
@@ -163,16 +164,24 @@ export default function ConnectPage() {
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="h-5 w-5 text-yellow-400 shrink-0 mt-0.5" />
                       <p className="text-sm text-yellow-300">
-                        Arbitrum Oneネットワークに切り替えてください
+                        Arbitrumネットワークに切り替えてください
                       </p>
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
                       className="w-full border-yellow-600 text-yellow-400 hover:bg-yellow-950/40"
+                      onClick={switchToArbitrumSepolia}
+                    >
+                      Arbitrum Sepolia (testnet) に切り替える
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-zinc-600 text-zinc-400 hover:bg-zinc-800/40"
                       onClick={switchToArbitrum}
                     >
-                      Arbitrum One に切り替える
+                      Arbitrum One (mainnet) に切り替える
                     </Button>
                   </div>
                 )}
