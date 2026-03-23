@@ -2,6 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import Link from 'next/link'
 import { useWallet } from '@/hooks/useWallet'
 import { WalletAddressMask } from '@/components/shared'
 const CHAIN_INFO: Record<number, { name: string; colorClass: string }> = {
@@ -51,7 +52,7 @@ export function UserHeader() {
         {isConnected && address ? (
           <WalletAddressMask address={address} />
         ) : (
-          <span className="text-xs text-blue-400">ウォレット接続</span>
+          <Link href="/connect" className="text-xs text-blue-400 hover:underline">ウォレット接続</Link>
         )}
       </div>
     </header>

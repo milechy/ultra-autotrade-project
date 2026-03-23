@@ -19,7 +19,7 @@ import { useAuth } from '@/lib/auth'
 import { UserProviders } from '@/components/user/UserProviders'
 import { getJson, putJson } from '@/lib/api/http'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || ''
 
 type NotificationLevel = 'all' | 'alert' | 'emergency'
 

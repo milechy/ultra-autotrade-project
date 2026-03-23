@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { PerformanceCard } from '@/components/transparency'
 import type { PerformanceData } from '@/components/transparency'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || ''
 
 function AiFeedContent() {
   const { token } = useAuth()
