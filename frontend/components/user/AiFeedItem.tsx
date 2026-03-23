@@ -19,12 +19,12 @@ export type AiEvent = {
 const actionConfig: Record<string, { label: string; className: string }> = {
   BUY: { label: 'BUY', className: 'bg-green-100 text-green-800 border-green-200' },
   SELL: { label: 'SELL', className: 'bg-red-100 text-red-800 border-red-200' },
-  HOLD: { label: 'HOLD', className: 'bg-gray-100 text-gray-700 border-gray-200' },
+  HOLD: { label: 'HOLD', className: 'bg-gray-100 dark:bg-gray-800 text-gray-700 border-gray-200 dark:border-gray-700' },
 }
 
 export function AiFeedItem({ event }: { event: AiEvent }) {
   const action = String(event.action ?? 'HOLD').toUpperCase()
-  const config = actionConfig[action] ?? { label: action, className: 'bg-gray-100 text-gray-700 border-gray-200' }
+  const config = actionConfig[action] ?? { label: action, className: 'bg-gray-100 dark:bg-gray-800 text-gray-700 border-gray-200 dark:border-gray-700' }
 
   const time = event.timestamp
     ? new Date(event.timestamp).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })

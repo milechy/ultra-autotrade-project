@@ -12,7 +12,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 }
 
 export function StatusBadge({ status }: { status: StatusType }) {
-  const config = statusConfig[status] ?? { label: status, className: 'bg-gray-100 text-gray-700 border-gray-200' }
+  const config = statusConfig[status] ?? { label: status, className: 'bg-gray-100 dark:bg-gray-800 text-gray-700 border-gray-200 dark:border-gray-700' }
   return (
     <Badge variant="outline" className={cn('font-mono text-xs font-bold', config.className)}>
       {config.label}

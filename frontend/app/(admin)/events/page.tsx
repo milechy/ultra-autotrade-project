@@ -130,7 +130,7 @@ const MOCK_EVENTS: MonitoringEvent[] = [
 
 const LEVEL_STYLES: Record<EventLevel, { badge: string; dot: string; label: string }> = {
   INFO: {
-    badge: 'bg-gray-100 text-gray-700 border-gray-200',
+    badge: 'bg-gray-100 dark:bg-gray-800 text-gray-700 border-gray-200 dark:border-gray-700',
     dot: 'bg-gray-400',
     label: 'INFO',
   },
@@ -266,7 +266,7 @@ function EventsContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">監視イベントログ</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">監視イベントログ</h1>
           <p className="mt-1 text-sm text-gray-500">
             システムの監視イベントをリアルタイムで表示します
           </p>
@@ -284,7 +284,7 @@ function EventsContent() {
       </div>
 
       {/* Filters */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm space-y-4">
         {/* Level checkboxes */}
         <div className="flex flex-wrap items-center gap-4">
           <span className="text-sm font-medium text-gray-700 min-w-[4rem]">レベル:</span>
@@ -342,7 +342,7 @@ function EventsContent() {
       {loading ? (
         <div className="flex items-center justify-center py-16 text-gray-400">
           <div className="text-center space-y-2">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-500 mx-auto" />
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 dark:border-gray-700 border-t-blue-500 mx-auto" />
             <p className="text-sm">読み込み中...</p>
           </div>
         </div>
@@ -367,7 +367,7 @@ function EventsContent() {
 
                   {/* Card */}
                   <div
-                    className="flex-1 cursor-pointer rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all hover:border-gray-300 hover:shadow-md"
+                    className="flex-1 cursor-pointer rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm transition-all hover:border-gray-300 hover:shadow-md"
                     onClick={() => setSelectedEvent(event)}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
@@ -378,7 +378,7 @@ function EventsContent() {
                         >
                           {style.label}
                         </Badge>
-                        <span className="text-sm font-semibold text-gray-800">
+                        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                           {event.component}
                         </span>
                       </div>

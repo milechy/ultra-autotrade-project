@@ -15,7 +15,7 @@ const tokenConfig: Record<string, { bg: string; text: string; label: string }> =
   ETH:  { bg: 'bg-purple-500', text: 'text-white', label: 'E' },
   WETH: { bg: 'bg-gray-500', text: 'text-white', label: 'WE' },
   WBTC: { bg: 'bg-orange-500', text: 'text-white', label: 'WB' },
-  DAI:  { bg: 'bg-yellow-400', text: 'text-gray-900', label: 'D' },
+  DAI:  { bg: 'bg-yellow-400', text: 'text-gray-900 dark:text-gray-100', label: 'D' },
   AAVE: { bg: 'bg-pink-500', text: 'text-white', label: 'AA' },
 }
 

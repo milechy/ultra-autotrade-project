@@ -58,3 +58,15 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/* Dark mode default: smooth color transitions */
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  * {
+    transition-property: background-color, border-color, color;
+    transition-duration: 150ms;
+    transition-timing-function: ease-in-out;
+  }
+}

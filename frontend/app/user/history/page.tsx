@@ -214,13 +214,13 @@ function HistoryPage() {
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => setActiveTab('aave')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'aave' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'aave' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600'}`}
           >
             Aave操作履歴
           </button>
           <button
             onClick={() => setActiveTab('exchange')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'exchange' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'exchange' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600'}`}
           >
             取引所履歴（Coming Soon）
           </button>
@@ -236,7 +236,7 @@ function HistoryPage() {
 
         {activeTab === 'exchange' && (
           <div className="relative">
-            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+            <div className="absolute inset-0 bg-white dark:bg-gray-900/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
               <p className="text-gray-500 font-medium">Coming Soon — Phase 2で対応予定</p>
             </div>
             <div className="pointer-events-none select-none opacity-50">

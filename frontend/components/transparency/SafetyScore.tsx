@@ -85,7 +85,7 @@ export function SafetyScore({ data, className }: SafetyScoreProps) {
           <p className={cn('text-sm font-medium', colors.text)}>
             {scoreInt}点：{label}
           </p>
-          <div className="h-2 w-full rounded-full bg-white/60 overflow-hidden">
+          <div className="h-2 w-full rounded-full bg-white dark:bg-gray-900/60 overflow-hidden">
             <div
               className={cn('h-full rounded-full transition-all duration-500', colors.bar)}
               style={{ width: `${scoreInt}%` }}
@@ -131,7 +131,7 @@ export function SafetyScore({ data, className }: SafetyScoreProps) {
                         </div>
                         <span className={cn('font-medium', itemColors.text)}>{itemScore}点</span>
                       </div>
-                      <div className="h-1.5 w-full rounded-full bg-white/60 overflow-hidden">
+                      <div className="h-1.5 w-full rounded-full bg-white dark:bg-gray-900/60 overflow-hidden">
                         <div
                           className={cn('h-full rounded-full transition-all duration-500', itemColors.bar)}
                           style={{ width: `${itemScore}%` }}

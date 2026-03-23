@@ -402,7 +402,7 @@ export default function GridPage() {
         <title>Grid Trading Bot - Ultra AutoTrade</title>
         {/* Coming Soon overlay */}
         <div className="relative">
-          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center rounded-lg">
+          <div className="absolute inset-0 bg-white dark:bg-gray-900/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center rounded-lg">
             <div className="text-center">
               <p className="text-2xl font-bold text-gray-700 mb-2">Coming Soon</p>
               <p className="text-gray-500">Phase 2で対応予定</p>

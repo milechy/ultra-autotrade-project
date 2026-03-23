@@ -276,7 +276,7 @@ function TradesContent() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">取引履歴</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">取引履歴</h1>
           <p className="mt-0.5 text-xs text-gray-400">
             全ユーザーの取引一覧 — {filtered.length} 件表示
           </p>
@@ -288,7 +288,7 @@ function TradesContent() {
       </div>
 
       {/* Filters */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm">
         <div className="flex flex-wrap gap-3">
           <Input
             placeholder="ユーザー / ウォレットで検索..."
@@ -323,9 +323,9 @@ function TradesContent() {
       </div>
 
       {/* Desktop Table */}
-      <div className="hidden md:block rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <div className="hidden md:block rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">日時</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">ユーザー</th>
@@ -344,7 +344,7 @@ function TradesContent() {
               </tr>
             ) : (
               filtered.map((t) => (
-                <tr key={t.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={t.id} className="hover:bg-gray-50 dark:bg-gray-900 transition-colors">
                   <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                     {formatDateTime(t.timestamp)}
                   </td>
@@ -361,7 +361,7 @@ function TradesContent() {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm font-mono text-gray-800">
+                  <td className="px-4 py-3 text-sm font-mono text-gray-800 dark:text-gray-200">
                     {t.action === "HOLD" ? "—" : `$${t.amountUSD.toLocaleString()}`}
                   </td>
                   <td className="px-4 py-3">
@@ -386,12 +386,12 @@ function TradesContent() {
       {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
         {filtered.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-400">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 text-center text-sm text-gray-400">
             条件に一致する取引がありません
           </div>
         ) : (
           filtered.map((t) => (
-            <div key={t.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+            <div key={t.id} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <TradeActionBadge action={t.action} />
@@ -411,7 +411,7 @@ function TradesContent() {
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">{t.asset}</span>
-                <span className="font-mono font-semibold text-gray-800">
+                <span className="font-mono font-semibold text-gray-800 dark:text-gray-200">
                   {t.action === "HOLD" ? "—" : `$${t.amountUSD.toLocaleString()}`}
                 </span>
               </div>

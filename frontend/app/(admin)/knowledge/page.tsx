@@ -453,7 +453,7 @@ export default function KnowledgeIndexPage() {
                             ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
                             : item.similarity_score >= 0.6
                             ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300"
-                            : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
                         }`}>
                           {(item.similarity_score * 100).toFixed(1)}%
                         </span>
@@ -490,7 +490,7 @@ export default function KnowledgeIndexPage() {
               <button
                 onClick={handleWorkflowRun}
                 disabled={workflowRunning}
-                className="px-5 py-2 text-sm bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
+                className="px-5 py-2 text-sm bg-gray-900 dark:bg-gray-100 dark:bg-gray-800 text-white dark:text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
               >
                 {workflowRunning ? "処理中..." : "Pendingアイテムを処理"}
               </button>
