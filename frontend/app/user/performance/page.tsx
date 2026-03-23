@@ -3,20 +3,13 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from 'recharts'
 import { convertUSDCtoJPY, formatJPY } from '@/lib/jpy-converter'
+
+const PerformanceBarChart = dynamic(() => import('./PerformanceBarChart'), { ssr: false })
 import { useAuth } from '@/lib/auth'
 import type { PerformanceData, MonthlyPnl } from '@/components/transparency'
 
@@ -186,32 +179,7 @@ function PerformanceContent() {
             <CardTitle className="text-base">月次損益</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={monthly} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(v: string) => v.slice(5)}
-                />
-                <YAxis
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(v: number) => `¥${(v / 1000).toFixed(0)}k`}
-                />
-                <Tooltip
-                  formatter={(v: number) => [formatJPY(v), '損益']}
-                  labelFormatter={(l: string) => `${l}月`}
-                />
-                <Bar dataKey="gain_jpy" radius={[4, 4, 0, 0]}>
-                  {monthly.map((entry, i) => (
-                    <Cell
-                      key={i}
-                      fill={entry.gain_jpy >= 0 ? '#16a34a' : '#dc2626'}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <PerformanceBarChart monthly={monthly} />
           </CardContent>
         </Card>
       )}

@@ -2,7 +2,6 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
-import { useTranslations } from 'next-intl'
 import { TrendingUp, Users, ShieldCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -23,13 +22,12 @@ const RISK_COLORS = {
 } as const
 
 export function CopyTradingCard({ strategy, isSubscribed, onSubscribe, onUnsubscribe }: Props) {
-  const t = useTranslations('CopyTrading')
   const p = strategy.performance
 
   const riskLabel = {
-    low: t('riskLow'),
-    medium: t('riskMedium'),
-    high: t('riskHigh'),
+    low: '低',
+    medium: '中',
+    high: '高',
   }[strategy.risk_level]
 
   return (
@@ -53,21 +51,21 @@ export function CopyTradingCard({ strategy, isSubscribed, onSubscribe, onUnsubsc
         {p && (
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">{t('winRate')}</span>
+              <span className="text-xs text-muted-foreground">勝率</span>
               <span className="font-semibold">{(p.win_rate * 100).toFixed(1)}%</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">{t('sharpeRatio')}</span>
+              <span className="text-xs text-muted-foreground">シャープレシオ</span>
               <span className="font-semibold">{p.sharpe_ratio.toFixed(2)}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">{t('totalPnl')}</span>
+              <span className="text-xs text-muted-foreground">累積損益</span>
               <span className={`font-semibold ${parseFloat(p.total_pnl) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {parseFloat(p.total_pnl) >= 0 ? '+' : ''}{parseFloat(p.total_pnl).toFixed(2)} USDT
               </span>
             </div>
             <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">{t('trades')}</span>
+              <span className="text-xs text-muted-foreground">取引回数</span>
               <span className="font-semibold">{p.total_trades}</span>
             </div>
           </div>
@@ -75,7 +73,7 @@ export function CopyTradingCard({ strategy, isSubscribed, onSubscribe, onUnsubsc
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="h-3 w-3" />
-            <span>{t('strategist')}: {strategy.strategist_id.slice(0, 8)}...</span>
+            <span>ストラテジスト: {strategy.strategist_id.slice(0, 8)}...</span>
           </div>
           {isSubscribed ? (
             <Button
@@ -84,7 +82,7 @@ export function CopyTradingCard({ strategy, isSubscribed, onSubscribe, onUnsubsc
               onClick={() => onUnsubscribe(strategy.id)}
               className="text-xs"
             >
-              {t('unsubscribe')}
+              フォロー解除
             </Button>
           ) : (
             <Button
@@ -92,7 +90,7 @@ export function CopyTradingCard({ strategy, isSubscribed, onSubscribe, onUnsubsc
               onClick={() => onSubscribe(strategy)}
               className="text-xs"
             >
-              {t('subscribe')}
+              フォローする
             </Button>
           )}
         </div>
