@@ -91,6 +91,27 @@ export function useWallet() {
     }
   }, [])
 
+  const switchToBaseSepolia = useCallback(async () => {
+    if (typeof window === 'undefined' || !window.ethereum) return
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x14a34' }], // Base Sepolia = 84532
+      })
+    } catch {
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId: '0x14a34',
+          chainName: 'Base Sepolia',
+          rpcUrls: ['https://sepolia.base.org'],
+          nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+          blockExplorerUrls: ['https://sepolia.basescan.org'],
+        }],
+      })
+    }
+  }, [])
+
   return {
     address: address ?? null,
     chainId: chainId ?? null,
@@ -100,6 +121,7 @@ export function useWallet() {
     disconnect: disconnectWallet,
     switchToArbitrum,
     switchToArbitrumSepolia,
+    switchToBaseSepolia,
     provider,
     signer,
   }

@@ -9,8 +9,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useWallet } from '@/hooks/useWallet'
 import { useMinimumBalance } from '@/hooks/useMinimumBalance'
 
-// Arbitrum One (mainnet) and Arbitrum Sepolia (testnet)
-const ARBITRUM_CHAIN_IDS = [42161, 421614]
+// Arbitrum One (mainnet), Arbitrum Sepolia (testnet), and Base Sepolia (testnet)
+const ARBITRUM_CHAIN_IDS = [42161, 421614, 84532]
 
 const STEP_LABELS = [
   'ウォレット接続',
@@ -63,7 +63,7 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 
 export default function ConnectPage() {
   const router = useRouter()
-  const { address, isConnected, chainId, connect, switchToArbitrum, switchToArbitrumSepolia } = useWallet()
+  const { address, isConnected, chainId, connect, switchToArbitrum, switchToArbitrumSepolia, switchToBaseSepolia } = useWallet()
   const { checkMinimum, minimumUSD } = useMinimumBalance()
 
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -174,6 +174,14 @@ export default function ConnectPage() {
                       onClick={switchToArbitrumSepolia}
                     >
                       Arbitrum Sepolia (testnet) に切り替える
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-blue-600 text-blue-400 hover:bg-blue-950/40"
+                      onClick={switchToBaseSepolia}
+                    >
+                      Base Sepolia (testnet) に切り替える
                     </Button>
                     <Button
                       variant="outline"

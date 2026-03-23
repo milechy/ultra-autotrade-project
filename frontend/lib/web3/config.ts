@@ -45,6 +45,11 @@ export const SUPPORTED_CHAINS = {
     name: 'Arbitrum Sepolia',
     rpc: process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC || 'https://sepolia-rollup.arbitrum.io/rpc',
   },
+  'base-sepolia': {
+    id: 84532,
+    name: 'Base Sepolia',
+    rpc: process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC || 'https://sepolia.base.org',
+  },
 } as const
 
 export type SupportedChainKey = keyof typeof SUPPORTED_CHAINS
@@ -54,10 +59,11 @@ export const DEFAULT_CHAIN: SupportedChainKey =
   (process.env.NEXT_PUBLIC_DEFAULT_CHAIN as SupportedChainKey) || 'arbitrum-sepolia'
 
 export const MINIMUM_USD_BALANCE = 3000
-export const ARBITRUM_CHAIN_IDS = [42161, 421614]
+export const ARBITRUM_CHAIN_IDS = [42161, 421614, 84532]
 
 export function getChainKey(chainId: number): SupportedChainKey | null {
   if (chainId === 42161) return 'arbitrum'
   if (chainId === 421614) return 'arbitrum-sepolia'
+  if (chainId === 84532) return 'base-sepolia'
   return null
 }

@@ -3,21 +3,32 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { getJson } from "@/lib/api/http";
 
-type ConfidencePoint = {
-  timestamp: string;
+type AiDecisionItem = {
+  id: string | number;
   action: "BUY" | "SELL" | "HOLD";
+  reasoning: string;
+  asset: string;
   confidence: number;
-  prompt_version: string;
+  created_at: string;
+  model_used: string;
+  is_dry_run: boolean;
 };
 
-type TrendResponse = {
-  data_points: ConfidencePoint[];
-  is_mock: boolean;
-  total_count: number;
+type AiDecisionsResponse = {
+  items: AiDecisionItem[];
+  total: number;
+};
+
+type DailyAverage = {
+  label: string;
+  avg: number;
+  action: "BUY" | "SELL" | "HOLD";
+  count: number;
 };
 
 const ACTION_COLORS = {
@@ -26,25 +37,20 @@ const ACTION_COLORS = {
   HOLD: { bg: "#f3f4f6", text: "#6b7280", bar: "#6b7280" },
 };
 
-function computeDailyAverages(points: ConfidencePoint[]): Array<{
-  label: string;
-  avg: number;
-  action: "BUY" | "SELL" | "HOLD";
-  count: number;
-}> {
+function computeDailyAverages(items: AiDecisionItem[]): DailyAverage[] {
   const byDay: Record<string, { sum: number; count: number; actions: Record<string, number> }> = {};
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  for (const p of points) {
-    if (new Date(p.timestamp) < cutoff) continue;
-    const label = new Date(p.timestamp).toLocaleDateString("ja-JP", {
+  for (const item of items) {
+    if (new Date(item.created_at) < cutoff) continue;
+    const label = new Date(item.created_at).toLocaleDateString("ja-JP", {
       month: "2-digit",
       day: "2-digit",
       timeZone: "Asia/Tokyo",
     });
     if (!byDay[label]) byDay[label] = { sum: 0, count: 0, actions: { BUY: 0, SELL: 0, HOLD: 0 } };
-    byDay[label].sum += p.confidence;
+    byDay[label].sum += item.confidence;
     byDay[label].count++;
-    byDay[label].actions[p.action]++;
+    byDay[label].actions[item.action] = (byDay[label].actions[item.action] ?? 0) + 1;
   }
   return Object.entries(byDay).map(([label, { sum, count, actions }]) => ({
     label,
@@ -63,18 +69,26 @@ export default function AiFeedPage() {
 }
 
 function AiFeedContent() {
-  const { token } = useAuth();
-  const [trend, setTrend] = useState<TrendResponse | null>(null);
+  const router = useRouter();
+  const { token, isAuthenticated, isLoading: authLoading } = useAuth();
+  const [decisions, setDecisions] = useState<AiDecisionItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchTrend = useCallback(async () => {
+  // Redirect if not authenticated after auth has loaded
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push("/login?redirect=/user/ai-feed");
+    }
+  }, [authLoading, isAuthenticated, router]);
+
+  const fetchDecisions = useCallback(async () => {
     if (!token) return;
     setIsLoading(true);
     try {
-      const data = await getJson<TrendResponse>("/api/ai/trend/confidence?days=7", {
+      const data = await getJson<AiDecisionsResponse>("/api/ai/decisions", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setTrend(data);
+      setDecisions(data.items ?? []);
     } catch {
       // silent — show empty state
     } finally {
@@ -83,16 +97,20 @@ function AiFeedContent() {
   }, [token]);
 
   useEffect(() => {
-    fetchTrend();
-  }, [fetchTrend]);
+    fetchDecisions();
+  }, [fetchDecisions]);
 
-  const dailyAverages = trend ? computeDailyAverages(trend.data_points) : [];
+  const dailyAverages = computeDailyAverages(decisions);
   const overallAvg =
-    trend && trend.data_points.length > 0
-      ? Math.round(
-          trend.data_points.reduce((s, p) => s + p.confidence, 0) / trend.data_points.length,
-        )
+    decisions.length > 0
+      ? Math.round(decisions.reduce((s, item) => s + item.confidence, 0) / decisions.length)
       : null;
+
+  if (authLoading) {
+    return (
+      <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0" }}>認証確認中...</div>
+    );
+  }
 
   return (
     <>
@@ -104,20 +122,6 @@ function AiFeedContent() {
           AI判定の信頼度トレンド（直近7日間）
         </p>
       </div>
-
-      {trend?.is_mock && (
-        <div style={{
-          padding: "10px 14px",
-          background: "#fffbeb",
-          border: "1px solid #fde68a",
-          borderRadius: 8,
-          color: "#92400e",
-          fontSize: 12,
-          marginBottom: 16,
-        }}>
-          サンプルデータを表示しています。
-        </div>
-      )}
 
       {isLoading && (
         <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0" }}>読み込み中...</div>
