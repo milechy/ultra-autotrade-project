@@ -3,18 +3,12 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState, useEffect, useCallback } from 'react'
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-} from 'recharts'
+import dynamic from 'next/dynamic'
 import { DateRangeFilter } from '@/components/shared'
 import { Skeleton } from '@/components/ui/skeleton'
 import { apiFetch } from '@/lib/api/client'
+
+const AssetChartRecharts = dynamic(() => import('./AssetChartRecharts'), { ssr: false })
 
 interface DataPoint {
   date: string
@@ -26,11 +20,6 @@ interface PortfolioHistoryResponse {
   total: number
   period: string
   interval: string
-}
-
-function formatYAxis(v: number) {
-  if (v >= 1000) return `$${(v / 1000).toFixed(1)}k`
-  return `$${v}`
 }
 
 export function AssetChart() {
@@ -104,41 +93,7 @@ export function AssetChart() {
           </button>
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={data} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 10, fill: '#71717a' }}
-              interval="preserveStartEnd"
-              tickLine={false}
-            />
-            <YAxis
-              tickFormatter={formatYAxis}
-              tick={{ fontSize: 10, fill: '#71717a' }}
-              tickLine={false}
-              axisLine={false}
-              width={52}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#18181b',
-                border: '1px solid #3f3f46',
-                borderRadius: '8px',
-                fontSize: '12px',
-              }}
-              formatter={(v: number) => [`$${v.toLocaleString()}`, '総資産']}
-            />
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke="#60a5fa"
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4, fill: '#60a5fa' }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <AssetChartRecharts data={data} />
       )}
     </div>
   )
