@@ -13,12 +13,11 @@ from alembic import context
 # Add backend directory to sys.path so app modules can be imported
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.database import Base, get_database_url  # noqa: E402
-
 # Import all models so Alembic autogenerate can detect them
 from app.ai.models import AIDecision  # noqa: F401, E402
 from app.auth.models import User  # noqa: F401, E402
 from app.billing.models import FeeCalculation, FeeConfig, HighWaterMark  # noqa: F401, E402
+from app.database import Base, get_database_url  # noqa: E402
 from app.knowledge.models import (  # noqa: F401, E402
     KnowledgeChunk,
     KnowledgeDocument,

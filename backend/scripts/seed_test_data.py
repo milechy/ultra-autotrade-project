@@ -25,8 +25,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import select
 
-from app.database import Base, SessionLocal, engine, init_db
 from app.ai.models import AIDecision
+from app.database import SessionLocal, init_db
 from app.portfolio.models import PortfolioSnapshot
 from app.proposals.models import Proposal
 from app.transactions.models import Transaction
@@ -40,44 +40,134 @@ def seed_ai_decisions(db, user_id: int) -> list[int]:
     """BUY/SELL/HOLD 各3件を投入し、IDリストを返す。"""
     records = [
         # BUY x 3
-        dict(user_id=user_id, query="Arbitrum USDC supply opportunity", action="BUY",
-             confidence=82, reason="Health Factor is stable at 2.1. Market conditions favorable for USDC supply. TVL increasing on Arbitrum.",
-             primary_provider="claude-sonnet-4-6", primary_action="BUY", primary_confidence=82,
-             secondary_provider="gpt-4o", secondary_action="BUY", secondary_confidence=78, agreed=True),
-        dict(user_id=user_id, query="WETH collateral analysis", action="BUY",
-             confidence=75, reason="WETH price stable. Supply rate at 3.2% APY. Risk within acceptable bounds.",
-             primary_provider="claude-sonnet-4-6", primary_action="BUY", primary_confidence=75,
-             secondary_provider="gpt-4o", secondary_action="HOLD", secondary_confidence=60, agreed=False),
-        dict(user_id=user_id, query="Portfolio rebalance check", action="BUY",
-             confidence=88, reason="Strong upward momentum. Confidence high. Aave V3 safety score: 92.",
-             primary_provider="claude-sonnet-4-6", primary_action="BUY", primary_confidence=88,
-             secondary_provider="gpt-4o", secondary_action="BUY", secondary_confidence=85, agreed=True),
+        dict(
+            user_id=user_id,
+            query="Arbitrum USDC supply opportunity",
+            action="BUY",
+            confidence=82,
+            reason="Health Factor is stable at 2.1. Market conditions favorable for USDC supply. TVL increasing on Arbitrum.",
+            primary_provider="claude-sonnet-4-6",
+            primary_action="BUY",
+            primary_confidence=82,
+            secondary_provider="gpt-4o",
+            secondary_action="BUY",
+            secondary_confidence=78,
+            agreed=True,
+        ),
+        dict(
+            user_id=user_id,
+            query="WETH collateral analysis",
+            action="BUY",
+            confidence=75,
+            reason="WETH price stable. Supply rate at 3.2% APY. Risk within acceptable bounds.",
+            primary_provider="claude-sonnet-4-6",
+            primary_action="BUY",
+            primary_confidence=75,
+            secondary_provider="gpt-4o",
+            secondary_action="HOLD",
+            secondary_confidence=60,
+            agreed=False,
+        ),
+        dict(
+            user_id=user_id,
+            query="Portfolio rebalance check",
+            action="BUY",
+            confidence=88,
+            reason="Strong upward momentum. Confidence high. Aave V3 safety score: 92.",
+            primary_provider="claude-sonnet-4-6",
+            primary_action="BUY",
+            primary_confidence=88,
+            secondary_provider="gpt-4o",
+            secondary_action="BUY",
+            secondary_confidence=85,
+            agreed=True,
+        ),
         # SELL x 3
-        dict(user_id=user_id, query="USDC withdraw signal", action="SELL",
-             confidence=71, reason="Health Factor dropped to 1.8. Recommend partial withdrawal to restore safety margin.",
-             primary_provider="claude-sonnet-4-6", primary_action="SELL", primary_confidence=71,
-             secondary_provider="gpt-4o", secondary_action="SELL", secondary_confidence=68, agreed=True),
-        dict(user_id=user_id, query="Liquidation risk assessment", action="SELL",
-             confidence=65, reason="Market volatility elevated. Conservative withdrawal advised to protect collateral.",
-             primary_provider="claude-sonnet-4-6", primary_action="SELL", primary_confidence=65,
-             secondary_provider=None, secondary_action=None, secondary_confidence=None, agreed=False),
-        dict(user_id=user_id, query="Risk rebalance — HF 1.75", action="SELL",
-             confidence=79, reason="HF below safe threshold. Immediate USDC withdrawal recommended.",
-             primary_provider="claude-sonnet-4-6", primary_action="SELL", primary_confidence=79,
-             secondary_provider="gpt-4o", secondary_action="SELL", secondary_confidence=77, agreed=True),
+        dict(
+            user_id=user_id,
+            query="USDC withdraw signal",
+            action="SELL",
+            confidence=71,
+            reason="Health Factor dropped to 1.8. Recommend partial withdrawal to restore safety margin.",
+            primary_provider="claude-sonnet-4-6",
+            primary_action="SELL",
+            primary_confidence=71,
+            secondary_provider="gpt-4o",
+            secondary_action="SELL",
+            secondary_confidence=68,
+            agreed=True,
+        ),
+        dict(
+            user_id=user_id,
+            query="Liquidation risk assessment",
+            action="SELL",
+            confidence=65,
+            reason="Market volatility elevated. Conservative withdrawal advised to protect collateral.",
+            primary_provider="claude-sonnet-4-6",
+            primary_action="SELL",
+            primary_confidence=65,
+            secondary_provider=None,
+            secondary_action=None,
+            secondary_confidence=None,
+            agreed=False,
+        ),
+        dict(
+            user_id=user_id,
+            query="Risk rebalance — HF 1.75",
+            action="SELL",
+            confidence=79,
+            reason="HF below safe threshold. Immediate USDC withdrawal recommended.",
+            primary_provider="claude-sonnet-4-6",
+            primary_action="SELL",
+            primary_confidence=79,
+            secondary_provider="gpt-4o",
+            secondary_action="SELL",
+            secondary_confidence=77,
+            agreed=True,
+        ),
         # HOLD x 3
-        dict(user_id=user_id, query="Market conditions check", action="HOLD",
-             confidence=55, reason="Mixed signals. Gas fees elevated. No action recommended until conditions improve.",
-             primary_provider="claude-sonnet-4-6", primary_action="HOLD", primary_confidence=55,
-             secondary_provider="gpt-4o", secondary_action="HOLD", secondary_confidence=62, agreed=True),
-        dict(user_id=user_id, query="Weekly portfolio review", action="HOLD",
-             confidence=60, reason="Portfolio balanced. Current yield acceptable. No rebalancing needed.",
-             primary_provider="claude-sonnet-4-6", primary_action="HOLD", primary_confidence=60,
-             secondary_provider=None, secondary_action=None, secondary_confidence=None, agreed=False),
-        dict(user_id=user_id, query="Pre-market open assessment", action="HOLD",
-             confidence=58, reason="Insufficient signal strength. Waiting for clearer trend confirmation.",
-             primary_provider="claude-sonnet-4-6", primary_action="HOLD", primary_confidence=58,
-             secondary_provider="gpt-4o", secondary_action="BUY", secondary_confidence=55, agreed=False),
+        dict(
+            user_id=user_id,
+            query="Market conditions check",
+            action="HOLD",
+            confidence=55,
+            reason="Mixed signals. Gas fees elevated. No action recommended until conditions improve.",
+            primary_provider="claude-sonnet-4-6",
+            primary_action="HOLD",
+            primary_confidence=55,
+            secondary_provider="gpt-4o",
+            secondary_action="HOLD",
+            secondary_confidence=62,
+            agreed=True,
+        ),
+        dict(
+            user_id=user_id,
+            query="Weekly portfolio review",
+            action="HOLD",
+            confidence=60,
+            reason="Portfolio balanced. Current yield acceptable. No rebalancing needed.",
+            primary_provider="claude-sonnet-4-6",
+            primary_action="HOLD",
+            primary_confidence=60,
+            secondary_provider=None,
+            secondary_action=None,
+            secondary_confidence=None,
+            agreed=False,
+        ),
+        dict(
+            user_id=user_id,
+            query="Pre-market open assessment",
+            action="HOLD",
+            confidence=58,
+            reason="Insufficient signal strength. Waiting for clearer trend confirmation.",
+            primary_provider="claude-sonnet-4-6",
+            primary_action="HOLD",
+            primary_confidence=58,
+            secondary_provider="gpt-4o",
+            secondary_action="BUY",
+            secondary_confidence=55,
+            agreed=False,
+        ),
     ]
 
     ids = []
@@ -227,6 +317,7 @@ def seed_transactions(db, user_id: int, ai_decision_ids: list[int]) -> None:
 def seed_portfolio_snapshots(db, user_id: int) -> None:
     """30日分のポートフォリオスナップショットを投入（チャート用）。"""
     import random
+
     random.seed(42)
 
     base_value = Decimal("8500.00")
@@ -242,20 +333,32 @@ def seed_portfolio_snapshots(db, user_id: int) -> None:
         hf = (base_hf + Decimal(str(random.uniform(-0.15, 0.15)))).quantize(Decimal("0.0001"))
         hf = max(Decimal("1.5"), min(Decimal("3.0"), hf))
 
-        snapshots.append(PortfolioSnapshot(
-            user_id=user_id,
-            total_value_usd=total_value,
-            total_supply_usd=supply,
-            total_borrow_usd=borrow,
-            health_factor=hf,
-            positions_json=[
-                {"symbol": "USDC", "supplied": float(supply * Decimal("0.6")), "borrowed": float(borrow * Decimal("0.5")),
-                 "supplyApr": 3.4, "usdValue": float(supply * Decimal("0.6"))},
-                {"symbol": "WETH", "supplied": float(supply * Decimal("0.4")), "borrowed": float(borrow * Decimal("0.5")),
-                 "supplyApr": 1.8, "usdValue": float(supply * Decimal("0.4"))},
-            ],
-            recorded_at=_now(offset_hours=i * 24),
-        ))
+        snapshots.append(
+            PortfolioSnapshot(
+                user_id=user_id,
+                total_value_usd=total_value,
+                total_supply_usd=supply,
+                total_borrow_usd=borrow,
+                health_factor=hf,
+                positions_json=[
+                    {
+                        "symbol": "USDC",
+                        "supplied": float(supply * Decimal("0.6")),
+                        "borrowed": float(borrow * Decimal("0.5")),
+                        "supplyApr": 3.4,
+                        "usdValue": float(supply * Decimal("0.6")),
+                    },
+                    {
+                        "symbol": "WETH",
+                        "supplied": float(supply * Decimal("0.4")),
+                        "borrowed": float(borrow * Decimal("0.5")),
+                        "supplyApr": 1.8,
+                        "usdValue": float(supply * Decimal("0.4")),
+                    },
+                ],
+                recorded_at=_now(offset_hours=i * 24),
+            )
+        )
         base_value = total_value  # drift forward
 
     for s in snapshots:
@@ -267,6 +370,7 @@ def seed_portfolio_snapshots(db, user_id: int) -> None:
 def get_or_create_admin_user(db):
     """最初のユーザーを取得する（seedは認証不要で直接DB操作）。"""
     from app.auth.models import User
+
     user = db.scalars(select(User).order_by(User.id.asc()).limit(1)).first()
     if user is None:
         print("  ⚠️  ユーザーが存在しません。先に /auth/register でadminを登録してください。")

@@ -71,9 +71,7 @@ class PortfolioHistory(Base):
     )
     period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     open_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=2), nullable=False)
-    close_value_usd: Mapped[Decimal] = mapped_column(
-        Numeric(precision=20, scale=2), nullable=False
-    )
+    close_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=2), nullable=False)
     high_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=2), nullable=False)
     low_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=2), nullable=False)
     pnl_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=2), nullable=False)

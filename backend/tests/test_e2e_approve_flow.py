@@ -13,32 +13,31 @@ proposals router が実装済み (router.py) であるため、スキップを�
 3. 取得したトークンで proposals API を呼び出す
 """
 
-from datetime import datetime, timedelta, timezone
-from decimal import Decimal
-
 import pytest
 from fastapi.testclient import TestClient
-
-from app.database import init_db
 
 
 @pytest.fixture(autouse=True, scope="module")
 def _init_database(tmp_path_factory: pytest.TempPathFactory) -> None:
     """モジュール実行前にデータベーステーブルを作成する（tmp ディレクトリ使用）。"""
     import os
+
     tmp_dir = tmp_path_factory.mktemp("proposals_db")
     db_path = tmp_dir / "test_proposals.db"
     os.environ["DATABASE_URL"] = f"sqlite:///{db_path}"
     os.environ["INITIAL_ADMIN_EMAIL"] = _ADMIN_EMAIL
     # Re-import to pick up new DATABASE_URL
     from app import database as _db
+
     _db.db_url = f"sqlite:///{db_path}"
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
+
     engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
     _db.engine = engine
     _db.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     from app.database import Base
+
     Base.metadata.create_all(bind=engine)
 
 
@@ -63,9 +62,7 @@ def _register_and_login(client: TestClient) -> str:
     )
     # 登録成功 or 既存ユーザー（409 または 403 "already exists"） を許容
     if register_resp.status_code not in (200, 201, 400, 403, 409):
-        raise AssertionError(
-            f"登録失敗: {register_resp.status_code} {register_resp.text}"
-        )
+        raise AssertionError(f"登録失敗: {register_resp.status_code} {register_resp.text}")
 
     login_resp = client.post(
         "/auth/login",
@@ -101,9 +98,7 @@ def _create_test_proposal(client: TestClient, token: str, user_id: int) -> int:
 class TestProposalsPendingUnauthenticated:
     """GET /api/proposals/pending - 認証なしアクセスのテスト"""
 
-    def test_get_pending_proposals_without_auth_returns_401(
-        self, client: TestClient
-    ) -> None:
+    def test_get_pending_proposals_without_auth_returns_401(self, client: TestClient) -> None:
         """認証ヘッダなし → 401 Unauthorized。"""
         response = client.get("/api/proposals/pending")
         # 未認証は 401、エンドポイント未実装なら 404 を許容
@@ -129,9 +124,7 @@ class TestProposalsPendingAuthenticated:
         )
         data = response.json()
         # ProposalListResponse スキーマ: {items: [], total: int}
-        assert "items" in data or isinstance(data, list), (
-            f"レスポンス形式が不正: {data}"
-        )
+        assert "items" in data or isinstance(data, list), f"レスポンス形式が不正: {data}"
 
     def test_pending_returns_only_pending_status(self, client: TestClient) -> None:
         """GET /api/proposals/pending は pending ステータスのみ返すこと。"""

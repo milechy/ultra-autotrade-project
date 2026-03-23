@@ -16,7 +16,7 @@ AI → Risk Engine → Execution 統合テスト
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -37,7 +37,6 @@ from app.bots.schemas import OctoBotSignal, OctoBotSignalRequest
 from app.bots.service import OctoBotService
 from app.exchange.schemas import OrderResult, OrderStatus
 from app.knowledge.schemas import KnowledgeItem, KnowledgeItemType, KnowledgeSearchResult
-
 
 # ---------------------------------------------------------------------------
 # Fake Clients (no external calls)
@@ -257,9 +256,7 @@ class TestAIRiskExecutionFlow:
 
         ks.get_pending.return_value = [_make_knowledge_item()]
         ks.search.return_value = [
-            KnowledgeSearchResult(
-                chunk_id=1, document_id=1, content="BTC up", similarity=0.9
-            )
+            KnowledgeSearchResult(chunk_id=1, document_id=1, content="BTC up", similarity=0.9)
         ]
         ai.judge_with_rag.return_value = _make_cv_result(TradeAction.BUY, 85)
         ex.execute_trade.return_value = _make_order_result(OrderStatus.SUCCESS)
@@ -287,9 +284,7 @@ class TestAIRiskExecutionFlow:
 
         ks.get_pending.return_value = [_make_knowledge_item()]
         ks.search.return_value = [
-            KnowledgeSearchResult(
-                chunk_id=1, document_id=1, content="BTC crash", similarity=0.85
-            )
+            KnowledgeSearchResult(chunk_id=1, document_id=1, content="BTC crash", similarity=0.85)
         ]
         ai.judge_with_rag.return_value = _make_cv_result(TradeAction.SELL, 80)
         ex.execute_trade.return_value = _make_order_result(OrderStatus.SUCCESS)
@@ -420,9 +415,7 @@ class TestAIRiskExecutionFlow:
 
         ks.get_pending.return_value = [_make_knowledge_item()]
         ks.search.return_value = [
-            KnowledgeSearchResult(
-                chunk_id=1, document_id=1, content="BTC up", similarity=0.9
-            )
+            KnowledgeSearchResult(chunk_id=1, document_id=1, content="BTC up", similarity=0.9)
         ]
         ai.judge_with_rag.return_value = _make_cv_result(TradeAction.BUY, 85)
         ex.execute_trade.side_effect = RuntimeError("Exchange connection timeout")
@@ -466,9 +459,7 @@ class TestAIRiskExecutionFlow:
             _make_knowledge_item(2, "Neutral news"),
         ]
         ks.search.return_value = [
-            KnowledgeSearchResult(
-                chunk_id=1, document_id=1, content="context", similarity=0.8
-            )
+            KnowledgeSearchResult(chunk_id=1, document_id=1, content="context", similarity=0.8)
         ]
         # First call BUY, second call HOLD
         ai.judge_with_rag.side_effect = [
