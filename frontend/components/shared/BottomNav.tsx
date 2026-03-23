@@ -4,12 +4,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, TrendingUp, Brain, Settings } from 'lucide-react'
+import { Home, CheckCircle, Brain, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/user/dashboard', label: 'ホーム', icon: Home },
-  { href: '/user/trade', label: '取引', icon: TrendingUp },
+  { href: '/user/approve', label: '承認', icon: CheckCircle },
   { href: '/user/ai-feed', label: 'AI判定', icon: Brain },
   { href: '/user/settings', label: '設定', icon: Settings },
 ]
