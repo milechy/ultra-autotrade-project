@@ -291,6 +291,26 @@ def create_app() -> FastAPI:
             logger.error("Failed to start scheduled tasks: %s", exc)
             # Scheduled task startup failure does not block app startup (fail-safe)
 
+    @app.on_event("startup")
+    async def startup_ai_judgment_scheduler() -> None:
+        """4時間ごとのAI判定スケジューラーを開始する。"""
+        import asyncio
+
+        enable_scheduler = os.getenv("ENABLE_AI_JUDGMENT_SCHEDULER", "0") == "1"
+        if not enable_scheduler:
+            logger.info(
+                "AI judgment scheduler disabled (set ENABLE_AI_JUDGMENT_SCHEDULER=1 to enable)"
+            )
+            return
+        try:
+            from app.automation.ai_judgment_scheduler import ai_judgment_loop
+
+            interval = int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS", "4"))
+            asyncio.create_task(ai_judgment_loop(interval_hours=interval))
+            logger.info("AI judgment scheduler started (interval=%dh)", interval)
+        except Exception as exc:
+            logger.error("Failed to start AI judgment scheduler: %s", exc)
+
     @app.on_event("shutdown")
     async def shutdown_scheduled_tasks() -> None:
         """
