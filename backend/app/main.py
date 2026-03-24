@@ -34,6 +34,7 @@ from app.aave.router import router as aave_router
 from app.aave.transparency_router import router as transparency_router
 from app.ai.decisions_router import router as ai_decisions_router
 from app.ai.router import router as ai_router
+from app.api.alias_router import router as alias_router
 from app.api.automation_dashboard import router as automation_dashboard_router
 from app.auth.router import router as auth_router
 from app.auth.service import AuthService
@@ -131,6 +132,7 @@ def create_app() -> FastAPI:
     app.include_router(proposals_router)  # Proposals API
     app.include_router(portfolio_router)  # Portfolio History API
     app.include_router(user_settings_router)  # User Settings API
+    app.include_router(alias_router)  # API aliases (/api/safety-score etc.)
 
     # Register global error handlers (production safety)
     register_error_handlers(app)

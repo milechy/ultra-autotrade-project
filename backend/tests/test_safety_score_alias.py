@@ -1,10 +1,10 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_safety_score_alias.py
-"""GET /api/aave/safety-score エンドポイントのテスト。
+"""GET /api/safety-score エンドポイントのテスト。
 
-aave_router は main.py で prefix="/api" で登録されており、
-router 内の prefix は "/aave" なので実際のパスは /api/aave/safety-score になる。
+alias_router は main.py で prefix なしで登録されており、
+エンドポイント定義に /api/safety-score を直接記載するため実際のパスは /api/safety-score になる。
 """
 
 from unittest.mock import MagicMock
@@ -16,7 +16,7 @@ from app.auth.models import UserRole
 from app.main import create_app
 
 # エンドポイントの実際のパス
-_SAFETY_SCORE_PATH = "/api/aave/safety-score"
+_SAFETY_SCORE_PATH = "/api/safety-score"
 
 
 def _make_viewer_user() -> MagicMock:
@@ -31,7 +31,7 @@ def _make_viewer_user() -> MagicMock:
 
 
 class TestSafetyScoreAlias:
-    """GET /api/aave/safety-score テストクラス。"""
+    """GET /api/safety-score テストクラス。"""
 
     def _make_client(self) -> TestClient:
         """テスト用 TestClient を作成して返す。"""
