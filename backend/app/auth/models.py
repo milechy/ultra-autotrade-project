@@ -81,6 +81,9 @@ class User(Base):
     execution_policy: Mapped[str] = mapped_column(
         String(20), nullable=False, default="auto_execute"
     )
+    wallet_address: Mapped[Optional[str]] = mapped_column(
+        String(42), unique=True, nullable=True, index=True, default=None
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"

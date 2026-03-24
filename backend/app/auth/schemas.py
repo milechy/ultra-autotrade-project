@@ -154,3 +154,25 @@ class RiskModeUpdateRequest(BaseModel):
         description="conservative / balanced / aggressive",
         pattern="^(conservative|balanced|aggressive)$",
     )
+
+
+class WalletConnectRequest(BaseModel):
+    """WalletConnect認証リクエスト。"""
+
+    wallet_address: str = Field(
+        ..., min_length=42, max_length=42, description="EVM wallet address (0x...)"
+    )
+    message: str = Field(..., description="Signed message (must contain timestamp)")
+    signature: str = Field(..., description="ECDSA signature (0x...)")
+
+
+class WalletConnectResponse(BaseModel):
+    """WalletConnect認証レスポンス。"""
+
+    access_token: str
+    token_type: str = "bearer"  # noqa: S105
+    expires_in: int
+    is_new_user: bool
+    needs_terms_acceptance: bool
+
+    model_config = ConfigDict(from_attributes=True)

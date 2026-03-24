@@ -33,6 +33,8 @@ from .schemas import (
     TermsStatusResponse,
     TokenResponse,
     UserResponse,
+    WalletConnectRequest,
+    WalletConnectResponse,
 )
 from .service import AuthService
 
@@ -295,3 +297,62 @@ def update_risk_mode(
     db.refresh(user)
     logger.info("User changed risk mode to %s: %s", request.mode, user.email)
     return {"mode": user.risk_mode, "message": f"Risk mode updated to {request.mode}"}
+
+
+@router.post(
+    "/wallet/connect",
+    response_model=WalletConnectResponse,
+    summary="WalletConnect authentication",
+)
+def wallet_connect(
+    request: WalletConnectRequest,
+    db: Session = Depends(get_db),
+) -> WalletConnectResponse:
+    """
+    WalletConnectによる認証。初回接続時はユーザーを自動作成。
+
+    1. 署名検証 (eth_account)
+    2. ウォレットアドレスでユーザー検索
+    3. 未登録なら自動登録（role=viewer, risk_mode=conservative）
+    4. JWT発行
+    """
+    # 署名検証
+    if not AuthService.verify_wallet_signature(
+        request.wallet_address, request.message, request.signature
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid wallet signature",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # ウォレットアドレスでユーザー検索
+    existing_user = AuthService.get_user_by_wallet(db, request.wallet_address)
+    is_new_user = existing_user is None
+
+    if is_new_user:
+        user = AuthService.create_wallet_user(db, request.wallet_address)
+    else:
+        user = existing_user
+
+    token, expires_in = AuthService.create_access_token(
+        user_id=user.id,
+        email=user.email,
+        role=user.role,
+    )
+
+    needs_terms_acceptance = user.terms_version != CURRENT_TERMS_VERSION
+
+    logger.info(
+        "Wallet connect: %s...%s (new=%s)",
+        request.wallet_address[:10],
+        request.wallet_address[-4:],
+        is_new_user,
+    )
+    return WalletConnectResponse(
+        access_token=token,
+        token_type="bearer",  # noqa: S106
+        expires_in=expires_in,
+        is_new_user=is_new_user,
+        needs_terms_acceptance=needs_terms_acceptance,
+    )
