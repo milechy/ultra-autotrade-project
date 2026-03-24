@@ -19,8 +19,6 @@ import { useAuth } from '@/lib/auth'
 import { UserProviders } from '@/components/user/UserProviders'
 import { getJson, putJson } from '@/lib/api/http'
 
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || ''
-
 type NotificationLevel = 'all' | 'alert' | 'emergency'
 
 type UserSettings = {
@@ -121,13 +119,33 @@ function SettingsPage() {
   }, [fetchSettings])
 
   useEffect(() => {
+    if (!token) return
     setRiskProfileLoading(true)
-    fetch(`${API_URL}/api/transparency/risk-profile`)
-      .then(r => r.json())
-      .then((data: RiskProfile[]) => setRiskProfiles(data))
+    getJson<{ mode: string; options: Array<{
+      mode: string
+      label: string
+      description: string
+      max_utilization: number
+      min_health_factor: string
+      allowed_assets: string[]
+    }> }>('/auth/risk-mode', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then((data) => {
+        const profiles: RiskProfile[] = data.options.map(opt => ({
+          name: opt.mode,
+          name_ja: opt.label,
+          description: opt.description,
+          max_borrow_pct: opt.max_utilization,
+          allowed_assets: opt.allowed_assets,
+          min_health_factor: parseFloat(opt.min_health_factor),
+        }))
+        setRiskProfiles(profiles)
+        setSelectedRiskProfile(data.mode)
+      })
       .catch(() => {})
       .finally(() => setRiskProfileLoading(false))
-  }, [])
+  }, [token])
 
   const handleSave = async () => {
     if (!token) return

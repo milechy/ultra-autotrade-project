@@ -4,7 +4,6 @@
 
 import Link from 'next/link'
 import { useAccount, useBalance } from 'wagmi'
-import { arbitrum } from 'wagmi/chains'
 import { formatUnits } from 'viem'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -32,7 +31,8 @@ try {
 export function WalletContent() {
   const { address, isConnected, chain } = useAccount()
   const { data: balance } = useBalance({ address })
-  const isCorrectChain = chain?.id === arbitrum.id
+  const ALLOWED_CHAIN_IDS = [42161, 421614, 84532]
+  const isCorrectChain = chain?.id != null && ALLOWED_CHAIN_IDS.includes(chain.id)
 
   if (!isConnected) {
     return (
