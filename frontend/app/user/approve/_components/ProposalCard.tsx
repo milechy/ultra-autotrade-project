@@ -13,6 +13,7 @@ export interface Proposal {
   operation: 'SUPPLY' | 'WITHDRAW' | 'BORROW' | 'REPAY'
   asset: string
   amount: number
+  amountRaw: string
   amountUSD: number
   reason: string
   currentHF: number
@@ -28,6 +29,7 @@ export interface ProposalCardProps {
   onReject: (id: string) => void
   status: ProposalStatus
   txHash?: string
+  chain?: string
 }
 
 const operationBadgeConfig: Record<
@@ -69,6 +71,7 @@ export function ProposalCard({
   onReject,
   status,
   txHash,
+  chain,
 }: ProposalCardProps) {
   const opConfig = operationBadgeConfig[proposal.operation]
   const hfDecreased = proposal.projectedHF < proposal.currentHF
@@ -146,7 +149,7 @@ export function ProposalCard({
         )}
 
         {/* Transaction status */}
-        <TransactionStatus status={status} txHash={txHash} />
+        <TransactionStatus status={status} txHash={txHash} chain={chain} />
 
         {/* Action buttons */}
         {!isDone && (

@@ -5,15 +5,17 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
+import { RefreshCw, ChevronLeft, ChevronRight, Filter, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
 import AuthGuard from '@/components/AuthGuard'
 import { useAuth } from '@/lib/auth'
 import { UserProviders } from '@/components/user/UserProviders'
 import { getJson } from '@/lib/api/http'
+import { apiFetch } from '@/lib/api/client'
 
 type TradeStatus = 'SUCCESS' | 'FAILED' | 'SKIPPED'
 type TradeAction = 'BUY' | 'SELL'
@@ -38,6 +40,199 @@ type HistoryResponse = {
 }
 
 const PAGE_SIZE = 20
+
+// ---- Aave transaction types ----
+
+type AaveTransactionStatus = 'pending' | 'success' | 'failed'
+type AaveOperation = 'SUPPLY' | 'WITHDRAW' | 'BORROW' | 'REPAY'
+
+type AaveTransaction = {
+  id: number
+  operation: AaveOperation
+  asset: string
+  amount: string
+  amount_usd: string
+  tx_hash: string | null
+  chain: string
+  status: AaveTransactionStatus
+  is_dry_run: boolean
+  created_at: string
+}
+
+type AaveTransactionListResponse = {
+  items: AaveTransaction[]
+  total: number
+  limit: number
+  offset: number
+}
+
+const AAVE_PAGE_SIZE = 20
+
+const aaveOperationConfig: Record<AaveOperation, { label: string; className: string }> = {
+  SUPPLY: { label: 'SUPPLY', className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
+  WITHDRAW: { label: 'WITHDRAW', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' },
+  BORROW: { label: 'BORROW', className: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' },
+  REPAY: { label: 'REPAY', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
+}
+
+function aaveStatusConfig(status: AaveTransactionStatus) {
+  if (status === 'success') return { label: '成功', variant: 'default' as const }
+  if (status === 'failed') return { label: '失敗', variant: 'destructive' as const }
+  return { label: '処理中', variant: 'secondary' as const }
+}
+
+function getExplorerUrl(txHash: string, chain: string): string {
+  if (chain === 'arbitrum') return `https://arbiscan.io/tx/${txHash}`
+  if (chain === 'arbitrum-sepolia') return `https://sepolia.arbiscan.io/tx/${txHash}`
+  if (chain === 'base-sepolia') return `https://sepolia.basescan.org/tx/${txHash}`
+  if (chain === 'base') return `https://basescan.org/tx/${txHash}`
+  return `https://arbiscan.io/tx/${txHash}`
+}
+
+function AaveHistoryTab() {
+  const [transactions, setTransactions] = useState<AaveTransaction[]>([])
+  const [total, setTotal] = useState(0)
+  const [offset, setOffset] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [operationFilter, setOperationFilter] = useState<AaveOperation | ''>('')
+
+  const fetchAave = useCallback(async (newOffset = 0) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const params = new URLSearchParams()
+      params.set('limit', String(AAVE_PAGE_SIZE))
+      params.set('offset', String(newOffset))
+      if (operationFilter) params.set('operation', operationFilter)
+      const res = await apiFetch<AaveTransactionListResponse>(`/api/transactions?${params.toString()}`)
+      if (newOffset === 0) {
+        setTransactions(res.items)
+      } else {
+        setTransactions(prev => [...prev, ...res.items])
+      }
+      setTotal(res.total)
+      setOffset(newOffset)
+    } catch {
+      setError('取引履歴を取得できません')
+    } finally {
+      setLoading(false)
+    }
+  }, [operationFilter])
+
+  useEffect(() => {
+    fetchAave(0)
+  }, [fetchAave])
+
+  const hasMore = transactions.length < total
+
+  if (loading && transactions.length === 0) {
+    return (
+      <div className="space-y-3">
+        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950 dark:border-red-800 p-4 text-center space-y-2">
+        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <button onClick={() => fetchAave(0)} className="text-xs text-blue-500 underline">再試行</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Filter */}
+      <div className="flex gap-2 flex-wrap">
+        {(['', 'SUPPLY', 'WITHDRAW', 'BORROW', 'REPAY'] as const).map(op => (
+          <button
+            key={op}
+            onClick={() => setOperationFilter(op as AaveOperation | '')}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              operationFilter === op
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            {op === '' ? '全て' : op}
+          </button>
+        ))}
+      </div>
+
+      {transactions.length === 0 ? (
+        <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">
+          取引履歴がありません
+        </div>
+      ) : (
+        <>
+          <div className="text-xs text-muted-foreground">全 {total} 件</div>
+          <div className="space-y-2">
+            {transactions.map(tx => {
+              const opCfg = aaveOperationConfig[tx.operation as AaveOperation] ?? aaveOperationConfig.SUPPLY
+              const stCfg = aaveStatusConfig(tx.status)
+              return (
+                <div key={tx.id} className="rounded-lg border bg-card p-3 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${opCfg.className}`}>
+                        {opCfg.label}
+                      </span>
+                      <span className="font-semibold text-sm">{tx.asset}</span>
+                      {tx.is_dry_run && (
+                        <span className="rounded-full bg-zinc-200 dark:bg-zinc-700 px-2 py-0.5 text-xs text-zinc-500">
+                          DRY RUN
+                        </span>
+                      )}
+                    </div>
+                    <Badge variant={stCfg.variant} className="text-xs shrink-0">{stCfg.label}</Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{parseFloat(tx.amount).toLocaleString()} {tx.asset}</span>
+                    <span className="text-muted-foreground text-xs">${parseFloat(tx.amount_usd).toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>
+                      {new Date(tx.created_at).toLocaleString('ja-JP', {
+                        timeZone: 'Asia/Tokyo',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                    {tx.tx_hash && (
+                      <a
+                        href={getExplorerUrl(tx.tx_hash, tx.chain)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-400 font-mono"
+                      >
+                        {tx.tx_hash.slice(0, 6)}...{tx.tx_hash.slice(-4)}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {hasMore && (
+            <button
+              onClick={() => fetchAave(offset + AAVE_PAGE_SIZE)}
+              disabled={loading}
+              className="w-full py-2 text-sm text-muted-foreground hover:text-foreground border border-muted rounded-lg"
+            >
+              {loading ? '読み込み中...' : 'もっと見る'}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
 
 function StatusBadge({ status }: { status: TradeStatus }) {
   const map: Record<TradeStatus, { label: string; variant: 'default' | 'destructive' | 'secondary' | 'outline' }> = {
@@ -226,13 +421,7 @@ function HistoryPage() {
           </button>
         </div>
 
-        {activeTab === 'aave' && (
-          <div className="space-y-3">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-600">Aave操作履歴はリバランス実行後に表示されます</p>
-            </div>
-          </div>
-        )}
+        {activeTab === 'aave' && <AaveHistoryTab />}
 
         {activeTab === 'exchange' && (
           <div className="relative">

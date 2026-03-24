@@ -4,10 +4,15 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Clock } from 'lucide-react'
+import { parseUnits } from 'ethers'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { apiFetch, apiPost } from '@/lib/api/client'
 import { useAuth } from '@/lib/auth'
+import { useWallet } from '@/hooks/useWallet'
+import { useAaveV3 } from '@/hooks/useAaveV3'
+import { getChainKey } from '@/lib/web3/config'
+import type { SupportedToken } from '@/lib/web3/config'
 import {
   ProposalCard,
   RecentApprovals,
@@ -37,12 +42,31 @@ interface ProposalListResponse {
   total: number
 }
 
+// Token decimals map
+const TOKEN_DECIMALS: Record<string, number> = {
+  USDC: 6,
+  USDT: 6,
+  WBTC: 8,
+  WETH: 18,
+  DAI: 18,
+}
+
+const SUPPORTED_TOKENS = new Set<string>(['USDC', 'USDT', 'WBTC', 'WETH', 'DAI'])
+
+function chainIdToName(chainId: number | undefined): string {
+  if (chainId === 42161) return 'arbitrum'
+  if (chainId === 421614) return 'arbitrum-sepolia'
+  if (chainId === 84532) return 'base-sepolia'
+  return 'arbitrum-sepolia'
+}
+
 function mapToProposal(item: ProposalAPIResponse): Proposal {
   return {
     id: String(item.id),
     operation: item.operation as Proposal['operation'],
     asset: item.asset,
     amount: parseFloat(item.amount),
+    amountRaw: item.amount,
     amountUSD: parseFloat(item.amount_usd),
     reason: item.reason,
     currentHF: 0,
@@ -73,13 +97,16 @@ type ProposalState = {
 export default function ApprovePage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth()
   const router = useRouter()
+  const { isConnected, chainId } = useWallet()
+  const { isReady, approve: approveToken, supply, withdraw, borrow, repay } = useAaveV3()
+
   const [proposals, setProposals] = useState<Proposal[]>([])
   const [recentApprovals, setRecentApprovals] = useState<RecentApproval[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [proposalStates, setProposalStates] = useState<
-    Record<string, ProposalState>
-  >({})
+  const [proposalStates, setProposalStates] = useState<Record<string, ProposalState>>({})
+
+  const chain = chainIdToName(chainId)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -109,21 +136,60 @@ export default function ApprovePage() {
   }, [fetchData, isAuthenticated])
 
   const handleApprove = useCallback(async (id: string) => {
+    const proposal = proposals.find((p) => p.id === id)
+    if (!proposal) return
+
     setProposalStates((prev) => ({ ...prev, [id]: { status: 'approving' } }))
+
     try {
-      const result = await apiPost<ProposalAPIResponse>(`/api/proposals/${id}/approve`, {})
-      setProposalStates((prev) => ({
-        ...prev,
-        [id]: { status: 'success', txHash: result.tx_hash ?? undefined },
-      }))
+      // ── Wallet signing path ──────────────────────────────────────────────
+      if (isReady && isConnected && getChainKey(chainId ?? 0) && SUPPORTED_TOKENS.has(proposal.asset)) {
+        const token = proposal.asset as SupportedToken
+        const decimals = TOKEN_DECIMALS[proposal.asset] ?? 18
+        const amount = parseUnits(proposal.amountRaw, decimals)
+
+        // ERC20 approve required before SUPPLY / REPAY
+        if (proposal.operation === 'SUPPLY' || proposal.operation === 'REPAY') {
+          const approveTx = await approveToken(token, amount)
+          await approveTx.wait(1)
+        }
+
+        let tx
+        if (proposal.operation === 'SUPPLY') {
+          tx = await supply(token, amount)
+        } else if (proposal.operation === 'WITHDRAW') {
+          tx = await withdraw(token, amount)
+        } else if (proposal.operation === 'BORROW') {
+          tx = await borrow(token, amount)
+        } else {
+          tx = await repay(token, amount)
+        }
+
+        setProposalStates((prev) => ({ ...prev, [id]: { status: 'confirming' } }))
+        await tx.wait(1)
+        const txHash = tx.hash
+
+        // Notify backend of on-chain execution
+        await apiPost<ProposalAPIResponse>(`/api/proposals/${id}/approve`, { tx_hash: txHash })
+
+        setProposalStates((prev) => ({ ...prev, [id]: { status: 'success', txHash } }))
+      } else {
+        // ── REST fallback (managed mode / wallet not connected) ────────────
+        const result = await apiPost<ProposalAPIResponse>(`/api/proposals/${id}/approve`, {})
+        setProposalStates((prev) => ({
+          ...prev,
+          [id]: { status: 'success', txHash: result.tx_hash ?? undefined },
+        }))
+      }
+
       setTimeout(() => {
         setProposals((prev) => prev.filter((p) => p.id !== id))
       }, 2000)
     } catch {
-      setProposalStates((prev) => ({ ...prev, [id]: { status: 'pending' } }))
+      setProposalStates((prev) => ({ ...prev, [id]: { status: 'failed' } }))
       setError('承認に失敗しました')
     }
-  }, [])
+  }, [proposals, isReady, isConnected, chainId, approveToken, supply, withdraw, borrow, repay])
 
   const handleReject = useCallback(async (id: string) => {
     try {
@@ -176,6 +242,14 @@ export default function ApprovePage() {
           </div>
         </div>
 
+        {/* Wallet status indicator */}
+        {isConnected && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+            <span>ウォレット接続済み — 承認時にMetaMaskで署名が必要です</span>
+          </div>
+        )}
+
         {/* Error display */}
         {error && (
           <div className="rounded-lg border border-red-800 bg-red-950 p-3">
@@ -203,6 +277,7 @@ export default function ApprovePage() {
                   onReject={handleReject}
                   status={state.status}
                   txHash={state.txHash}
+                  chain={chain}
                 />
               )
             })}

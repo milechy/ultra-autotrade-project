@@ -1,17 +1,38 @@
 'use client'
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 
-import { CheckCircle2, XCircle, Loader2 } from 'lucide-react'
-import { TxHashLink } from '@/components/shared/TxHashLink'
+import { CheckCircle2, XCircle, Loader2, ExternalLink } from 'lucide-react'
 
 export type ProposalStatus = 'pending' | 'approving' | 'confirming' | 'success' | 'failed'
 
 export interface TransactionStatusProps {
   status: ProposalStatus
   txHash?: string
+  chain?: string
 }
 
-export function TransactionStatus({ status, txHash }: TransactionStatusProps) {
+function getTxUrl(hash: string, chain?: string): string {
+  if (chain === 'arbitrum-sepolia') return `https://sepolia.arbiscan.io/tx/${hash}`
+  if (chain === 'base-sepolia') return `https://sepolia.basescan.org/tx/${hash}`
+  if (chain === 'base') return `https://basescan.org/tx/${hash}`
+  return `https://arbiscan.io/tx/${hash}`
+}
+
+function TxLink({ hash, chain }: { hash: string; chain?: string }) {
+  return (
+    <a
+      href={getTxUrl(hash, chain)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-mono text-sm underline-offset-4 hover:underline transition-colors"
+    >
+      {hash.slice(0, 6)}...{hash.slice(-4)}
+      <ExternalLink className="h-3 w-3 flex-shrink-0" />
+    </a>
+  )
+}
+
+export function TransactionStatus({ status, txHash, chain }: TransactionStatusProps) {
   if (status === 'pending') return null
 
   if (status === 'approving') {
@@ -39,7 +60,7 @@ export function TransactionStatus({ status, txHash }: TransactionStatusProps) {
         <span className="text-green-600 dark:text-green-400 font-medium">トランザクション完了</span>
         {txHash && (
           <span className="ml-auto">
-            <TxHashLink hash={txHash} />
+            <TxLink hash={txHash} chain={chain} />
           </span>
         )}
       </div>
