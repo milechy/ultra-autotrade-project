@@ -5,7 +5,7 @@
 import os
 import tempfile
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -28,7 +28,6 @@ from app.automation.ai_judgment_scheduler import (  # noqa: E402
 )
 from app.database import Base  # noqa: E402
 from app.proposals.models import Proposal  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

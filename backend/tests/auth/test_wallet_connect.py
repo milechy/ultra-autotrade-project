@@ -81,7 +81,7 @@ class TestWalletConnect:
 
     def _make_valid_request(self) -> dict:
         """有効なリクエストペイロードを生成する。"""
-        message = f"Ultra AutoTrade: test at 2026-03-24T00:00:00Z"
+        message = "Ultra AutoTrade: test at 2026-03-24T00:00:00Z"
         signature = _sign_message(message, TEST_PRIVATE_KEY)
         return {
             "wallet_address": TEST_WALLET_ADDRESS,
