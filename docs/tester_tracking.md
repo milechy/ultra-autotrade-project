@@ -39,11 +39,26 @@
 Slack #ultra-auto-project に共有
     ↓
 運営がテストUSDCを送金（Sepolia ETH + テストUSDC）
-    ↓
+    ↓  ※ scripts/batch_send_test_usdc.py で一括送金可能
+    ↓  ※ Arbitrum Sepolia / Base Sepolia 両対応
+    ↓  ※ dry-run確認済み (commit: 3a49391)
 テスター「接続確認済み」に ✅
     ↓
 フィードバックを #ultra-tester-feedback で収集
 ```
+
+### USDC送金コマンド（運営用）
+
+```bash
+# dry-run（実際には送金しない、確認用）
+python scripts/batch_send_test_usdc.py --dry-run
+
+# 本番送金（アドレスリストを用意してから実行）
+python scripts/batch_send_test_usdc.py
+```
+
+- 環境変数: `AAVE_WALLET_PRIVATE_KEY`（送金元ウォレットの秘密鍵）
+- スクリプト: `scripts/mint_test_usdc.py`（Faucet取得）、`scripts/batch_send_test_usdc.py`（バッチ送金）
 
 ---
 
