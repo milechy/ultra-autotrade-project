@@ -117,9 +117,10 @@ def test_run_job_hold_no_proposals(db_session):
     """HOLD 判定のとき Proposal が作成されないこと。"""
     mock_result = _make_cross_validation_result(TradeAction.HOLD)
 
-    with patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService, patch(
-        "app.automation.ai_judgment_scheduler.KnowledgeService"
-    ) as MockKnowledgeService:
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
         MockAIService.return_value.judge_with_rag.return_value = mock_result
         MockKnowledgeService.return_value.search.return_value = []
 
@@ -141,9 +142,10 @@ def test_run_job_buy_creates_proposals(db_session):
 
     mock_result = _make_cross_validation_result(TradeAction.BUY)
 
-    with patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService, patch(
-        "app.automation.ai_judgment_scheduler.KnowledgeService"
-    ) as MockKnowledgeService:
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
         MockAIService.return_value.judge_with_rag.return_value = mock_result
         MockKnowledgeService.return_value.search.return_value = []
 
@@ -165,9 +167,10 @@ def test_run_job_saves_to_ai_decisions(db_session):
     """run_ai_judgment_job 実行後、ai_decisions に1件保存されること。"""
     mock_result = _make_cross_validation_result(TradeAction.HOLD)
 
-    with patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService, patch(
-        "app.automation.ai_judgment_scheduler.KnowledgeService"
-    ) as MockKnowledgeService:
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
         MockAIService.return_value.judge_with_rag.return_value = mock_result
         MockKnowledgeService.return_value.search.return_value = []
 
@@ -186,9 +189,10 @@ def test_run_job_sell_creates_withdraw_proposals(db_session):
 
     mock_result = _make_cross_validation_result(TradeAction.SELL)
 
-    with patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService, patch(
-        "app.automation.ai_judgment_scheduler.KnowledgeService"
-    ) as MockKnowledgeService:
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
         MockAIService.return_value.judge_with_rag.return_value = mock_result
         MockKnowledgeService.return_value.search.return_value = []
 
