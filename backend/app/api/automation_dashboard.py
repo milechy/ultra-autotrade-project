@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.ai.service import AIService
-from app.auth.dependencies import require_admin, require_viewer
+from app.auth.dependencies import require_active_user, require_admin, require_viewer
 from app.auth.models import User
 from app.automation.monitoring_service import MonitoringService
 from app.automation.reporting_service import ReportingService
@@ -174,3 +175,27 @@ def emergency_stop_api(
         "status": "stopped",
         "message": "緊急停止が実行されました。全ての自動取引が停止されています。",
     }
+
+
+@router.post("/pause", summary="ユーザー運用一時停止")
+def pause_automation(
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """ユーザー単位の運用を一時停止する（全体緊急停止とは別）。"""
+    current_user.is_active = False
+    db.add(current_user)
+    db.commit()
+    return {"message": "paused", "is_active": False}
+
+
+@router.post("/resume", summary="ユーザー運用再開")
+def resume_automation(
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """ユーザー単位の運用を再開する。"""
+    current_user.is_active = True
+    db.add(current_user)
+    db.commit()
+    return {"message": "resumed", "is_active": True}

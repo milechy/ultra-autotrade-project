@@ -204,3 +204,17 @@ class TestTransactionsAPI:
         )
         assert r.status_code == 200
         assert all(item["status"] == "success" for item in r.json()["items"])
+
+    def test_filter_by_chain(self, client: TestClient) -> None:
+        token = get_admin_token(client)
+        client.post(
+            "/api/transactions",
+            json=SAMPLE_TX,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r = client.get(
+            "/api/transactions?chain=arbitrum_one",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert all(item["chain"] == "arbitrum_one" for item in r.json()["items"])

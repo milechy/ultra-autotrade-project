@@ -57,6 +57,7 @@ def list_transactions(
     tx_status: Optional[str] = None,
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
+    chain: Optional[str] = None,
     current_user: User = Depends(require_viewer),
     db: Session = Depends(get_db),
 ) -> TransactionListResponse:
@@ -73,6 +74,8 @@ def list_transactions(
         stmt = stmt.where(Transaction.created_at >= date_from)
     if date_to:
         stmt = stmt.where(Transaction.created_at <= date_to)
+    if chain:
+        stmt = stmt.where(Transaction.chain == chain)
     total = len(db.scalars(stmt).all())
     stmt = stmt.order_by(Transaction.created_at.desc()).offset(offset).limit(limit)
     items = db.scalars(stmt).all()

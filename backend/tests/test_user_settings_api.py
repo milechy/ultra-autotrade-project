@@ -129,3 +129,15 @@ class TestUserSettingsAPI:
         r = client.post("/api/user/resume", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         assert r.json()["is_active"] is True
+
+    def test_automation_pause(self, client: TestClient) -> None:
+        token = register_and_login(client)
+        r = client.post("/api/automation/pause", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        assert r.json()["is_active"] is False
+
+    def test_automation_resume(self, client: TestClient) -> None:
+        token = register_and_login(client)
+        r = client.post("/api/automation/resume", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        assert r.json()["is_active"] is True
