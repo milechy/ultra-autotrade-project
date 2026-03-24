@@ -7,6 +7,7 @@ import { Wallet, CheckCircle, AlertTriangle, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useWallet } from '@/hooks/useWallet'
+import { useAuth } from '@/lib/auth'
 import { useMinimumBalance } from '@/hooks/useMinimumBalance'
 
 // Arbitrum One (mainnet), Arbitrum Sepolia (testnet), and Base Sepolia (testnet)
@@ -63,11 +64,14 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 
 export default function ConnectPage() {
   const router = useRouter()
-  const { address, isConnected, chainId, connect, switchToArbitrum, switchToArbitrumSepolia, switchToBaseSepolia } = useWallet()
+  const { loginWithWallet } = useAuth()
+  const { address, isConnected, chainId, connect, switchToArbitrum, switchToArbitrumSepolia, switchToBaseSepolia, signer } = useWallet()
   const { checkMinimum, minimumUSD } = useMinimumBalance()
 
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [riskAccepted, setRiskAccepted] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
 
   // Simulate minimum balance check with a mock value when connected
   // In production this would come from Aave account data
@@ -101,8 +105,18 @@ export default function ConnectPage() {
     // We don't auto-redirect here — user must click "運用を開始する"
   }, [])
 
-  const handleStart = () => {
-    router.push('/user/dashboard')
+  const handleStart = async () => {
+    if (!address || !signer) return
+    setAuthError(null)
+    setIsAuthenticating(true)
+    try {
+      await loginWithWallet(address, signer)
+      router.push('/user/dashboard')
+    } catch (err) {
+      setAuthError('認証に失敗しました。もう一度お試しください。')
+    } finally {
+      setIsAuthenticating(false)
+    }
   }
 
   return (
@@ -281,15 +295,22 @@ export default function ConnectPage() {
           )}
 
           {/* Start Button */}
+          {allChecksPass && authError && (
+            <div className="flex items-center gap-2 py-2 px-4 rounded-lg bg-red-950/40 border border-red-800">
+              <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
+              <span className="text-sm text-red-300">{authError}</span>
+            </div>
+          )}
+
           {allChecksPass && (
             <Button
               size="lg"
               className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-6 text-base disabled:opacity-40 disabled:cursor-not-allowed"
-              disabled={!termsAccepted || !riskAccepted}
+              disabled={!termsAccepted || !riskAccepted || isAuthenticating}
               onClick={handleStart}
             >
-              運用を開始する
-              <ArrowRight className="ml-2 h-5 w-5" />
+              {isAuthenticating ? '認証中...' : '運用を開始する'}
+              {!isAuthenticating && <ArrowRight className="ml-2 h-5 w-5" />}
             </Button>
           )}
 

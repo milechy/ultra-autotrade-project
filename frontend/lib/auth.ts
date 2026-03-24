@@ -19,10 +19,15 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { login as apiLogin, getMe, logout as apiLogout, type UserResponse, type TokenResponse } from "./api/auth";
+import { login as apiLogin, getMe, logout as apiLogout, walletConnect, type UserResponse, type TokenResponse } from "./api/auth";
 
 const TOKEN_KEY = "ultra_auth_token";
 const TOKEN_EXPIRES_KEY = "ultra_auth_expires";
+
+/** ethers.Signer の signMessage だけを使う duck-typed interface */
+interface WalletSigner {
+  signMessage: (message: string | Uint8Array) => Promise<string>;
+}
 
 interface AuthContextType {
   user: UserResponse | null;
@@ -31,6 +36,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   login: (email: string, password: string) => Promise<UserResponse>;
+  loginWithWallet: (address: string, signer: WalletSigner) => Promise<UserResponse>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -99,6 +105,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const loginWithWallet = useCallback(async (address: string, signer: WalletSigner) => {
+    const message = `Sign in to Ultra AutoTrade\nAddress: ${address}`;
+    const signature = await signer.signMessage(message);
+    const response = await walletConnect({ wallet_address: address, message, signature });
+    const expiresAt = Date.now() + response.expires_in * 1000;
+    const newToken = response.access_token;
+
+    try {
+      const userInfo = await getMe(newToken);
+      localStorage.setItem(TOKEN_KEY, newToken);
+      localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt));
+      setToken(newToken);
+      setUser(userInfo);
+      return userInfo;
+    } catch (error) {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(TOKEN_EXPIRES_KEY);
+      throw error;
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     if (token) {
       try {
@@ -128,6 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!user,
     isAdmin: user?.role === "admin",
     login,
+    loginWithWallet,
     logout,
     refresh,
   };
