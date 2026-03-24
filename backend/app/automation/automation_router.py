@@ -118,6 +118,42 @@ def process_news(
     )
 
 
+class AIJudgmentTriggerResponse(BaseModel):
+    """POST /api/ai/trigger のレスポンス。"""
+
+    action: str = Field(..., description="AI判定アクション (BUY/SELL/HOLD)")
+    confidence: int = Field(..., description="信頼度スコア (0-100)")
+    proposals_created: int = Field(..., description="作成された提案件数")
+    decision_id: int = Field(..., description="保存されたai_decision ID")
+
+
+@router.post(
+    "/api/ai/trigger",
+    response_model=AIJudgmentTriggerResponse,
+    summary="AI判定を手動で即時実行する（管理者専用）",
+)
+def trigger_ai_judgment(
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(require_admin),
+) -> AIJudgmentTriggerResponse:
+    """
+    AI判定ジョブを手動で1回実行する（テスト・デバッグ用）。
+    BUY/SELL判定時はアクティブユーザー全員にproposalを作成する。
+    """
+    from app.automation.ai_judgment_scheduler import run_ai_judgment_job  # noqa: PLC0415
+
+    logger.info("Manual AI judgment trigger by admin (user_id=%s)", current_user.id)
+    try:
+        result = run_ai_judgment_job(db=db)
+    except Exception as exc:
+        logger.error("Manual AI judgment failed: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="AI judgment execution failed",
+        ) from exc
+    return AIJudgmentTriggerResponse(**result)
+
+
 class EmergencyStopResponse(BaseModel):
     """POST /automation/emergency-stop のレスポンス。"""
 
