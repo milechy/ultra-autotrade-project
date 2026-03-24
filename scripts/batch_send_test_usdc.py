@@ -30,11 +30,14 @@ import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
 from web3 import Web3
+
+load_dotenv(Path(__file__).parent.parent / ".env.staging")
 
 # USDC コントラクトアドレス
 USDC_CONTRACTS: dict[str, str] = {
-    "arb": "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",   # Arbitrum Sepolia
+    "arb": "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",  # Arbitrum Sepolia
     "base": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",  # Base Sepolia
 }
 
@@ -114,12 +117,10 @@ def send_usdc(
         送金成功時はトランザクションハッシュ、dry_run 時は None
     """
     if dry_run:
-        print(
-            f"  [DRY-RUN] Would send {amount_units / 1_000_000:.2f} USDC → {recipient}"
-        )
+        print(f"  [DRY-RUN] Would send {amount_units / 1_000_000:.2f} USDC → {recipient}")
         return None
 
-    nonce = w3.eth.get_transaction_count(sender_address)
+    nonce = w3.eth.get_transaction_count(sender_address, "pending")
     tx = contract.functions.transfer(recipient, amount_units).build_transaction(
         {
             "chainId": chain_id,
@@ -141,9 +142,7 @@ def send_usdc(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Batch send test USDC to tester wallets"
-    )
+    parser = argparse.ArgumentParser(description="Batch send test USDC to tester wallets")
     parser.add_argument(
         "--chain",
         choices=["arb", "base"],
@@ -182,16 +181,31 @@ def main() -> None:
         print("[ERROR] No addresses provided. Use --addresses or --file.", file=sys.stderr)
         sys.exit(1)
 
-    # 環境変数
-    private_key = os.environ.get("SENDER_PRIVATE_KEY", "")
+    # 環境変数（.env.staging との互換フォールバック）
+    private_key = os.environ.get("SENDER_PRIVATE_KEY") or os.environ.get(
+        "AAVE_WALLET_PRIVATE_KEY", ""
+    )
     if not private_key and not args.dry_run:
-        print("[ERROR] SENDER_PRIVATE_KEY environment variable is not set.", file=sys.stderr)
+        print(
+            "[ERROR] SENDER_PRIVATE_KEY (or AAVE_WALLET_PRIVATE_KEY) env var is not set.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
-    rpc_env_key = "ARB_SEPOLIA_RPC" if args.chain == "arb" else "BASE_SEPOLIA_RPC"
-    rpc_url = os.environ.get(rpc_env_key, "")
+    if args.chain == "arb":
+        rpc_url = os.environ.get("ARB_SEPOLIA_RPC") or os.environ.get(
+            "ALCHEMY_RPC_URL_ARBITRUM_SEPOLIA", ""
+        )
+        rpc_env_desc = "ARB_SEPOLIA_RPC / ALCHEMY_RPC_URL_ARBITRUM_SEPOLIA"
+    else:
+        rpc_url = (
+            os.environ.get("BASE_SEPOLIA_RPC")
+            or os.environ.get("ALCHEMY_RPC_URL_BASE_SEPOLIA")
+            or os.environ.get("AAVE_RPC_URL_BASE_SEPOLIA", "")
+        )
+        rpc_env_desc = "BASE_SEPOLIA_RPC / ALCHEMY_RPC_URL_BASE_SEPOLIA / AAVE_RPC_URL_BASE_SEPOLIA"
     if not rpc_url:
-        print(f"[ERROR] {rpc_env_key} environment variable is not set.", file=sys.stderr)
+        print(f"[ERROR] RPC URL not set. Check: {rpc_env_desc}", file=sys.stderr)
         sys.exit(1)
 
     chain_id = CHAIN_IDS[args.chain]
@@ -208,8 +222,11 @@ def main() -> None:
     # Web3 接続
     w3 = Web3(Web3.HTTPProvider(rpc_url))
     if not w3.is_connected():
-        print(f"[ERROR] Cannot connect to RPC: {rpc_url}", file=sys.stderr)
-        sys.exit(1)
+        if args.dry_run:
+            print(f"[WARN] Cannot connect to RPC (dry-run: continuing anyway): {rpc_url}")
+        else:
+            print(f"[ERROR] Cannot connect to RPC: {rpc_url}", file=sys.stderr)
+            sys.exit(1)
 
     # 送金元アドレス
     if not args.dry_run:
@@ -217,7 +234,10 @@ def main() -> None:
         sender_address = sender_account.address
         print(f"Sender   : {sender_address}")
     else:
-        sender_address = "0x0000000000000000000000000000000000000000"
+        fallback_addr = os.environ.get("AAVE_WALLET_ADDRESS", "")
+        sender_address = fallback_addr or "0x0000000000000000000000000000000000000000"
+        if fallback_addr:
+            print(f"Sender   : {sender_address} (from AAVE_WALLET_ADDRESS, dry-run)")
 
     # コントラクト初期化
     usdc_contract = w3.eth.contract(
@@ -230,8 +250,7 @@ def main() -> None:
         balance = usdc_contract.functions.balanceOf(sender_address).call()
         total_needed = args.amount * len(addresses)
         print(
-            f"Balance  : {balance / 1_000_000:.2f} USDC "
-            f"(need {total_needed / 1_000_000:.2f} USDC)"
+            f"Balance  : {balance / 1_000_000:.2f} USDC (need {total_needed / 1_000_000:.2f} USDC)"
         )
         if balance < total_needed:
             print("[ERROR] Insufficient USDC balance.", file=sys.stderr)
