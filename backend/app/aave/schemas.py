@@ -15,7 +15,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from app.ai.schemas import TradeAction
 
@@ -73,6 +73,14 @@ class AaveSystemState(BaseModel):
     )
 
     model_config = ConfigDict()
+
+    @field_validator("health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Aave V3 ではポジションがないと HF=∞ を返す。Pydantic の finite_number 制約を回避するため 999.0 に丸める。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
 
     @field_serializer("health_factor")
     @classmethod
@@ -178,6 +186,14 @@ class AaveOperationResult(BaseModel):
         description="操作が実行されたチェーン名。",
     )
 
+    @field_validator("before_health_factor", "after_health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Aave V3 ではポジションがないと HF=∞ を返す。finite_number 制約を回避するため 999.0 に丸める。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
+
 
 class AaveRebalanceResponse(BaseModel):
     """
@@ -212,6 +228,14 @@ class AaveMonitorStatus(BaseModel):
     balance: AaveBalanceInfo = Field(description="USDC / aUSDC 残高。")
     client_type: str = Field(description="AAVE_CLIENT_TYPE 環境変数の値。")
     fetched_at: str = Field(description="取得日時 (ISO 8601)。")
+
+    @field_validator("health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Aave V3 ではポジションがないと HF=∞ を返す。finite_number 制約を回避するため 999.0 に丸める。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
 
     @field_serializer("health_factor")
     @classmethod
