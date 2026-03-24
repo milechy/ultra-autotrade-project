@@ -115,6 +115,25 @@ def get_health_factor(
 
 
 @router.get(
+    "/safety-score",
+    summary="安全スコアを取得する",
+)
+def get_safety_score(
+    current_user: User = Depends(require_viewer),
+) -> dict:
+    """SafetyScoreCalculator を使って安全スコアを計算して返す。"""
+    from .safety_score import SafetyScoreCalculator, SafetyScoreParams  # noqa: PLC0415
+
+    params = SafetyScoreParams(
+        utilization_rate=Decimal("0.50"),
+        health_factor=Decimal("0"),
+        volatility_30d=Decimal("0.15"),
+    )
+    result = SafetyScoreCalculator().calculate(params)
+    return result.model_dump()
+
+
+@router.get(
     "/status",
     response_model=AaveMonitorStatus,
     summary="Aave ポジション状態（HF + 残高）をリアルタイム取得する",

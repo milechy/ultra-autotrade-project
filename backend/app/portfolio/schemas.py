@@ -49,3 +49,15 @@ class PortfolioCurrentResponse(BaseModel):
     positions_json: Optional[List[Any]] = None
     recorded_at: Optional[datetime] = None
     has_data: bool = False
+
+
+class PortfolioLiveResponse(BaseModel):
+    """GET /api/portfolio ライブAaveデータレスポンス。"""
+
+    total_supply_usd: Decimal
+    total_borrow_usd: Decimal
+    health_factor: Optional[Decimal]
+    net_worth_usd: Decimal
+    positions: list = []
+    chain: str
+    fetched_at: str  # ISO 8601

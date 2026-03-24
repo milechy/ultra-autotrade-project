@@ -2,10 +2,13 @@
 # backend/app/portfolio/router.py
 """ポートフォリオ履歴API ルーター定義。"""
 
+import os
+import time
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from decimal import Decimal
+from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -17,11 +20,62 @@ from .models import PortfolioSnapshot
 from .schemas import (
     PortfolioCurrentResponse,
     PortfolioHistoryResponse,
+    PortfolioLiveResponse,
     PortfolioSnapshotCreate,
     PortfolioSnapshotResponse,
 )
 
+# 30秒インメモリキャッシュ: {cache_key: (timestamp, data)}
+_live_cache: dict[str, tuple[float, Any]] = {}
+_CACHE_TTL_SECONDS = 30
+
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
+
+
+@router.get("", response_model=PortfolioLiveResponse, summary="ライブAaveポートフォリオデータ")
+def get_live_portfolio(
+    chain: str = Query(
+        default="arbitrum_sepolia", description="チェーン名 (arbitrum_sepolia など)"
+    ),
+    current_user: User = Depends(require_viewer),
+) -> PortfolioLiveResponse:
+    """Aave getUserAccountData() をリアルタイム取得して返す（30秒キャッシュ）。"""
+    from app.aave.client import get_default_aave_client  # noqa: PLC0415
+
+    cache_key = chain
+    now_ts = time.monotonic()
+    cached = _live_cache.get(cache_key)
+    if cached is not None:
+        ts, data = cached
+        if now_ts - ts < _CACHE_TTL_SECONDS:
+            return data
+
+    wallet_address = os.getenv("AAVE_WALLET_ADDRESS", "")
+
+    try:
+        client = get_default_aave_client()
+        account_data = client.get_account_data(wallet_address)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Aaveデータの取得に失敗しました: {exc}",
+        ) from exc
+
+    hf = account_data.health_factor
+    hf_result: Optional[Decimal] = None if hf == Decimal("inf") or str(hf) == "Infinity" else hf
+
+    response = PortfolioLiveResponse(
+        total_supply_usd=account_data.total_collateral_usd,
+        total_borrow_usd=account_data.total_debt_usd,
+        health_factor=hf_result,
+        net_worth_usd=account_data.total_collateral_usd - account_data.total_debt_usd,
+        positions=[],
+        chain=chain,
+        fetched_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+    _live_cache[cache_key] = (now_ts, response)
+    return response
 
 
 def _get_since(period: str) -> Optional[datetime]:

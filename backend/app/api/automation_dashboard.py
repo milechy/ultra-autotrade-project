@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.ai.service import AIService
@@ -148,3 +149,28 @@ def run_workflow(
         err.model_copy(update={"message": err.message[:200]}) for err in run_result.errors
     ]
     return run_result.model_copy(update={"errors": sanitized_errors})
+
+
+class EmergencyStopRequest(BaseModel):
+    """POST /emergency-stop のリクエストボディ。"""
+
+    reason: str = "Manual emergency stop via API"
+
+
+@router.post(
+    "/emergency-stop",
+    summary="緊急停止（管理者専用）",
+)
+def emergency_stop_api(
+    request: EmergencyStopRequest = Body(default=EmergencyStopRequest()),
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    """全ての自動取引を即時停止する（管理者専用）。"""
+    monitoring_service.activate_emergency_stop(
+        reason=f"{request.reason} (user_id={current_user.id})"
+    )
+    return {
+        "status": "stopped",
+        "message": "緊急停止が実行されました。全ての自動取引が停止されています。",
+    }
