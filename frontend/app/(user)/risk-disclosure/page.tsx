@@ -15,7 +15,7 @@ export default function RiskDisclosurePage() {
           variant="ghost"
           size="sm"
           className="mb-6 text-zinc-400 hover:text-zinc-100"
-          onClick={() => router.back()}
+          onClick={() => router.push('/connect')}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           戻る
