@@ -58,6 +58,6 @@ class PortfolioLiveResponse(BaseModel):
     total_borrow_usd: Decimal
     health_factor: Optional[Decimal]
     net_worth_usd: Decimal
-    positions: list = []
+    positions: list[Any] = []
     chain: str
     fetched_at: str  # ISO 8601

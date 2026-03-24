@@ -6,7 +6,7 @@ import os
 import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -26,7 +26,7 @@ from .schemas import (
 )
 
 # 30秒インメモリキャッシュ: {cache_key: (timestamp, data)}
-_live_cache: dict[str, tuple[float, Any]] = {}
+_live_cache: dict[str, tuple[float, PortfolioLiveResponse]] = {}
 _CACHE_TTL_SECONDS = 30
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])

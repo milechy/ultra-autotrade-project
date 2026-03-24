@@ -10,7 +10,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -109,7 +109,7 @@ def _create_proposals_for_users(
     return count
 
 
-def run_ai_judgment_job(db: Optional[Session] = None) -> dict:
+def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
     """AI 判定を実行して DB に保存する同期関数。
 
     BUY / SELL 判定時はアクティブユーザー全員に Proposal を作成する。
@@ -123,6 +123,7 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict:
     _own_session = db is None
     if _own_session:
         db = SessionLocal()
+    assert db is not None
 
     try:
         # RAG コンテキスト取得（失敗時は空のコンテキストでフォールバック）
