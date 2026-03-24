@@ -306,7 +306,7 @@ export default function ConnectPage() {
             <Button
               size="lg"
               className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-6 text-base disabled:opacity-40 disabled:cursor-not-allowed"
-              disabled={!termsAccepted || !riskAccepted || isAuthenticating}
+              disabled={!termsAccepted || !riskAccepted || isAuthenticating || !signer}
               onClick={handleStart}
             >
               {isAuthenticating ? '認証中...' : '運用を開始する'}

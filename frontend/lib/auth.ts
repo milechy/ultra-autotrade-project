@@ -60,9 +60,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Fetch user information
         getMe(storedToken)
           .then(setUser)
-          .catch(() => {
-            // Clear auth if token is invalid
-            clearAuth();
+          .catch((err: unknown) => {
+            const status = (err as { status?: number }).status
+            if (status === 401 || status === 403) {
+              clearAuth()
+            }
+            // Network error: keep token — user may still be authenticated
           })
           .finally(() => setIsLoading(false));
         return;
@@ -152,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     token,
     isLoading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!(user || token),
     isAdmin: user?.role === "admin",
     login,
     loginWithWallet,
