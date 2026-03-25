@@ -60,6 +60,7 @@ from app.transactions.router import admin_router as admin_transactions_router
 from app.transactions.router import router as transactions_router
 from app.users.router import router as users_router
 from app.users.settings_router import router as user_settings_router
+from app.notifications.router import router as notification_router
 from app.webhook.router import router as webhook_router
 
 logger = logging.getLogger(__name__)
@@ -133,6 +134,7 @@ def create_app() -> FastAPI:
     app.include_router(portfolio_router)  # Portfolio History API
     app.include_router(user_settings_router)  # User Settings API
     app.include_router(alias_router)  # API aliases (/api/safety-score etc.)
+    app.include_router(notification_router)  # Notifications (Phase PWA)
 
     # Register global error handlers (production safety)
     register_error_handlers(app)
