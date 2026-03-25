@@ -238,7 +238,12 @@ class TestGetExchangeSettingsFallback:
         """When no API key env vars are set, api_key is empty (dry-run mode)."""
         monkeypatch.delenv("EXCHANGE_API_KEY", raising=False)
         monkeypatch.delenv("EXCHANGE_SECRET_KEY", raising=False)
+        monkeypatch.delenv("EXCHANGE_API_SECRET", raising=False)
         monkeypatch.delenv("EXCHANGE_CLIENT_TYPE", raising=False)
+        monkeypatch.delenv("BITFLYER_API_KEY", raising=False)
+        monkeypatch.delenv("BITFLYER_API_SECRET", raising=False)
+        monkeypatch.delenv("BYBIT_API_KEY", raising=False)
+        monkeypatch.delenv("BYBIT_API_SECRET", raising=False)
 
         import app.exchange.config as cfg
 
