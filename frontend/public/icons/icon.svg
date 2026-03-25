@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="80" fill="#09090b"/>
+  <rect x="40" y="40" width="432" height="432" rx="60" fill="#18181b"/>
+  <!-- U letter -->
+  <text x="256" y="320" font-family="system-ui, -apple-system, sans-serif" font-size="300" font-weight="900" text-anchor="middle" fill="#3b82f6">U</text>
+  <!-- Trend line -->
+  <polyline points="80,380 160,320 240,340 320,260 400,200 440,170" stroke="#10b981" stroke-width="18" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

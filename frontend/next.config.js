@@ -2,6 +2,10 @@
 const createNextIntlPlugin = require('next-intl/plugin');
 const withNextIntl = createNextIntlPlugin('./lib/i18n.ts');
 
+// PWA configuration (manual SW — no next-pwa package required)
+// sw.js is served from /public/sw.js
+// Registration is handled by frontend/lib/pwa/register.ts
+
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
@@ -23,6 +27,24 @@ const nextConfig = {
       '@safe-global/safe-apps-provider': false,
     };
     return config;
+  },
+  async headers() {
+    return [
+      {
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
+      {
+        source: '/manifest.json',
+        headers: [
+          { key: 'Content-Type', value: 'application/manifest+json' },
+          { key: 'Cache-Control', value: 'public, max-age=3600' },
+        ],
+      },
+    ]
   },
 };
 module.exports = withNextIntl(nextConfig);

@@ -1,11 +1,33 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import '../styles/globals.css'
+import { PWAProvider, InstallBanner, UpdatePrompt } from '@/components/pwa'
 
 export const metadata: Metadata = {
   title: 'Ultra AutoTrade',
-  description: 'Automated trading dashboard',
+  description: 'AI-powered DeFi automated trading on Aave V3',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'UltraAT',
+  },
+  icons: {
+    icon: [
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180' }],
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#09090b',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export default function RootLayout({
@@ -15,8 +37,18 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja" className="dark">
+      <head>
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="format-detection" content="telephone=no" />
+      </head>
       <body className="bg-background text-foreground antialiased">
-        {children}
+        <PWAProvider>
+          {children}
+          <InstallBanner />
+          <UpdatePrompt />
+        </PWAProvider>
       </body>
     </html>
   )
