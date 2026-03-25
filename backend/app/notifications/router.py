@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
@@ -59,7 +60,7 @@ class UnsubscribeRequest(BaseModel):
 def subscribe(
     req: SubscribeRequest,
     store: InMemorySubscriptionStore = Depends(get_subscription_store),
-) -> dict:
+) -> dict[str, Any]:
     """Push subscription を登録する。認証不要（Service Worker から呼び出し可能）。"""
     subscription = WebPushSubscription(
         endpoint=req.endpoint,
@@ -75,7 +76,7 @@ def subscribe(
 def unsubscribe(
     endpoint: str,
     store: InMemorySubscriptionStore = Depends(get_subscription_store),
-) -> dict:
+) -> dict[str, Any]:
     """Push subscription を削除する。認証不要。endpoint はクエリパラメータで指定する。"""
     store.remove(endpoint)
     logger.info("Push subscription 削除: endpoint=%s", endpoint[:30])
@@ -83,7 +84,7 @@ def unsubscribe(
 
 
 @router.get("/push/vapid-key", status_code=status.HTTP_200_OK)
-def get_vapid_key() -> dict:
+def get_vapid_key() -> dict[str, Any]:
     """VAPID 公開鍵を返す。VAPID 未設定の場合は null を返す。認証不要。"""
     config: VAPIDConfig | None = get_vapid_config()
     if config is None:
@@ -95,7 +96,7 @@ def get_vapid_key() -> dict:
 def send_test_push(
     store: InMemorySubscriptionStore = Depends(get_subscription_store),
     _current_user: User = Depends(require_active_user),
-) -> dict:
+) -> dict[str, Any]:
     """テスト通知を送信する。認証必須。"""
     from app.notifications.config import get_notification_settings
 
@@ -140,6 +141,6 @@ def send_test_push(
 def get_subscription_count(
     store: InMemorySubscriptionStore = Depends(get_subscription_store),
     _current_user: User = Depends(require_admin),
-) -> dict:
+) -> dict[str, Any]:
     """登録済み subscription 数を返す。管理者のみ。"""
     return {"count": store.count()}

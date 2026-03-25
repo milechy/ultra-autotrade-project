@@ -8,6 +8,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 from .schemas import NotificationChannel, NotificationMessage, NotificationSeverity
 
@@ -28,11 +29,11 @@ class NotificationPayload:
     body: str
     severity: str  # "emergency" | "alert" | "warning" | "info"
     notification_message: NotificationMessage  # ロギング用
-    web_push_payload: dict  # Web Push 用ペイロード
+    web_push_payload: dict[str, Any]  # Web Push 用ペイロード
     line_flex_color: str  # LINE Flex ヘッダー背景色 (#RRGGBB)
 
 
-def _build_web_push_payload(title: str, body: str, severity: str) -> dict:
+def _build_web_push_payload(title: str, body: str, severity: str) -> dict[str, Any]:
     """Web Push ペイロードを構築する。"""
     return {
         "title": title,

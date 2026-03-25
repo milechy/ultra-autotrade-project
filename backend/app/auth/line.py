@@ -10,7 +10,7 @@ import datetime
 import logging
 import os
 import secrets
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 from sqlalchemy.orm import Session
@@ -26,7 +26,7 @@ class LineAuthError(Exception):
     """LINE認証エラー。"""
 
 
-async def verify_line_id_token(id_token: str) -> dict:
+async def verify_line_id_token(id_token: str) -> dict[str, Any]:
     """
     LINE idTokenをLINE APIで検証する。
 

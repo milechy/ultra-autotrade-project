@@ -11,12 +11,12 @@ import logging
 import os
 import threading
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
 try:
-    from pywebpush import WebPushException, webpush
+    from pywebpush import WebPushException, webpush  # type: ignore
 
     _PYWEBPUSH_AVAILABLE = True
 except ImportError:
@@ -78,7 +78,7 @@ class WebPushSender:
         self._vapid_config = vapid_config
         self._store = store
 
-    def send_to_all(self, payload: dict, ttl: int = 86400) -> int:
+    def send_to_all(self, payload: dict[str, Any], ttl: int = 86400) -> int:
         """全サブスクリプションに通知を送信する。成功数を返す。"""
         if not _PYWEBPUSH_AVAILABLE:
             logger.warning("pywebpush がインストールされていません。Web Push は無効です。")
@@ -116,7 +116,7 @@ class WebPushSender:
         return success_count
 
     def send_to_subscription(
-        self, subscription: WebPushSubscription, payload: dict, ttl: int
+        self, subscription: WebPushSubscription, payload: dict[str, Any], ttl: int
     ) -> bool:
         """特定のサブスクリプションに通知を送信する。成功した場合は True を返す。"""
         if not _PYWEBPUSH_AVAILABLE:

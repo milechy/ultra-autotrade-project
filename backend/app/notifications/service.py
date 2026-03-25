@@ -103,7 +103,7 @@ class DualChannelNotificationService:
         self._line_sender = line_sender
         self._push_sender = push_sender
 
-    async def send_line(self, payload: Any) -> dict | None:
+    async def send_line(self, payload: Any) -> dict[str, Any] | None:
         """LINE Flex Message を送信する。未設定または失敗時は None を返す。"""
         if self._line_sender is None:
             logger.debug("LINE sender not configured, skipping.")
@@ -121,7 +121,7 @@ class DualChannelNotificationService:
             logger.error("LINE notification failed: %s", exc)
             return None
 
-    async def send_web_push(self, payload: Any, user_wallet: str) -> dict | None:
+    async def send_web_push(self, payload: Any, user_wallet: str) -> dict[str, Any] | None:
         """Web Push を全 subscription に送信する。未設定または失敗時は None を返す。"""
         if self._push_sender is None:
             logger.debug("Web Push sender not configured, skipping.")
@@ -136,7 +136,7 @@ class DualChannelNotificationService:
             logger.error("Web Push notification failed: %s", exc)
             return None
 
-    async def send(self, payload: Any, user_wallet: str) -> dict:
+    async def send(self, payload: Any, user_wallet: str) -> dict[str, Any]:
         """
         LINE + Web Push の両チャンネルに通知を送信する。
 
@@ -147,7 +147,7 @@ class DualChannelNotificationService:
         Returns:
             {"line": result | None, "web_push": result | None}
         """
-        results: dict = {"line": None, "web_push": None}
+        results: dict[str, Any] = {"line": None, "web_push": None}
 
         # LINE通知
         try:

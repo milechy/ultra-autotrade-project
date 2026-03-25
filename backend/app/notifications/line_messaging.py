@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import httpx
 
@@ -22,7 +23,7 @@ SEVERITY_COLOR: dict[str, str] = {
 }
 
 
-def build_alert_flex_bubble(title: str, body: str, severity: str, color: str) -> dict:
+def build_alert_flex_bubble(title: str, body: str, severity: str, color: str) -> dict[str, Any]:
     """Flex Message bubble dict を構築する。
 
     Args:
