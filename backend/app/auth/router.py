@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
@@ -356,4 +357,48 @@ def wallet_connect(
         expires_in=expires_in,
         is_new_user=is_new_user,
         needs_terms_acceptance=needs_terms_acceptance,
+    )
+
+
+# ── LINE LIFF認証 ────────────────────────────────────────────────────────────
+
+
+class LineAuthRequest(BaseModel):
+    id_token: str
+    display_name: str
+
+
+@router.post("/line", response_model=TokenResponse, summary="LINE LIFF認証")
+async def line_auth(
+    request: LineAuthRequest,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    """
+    LINE idTokenを検証してJWTを返す。
+    LIFFアプリからのログインに使用する。
+    """
+    from .line import LineAuthError, get_or_create_line_user, verify_line_id_token  # noqa: PLC0415
+
+    try:
+        payload = await verify_line_id_token(request.id_token)
+    except LineAuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+        ) from exc
+
+    line_user_id: str = payload["sub"]
+    display_name: str = payload.get("name", request.display_name)
+
+    user = get_or_create_line_user(db, line_user_id, display_name)
+    token, expires_in = AuthService.create_access_token(
+        user_id=user.id,
+        email=user.email,
+        role=user.role,
+    )
+
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",  # noqa: S106
+        expires_in=expires_in,
     )
