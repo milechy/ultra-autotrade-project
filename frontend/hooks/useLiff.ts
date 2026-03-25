@@ -13,7 +13,11 @@ export type LiffProfile = {
 
 export type LiffState = {
   isReady: boolean;
+  /** isReady の別名（layout等との互換性） */
+  isInitialized: boolean;
   isLoggedIn: boolean;
+  /** LINEアプリ内で開かれているか */
+  isInClient: boolean;
   profile: LiffProfile | null;
   idToken: string | null;
   error: string | null;
@@ -22,7 +26,9 @@ export type LiffState = {
 export function useLiff(): LiffState {
   const [state, setState] = useState<LiffState>({
     isReady: false,
+    isInitialized: false,
     isLoggedIn: false,
+    isInClient: false,
     profile: null,
     idToken: null,
     error: null,
@@ -40,8 +46,15 @@ export function useLiff(): LiffState {
         if (cancelled) return;
 
         const isLoggedIn = liff.isLoggedIn();
+        const isInClient = liff.isInClient();
         if (!isLoggedIn) {
-          setState((s) => ({ ...s, isReady: true, isLoggedIn: false }));
+          setState((s) => ({
+            ...s,
+            isReady: true,
+            isInitialized: true,
+            isLoggedIn: false,
+            isInClient,
+          }));
           return;
         }
 
@@ -53,7 +66,9 @@ export function useLiff(): LiffState {
         if (cancelled) return;
         setState({
           isReady: true,
+          isInitialized: true,
           isLoggedIn: true,
+          isInClient,
           profile: {
             userId: profile.userId,
             displayName: profile.displayName,
@@ -67,6 +82,7 @@ export function useLiff(): LiffState {
           setState((s) => ({
             ...s,
             isReady: true,
+            isInitialized: true,
             error:
               err instanceof Error ? err.message : "LIFF initialization failed",
           }));
