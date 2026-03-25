@@ -52,6 +52,7 @@ from app.error_handlers import register_error_handlers
 from app.exchange.router import router as exchange_router
 from app.hooks.router import router as hooks_router
 from app.knowledge.router import router as knowledge_router
+from app.notifications.router import router as notification_router
 from app.portfolio.router import router as portfolio_router
 from app.proposals.router import router as proposals_router
 from app.reports.router import router as reports_router
@@ -60,7 +61,6 @@ from app.transactions.router import admin_router as admin_transactions_router
 from app.transactions.router import router as transactions_router
 from app.users.router import router as users_router
 from app.users.settings_router import router as user_settings_router
-from app.notifications.router import router as notification_router
 from app.webhook.router import router as webhook_router
 
 logger = logging.getLogger(__name__)
