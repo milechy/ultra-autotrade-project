@@ -102,13 +102,10 @@ class TestGetMultiChainSettings:
         settings = result["arbitrum"]
         assert settings.flashbots_rpc_url is None
 
-    @patch.dict(
-        "os.environ",
-        {
-            "AAVE_ACTIVE_CHAINS": "arbitrum",
-            # RPC URL missing
-        },
-    )
-    def test_missing_rpc_url_raises(self) -> None:
+    def test_missing_rpc_url_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Ensure RPC URL env vars are absent so ValueError is raised on staging too
+        monkeypatch.setenv("AAVE_ACTIVE_CHAINS", "arbitrum")
+        monkeypatch.delenv("AAVE_RPC_URL_ARBITRUM", raising=False)
+        monkeypatch.delenv("ALCHEMY_RPC_URL_ARBITRUM_SEPOLIA", raising=False)
         with pytest.raises(ValueError, match="RPC URL"):
             get_multi_chain_settings()

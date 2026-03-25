@@ -125,6 +125,7 @@ def test_scenario_buy_to_deposit(
     mock_octobot_client: MockOctoBotClient,
     fake_aave_client: FakeAaveClient,
     fake_state_manager: FakeAaveStateManager,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
     シナリオ 1: BUY → DEPOSIT
@@ -133,6 +134,9 @@ def test_scenario_buy_to_deposit(
     → OctoBotService.process_signals で OctoBot へ送信
     → AaveService.execute_rebalance で DEPOSIT 実行
     """
+    # Isolate from staging env: ensure max_single_trade_usd does not cap test amounts
+    monkeypatch.setenv("AAVE_MAX_SINGLE_TRADE_USD", "100")
+
     # 1. OctoBot シグナル処理
     octobot_service = OctoBotService(
         client=mock_octobot_client,
@@ -184,6 +188,7 @@ def test_scenario_sell_to_withdraw(
     mock_octobot_client: MockOctoBotClient,
     fake_aave_client: FakeAaveClient,
     fake_state_manager: FakeAaveStateManager,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
     シナリオ 2: SELL → WITHDRAW
@@ -192,6 +197,9 @@ def test_scenario_sell_to_withdraw(
     → OctoBotService.process_signals で OctoBot へ送信
     → AaveService.execute_rebalance で WITHDRAW 実行
     """
+    # Isolate from staging env: ensure max_single_trade_usd does not cap test amounts
+    monkeypatch.setenv("AAVE_MAX_SINGLE_TRADE_USD", "100")
+
     # 1. OctoBot シグナル処理
     octobot_service = OctoBotService(
         client=mock_octobot_client,

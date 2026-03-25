@@ -493,8 +493,12 @@ class TestAaveServiceFlow:
         self,
         fake_aave_client: FakeAaveClient,
         fake_state_manager: FakeAaveStateManager,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """BUY → DEPOSIT が 1 回実行される。"""
+        # Isolate from staging env: ensure max_single_trade_usd does not cap test amounts
+        monkeypatch.setenv("AAVE_MAX_SINGLE_TRADE_USD", "200")
+
         svc = AaveService(client=fake_aave_client, state_manager=fake_state_manager)
         result = svc.execute_rebalance(
             action=TradeAction.BUY,
