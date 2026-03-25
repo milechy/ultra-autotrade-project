@@ -26,6 +26,9 @@ export function registerSW(): void {
   })
 }
 
+// Alias for compatibility
+export const registerServiceWorker = registerSW;
+
 export function unregisterSW(): Promise<boolean> {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
     return Promise.resolve(false)
