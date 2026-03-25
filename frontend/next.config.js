@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
 const createNextIntlPlugin = require('next-intl/plugin');
 const withNextIntl = createNextIntlPlugin('./lib/i18n.ts');
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === 'development',
+});
 
 // PWA configuration (manual SW — no next-pwa package required)
 // sw.js is served from /public/sw.js
@@ -16,7 +22,7 @@ const nextConfig = {
   output: 'standalone',
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev }) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
       '@coinbase/wallet-sdk': false,
@@ -26,6 +32,12 @@ const nextConfig = {
       'pino-pretty': false,
       '@safe-global/safe-apps-provider': false,
     };
+    if (!dev && !isServer) {
+      config.optimization = {
+        ...config.optimization,
+        minimize: true,
+      };
+    }
     return config;
   },
   async headers() {
@@ -55,8 +67,9 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
-              "connect-src 'self' https://*.infura.io https://*.alchemy.com wss://*.walletconnect.org https://api.coingecko.com",
+              "connect-src 'self' https://*.infura.io https://*.alchemy.com wss://*.walletconnect.org https://api.coingecko.com https:",
               "frame-ancestors 'none'",
+              "worker-src 'self' blob:",
             ].join('; '),
           },
           {
@@ -72,4 +85,4 @@ const nextConfig = {
     ]
   },
 };
-module.exports = withNextIntl(nextConfig);
+module.exports = withNextIntl(withPWA(nextConfig));
