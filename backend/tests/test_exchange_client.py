@@ -234,8 +234,12 @@ class TestGetExchangeSettingsFallback:
 
         assert settings.sandbox is True
 
-    def test_empty_keys_trigger_dry_run(self):
+    def test_empty_keys_trigger_dry_run(self, monkeypatch):
         """When no API key env vars are set, api_key is empty (dry-run mode)."""
+        monkeypatch.delenv("EXCHANGE_API_KEY", raising=False)
+        monkeypatch.delenv("EXCHANGE_SECRET_KEY", raising=False)
+        monkeypatch.delenv("EXCHANGE_CLIENT_TYPE", raising=False)
+
         import app.exchange.config as cfg
 
         # Patch get_env to return None for all key-related vars
