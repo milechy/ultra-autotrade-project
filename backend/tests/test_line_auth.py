@@ -47,9 +47,7 @@ def test_db():
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
 
-    test_engine = create_engine(
-        f"sqlite:///{path}", connect_args={"check_same_thread": False}
-    )
+    test_engine = create_engine(f"sqlite:///{path}", connect_args={"check_same_thread": False})
     TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
     Base.metadata.create_all(bind=test_engine)
@@ -170,9 +168,7 @@ class TestLineAuth:
 
         assert response.status_code == 401
 
-    def test_line_auth_uses_payload_name_over_request_display_name(
-        self, client: TestClient
-    ):
+    def test_line_auth_uses_payload_name_over_request_display_name(self, client: TestClient):
         """LINE APIが返す name が display_name より優先されること。"""
         payload_with_name = {
             "sub": "Uxyz987654",
