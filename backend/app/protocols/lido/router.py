@@ -1,0 +1,62 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
+"""Lido Finance FastAPI ルーター。
+⚠️ このルーターは feature/phase2-protocols ブランチ専用。
+main.py への登録は dev マージ時に行う。
+"""
+
+from __future__ import annotations
+
+import logging
+
+from fastapi import APIRouter, HTTPException
+
+from .client import get_lido_client
+from .config import get_lido_config
+from .schemas import LidoAprResponse, LidoStakeRequest, LidoStakeResponse, LidoStatus
+from .service import LidoService
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/protocols/lido", tags=["lido"])
+
+
+def _get_service() -> LidoService:
+    config = get_lido_config()
+    client = get_lido_client(config)
+    return LidoService(client=client, config=config)
+
+
+@router.get("/status", response_model=LidoStatus)
+async def get_lido_status() -> LidoStatus:
+    """Lido ステータス取得（残高・APR・peg乖離）。"""
+    service = _get_service()
+    try:
+        return await service.get_status()
+    except Exception as exc:
+        logger.exception("Lido status 取得失敗")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/stake", response_model=LidoStakeResponse)
+async def stake_eth(request: LidoStakeRequest) -> LidoStakeResponse:
+    """ETH → stETH ステーキング実行。dry_run=True（デフォルト）でシミュレーション。"""
+    service = _get_service()
+    try:
+        return await service.stake(request)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Lido stake 失敗")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get("/apr", response_model=LidoAprResponse)
+async def get_lido_apr() -> LidoAprResponse:
+    """現在の Lido staking APR を返す。"""
+    service = _get_service()
+    try:
+        return await service.get_apr()
+    except Exception as exc:
+        logger.exception("Lido APR 取得失敗")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
