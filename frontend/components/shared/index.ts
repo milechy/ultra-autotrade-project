@@ -30,3 +30,6 @@ export type { WalletAddressMaskProps } from './WalletAddressMask'
 
 export { DateRangeFilter } from './DateRangeFilter'
 export type { DateRangeFilterProps } from './DateRangeFilter'
+
+export { SafetyScoreGauge } from './SafetyScoreGauge'
+export type { SafetyScoreGaugeProps } from './SafetyScoreGauge'
