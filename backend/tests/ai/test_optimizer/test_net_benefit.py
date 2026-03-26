@@ -219,6 +219,13 @@ class TestCalculate:
         assert isinstance(result.total_cost, Decimal)
         assert isinstance(result.risk_adjusted_yield, Decimal)
 
+    def test_expected_apy_passed_through(
+        self, calculator: ExpectedNetBenefitCalculator, aave_candidate: StrategyCandidate
+    ) -> None:
+        """candidate.expected_apy が NetBenefitResult に正確に引き継がれること。"""
+        result = calculator.calculate(aave_candidate, Decimal("10000"))
+        assert result.expected_apy == aave_candidate.expected_apy
+
 
 class TestRankStrategies:
     """rank_strategies メソッドのテスト。"""
@@ -275,6 +282,20 @@ class TestRankStrategies:
         # 同じ APY なら高リスクペナルティにより Pendle YT のランクが下がる
         assert aave_result.rank < pendle_yt_result.rank
         assert aave_result.risk_adjusted_yield > pendle_yt_result.risk_adjusted_yield
+
+    def test_rank_strategies_passes_through_expected_apy(
+        self,
+        calculator: ExpectedNetBenefitCalculator,
+        sample_candidates: list[StrategyCandidate],
+    ) -> None:
+        """rank_strategies が各候補の expected_apy を NetBenefitResult に引き継ぐこと。"""
+        results = calculator.rank_strategies(sample_candidates, Decimal("10000"))
+        candidate_apy_map = {c.protocol: c.expected_apy for c in sample_candidates}
+        for result in results:
+            assert result.expected_apy == candidate_apy_map[result.protocol], (
+                f"{result.protocol} expected_apy mismatch: "
+                f"got {result.expected_apy}, expected {candidate_apy_map[result.protocol]}"
+            )
 
     def test_multiple_candidates_with_same_net_benefit(
         self, calculator: ExpectedNetBenefitCalculator

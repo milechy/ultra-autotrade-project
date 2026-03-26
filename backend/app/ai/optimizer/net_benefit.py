@@ -87,6 +87,7 @@ class ExpectedNetBenefitCalculator:
             gross_yield=gross_yield,
             total_cost=total_cost,
             risk_adjusted_yield=risk_adjusted_yield,
+            expected_apy=candidate.expected_apy,
             rank=0,  # rank_strategies で設定
             recommendation=recommendation,
         )
@@ -134,6 +135,7 @@ class ExpectedNetBenefitCalculator:
                     gross_yield=result.gross_yield,
                     total_cost=result.total_cost,
                     risk_adjusted_yield=result.risk_adjusted_yield,
+                    expected_apy=result.expected_apy,
                     rank=i,
                     recommendation=result.recommendation,
                 )

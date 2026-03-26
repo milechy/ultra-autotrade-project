@@ -278,3 +278,12 @@ class TestConstraints:
             assert isinstance(entry.expected_apy, Decimal)
         assert isinstance(result.total_expected_apy, Decimal)
         assert isinstance(result.total_risk_score, Decimal)
+
+    def test_explanation_contains_disclaimer(
+        self,
+        allocator: PortfolioAllocator,
+        ranked_results: list,
+    ) -> None:
+        """説明文に免責事項が含まれること。"""
+        result = allocator.allocate(ranked_results, Decimal("10000"), "conservative")
+        assert "保証するものではありません" in result.explanation

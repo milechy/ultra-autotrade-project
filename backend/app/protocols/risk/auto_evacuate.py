@@ -154,7 +154,12 @@ class AutoEvacuator:
         return plan
 
     async def execute_evacuation(
-        self, plan: EvacuationPlan, dry_run: bool = True
+        self,
+        plan: EvacuationPlan,
+        dry_run: bool = True,
+        manual_approval: bool = False,
+        operation_mode: str = "active",
+        emergency_stop_active: bool = False,
     ) -> EvacuationResult:
         """避難計画を実行する。
 
@@ -166,10 +171,43 @@ class AutoEvacuator:
         Args:
             plan: 実行する避難計画。
             dry_run: True の場合はシミュレーションのみ（デフォルト True）。
+            manual_approval: 手動承認フラグ。
+            operation_mode: 運用モード ("active" or "managed")。
+            emergency_stop_active: 緊急停止フラグ。
 
         Returns:
             EvacuationResult
         """
+        # Guard 1: 緊急停止チェック
+        if emergency_stop_active:
+            logger.warning(
+                "execute_evacuation: 緊急停止が有効なため実行をブロックします。manual override required."
+            )
+            return EvacuationResult(
+                plan=plan,
+                executed=False,
+                dry_run=True,
+                steps_completed=0,
+                steps_total=len(plan.steps),
+                errors=["Emergency stop is active. Manual override required."],
+            )
+
+        # Guard 2: 本番実行時の承認チェック
+        if not dry_run:
+            if plan.priority == "immediate" and operation_mode == "managed":
+                # managed モード + CRITICAL → 自動実行許可
+                pass
+            elif not manual_approval:
+                logger.warning("execute_evacuation: 手動承認なしの本番実行をブロックします。")
+                return EvacuationResult(
+                    plan=plan,
+                    executed=False,
+                    dry_run=True,
+                    steps_completed=0,
+                    steps_total=len(plan.steps),
+                    errors=["Manual approval required for non-managed execution."],
+                )
+
         logger.warning(
             "execute_evacuation: dry_run=%s, steps=%d",
             dry_run,
@@ -191,19 +229,26 @@ class AutoEvacuator:
                     step.destination,
                 )
             steps_completed = len(plan.steps)
+            return EvacuationResult(
+                plan=plan,
+                executed=False,
+                dry_run=True,
+                steps_completed=steps_completed,
+                steps_total=len(plan.steps),
+                errors=errors,
+            )
         else:
             # PoC: 実装は未対応（本番フェーズで実装）
             logger.warning("execute_evacuation: 本番実行は未実装のため dry_run として扱います")
             steps_completed = len(plan.steps)
-
-        return EvacuationResult(
-            plan=plan,
-            executed=not dry_run,
-            dry_run=dry_run,
-            steps_completed=steps_completed,
-            steps_total=len(plan.steps),
-            errors=errors,
-        )
+            return EvacuationResult(
+                plan=plan,
+                executed=False,  # Fixed: always False since unimplemented
+                dry_run=True,  # Fixed: force dry_run=True
+                steps_completed=steps_completed,
+                steps_total=len(plan.steps),
+                errors=[],
+            )
 
     def _prioritize_steps(self, steps: list[EvacuationStep]) -> list[EvacuationStep]:
         """ステップを order 昇順（最高リスク優先）でソートする。

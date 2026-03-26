@@ -1,6 +1,7 @@
 """Pendle Finance サービス層のビジネスロジックテスト。"""
 
 import logging
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from unittest.mock import AsyncMock
 
@@ -8,7 +9,7 @@ import pytest
 
 from app.protocols.pendle.client import DummyPendleClient
 from app.protocols.pendle.config import PendleConfig
-from app.protocols.pendle.schemas import PendleMintRequest
+from app.protocols.pendle.schemas import PendleMarketInfo, PendleMintRequest, PendleRedeemRequest
 from app.protocols.pendle.service import PendleService
 
 
@@ -256,3 +257,76 @@ class TestPendleServiceDecimalPrecision:
         assert type(response.implied_fixed_yield) is Decimal
         assert response.pt_received is not None
         assert type(response.pt_received) is Decimal
+
+
+class TestPendleServiceRedeemMaturityCheck:
+    def _make_market_info(self, days_to_maturity: int) -> PendleMarketInfo:
+        return PendleMarketInfo(
+            market_address="0x" + "0" * 40,
+            underlying_asset="stETH",
+            maturity=datetime.now(tz=timezone.utc) + timedelta(days=days_to_maturity),
+            days_to_maturity=days_to_maturity,
+            implied_apy=Decimal("5.2"),
+            pt_price=Decimal("0.95"),
+            yt_price=Decimal("0.05"),
+            tvl_usd=Decimal("50000000"),
+        )
+
+    @pytest.mark.asyncio
+    async def test_redeem_pt_blocked_before_maturity(self, config: PendleConfig) -> None:
+        """PT リデームは満期前（days_to_maturity=30）にブロックされること。"""
+        mock_client = AsyncMock()
+        mock_client.get_market_info.return_value = self._make_market_info(30)
+        svc = PendleService(client=mock_client, config=config)
+        req = PendleRedeemRequest(
+            token_type="PT",
+            amount=Decimal("1.0"),
+            market_address="0x" + "0" * 40,
+        )
+
+        with pytest.raises(ValueError, match="Cannot redeem PT before maturity"):
+            await svc.redeem(req)
+
+    @pytest.mark.asyncio
+    async def test_redeem_pt_allowed_at_maturity(self, config: PendleConfig) -> None:
+        """PT リデームは満期時（days_to_maturity=0）に成功すること。"""
+        mock_client = AsyncMock()
+        mock_client.get_market_info.return_value = self._make_market_info(0)
+        mock_client.redeem_pt.return_value = {
+            "success": True,
+            "underlying_received": Decimal("1.0"),
+            "tx_hash": "0x" + "cc" * 32,
+        }
+        svc = PendleService(client=mock_client, config=config)
+        req = PendleRedeemRequest(
+            token_type="PT",
+            amount=Decimal("1.0"),
+            market_address="0x" + "0" * 40,
+            dry_run=False,
+        )
+
+        response = await svc.redeem(req)
+        assert response is not None
+        assert response.operation == "REDEEM_PT"
+
+    @pytest.mark.asyncio
+    async def test_redeem_yt_not_blocked_by_maturity(self, config: PendleConfig) -> None:
+        """YT リデームは満期チェックに影響されないこと（days_to_maturity=30 でも成功）。"""
+        mock_client = AsyncMock()
+        mock_client.get_market_info.return_value = self._make_market_info(30)
+        mock_client.redeem_yt.return_value = {
+            "success": True,
+            "underlying_received": Decimal("0.05"),
+            "tx_hash": "0x" + "dd" * 32,
+        }
+        svc = PendleService(client=mock_client, config=config)
+        req = PendleRedeemRequest(
+            token_type="YT",
+            amount=Decimal("1.0"),
+            market_address="0x" + "0" * 40,
+            dry_run=False,
+        )
+
+        response = await svc.redeem(req)
+        assert response is not None
+        assert response.operation == "REDEEM_YT"

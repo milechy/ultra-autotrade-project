@@ -67,6 +67,7 @@ class NetBenefitResult(BaseModel):
     gross_yield: Decimal  # グロス利回り（USD）
     total_cost: Decimal  # 合計コスト（ガス + ブリッジ）
     risk_adjusted_yield: Decimal  # リスク調整後利回り
+    expected_apy: Decimal = Decimal("0")  # 元の期待APY (%)
     rank: int  # 1 = 最良
     recommendation: Recommendation
 

@@ -15,6 +15,8 @@ from .strategy_scorer import StrategyScorer
 
 logger = logging.getLogger(__name__)
 
+_DISCLAIMER = "\n\n※ 本提案は将来の収益を保証するものではありません。市場環境により実際の結果は異なる場合があります。"
+
 # プロトコル表示名（日本語）
 _PROTOCOL_DISPLAY: dict[str, str] = {
     "aave": "Aave 預金",
@@ -137,7 +139,7 @@ class StrategyComparator:
             net_benefit_val,
         )
 
-        return report
+        return report + _DISCLAIMER
 
     def _format_result(self, result: NetBenefitResult) -> str:
         """単一結果を人間が読みやすい文字列に変換する。"""

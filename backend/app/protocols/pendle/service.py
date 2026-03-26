@@ -146,6 +146,16 @@ class PendleService:
 
     async def redeem(self, request: PendleRedeemRequest) -> PendleRedeemResponse:
         """PT または YT のリデーム実行。"""
+        # 満期チェック（PT の場合のみ）
+        if request.token_type == "PT":
+            market_info = await self._client.get_market_info(request.market_address)
+            if market_info.days_to_maturity > 0:
+                raise ValueError(
+                    f"Cannot redeem PT before maturity. "
+                    f"Days remaining: {market_info.days_to_maturity}. "
+                    f"Use market sell instead."
+                )
+
         if request.dry_run:
             logger.info(
                 "PendleService.redeem dry_run: token_type=%s, amount=%s",

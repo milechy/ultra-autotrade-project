@@ -87,13 +87,20 @@ async def redeem_tokens(request: PendleRedeemRequest) -> PendleRedeemResponse:
 
 
 @router.get("/strategies", response_model=StrategyComparison)
-async def get_strategies(amount: float = 1.0) -> StrategyComparison:
+async def get_strategies(amount: str = "1.0") -> StrategyComparison:
     """利用可能な戦略の比較を返す。"""
     from decimal import Decimal  # noqa: PLC0415
 
     from ..lido.client import get_lido_client as get_lido  # noqa: PLC0415
     from ..lido.config import get_lido_config  # noqa: PLC0415
     from .strategy import LidoPendleCompoundStrategy  # noqa: PLC0415
+
+    try:
+        amount_decimal = Decimal(amount)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400, detail="Invalid amount format. Use numeric string."
+        ) from exc
 
     try:
         lido_config = get_lido_config()
@@ -106,7 +113,7 @@ async def get_strategies(amount: float = 1.0) -> StrategyComparison:
             pendle_client=pendle_client,
         )
         return await strategy.compare_strategies(
-            amount=Decimal(str(amount)),
+            amount=amount_decimal,
             market_address=pendle_config.market_address,
         )
     except Exception as exc:

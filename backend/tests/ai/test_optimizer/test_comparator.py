@@ -110,3 +110,9 @@ class TestGenerateReport:
         result = comparator.compare(Decimal("5000"))
         assert result is not None
         assert len(result.candidates) == 5
+
+    def test_report_contains_disclaimer(self, comparator: StrategyComparator) -> None:
+        """generate_report が免責事項を含むこと。"""
+        comparison = comparator.compare(Decimal("10000"))
+        report = comparator.generate_report(comparison)
+        assert "保証するものではありません" in report

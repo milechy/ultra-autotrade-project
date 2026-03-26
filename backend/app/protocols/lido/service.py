@@ -28,7 +28,14 @@ class LidoService:
         # 1. peg 乖離チェック
         ratio = await self._client.get_steth_eth_ratio()
         deviation_pct = abs(Decimal("1") - ratio) * Decimal("100")
-        if deviation_pct > Decimal(str(self._config.peg_deviation_warn_pct)):
+        if deviation_pct > Decimal("2"):
+            error_msg = (
+                f"stETH/ETH peg deviation {deviation_pct}% exceeds "
+                f"critical threshold (2%). Staking blocked."
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        elif deviation_pct > Decimal(str(self._config.peg_deviation_warn_pct)):
             logger.warning(
                 "stETH/ETH ペグ乖離警告: deviation=%.2f%% (閾値=%.2f%%)",
                 float(deviation_pct),

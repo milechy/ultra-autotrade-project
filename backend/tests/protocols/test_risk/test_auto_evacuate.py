@@ -196,6 +196,55 @@ class TestExecuteEvacuation:
         result = await evacuator.execute_evacuation(plan, dry_run=True)
         assert result.errors == []
 
+    @pytest.mark.asyncio
+    async def test_execute_blocked_by_emergency_stop(self, evacuator: AutoEvacuator) -> None:
+        """emergency_stop_active=True のとき実行がブロックされること。"""
+        assessment = _make_assessment(should_evacuate=True)
+        plan = await evacuator.create_evacuation_plan(assessment)
+        assert plan is not None
+        result = await evacuator.execute_evacuation(plan, emergency_stop_active=True)
+        assert result.executed is False
+        assert any("Emergency stop" in e for e in result.errors)
+
+    @pytest.mark.asyncio
+    async def test_execute_blocked_without_manual_approval(self, evacuator: AutoEvacuator) -> None:
+        """dry_run=False, manual_approval=False, operation_mode="active" のとき実行がブロックされること。"""
+        assessment = _make_assessment(should_evacuate=True)
+        plan = await evacuator.create_evacuation_plan(assessment)
+        assert plan is not None
+        result = await evacuator.execute_evacuation(
+            plan, dry_run=False, manual_approval=False, operation_mode="active"
+        )
+        assert result.executed is False
+        assert any("Manual approval required" in e for e in result.errors)
+
+    @pytest.mark.asyncio
+    async def test_execute_allowed_managed_immediate(self, evacuator: AutoEvacuator) -> None:
+        """dry_run=False, operation_mode="managed", plan.priority="immediate" のとき承認不要でブロックされないこと。"""
+        # CRITICAL リスク → priority="immediate"
+        assessment = _make_assessment(should_evacuate=True, overall_risk=RiskLevel.CRITICAL)
+        plan = await evacuator.create_evacuation_plan(assessment)
+        assert plan is not None
+        assert plan.priority == "immediate"
+        result = await evacuator.execute_evacuation(
+            plan, dry_run=False, manual_approval=False, operation_mode="managed"
+        )
+        # PoC では未実装なので executed=False だが、承認エラーは含まれない
+        assert result.executed is False
+        assert not any("Manual approval required" in e for e in result.errors)
+
+    @pytest.mark.asyncio
+    async def test_execute_unimplemented_returns_false(self, evacuator: AutoEvacuator) -> None:
+        """dry_run=False + 承認あり → executed=False, dry_run=True（未実装のため）。"""
+        assessment = _make_assessment(should_evacuate=True)
+        plan = await evacuator.create_evacuation_plan(assessment)
+        assert plan is not None
+        result = await evacuator.execute_evacuation(
+            plan, dry_run=False, manual_approval=True, operation_mode="active"
+        )
+        assert result.executed is False
+        assert result.dry_run is True
+
 
 class TestPrioritizeSteps:
     def test_prioritize_steps_sorts_ascending(self, evacuator: AutoEvacuator) -> None:

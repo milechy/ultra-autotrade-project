@@ -54,22 +54,46 @@ class TestLidoServiceStake:
         assert response.operation == "STAKE"
 
     @pytest.mark.asyncio
-    async def test_peg_deviation_warning_logged(
-        self, config: LidoConfig, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """peg 乖離 > 2% で WARNING ログが出ることを確認。"""
+    async def test_peg_deviation_warning_logged(self, caplog: pytest.LogCaptureFixture) -> None:
+        """peg 乖離 > warn_pct (1%) かつ <= 2% で WARNING ログが出ることを確認。"""
+        warn_config = LidoConfig(sandbox=True, peg_deviation_warn_pct=1.0)
         mock_client = AsyncMock()
-        mock_client.get_steth_eth_ratio.return_value = Decimal("0.97")  # 3% deviation
+        mock_client.get_steth_eth_ratio.return_value = Decimal("0.985")  # 1.5% deviation
         mock_client.get_staking_apr.return_value = Decimal("3.5")
         mock_client.stake_eth.return_value = TxResult(
             tx_hash="0x" + "ab" * 32, success=True, received_steth_wei=100_000_000_000_000_000
         )
-        svc = LidoService(client=mock_client, config=config)
+        svc = LidoService(client=mock_client, config=warn_config)
         request = LidoStakeRequest(amount_eth=Decimal("0.1"), dry_run=True)
 
         with caplog.at_level(logging.WARNING, logger="app.protocols.lido.service"):
             await svc.stake(request)
         assert any("ペグ乖離警告" in record.message for record in caplog.records)
+
+    @pytest.mark.asyncio
+    async def test_stake_blocked_on_critical_peg_deviation(self, config: LidoConfig) -> None:
+        """peg 乖離 > 2% (ratio=0.97, 3% deviation) でステーキングがブロックされること。"""
+        mock_client = AsyncMock()
+        mock_client.get_steth_eth_ratio.return_value = Decimal("0.97")  # 3% deviation
+        mock_client.get_staking_apr.return_value = Decimal("3.5")
+        svc = LidoService(client=mock_client, config=config)
+        request = LidoStakeRequest(amount_eth=Decimal("0.1"), dry_run=True)
+
+        with pytest.raises(ValueError, match="Staking blocked"):
+            await svc.stake(request)
+
+    @pytest.mark.asyncio
+    async def test_stake_allowed_on_minor_peg_deviation(self, config: LidoConfig) -> None:
+        """peg 乖離 <= 2% (ratio=0.99, 1% deviation) でステーキングが正常に進むこと。"""
+        mock_client = AsyncMock()
+        mock_client.get_steth_eth_ratio.return_value = Decimal("0.99")  # 1% deviation
+        mock_client.get_staking_apr.return_value = Decimal("3.5")
+        svc = LidoService(client=mock_client, config=config)
+        request = LidoStakeRequest(amount_eth=Decimal("0.1"), dry_run=True)
+
+        response = await svc.stake(request)
+        assert response is not None
+        assert response.dry_run is True
 
     @pytest.mark.asyncio
     async def test_no_peg_deviation_warning_when_normal(

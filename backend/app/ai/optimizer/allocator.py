@@ -17,6 +17,10 @@ from .schemas import (
 
 logger = logging.getLogger(__name__)
 
+_DISCLAIMER = (
+    "\n\n※ 本提案は将来の収益を保証するものではありません。投資判断は自己責任でお願いします。"
+)
+
 # 最小アイドル/現金リザーブ
 _MIN_IDLE_PCT = Decimal("5")
 
@@ -181,23 +185,9 @@ class PortfolioAllocator:
                     asset=info.asset,
                     allocation_pct=pct,
                     amount_usd=total_usd * pct / Decimal("100"),
-                    expected_apy=info.gross_yield
-                    / (total_usd * pct / Decimal("100"))
-                    * Decimal("100")
-                    if (total_usd * pct) > Decimal("0")
-                    else Decimal("0"),
+                    expected_apy=info.expected_apy,
                 )
             )
-
-        # APY を ranked_results から直接設定（より正確）
-        for entry in entries:
-            if entry.protocol == Protocol.IDLE:
-                continue
-            info = protocol_info.get(entry.protocol)
-            if info is not None:
-                # APY は候補の元データから取得するため scorer から再設定
-                # ここでは gross_yield を元に逆算
-                pass
 
         return entries
 
@@ -308,16 +298,17 @@ class PortfolioAllocator:
         apy_str = f"{total_expected_apy:.1f}"
 
         if risk_mode == "conservative":
-            return f"安全重視の配分です。預金のみで年率約{apy_str}%の利回りが期待できます。"
+            explanation = f"安全重視の配分です。預金のみで年率約{apy_str}%の利回りが期待できます。"
         elif risk_mode == "balanced":
-            return (
+            explanation = (
                 f"バランス型の配分です。"
                 f"複数の運用先に分散し、年率約{apy_str}%の利回りが期待できます。"
             )
         elif risk_mode == "aggressive":
-            return (
+            explanation = (
                 f"積極型の配分です。"
                 f"高い利回りを狙いますが、リスクも高めです。年率約{apy_str}%の期待利回りです。"
             )
         else:
-            return f"年率約{apy_str}%の利回りが期待できます。"
+            explanation = f"年率約{apy_str}%の利回りが期待できます。"
+        return explanation + _DISCLAIMER
