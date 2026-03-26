@@ -115,8 +115,14 @@ git log -3 --oneline
 ### 3-2. Docker イメージのビルド
 
 ```bash
-docker compose -f docker-compose.staging.yml --env-file .env.staging build --no-cache
+# .env.staging の変数をシェルにexport（NEXT_PUBLIC_* をビルドに渡すため必須）
+export $(grep -v '^#' .env.staging | xargs)
+docker compose -f docker-compose.staging.yml build --no-cache
 ```
+
+> **重要:** `NEXT_PUBLIC_*` 変数は Docker の `build.args` として渡されるが、
+> docker compose は `env_file` の値を `build.args` に自動展開しない。
+> `export` でシェル環境変数に読み込んでからビルドすることで正しく埋め込まれる。
 
 ビルド時間の目安: 3〜5 分
 

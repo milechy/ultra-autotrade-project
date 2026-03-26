@@ -1,4 +1,15 @@
 /** @type {import('next').NextConfig} */
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
+const cspConnectSrc = [
+  "'self'",
+  backendUrl,
+  "https://*.infura.io",
+  "https://*.alchemy.com",
+  "wss://*.walletconnect.org",
+  "https://api.coingecko.com",
+  "https:",
+].filter(Boolean).join(' ');
+
 const createNextIntlPlugin = require('next-intl/plugin');
 const withNextIntl = createNextIntlPlugin('./lib/i18n.ts');
 const withPWA = require('next-pwa')({
@@ -67,7 +78,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
-              "connect-src 'self' https://*.infura.io https://*.alchemy.com wss://*.walletconnect.org https://api.coingecko.com https:",
+              `connect-src ${cspConnectSrc}`,
               "frame-ancestors 'none'",
               "worker-src 'self' blob:",
             ].join('; '),
