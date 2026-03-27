@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 'use client'
 
-// Aave V3 コントラクトアドレス（Arbitrum One）
+// Aave V3 コントラクトアドレス（チェーン別）
 export const AAVE_V3_ADDRESSES = {
   arbitrum: {
     Pool: '0x794a61358D6845594F94dc1DB02A252b5b4814aD',
@@ -9,9 +9,14 @@ export const AAVE_V3_ADDRESSES = {
     Oracle: '0xb56c2F0B653B2e0b10C9b928C8580Ac5Df02C7C5',
   },
   'arbitrum-sepolia': {
-    Pool: '0xBfC91D59fdAA134A4ED45f7B584cAf96D7792Eff', // testnet
+    Pool: '0xBfC91D59fdAA134A4ED45f7B584cAf96D7792Eff',
     PoolDataProvider: '0x7F23D86Ee20D869112572136221e173428DD523f',
     Oracle: '0x5Cd4628e6904807057A7eFe7C7Bc36a12B2d4ab5',
+  },
+  'base-sepolia': {
+    Pool: '0x8bAB6d1b75f19e9eD9fCe8b9BD338844fF79aE27',
+    PoolDataProvider: '0x69FA688f1Dc47d4B5d8029D5a35FB7a548310654',
+    Oracle: '0xb56c2F0B653B2e0b10C9b928C8580Ac5Df02C7C5',
   },
 } as const
 
@@ -28,6 +33,13 @@ export const TOKEN_ADDRESSES = {
     USDC: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
     USDT: '0x27CEA6Eb8a21Aae05Eb29C91c5CA10592892F584',
     WETH: '0x980B62Da83eFf3D4576C647993b0c1D7faf17c73',
+    WBTC: '0x6Bf14CB0A831078629D993FDeBcB182b21A8774C',
+    DAI:  '0xc5E420e74Fd98Da91dAC7Bca77f00a6aECde02d4',
+  },
+  'base-sepolia': {
+    USDC: '0xba50cd2a20f6da35d788639e581bca8d0b5d4d5f',
+    USDT: '0x27CEA6Eb8a21Aae05Eb29C91c5CA10592892F584',
+    WETH: '0x4200000000000000000000000000000000000006',
     WBTC: '0x6Bf14CB0A831078629D993FDeBcB182b21A8774C',
     DAI:  '0xc5E420e74Fd98Da91dAC7Bca77f00a6aECde02d4',
   },
@@ -56,7 +68,7 @@ export type SupportedChainKey = keyof typeof SUPPORTED_CHAINS
 export type SupportedToken = keyof typeof TOKEN_ADDRESSES.arbitrum
 
 export const DEFAULT_CHAIN: SupportedChainKey =
-  (process.env.NEXT_PUBLIC_DEFAULT_CHAIN as SupportedChainKey) || 'arbitrum-sepolia'
+  (process.env.NEXT_PUBLIC_DEFAULT_CHAIN as SupportedChainKey) || 'base-sepolia'
 
 export const MINIMUM_USD_BALANCE = 3000
 export const ARBITRUM_CHAIN_IDS = [42161, 421614, 84532]
