@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { postJson } from '@/lib/api/http'
+import { useAutomationStatus } from '@/components/user/UserProviders'
 
 const navItems = [
   { href: '/user/dashboard', label: 'ダッシュボード' },
@@ -28,8 +29,8 @@ export function UserHeader() {
   const router = useRouter()
   const { user, logout, token } = useAuth()
   const { address, chain } = useAccount()
+  const { isStopped, refreshStatus } = useAutomationStatus()
   const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false)
-  const [emergencyStopped, setEmergencyStopped] = useState(false)
 
   const handleLogout = async () => {
     await logout()
@@ -42,7 +43,7 @@ export function UserHeader() {
       await postJson('/automation/emergency-stop', {}, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      setEmergencyStopped(true)
+      await refreshStatus()
     } finally {
       setShowEmergencyConfirm(false)
     }
@@ -101,7 +102,7 @@ export function UserHeader() {
                 {user.username}
               </span>
             )}
-            {emergencyStopped ? (
+            {isStopped ? (
               <span className="flex items-center justify-center h-7 w-7 rounded-full bg-destructive text-destructive-foreground">
                 <ShieldAlert size={14} />
               </span>

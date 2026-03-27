@@ -9,19 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { KPICard, HealthFactorGauge, StatusBadge } from '@/components/shared'
 import { useWallet } from '@/hooks/useWallet'
 import { useAaveV3 } from '@/hooks/useAaveV3'
-import { fetchAutomationStatus } from '@/lib/api/automation'
+import { useAutomationStatus } from '@/components/user/UserProviders'
 import type { AaveUserAccountData } from '@/types/web3'
-import type { AutomationStatus } from '@/lib/types'
-
-import type { StatusBadgeProps } from '@/components/shared'
-
-type SystemStatus = StatusBadgeProps['status']
-
-function toSystemStatus(s: AutomationStatus): SystemStatus {
-  if (s.emergency_reason) return 'HARD_STOP'
-  if (s.is_trading_paused) return 'PAUSED'
-  return 'NORMAL'
-}
 
 function formatUSD(raw: bigint): string {
   const usd = Number(raw) / 1e8
@@ -39,11 +28,11 @@ function parseHealthFactor(raw: bigint): number | null {
 export function PortfolioSummary() {
   const { address, isConnected } = useWallet()
   const { getUserAccountData } = useAaveV3()
+  const { systemStatus, isStopped } = useAutomationStatus()
   const [data, setData] = useState<AaveUserAccountData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [systemStatus, setSystemStatus] = useState<SystemStatus>('NORMAL')
 
   const fetchData = useCallback(async (silent = false) => {
     if (!isConnected || !address) return
@@ -65,27 +54,14 @@ export function PortfolioSummary() {
     fetchData()
   }, [fetchData])
 
-  // U-03: Load automation status from GET /api/automation/status
-  const fetchStatus = useCallback(async () => {
-    try {
-      const status = await fetchAutomationStatus()
-      setSystemStatus(toSystemStatus(status))
-    } catch {/* keep current status on error */}
-  }, [])
-
-  useEffect(() => {
-    fetchStatus()
-  }, [fetchStatus])
-
   // 30-second auto-refresh (stale-while-revalidate)
   useEffect(() => {
     if (!isConnected) return
     const id = setInterval(() => {
       fetchData(true)
-      fetchStatus()
     }, 30_000)
     return () => clearInterval(id)
-  }, [isConnected, fetchData, fetchStatus])
+  }, [isConnected, fetchData])
 
   if (!isConnected) {
     return (
@@ -124,6 +100,14 @@ export function PortfolioSummary() {
 
   return (
     <div className="space-y-4">
+      {isStopped && (
+        <div className="rounded-lg border border-red-800 bg-red-950/40 px-4 py-3 flex items-start gap-2">
+          <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-red-400" />
+          <p className="text-sm text-red-400 font-medium">
+            緊急停止中 — 全ての自動取引が停止されています。解除には管理者への連絡が必要です。
+          </p>
+        </div>
+      )}
       {refreshing && (
         <div className="flex items-center gap-1.5 text-xs text-zinc-500">
           <RefreshCw className="h-3 w-3 animate-spin" />

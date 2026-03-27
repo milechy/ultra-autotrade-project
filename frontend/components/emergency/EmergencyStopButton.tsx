@@ -7,11 +7,12 @@ import { AlertTriangle, ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth'
 import { postJson } from '@/lib/api/http'
+import { useAutomationStatus } from '@/components/user/UserProviders'
 export function EmergencyStopButton() {
   const { token } = useAuth()
+  const { isStopped, refreshStatus } = useAutomationStatus()
   const [showConfirm, setShowConfirm] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [stopped, setStopped] = useState(false)
 
   const handleConfirm = async () => {
     if (!token) return
@@ -20,10 +21,10 @@ export function EmergencyStopButton() {
       await postJson('/automation/emergency-stop', {}, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      setStopped(true)
+      await refreshStatus()
       setShowConfirm(false)
     } catch {
-      // fail silently, stopped state not set
+      // fail silently, isStopped state not set
     } finally {
       setIsLoading(false)
     }
@@ -33,24 +34,24 @@ export function EmergencyStopButton() {
     <>
       {/* Floating button — above BottomNav (bottom-nav is h-16 = 64px) */}
       <button
-        onClick={() => !stopped && setShowConfirm(true)}
+        onClick={() => !isStopped && setShowConfirm(true)}
         className={[
           'fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-all',
-          stopped
+          isStopped
             ? 'bg-destructive/40 cursor-not-allowed'
             : 'bg-destructive hover:bg-destructive/90 active:scale-95',
         ].join(' ')}
         aria-label="緊急停止"
-        title={stopped ? '停止中' : '緊急停止'}
+        title={isStopped ? '停止中' : '緊急停止'}
       >
-        {stopped ? (
+        {isStopped ? (
           <ShieldAlert className="h-5 w-5 text-destructive-foreground/60" />
         ) : (
           <AlertTriangle className="h-5 w-5 text-destructive-foreground" />
         )}
       </button>
 
-      {stopped && (
+      {isStopped && (
         <div className="fixed bottom-20 right-16 z-40">
           <span className="rounded bg-destructive/90 px-2 py-1 text-xs text-destructive-foreground font-medium">
             {'停止中'}

@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
 import { Bell, TrendingUp, ShieldAlert, Save, RefreshCw, Info } from 'lucide-react'
+import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RiskModeSelector } from '@/components/transparency'
 import type { RiskProfile } from '@/components/transparency'
@@ -16,7 +17,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import AuthGuard from '@/components/AuthGuard'
 import { EmergencyStop } from '@/components/user/EmergencyStop'
 import { useAuth } from '@/lib/auth'
-import { UserProviders } from '@/components/user/UserProviders'
+import { useAutomationStatus } from '@/components/user/UserProviders'
 import { getJson, putJson } from '@/lib/api/http'
 
 type NotificationLevel = 'all' | 'alert' | 'emergency'
@@ -86,12 +87,12 @@ function SectionHeader({ icon: Icon, title }: { icon: React.ElementType; title: 
 
 function SettingsPage() {
   const { token, isAdmin } = useAuth()
+  const { isStopped, refreshStatus } = useAutomationStatus()
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
-  const [isStopped, setIsStopped] = useState(false)
   const [riskProfiles, setRiskProfiles] = useState<RiskProfile[]>([])
   const [selectedRiskProfile, setSelectedRiskProfile] = useState<string>('')
   const [riskProfileLoading, setRiskProfileLoading] = useState(true)
@@ -101,12 +102,11 @@ function SettingsPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const data = await getJson<UserSettings & { is_trading_paused?: boolean }>(
+      const data = await getJson<UserSettings>(
         '/api/user/settings',
         { headers: { Authorization: `Bearer ${token}` } }
       )
       setSettings({ ...DEFAULT_SETTINGS, ...data })
-      if (data.is_trading_paused != null) setIsStopped(data.is_trading_paused)
     } catch {
       // use defaults silently if endpoint not ready
     } finally {
@@ -167,6 +167,19 @@ function SettingsPage() {
 
   const set = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }))
+  }
+
+  const handleRiskModeSelect = async (name: string) => {
+    if (!token) return
+    try {
+      await putJson('/auth/risk-mode', { mode: name }, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setSelectedRiskProfile(name)
+      toast.success('リスクモードを保存しました')
+    } catch {
+      toast.error('リスクモードの保存に失敗しました')
+    }
   }
 
   const notificationLevelOptions: { value: NotificationLevel; label: string }[] = [
@@ -384,7 +397,7 @@ function SettingsPage() {
               <RiskModeSelector
                 profiles={riskProfiles}
                 current={selectedRiskProfile}
-                onSelect={setSelectedRiskProfile}
+                onSelect={(name) => { void handleRiskModeSelect(name) }}
               />
             ) : (
               <p className="text-sm text-muted-foreground">リスクプロファイルを取得できませんでした</p>
@@ -396,7 +409,7 @@ function SettingsPage() {
         {isAdmin && (
           <EmergencyStop
             isStopped={isStopped}
-            onStopped={() => setIsStopped(true)}
+            onStopped={() => { void refreshStatus() }}
           />
         )}
 
@@ -413,10 +426,8 @@ function SettingsPage() {
 
 export default function UserSettingsPage() {
   return (
-    <UserProviders>
-      <AuthGuard>
-        <SettingsPage />
-      </AuthGuard>
-    </UserProviders>
+    <AuthGuard>
+      <SettingsPage />
+    </AuthGuard>
   )
 }
