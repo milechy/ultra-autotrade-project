@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ShieldAlert } from 'lucide-react'
+import { ShieldAlert, ShieldOff } from 'lucide-react'
 import { useAccount } from 'wagmi'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
@@ -31,6 +31,7 @@ export function UserHeader() {
   const { address, chain } = useAccount()
   const { isStopped, refreshStatus } = useAutomationStatus()
   const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false)
+  const [showResumeConfirm, setShowResumeConfirm] = useState(false)
 
   const handleLogout = async () => {
     await logout()
@@ -40,12 +41,24 @@ export function UserHeader() {
   const handleEmergencyStop = async () => {
     if (!token) return
     try {
-      await postJson('/automation/emergency-stop', {}, {
+      await postJson('/api/automation/emergency-stop', {}, {
         headers: { Authorization: `Bearer ${token}` },
       })
       await refreshStatus()
     } finally {
       setShowEmergencyConfirm(false)
+    }
+  }
+
+  const handleResume = async () => {
+    if (!token) return
+    try {
+      await postJson('/api/automation/emergency-stop/resume', {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      await refreshStatus()
+    } finally {
+      setShowResumeConfirm(false)
     }
   }
 
@@ -103,9 +116,14 @@ export function UserHeader() {
               </span>
             )}
             {isStopped ? (
-              <span className="flex items-center justify-center h-7 w-7 rounded-full bg-destructive text-destructive-foreground">
-                <ShieldAlert size={14} />
-              </span>
+              <button
+                onClick={() => setShowResumeConfirm(true)}
+                className="flex items-center justify-center h-7 w-7 rounded-full bg-amber-500 hover:bg-amber-400 text-white transition-colors"
+                aria-label="停止解除"
+                title="停止解除"
+              >
+                <ShieldOff size={14} />
+              </button>
             ) : (
               <button
                 onClick={() => setShowEmergencyConfirm(true)}
@@ -163,6 +181,32 @@ export function UserHeader() {
                 className="flex-1 rounded bg-destructive px-3 py-2 text-sm font-bold text-destructive-foreground hover:bg-destructive/90 transition-colors"
               >
                 停止する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resume confirmation dialog */}
+      {showResumeConfirm && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-sm rounded-xl bg-background border p-6 shadow-xl">
+            <p className="mb-2 text-base font-semibold">運用を再開しますか？</p>
+            <p className="mb-4 text-sm text-amber-600 dark:text-amber-400">
+              注意: Health Factor など自動条件が未改善の場合、再開後に再停止される可能性があります。
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowResumeConfirm(false)}
+                className="flex-1 rounded border px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleResume}
+                className="flex-1 rounded bg-amber-500 px-3 py-2 text-sm font-bold text-white hover:bg-amber-400 transition-colors"
+              >
+                再開する
               </button>
             </div>
           </div>
