@@ -176,6 +176,22 @@ def emergency_stop_api(
     }
 
 
+@router.post("/emergency-stop/resume", summary="緊急停止解除")
+def resume_emergency_stop_api(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+    current_user: User = Depends(require_active_user),
+) -> dict[str, Any]:
+    """
+    手動緊急停止を解除する。
+    HF < 1.6 など自動トリガーによる停止は、HF が改善しない限り再度停止される。
+    """
+    monitoring_service.clear_emergency_stop()
+    return {
+        "status": "resumed",
+        "message": "緊急停止を解除しました。HF等の自動条件が未改善の場合は再停止される可能性があります。",
+    }
+
+
 @router.post("/pause", summary="ユーザー運用一時停止")
 def pause_automation(
     current_user: User = Depends(require_active_user),
