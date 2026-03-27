@@ -3,7 +3,13 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { AuthProvider } from '@/lib/auth'
+import { Toaster } from 'sonner'
 
 export function UserProviders({ children }: { children: React.ReactNode }) {
-  return <AuthProvider>{children}</AuthProvider>
+  return (
+    <AuthProvider>
+      {children}
+      <Toaster position="top-center" richColors />
+    </AuthProvider>
+  )
 }

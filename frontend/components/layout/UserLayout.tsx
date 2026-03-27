@@ -6,6 +6,8 @@ import { useAuth } from '@/lib/auth'
 import { EmergencyStopButton } from '@/components/shared'
 import { UserHeader } from './UserHeader'
 import { BottomNav } from './BottomNav'
+import { toast } from 'sonner'
+import { postJson } from '@/lib/api/http'
 
 interface UserLayoutProps {
   children: React.ReactNode
@@ -17,10 +19,14 @@ export function UserLayout({ children, pendingCount }: UserLayoutProps) {
 
   const handleEmergencyStop = async () => {
     if (!token) return
-    await fetch('/api/automation/emergency-stop', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    try {
+      await postJson('/automation/emergency-stop', {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      toast.success('緊急停止を実行しました')
+    } catch {
+      toast.error('緊急停止の実行に失敗しました')
+    }
   }
 
   return (
