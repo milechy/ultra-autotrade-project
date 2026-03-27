@@ -43,7 +43,7 @@ export function WalletContent() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <Step num={1} text="MetaMask または WalletConnect 対応ウォレットを準備" />
-            <Step num={2} text="Arbitrum ネットワークを追加・切り替え" />
+            <Step num={2} text="Base Sepolia ネットワークを追加・切り替え" />
             <Step num={3} text="下のボタンからウォレットを接続" />
           </CardContent>
         </Card>
@@ -83,7 +83,7 @@ export function WalletContent() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>ネットワークが違います</AlertTitle>
           <AlertDescription>
-            Arbitrum ネットワークに切り替えてください。現在: {chain?.name ?? '不明'}
+            Base Sepolia ネットワークに切り替えてください。現在: {chain?.name ?? '不明'}
           </AlertDescription>
         </Alert>
       )}

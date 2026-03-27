@@ -10,8 +10,19 @@ import { useWallet } from '@/hooks/useWallet'
 import { useAuth } from '@/lib/auth'
 import { useMinimumBalance } from '@/hooks/useMinimumBalance'
 
-// Arbitrum One (mainnet), Arbitrum Sepolia (testnet), and Base Sepolia (testnet)
-const ARBITRUM_CHAIN_IDS = [42161, 421614, 84532]
+// Arbitrum One (mainnet), Arbitrum Sepolia (testnet), Base Sepolia (testnet)
+const SUPPORTED_CHAIN_IDS = [42161, 421614, 84532]
+
+const CHAIN_DISPLAY_NAMES: Record<number, string> = {
+  42161: 'Arbitrum One',
+  421614: 'Arbitrum Sepolia',
+  84532: 'Base Sepolia',
+}
+
+function getNetworkDisplayName(chainId: number | null): string {
+  if (chainId == null) return '不明なネットワーク'
+  return CHAIN_DISPLAY_NAMES[chainId] ?? `Chain ${chainId}`
+}
 
 const STEP_LABELS = [
   'ウォレット接続',
@@ -85,7 +96,7 @@ export default function ConnectPage() {
   }
   const balanceCheck = checkMinimum(mockAccountData)
 
-  const isCorrectNetwork = chainId != null && ARBITRUM_CHAIN_IDS.includes(chainId)
+  const isCorrectNetwork = chainId != null && SUPPORTED_CHAIN_IDS.includes(chainId)
   // Balance check is informational only — do not block onboarding (testnet has no minimum)
   const allChecksPass = isConnected && isCorrectNetwork
 
@@ -170,7 +181,7 @@ export default function ConnectPage() {
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
                     <span className="text-sm text-emerald-400 font-medium">
-                      Arbitrum One に接続済み
+                      {getNetworkDisplayName(chainId)} に接続済み
                     </span>
                   </div>
                 ) : (
@@ -178,17 +189,9 @@ export default function ConnectPage() {
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="h-5 w-5 text-yellow-400 shrink-0 mt-0.5" />
                       <p className="text-sm text-yellow-300">
-                        Arbitrumネットワークに切り替えてください
+                        Base Sepoliaに切り替えてください
                       </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-yellow-600 text-yellow-400 hover:bg-yellow-950/40"
-                      onClick={switchToArbitrumSepolia}
-                    >
-                      Arbitrum Sepolia (testnet) に切り替える
-                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -196,6 +199,14 @@ export default function ConnectPage() {
                       onClick={switchToBaseSepolia}
                     >
                       Base Sepolia (testnet) に切り替える
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-yellow-600 text-yellow-400 hover:bg-yellow-950/40"
+                      onClick={switchToArbitrumSepolia}
+                    >
+                      Arbitrum Sepolia (testnet) に切り替える
                     </Button>
                     <Button
                       variant="outline"

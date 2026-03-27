@@ -56,7 +56,7 @@ export type SupportedChainKey = keyof typeof SUPPORTED_CHAINS
 export type SupportedToken = keyof typeof TOKEN_ADDRESSES.arbitrum
 
 export const DEFAULT_CHAIN: SupportedChainKey =
-  (process.env.NEXT_PUBLIC_DEFAULT_CHAIN as SupportedChainKey) || 'arbitrum-sepolia'
+  (process.env.NEXT_PUBLIC_DEFAULT_CHAIN as SupportedChainKey) || 'base-sepolia'
 
 export const MINIMUM_USD_BALANCE = 3000
 export const ARBITRUM_CHAIN_IDS = [42161, 421614, 84532]

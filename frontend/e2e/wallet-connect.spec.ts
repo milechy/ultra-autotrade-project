@@ -149,7 +149,7 @@ test.describe('[Connect/Mock] 非Arbitrumネットワーク – 切替プロン�
   test('非Arbitrum接続時に切替案内メッセージが表示される', async ({ page }) => {
     await clickConnectAndWait(page)
     await expect(
-      page.getByText('Arbitrum Oneネットワークに切り替えてください')
+      page.getByText('Base Sepoliaに切り替えてください')
     ).toBeVisible({ timeout: 5_000 })
   })
 

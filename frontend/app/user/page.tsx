@@ -14,7 +14,7 @@ const steps = [
     number: 1,
     icon: Wallet,
     title: 'ウォレットを接続',
-    description: 'MetaMask / WalletConnect 対応ウォレットをArbitrumネットワークに接続',
+    description: 'MetaMask / WalletConnect 対応ウォレットをBase Sepoliaネットワークに接続',
   },
   {
     number: 2,
@@ -59,8 +59,8 @@ export default function LandingPage() {
             <Badge variant="outline" className="text-blue-400 border-blue-400/50">
               Aave V3
             </Badge>
-            <Badge variant="outline" className="text-cyan-400 border-cyan-400/50">
-              Arbitrum One
+            <Badge variant="outline" className="text-indigo-400 border-indigo-400/50">
+              Base Sepolia
             </Badge>
           </div>
         </div>

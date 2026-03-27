@@ -14,6 +14,10 @@ const CHAIN_INFO: Record<number, { name: string; colorClass: string }> = {
     name: 'Arbitrum Sepolia',
     colorClass: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
   },
+  84532: {
+    name: 'Base Sepolia',
+    colorClass: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
+  },
 }
 
 function NetworkBadge({ chainId }: { chainId: number | null }) {
