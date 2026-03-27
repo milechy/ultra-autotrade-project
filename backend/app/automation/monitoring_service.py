@@ -104,6 +104,10 @@ class MonitoringService:
         self._last_price_change_24h: Optional[float] = None
         self._last_event_level: AlertLevel = AlertLevel.INFO
 
+        # 起動時に state.json から緊急停止状態を復元（OR 条件維持）
+        if enable_state_sync:
+            self._restore_state_from_file()
+
     # ------------------------------------------------------------------
     # 内部ユーティリティ
     # ------------------------------------------------------------------
@@ -141,6 +145,25 @@ class MonitoringService:
         if level_order[event.level] >= level_order[self._last_event_level]:
             self._last_event_level = event.level
         return event
+
+    def _restore_state_from_file(self) -> None:
+        """起動時に state.json から緊急停止状態を復元する。"""
+        try:
+            from app.aave.state_manager import StateFileNotFoundError, read_system_state
+            try:
+                current = read_system_state()
+                if current.emergency_stop:
+                    self._trading_paused = True
+                    reason = getattr(current, "reason", None)
+                    self._emergency_reason = reason or "Restored from state.json on startup"
+                    logger.info(
+                        "Restored emergency_stop=True from state.json (reason=%s)",
+                        self._emergency_reason,
+                    )
+            except StateFileNotFoundError:
+                pass  # 初回起動時は state.json なし
+        except Exception as exc:
+            logger.warning("Failed to restore emergency state from file: %s", exc)
 
     def _sync_state_file(
         self,
@@ -560,6 +583,14 @@ class MonitoringService:
             level=AlertLevel.EMERGENCY,
             code="EMERGENCY_STOP",
             message=reason,
+        )
+
+        # state.json に永続化（再起動後も緊急停止状態を維持するため）
+        self._sync_state_file(
+            health_factor=self._last_health_factor,
+            hf_triggered_emergency=True,
+            reason=reason,
+            now=now,
         )
 
         # Slack通知

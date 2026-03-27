@@ -20,6 +20,7 @@ from app.automation.schemas import (
     DashboardSnapshot,
     WorkflowRunResult,
 )
+from app.automation.state import get_monitoring_service
 from app.automation.workflow import process_pending_knowledge
 from app.database import get_db
 from app.exchange.router import get_exchange_service
@@ -30,9 +31,7 @@ router = APIRouter(tags=["automation-dashboard"])
 
 # Dependency providers (Phase11)
 # - テスト時に FastAPI dependency_overrides で差し替え可能にする
-def get_monitoring_service() -> MonitoringService:
-    return MonitoringService()
-
+# - get_monitoring_service は state.py のシングルトンを使用（毎回新規生成しない）
 
 def get_reporting_service() -> ReportingService:
     return ReportingService()
