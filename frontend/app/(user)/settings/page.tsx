@@ -94,11 +94,6 @@ export default function SettingsPage() {
   const set = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }))
 
-    // U-07: Persist risk mode to PUT /auth/risk-mode
-    if (key === 'riskMode' && token) {
-      apiPut('/auth/risk-mode', { mode: value }).catch(() => {/* silently ignore */})
-    }
-
     // Persist user settings to PUT /api/user/settings
     if (token && (key === 'email' || key === 'notificationFrequency' || key === 'maxSingleTradeUsd' || key === 'maxDailyTradeUsd')) {
       const fieldMap: Partial<Record<keyof SettingsState, string>> = {

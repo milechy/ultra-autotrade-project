@@ -2,13 +2,20 @@
 // Unauthorized copying or distribution is strictly prohibited.
 'use client'
 
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { apiPut } from '@/lib/api/client'
 
 type RiskMode = 'conservative' | 'balanced' | 'aggressive'
+
+interface RiskModeResponse {
+  mode: RiskMode
+  message: string
+}
 
 interface RiskSettingsCardProps {
   riskMode: RiskMode
@@ -39,10 +46,20 @@ export function RiskSettingsCard({
   maxDailyTradeUsd,
   onMaxDailyTradeUsdChange,
 }: RiskSettingsCardProps) {
-  const handleRiskModeChange = (mode: RiskMode) => {
-    onRiskModeChange(mode)
-    // TODO: Save to backend PUT /api/user/settings (PUT /auth/risk-mode)
-    toast('設定を保存しました')
+  const [saving, setSaving] = useState(false)
+
+  const handleRiskModeChange = async (mode: RiskMode) => {
+    if (saving || mode === riskMode) return
+    setSaving(true)
+    try {
+      await apiPut<RiskModeResponse>('/auth/risk-mode', { mode })
+      onRiskModeChange(mode)
+      toast.success('リスクモードを保存しました')
+    } catch {
+      toast.error('リスクモードの保存に失敗しました')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -60,9 +77,10 @@ export function RiskSettingsCard({
               return (
                 <button
                   key={opt.mode}
-                  onClick={() => handleRiskModeChange(opt.mode)}
+                  onClick={() => { void handleRiskModeChange(opt.mode) }}
+                  disabled={saving}
                   className={cn(
-                    'text-left rounded-lg border-2 p-3 transition-all',
+                    'text-left rounded-lg border-2 p-3 transition-all disabled:opacity-60',
                     isActive
                       ? modeActiveClass[opt.mode]
                       : 'border-zinc-700 bg-zinc-800/40 hover:border-zinc-600'

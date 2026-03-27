@@ -148,10 +148,7 @@ export function PortfolioSummary() {
           icon={TrendingUp}
         />
         <Card className="border-zinc-800 bg-zinc-900">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm font-medium text-zinc-400">Health Factor</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
+          <CardContent className="px-4 py-4">
             <HealthFactorGauge value={healthFactor} size="lg" />
           </CardContent>
         </Card>
