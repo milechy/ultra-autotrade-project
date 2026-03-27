@@ -3,7 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { AuthProvider } from '@/lib/auth'
+import { AuthProvider, useAuth } from '@/lib/auth'
 import { Toaster } from 'sonner'
 import { fetchAutomationStatus } from '@/lib/api/automation'
 import type { AutomationStatus } from '@/lib/types'
@@ -34,13 +34,14 @@ function toSystemStatus(s: AutomationStatus): SystemStatus {
 
 function AutomationStatusProvider({ children }: { children: React.ReactNode }) {
   const [systemStatus, setSystemStatus] = useState<SystemStatus>('NORMAL')
+  const { token } = useAuth()
 
   const refreshStatus = useCallback(async () => {
     try {
-      const status = await fetchAutomationStatus()
+      const status = await fetchAutomationStatus(token ?? undefined)
       setSystemStatus(toSystemStatus(status))
     } catch {/* keep current on error */}
-  }, [])
+  }, [token])
 
   useEffect(() => {
     void refreshStatus()

@@ -160,14 +160,14 @@ class EmergencyStopRequest(BaseModel):
 
 @router.post(
     "/emergency-stop",
-    summary="緊急停止（管理者専用）",
+    summary="緊急停止",
 )
 def emergency_stop_api(
     request: EmergencyStopRequest = Body(default=EmergencyStopRequest()),
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_active_user),
 ) -> dict[str, Any]:
-    """全ての自動取引を即時停止する（管理者専用）。"""
+    """全ての自動取引を即時停止する。"""
     monitoring_service.activate_emergency_stop(
         reason=f"{request.reason} (user_id={current_user.id})"
     )
