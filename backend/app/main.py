@@ -52,6 +52,7 @@ from app.error_handlers import register_error_handlers
 from app.exchange.router import router as exchange_router
 from app.hooks.router import router as hooks_router
 from app.knowledge.router import router as knowledge_router
+from app.notifications.router import api_router as notification_api_router
 from app.notifications.router import router as notification_router
 from app.portfolio.router import router as portfolio_router
 from app.proposals.router import router as proposals_router
@@ -135,6 +136,7 @@ def create_app() -> FastAPI:
     app.include_router(user_settings_router)  # User Settings API
     app.include_router(alias_router)  # API aliases (/api/safety-score etc.)
     app.include_router(notification_router)  # Notifications (Phase PWA)
+    app.include_router(notification_api_router)  # Notifications /api/* alias (Phase PWA)
 
     # Register global error handlers (production safety)
     register_error_handlers(app)
