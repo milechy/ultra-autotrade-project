@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.ai.service import AIService
-from app.auth.dependencies import require_admin
+from app.auth.dependencies import require_active_user, require_admin
 from app.automation.monitoring_service import MonitoringService
 from app.automation.rate_limiter import RateLimiterService, get_rate_limiter
 from app.automation.rate_limiter_schemas import RateLimitStatus
@@ -164,18 +164,18 @@ class EmergencyStopResponse(BaseModel):
 @router.post(
     "/automation/emergency-stop",
     response_model=EmergencyStopResponse,
-    summary="全自動取引を即時停止する（管理者専用）",
+    summary="全自動取引を即時停止する",
 )
 def emergency_stop(
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
-    current_user: Any = Depends(require_admin),
+    current_user: Any = Depends(require_active_user),
 ) -> EmergencyStopResponse:
     """
     全ての自動取引を即時停止する。一度停止すると clear_emergency_stop() を明示的に
     呼ぶまで再開されない（OR 条件で維持される）。
     """
     monitoring_service.activate_emergency_stop(
-        reason=f"Manual emergency stop by admin (user_id={current_user.id})",
+        reason=f"Manual emergency stop by user (user_id={current_user.id})",
     )
     return EmergencyStopResponse(
         status="stopped",
