@@ -3,7 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState } from 'react'
-import { AlertTriangle, ShieldAlert, ShieldOff } from 'lucide-react'
+import { AlertTriangle, ShieldOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth'
 import { postJson } from '@/lib/api/http'
@@ -52,7 +52,7 @@ export function EmergencyStopButton() {
       <button
         onClick={() => setShowConfirm(true)}
         className={[
-          'fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-all active:scale-95',
+          'fixed bottom-20 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-all active:scale-95',
           isStopped
             ? 'bg-amber-500 hover:bg-amber-400'
             : 'bg-destructive hover:bg-destructive/90',
@@ -68,11 +68,15 @@ export function EmergencyStopButton() {
       </button>
 
       {isStopped && (
-        <div className="fixed bottom-20 right-16 z-40">
+        <button
+          onClick={() => setShowConfirm(true)}
+          className="fixed bottom-20 right-[72px] z-50 cursor-pointer"
+          aria-label="停止解除"
+        >
           <span className="rounded bg-amber-500 px-2 py-1 text-xs text-white font-medium">
             停止中 — タップで解除
           </span>
-        </div>
+        </button>
       )}
 
       {/* Confirmation dialog */}
