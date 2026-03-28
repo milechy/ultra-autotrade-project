@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { DateRangeFilter } from '@/components/shared'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useAuth } from '@/lib/auth'
 import { apiFetch } from '@/lib/api/client'
 
 const AssetChartRecharts = dynamic(() => import('./AssetChartRecharts'), { ssr: false })
@@ -23,13 +24,16 @@ interface PortfolioHistoryResponse {
 }
 
 export function AssetChart() {
+  const { token, isLoading: authLoading } = useAuth()
   const [period, setPeriod] = useState<string>('30d')
   const [data, setData] = useState<DataPoint[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
 
   const fetchData = useCallback(async () => {
+    if (!token) return
     setError(false)
+    setLoading(true)
     try {
       const res = await apiFetch<PortfolioHistoryResponse>(
         `/api/portfolio/history?period=${period}&interval=daily`,
@@ -47,18 +51,18 @@ export function AssetChart() {
     } finally {
       setLoading(false)
     }
-  }, [period])
+  }, [period, token])
 
   useEffect(() => {
-    setLoading(true)
     fetchData()
   }, [fetchData])
 
-  // 30-second auto-refresh
+  // 30-second auto-refresh — only when authenticated
   useEffect(() => {
+    if (!token) return
     const id = setInterval(() => fetchData(), 30_000)
     return () => clearInterval(id)
-  }, [fetchData])
+  }, [fetchData, token])
 
   const handleRangeChange = (range: { from: Date; to: Date } | 'all') => {
     if (range === 'all') {
@@ -80,7 +84,7 @@ export function AssetChart() {
   return (
     <div className="space-y-3">
       <DateRangeFilter onChange={handleRangeChange} presets />
-      {loading ? (
+      {authLoading || loading ? (
         <Skeleton className="h-[200px] rounded-xl" />
       ) : error ? (
         <div className="flex flex-col items-center gap-2 py-8">

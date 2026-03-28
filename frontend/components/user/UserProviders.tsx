@@ -34,20 +34,22 @@ function toSystemStatus(s: AutomationStatus): SystemStatus {
 
 function AutomationStatusProvider({ children }: { children: React.ReactNode }) {
   const [systemStatus, setSystemStatus] = useState<SystemStatus>('NORMAL')
-  const { token } = useAuth()
+  const { token, isLoading } = useAuth()
 
   const refreshStatus = useCallback(async () => {
+    if (!token) return
     try {
-      const status = await fetchAutomationStatus(token ?? undefined)
+      const status = await fetchAutomationStatus(token)
       setSystemStatus(toSystemStatus(status))
     } catch {/* keep current on error */}
   }, [token])
 
   useEffect(() => {
+    if (isLoading) return
     void refreshStatus()
     const id = setInterval(() => { void refreshStatus() }, 30_000)
     return () => clearInterval(id)
-  }, [refreshStatus])
+  }, [refreshStatus, isLoading])
 
   const value: AutomationStatusContextValue = {
     systemStatus,

@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AssetIcon } from '@/components/shared'
 import { useWallet } from '@/hooks/useWallet'
+import { useAuth } from '@/lib/auth'
 import { apiFetch } from '@/lib/api/client'
 
 interface Position {
@@ -63,12 +64,15 @@ function PositionCard({ pos }: { pos: Position }) {
 
 export function PositionList() {
   const { isConnected } = useWallet()
+  const { token, isLoading: authLoading } = useAuth()
   const [positions, setPositions] = useState<Position[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
 
   const fetchPositions = useCallback(async () => {
+    if (!token) return
     setError(false)
+    setLoading(true)
     try {
       const res = await apiFetch<PortfolioCurrentResponse>('/api/portfolio/current')
       setPositions(res?.positions_json ?? [])
@@ -77,20 +81,20 @@ export function PositionList() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [token])
 
   useEffect(() => {
     fetchPositions()
   }, [fetchPositions, isConnected])
 
-  // 30-second auto-refresh
+  // 30-second auto-refresh — only when authenticated
   useEffect(() => {
-    if (!isConnected) return
+    if (!isConnected || !token) return
     const id = setInterval(() => fetchPositions(), 30_000)
     return () => clearInterval(id)
-  }, [isConnected, fetchPositions])
+  }, [isConnected, fetchPositions, token])
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="space-y-3">
         <Skeleton className="h-20 rounded-xl" />
