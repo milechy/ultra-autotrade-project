@@ -34,7 +34,7 @@ export function AssetChart() {
       const res = await apiFetch<PortfolioHistoryResponse>(
         `/api/portfolio/history?period=${period}&interval=daily`,
       )
-      const mapped: DataPoint[] = res.items.map((item) => ({
+      const mapped: DataPoint[] = (res?.items ?? []).map((item) => ({
         date: new Date(item.recorded_at).toLocaleDateString('ja-JP', {
           month: 'short',
           day: 'numeric',
@@ -91,6 +91,10 @@ export function AssetChart() {
           >
             再試行
           </button>
+        </div>
+      ) : data.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-8">
+          <p className="text-sm text-zinc-400 text-center">まだ運用履歴がありません</p>
         </div>
       ) : (
         <AssetChartRecharts data={data} />

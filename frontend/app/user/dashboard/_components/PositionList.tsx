@@ -71,7 +71,7 @@ export function PositionList() {
     setError(false)
     try {
       const res = await apiFetch<PortfolioCurrentResponse>('/api/portfolio/current')
-      setPositions(res.positions_json ?? [])
+      setPositions(res?.positions_json ?? [])
     } catch {
       setError(true)
     } finally {
@@ -101,7 +101,15 @@ export function PositionList() {
 
   if (error) {
     return (
-      <p className="text-sm text-red-400 text-center">データ取得エラー</p>
+      <div className="flex flex-col items-center gap-2 py-6">
+        <p className="text-sm text-zinc-400 text-center">データを取得できません</p>
+        <button
+          onClick={() => { setLoading(true); fetchPositions() }}
+          className="text-xs text-blue-400 hover:text-blue-300 underline"
+        >
+          再試行
+        </button>
+      </div>
     )
   }
 
