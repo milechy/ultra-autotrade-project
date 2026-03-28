@@ -33,6 +33,7 @@ router = APIRouter(tags=["automation-dashboard"])
 # - テスト時に FastAPI dependency_overrides で差し替え可能にする
 # - get_monitoring_service は state.py のシングルトンを使用（毎回新規生成しない）
 
+
 def get_reporting_service() -> ReportingService:
     return ReportingService()
 

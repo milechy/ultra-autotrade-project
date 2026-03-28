@@ -150,6 +150,7 @@ class MonitoringService:
         """起動時に state.json から緊急停止状態を復元する。"""
         try:
             from app.aave.state_manager import StateFileNotFoundError, read_system_state
+
             try:
                 current = read_system_state()
                 if current.emergency_stop:
