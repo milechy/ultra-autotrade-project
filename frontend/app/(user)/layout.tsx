@@ -2,7 +2,9 @@
 // Unauthorized copying or distribution is strictly prohibited.
 import { WagmiRootProvider } from '@/lib/wallet/WagmiRootProvider'
 import { UserProviders } from '@/components/user/UserProviders'
-import { UserLayout } from '@/components/layout'
+import { UserHeader } from '@/components/user/UserHeader'
+import { BottomNav } from '@/components/shared/BottomNav'
+import { EmergencyStopButton } from '@/components/emergency/EmergencyStopButton'
 
 export default function UserAppLayout({
   children,
@@ -12,7 +14,12 @@ export default function UserAppLayout({
   return (
     <WagmiRootProvider>
       <UserProviders>
-        <UserLayout>{children}</UserLayout>
+        <UserHeader />
+        <div className="min-h-screen pb-16">
+          {children}
+        </div>
+        <BottomNav />
+        <EmergencyStopButton />
       </UserProviders>
     </WagmiRootProvider>
   )
