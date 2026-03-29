@@ -170,7 +170,7 @@ export default function ConnectPage() {
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
                     <span className="text-sm text-emerald-400 font-medium">
-                      Arbitrum One に接続済み
+                      テストネットに接続済み
                     </span>
                   </div>
                 ) : (
@@ -178,17 +178,9 @@ export default function ConnectPage() {
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="h-5 w-5 text-yellow-400 shrink-0 mt-0.5" />
                       <p className="text-sm text-yellow-300">
-                        Arbitrumネットワークに切り替えてください
+                        テストネット（Base Sepolia / Arbitrum Sepolia）に切り替えてください
                       </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-yellow-600 text-yellow-400 hover:bg-yellow-950/40"
-                      onClick={switchToArbitrumSepolia}
-                    >
-                      Arbitrum Sepolia (testnet) に切り替える
-                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -196,6 +188,14 @@ export default function ConnectPage() {
                       onClick={switchToBaseSepolia}
                     >
                       Base Sepolia (testnet) に切り替える
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-yellow-600 text-yellow-400 hover:bg-yellow-950/40"
+                      onClick={switchToArbitrumSepolia}
+                    >
+                      Arbitrum Sepolia (testnet) に切り替える
                     </Button>
                     <Button
                       variant="outline"
