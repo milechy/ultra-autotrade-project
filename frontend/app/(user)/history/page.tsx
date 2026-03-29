@@ -73,7 +73,12 @@ const LIMIT = 20
 
 export default function HistoryPage() {
   const [activeType, setActiveType] = useState<OperationType>('ALL')
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | 'all'>('all')
+  // Initialize to 30-day range to match DateRangeFilter's default visual state
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | 'all'>(() => {
+    const from = new Date()
+    from.setDate(from.getDate() - 30)
+    return { from, to: new Date() }
+  })
 
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [totalCount, setTotalCount] = useState(0)
@@ -147,49 +152,7 @@ export default function HistoryPage() {
   const hasMore = transactions.length < totalCount
 
   // -------------------------------------------------------------------------
-  // Loading state
-  // -------------------------------------------------------------------------
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100">
-        <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-          <Skeleton className="h-8 w-32" />
-          <div className="grid grid-cols-3 gap-4">
-            <Skeleton className="h-24 rounded-xl" />
-            <Skeleton className="h-24 rounded-xl" />
-            <Skeleton className="h-24 rounded-xl" />
-          </div>
-          <Skeleton className="h-16 rounded-xl" />
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-20 rounded-xl" />
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // -------------------------------------------------------------------------
-  // Error state
-  // -------------------------------------------------------------------------
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <p className="text-sm text-red-400">{error}</p>
-          <button onClick={fetchData} className="text-xs text-blue-400 underline">
-            再試行
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // -------------------------------------------------------------------------
-  // Main render
+  // Main render — filters are always mounted so their state is never reset
   // -------------------------------------------------------------------------
 
   return (
@@ -202,13 +165,21 @@ export default function HistoryPage() {
         </div>
 
         {/* Stats */}
-        <StatsCards
-          totalCount={totalCount}
-          totalProfitUSD={totalProfitUSD}
-          totalFeeUSD={totalFeeUSD}
-        />
+        {loading ? (
+          <div className="grid grid-cols-3 gap-4">
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+          </div>
+        ) : (
+          <StatsCards
+            totalCount={totalCount}
+            totalProfitUSD={totalProfitUSD}
+            totalFeeUSD={totalFeeUSD}
+          />
+        )}
 
-        {/* Filters */}
+        {/* Filters — always rendered so selected state persists across fetches */}
         <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
           <TransactionFilters
             activeType={activeType}
@@ -217,11 +188,26 @@ export default function HistoryPage() {
           />
         </div>
 
-        {/* Transaction list */}
-        <TransactionList transactions={transactions} />
+        {/* Transaction list or error */}
+        {error ? (
+          <div className="text-center space-y-3">
+            <p className="text-sm text-red-400">{error}</p>
+            <button onClick={fetchData} className="text-xs text-blue-400 underline">
+              再試行
+            </button>
+          </div>
+        ) : loading ? (
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-20 rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <TransactionList transactions={transactions} />
+        )}
 
         {/* Load more */}
-        {hasMore && (
+        {!loading && !error && hasMore && (
           <button
             onClick={handleLoadMore}
             disabled={loadingMore}
