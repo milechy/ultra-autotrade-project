@@ -35,9 +35,10 @@ test.describe('U-06 取引履歴 (/history)', () => {
     await expect(withdrawBtn).toBeVisible();
   });
 
-  test('取引リストまたは「取引履歴がありません」メッセージが表示される', async ({ page }) => {
-    // MOCK_TRANSACTIONS があるので取引リストが表示される
-    const list = page.getByText(/SUPPLY|WITHDRAW|BORROW|REPAY|取引履歴がありません/).first();
+  test('取引リストまたは「まだ取引履歴がありません」メッセージが表示される', async ({ page }) => {
+    // TransactionList: データあり時は SUPPLY/WITHDRAW 等のバッジ
+    // データなし時は "まだ取引履歴がありません"（TransactionList の空状態テキスト）
+    const list = page.getByText(/SUPPLY|WITHDRAW|BORROW|REPAY|まだ取引履歴がありません|取引履歴がありません/).first();
     await expect(list).toBeVisible();
   });
 });
