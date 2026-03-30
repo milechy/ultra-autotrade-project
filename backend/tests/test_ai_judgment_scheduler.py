@@ -2,6 +2,7 @@
 # backend/tests/test_ai_judgment_scheduler.py
 """AI判定スケジューラーのテスト。"""
 
+import asyncio
 import os
 import tempfile
 from decimal import Decimal
@@ -23,6 +24,7 @@ from app.ai.schemas import (  # noqa: E402
 )
 from app.auth.models import User  # noqa: E402
 from app.automation.ai_judgment_scheduler import (  # noqa: E402
+    ai_judgment_loop,
     run_ai_judgment_job,
     save_ai_decision,
 )
@@ -204,3 +206,75 @@ def test_run_job_sell_creates_withdraw_proposals(db_session):
     proposals = db_session.scalars(select(Proposal)).all()
     assert len(proposals) == 1
     assert proposals[0].operation == "WITHDRAW"
+
+
+# ---------------------------------------------------------------------------
+# ai_judgment_loop のテスト
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_scheduler_runs_immediately_on_start():
+    """起動直後（interval sleep前）にrun_ai_judgment_jobが呼ばれること。"""
+    call_order: list[tuple] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        call_order.append(("sleep", seconds))
+        if seconds > 0:
+            raise asyncio.CancelledError  # stop the loop after first interval sleep
+
+    def fake_run_job() -> dict:
+        call_order.append(("job",))
+        return {"action": "HOLD", "confidence": 70, "proposals_created": 0, "decision_id": 1}
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.run_ai_judgment_job", side_effect=fake_run_job),
+        patch("asyncio.sleep", side_effect=fake_sleep),
+    ):
+        try:
+            await ai_judgment_loop(interval_hours=1)
+        except asyncio.CancelledError:
+            pass
+
+    # The job must have been called before the long sleep
+    assert ("job",) in call_order
+    # The first non-zero sleep should come AFTER the job
+    first_job_idx = call_order.index(("job",))
+    first_long_sleep_idx = next(
+        i for i, item in enumerate(call_order) if item[0] == "sleep" and item[1] > 0
+    )
+    assert first_job_idx < first_long_sleep_idx
+
+
+@pytest.mark.asyncio
+async def test_scheduler_repeats_after_interval():
+    """初回実行後にinterval_hours間隔で繰り返すこと。"""
+    job_call_count = 0
+    sleep_call_count = 0
+
+    async def fake_sleep(seconds: float) -> None:
+        nonlocal sleep_call_count
+        sleep_call_count += 1
+        if sleep_call_count >= 3:  # stop after 3rd sleep (0 + interval + interval)
+            raise asyncio.CancelledError
+
+    def fake_run_job() -> dict:
+        nonlocal job_call_count
+        job_call_count += 1
+        return {
+            "action": "HOLD",
+            "confidence": 70,
+            "proposals_created": 0,
+            "decision_id": job_call_count,
+        }
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.run_ai_judgment_job", side_effect=fake_run_job),
+        patch("asyncio.sleep", side_effect=fake_sleep),
+    ):
+        try:
+            await ai_judgment_loop(interval_hours=1)
+        except asyncio.CancelledError:
+            pass
+
+    assert job_call_count >= 2  # ran at least twice

@@ -3,6 +3,9 @@
 """Tests for geopolitical risk feed module."""
 
 from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from app.data_feeds.geopolitical import (
     GDELTEvent,
@@ -206,3 +209,59 @@ class TestMarketContextInJudgment:
         _system, user = service._build_rag_prompt("test query", rag)
         assert "## Market Context" not in user
         assert "chunk1" in user
+
+
+class TestGDELTFallback:
+    @pytest.mark.asyncio
+    async def test_gdelt_fallback_on_error(self) -> None:
+        """パースエラー時にデフォルトGDELTEventを返すこと。"""
+        from app.data_feeds.geopolitical import fetch_gdelt_events
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.side_effect = ValueError("Expecting value")  # JSON parse error
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        result = await fetch_gdelt_events(mock_client)
+
+        assert result.avg_tone == Decimal("0")
+        assert result.event_count == 0
+
+    @pytest.mark.asyncio
+    async def test_gdelt_fallback_on_http_error(self) -> None:
+        """HTTP エラー時にデフォルトGDELTEventを返すこと。"""
+        import httpx  # noqa: PLC0415
+
+        from app.data_feeds.geopolitical import fetch_gdelt_events  # noqa: PLC0415
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "500", request=MagicMock(), response=mock_response
+        )
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        result = await fetch_gdelt_events(mock_client)
+
+        assert result.event_count == 0
+
+    def test_ai_judgment_continues_without_news_context(self) -> None:
+        """ニュース/GDELT両方失敗でもAI判定が完走すること。"""
+        from app.data_feeds.context import build_market_context
+        from app.data_feeds.geopolitical import GeoRiskResult
+        from app.data_feeds.news_feed import NewsFeedResult
+
+        # Both feeds return fallback/default values
+        fallback_news = NewsFeedResult(
+            summary="ニュースデータ取得不可。市場データとAaveオンチェーンデータのみで判定。"
+        )
+        fallback_geo = GeoRiskResult(summary="No data available.")
+
+        ctx = build_market_context(news=fallback_news, geo_risk=fallback_geo)
+        prompt = ctx.to_prompt_context()
+
+        # Judgment context is built successfully even with fallback data
+        assert "ニュースデータ取得不可" in prompt
+        assert "Geopolitical Risk" in prompt

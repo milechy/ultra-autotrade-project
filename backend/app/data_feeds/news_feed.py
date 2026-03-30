@@ -144,15 +144,19 @@ async def fetch_crypto_news(client: httpx.AsyncClient) -> NewsFeedResult:
             )
 
     except httpx.HTTPStatusError as exc:
-        logger.error(
-            "Perplexity API error: %s - %s",
+        logger.warning(
+            "Perplexity API error %s — falling back to no-news context: %s",
             exc.response.status_code,
             exc.response.text[:200],
         )
-        return NewsFeedResult(summary="API error: %d" % exc.response.status_code)
+        return NewsFeedResult(
+            summary="ニュースデータ取得不可。市場データとAaveオンチェーンデータのみで判定。"
+        )
     except Exception as exc:
-        logger.error("Perplexity fetch failed: %s", exc)
-        return NewsFeedResult(summary="News fetch failed.")
+        logger.warning("Perplexity fetch failed — falling back to no-news context: %s", exc)
+        return NewsFeedResult(
+            summary="ニュースデータ取得不可。市場データとAaveオンチェーンデータのみで判定。"
+        )
 
 
 # ============================================================

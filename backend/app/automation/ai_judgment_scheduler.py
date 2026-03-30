@@ -185,7 +185,7 @@ async def ai_judgment_loop(interval_hours: int = 4) -> None:
     await asyncio.sleep(0)  # イベントループに制御を返す
     while True:
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(None, run_ai_judgment_job)
             logger.info("AI judgment completed: %s", result)
         except Exception as exc:

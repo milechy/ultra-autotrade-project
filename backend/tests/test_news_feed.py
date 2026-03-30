@@ -136,4 +136,34 @@ class TestFetchCryptoNews:
         with patch.dict("os.environ", {"PERPLEXITY_API_KEY": "test-key"}):
             result = await fetch_crypto_news(mock_client)
 
-        assert "429" in result.summary or "error" in result.summary.lower()
+        assert "ニュースデータ取得不可" in result.summary
+
+    @pytest.mark.asyncio
+    async def test_perplexity_fallback_on_401(self) -> None:
+        """401レスポンス時にデフォルトNewsFeedResultを返し、WARNINGをログすること。"""
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_response.text = "Unauthorized"
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "401", request=MagicMock(), response=mock_response
+        )
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+
+        with patch.dict("os.environ", {"PERPLEXITY_API_KEY": "test-key"}):
+            result = await fetch_crypto_news(mock_client)
+
+        assert "ニュースデータ取得不可" in result.summary
+        assert result.updated_at is None  # fallback has no timestamp
+
+    @pytest.mark.asyncio
+    async def test_perplexity_fallback_on_timeout(self) -> None:
+        """タイムアウト時にデフォルトNewsFeedResultを返すこと。"""
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(side_effect=httpx.TimeoutException("timeout"))
+
+        with patch.dict("os.environ", {"PERPLEXITY_API_KEY": "test-key"}):
+            result = await fetch_crypto_news(mock_client)
+
+        assert "ニュースデータ取得不可" in result.summary
+        assert result.updated_at is None
