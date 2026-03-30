@@ -14,7 +14,7 @@ const steps = [
     number: 1,
     icon: Wallet,
     title: 'ウォレットを接続',
-    description: 'MetaMask / WalletConnect 対応ウォレットをArbitrumネットワークに接続',
+    description: 'MetaMask / WalletConnect 対応ウォレットをテストネット（Base Sepolia / Arbitrum Sepolia）に接続',
   },
   {
     number: 2,
