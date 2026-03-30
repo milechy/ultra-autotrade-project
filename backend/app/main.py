@@ -156,7 +156,10 @@ def create_app() -> FastAPI:
             logger.error("Failed to initialize database: %s", exc)
 
         # Validate JWT secret key strength (rejects weak keys in staging/production)
-        AuthService.validate_secret_key()
+        try:
+            AuthService.validate_secret_key()
+        except Exception as exc:
+            logger.error("JWT secret key validation failed: %s", exc)
 
     @app.on_event("startup")
     async def startup_judgment_logger() -> None:
@@ -178,6 +181,7 @@ def create_app() -> FastAPI:
         Enabled by setting ENABLE_BACKGROUND_MONITORING=1.
         Disabled by default in development.
         """
+        print("=== startup_event REACHED ===", flush=True)
         enable_monitoring = os.getenv("ENABLE_BACKGROUND_MONITORING", "0") == "1"
 
         if not enable_monitoring:
@@ -207,7 +211,7 @@ def create_app() -> FastAPI:
 
             logger.info("Background monitoring started successfully")
 
-        except Exception as exc:
+        except BaseException as exc:
             logger.error("Failed to start background monitoring: %s", exc)
             # Monitoring startup failure does not block app startup (fail-safe)
 
@@ -232,11 +236,12 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def startup_data_feeds() -> None:
         """Start data feed background tasks (geo-risk + news)."""
+        print("=== startup_data_feeds REACHED ===", flush=True)
         import asyncio
 
-        geo_interval = int(os.getenv("GEO_RISK_INTERVAL_MINUTES", "30"))
-        news_interval = int(os.getenv("NEWS_INTERVAL_MINUTES", "15"))
         try:
+            geo_interval = int(os.getenv("GEO_RISK_INTERVAL_MINUTES", "30"))
+            news_interval = int(os.getenv("NEWS_INTERVAL_MINUTES", "15"))
             asyncio.create_task(start_geo_risk_background_task(interval_minutes=geo_interval))
             logger.info("GeoRisk background task started (interval=%dmin)", geo_interval)
             asyncio.create_task(start_news_background_task(interval_minutes=news_interval))
@@ -247,7 +252,7 @@ def create_app() -> FastAPI:
             howl_interval = int(os.getenv("HOWL_INTERVAL_HOURS", "6"))
             asyncio.create_task(start_howl_background_task(interval_hours=howl_interval))
             logger.info("HOWL review background task started (interval=%dh)", howl_interval)
-        except Exception as exc:
+        except BaseException as exc:
             logger.error("Failed to start data feed background tasks: %s", exc)
 
     # --- Scheduled tasks (Phase6) ---
@@ -260,6 +265,7 @@ def create_app() -> FastAPI:
             ENABLE_DAILY_REPORTS=1: enable daily reports
             ENABLE_WEEKLY_REPORTS=1: enable weekly reports
         """
+        print("=== startup_scheduled_tasks REACHED ===", flush=True)
         enable_daily = os.getenv("ENABLE_DAILY_REPORTS", "0") == "1"
         enable_weekly = os.getenv("ENABLE_WEEKLY_REPORTS", "0") == "1"
 
@@ -289,13 +295,14 @@ def create_app() -> FastAPI:
                 )
                 logger.info("Weekly reports scheduled successfully")
 
-        except Exception as exc:
+        except BaseException as exc:
             logger.error("Failed to start scheduled tasks: %s", exc)
             # Scheduled task startup failure does not block app startup (fail-safe)
 
     @app.on_event("startup")
     async def startup_ai_judgment_scheduler() -> None:
         """4時間ごとのAI判定スケジューラーを開始する。"""
+        print("=== startup_ai_judgment_scheduler REACHED ===", flush=True)
         logger.info("startup_ai_judgment_scheduler: entry")
         import asyncio
 
