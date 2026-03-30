@@ -54,8 +54,9 @@ export function AssetChart() {
   }, [period, token])
 
   useEffect(() => {
+    if (authLoading) return
     fetchData()
-  }, [fetchData])
+  }, [fetchData, authLoading])
 
   // 30-second auto-refresh — only when authenticated
   useEffect(() => {

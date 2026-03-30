@@ -37,19 +37,19 @@ function AutomationStatusProvider({ children }: { children: React.ReactNode }) {
   const { token, isLoading } = useAuth()
 
   const refreshStatus = useCallback(async () => {
-    if (!token) return
+    if (isLoading || !token) return
     try {
       const status = await fetchAutomationStatus(token)
       setSystemStatus(toSystemStatus(status))
     } catch {/* keep current on error */}
-  }, [token])
+  }, [isLoading, token])
 
   useEffect(() => {
-    if (isLoading) return
+    if (isLoading || !token) return
     void refreshStatus()
     const id = setInterval(() => { void refreshStatus() }, 30_000)
     return () => clearInterval(id)
-  }, [refreshStatus, isLoading])
+  }, [refreshStatus, isLoading, token])
 
   const value: AutomationStatusContextValue = {
     systemStatus,

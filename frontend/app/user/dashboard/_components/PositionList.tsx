@@ -84,8 +84,9 @@ export function PositionList() {
   }, [token])
 
   useEffect(() => {
+    if (authLoading) return
     fetchPositions()
-  }, [fetchPositions, isConnected])
+  }, [fetchPositions, isConnected, authLoading])
 
   // 30-second auto-refresh — only when authenticated
   useEffect(() => {
