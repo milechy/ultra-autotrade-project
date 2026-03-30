@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 JUDGMENT_LOG_DIR = os.getenv("JUDGMENT_LOG_DIR", "/var/log/ultra-autotrade")
+_FALLBACK_LOG_DIR = "/tmp/ultra-autotrade"
 JUDGMENT_LOG_FILE = "judgment_log.jsonl"
 MAX_RECENT = 20
 
@@ -117,44 +118,63 @@ class JudgmentLogger:
         self._cognitive = CognitiveState()
         self._lock = asyncio.Lock()
         self._initialized = False
+        self._file_enabled: bool = True
 
     async def initialize(self) -> None:
         """Create log directory and load recent state from existing JSONL."""
         if self._initialized:
             return
-        try:
-            self._log_dir.mkdir(parents=True, exist_ok=True)
-            if self._log_path.exists():
-                with open(self._log_path) as f:
-                    lines = f.readlines()
-                for line in lines[-MAX_RECENT:]:
-                    try:
-                        record = JudgmentRecord.model_validate_json(line.strip())
-                        self._recent.append(record)
-                    except Exception as exc:  # noqa: BLE001
-                        logger.warning("Skipping malformed JSONL line: %s", exc)
-                        continue
-                self._rebuild_cognitive_state()
-            self._initialized = True
-            logger.info(
-                "JudgmentLogger initialized: %s (%d recent records)",
-                self._log_path,
-                len(self._recent),
-            )
-        except Exception as exc:
-            logger.error("JudgmentLogger initialization failed: %s", exc)
-            self._initialized = True  # Don't retry, just log
+
+        # Try primary path, then fallback, then in-memory only
+        dirs_to_try = [self._log_dir, Path(_FALLBACK_LOG_DIR)]
+        for candidate in dirs_to_try:
+            try:
+                candidate.mkdir(parents=True, exist_ok=True)
+                # Verify write access with a probe
+                probe = candidate / ".write_probe"
+                probe.touch()
+                probe.unlink()
+                self._log_dir = candidate
+                self._log_path = candidate / JUDGMENT_LOG_FILE
+                break
+            except (PermissionError, OSError) as exc:
+                logger.warning("JudgmentLogger: cannot write to %s: %s", candidate, exc)
+        else:
+            # All paths failed — in-memory only
+            self._file_enabled = False
+            logger.warning("JudgmentLogger: all log paths unwritable, running in-memory only")
+
+        if self._file_enabled and self._log_path.exists():
+            with open(self._log_path) as f:
+                lines = f.readlines()
+            for line in lines[-MAX_RECENT:]:
+                try:
+                    record = JudgmentRecord.model_validate_json(line.strip())
+                    self._recent.append(record)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Skipping malformed JSONL line: %s", exc)
+                    continue
+            self._rebuild_cognitive_state()
+
+        self._initialized = True
+        logger.info(
+            "JudgmentLogger initialized: %s (%d recent records, file_enabled=%s)",
+            self._log_path if self._file_enabled else "in-memory",
+            len(self._recent),
+            self._file_enabled,
+        )
 
     async def record(self, record: JudgmentRecord) -> None:
         """Append a judgment record to JSONL and update cognitive state."""
         async with self._lock:
-            try:
-                with open(self._log_path, "a") as f:
-                    f.write(record.model_dump_json() + "\n")
-                    f.flush()
-                    os.fsync(f.fileno())
-            except Exception as exc:
-                logger.error("Failed to write judgment log: %s", exc)
+            if self._file_enabled:
+                try:
+                    with open(self._log_path, "a") as f:
+                        f.write(record.model_dump_json() + "\n")
+                        f.flush()
+                        os.fsync(f.fileno())
+                except Exception as exc:
+                    logger.error("Failed to write judgment log: %s", exc)
 
             self._recent.append(record)
             self._update_cognitive(record)
@@ -196,13 +216,14 @@ class JudgmentLogger:
 
     def record_nowait(self, record: JudgmentRecord) -> None:
         """Sync record for use in non-async contexts. No lock (caller ensures single-writer)."""
-        try:
-            with open(self._log_path, "a") as f:
-                f.write(record.model_dump_json() + "\n")
-                f.flush()
-                os.fsync(f.fileno())
-        except Exception as exc:
-            logger.error("Failed to write judgment log: %s", exc)
+        if self._file_enabled:
+            try:
+                with open(self._log_path, "a") as f:
+                    f.write(record.model_dump_json() + "\n")
+                    f.flush()
+                    os.fsync(f.fileno())
+            except Exception as exc:
+                logger.error("Failed to write judgment log: %s", exc)
         self._recent.append(record)
         self._update_cognitive(record)
 

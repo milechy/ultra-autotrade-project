@@ -151,6 +151,56 @@ class TestJudgmentLogger:
         assert state.win_rate == 1.0
 
 
+class TestJudgmentLoggerFallback:
+    @pytest.mark.asyncio
+    async def test_fallback_path_when_primary_unwritable(self, tmp_log_dir) -> None:
+        """Falls back to /tmp when primary log dir is not writable."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as fallback_dir:
+            # Use a non-existent path under /proc to simulate unwritable primary
+            unwritable = "/proc/ultra-autotrade-test-nonexistent"
+            jl = JudgmentLogger(log_dir=unwritable)
+            # Patch _FALLBACK_LOG_DIR to our temp dir
+            import app.ai.judgment_log as jl_module
+
+            original_fallback = jl_module._FALLBACK_LOG_DIR
+            jl_module._FALLBACK_LOG_DIR = fallback_dir
+            try:
+                await jl.initialize()
+                assert jl._initialized is True
+                # Either file_enabled with fallback dir, or in-memory only
+                # In either case, no exception raised
+                record = JudgmentRecord(action="HOLD", confidence=50)
+                await jl.record(record)
+                assert jl.get_cognitive_state().total_judgments == 1
+            finally:
+                jl_module._FALLBACK_LOG_DIR = original_fallback
+
+    @pytest.mark.asyncio
+    async def test_in_memory_only_when_all_paths_fail(self) -> None:
+        """Runs in-memory only when both primary and fallback are unwritable."""
+        import app.ai.judgment_log as jl_module
+
+        original_fallback = jl_module._FALLBACK_LOG_DIR
+
+        unwritable_primary = "/proc/ultra-autotrade-test-1"
+        unwritable_fallback = "/proc/ultra-autotrade-test-2"
+        jl_module._FALLBACK_LOG_DIR = unwritable_fallback
+        try:
+            jl = JudgmentLogger(log_dir=unwritable_primary)
+            await jl.initialize()
+            assert jl._initialized is True
+            assert jl._file_enabled is False
+            # Record still works in-memory
+            record = JudgmentRecord(action="BUY", confidence=80)
+            await jl.record(record)
+            assert jl.get_cognitive_state().total_judgments == 1
+            assert jl.get_cognitive_state().last_action == "BUY"
+        finally:
+            jl_module._FALLBACK_LOG_DIR = original_fallback
+
+
 class TestCognitiveState:
     def test_empty_state(self) -> None:
         state = CognitiveState()

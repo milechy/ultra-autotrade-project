@@ -166,7 +166,7 @@ def create_app() -> FastAPI:
 
             await get_judgment_logger().initialize()
             logger.info("JudgmentLogger initialized")
-        except Exception as exc:
+        except BaseException as exc:
             logger.error("Failed to initialize JudgmentLogger: %s", exc)
 
     # --- Background monitoring tasks (Phase5) ---
@@ -296,6 +296,7 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def startup_ai_judgment_scheduler() -> None:
         """4時間ごとのAI判定スケジューラーを開始する。"""
+        logger.info("startup_ai_judgment_scheduler: entry")
         import asyncio
 
         enable_scheduler = os.getenv("ENABLE_AI_JUDGMENT_SCHEDULER", "0") == "1"
@@ -310,7 +311,7 @@ def create_app() -> FastAPI:
             interval = int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS", "4"))
             asyncio.create_task(ai_judgment_loop(interval_hours=interval))
             logger.info("AI judgment scheduler started (interval=%dh)", interval)
-        except Exception as exc:
+        except BaseException as exc:
             logger.error("Failed to start AI judgment scheduler: %s", exc)
 
     @app.on_event("shutdown")
