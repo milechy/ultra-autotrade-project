@@ -64,6 +64,8 @@ from app.users.settings_router import router as user_settings_router
 from app.webhook.router import router as webhook_router
 
 logger = logging.getLogger(__name__)
+# Ensure app.* loggers output at INFO level regardless of root logger config
+logging.getLogger("app").setLevel(logging.INFO)
 
 
 def create_app() -> FastAPI:
@@ -181,7 +183,6 @@ def create_app() -> FastAPI:
         Enabled by setting ENABLE_BACKGROUND_MONITORING=1.
         Disabled by default in development.
         """
-        print("=== startup_event REACHED ===", flush=True)
         enable_monitoring = os.getenv("ENABLE_BACKGROUND_MONITORING", "0") == "1"
 
         if not enable_monitoring:
@@ -236,7 +237,6 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def startup_data_feeds() -> None:
         """Start data feed background tasks (geo-risk + news)."""
-        print("=== startup_data_feeds REACHED ===", flush=True)
         import asyncio
 
         try:
@@ -265,7 +265,6 @@ def create_app() -> FastAPI:
             ENABLE_DAILY_REPORTS=1: enable daily reports
             ENABLE_WEEKLY_REPORTS=1: enable weekly reports
         """
-        print("=== startup_scheduled_tasks REACHED ===", flush=True)
         enable_daily = os.getenv("ENABLE_DAILY_REPORTS", "0") == "1"
         enable_weekly = os.getenv("ENABLE_WEEKLY_REPORTS", "0") == "1"
 
@@ -302,7 +301,6 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def startup_ai_judgment_scheduler() -> None:
         """4時間ごとのAI判定スケジューラーを開始する。"""
-        print("=== startup_ai_judgment_scheduler REACHED ===", flush=True)
         logger.info("startup_ai_judgment_scheduler: entry")
         import asyncio
 
