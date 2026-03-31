@@ -125,10 +125,8 @@ CHAIN_REGISTRY: dict[str, AaveChainConfig] = {
         },
         flashbots_rpc_env_var=None,
         pool_addresses_provider="0xd449FeD49d9C443688d6816fE6872F21402e41de",
-        # TODO: Base Sepolia の PoolDataProvider アドレスは未確認。Aave 公式ドキュメントで要検証。
-        data_provider_address=None,
-        # TODO: Base Sepolia の AaveOracle アドレスは未確認。Aave 公式ドキュメントで要検証。
-        oracle_address=None,
+        data_provider_address="0xBc9f5b7E248451CdD7cA54e717a2BFe1F32b566b",
+        oracle_address="0x943b0dE18d4abf4eF02A85912F8fc07684C141dF",
         is_testnet=True,
     ),
 }
