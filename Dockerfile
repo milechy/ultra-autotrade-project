@@ -15,6 +15,16 @@ COPY backend/requirements.txt .
 RUN pip install --upgrade pip \
     && pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
 
+# アプリケーションコードをコピー（Cythonビルドのために必要）
+COPY backend/ backend/
+
+# 本番用: Cythonコンパイル（builderステージで実行 - gccが利用可能）
+ARG BUILD_MODE=development
+RUN if [ "$BUILD_MODE" = "production" ]; then \
+      pip install --no-index --find-links /wheels Cython && \
+      cd /build/backend && python setup_cython.py build_ext --inplace; \
+    fi
+
 
 # ─── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM python:3.11-slim AS runtime
@@ -32,15 +42,13 @@ COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir --no-index --find-links /wheels /wheels/*.whl \
     && rm -rf /wheels
 
-# アプリケーションコードをコピー
-COPY backend/ backend/
+# アプリケーションコードをコピー（Cythonコンパイル済み成果物を含む）
+COPY --from=builder /build/backend/ backend/
 
-# 本番用: Cythonコンパイル
+# 本番用: Cythonコンパイル済みの場合、元の.pyファイルを削除（.soで代替）
 ARG BUILD_MODE=development
 RUN if [ "$BUILD_MODE" = "production" ]; then \
-      pip install Cython && \
-      cd /app/backend && python setup_cython.py build_ext --inplace && \
-      find app/ai -name "*.py" ! -name "__init__.py" ! -name "schemas.py" ! -name "router.py" ! -name "decisions_router.py" ! -name "decisions_schemas.py" ! -name "models.py" -delete; \
+      find backend/app/ai -name "*.py" ! -name "__init__.py" ! -name "schemas.py" ! -name "router.py" ! -name "decisions_router.py" ! -name "decisions_schemas.py" ! -name "models.py" -delete; \
     fi
 
 # 非 root ユーザーで実行（docs/13_security_design.md）
