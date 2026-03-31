@@ -106,6 +106,25 @@ services:
         loki-timeout: "10s"
         loki-external-labels: "service=backend,env=staging"
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ultra-autotrade-cloudflared-staging
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./config/cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      # Tunnel 認証情報（Hetzner VPS 上の実ファイルをマウント）
+      # `cloudflared tunnel create ultra-autotrade` 実行後に生成される
+      - /root/.cloudflared:/root/.cloudflared:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   frontend:
     container_name: ultra-autotrade-frontend-staging
     build:
