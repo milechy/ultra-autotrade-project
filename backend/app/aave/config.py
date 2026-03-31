@@ -49,6 +49,7 @@ class AaveSettings:
     flashbots_rpc_url: Optional[str] = None
     rpc_url_secondary: Optional[str] = None
     chain_name: Optional[str] = None
+    max_price_deviation_pct: Decimal = Decimal("2.0")
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -139,6 +140,10 @@ def get_aave_settings() -> AaveSettings:
     wallet_private_key = get_env("AAVE_WALLET_PRIVATE_KEY", required=False)
     usdc_address = get_env("AAVE_USDC_ADDRESS", required=False)
     flashbots_rpc_url = get_env("AAVE_FLASHBOTS_RPC_URL", required=False)
+    max_price_deviation_pct = _get_env_decimal(
+        "AAVE_MAX_PRICE_DEVIATION_PCT",
+        default="2.0",
+    )
 
     return AaveSettings(
         network=network,
@@ -159,6 +164,7 @@ def get_aave_settings() -> AaveSettings:
         usdc_address=usdc_address,
         flashbots_rpc_url=flashbots_rpc_url,
         rpc_url_secondary=rpc_url_secondary,
+        max_price_deviation_pct=max_price_deviation_pct,
     )
 
 

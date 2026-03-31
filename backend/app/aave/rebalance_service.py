@@ -46,6 +46,7 @@ from .schemas import (
     AaveOperationMode,
     AaveOperationType,
 )
+from .slippage_guard import SlippageGuard
 from .state_manager import AaveStateManager
 
 logger = logging.getLogger(__name__)
@@ -800,6 +801,27 @@ class RebalanceService:
                 op.amount_usd,
                 proposal_id,
             )
+
+            # スリッページ保護: 操作実行前に価格変動チェック
+            # ステーブルコイン（USDC等）は価格が $1.00 固定として記録・確認
+            _slippage_guard = SlippageGuard(
+                max_deviation_pct=getattr(
+                    self._aave_settings, "max_price_deviation_pct", Decimal("2.0")
+                )
+            )
+            _asset_price = (
+                Decimal("1.00")
+                if _slippage_guard.is_stablecoin(op.asset_symbol)
+                else Decimal("1.00")  # TODO: 将来的に外部価格フィードを使用
+            )
+            _slippage_guard.record_pre_price(op.asset_symbol, _asset_price)
+            if not _slippage_guard.check_post_price(op.asset_symbol, _asset_price):
+                logger.warning(
+                    "execute: slippage check failed for %s %s; skipping operation",
+                    op.operation.value,
+                    op.asset_symbol,
+                )
+                continue
 
             dry_run = self._rb_settings.shadow_mode
             result = self._aave_service.execute_rebalance(
