@@ -1,24 +1,92 @@
-# docker-compose.production.yml
-#
-# Ultra AutoTrade Production 環境用 Docker Compose
-#
-# staging との主な差分:
-# - container_name: -staging → -production
-# - env_file: .env.staging → ./backend/.env.production
-# - healthcheck: 本番向けに設定
-# - restart: always（本番は常に再起動）
-#
-# 使用方法:
-#   docker compose -f docker-compose.production.yml up -d
-#   docker compose -f docker-compose.production.yml logs -f backend
-
 version: "3.9"
 
+# NOTE: The Loki Docker logging driver must be installed on the host before starting this stack:
+#   docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
+# Verify installation with: docker plugin ls
+
 volumes:
-  ultra-state:
+  ultra-state-production:
+    driver: local
+  postgres-data-production:
+    driver: local
+  loki-data-production:
     driver: local
 
 services:
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: ultra-autotrade-loki-production
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./docker/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data-production:/loki
+    command: -config.file=/etc/loki/loki-config.yaml
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: ultra-autotrade-promtail-production
+    volumes:
+      - ./docker/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    depends_on:
+      - loki
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ultra-autotrade-postgres-production
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ultra}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ultra_autotrade}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data-production:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ultra}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-timeout: "10s"
+        loki-external-labels: "service=postgres,env=production"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+
   backend:
     container_name: ultra-autotrade-backend-production
     build:
@@ -29,46 +97,66 @@ services:
       uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
-      --workers 1
       --log-level info
-
-    # 環境変数ファイル（Git 管理外）
     env_file:
-      - ./backend/.env.production
-
-    # ポート公開
+      - .env.production       # production 用の環境変数ファイル（Git 管理外）
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade}
+      REBALANCE_SHADOW_MODE: "false"
     ports:
       - "8000:8000"
-
-    # state.json 永続化ボリューム
     volumes:
-      - ultra-state:/var/run/ultra:rw
-
-    # 再起動ポリシー
+      - ultra-state-production:/var/run/ultra:rw
+      - ./backend/data:/app/backend/data:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: always
-
-    # ヘルスチェック設定
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
-
-    # ログ設定（ローテーション）
+      start_period: 40s
     logging:
-      driver: "json-file"
+      driver: loki
       options:
-        max-size: "50m"
-        max-file: "10"
-        compress: "true"
-
-    # リソース制限（必要に応じて調整）
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-timeout: "10s"
+        loki-external-labels: "service=backend,env=production"
     deploy:
       resources:
         limits:
-          cpus: '2'
+          cpus: "2.0"
           memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
+
+  frontend:
+    container_name: ultra-autotrade-frontend-production
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api.ultra-auto-trade.com}
+    environment:
+      NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api.ultra-auto-trade.com}
+      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://backend:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: always
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-timeout: "10s"
+        loki-external-labels: "service=frontend,env=production"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
