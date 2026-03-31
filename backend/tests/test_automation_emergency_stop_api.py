@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
-from app.auth.dependencies import require_admin
+from app.auth.dependencies import require_active_user, require_admin
 from app.auth.models import UserRole
 from app.automation.state import get_monitoring_service
 from app.main import create_app
@@ -27,6 +27,7 @@ def _make_client(override_auth: bool = True) -> tuple[TestClient, MagicMock]:
     app = create_app()
     app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
     if override_auth:
+        app.dependency_overrides[require_active_user] = lambda: _make_admin_user()
         app.dependency_overrides[require_admin] = lambda: _make_admin_user()
     return TestClient(app, raise_server_exceptions=False), mock_monitoring
 

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 from app.api.automation_dashboard import get_monitoring_service
-from app.auth.dependencies import require_admin
+from app.auth.dependencies import require_active_user, require_admin
 from app.auth.models import UserRole
 from app.main import create_app
 
@@ -31,6 +31,7 @@ class TestEmergencyStopDashboard:
         """テスト用 TestClient と MonitoringService モックを作成して返す。"""
         app = create_app()
         mock_monitoring = MagicMock()
+        app.dependency_overrides[require_active_user] = lambda: _make_admin_user()
         app.dependency_overrides[require_admin] = lambda: _make_admin_user()
         app.dependency_overrides[get_monitoring_service] = lambda: mock_monitoring
         client = TestClient(app)
