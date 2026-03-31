@@ -25,6 +25,12 @@ from decimal import Decimal
 from typing import Any, Optional, Protocol
 
 from .config import AaveSettings, get_aave_settings
+from .gas_estimator import (
+    DEFAULT_FALLBACK_GAS_APPROVE,
+    DEFAULT_FALLBACK_GAS_SUPPLY,
+    DEFAULT_FALLBACK_GAS_WITHDRAW,
+    GasEstimator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -568,13 +574,24 @@ class Web3AaveClient(AaveClientBase):
             )
 
             # Step 1: ERC-20 approve
+            gas_estimator = GasEstimator(self._w3)
+            approve_params_for_estimate = {
+                "from": checksum_wallet,
+                "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                "gasPrice": self._w3.eth.gas_price,
+            }
+            approve_gas = gas_estimator.estimate_gas_with_buffer(
+                approve_params_for_estimate, DEFAULT_FALLBACK_GAS_APPROVE
+            )
+            if not gas_estimator.is_gas_cost_acceptable(approve_gas):
+                raise AaveClientError(f"approve ガスコストが上限を超過: {approve_gas} units")
             approve_tx = token_contract.functions.approve(
                 pool_address, amount_wei
             ).build_transaction(
                 {
                     "from": checksum_wallet,
                     "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
-                    "gas": 100000,
+                    "gas": approve_gas,
                     "gasPrice": self._w3.eth.gas_price,
                 }
             )
@@ -588,6 +605,16 @@ class Web3AaveClient(AaveClientBase):
 
             # Step 2: Pool.supply
             try:
+                supply_params_for_estimate = {
+                    "from": checksum_wallet,
+                    "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                    "gasPrice": self._w3.eth.gas_price,
+                }
+                supply_gas = gas_estimator.estimate_gas_with_buffer(
+                    supply_params_for_estimate, DEFAULT_FALLBACK_GAS_SUPPLY
+                )
+                if not gas_estimator.is_gas_cost_acceptable(supply_gas):
+                    raise AaveClientError(f"supply ガスコストが上限を超過: {supply_gas} units")
                 supply_tx = self._pool.functions.supply(
                     Web3.to_checksum_address(asset_address),
                     amount_wei,
@@ -597,7 +624,7 @@ class Web3AaveClient(AaveClientBase):
                     {
                         "from": checksum_wallet,
                         "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
-                        "gas": 300000,
+                        "gas": supply_gas,
                         "gasPrice": self._w3.eth.gas_price,
                     }
                 )
@@ -610,11 +637,19 @@ class Web3AaveClient(AaveClientBase):
                 # supply 失敗時は allowance を revoke して部分成功状態を解消
                 logger.error("supply 失敗: %s — allowance を revoke します", supply_exc)
                 try:
+                    revoke_params_for_estimate = {
+                        "from": checksum_wallet,
+                        "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                        "gasPrice": self._w3.eth.gas_price,
+                    }
+                    revoke_gas = gas_estimator.estimate_gas_with_buffer(
+                        revoke_params_for_estimate, DEFAULT_FALLBACK_GAS_APPROVE
+                    )
                     revoke_tx = token_contract.functions.approve(pool_address, 0).build_transaction(
                         {
                             "from": checksum_wallet,
                             "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
-                            "gas": 100000,
+                            "gas": revoke_gas,
                             "gasPrice": self._w3.eth.gas_price,
                         }
                     )
@@ -746,6 +781,17 @@ class Web3AaveClient(AaveClientBase):
             )
 
             # Pool.withdraw(asset, amount, to)
+            gas_estimator = GasEstimator(self._w3)
+            withdraw_params_for_estimate = {
+                "from": checksum_wallet,
+                "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                "gasPrice": self._w3.eth.gas_price,
+            }
+            withdraw_gas = gas_estimator.estimate_gas_with_buffer(
+                withdraw_params_for_estimate, DEFAULT_FALLBACK_GAS_WITHDRAW
+            )
+            if not gas_estimator.is_gas_cost_acceptable(withdraw_gas):
+                raise AaveClientError(f"withdraw ガスコストが上限を超過: {withdraw_gas} units")
             withdraw_tx = self._pool.functions.withdraw(
                 Web3.to_checksum_address(asset_address),
                 amount_wei,
@@ -754,7 +800,7 @@ class Web3AaveClient(AaveClientBase):
                 {
                     "from": checksum_wallet,
                     "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
-                    "gas": 300000,
+                    "gas": withdraw_gas,
                     "gasPrice": self._w3.eth.gas_price,
                 }
             )
