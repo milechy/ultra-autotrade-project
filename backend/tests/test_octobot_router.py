@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

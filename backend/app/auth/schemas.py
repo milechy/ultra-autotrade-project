@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/auth/schemas.py
 """
 認証関連の Pydantic スキーマ。
@@ -69,8 +71,29 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    terms_accepted_at: Optional[datetime] = None
+    terms_version: Optional[str] = None
+    risk_mode: Optional[str] = "conservative"
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TermsAcceptRequest(BaseModel):
+    """利用規約同意リクエスト。"""
+
+    version: str = Field(
+        ..., description="Terms version being accepted (e.g. '2.0')", max_length=20
+    )
+
+
+class TermsStatusResponse(BaseModel):
+    """利用規約同意状態レスポンス。"""
+
+    accepted: bool
+    terms_version: Optional[str] = None
+    terms_accepted_at: Optional[datetime] = None
+    current_version: str = "2.0"
+    needs_acceptance: bool = True
 
 
 class UserCreateRequest(BaseModel):
@@ -121,3 +144,35 @@ class PasswordChangeRequest(BaseModel):
 
     current_password: str
     new_password: str = Field(min_length=8, max_length=100)
+
+
+class RiskModeUpdateRequest(BaseModel):
+    """リスクモード変更リクエスト。"""
+
+    mode: str = Field(
+        ...,
+        description="conservative / balanced / aggressive",
+        pattern="^(conservative|balanced|aggressive)$",
+    )
+
+
+class WalletConnectRequest(BaseModel):
+    """WalletConnect認証リクエスト。"""
+
+    wallet_address: str = Field(
+        ..., min_length=42, max_length=42, description="EVM wallet address (0x...)"
+    )
+    message: str = Field(..., description="Signed message (must contain timestamp)")
+    signature: str = Field(..., description="ECDSA signature (0x...)")
+
+
+class WalletConnectResponse(BaseModel):
+    """WalletConnect認証レスポンス。"""
+
+    access_token: str
+    token_type: str = "bearer"  # noqa: S105
+    expires_in: int
+    is_new_user: bool
+    needs_terms_acceptance: bool
+
+    model_config = ConfigDict(from_attributes=True)

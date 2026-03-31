@@ -1,8 +1,12 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_ai_service.py
 
 from datetime import datetime, timezone
 
-from app.ai.schemas import AIAnalysisResult, TradeAction
+import pytest
+
+from app.ai.schemas import AIAnalysisResult, RAGContext, TradeAction
 from app.ai.service import AIService
 from app.notion.schemas import NotionNewsItem
 
@@ -67,3 +71,49 @@ def test_ai_service_uses_llm_analyzer_when_provided():
     assert result.action == TradeAction.BUY
     assert result.confidence == 90
     assert result.sentiment == "positive"
+
+
+@pytest.mark.vcr()
+def test_judge_with_rag_vcr():
+    """VCR カセットを使って judge_with_rag() が BUY/SELL/HOLD を返すことを確認。"""
+    service = AIService()
+    rag_context = RAGContext(
+        chunks=["Bitcoin price surged 10% on strong institutional demand."],
+        query="BTC price analysis",
+        source_count=1,
+    )
+    result = service.judge_with_rag("BTC price analysis", rag_context)
+    assert result.final_action in (TradeAction.BUY, TradeAction.SELL, TradeAction.HOLD)
+    assert 0 <= result.final_confidence <= 100
+
+
+def test_build_rag_prompt_v3_without_market_context():
+    """v3 テンプレートで market_context が None の場合に KeyError が起きないこと。
+
+    AI_PROMPT_VERSION=v3 かつ market_context 未指定でスケジューラーが呼ぶパターン。
+    """
+    from unittest.mock import MagicMock
+
+    from app.ai.config import AISettings
+
+    service = AIService()
+    rag_context = RAGContext(chunks=["test chunk"], query="test query", source_count=1)
+
+    settings = MagicMock(spec=AISettings)
+    settings.prompt_version = "v3"
+    settings.anthropic_api_key = None  # API呼び出しは行わない
+    settings.openai_api_key = None
+    settings.cross_validation_enabled = False
+    settings.shadow_mode = False
+
+    # _build_rag_prompt が KeyError を起こさないことを確認（戻り値の形式だけ検証）
+    system_prompt, user_content = service._build_rag_prompt(
+        query="test query",
+        rag_context=rag_context,
+        version="v3",
+        market_context=None,
+    )
+    assert isinstance(system_prompt, str)
+    assert isinstance(user_content, str)
+    assert "No agent signals available" in user_content
+    assert "test chunk" in user_content

@@ -1,13 +1,17 @@
+'use client'
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
+
 // frontend/components/AuthGuard.tsx
 /**
- * 認証ガードコンポーネント。
+ * Authentication guard component.
  *
- * 未認証の場合はログインページにリダイレクト。
- * adminOnly の場合は管理者以外をブロック。
+ * Redirects to the login page when unauthenticated.
+ * Blocks non-admin users when adminOnly is true.
  */
 
 import { useEffect } from "react";
-import { useRouter } from "next/router";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "../lib/auth";
 
 interface AuthGuardProps {
@@ -18,22 +22,23 @@ interface AuthGuardProps {
 export default function AuthGuard({ children, adminOnly = false }: AuthGuardProps) {
   const { isAuthenticated, isAdmin, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (isLoading) return;
 
     if (!isAuthenticated) {
-      // 現在のパスをクエリに含めてリダイレクト
-      router.replace(`/login?redirect=${encodeURIComponent(router.asPath)}`);
+      // Redirect with current path in query string
+      router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
       return;
     }
 
     if (adminOnly && !isAdmin) {
-      // 管理者専用ページに非管理者がアクセスした場合
+      // Non-admin user attempted to access an admin-only page
       router.replace("/dashboard");
       return;
     }
-  }, [isAuthenticated, isAdmin, isLoading, adminOnly, router]);
+  }, [isAuthenticated, isAdmin, isLoading, adminOnly, router, pathname]);
 
   if (isLoading) {
     return (
@@ -44,11 +49,11 @@ export default function AuthGuard({ children, adminOnly = false }: AuthGuardProp
   }
 
   if (!isAuthenticated) {
-    return null; // リダイレクト中
+    return null; // Redirecting
   }
 
   if (adminOnly && !isAdmin) {
-    return null; // リダイレクト中
+    return null; // Redirecting
   }
 
   return <>{children}</>;

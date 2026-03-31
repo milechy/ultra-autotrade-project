@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 """Workflow integration tests for Knowledge → RAG → AI Judge → Exchange pipeline."""
 
 from datetime import datetime, timezone

@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/aave/service.py
 
 """
@@ -127,6 +129,11 @@ class AaveService:
 
         # HOLD は常に NOOP
         if action_val == "HOLD":
+            return AaveOperationType.NOOP
+
+        # HF 取得失敗時は安全側に倒す
+        if health_factor is None:
+            logger.warning("health_factor is None (fetch failed); returning NOOP for safety.")
             return AaveOperationType.NOOP
 
         # 連続トレード制限（10分以内に 1回まで）
@@ -372,3 +379,89 @@ class AaveService:
             before_health_factor=before_hf,
             after_health_factor=before_hf,
         )
+
+
+class MultiChainAaveService:
+    """
+    チェーンごとに独立した AaveService を管理するマルチチェーンサービス。
+
+    各チェーンの Health Factor は独立して管理され、
+    1 つのチェーンの HARD_STOP が他チェーンに影響しない。
+    """
+
+    def __init__(
+        self,
+        services: dict[str, AaveService] | None = None,
+    ) -> None:
+        # services が明示的に渡された場合はそのまま使用する。
+        # None の場合は初回アクセス時に遅延初期化する（lazy init）。
+        # これにより、RPC URL 未設定環境でも __init__ 時点では ValueError が発生しない。
+        self._services: dict[str, AaveService] | None = services
+
+    def _get_services(self) -> dict[str, AaveService]:
+        """チェーンサービスマップを遅延初期化して返す。"""
+        if self._services is None:
+            from .client import make_multi_chain_clients
+            from .config import get_multi_chain_settings
+
+            clients = make_multi_chain_clients()
+            settings_map = get_multi_chain_settings()
+            self._services = {
+                name: AaveService(client=client, settings=settings_map[name])  # type: ignore[arg-type]
+                for name, client in clients.items()
+            }
+        return self._services
+
+    def get_chain_names(self) -> list[str]:
+        """アクティブなチェーン名の一覧を返す。"""
+        return list(self._get_services().keys())
+
+    def get_service(self, chain_name: str) -> AaveService:
+        """
+        指定チェーンの AaveService を取得する。
+
+        :raises KeyError: 存在しないチェーン名の場合
+        """
+        services = self._get_services()
+        if chain_name not in services:
+            available = ", ".join(sorted(services.keys()))
+            raise KeyError(f"チェーン {chain_name!r} は存在しません。利用可能: {available}")
+        return services[chain_name]
+
+    def execute_rebalance(
+        self,
+        chain_name: str,
+        action: TradeAction,
+        amount: Decimal,
+        asset_symbol: str | None = None,
+        dry_run: bool = False,
+    ) -> AaveOperationResult:
+        """
+        指定チェーンでリバランスを実行する。
+
+        :param chain_name: 対象チェーン名
+        """
+        service = self.get_service(chain_name)
+        return service.execute_rebalance(
+            action=action,
+            amount=amount,
+            asset_symbol=asset_symbol,
+            dry_run=dry_run,
+        )
+
+    def get_all_health_factors(self) -> dict[str, Optional[Decimal]]:
+        """
+        全アクティブチェーンの Health Factor を取得する。
+
+        各チェーンは独立して問い合わせ、1 つのチェーンの失敗が
+        他のチェーンに影響しない。失敗したチェーンの値は None。
+        """
+        result: dict[str, Optional[Decimal]] = {}
+        for name, service in self._get_services().items():
+            try:
+                hf = service._client.get_health_factor()
+                result[name] = hf
+            except Exception:
+                logger.error("Failed to get health factor for chain %s", name, exc_info=True)
+                result[name] = None
+        return result

@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_exchange_client.py
 """Exchange client tests."""
 
@@ -182,56 +184,67 @@ class TestBybitSandboxClientDryRun:
 class TestGetExchangeSettingsFallback:
     """Test BYBIT_* env var fallback in get_exchange_settings()."""
 
-    def test_bybit_api_key_used_when_exchange_api_key_missing(self):
+    def test_bybit_api_key_used_when_exchange_api_key_missing(self, monkeypatch):
         """BYBIT_API_KEY is used when EXCHANGE_API_KEY is not set."""
         import app.exchange.config as cfg
 
-        env = {
-            "BYBIT_API_KEY": "bybit-key-123",
-            "BYBIT_API_SECRET": "bybit-secret-456",
-        }
-        with patch.dict("os.environ", env, clear=False):
-            # Reload to clear any cached state (get_env reads os.environ directly)
-            importlib.reload(cfg)
-            settings = cfg.get_exchange_settings()
+        # Isolate from staging env: remove EXCHANGE_API_KEY so BYBIT_API_KEY fallback is used
+        monkeypatch.delenv("EXCHANGE_API_KEY", raising=False)
+        monkeypatch.delenv("EXCHANGE_API_SECRET", raising=False)
+        monkeypatch.delenv("BITFLYER_API_KEY", raising=False)
+        monkeypatch.delenv("BITFLYER_API_SECRET", raising=False)
+        monkeypatch.setenv("BYBIT_API_KEY", "bybit-key-123")
+        monkeypatch.setenv("BYBIT_API_SECRET", "bybit-secret-456")
+
+        # Reload to clear any cached state (get_env reads os.environ directly)
+        importlib.reload(cfg)
+        settings = cfg.get_exchange_settings()
 
         assert settings.api_key == "bybit-key-123"
         assert settings.api_secret == "bybit-secret-456"
 
-    def test_exchange_api_key_takes_priority_over_bybit(self):
+    def test_exchange_api_key_takes_priority_over_bybit(self, monkeypatch):
         """EXCHANGE_API_KEY takes priority over BYBIT_API_KEY when both are set."""
         import app.exchange.config as cfg
 
-        env = {
-            "EXCHANGE_API_KEY": "exchange-key",
-            "EXCHANGE_API_SECRET": "exchange-secret",
-            "BYBIT_API_KEY": "bybit-key",
-            "BYBIT_API_SECRET": "bybit-secret",
-        }
-        with patch.dict("os.environ", env, clear=False):
-            importlib.reload(cfg)
-            settings = cfg.get_exchange_settings()
+        monkeypatch.setenv("EXCHANGE_API_KEY", "exchange-key")
+        monkeypatch.setenv("EXCHANGE_API_SECRET", "exchange-secret")
+        monkeypatch.setenv("BYBIT_API_KEY", "bybit-key")
+        monkeypatch.setenv("BYBIT_API_SECRET", "bybit-secret")
+
+        importlib.reload(cfg)
+        settings = cfg.get_exchange_settings()
 
         assert settings.api_key == "exchange-key"
         assert settings.api_secret == "exchange-secret"
 
-    def test_bybit_sandbox_fallback(self):
+    def test_bybit_sandbox_fallback(self, monkeypatch):
         """BYBIT_SANDBOX is used when EXCHANGE_SANDBOX is not set."""
         import app.exchange.config as cfg
 
-        env = {
-            "BYBIT_API_KEY": "key",
-            "BYBIT_API_SECRET": "secret",
-            "BYBIT_SANDBOX": "true",
-        }
-        with patch.dict("os.environ", env, clear=False):
-            importlib.reload(cfg)
-            settings = cfg.get_exchange_settings()
+        # Isolate from staging env: remove EXCHANGE_SANDBOX so BYBIT_SANDBOX fallback is used
+        monkeypatch.delenv("EXCHANGE_SANDBOX", raising=False)
+        monkeypatch.delenv("APP_ENV", raising=False)
+        monkeypatch.setenv("BYBIT_API_KEY", "key")
+        monkeypatch.setenv("BYBIT_API_SECRET", "secret")
+        monkeypatch.setenv("BYBIT_SANDBOX", "true")
+
+        importlib.reload(cfg)
+        settings = cfg.get_exchange_settings()
 
         assert settings.sandbox is True
 
-    def test_empty_keys_trigger_dry_run(self):
+    def test_empty_keys_trigger_dry_run(self, monkeypatch):
         """When no API key env vars are set, api_key is empty (dry-run mode)."""
+        monkeypatch.delenv("EXCHANGE_API_KEY", raising=False)
+        monkeypatch.delenv("EXCHANGE_SECRET_KEY", raising=False)
+        monkeypatch.delenv("EXCHANGE_API_SECRET", raising=False)
+        monkeypatch.delenv("EXCHANGE_CLIENT_TYPE", raising=False)
+        monkeypatch.delenv("BITFLYER_API_KEY", raising=False)
+        monkeypatch.delenv("BITFLYER_API_SECRET", raising=False)
+        monkeypatch.delenv("BYBIT_API_KEY", raising=False)
+        monkeypatch.delenv("BYBIT_API_SECRET", raising=False)
+
         import app.exchange.config as cfg
 
         # Patch get_env to return None for all key-related vars
@@ -437,3 +450,134 @@ class TestBtcJpyQuantityCalculation:
         assert call_args is not None
         _, _, quantity = call_args[0]
         assert abs(quantity - 0.0015) < 1e-10
+
+
+class TestAppEnvProdMode:
+    """Test APP_ENV=prod forces sandbox=False in get_exchange_settings()."""
+
+    def test_app_env_prod_forces_sandbox_false(self):
+        """APP_ENV=prod → settings.sandbox is False."""
+        import importlib
+
+        import app.exchange.config as cfg
+
+        env = {"APP_ENV": "prod"}
+        with patch.dict("os.environ", env, clear=False):
+            importlib.reload(cfg)
+            settings = cfg.get_exchange_settings()
+
+        assert settings.sandbox is False
+        assert settings.app_env == "prod"
+
+    def test_app_env_prod_overrides_exchange_sandbox_true(self):
+        """APP_ENV=prod overrides EXCHANGE_SANDBOX=true."""
+        import importlib
+
+        import app.exchange.config as cfg
+
+        env = {"APP_ENV": "prod", "EXCHANGE_SANDBOX": "true"}
+        with patch.dict("os.environ", env, clear=False):
+            importlib.reload(cfg)
+            settings = cfg.get_exchange_settings()
+
+        assert settings.sandbox is False
+
+    def test_app_env_non_prod_keeps_sandbox_true(self):
+        """APP_ENV=staging (non-prod) → sandbox defaults to True."""
+        import app.exchange.config as cfg
+
+        original_get_env = cfg.get_env
+
+        def patched_get_env(name: str, required: bool = True) -> str | None:
+            if name == "APP_ENV":
+                return "staging"
+            if name in ("EXCHANGE_SANDBOX", "BYBIT_SANDBOX"):
+                return None
+            return original_get_env(name, required=required)
+
+        with patch.object(cfg, "get_env", patched_get_env):
+            settings = cfg.get_exchange_settings()
+
+        assert settings.sandbox is True
+
+    def test_app_env_field_set_correctly(self):
+        """settings.app_env matches APP_ENV env var."""
+        import importlib
+
+        import app.exchange.config as cfg
+
+        env = {"APP_ENV": "prod"}
+        with patch.dict("os.environ", env, clear=False):
+            importlib.reload(cfg)
+            settings = cfg.get_exchange_settings()
+
+        assert settings.app_env == "prod"
+
+
+class TestGetBitflyerSettings:
+    """Test get_bitflyer_settings() uses BITFLYER_* keys directly."""
+
+    def test_bitflyer_settings_uses_bitflyer_api_key(self):
+        """BITFLYER_API_KEY → settings.api_key (not BYBIT_API_KEY)."""
+        import app.exchange.config as cfg
+
+        original_get_env = cfg.get_env
+
+        def patched_get_env(name: str, required: bool = True) -> str | None:
+            if name == "BITFLYER_API_KEY":
+                return "bitflyer-real-key"
+            if name == "BITFLYER_API_SECRET":
+                return "bitflyer-real-secret"
+            return original_get_env(name, required=required)
+
+        with patch.object(cfg, "get_env", patched_get_env):
+            settings = cfg.get_bitflyer_settings()
+
+        assert settings.api_key == "bitflyer-real-key"
+        assert settings.api_secret == "bitflyer-real-secret"
+
+    def test_bitflyer_settings_default_symbol_is_btc_jpy(self):
+        """get_bitflyer_settings() defaults default_symbol to 'BTC/JPY'."""
+        import app.exchange.config as cfg
+
+        original_get_env = cfg.get_env
+
+        def patched_get_env(name: str, required: bool = True) -> str | None:
+            if name == "EXCHANGE_DEFAULT_SYMBOL":
+                return None
+            return original_get_env(name, required=required)
+
+        with patch.object(cfg, "get_env", patched_get_env):
+            settings = cfg.get_bitflyer_settings()
+
+        assert settings.default_symbol == "BTC/JPY"
+
+    def test_bitflyer_settings_sandbox_always_true(self):
+        """bitFlyer settings sandbox is always True (no sandbox available)."""
+        import app.exchange.config as cfg
+
+        settings = cfg.get_bitflyer_settings()
+        assert settings.sandbox is True
+
+    def test_bitflyer_settings_ignores_bybit_key(self):
+        """When BYBIT_API_KEY is set, bitFlyer settings uses BITFLYER_API_KEY instead."""
+        import app.exchange.config as cfg
+
+        original_get_env = cfg.get_env
+
+        def patched_get_env(name: str, required: bool = True) -> str | None:
+            if name == "BYBIT_API_KEY":
+                return "bybit-key-should-be-ignored"
+            if name == "BITFLYER_API_KEY":
+                return "bitflyer-correct-key"
+            if name == "BYBIT_API_SECRET":
+                return "bybit-secret-should-be-ignored"
+            if name == "BITFLYER_API_SECRET":
+                return "bitflyer-correct-secret"
+            return original_get_env(name, required=required)
+
+        with patch.object(cfg, "get_env", patched_get_env):
+            settings = cfg.get_bitflyer_settings()
+
+        assert settings.api_key == "bitflyer-correct-key"
+        assert settings.api_secret == "bitflyer-correct-secret"

@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 // frontend/lib/api/auth.ts
 /**
  * 認証 API クライアント。
@@ -85,4 +87,25 @@ export async function changePassword(
       Authorization: `Bearer ${token}`,
     },
   });
+}
+
+export interface WalletConnectRequest {
+  wallet_address: string;
+  message: string;
+  signature: string;
+}
+
+export interface WalletConnectResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  is_new_user: boolean;
+  needs_terms_acceptance: boolean;
+}
+
+/**
+ * ウォレット署名認証（POST /auth/wallet/connect）
+ */
+export async function walletConnect(request: WalletConnectRequest): Promise<WalletConnectResponse> {
+  return await postJson<WalletConnectResponse>("/auth/wallet/connect", request);
 }

@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/knowledge/schemas.py
 
 """
@@ -76,6 +78,7 @@ class KnowledgeItem(BaseModel):
     status: KnowledgeItemStatus = Field(..., description="処理状態")
     chunk_count: int = Field(..., description="チャンク数")
     item_type: KnowledgeItemType = Field(..., description="入力種別")
+    quality_score: Optional[float] = Field(None, description="コンテンツ品質スコア（0〜100）")
     created_at: datetime = Field(..., description="作成日時")
     updated_at: datetime = Field(..., description="更新日時")
 

@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/automation/router.py
 
 """
@@ -11,12 +13,15 @@ Phase 10: 運用ダッシュボード向けの監視・レポートAPIを提供�
 docs/04_api_design.md および docs/19_operations_runbook.md に準拠。
 """
 
-from datetime import timedelta
+import os
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai.models import AIDecision
 from app.ai.service import AIService
 from app.automation.workflow import process_pending_knowledge
 from app.database import get_db
@@ -48,6 +53,28 @@ def get_reporting_service(
     return ReportingService(monitoring=monitoring)
 
 
+def _compute_next_scheduled_run(db: Session) -> Optional[datetime]:
+    """ai_decisions の最新 created_at から次回スケジューラー実行時刻を算出する。"""
+    stmt = select(AIDecision.created_at).order_by(AIDecision.created_at.desc()).limit(1)
+    last_run: Optional[datetime] = db.scalars(stmt).first()
+    if last_run is None:
+        return None
+
+    interval_hours = int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS", "4"))
+    next_run = last_run + timedelta(hours=interval_hours)
+
+    now = datetime.now(timezone.utc)
+    # Ensure next_run is timezone-aware
+    if next_run.tzinfo is None:
+        next_run = next_run.replace(tzinfo=timezone.utc)
+
+    # If the computed time is already past, return now (run is imminent)
+    if next_run <= now:
+        return now
+
+    return next_run
+
+
 @router.get(
     "/status",
     response_model=AutomationStatus,
@@ -55,6 +82,7 @@ def get_reporting_service(
 )
 def get_automation_status(
     monitoring: MonitoringService = Depends(get_monitoring_service),
+    db: Session = Depends(get_db),
 ) -> AutomationStatus:
     """
     自動運用基盤の現在ステータスを返す。
@@ -66,7 +94,9 @@ def get_automation_status(
     運用者が「今この瞬間の全体状態」を把握するためのエンドポイント。
     docs/19_operations_runbook.md の「2.6 ダッシュボードの見方」を参照。
     """
-    return monitoring.get_status()
+    status = monitoring.get_status()
+    next_run = _compute_next_scheduled_run(db)
+    return status.model_copy(update={"next_scheduled_run": next_run})
 
 
 @router.get(

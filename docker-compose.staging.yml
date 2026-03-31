@@ -1,12 +1,51 @@
 version: "3.9"
 
+# NOTE: The Loki Docker logging driver must be installed on the host before starting this stack:
+#   docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
+# Verify installation with: docker plugin ls
+
 volumes:
   ultra-state:
     driver: local
   postgres-data:
     driver: local
+  loki-data:
+    driver: local
 
 services:
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: ultra-autotrade-loki-staging
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./docker/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/loki-config.yaml
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: ultra-autotrade-promtail-staging
+    volumes:
+      - ./docker/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    depends_on:
+      - loki
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   postgres:
     image: pgvector/pgvector:pg16
     container_name: ultra-autotrade-postgres-staging
@@ -25,10 +64,13 @@ services:
       timeout: 5s
       retries: 5
     logging:
-      driver: "json-file"
+      driver: loki
       options:
-        max-size: "10m"
-        max-file: "3"
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-timeout: "10s"
+        loki-external-labels: "service=postgres,env=staging"
 
   backend:
     container_name: ultra-autotrade-backend-staging
@@ -40,10 +82,12 @@ services:
       uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
+      --log-level info
     env_file:
       - .env.staging       # staging 用の環境変数ファイル（Git 管理外）
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade}
+      REBALANCE_SHADOW_MODE: "false"   # testnet 実行モード（dry-run を無効化）
     ports:
       - "8000:8000"
     volumes:
@@ -54,10 +98,13 @@ services:
         condition: service_healthy
     restart: always
     logging:
-      driver: "json-file"
+      driver: loki
       options:
-        max-size: "10m"
-        max-file: "5"
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-timeout: "10s"
+        loki-external-labels: "service=backend,env=staging"
 
   frontend:
     container_name: ultra-autotrade-frontend-staging
@@ -68,13 +115,17 @@ services:
         NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api.ultra-auto-trade.com}
     environment:
       NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api.ultra-auto-trade.com}
+      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://backend:8000}
     ports:
       - "3000:3000"
     depends_on:
       - backend
     restart: always
     logging:
-      driver: "json-file"
+      driver: loki
       options:
-        max-size: "10m"
-        max-file: "3"
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-timeout: "10s"
+        loki-external-labels: "service=frontend,env=staging"

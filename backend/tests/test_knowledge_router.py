@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_knowledge_router.py
 """Knowledge Hub router tests using FastAPI TestClient with dependency overrides."""
 

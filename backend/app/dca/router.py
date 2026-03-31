@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/dca/router.py
 
 """
@@ -19,7 +21,14 @@ from app.exchange.client import DummyExchangeClient
 from app.exchange.service import ExchangeService
 
 from .config import get_dca_config
-from .schemas import DCAConfig, DCAExecutionResult
+from .grid_bot import GridBotService, GridConfig, get_grid_config_from_env
+from .schemas import (
+    DCAConfig,
+    DCAExecutionResult,
+    GridConfigRequest,
+    GridLevelResponse,
+    GridStatusResponse,
+)
 from .service import DCAService
 
 logger = logging.getLogger(__name__)
@@ -61,3 +70,82 @@ def update_config(new_config: DCAConfig) -> DCAConfig:
         new_config.dry_run,
     )
     return new_config
+
+
+def _get_grid_service() -> GridBotService:
+    """GridBotService の依存性注入ファクトリ。"""
+    client = DummyExchangeClient()
+    exchange_service = ExchangeService(client=client)
+    return GridBotService(exchange_service=exchange_service)
+
+
+def _to_grid_status_response(status: object) -> GridStatusResponse:
+    """GridStatus → GridStatusResponse に変換する。"""
+    from .grid_bot import GridStatus
+
+    if not isinstance(status, GridStatus):
+        raise TypeError(f"Expected GridStatus, got {type(status)}")
+    return GridStatusResponse(
+        enabled=status.enabled,
+        symbol=status.symbol,
+        upper_price=status.upper_price,
+        lower_price=status.lower_price,
+        grid_count=status.grid_count,
+        current_price=status.current_price,
+        levels=[
+            GridLevelResponse(
+                price=lvl.price,
+                side=lvl.side,
+                order_id=lvl.order_id,
+                filled=lvl.filled,
+            )
+            for lvl in status.levels
+        ],
+        total_orders=status.total_orders,
+        filled_orders=status.filled_orders,
+        pnl_usd=status.pnl_usd,
+    )
+
+
+@router.post("/grid/execute", response_model=GridStatusResponse)
+def execute_grid(
+    body: GridConfigRequest,
+    service: GridBotService = Depends(_get_grid_service),
+) -> GridStatusResponse:
+    """グリッドボットを設定・実行する。"""
+    config = GridConfig(
+        upper_price=body.upper_price,
+        lower_price=body.lower_price,
+        grid_count=body.grid_count,
+        symbol=body.symbol,
+        amount_per_grid_usd=body.amount_per_grid_usd,
+        enabled=body.enabled,
+        dry_run=body.dry_run,
+    )
+    status = service.execute(config)
+    return _to_grid_status_response(status)
+
+
+@router.get("/grid/status", response_model=GridStatusResponse)
+def get_grid_status(
+    service: GridBotService = Depends(_get_grid_service),
+) -> GridStatusResponse:
+    """現在のグリッドステータスを返す（注文は発注しない）。"""
+    config = get_grid_config_from_env()
+    status = service.get_status(config)
+    return _to_grid_status_response(status)
+
+
+@router.get("/grid/config", response_model=GridConfigRequest)
+def get_grid_config() -> GridConfigRequest:
+    """環境変数からグリッド設定を取得して返す。"""
+    config = get_grid_config_from_env()
+    return GridConfigRequest(
+        upper_price=config.upper_price,
+        lower_price=config.lower_price,
+        grid_count=config.grid_count,
+        symbol=config.symbol,
+        amount_per_grid_usd=config.amount_per_grid_usd,
+        enabled=config.enabled,
+        dry_run=config.dry_run,
+    )

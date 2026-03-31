@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/auth/service.py
 """
 認証サービス。
@@ -8,12 +10,17 @@ docs/13_security_design.md に準拠。
 
 import logging
 import os
+import random
+import string
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt as pyjwt
+from eth_account.messages import encode_defunct
+from jwt import InvalidTokenError as JWTError
 from sqlalchemy.orm import Session
+from web3 import Web3
 
 from .models import User, UserRole
 from .schemas import RegisterRequest, UserCreateRequest
@@ -133,7 +140,7 @@ class AuthService:
             "iat": datetime.now(timezone.utc),
         }
 
-        token = jwt.encode(to_encode, cls.SECRET_KEY, algorithm=cls.ALGORITHM)
+        token = pyjwt.encode(to_encode, cls.SECRET_KEY, algorithm=cls.ALGORITHM)
         expires_in = int(expires_delta.total_seconds())
 
         return token, expires_in
@@ -150,7 +157,9 @@ class AuthService:
             ペイロード辞書、または無効な場合は None
         """
         try:
-            payload: dict[str, Any] = jwt.decode(token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM])
+            payload: dict[str, Any] = pyjwt.decode(
+                token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM]
+            )
             return payload
         except JWTError as e:
             logger.warning("JWT decode error: %s", e)
@@ -324,3 +333,72 @@ class AuthService:
     def count_admins(cls, db: Session) -> int:
         """管理者の数を取得する。"""
         return db.query(User).filter(User.role == UserRole.ADMIN.value).count()
+
+    @classmethod
+    def get_user_by_wallet(cls, db: Session, wallet_address: str) -> Optional[User]:
+        """ウォレットアドレスでユーザーを取得する。"""
+        return db.query(User).filter(User.wallet_address == wallet_address.lower()).first()
+
+    @classmethod
+    def verify_wallet_signature(cls, wallet_address: str, message: str, signature: str) -> bool:
+        """
+        ウォレット署名を検証する。
+
+        - eth_account.messages.encode_defunct でメッセージをエンコード
+        - Account.recover_message で署名者アドレスを復元
+        - 復元アドレスが wallet_address と一致するか確認
+        """
+        try:
+            w3 = Web3()
+            encoded_message = encode_defunct(text=message)
+            recovered_address: str = w3.eth.account.recover_message(
+                encoded_message, signature=signature
+            )
+            return recovered_address.lower() == wallet_address.lower()
+        except Exception as e:
+            logger.warning("Wallet signature verification failed: %s", e)
+            return False
+
+    @classmethod
+    def create_wallet_user(cls, db: Session, wallet_address: str) -> User:
+        """
+        ウォレットアドレスからユーザーを自動作成する。
+
+        - role = viewer
+        - risk_mode = conservative
+        - terms_accepted_at = None
+        - email / username は wallet_ プレフィックス + アドレス先頭8文字（衝突時はランダム4桁追加）
+        """
+        base_slug = wallet_address[2:10].lower()
+        base_email = f"wallet_{base_slug}@wallet.local"
+        base_username = f"wallet_{base_slug}"
+
+        # 衝突回避
+        email = base_email
+        username = base_username
+        if cls.get_user_by_email(db, email):
+            suffix = "".join(random.choices(string.digits, k=4))
+            email = f"wallet_{base_slug}{suffix}@wallet.local"
+        if cls.get_user_by_username(db, username):
+            suffix = "".join(random.choices(string.digits, k=4))
+            username = f"wallet_{base_slug}{suffix}"
+
+        # 使用しないランダムパスワードをハッシュ化
+        random_password = "".join(random.choices(string.ascii_letters + string.digits, k=64))
+        hashed = cls.hash_password(random_password)
+
+        user = User(
+            email=email,
+            username=username,
+            hashed_password=hashed,
+            role=UserRole.VIEWER.value,
+            risk_mode="conservative",
+            terms_accepted_at=None,
+            wallet_address=wallet_address.lower(),
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        logger.info("Created wallet user: %s (wallet=%s...)", user.email, wallet_address[:10])
+        return user

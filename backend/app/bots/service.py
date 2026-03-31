@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Tuple

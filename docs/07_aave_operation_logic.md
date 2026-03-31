@@ -93,3 +93,22 @@ AAVE_TRADE_COOLDOWN_SECONDS=600
   - 緊急停止フロー
   - ロールバックフロー
   - の動作確認を行うことが望ましい。
+## 6. モード別実行ルール（2026-03-23追加）
+
+### 6.1 execution_policy による分岐
+
+| execution_policy | Aave操作 | 提案作成 | 承認 |
+|-----------------|---------|---------|------|
+| `auto_execute` | 即時実行 | なし | 不要 |
+| `require_approval` | 承認後実行 | 作成（TTL: 1時間） | 必要 |
+| `proposal_only` | 実行しない | 作成のみ | 不要 |
+
+### 6.2 ガス代チェック（auto_execute時）
+
+- 推定利益（supply APY × amount × 期間） > 推定ガス代 の場合のみ実行
+- ガス代はトランザクション送信前に `eth_estimateGas` で取得
+
+### 6.3 緊急時オーバーライド
+
+- HF < 1.6 の場合: `execution_policy` に関わらず即時 `auto_execute`
+- 緊急時の操作は LINE で `notify_hf_protection()` を呼び出して通知

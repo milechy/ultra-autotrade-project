@@ -1,3 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
 // frontend/lib/api/knowledge.ts
 import { getJson, postJson } from "./http";
 import { getStoredToken } from "../auth";

@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/knowledge/models.py
 
 """
@@ -12,7 +14,7 @@ Knowledge Hub モジュールの SQLAlchemy モデル定義。
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -40,6 +42,7 @@ class KnowledgeSource(Base):
     title: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     item_type: Mapped[str] = mapped_column(String(20), nullable=False, default="text")
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
+    quality_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

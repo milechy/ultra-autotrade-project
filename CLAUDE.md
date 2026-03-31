@@ -57,6 +57,11 @@ Based on:
 4. `pytest tests/ --cov=app --cov-fail-under=80 -q` — 全テスト通過 + coverage 80%+
 5. `ruff check . --select S` — セキュリティ警告の確認（新規の critical なし）
 
+### 一括検証（コミット前に必ず実行）
+```bash
+./scripts/verify.sh
+```
+
 ### Core Principles (3つのみ)
 
 1. **Simplicity First** — 最小限の変更で目的を達成する。過剰な抽象化・将来対応は不要
@@ -72,9 +77,27 @@ Based on:
 - DB: PostgreSQL 16 + pgvector (HNSW index, NOT IVFFlat)
 - Exchange: Bybit (primary, via ccxt) + OKX (backup)
 - Aave: V3 on Polygon/Arbitrum (web3.py)
-- AI: Claude Opus 4.6 (primary judge) + GPT-4o (cross-verify on BUY/SELL only)
+- AI: Claude Sonnet 4.6 (primary judge) + GPT-4o (cross-verify on BUY/SELL only)
 - Proxy/DNS: Cloudflare Tunnel → Hetzner backend
 - Notion: 完全撤去 → Knowledge Hub (PostgreSQL + pgvector)
+
+---
+
+## Frontend 開発ルール
+
+### package.json に依存を追加した場合
+`package.json` に依存を追加したら、必ず以下を実行して `package-lock.json` も一緒にコミットすること:
+
+```bash
+cd frontend
+npm install --legacy-peer-deps
+git add package.json package-lock.json
+git commit -m "chore(frontend): ..."
+```
+
+**理由:** 並行開発で `package.json` が更新されると `package-lock.json` が同期されず、
+Docker ビルド・CI が失敗する。`npm install` は `package.json` ベースで解決するため同期問題が起きない。
+（`npm ci` は `package-lock.json` との完全一致を要求するため並行開発と相性が悪い）
 
 ---
 
@@ -100,7 +123,7 @@ Based on:
 2. Rule engine: cooldown active? → HOLD
 3. Rule engine: daily limit 30% reached? → HOLD
 4. RAG: Knowledge Hub → context generation
-5. Phase A: Claude Opus judgment → JSON
+5. Phase A: Claude Sonnet 4.6 judgment → JSON
 6. Phase B: (conditional) GPT-4o cross-verify on BUY/SELL
 7. Rule engine: final guardrail check
 8. Execution: ccxt → Bybit
@@ -180,3 +203,38 @@ feature/* (各LLM担当) → dev (Opus統合) → staging (Codex最終レビュ�
 - NO frontend needed yet — curl + pytest only
 - Bybit: Sandbox mode (sandbox=True)
 - AI: Claude Opus → JSON → validate → execute OR hold
+## Agent Teams 運用ルール
+
+### Slack通知（必須）
+タスクを1つ完了するたびに、以下のコマンドでSlack通知を送ること：
+```bash
+WEBHOOK=$(grep SLACK_WEBHOOK_URL .env.staging | cut -d= -f2-)
+curl -s -X POST "$WEBHOOK" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "✅ [チームメイト名] 完了: [タスク名]\n結果: [1行サマリー]\nファイル: [変更したファイル一覧]"}'
+```
+
+### エラー時の通知
+```bash
+curl -s -X POST "$WEBHOOK" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "❌ [チームメイト名] エラー: [タスク名]\n原因: [エラー内容]"}'
+```
+
+## 開発体制 v2（2026-03-20〜）
+
+- **claude.ai**: PM/アーキテクト/Asana管理
+- **Claude Code Agent Teams**: 並行開発の主力（tmux + iTerm2）
+- **Cursor**: 廃止（Agent Teamsに統合）
+- **Slack #ultra-auto-project**: 完了通知・CI・承認リクエスト
+- **Asana**: タスク管理（プロジェクトGID: 1213741124336104）
+
+## Skills & Hooks
+
+### スキル（.claude/skills/）
+- single-function-edit.md — 1回1関数ルール
+- pre-commit-diff.md — コミット前diff確認
+
+### フック
+- pre-large-edit.sh (PreToolUse) — 50行超の変更を警告
+- post-commit-diff.sh (PostToolUse) — コミット時にdiff表示

@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/notifications/config.py
 
 """
@@ -37,6 +39,8 @@ class NotificationSettings:
     line_notify_token: Optional[str] = None
     slack_webhook_url: Optional[str] = None
     default_channel: NotificationChannel = NotificationChannel.INTERNAL_LOG
+    line_channel_access_token: str = ""
+    line_user_id: str = ""
 
     @property
     def is_line_configured(self) -> bool:
@@ -47,6 +51,11 @@ class NotificationSettings:
     def is_slack_configured(self) -> bool:
         """Slack Webhook が設定されているかどうか。"""
         return bool(self.slack_webhook_url)
+
+    @property
+    def is_line_messaging_configured(self) -> bool:
+        """LINE Messaging API が設定されているかどうか。"""
+        return bool(self.line_channel_access_token) and bool(self.line_user_id)
 
 
 def _parse_notification_channel(value: Optional[str]) -> NotificationChannel:
@@ -92,11 +101,15 @@ def load_notification_settings() -> NotificationSettings:
     line_token = os.getenv("LINE_NOTIFY_TOKEN") or None
     slack_url = os.getenv("SLACK_WEBHOOK_URL") or None
     channel_str = os.getenv("NOTIFICATION_CHANNEL")
+    line_channel_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN") or ""
+    line_user_id = os.getenv("LINE_USER_ID") or ""
 
     return NotificationSettings(
         line_notify_token=line_token,
         slack_webhook_url=slack_url,
         default_channel=_parse_notification_channel(channel_str),
+        line_channel_access_token=line_channel_access_token,
+        line_user_id=line_user_id,
     )
 
 

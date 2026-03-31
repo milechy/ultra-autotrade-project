@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/automation/automation_router.py
 """
 自動化ワークフロー用 API エンドポイント。
@@ -7,14 +9,17 @@ POST /automation/process-news:
 """
 
 import logging
-from typing import List
+from typing import Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.ai.service import AIService
+from app.auth.dependencies import require_active_user, require_admin
 from app.automation.monitoring_service import MonitoringService
+from app.automation.rate_limiter import RateLimiterService, get_rate_limiter
+from app.automation.rate_limiter_schemas import RateLimitStatus
 from app.automation.state import get_monitoring_service
 from app.automation.workflow import process_pending_knowledge
 from app.database import get_db
@@ -40,6 +45,18 @@ class ProcessNewsResponse(BaseModel):
         ...,
         description="処理ステータス (completed / completed_with_errors / failed / no_items)",
     )
+
+
+@router.get(
+    "/automation/rate-limits",
+    response_model=RateLimitStatus,
+    summary="APIレート制限の使用状況を取得",
+)
+def get_rate_limits(
+    limiter: RateLimiterService = Depends(get_rate_limiter),
+) -> RateLimitStatus:
+    """各APIのレート制限使用状況（インメモリスライディングウィンドウ）を返す。"""
+    return limiter.get_status()
 
 
 @router.post(
@@ -98,4 +115,69 @@ def process_news(
         notion_updated_count=0,
         errors=[e.message for e in run_result.errors],
         status=status_str,
+    )
+
+
+class AIJudgmentTriggerResponse(BaseModel):
+    """POST /api/ai/trigger のレスポンス。"""
+
+    action: str = Field(..., description="AI判定アクション (BUY/SELL/HOLD)")
+    confidence: int = Field(..., description="信頼度スコア (0-100)")
+    proposals_created: int = Field(..., description="作成された提案件数")
+    decision_id: int = Field(..., description="保存されたai_decision ID")
+
+
+@router.post(
+    "/api/ai/trigger",
+    response_model=AIJudgmentTriggerResponse,
+    summary="AI判定を手動で即時実行する（管理者専用）",
+)
+def trigger_ai_judgment(
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(require_admin),
+) -> AIJudgmentTriggerResponse:
+    """
+    AI判定ジョブを手動で1回実行する（テスト・デバッグ用）。
+    BUY/SELL判定時はアクティブユーザー全員にproposalを作成する。
+    """
+    from app.automation.ai_judgment_scheduler import run_ai_judgment_job  # noqa: PLC0415
+
+    logger.info("Manual AI judgment trigger by admin (user_id=%s)", current_user.id)
+    try:
+        result = run_ai_judgment_job(db=db)
+    except Exception as exc:
+        logger.error("Manual AI judgment failed: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="AI judgment execution failed",
+        ) from exc
+    return AIJudgmentTriggerResponse(**result)
+
+
+class EmergencyStopResponse(BaseModel):
+    """POST /automation/emergency-stop のレスポンス。"""
+
+    status: str = Field(..., description="always 'stopped'")
+    message: str = Field(..., description="緊急停止の確認メッセージ")
+
+
+@router.post(
+    "/automation/emergency-stop",
+    response_model=EmergencyStopResponse,
+    summary="全自動取引を即時停止する",
+)
+def emergency_stop(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+    current_user: Any = Depends(require_active_user),
+) -> EmergencyStopResponse:
+    """
+    全ての自動取引を即時停止する。一度停止すると clear_emergency_stop() を明示的に
+    呼ぶまで再開されない（OR 条件で維持される）。
+    """
+    monitoring_service.activate_emergency_stop(
+        reason=f"Manual emergency stop by user (user_id={current_user.id})",
+    )
+    return EmergencyStopResponse(
+        status="stopped",
+        message="緊急停止が実行されました。全ての自動取引が停止されています。",
     )

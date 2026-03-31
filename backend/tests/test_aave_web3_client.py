@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_aave_web3_client.py
 
 """
@@ -27,6 +29,7 @@ from app.aave.client import (
     DummyAaveClient,
     Web3AaveClient,
     get_default_aave_client,
+    make_aave_client,
 )
 from app.aave.config import AaveSettings
 
@@ -404,6 +407,44 @@ def test_dummy_client_withdraw():
 
     tx_hash = client.withdraw("USDC", Decimal("5.0"))
     assert tx_hash == "dummy-withdraw-USDC-5.0"
+
+
+# ==============================================================================
+# Arbitrum アドレス定数のテスト
+# ==============================================================================
+
+
+def test_arbitrum_pool_address_format():
+    """Arbitrum Pool アドレスが正しい形式であること。"""
+    from app.aave.client import _POOL_ADDRESS_ARBITRUM
+
+    assert _POOL_ADDRESS_ARBITRUM.startswith("0x")
+    assert len(_POOL_ADDRESS_ARBITRUM) == 42
+
+
+def test_arbitrum_usdc_address_format():
+    """Arbitrum USDC アドレスが正しい形式であること。"""
+    from app.aave.client import _USDC_ADDRESS_ARBITRUM
+
+    assert _USDC_ADDRESS_ARBITRUM.startswith("0x")
+    assert len(_USDC_ADDRESS_ARBITRUM) == 42
+
+
+def test_make_aave_client_with_network_arbitrum():
+    """make_aave_client(network='arbitrum') で正しい pool address が使われること。"""
+    with patch("app.aave.client.Web3") as mock_web3:
+        mock_w3 = MagicMock()
+        mock_w3.is_connected.return_value = True
+        mock_web3.return_value = mock_w3
+        mock_web3.HTTPProvider = MagicMock()
+        mock_web3.to_checksum_address = lambda x: x
+
+        client = make_aave_client(
+            "web3",
+            rpc_url="https://arb-mainnet.example.com",
+            network="arbitrum",
+        )
+        assert isinstance(client, Web3AaveClient)
 
 
 # ==============================================================================

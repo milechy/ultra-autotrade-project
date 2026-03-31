@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/exchange/config.py
 
 """
@@ -22,6 +24,7 @@ class ExchangeSettings:
     - sandbox=True がデフォルトであり、本番環境への誤送信を防止する
     - max_order_usd は安全側に小さく設定する
     - usd_to_jpy_rate は bitFlyer（BTC/JPY）使用時に amount_usd を JPY 換算するレート
+    - passphrase は OKX 等のパスフレーズ認証が必要な取引所で使用する
     """
 
     api_key: str
@@ -34,6 +37,9 @@ class ExchangeSettings:
     timeout_seconds: int
     hostname: str
     usd_to_jpy_rate: float  # USD/JPY 換算レート（bitFlyer 使用時）
+    app_env: str
+    phase: int  # 段階的資金投入フェーズ (1=マイクロテスト, 2=小規模本番, 3=本格運用)
+    passphrase: str = ""  # OKX 等のパスフレーズ認証（不要な取引所は空文字列）
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -114,17 +120,30 @@ def get_exchange_settings() -> ExchangeSettings:
         or ""
     )
 
+    # APP_ENV=prod → 強制的に本番モード（sandbox=False）
+    app_env = get_env("APP_ENV", required=False) or "local"
+
     # EXCHANGE_SANDBOX が未設定の場合は BYBIT_SANDBOX にフォールバック
-    raw_sandbox = get_env("EXCHANGE_SANDBOX", required=False) or get_env(
-        "BYBIT_SANDBOX", required=False
-    )
-    sandbox = raw_sandbox.lower() in ("true", "1", "yes") if raw_sandbox else True
+    if app_env == "prod":
+        sandbox = False
+    else:
+        raw_sandbox = get_env("EXCHANGE_SANDBOX", required=False) or get_env(
+            "BYBIT_SANDBOX", required=False
+        )
+        sandbox = raw_sandbox.lower() in ("true", "1", "yes") if raw_sandbox else True
     default_symbol = get_env("EXCHANGE_DEFAULT_SYMBOL", required=False) or "BTC/USDT"
+
+    phase = _get_env_int("EXCHANGE_PHASE", default=1)
+    # フェーズに基づいてmax_order_usdの上限を設定
+    phase_limits = {1: Decimal("50"), 2: Decimal("100"), 3: Decimal("1000")}
+    phase_max = phase_limits.get(phase, Decimal("50"))
 
     max_order_usd = _get_env_decimal(
         "EXCHANGE_MAX_ORDER_USD",
         default="100",  # 1注文あたり 100 USD 相当を上限にする（デフォルト）
     )
+    if max_order_usd > phase_max:
+        max_order_usd = phase_max
     daily_trade_limit = _get_env_int(
         "EXCHANGE_DAILY_TRADE_LIMIT",
         default=10,
@@ -151,4 +170,132 @@ def get_exchange_settings() -> ExchangeSettings:
         timeout_seconds=timeout_seconds,
         hostname=hostname,
         usd_to_jpy_rate=usd_to_jpy_rate,
+        app_env=app_env,
+        phase=phase,
+    )
+
+
+def get_bitflyer_settings() -> ExchangeSettings:
+    """
+    bitFlyer 専用の ExchangeSettings を構築して返す。
+
+    - BITFLYER_API_KEY / BITFLYER_API_SECRET を直接使用する（フォールバックチェーンなし）
+    - default_symbol は "BTC/JPY"（bitFlyer は USDT 建てなし）
+    - sandbox は常に True（bitFlyer にサンドボックスなし、dry_run で安全動作）
+    """
+    api_key = get_env("BITFLYER_API_KEY", required=False) or ""
+    api_secret = get_env("BITFLYER_API_SECRET", required=False) or ""
+    app_env = get_env("APP_ENV", required=False) or "local"
+    default_symbol = get_env("EXCHANGE_DEFAULT_SYMBOL", required=False) or "BTC/JPY"
+
+    phase = _get_env_int("EXCHANGE_PHASE", default=1)
+    phase_limits = {1: Decimal("50"), 2: Decimal("100"), 3: Decimal("1000")}
+    phase_max = phase_limits.get(phase, Decimal("50"))
+
+    max_order_usd = _get_env_decimal("EXCHANGE_MAX_ORDER_USD", default="100")
+    if max_order_usd > phase_max:
+        max_order_usd = phase_max
+    daily_trade_limit = _get_env_int("EXCHANGE_DAILY_TRADE_LIMIT", default=10)
+    cooldown_seconds = _get_env_int("EXCHANGE_COOLDOWN_SECONDS", default=300)
+    timeout_seconds = _get_env_int("EXCHANGE_TIMEOUT_SECONDS", default=30)
+    usd_to_jpy_rate = float(get_env("USD_TO_JPY_RATE", required=False) or "150.0")
+
+    return ExchangeSettings(
+        api_key=api_key,
+        api_secret=api_secret,
+        sandbox=True,  # bitFlyer にサンドボックスなし → 常に dry_run で安全動作
+        default_symbol=default_symbol,
+        max_order_usd=max_order_usd,
+        daily_trade_limit=daily_trade_limit,
+        cooldown_seconds=cooldown_seconds,
+        timeout_seconds=timeout_seconds,
+        hostname="bitflyer.com",
+        usd_to_jpy_rate=usd_to_jpy_rate,
+        app_env=app_env,
+        phase=phase,
+    )
+
+
+def get_okx_settings() -> ExchangeSettings:
+    """
+    OKX 専用の ExchangeSettings を構築して返す。
+
+    - OKX_API_KEY / OKX_API_SECRET / OKX_PASSPHRASE を使用する
+    - default_symbol は "BTC/USDT"
+    - sandbox は OKX_SANDBOX 環境変数で制御（デフォルト: True）
+    """
+    api_key = get_env("OKX_API_KEY", required=False) or ""
+    api_secret = get_env("OKX_API_SECRET", required=False) or ""
+    passphrase = get_env("OKX_PASSPHRASE", required=False) or ""
+    app_env = get_env("APP_ENV", required=False) or "local"
+    default_symbol = get_env("EXCHANGE_DEFAULT_SYMBOL", required=False) or "BTC/USDT"
+    sandbox = _get_env_bool("OKX_SANDBOX", default=True)
+
+    phase = _get_env_int("EXCHANGE_PHASE", default=1)
+    phase_limits = {1: Decimal("50"), 2: Decimal("100"), 3: Decimal("1000")}
+    phase_max = phase_limits.get(phase, Decimal("50"))
+
+    max_order_usd = _get_env_decimal("EXCHANGE_MAX_ORDER_USD", default="100")
+    if max_order_usd > phase_max:
+        max_order_usd = phase_max
+    daily_trade_limit = _get_env_int("EXCHANGE_DAILY_TRADE_LIMIT", default=10)
+    cooldown_seconds = _get_env_int("EXCHANGE_COOLDOWN_SECONDS", default=300)
+    timeout_seconds = _get_env_int("EXCHANGE_TIMEOUT_SECONDS", default=30)
+    usd_to_jpy_rate = float(get_env("USD_TO_JPY_RATE", required=False) or "150.0")
+
+    return ExchangeSettings(
+        api_key=api_key,
+        api_secret=api_secret,
+        sandbox=sandbox,
+        default_symbol=default_symbol,
+        max_order_usd=max_order_usd,
+        daily_trade_limit=daily_trade_limit,
+        cooldown_seconds=cooldown_seconds,
+        timeout_seconds=timeout_seconds,
+        hostname="okx.com",
+        usd_to_jpy_rate=usd_to_jpy_rate,
+        app_env=app_env,
+        phase=phase,
+        passphrase=passphrase,
+    )
+
+
+def get_kraken_settings() -> ExchangeSettings:
+    """
+    Kraken 専用の ExchangeSettings を構築して返す。
+
+    - KRAKEN_API_KEY / KRAKEN_API_SECRET を使用する
+    - default_symbol は "BTC/USD"（Kraken は USD 建て）
+    - Kraken はサンドボックスなし → sandbox=True で dry_run 動作
+    """
+    api_key = get_env("KRAKEN_API_KEY", required=False) or ""
+    api_secret = get_env("KRAKEN_API_SECRET", required=False) or ""
+    app_env = get_env("APP_ENV", required=False) or "local"
+    default_symbol = get_env("EXCHANGE_DEFAULT_SYMBOL", required=False) or "BTC/USD"
+
+    phase = _get_env_int("EXCHANGE_PHASE", default=1)
+    phase_limits = {1: Decimal("50"), 2: Decimal("100"), 3: Decimal("1000")}
+    phase_max = phase_limits.get(phase, Decimal("50"))
+
+    max_order_usd = _get_env_decimal("EXCHANGE_MAX_ORDER_USD", default="100")
+    if max_order_usd > phase_max:
+        max_order_usd = phase_max
+    daily_trade_limit = _get_env_int("EXCHANGE_DAILY_TRADE_LIMIT", default=10)
+    cooldown_seconds = _get_env_int("EXCHANGE_COOLDOWN_SECONDS", default=300)
+    timeout_seconds = _get_env_int("EXCHANGE_TIMEOUT_SECONDS", default=30)
+    usd_to_jpy_rate = float(get_env("USD_TO_JPY_RATE", required=False) or "150.0")
+
+    return ExchangeSettings(
+        api_key=api_key,
+        api_secret=api_secret,
+        sandbox=True,  # Kraken にサンドボックスなし → 常に dry_run で安全動作
+        default_symbol=default_symbol,
+        max_order_usd=max_order_usd,
+        daily_trade_limit=daily_trade_limit,
+        cooldown_seconds=cooldown_seconds,
+        timeout_seconds=timeout_seconds,
+        hostname="kraken.com",
+        usd_to_jpy_rate=usd_to_jpy_rate,
+        app_env=app_env,
+        phase=phase,
     )

@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_auth.py
 """
 認証・ユーザー管理 API のテスト。
@@ -22,6 +24,7 @@ from sqlalchemy.orm import sessionmaker
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-for-auth-tests"
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"
+os.environ["INITIAL_ADMIN_EMAIL"] = "admin@example.com"
 
 from app.database import Base, get_db
 from app.main import create_app
@@ -59,6 +62,7 @@ def test_db():
 def client(test_db) -> TestClient:
     """テスト用クライアントを作成する。"""
     override_get_db, _ = test_db
+    os.environ["INITIAL_ADMIN_EMAIL"] = "admin@example.com"
     app = create_app()
     app.dependency_overrides[get_db] = override_get_db
     return TestClient(app)
@@ -749,7 +753,7 @@ class TestEditorRolePermissions:
             client, admin_token, "viewer@example.com", "viewer", "viewer"
         )
         response = client.post(
-            "/aave/rebalance",
+            "/api/aave/rebalance",
             json={"action": "HOLD", "amount": "100", "asset_symbol": "USDC", "dry_run": True},
             headers={"Authorization": f"Bearer {viewer_token}"},
         )
@@ -762,7 +766,7 @@ class TestEditorRolePermissions:
             client, admin_token, "editor@example.com", "editor", "editor"
         )
         response = client.post(
-            "/aave/rebalance",
+            "/api/aave/rebalance",
             json={"action": "HOLD", "amount": "100", "asset_symbol": "USDC", "dry_run": True},
             headers={"Authorization": f"Bearer {editor_token}"},
         )

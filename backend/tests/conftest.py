@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/conftest.py
 """
 Pytest configuration for Ultra AutoTrade backend tests.
@@ -38,6 +40,8 @@ def _ensure_test_env_vars() -> None:
     os.environ.setdefault("BYBIT_API_SECRET", "dummy-bybit-secret-for-tests")
     os.environ.setdefault("BYBIT_SANDBOX", "true")
     os.environ.setdefault("EXCHANGE_CLIENT_TYPE", "dummy")
+    os.environ.setdefault("INITIAL_ADMIN_EMAIL", "terms_admin@example.com")
+    os.environ.setdefault("LOGIN_RATE_LIMIT", "1000/minute")
 
 
 _ensure_project_root_in_sys_path()
@@ -52,3 +56,25 @@ from app.main import create_app  # noqa: E402
 def client():
     app = create_app()
     return TestClient(app)
+
+
+# ---------------------------------------------------------------------------
+# VCR (pytest-recording) グローバル設定
+#
+# カセット更新時は以下を実行:
+#   VCR_RECORD_MODE=new_episodes pytest tests/test_ai_service.py tests/test_knowledge_service.py
+#
+# CI では VCR_RECORD_MODE=none が設定されており、実 API は呼ばれない。
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def vcr_config():
+    """VCR グローバル設定。APIキーをカセットから除外する。"""
+    return {
+        "filter_headers": ["authorization", "x-api-key"],
+        "filter_post_data_headers": ["authorization"],
+        "record_mode": os.environ.get("VCR_RECORD_MODE", "none"),
+        "cassette_library_dir": str(Path(__file__).parent / "cassettes"),
+        "decode_compressed_response": True,
+    }

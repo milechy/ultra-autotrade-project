@@ -1,0 +1,97 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect Aave-related changes
+        id: aave-check
+        run: |
+          AAVE_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '(aave|health_factor|rebalance)' || true)
+          if [ -n "$AAVE_FILES" ]; then
+            echo "has_aave_changes=true" >> $GITHUB_OUTPUT
+            echo "Aave-related files changed: $AAVE_FILES"
+          else
+            echo "has_aave_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Claude Code Review (standard)
+        if: steps.aave-check.outputs.has_aave_changes == 'false'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            このPRをレビューしてください。以下の基準で評価し、問題があればPRコメントとして投稿してください。
+
+            ## Definition of Done チェック
+            - ruff によるlintエラーがないこと
+            - mypy による型エラーがないこと
+            - pytest カバレッジ 80% 以上を維持していること
+            - セキュリティ警告（新規 critical）がないこと
+
+            ## セキュリティ基準（CLAUDE.md より）
+            - 秘密鍵・APIキーが環境変数以外に存在しないこと（ハードコード禁止）
+            - ログにトークン・キーが出力されないこと（先頭6文字+末尾4文字のマスク必須）
+            - LLM出力はJSONスキーマバリデーション必須（パース失敗→HOLD）
+            - 財務計算はDecimal型のみ（float禁止）
+            - SQLインジェクション・XSS等のOWASP Top 10脆弱性がないこと
+
+            ## コード品質
+            - ファイルあたり500行以内
+            - コミットあたり最大5ファイル
+            - 過剰な抽象化・将来対応がないこと
+            - エラー処理はfail-closed（エラー→HOLD/NOOP）
+
+            重要度レベルで分類してコメントしてください:
+            - 🔴 **Critical** (修正必須): セキュリティ・重大なロジックエラー
+            - 🟡 **Nit** (軽微): スタイル・軽微な改善提案
+            - 🟣 **Pre-existing** (既存の問題): 今回のPRとは無関係
+
+      - name: Claude Code Review (Aave security focus)
+        if: steps.aave-check.outputs.has_aave_changes == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            このPRにはAave関連ファイルの変更が含まれています。
+            通常のレビューに加えて、以下のAave固有のセキュリティチェックを重点的に行い、結果をPRコメントとして投稿してください。
+
+            ## ⚠️ Aave セキュリティ重点チェック
+            - Health Factor < 1.6 の場合に自動 HARD_STOP が発動すること
+            - 単一取引が総資産の10%以内であること
+            - 1日の取引合計が総資産の30%以内であること
+            - Aave操作間のクールダウン（10分）が実装されていること
+            - Emergency stop フラグが OR ロジックで実装されていること（手動停止を上書き不可）
+            - staging と production で物理的に異なるキーが使用されること
+
+            ## Definition of Done チェック
+            - ruff によるlintエラーがないこと
+            - mypy による型エラーがないこと
+            - pytest カバレッジ 80% 以上を維持していること
+            - セキュリティ警告（新規 critical）がないこと
+
+            ## セキュリティ基準（CLAUDE.md より）
+            - 秘密鍵・APIキーが環境変数以外に存在しないこと（ハードコード禁止）
+            - ログにトークン・キーが出力されないこと（先頭6文字+末尾4文字のマスク必須）
+            - 財務計算はDecimal型のみ（float禁止）
+            - SQLインジェクション・XSS等のOWASP Top 10脆弱性がないこと
+
+            重要度レベルで分類してコメントしてください:
+            - 🔴 **Critical** (修正必須): セキュリティ・重大なロジックエラー
+            - 🟡 **Nit** (軽微): スタイル・軽微な改善提案
+            - 🟣 **Pre-existing** (既存の問題): 今回のPRとは無関係

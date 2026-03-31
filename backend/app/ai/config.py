@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/ai/config.py
 
 """
@@ -31,6 +33,9 @@ class AISettings:
     openai_model: str
     min_confidence_threshold: int
     cross_validation_enabled: bool
+    prompt_version: str
+    shadow_mode: bool  # True=判定記録のみ、実行しない
+    ai_fallback_model: str  # Opus失敗時のフォールバックモデル（環境変数: AI_FALLBACK_MODEL）
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -73,12 +78,14 @@ def get_ai_settings() -> AISettings:
       - AI_OPENAI_MODEL（デフォルト: gpt-4o）
       - AI_MIN_CONFIDENCE_THRESHOLD（デフォルト: 40）
       - AI_CROSS_VALIDATION_ENABLED（デフォルト: True）
+      - AI_PROMPT_VERSION（デフォルト: v1）
     """
     anthropic_api_key = get_env("ANTHROPIC_API_KEY", required=False)
     openai_api_key = get_env("OPENAI_API_KEY", required=False)
 
     claude_model = get_env("AI_CLAUDE_MODEL", required=False) or "claude-sonnet-4-20250514"
     openai_model = get_env("AI_OPENAI_MODEL", required=False) or "gpt-4o"
+    ai_fallback_model = get_env("AI_FALLBACK_MODEL", required=False) or "claude-sonnet-4-20250514"
 
     min_confidence_threshold = _get_env_int(
         "AI_MIN_CONFIDENCE_THRESHOLD",
@@ -88,6 +95,8 @@ def get_ai_settings() -> AISettings:
         "AI_CROSS_VALIDATION_ENABLED",
         default=True,
     )
+    prompt_version = get_env("AI_PROMPT_VERSION", required=False) or "v1"
+    shadow_mode = _get_env_bool("AI_SHADOW_MODE", default=False)
 
     return AISettings(
         anthropic_api_key=anthropic_api_key,
@@ -96,4 +105,7 @@ def get_ai_settings() -> AISettings:
         openai_model=openai_model,
         min_confidence_threshold=min_confidence_threshold,
         cross_validation_enabled=cross_validation_enabled,
+        prompt_version=prompt_version,
+        shadow_mode=shadow_mode,
+        ai_fallback_model=ai_fallback_model,
     )

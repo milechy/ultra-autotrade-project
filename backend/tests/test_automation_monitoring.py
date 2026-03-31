@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_automation_monitoring.py
 
 import tempfile
@@ -351,3 +353,54 @@ def test_state_sync_with_hf_none(temp_state_file) -> None:
     assert state.mode == AaveOperationMode.NORMAL  # HF=None は NORMAL 扱い
     assert state.emergency_stop is False
     assert state.last_update == datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+
+# ==============================================================================
+# Slack Notification Tests (Task 1)
+# ==============================================================================
+
+
+def test_activate_emergency_stop_sends_notification() -> None:
+    """activate_emergency_stop() が通知サービスに EMERGENCY を送信することを確認。"""
+    from unittest.mock import MagicMock
+
+    from app.notifications.schemas import NotificationSeverity
+
+    mock_notif = MagicMock()
+    service = MonitoringService(enable_state_sync=False, notification_service=mock_notif)
+
+    service.activate_emergency_stop(
+        reason="test reason",
+        component=ComponentType.SYSTEM,
+    )
+
+    mock_notif.send.assert_called_once()
+    call_args = mock_notif.send.call_args[0][0]
+    assert call_args.severity == NotificationSeverity.EMERGENCY
+
+
+def test_clear_emergency_stop_sends_notification() -> None:
+    """clear_emergency_stop() が通知サービスに INFO を送信することを確認。"""
+    from unittest.mock import MagicMock
+
+    from app.notifications.schemas import NotificationSeverity
+
+    mock_notif = MagicMock()
+    service = MonitoringService(enable_state_sync=False, notification_service=mock_notif)
+
+    service.activate_emergency_stop(reason="initial stop", component=ComponentType.SYSTEM)
+    mock_notif.reset_mock()
+
+    service.clear_emergency_stop()
+
+    mock_notif.send.assert_called_once()
+    call_args = mock_notif.send.call_args[0][0]
+    assert call_args.severity == NotificationSeverity.INFO
+
+
+def test_no_notification_without_service() -> None:
+    """通知サービスが未設定の場合でも activate_emergency_stop は例外を出さない。"""
+    service = MonitoringService(enable_state_sync=False, notification_service=None)
+    # Should not raise
+    service.activate_emergency_stop(reason="test", component=ComponentType.SYSTEM)
+    assert not service.is_trading_allowed()

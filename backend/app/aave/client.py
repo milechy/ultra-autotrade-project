@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/aave/client.py
 """
 Aave V3 クライアント — web3.py ベース。
@@ -18,10 +20,17 @@ from __future__ import annotations
 import logging
 import os
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Optional, Protocol
 
 from .config import AaveSettings, get_aave_settings
+from .gas_estimator import (
+    DEFAULT_FALLBACK_GAS_APPROVE,
+    DEFAULT_FALLBACK_GAS_SUPPLY,
+    DEFAULT_FALLBACK_GAS_WITHDRAW,
+    GasEstimator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +110,28 @@ _POOL_ADDRESS_SEPOLIA = "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951"
 # Sepolia USDC アドレス
 _USDC_ADDRESS_SEPOLIA = "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8"
 
+# Aave V3 Pool アドレス（Arbitrum Mainnet）
+_POOL_ADDRESS_ARBITRUM = "0x794a61358D6845594F94dc1DB02A252b5b4814aD"
+
+# Arbitrum USDC.e アドレス
+_USDC_ADDRESS_ARBITRUM = "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
+
+# Aave V3 Pool アドレス（Arbitrum Sepolia）
+_POOL_ADDRESS_ARBITRUM_SEPOLIA = "0xBfC91D59fdAA134A4ED45f7B584cAf96D7792Eff"
+
+# Arbitrum Sepolia USDC
+_USDC_ADDRESS_ARBITRUM_SEPOLIA = "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"
+
+
+@dataclass
+class AccountData:
+    """Aave V3 account data from getUserAccountData()."""
+
+    total_collateral_usd: Decimal
+    total_debt_usd: Decimal
+    available_borrows_usd: Decimal
+    health_factor: Decimal
+
 
 class AaveClientBase(ABC):
     """Aave クライアントの抽象基底クラス。"""
@@ -160,6 +191,9 @@ class AaveClientBase(ABC):
         HF < 1.6 の場合は AaveClientError を raise する（docs/13 rule 2）。
         """
 
+    @abstractmethod
+    def get_account_data(self, wallet_address: str) -> AccountData: ...
+
 
 class AaveClientError(Exception):
     """Aave クライアントの基底例外。"""
@@ -187,6 +221,9 @@ class AaveClient(Protocol):
     def withdraw(self, asset_symbol: str, amount: Decimal) -> str:
         """指定したトークンを Aave から withdraw する。"""
 
+    def get_account_data(self, wallet_address: str) -> "AccountData":
+        """Aave V3 Pool のアカウントデータを取得する。"""
+
 
 class DummyAaveClient(AaveClientBase):
     """
@@ -205,6 +242,14 @@ class DummyAaveClient(AaveClientBase):
     def get_health_factor(self, wallet_address: str = "") -> Decimal:
         logger.info("DummyAaveClient.get_health_factor called (no RPC)")
         return Decimal("2.5")  # 安全な値を返す
+
+    def get_account_data(self, wallet_address: str) -> AccountData:
+        return AccountData(
+            total_collateral_usd=Decimal("10000"),
+            total_debt_usd=Decimal("3000"),
+            available_borrows_usd=Decimal("5000"),
+            health_factor=Decimal("2.5"),
+        )
 
     def deposit(
         self,
@@ -268,6 +313,7 @@ class Web3AaveClient(AaveClientBase):
         rpc_url: Optional[str] = None,
         pool_address: str = _POOL_ADDRESS_SEPOLIA,
         settings: Optional[AaveSettings] = None,
+        flashbots_rpc_url: Optional[str] = None,
     ) -> None:
         # web3 はモジュールレベルで参照（テスト時にモックしやすくするため）
         if Web3 is None:
@@ -291,7 +337,19 @@ class Web3AaveClient(AaveClientBase):
             effective_rpc_url = rpc_url
             effective_pool_address = pool_address
 
-        self._w3 = Web3(Web3.HTTPProvider(effective_rpc_url))
+        # RPCProvider でフェイルオーバーを有効化
+        _secondary_url: Optional[str] = None
+        if settings is not None:
+            _secondary_url = getattr(settings, "rpc_url_secondary", None)
+        from .rpc_provider import RPCProvider  # noqa: PLC0415
+
+        self._rpc_provider = RPCProvider(effective_rpc_url, _secondary_url, web3_cls=Web3)
+        try:
+            self._w3 = self._rpc_provider.get_web3()
+        except ConnectionError as exc:
+            raise AaveClientError(
+                f"RPC に接続できません: {effective_rpc_url[:20]}..."
+            ) from exc  # URLを切り詰めてログ
         if not self._w3.is_connected():
             raise AaveClientError(
                 f"RPC に接続できません: {effective_rpc_url[:20]}..."
@@ -300,6 +358,18 @@ class Web3AaveClient(AaveClientBase):
             address=Web3.to_checksum_address(effective_pool_address),
             abi=_POOL_ABI_MINIMAL,
         )
+
+        # Flashbots Protect RPC（MEV対策）
+        _fb_url: Optional[str] = None
+        if settings is not None:
+            _fb_url = getattr(settings, "flashbots_rpc_url", None)
+        if flashbots_rpc_url is not None:
+            _fb_url = flashbots_rpc_url
+        if _fb_url:
+            self._w3_tx = Web3(Web3.HTTPProvider(_fb_url))
+            logger.info("Flashbots Protect RPC 設定完了 (endpoint=%s...)", _fb_url[:30])
+        else:
+            self._w3_tx = self._w3
 
         # 後方互換: settings が渡された場合はウォレット情報を保持
         if settings is not None:
@@ -380,6 +450,44 @@ class Web3AaveClient(AaveClientBase):
             raise
         except Exception as exc:
             raise AaveClientError(f"get_health_factor 失敗: {exc}") from exc
+
+    def get_account_data(self, wallet_address: str) -> AccountData:
+        """
+        Aave V3 Pool.getUserAccountData() から口座データを取得。
+
+        totalCollateralBase / totalDebtBase / availableBorrowsBase は 8 decimals (USD base unit)。
+        healthFactor は 18 decimals。
+        """
+        if Web3 is None:
+            raise AaveClientError("web3 package is required. Install with: pip install web3")
+
+        if not wallet_address and hasattr(self, "account"):
+            wallet_address = self.account.address
+
+        try:
+            checksum_addr = Web3.to_checksum_address(wallet_address)
+            result = self._pool.functions.getUserAccountData(checksum_addr).call()
+            # result: [totalCollateralBase, totalDebtBase, availableBorrowsBase,
+            #          currentLiquidationThreshold, ltv, healthFactor]
+            _BASE = Decimal(10**8)
+            total_collateral_usd = Decimal(result[0]) / _BASE
+            total_debt_usd = Decimal(result[1]) / _BASE
+            available_borrows_usd = Decimal(result[2]) / _BASE
+            hf_raw: int = result[5]
+            if hf_raw >= 2**256 - 1 or (hf_raw == 0 and result[1] == 0):
+                health_factor = Decimal("inf")
+            else:
+                health_factor = Decimal(hf_raw) / Decimal(10**18)
+            return AccountData(
+                total_collateral_usd=total_collateral_usd,
+                total_debt_usd=total_debt_usd,
+                available_borrows_usd=available_borrows_usd,
+                health_factor=health_factor,
+            )
+        except AaveClientError:
+            raise
+        except Exception as exc:
+            raise AaveClientError(f"get_account_data 失敗: {exc}") from exc
 
     def deposit(
         self,
@@ -478,43 +586,96 @@ class Web3AaveClient(AaveClientBase):
             )
 
             # Step 1: ERC-20 approve
+            gas_estimator = GasEstimator(self._w3)
+            approve_params_for_estimate = {
+                "from": checksum_wallet,
+                "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                "gasPrice": self._w3.eth.gas_price,
+            }
+            approve_gas = gas_estimator.estimate_gas_with_buffer(
+                approve_params_for_estimate, DEFAULT_FALLBACK_GAS_APPROVE
+            )
+            if not gas_estimator.is_gas_cost_acceptable(approve_gas):
+                raise AaveClientError(f"approve ガスコストが上限を超過: {approve_gas} units")
             approve_tx = token_contract.functions.approve(
                 pool_address, amount_wei
             ).build_transaction(
                 {
                     "from": checksum_wallet,
                     "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
-                    "gas": 100000,
+                    "gas": approve_gas,
                     "gasPrice": self._w3.eth.gas_price,
                 }
             )
             signed_approve = self._w3.eth.account.sign_transaction(
                 approve_tx, private_key=account.key
             )
-            approve_hash = self._w3.eth.send_raw_transaction(signed_approve.raw_transaction)
+            approve_hash = self._w3_tx.eth.send_raw_transaction(signed_approve.raw_transaction)
             self._w3.eth.wait_for_transaction_receipt(approve_hash)
 
             logger.info("approve tx confirmed: %s", approve_hash.hex())
 
             # Step 2: Pool.supply
-            supply_tx = self._pool.functions.supply(
-                Web3.to_checksum_address(asset_address),
-                amount_wei,
-                checksum_wallet,
-                0,  # referralCode
-            ).build_transaction(
-                {
+            try:
+                supply_params_for_estimate = {
                     "from": checksum_wallet,
                     "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
-                    "gas": 300000,
                     "gasPrice": self._w3.eth.gas_price,
                 }
-            )
-            signed_supply = self._w3.eth.account.sign_transaction(
-                supply_tx, private_key=account.key
-            )
-            supply_hash = self._w3.eth.send_raw_transaction(signed_supply.raw_transaction)
-            receipt = self._w3.eth.wait_for_transaction_receipt(supply_hash)
+                supply_gas = gas_estimator.estimate_gas_with_buffer(
+                    supply_params_for_estimate, DEFAULT_FALLBACK_GAS_SUPPLY
+                )
+                if not gas_estimator.is_gas_cost_acceptable(supply_gas):
+                    raise AaveClientError(f"supply ガスコストが上限を超過: {supply_gas} units")
+                supply_tx = self._pool.functions.supply(
+                    Web3.to_checksum_address(asset_address),
+                    amount_wei,
+                    checksum_wallet,
+                    0,  # referralCode
+                ).build_transaction(
+                    {
+                        "from": checksum_wallet,
+                        "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                        "gas": supply_gas,
+                        "gasPrice": self._w3.eth.gas_price,
+                    }
+                )
+                signed_supply = self._w3.eth.account.sign_transaction(
+                    supply_tx, private_key=account.key
+                )
+                supply_hash = self._w3_tx.eth.send_raw_transaction(signed_supply.raw_transaction)
+                receipt = self._w3.eth.wait_for_transaction_receipt(supply_hash)
+            except Exception as supply_exc:
+                # supply 失敗時は allowance を revoke して部分成功状態を解消
+                logger.error("supply 失敗: %s — allowance を revoke します", supply_exc)
+                try:
+                    revoke_params_for_estimate = {
+                        "from": checksum_wallet,
+                        "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                        "gasPrice": self._w3.eth.gas_price,
+                    }
+                    revoke_gas = gas_estimator.estimate_gas_with_buffer(
+                        revoke_params_for_estimate, DEFAULT_FALLBACK_GAS_APPROVE
+                    )
+                    revoke_tx = token_contract.functions.approve(pool_address, 0).build_transaction(
+                        {
+                            "from": checksum_wallet,
+                            "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                            "gas": revoke_gas,
+                            "gasPrice": self._w3.eth.gas_price,
+                        }
+                    )
+                    signed_revoke = self._w3.eth.account.sign_transaction(
+                        revoke_tx, private_key=account.key
+                    )
+                    revoke_hash = self._w3_tx.eth.send_raw_transaction(
+                        signed_revoke.raw_transaction
+                    )
+                    self._w3.eth.wait_for_transaction_receipt(revoke_hash)
+                    logger.info("allowance revoke 完了: %s", revoke_hash.hex())
+                except Exception as revoke_exc:
+                    logger.error("allowance revoke 失敗: %s", revoke_exc)
+                raise AaveClientError(f"deposit 失敗 (supply error): {supply_exc}") from supply_exc
 
             tx_hash_hex = receipt["transactionHash"].hex()
             logger.info(
@@ -531,8 +692,6 @@ class Web3AaveClient(AaveClientBase):
 
         except (AaveClientError, ValueError):
             raise
-        except Exception as exc:
-            raise AaveClientError(f"deposit 失敗: {exc}") from exc
 
     def withdraw(
         self,
@@ -634,6 +793,17 @@ class Web3AaveClient(AaveClientBase):
             )
 
             # Pool.withdraw(asset, amount, to)
+            gas_estimator = GasEstimator(self._w3)
+            withdraw_params_for_estimate = {
+                "from": checksum_wallet,
+                "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                "gasPrice": self._w3.eth.gas_price,
+            }
+            withdraw_gas = gas_estimator.estimate_gas_with_buffer(
+                withdraw_params_for_estimate, DEFAULT_FALLBACK_GAS_WITHDRAW
+            )
+            if not gas_estimator.is_gas_cost_acceptable(withdraw_gas):
+                raise AaveClientError(f"withdraw ガスコストが上限を超過: {withdraw_gas} units")
             withdraw_tx = self._pool.functions.withdraw(
                 Web3.to_checksum_address(asset_address),
                 amount_wei,
@@ -642,12 +812,12 @@ class Web3AaveClient(AaveClientBase):
                 {
                     "from": checksum_wallet,
                     "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
-                    "gas": 300000,
+                    "gas": withdraw_gas,
                     "gasPrice": self._w3.eth.gas_price,
                 }
             )
             signed_tx = self._w3.eth.account.sign_transaction(withdraw_tx, private_key=account.key)
-            tx_hash = self._w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+            tx_hash = self._w3_tx.eth.send_raw_transaction(signed_tx.raw_transaction)
             receipt = self._w3.eth.wait_for_transaction_receipt(tx_hash)
 
             tx_hash_hex = receipt["transactionHash"].hex()
@@ -678,6 +848,9 @@ def make_aave_client(
     client_type: str,
     rpc_url: Optional[str] = None,
     pool_address: str = _POOL_ADDRESS_SEPOLIA,
+    network: str = "sepolia",
+    flashbots_rpc_url: Optional[str] = None,
+    chain_name: Optional[str] = None,
 ) -> AaveClientBase:
     """
     環境変数 AAVE_CLIENT_TYPE に基づいてクライアントを生成するファクトリ。
@@ -686,13 +859,38 @@ def make_aave_client(
         client_type: "dummy" または "web3"
         rpc_url: web3 の場合は必須
         pool_address: Aave V3 Pool コントラクトアドレス
+        network: ネットワーク名 ("sepolia", "arbitrum", "arbitrum-sepolia")
+        flashbots_rpc_url: Flashbots Protect RPC URL（MEV対策、オプション）
+        chain_name: チェーン名（chains.py のレジストリから設定を解決する、オプション）
     """
     if client_type == "dummy":
         return DummyAaveClient()
     if client_type == "web3":
+        if chain_name is not None:
+            from .chains import get_chain_config, get_rpc_url_for_chain
+
+            chain_config = get_chain_config(chain_name)
+            rpc_url = get_rpc_url_for_chain(chain_config)
+            pool_address = chain_config.pool_address
+            flashbots_rpc_url = (
+                os.getenv(chain_config.flashbots_rpc_env_var)
+                if chain_config.flashbots_rpc_env_var is not None
+                else None
+            )
         if not rpc_url:
             raise ValueError("AAVE_CLIENT_TYPE=web3 の場合は AAVE_RPC_URL が必須です")
-        return Web3AaveClient(rpc_url=rpc_url, pool_address=pool_address)
+        _network_pool = {
+            "sepolia": _POOL_ADDRESS_SEPOLIA,
+            "arbitrum": _POOL_ADDRESS_ARBITRUM,
+            "arbitrum-sepolia": _POOL_ADDRESS_ARBITRUM_SEPOLIA,
+        }
+        if pool_address == _POOL_ADDRESS_SEPOLIA and network in _network_pool:
+            pool_address = _network_pool[network]
+        return Web3AaveClient(
+            rpc_url=rpc_url,
+            pool_address=pool_address,
+            flashbots_rpc_url=flashbots_rpc_url,
+        )
     raise ValueError(f"不明な AAVE_CLIENT_TYPE: {client_type!r} (dummy | web3)")
 
 
@@ -726,3 +924,30 @@ def get_default_aave_client() -> AaveClient:
         else:
             logger.info("Using DummyAaveClient for %s environment", env)
             return DummyAaveClient(settings=settings)  # type: ignore[return-value]
+
+
+def make_multi_chain_clients(
+    client_type: Optional[str] = None,
+) -> dict[str, AaveClientBase]:
+    """
+    AAVE_ACTIVE_CHAINS の全チェーンに対してクライアントを生成する。
+
+    :param client_type: "dummy" | "web3"。未指定時は AAVE_CLIENT_TYPE env var を参照。
+    :returns: chain_name -> AaveClientBase のマッピング
+    """
+    from .chains import get_active_chains
+
+    if client_type is None:
+        client_type = os.getenv("AAVE_CLIENT_TYPE")
+        if client_type is None:
+            env = os.getenv("APP_ENV", "dev")
+            client_type = "web3" if env == "staging" else "dummy"
+
+    active_chains = get_active_chains()
+    return {
+        chain.chain_name: make_aave_client(
+            client_type=client_type,
+            chain_name=chain.chain_name,
+        )
+        for chain in active_chains
+    }

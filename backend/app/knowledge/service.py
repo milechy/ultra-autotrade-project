@@ -1,17 +1,21 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/knowledge/service.py
 
 """
-Knowledge Hub サービス層。
+Knowledge Hub service layer.
 
-主な責務:
-- URL スクレイピングまたは生テキストの取り込み
-- テキストのチャンク分割（tiktoken 使用）
-- OpenAI API による埋め込みベクトル生成
-- pgvector を利用したコサイン類似度ベクトル検索
-- KnowledgeSource / KnowledgeDocument / KnowledgeChunk の DB 管理
+Main responsibilities:
+- Ingest content via URL scraping or raw text
+- Split text into chunks (using tiktoken)
+- Generate embedding vectors via OpenAI API
+- Vector search using cosine similarity with pgvector
+- Manage KnowledgeSource / KnowledgeDocument / KnowledgeChunk in the DB
 """
 
 import logging
+import math
+import re
 from typing import List, Optional
 
 from openai import OpenAI
@@ -48,15 +52,14 @@ logger = logging.getLogger(__name__)
 
 
 class KnowledgeServiceError(Exception):
-    """Knowledge Hub サービス固有のエラー。"""
+    """Service-specific error for Knowledge Hub."""
 
 
 class KnowledgeService:
     """
-    Knowledge Hub のビジネスロジックを担うサービスクラス。
+    Service class responsible for Knowledge Hub business logic.
 
-    インスタンスは API リクエストごとに生成するか、
-    依存性注入でシングルトンとして扱う。
+    Instances can be created per API request or treated as singletons via dependency injection.
     """
 
     def __init__(self, *, settings: Optional[KnowledgeSettings] = None) -> None:
@@ -69,18 +72,18 @@ class KnowledgeService:
             self._tokenizer = None
 
     # ------------------------------------------------------------------ #
-    # 公開 API                                                             #
+    # Public API                                                           #
     # ------------------------------------------------------------------ #
 
     def create_item(self, db: Session, request: KnowledgeCreateRequest) -> KnowledgeItem:
         """
-        ナレッジアイテムを登録する。
+        Register a knowledge item.
 
-        URL 種別の場合はスクレイピングでテキストを取得し、
-        テキスト種別の場合は raw_text をそのまま使用する。
-        チャンク分割・埋め込み生成を行い DB に保存する。
+        For URL type: scrape text from the URL.
+        For text type: use raw_text as-is.
+        Performs chunk splitting and embedding generation, then saves to DB.
         """
-        # 1. 生テキストの取得
+        # 1. Resolve raw text
         try:
             raw_text, title = self._resolve_raw_text(request)
         except KnowledgeServiceError:
@@ -93,10 +96,10 @@ class KnowledgeService:
                 "No text content available. Provide raw_text or a valid source_url."
             )
 
-        # タイトルは引数優先、フォールバックはスクレイピング由来
+        # Title: prefer request argument; fall back to scraped value
         effective_title = request.title or title
 
-        # 2. KnowledgeSource 行の作成
+        # 2. Create KnowledgeSource row
         source = KnowledgeSource(
             source_url=request.source_url,
             title=effective_title,
@@ -104,7 +107,7 @@ class KnowledgeService:
             status=KnowledgeItemStatus.PENDING.value,
         )
         db.add(source)
-        db.flush()  # ID を確定する
+        db.flush()  # Commit to obtain ID
 
         logger.info(
             "KnowledgeSource created",
@@ -115,7 +118,7 @@ class KnowledgeService:
             },
         )
 
-        # 3. KnowledgeDocument 行の作成
+        # 3. Create KnowledgeDocument row
         document = KnowledgeDocument(
             source_id=source.id,
             raw_text=raw_text,
@@ -123,23 +126,23 @@ class KnowledgeService:
         db.add(document)
         db.flush()
 
-        # 4. テキストのチャンク分割
+        # 4. Split text into chunks
         chunks_text = self._chunk_text(raw_text)
         logger.info(
             "Text chunked",
             extra={"source_id": source.id, "chunk_count": len(chunks_text)},
         )
 
-        # 5. 埋め込み生成
+        # 5. Generate embeddings
         try:
             embeddings = self._embed_texts(chunks_text)
         except Exception as exc:
-            # 埋め込み失敗時はステータスを ERROR に更新してコミットする（fail-closed）
+            # On embedding failure: update status to ERROR and commit (fail-closed)
             source.status = KnowledgeItemStatus.ERROR.value
             db.commit()
             raise KnowledgeServiceError(f"Embedding generation failed: {exc}") from exc
 
-        # 6. KnowledgeChunk 行の作成
+        # 6. Create KnowledgeChunk rows
         for idx, (chunk_text, embedding) in enumerate(zip(chunks_text, embeddings)):
             token_count = (
                 len(self._tokenizer.encode(chunk_text))
@@ -155,7 +158,10 @@ class KnowledgeService:
             )
             db.add(chunk)
 
-        # 7. チャンク・埋め込みを保存してコミット（ステータスは PENDING のまま）
+        # 7. Compute and set quality score
+        source.quality_score = self._compute_quality_score(raw_text, len(chunks_text))
+
+        # 8. Save chunks and embeddings, then commit (status remains PENDING)
         db.commit()
         db.refresh(source)
 
@@ -165,6 +171,7 @@ class KnowledgeService:
                 "source_id": source.id,
                 "status": source.status,
                 "chunk_count": len(chunks_text),
+                "quality_score": source.quality_score,
             },
         )
 
@@ -172,9 +179,9 @@ class KnowledgeService:
 
     def search(self, db: Session, request: KnowledgeSearchRequest) -> List[KnowledgeSearchResult]:
         """
-        RAG 検索: クエリを埋め込み化し、pgvector コサイン類似度で検索する。
+        RAG search: embed the query and search by pgvector cosine similarity.
         """
-        # 1. クエリを埋め込み化
+        # 1. Embed the query
         try:
             query_embeddings = self._embed_texts([request.query])
         except Exception as exc:
@@ -182,7 +189,7 @@ class KnowledgeService:
 
         query_vector = query_embeddings[0]
 
-        # 2. pgvector コサイン距離 SQL
+        # 2. pgvector cosine distance SQL
         sql = text(
             """
             SELECT kc.id,
@@ -225,12 +232,12 @@ class KnowledgeService:
         return results
 
     def get_pending(self, db: Session) -> List[KnowledgeItem]:
-        """status='pending' のアイテムを全件取得する。"""
+        """Fetch all items with status='pending'."""
         return self.get_items(db, status=KnowledgeItemStatus.PENDING.value)
 
     def get_items(self, db: Session, *, status: Optional[str] = None) -> List[KnowledgeItem]:
         """
-        アイテムを全件取得する。status を指定するとフィルタリングする。
+        Fetch all items. Filters by status if provided.
         """
         query = db.query(KnowledgeSource)
         if status is not None:
@@ -243,9 +250,9 @@ class KnowledgeService:
         self, db: Session, item_id: int, status: KnowledgeItemStatus
     ) -> KnowledgeItem:
         """
-        アイテムのステータスを更新する。
+        Update the status of an item.
 
-        item_id が存在しない場合は KnowledgeServiceError を送出する。
+        Raises KnowledgeServiceError if item_id does not exist.
         """
         source = db.query(KnowledgeSource).filter(KnowledgeSource.id == item_id).first()
 
@@ -264,15 +271,15 @@ class KnowledgeService:
         return self._to_schema(source)
 
     # ------------------------------------------------------------------ #
-    # 内部ヘルパー                                                         #
+    # Internal helpers                                                     #
     # ------------------------------------------------------------------ #
 
     def _resolve_raw_text(self, request: KnowledgeCreateRequest) -> tuple[str, Optional[str]]:
         """
-        リクエストの種別に応じてテキストと推定タイトルを返す。
+        Return text content and estimated title based on request type.
 
         Returns:
-            (raw_text, title): テキスト本文と推定タイトル（不明の場合は None）
+            (raw_text, title): Body text and estimated title (None if unknown)
         """
         if request.item_type == KnowledgeItemType.URL:
             if not request.source_url:
@@ -280,17 +287,17 @@ class KnowledgeService:
             raw_text = self._scrape_url(request.source_url)
             return raw_text, None
 
-        # TEXT 種別
+        # TEXT type
         if not request.raw_text:
             raise KnowledgeServiceError("raw_text is required when item_type is 'text'.")
         return request.raw_text, None
 
     def _scrape_url(self, url: str) -> str:
         """
-        URL をスクレイピングしてクリーンなテキストを返す。
+        Scrape a URL and return clean text.
 
-        httpx (同期) + BeautifulSoup を使用する。
-        <article> → <main> → <body> の優先順位でテキストを抽出する。
+        Uses httpx (sync) + BeautifulSoup.
+        Text extraction priority: <article> → <main> → <body>.
         """
         if httpx is None:
             raise KnowledgeServiceError(
@@ -317,16 +324,16 @@ class KnowledgeService:
 
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # 不要なタグを除去する
+        # Remove unwanted tags
         for tag in soup(["script", "style", "nav", "footer", "header"]):
             tag.decompose()
 
-        # テキスト抽出優先順位: <article> → <main> → <body>
+        # Text extraction priority: <article> → <main> → <body>
         target = soup.find("article") or soup.find("main") or soup.find("body") or soup
 
         raw_text = target.get_text(separator="\n", strip=True)
 
-        # 空行を圧縮してクリーンアップ
+        # Compress blank lines and clean up
         lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
         cleaned = "\n".join(lines)
 
@@ -342,13 +349,13 @@ class KnowledgeService:
 
     def _chunk_text(self, text: str) -> List[str]:
         """
-        テキストをチャンクに分割する。
+        Split text into chunks.
 
-        tiktoken を使用して ~chunk_size_tokens トークンの断片に分割し、
-        chunk_overlap_tokens トークンのオーバーラップを持たせる。
+        Uses tiktoken to split into ~chunk_size_tokens fragments
+        with chunk_overlap_tokens overlap.
         """
         if self._tokenizer is None:
-            # tiktoken が利用できない場合は単純な文字数分割にフォールバック
+            # Fall back to character-based splitting when tiktoken is unavailable
             logger.warning("tiktoken not available, falling back to character-based chunking")
             chunk_size = self._settings.chunk_size_tokens * 4  # 1 token ≈ 4 chars
             overlap = self._settings.chunk_overlap_tokens * 4
@@ -380,10 +387,10 @@ class KnowledgeService:
 
     def _embed_texts(self, texts: List[str]) -> List[List[float]]:
         """
-        テキストリストを OpenAI API でバッチ埋め込みする。
+        Batch-embed a list of texts using the OpenAI API.
 
         Returns:
-            各テキストに対応する埋め込みベクトルのリスト
+            List of embedding vectors corresponding to each input text
         """
         if not texts:
             return []
@@ -396,13 +403,54 @@ class KnowledgeService:
         except Exception as exc:
             raise KnowledgeServiceError(f"OpenAI embeddings API call failed: {exc}") from exc
 
-        # レスポンスは index 順に並んでいることが保証されているが念のためソート
+        # Response is guaranteed to be in index order, but sort just in case
         sorted_data = sorted(response.data, key=lambda d: d.index)
         return [item.embedding for item in sorted_data]
 
+    def _compute_quality_score(self, text: str, chunk_count: int) -> float:
+        """
+        Calculate a content quality score in the range 0–100.
+
+        Score breakdown:
+          - Text length (log scale): 0–40 points
+          - Chunk count: 0–20 points
+          - Content richness (numbers, sentences, vocabulary diversity): 0–40 points
+        """
+        score = 0.0
+
+        # Text length score (log scale; full marks at 5000 characters)
+        length = len(text)
+        if length > 0:
+            length_score = min(40.0, 40.0 * math.log10(max(1, length)) / math.log10(5000))
+            score += length_score
+
+        # Chunk count score (full marks at 5 chunks)
+        score += min(20.0, chunk_count * 4.0)
+
+        # Content richness score
+        richness = 0.0
+
+        # Number density (proxy for information density)
+        numbers = len(re.findall(r"\d+\.?\d*", text))
+        richness += min(15.0, numbers * 1.5)
+
+        # Sentence count (sentences longer than 20 characters)
+        sentences = [s.strip() for s in re.split(r"[.!?。！？]", text) if len(s.strip()) > 20]
+        richness += min(15.0, float(len(sentences)))
+
+        # Vocabulary diversity (unique words / total words)
+        words = text.lower().split()
+        if words:
+            unique_ratio = len(set(words)) / len(words)
+            richness += unique_ratio * 10.0
+
+        score += richness
+
+        return round(min(100.0, max(0.0, score)), 2)
+
     def _to_schema(self, source: KnowledgeSource) -> KnowledgeItem:
         """
-        KnowledgeSource ORM オブジェクトを KnowledgeItem スキーマに変換する。
+        Convert a KnowledgeSource ORM object to a KnowledgeItem schema.
         """
         chunk_count = sum(len(doc.chunks) for doc in source.documents)
         raw_text = source.documents[0].raw_text if source.documents else None
@@ -415,6 +463,7 @@ class KnowledgeService:
             status=KnowledgeItemStatus(source.status),
             chunk_count=chunk_count,
             item_type=KnowledgeItemType(source.item_type),
+            quality_score=source.quality_score,
             created_at=source.created_at,
             updated_at=source.updated_at,
         )

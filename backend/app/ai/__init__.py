@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/ai/__init__.py
 """
 AI 解析ロジック用パッケージ。
@@ -13,4 +15,3 @@ from .schemas import (  # noqa: F401
     AIAnalysisResult,
     TradeAction,
 )
-from .service import AIService  # noqa: F401

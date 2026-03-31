@@ -1,0 +1,5 @@
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// This route is served from (liff)/liff-approve/page.tsx to avoid URL collision
+// with (user)/approve/page.tsx in Next.js route groups.
+// See: frontend/app/(liff)/liff-approve/page.tsx
+export { default } from "@/app/(liff)/liff-approve/page";

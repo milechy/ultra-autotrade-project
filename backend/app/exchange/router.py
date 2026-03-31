@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/exchange/router.py
 
 """
@@ -15,11 +17,18 @@ from functools import lru_cache
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from .client import BitFlyerClient, BybitSandboxClient, DummyExchangeClient
-from .config import get_exchange_settings
+from .config import (
+    get_bitflyer_settings,
+    get_exchange_settings,
+    get_kraken_settings,
+    get_okx_settings,
+)
+from .copy_trading import router as copy_trading_router
 from .schemas import ExchangeStatusResponse, OrderRequest, OrderResult
 from .service import ExchangeService
 
 router = APIRouter(prefix="/exchange", tags=["exchange"])
+router.include_router(copy_trading_router)
 
 
 @lru_cache()
@@ -35,6 +44,7 @@ def get_exchange_service() -> ExchangeService:
     NOTE:
     - テストでは monkeypatch で環境変数をセットしてから呼び出す。
     - lru_cache により同一プロセス内でシングルトンとして動作する。
+    - APP_ENV=prod の場合、Bybit は本番モード（sandbox=False）で動作する
     """
     settings = get_exchange_settings()
 
@@ -42,7 +52,21 @@ def get_exchange_service() -> ExchangeService:
     if client_type == "dummy":
         client: DummyExchangeClient | BybitSandboxClient | BitFlyerClient = DummyExchangeClient()
     elif client_type == "bitflyer":
-        client = BitFlyerClient(settings=settings)
+        bitflyer_settings = get_bitflyer_settings()
+        client = BitFlyerClient(settings=bitflyer_settings)
+        return ExchangeService(client=client, settings=bitflyer_settings)
+    elif client_type == "okx":
+        from .okx_client import OKXClient
+
+        okx_settings = get_okx_settings()
+        okx_client = OKXClient(settings=okx_settings)
+        return ExchangeService(client=okx_client, settings=okx_settings)
+    elif client_type == "kraken":
+        from .kraken_client import KrakenClient
+
+        kraken_settings = get_kraken_settings()
+        kraken_client = KrakenClient(settings=kraken_settings)
+        return ExchangeService(client=kraken_client, settings=kraken_settings)
     else:
         # "sandbox" or "bybit" → BybitSandboxClient
         client = BybitSandboxClient(settings=settings)

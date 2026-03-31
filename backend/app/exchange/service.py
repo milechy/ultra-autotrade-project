@@ -1,41 +1,45 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/exchange/service.py
 
 """
-Exchange サービス層（ルールエンジン）。
+Exchange service layer (rule engine).
 
-責務:
-- HOLD → 即時 SKIPPED
-- 日次取引上限チェック
-- クールダウン期間チェック
-- 最大注文金額チェック
-- dry_run チェック
-- 取引所クライアントへの注文委譲
-- 取引ログの管理
+Responsibilities:
+- HOLD → immediate SKIPPED
+- Daily trade limit check
+- Cooldown period check
+- Maximum order amount check
+- Dry-run check
+- Delegate order execution to exchange client
+- Manage trade log
 """
 
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple
 
 from app.ai.schemas import TradeAction
 
-from .client import BitFlyerClient, BybitSandboxClient, DummyExchangeClient, ExchangeClientError
+from .client import ExchangeClientError
 from .config import ExchangeSettings, get_exchange_settings
 from .schemas import ExchangeStatusResponse, OrderRequest, OrderResult, OrderSide, OrderStatus
 
 logger = logging.getLogger(__name__)
 
-# クライアントの型エイリアス（Protocol を使わずに Union で表現）
-_ExchangeClient = Union[BybitSandboxClient, BitFlyerClient, DummyExchangeClient]
+# Client type alias (OKXClient / KrakenClient use Any to avoid circular imports)
+_ExchangeClient = (
+    Any  # BybitSandboxClient | BitFlyerClient | DummyExchangeClient | OKXClient | KrakenClient
+)
 
 
 class ExchangeService:
     """
-    AI 判定結果から取引注文を生成・実行するサービス層。
+    Service layer that generates and executes trade orders from AI judgment results.
 
-    ルールチェックを順番に適用し、問題がなければ取引所クライアントに注文を委譲する。
-    全てのルールはインメモリで管理する（PoC フェーズ）。
+    Applies rule checks in sequence; delegates to the exchange client if all checks pass.
+    All rules are managed in-memory (PoC phase).
     """
 
     def __init__(
@@ -46,28 +50,28 @@ class ExchangeService:
     ) -> None:
         self._client = client
         self._settings = settings or get_exchange_settings()
-        # (side, timestamp) のタプルリスト。インプロセスで当日分を保持する。
+        # List of (side, timestamp) tuples. Holds today's trades in-process.
         self._trade_log: List[Tuple[str, datetime]] = []
 
-    # ---- 公開 API ------------------------------------------------------
+    # ---- Public API ------------------------------------------------------
 
     def execute_trade(self, request: OrderRequest) -> OrderResult:
         """
-        注文リクエストを受け取り、ルールチェック後に取引を実行する。
+        Accept an order request, run rule checks, then execute the trade.
 
-        処理フロー:
+        Processing flow:
         1. HOLD → SKIPPED
-        2. 日次取引上限チェック
-        3. クールダウンチェック
-        4. 最大注文金額チェック
-        5. dry_run チェック
-        6. ティッカー取得 → USD を数量に変換
-        7. 成行注文送信
+        2. Daily trade limit check
+        3. Cooldown check
+        4. Maximum order amount check
+        5. Dry-run check
+        6. Fetch ticker → convert USD to quantity
+        7. Submit market order
         """
         now = datetime.now(timezone.utc)
         symbol = request.symbol or self._settings.default_symbol
 
-        # 1. HOLD → 即時 SKIPPED
+        # 1. HOLD → immediate SKIPPED
         if request.action == TradeAction.HOLD:
             logger.info(
                 "Trade skipped: action is HOLD",
@@ -81,7 +85,7 @@ class ExchangeService:
                 timestamp=now,
             )
 
-        # 2. 日次取引上限チェック
+        # 2. Daily trade limit check
         daily_count = self._get_daily_trade_count(now)
         if daily_count >= self._settings.daily_trade_limit:
             logger.warning(
@@ -103,7 +107,7 @@ class ExchangeService:
                 timestamp=now,
             )
 
-        # 3. クールダウンチェック
+        # 3. Cooldown check
         last_trade = self._get_last_trade_at()
         if last_trade is not None:
             elapsed = (now - last_trade).total_seconds()
@@ -127,7 +131,7 @@ class ExchangeService:
                     timestamp=now,
                 )
 
-        # 4. 最大注文金額チェック
+        # 4. Maximum order amount check
         if request.amount_usd > self._settings.max_order_usd:
             logger.warning(
                 "Trade skipped: amount exceeds max order USD",
@@ -148,7 +152,7 @@ class ExchangeService:
                 timestamp=now,
             )
 
-        # 5. dry_run チェック
+        # 5. Dry-run check
         if request.dry_run:
             logger.info(
                 "Trade skipped: dry run mode",
@@ -162,11 +166,11 @@ class ExchangeService:
                 timestamp=now,
             )
 
-        # 6. ティッカー取得 → USD を数量に変換
+        # 6. Fetch ticker → convert USD to quantity
         try:
             ticker = self._client.fetch_ticker(symbol)
             price = Decimal(str(ticker["last"]))
-            # BTC/JPY の場合: amount_usd → JPY に換算してから BTC 数量を計算
+            # For BTC/JPY: convert amount_usd to JPY first, then calculate BTC quantity
             if "/JPY" in symbol:
                 amount_jpy = request.amount_usd * Decimal(str(self._settings.usd_to_jpy_rate))
                 quantity = float(amount_jpy / price)
@@ -186,7 +190,7 @@ class ExchangeService:
                 timestamp=now,
             )
 
-        # 7. アクションを side にマッピングして成行注文送信
+        # 7. Map action to side and submit market order
         side = "buy" if request.action == TradeAction.BUY else "sell"
 
         try:
@@ -239,15 +243,15 @@ class ExchangeService:
 
     def get_status(self) -> ExchangeStatusResponse:
         """
-        取引所の接続状態および本日の取引状況を返す。
+        Return exchange connection status and today's trade summary.
 
-        接続チェックに失敗した場合も例外は投げず、connected=False として返す。
+        On connection check failure, returns connected=False without raising an exception.
         """
         now = datetime.now(timezone.utc)
         daily_count = self._get_daily_trade_count(now)
         last_trade = self._get_last_trade_at()
 
-        # 残高取得を試みて接続確認とする
+        # Attempt to fetch balance as a connectivity check
         balance_usdt: Optional[Decimal] = None
         connected = False
         try:
@@ -269,18 +273,18 @@ class ExchangeService:
             last_trade_at=last_trade,
         )
 
-    # ---- 内部ヘルパー --------------------------------------------------
+    # ---- Internal helpers --------------------------------------------------
 
     def _get_daily_trade_count(self, now: datetime) -> int:
         """
-        本日（UTC 日付）に実行した取引件数を返す。
+        Return the number of trades executed today (UTC date).
         """
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
         return sum(1 for _, ts in self._trade_log if ts >= start_of_day)
 
     def _get_last_trade_at(self) -> Optional[datetime]:
         """
-        最後に取引を実行した時刻を返す。取引がなければ None。
+        Return the timestamp of the last executed trade, or None if no trades exist.
         """
         if not self._trade_log:
             return None

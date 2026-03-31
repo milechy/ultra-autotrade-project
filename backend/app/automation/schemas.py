@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/automation/schemas.py
 
 """
@@ -14,7 +16,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Dict, List, Optional  # ★ List を追加
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class AlertLevel(str, Enum):
@@ -135,6 +137,14 @@ class HealthFactorStatus(BaseModel):
         description="緊急停止レベルかどうか。",
     )
 
+    @field_validator("current", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Aave V3 ではポジションがないと HF=∞ を返す。finite_number 制約を回避するため 999.0 に丸める。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
+
 
 class AutomationStatus(BaseModel):
     """
@@ -166,6 +176,18 @@ class AutomationStatus(BaseModel):
         default_factory=list,
         description="最近のイベント。件数は MonitoringService 側で制御する。",
     )
+    next_scheduled_run: Optional[datetime] = Field(
+        None,
+        description="次回AI判定スケジューラー実行予定時刻（UTC）",
+    )
+
+    @field_validator("last_health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Aave V3 ではポジションがないと HF=∞ を返す。finite_number 制約を回避するため 999.0 に丸める。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +324,14 @@ class AutomationReportSummary(BaseModel):
         description="人間向けの簡易コメント。将来的に AI による文章生成に置き換え可能。",
     )
 
+    @field_validator("min_health_factor", "max_health_factor", "last_health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Aave V3 ではポジションがないと HF=∞ を返す。finite_number 制約を回避するため 999.0 に丸める。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
+
 
 # ---------------------------------------------------------------------------
 # ワークフロー実行結果スキーマ
@@ -324,5 +354,7 @@ class WorkflowRunResult(BaseModel):
     traded_count: int = 0
     skipped_count: int = 0
     hold_count: int = 0
+    shadow_logged_count: int = 0
+    proposed_count: int = 0
     errors: List[WorkflowStepError] = []
     status: str  # "completed", "completed_with_errors", "failed", "no_items"

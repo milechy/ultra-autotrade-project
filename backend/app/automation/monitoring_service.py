@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/automation/monitoring_service.py
 
 """
@@ -68,6 +70,8 @@ class MonitoringService:
         max_healthfactor_records: int = 1000,
         enable_state_sync: bool = True,
         notification_service: Optional[CompositeNotificationService] = None,
+        error_rate_window_size: int = 100,
+        ai_error_rate_threshold: float = 0.20,
     ) -> None:
         # 閾値
         self._latency_warning_threshold_s = float(latency_warning_threshold_s)
@@ -79,6 +83,11 @@ class MonitoringService:
         # state.json 同期設定
         self._enable_state_sync = enable_state_sync
         self._notification_service = notification_service
+
+        # エラー率監視設定
+        self._error_rate_window_size = error_rate_window_size
+        self._ai_error_rate_threshold = ai_error_rate_threshold
+        self._error_timestamps: Dict[str, Deque[datetime]] = {}
 
         # 状態
         self._events: Deque[MonitoringEvent] = deque(maxlen=max_events)
@@ -94,6 +103,10 @@ class MonitoringService:
         self._last_health_factor: Optional[Decimal] = None
         self._last_price_change_24h: Optional[float] = None
         self._last_event_level: AlertLevel = AlertLevel.INFO
+
+        # 起動時に state.json から緊急停止状態を復元（OR 条件維持）
+        if enable_state_sync:
+            self._restore_state_from_file()
 
     # ------------------------------------------------------------------
     # 内部ユーティリティ
@@ -132,6 +145,26 @@ class MonitoringService:
         if level_order[event.level] >= level_order[self._last_event_level]:
             self._last_event_level = event.level
         return event
+
+    def _restore_state_from_file(self) -> None:
+        """起動時に state.json から緊急停止状態を復元する。"""
+        try:
+            from app.aave.state_manager import StateFileNotFoundError, read_system_state
+
+            try:
+                current = read_system_state()
+                if current.emergency_stop:
+                    self._trading_paused = True
+                    reason = getattr(current, "reason", None)
+                    self._emergency_reason = reason or "Restored from state.json on startup"
+                    logger.info(
+                        "Restored emergency_stop=True from state.json (reason=%s)",
+                        self._emergency_reason,
+                    )
+            except StateFileNotFoundError:
+                pass  # 初回起動時は state.json なし
+        except Exception as exc:
+            logger.warning("Failed to restore emergency state from file: %s", exc)
 
     def _sync_state_file(
         self,
@@ -465,6 +498,58 @@ class MonitoringService:
 
         return None
 
+    def record_error(
+        self,
+        component: ComponentType,
+        *,
+        at: Optional[datetime] = None,
+    ) -> Optional[MonitoringEvent]:
+        """
+        コンポーネントのAPIエラーを記録し、エラー率が閾値を超えた場合にアラートを発行する。
+
+        docs/08_automation_rules.md:
+        - AI API エラー率 > 20% → アラート（取引停止）
+
+        Args:
+            component: エラーが発生したコンポーネント
+            at: 記録時刻（None の場合は現在時刻）
+
+        Returns:
+            エラー率が閾値を超えた場合は MonitoringEvent、それ以外は None
+        """
+        now = self._now(at)
+        key = component.value
+        if key not in self._error_timestamps:
+            self._error_timestamps[key] = deque(maxlen=self._error_rate_window_size)
+        self._error_timestamps[key].append(now)
+
+        total = len(self._error_timestamps[key])
+        if total == 0:
+            return None
+
+        error_rate = total / self._error_rate_window_size
+        if error_rate > self._ai_error_rate_threshold:
+            event = MonitoringEvent(
+                timestamp=now,
+                component=component,
+                level=AlertLevel.ALERT,
+                code="ERROR_RATE_HIGH",
+                message=(
+                    f"Error rate {error_rate:.1%} for {component.value} "
+                    f"exceeds threshold {self._ai_error_rate_threshold:.1%}."
+                ),
+            )
+            event.metric = MetricPoint(
+                metric_id=f"error_rate_{component.name.lower()}",
+                value=Decimal(str(round(error_rate, 4))),
+                unit="ratio",
+                labels={"component": component.name},
+                recorded_at=now,
+            )
+            return self._append_event(event)
+
+        return None
+
     # ------------------------------------------------------------------
     # 公開 API: 状態参照・緊急停止制御
     # ------------------------------------------------------------------
@@ -499,6 +584,14 @@ class MonitoringService:
             level=AlertLevel.EMERGENCY,
             code="EMERGENCY_STOP",
             message=reason,
+        )
+
+        # state.json に永続化（再起動後も緊急停止状態を維持するため）
+        self._sync_state_file(
+            health_factor=self._last_health_factor,
+            hf_triggered_emergency=True,
+            reason=reason,
+            now=now,
         )
 
         # Slack通知

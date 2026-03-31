@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/aave/router.py
 
 """
@@ -11,11 +13,11 @@ from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth.dependencies import require_admin
+from app.auth.dependencies import require_admin, require_viewer
 from app.auth.models import User
 
-from .schemas import AaveRebalanceRequest, AaveRebalanceResponse
-from .service import AaveService
+from .schemas import AaveMonitorStatus, AaveRebalanceRequest, AaveRebalanceResponse
+from .service import AaveService, MultiChainAaveService
 
 router = APIRouter(prefix="/aave", tags=["aave"])
 
@@ -32,6 +34,14 @@ def get_aave_service() -> AaveService:
     return AaveService()
 
 
+@lru_cache()
+def get_multi_chain_aave_service() -> MultiChainAaveService:
+    """
+    MultiChainAaveService のシングルトンインスタンスを取得する。
+    """
+    return MultiChainAaveService()
+
+
 @router.post(
     "/rebalance",
     response_model=AaveRebalanceResponse,
@@ -39,24 +49,29 @@ def get_aave_service() -> AaveService:
 )
 def rebalance(
     body: AaveRebalanceRequest,
-    service: AaveService = Depends(get_aave_service),
     current_user: User = Depends(require_admin),
+    multi_service: MultiChainAaveService = Depends(get_multi_chain_aave_service),
 ) -> AaveRebalanceResponse:
     """
     BUY/SELL/HOLD に応じて deposit / withdraw / NOOP を実行する。
 
-    - amount <= 0 の場合は 400
-    - サービス層の想定外エラーは 500
+    chain_name 未指定時はプライマリチェーン（arbitrum）を使用する。
     """
+    chain = body.chain_name or "arbitrum"
     try:
-        result = service.execute_rebalance(
+        result = multi_service.execute_rebalance(
+            chain_name=chain,
             action=body.action,
             amount=Decimal(body.amount),
             asset_symbol=body.asset_symbol,
             dry_run=body.dry_run,
         )
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     except ValueError as exc:
-        # バリデーションをすり抜けた異常値など
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
@@ -68,3 +83,57 @@ def rebalance(
         ) from exc
 
     return AaveRebalanceResponse(result=result)
+
+
+@router.get(
+    "/chains/health",
+    summary="全アクティブチェーンの Health Factor を取得する",
+)
+def get_chains_health(
+    current_user: User = Depends(require_viewer),
+    multi_service: MultiChainAaveService = Depends(get_multi_chain_aave_service),
+) -> dict[str, dict[str, str | None]]:
+    """全アクティブチェーンの Health Factor を一覧で返す。"""
+    health_factors = multi_service.get_all_health_factors()
+    return {
+        "chains": {name: str(hf) if hf is not None else None for name, hf in health_factors.items()}
+    }
+
+
+@router.get(
+    "/health-factor",
+    summary="Aave V3 Health Factor をリアルタイム取得する",
+)
+def get_health_factor(
+    current_user: User = Depends(require_viewer),
+) -> dict[str, str | None]:
+    """AAVE_CLIENT_TYPE に応じて HF をリアルタイム取得して返す。"""
+    from .monitor import get_health_factor as _get_hf  # noqa: PLC0415
+
+    hf = _get_hf()
+    return {"health_factor": str(hf) if hf is not None else None}
+
+
+@router.get(
+    "/status",
+    response_model=AaveMonitorStatus,
+    summary="Aave ポジション状態（HF + 残高）をリアルタイム取得する",
+)
+def get_monitor_status(
+    current_user: User = Depends(require_viewer),
+) -> AaveMonitorStatus:
+    """AAVE_CLIENT_TYPE に応じて HF + USDC/aUSDC 残高をリアルタイム取得して返す。"""
+    import os  # noqa: PLC0415
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    from .monitor import get_aave_balance  # noqa: PLC0415
+    from .monitor import get_health_factor as _get_hf  # noqa: PLC0415
+
+    hf = _get_hf()
+    balance = get_aave_balance()
+    return AaveMonitorStatus(
+        health_factor=hf,
+        balance=balance,
+        client_type=os.getenv("AAVE_CLIENT_TYPE", "dummy"),
+        fetched_at=datetime.now(timezone.utc).isoformat(),
+    )

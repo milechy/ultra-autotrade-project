@@ -1,0 +1,40 @@
+# ASH Configuration for Ultra AutoTrade
+# Updated: 2026-03-19
+fail_on_findings: false
+
+exclude_paths:
+  # Build artifacts & caches
+  - "**/.next/**"
+  - "**/.mypy_cache/**"
+  - "**/node_modules/**"
+  - "**/__pycache__/**"
+  - "**/.venv/**"
+  - "**/venv/**"
+  - "**/*.pyc"
+  - "**/dist/**"
+  - "**/.cache/**"
+  # OctoBot upstream (not our code)
+  - "octobot/**"
+  - "tentacles/**"
+  - "user/**"
+  - "**/layout.html"
+  # Test fixtures
+  - "tests/cassettes/**"
+  # ASH output
+  - ".ash/ash_output/**"
+  # Secrets baseline
+  - ".ash/.secrets.baseline"
+
+reporters:
+  junitxml:
+    enabled: false
+  ocsf:
+    enabled: false
+  unused-suppressions:
+    enabled: false
+
+reports:
+  formats:
+    - json
+    - markdown
+    - html

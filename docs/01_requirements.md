@@ -46,3 +46,29 @@
 - P2：自動化（監視・通知）
 - P3：管理画面
 - P4：高度分析・最適化
+## ユーザー運用モード（2026-03-23追加）
+
+### モード定義
+
+| UI表示 | user_mode | execution_policy | 動作 |
+|--------|-----------|------------------|------|
+| 完全おまかせ | `managed` | `auto_execute` | AI判定→リスクチェック→Aave自動実行→LINE通知 |
+| アクティブ | `active` | `require_approval` | AI判定→提案作成→ユーザー承認待ち→Aave実行 |
+| Pro（将来） | `pro` | `proposal_only` | AI判定→提案作成のみ（実行しない） |
+
+### 設計原則
+
+- `user_mode`（UI層）と `execution_policy`（オーケストレーション層）を分離
+- モード変更時に `execution_policy` は自動連動（API側で強制）
+- HF < 1.6 の緊急時は `execution_policy` に関わらず `auto_execute` 強制
+- 提案タイムアウト: 1時間経過で自動キャンセル
+
+### API
+
+- `GET /api/user/settings` — `user_mode`, `execution_policy` を返す
+- `PUT /api/user/settings` — `{ user_mode: "managed" | "active" }` でモード変更
+
+### オンボーディング
+
+- 初回: `/user/onboarding` でモード選択（2カード形式）
+- 選択後: `/user/dashboard` にリダイレクト

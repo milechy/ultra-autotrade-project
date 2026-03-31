@@ -1,24 +1,33 @@
+'use client'
+// Copyright (c) Ultra AutoTrade. All rights reserved.
+// Unauthorized copying or distribution is strictly prohibited.
+
 // frontend/lib/auth.ts
 /**
- * 認証状態管理。
+ * Authentication state management.
  *
- * - localStorage にトークンを保存
- * - useAuth フックで認証状態を取得
- * - AuthProvider でラップして使用
+ * - Stores token in localStorage
+ * - Exposes auth state via useAuth hook
+ * - Wrap component tree with AuthProvider to use
  *
- * セキュリティノート：
- * - localStorage を使用しているため XSS 攻撃に脆弱
- * - 本番環境では以下のいずれかを推奨：
+ * Security note:
+ * - Using localStorage is vulnerable to XSS attacks.
+ * - For production, one of the following is recommended:
  *   1. HttpOnly Cookie + SameSite=Strict
  *   2. In-Memory Token + Refresh Token (HttpOnly Cookie)
- * - 現状は CSP (Content Security Policy) で XSS リスクを緩和
+ * - Currently, XSS risk is mitigated via CSP (Content Security Policy).
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { login as apiLogin, getMe, logout as apiLogout, type UserResponse, type TokenResponse } from "./api/auth";
+import { login as apiLogin, getMe, logout as apiLogout, walletConnect, type UserResponse, type TokenResponse } from "./api/auth";
 
 const TOKEN_KEY = "ultra_auth_token";
 const TOKEN_EXPIRES_KEY = "ultra_auth_expires";
+
+/** ethers.Signer の signMessage だけを使う duck-typed interface */
+interface WalletSigner {
+  signMessage: (message: string | Uint8Array) => Promise<string>;
+}
 
 interface AuthContextType {
   user: UserResponse | null;
@@ -26,7 +35,8 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<UserResponse>;
+  loginWithWallet: (address: string, signer: WalletSigner) => Promise<UserResponse>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -38,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 初期化時にトークンを復元
+  // Restore token on initialization
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
     const expiresStr = localStorage.getItem(TOKEN_EXPIRES_KEY);
@@ -47,17 +57,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const expires = parseInt(expiresStr, 10);
       if (Date.now() < expires) {
         setToken(storedToken);
-        // ユーザー情報を取得
+        // Fetch user information
         getMe(storedToken)
           .then(setUser)
-          .catch(() => {
-            // トークンが無効な場合はクリア
-            clearAuth();
+          .catch((err: unknown) => {
+            const status = (err as { status?: number }).status
+            if (status === 401 || status === 403) {
+              clearAuth()
+            }
+            // Network error: keep token — user may still be authenticated
           })
           .finally(() => setIsLoading(false));
         return;
       }
-      // 期限切れの場合はクリア
+      // Clear auth if token is expired
       clearAuth();
     }
     setIsLoading(false);
@@ -74,20 +87,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const response: TokenResponse = await apiLogin({ email, password });
     const expiresAt = Date.now() + response.expires_in * 1000;
 
-    // トークンを一時保存（getMe 成功後に確定）
+    // Temporarily hold token (confirmed after getMe succeeds)
     const newToken = response.access_token;
 
     try {
-      // ユーザー情報を取得（トークン検証を兼ねる）
+      // Fetch user info (also validates the token)
       const userInfo = await getMe(newToken);
 
-      // 成功した場合のみ localStorage に保存
+      // Only save to localStorage on success
       localStorage.setItem(TOKEN_KEY, newToken);
       localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt));
       setToken(newToken);
       setUser(userInfo);
+      return userInfo;
     } catch (error) {
-      // getMe 失敗時はトークンを保存しない
+      // Do not save token if getMe fails
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(TOKEN_EXPIRES_KEY);
+      throw error;
+    }
+  }, []);
+
+  const loginWithWallet = useCallback(async (address: string, signer: WalletSigner) => {
+    const message = `Sign in to Ultra AutoTrade\nAddress: ${address}`;
+    const signature = await signer.signMessage(message);
+    const response = await walletConnect({ wallet_address: address, message, signature });
+    const expiresAt = Date.now() + response.expires_in * 1000;
+    const newToken = response.access_token;
+
+    try {
+      const userInfo = await getMe(newToken);
+      localStorage.setItem(TOKEN_KEY, newToken);
+      localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt));
+      setToken(newToken);
+      setUser(userInfo);
+      return userInfo;
+    } catch (error) {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(TOKEN_EXPIRES_KEY);
       throw error;
@@ -99,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         await apiLogout(token);
       } catch {
-        // ログアウト API が失敗してもローカルはクリア
+        // Clear local auth even if logout API call fails
       }
     }
     clearAuth();
@@ -120,9 +155,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     token,
     isLoading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!(user || token),
     isAdmin: user?.role === "admin",
     login,
+    loginWithWallet,
     logout,
     refresh,
   };
@@ -139,7 +175,7 @@ export function useAuth(): AuthContextType {
 }
 
 /**
- * トークンを直接取得（SSR 非対応）
+ * Retrieve stored token directly (not SSR-compatible)
  */
 export function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;

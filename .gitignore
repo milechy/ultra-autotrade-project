@@ -27,6 +27,10 @@ dist/
 build/
 *.egg-info/
 
+# Cython build artifacts
+*.so
+*.c
+
 # Database
 backend/data/
 *.db
@@ -52,3 +56,14 @@ phase*_seed_files.zip
 
 # Claude Code
 .mcp/
+
+# ASH Security Scanner output
+.ash/ash_output/
+.claude/settings.local.json
+.mypy_cache/
+
+# OctoBot user config (contains API tokens)
+user/config.json*
+
+# Claude settings backup (contains Slack tokens)
+.claude/settings.local.json.bak

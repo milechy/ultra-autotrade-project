@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/ai/schemas.py
 """
 /ai/analyze 用の Pydantic スキーマ定義。
@@ -92,6 +94,7 @@ class LLMProvider(str, Enum):
     CLAUDE = "claude"
     OPENAI = "openai"
     RULE_BASED = "rule_based"
+    CLAUDE_FALLBACK = "claude_fallback"  # Opus失敗時のSonnetフォールバック
 
 
 class LLMDecision(BaseModel):
@@ -104,6 +107,7 @@ class LLMDecision(BaseModel):
     confidence: int = Field(..., ge=0, le=100, description="信頼度スコア（0〜100）。")
     reason: Optional[str] = Field(None, description="判定理由の短い説明。")
     raw_response: Optional[str] = Field(None, description="LLM からの生レスポンス文字列。")
+    prompt_version: str = Field("v1", description="使用したプロンプトテンプレートのバージョン。")
 
 
 class CrossValidationResult(BaseModel):
@@ -121,6 +125,23 @@ class CrossValidationResult(BaseModel):
     final_action: TradeAction = Field(..., description="最終アクション（BUY / SELL / HOLD）。")
     final_confidence: int = Field(..., ge=0, le=100, description="最終信頼度スコア（0〜100）。")
     final_reason: Optional[str] = Field(None, description="最終判定理由。")
+    prompt_version: str = Field("v1", description="使用したプロンプトテンプレートのバージョン。")
+    shadow_mode: bool = Field(
+        False, description="Shadow Modeで記録された判定かどうか。True=実行しない。"
+    )
+
+
+class ShadowModeLog(BaseModel):
+    """Shadow Mode: 判定結果のログ記録（実行なし）"""
+
+    item_id: str = Field(..., description="判定対象のID")
+    action: TradeAction
+    confidence: int = Field(..., ge=0, le=100)
+    reason: Optional[str] = None
+    timestamp: datetime
+    prompt_version: str = Field("v1")
+    shadow_mode: bool = Field(True, description="常にTrue（Shadow Modeで記録されたことを示す）")
+    provider: Optional[str] = Field(None, description="判定に使ったLLMプロバイダー")
 
 
 class RAGContext(BaseModel):
@@ -134,3 +155,84 @@ class RAGContext(BaseModel):
     )
     query: str = Field(..., description="検索クエリ文字列。")
     source_count: int = Field(0, description="取得元ドキュメント数。")
+
+
+# ---------------------------------------------------------------------------
+# Trend / Analytics スキーマ（Stream S 追加分）
+# ---------------------------------------------------------------------------
+
+
+class ConfidenceDataPoint(BaseModel):
+    """信頼度トレンドの1データポイント。"""
+
+    timestamp: str = Field(..., description="ISO8601 日時文字列")
+    action: TradeAction = Field(..., description="BUY / SELL / HOLD")
+    confidence: float = Field(..., ge=0, le=100, description="信頼度 (0-100)")
+    prompt_version: str = Field("v1", description="プロンプトバージョン")
+
+
+class PromptVersionSummary(BaseModel):
+    """プロンプトバージョン別の平均信頼度サマリー。"""
+
+    version: str
+    avg_confidence: float
+    count: int
+
+
+class ConfidenceTrendResponse(BaseModel):
+    """GET /ai/trend/confidence のレスポンス。"""
+
+    data_points: List[ConfidenceDataPoint]
+    by_version: List[PromptVersionSummary]
+    is_mock: bool = Field(False, description="モックデータを返しているか")
+    total_count: int
+
+
+# ---------------------------------------------------------------------------
+# Sentiment History スキーマ（Stream U 追加分）
+# ---------------------------------------------------------------------------
+
+
+class SentimentLabel(str, Enum):
+    """センチメントラベル。"""
+
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
+    NEUTRAL = "neutral"
+
+
+class XPost(BaseModel):
+    """X（Twitter）投稿のサンプル。"""
+
+    post_id: str = Field(..., description="投稿ID（モックの場合は連番）")
+    text: str = Field(..., description="投稿テキスト")
+    sentiment: SentimentLabel = Field(..., description="このポストのセンチメント")
+    score: float = Field(
+        ...,
+        ge=-1.0,
+        le=1.0,
+        description="センチメントスコア（-1:完全ネガティブ〜+1:完全ポジティブ）",
+    )
+    created_at: str = Field(..., description="投稿時刻（ISO8601）")
+    likes: int = Field(0, ge=0, description="いいね数")
+
+
+class SentimentDataPoint(BaseModel):
+    """センチメント時系列の1データポイント。"""
+
+    timestamp: str = Field(..., description="ISO8601 日時文字列")
+    score: float = Field(..., ge=-1.0, le=1.0, description="センチメントスコア（-1〜+1）")
+    label: SentimentLabel = Field(..., description="positive/negative/neutral")
+    post_count: int = Field(0, ge=0, description="この時間帯の投稿数")
+    ai_action: Optional[TradeAction] = Field(None, description="この時点のAI判定アクション")
+
+
+class SentimentHistoryResponse(BaseModel):
+    """GET /ai/sentiment/history のレスポンス。"""
+
+    data_points: List[SentimentDataPoint] = Field(..., description="時系列データポイント")
+    latest_posts: List[XPost] = Field(default_factory=list, description="直近10件の投稿サンプル")
+    current_score: float = Field(..., ge=-1.0, le=1.0, description="現在のセンチメントスコア")
+    current_label: SentimentLabel = Field(..., description="現在のセンチメントラベル")
+    is_mock: bool = Field(False, description="モックデータを返しているか")
+    hours: int = Field(24, description="取得期間（時間）")

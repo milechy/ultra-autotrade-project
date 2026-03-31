@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/app/aave/schemas.py
 
 """
@@ -13,7 +15,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from app.ai.schemas import TradeAction
 
@@ -71,6 +73,14 @@ class AaveSystemState(BaseModel):
     )
 
     model_config = ConfigDict()
+
+    @field_validator("health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Aave V3 ではポジションがないと HF=∞ を返す。Pydantic の finite_number 制約を回避するため 999.0 に丸める。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
 
     @field_serializer("health_factor")
     @classmethod
@@ -130,6 +140,10 @@ class AaveRebalanceRequest(BaseModel):
             "実行されるであろう結果のみを返す。"
         ),
     )
+    chain_name: Optional[str] = Field(
+        None,
+        description="対象チェーン名。未指定時はプライマリチェーン（arbitrum）を使用する。",
+    )
 
 
 class AaveOperationResult(BaseModel):
@@ -167,6 +181,18 @@ class AaveOperationResult(BaseModel):
         ge=0,
         description="操作後のヘルスファクター（取得できなかった場合は None）。",
     )
+    chain_name: Optional[str] = Field(
+        None,
+        description="操作が実行されたチェーン名。",
+    )
+
+    @field_validator("before_health_factor", "after_health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Aave V3 ではポジションがないと HF=∞ を返す。finite_number 制約を回避するため 999.0 に丸める。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
 
 
 class AaveRebalanceResponse(BaseModel):
@@ -178,3 +204,40 @@ class AaveRebalanceResponse(BaseModel):
         ...,
         description="今回のリバランスで行われた操作結果。",
     )
+
+
+class AaveBalanceInfo(BaseModel):
+    """ウォレットの Aave 関連残高情報。"""
+
+    wallet_address: str = Field(description="監視対象のウォレットアドレス。")
+    usdc_balance: Decimal = Field(ge=0, description="USDC 残高（人間単位）。")
+    a_usdc_balance: Decimal = Field(ge=0, description="aUSDC 残高（人間単位）。")
+
+    @field_serializer("usdc_balance", "a_usdc_balance")
+    @classmethod
+    def _serialize_decimal(cls, v: Decimal) -> str:
+        return str(v)
+
+
+class AaveMonitorStatus(BaseModel):
+    """GET /aave/status のレスポンス。"""
+
+    health_factor: Optional[Decimal] = Field(
+        None, description="最新の Health Factor。取得失敗時は None。"
+    )
+    balance: AaveBalanceInfo = Field(description="USDC / aUSDC 残高。")
+    client_type: str = Field(description="AAVE_CLIENT_TYPE 環境変数の値。")
+    fetched_at: str = Field(description="取得日時 (ISO 8601)。")
+
+    @field_validator("health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Aave V3 ではポジションがないと HF=∞ を返す。finite_number 制約を回避するため 999.0 に丸める。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
+
+    @field_serializer("health_factor")
+    @classmethod
+    def _serialize_hf(cls, v: Optional[Decimal]) -> Optional[str]:
+        return str(v) if v is not None else None

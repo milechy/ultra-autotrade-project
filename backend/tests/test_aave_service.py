@@ -1,3 +1,5 @@
+# Copyright (c) Ultra AutoTrade. All rights reserved.
+# Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_aave_service.py
 
 from datetime import datetime, timedelta, timezone
@@ -949,3 +951,111 @@ def test_retry_throttle_recovery_after_interval() -> None:
         finally:
             if "AAVE_STATE_FILE_PATH" in os.environ:
                 del os.environ["AAVE_STATE_FILE_PATH"]
+
+
+# ---------------------------------------------------------------------------
+# Health Factor Infinity バリデーターのテスト
+# ---------------------------------------------------------------------------
+
+
+class TestHealthFactorInfinityValidators:
+    """Aave V3 が返す HF=∞ を Pydantic スキーマが 999.0 に変換することを確認するテスト群。"""
+
+    def test_aave_system_state_infinity_to_999(self):
+        from decimal import Decimal
+
+        from app.aave.schemas import AaveSystemState
+
+        state = AaveSystemState(
+            emergency_stop=False,
+            mode="normal",
+            health_factor=Decimal("Infinity"),
+            last_update=datetime.now(timezone.utc),
+            circuit_closed=True,
+        )
+        assert state.health_factor == Decimal("999.0")
+
+    def test_aave_system_state_none_preserved(self):
+        from app.aave.schemas import AaveSystemState
+
+        state = AaveSystemState(
+            emergency_stop=False,
+            mode="normal",
+            health_factor=None,
+            last_update=datetime.now(timezone.utc),
+            circuit_closed=True,
+        )
+        assert state.health_factor is None
+
+    def test_aave_operation_result_before_after_infinity(self):
+        from decimal import Decimal
+
+        from app.aave.schemas import (
+            AaveOperationResult,
+            AaveOperationStatus,
+            AaveOperationType,
+        )
+
+        result = AaveOperationResult(
+            operation=AaveOperationType.NOOP,
+            status=AaveOperationStatus.SKIPPED,
+            asset_symbol="USDC",
+            amount=Decimal("0"),
+            before_health_factor=Decimal("Infinity"),
+            after_health_factor=Decimal("Infinity"),
+        )
+        assert result.before_health_factor == Decimal("999.0")
+        assert result.after_health_factor == Decimal("999.0")
+
+    def test_aave_monitor_status_infinity(self):
+        from decimal import Decimal
+
+        from app.aave.schemas import AaveBalanceInfo, AaveMonitorStatus
+
+        status = AaveMonitorStatus(
+            health_factor=Decimal("Infinity"),
+            balance=AaveBalanceInfo(
+                wallet_address="0x1234",
+                usdc_balance=Decimal("0"),
+                a_usdc_balance=Decimal("0"),
+            ),
+            client_type="dummy",
+            fetched_at="2026-01-01T00:00:00Z",
+        )
+        assert status.health_factor == Decimal("999.0")
+
+    def test_health_factor_status_infinity(self):
+        from decimal import Decimal
+
+        from app.automation.schemas import AlertLevel, HealthFactorStatus
+
+        hf_status = HealthFactorStatus(
+            current=Decimal("Infinity"),
+            level=AlertLevel.INFO,
+            is_emergency=False,
+        )
+        assert hf_status.current == Decimal("999.0")
+
+    def test_automation_status_last_hf_infinity(self):
+        from decimal import Decimal
+
+        from app.automation.schemas import AlertLevel, AutomationStatus
+
+        status = AutomationStatus(
+            is_trading_paused=False,
+            last_health_factor=Decimal("Infinity"),
+            last_event_level=AlertLevel.INFO,
+        )
+        assert status.last_health_factor == Decimal("999.0")
+
+    def test_finite_hf_unchanged(self):
+        from decimal import Decimal
+
+        from app.automation.schemas import AlertLevel, HealthFactorStatus
+
+        hf_status = HealthFactorStatus(
+            current=Decimal("1.85"),
+            level=AlertLevel.INFO,
+            is_emergency=False,
+        )
+        assert hf_status.current == Decimal("1.85")
