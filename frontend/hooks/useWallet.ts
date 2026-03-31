@@ -112,6 +112,56 @@ export function useWallet() {
     }
   }, [])
 
+  const switchToBase = useCallback(async () => {
+    if (typeof window === 'undefined' || !window.ethereum) return
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x2105' }], // Base = 8453
+      })
+    } catch {
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId: '0x2105',
+          chainName: 'Base',
+          rpcUrls: ['https://mainnet.base.org'],
+          nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+          blockExplorerUrls: ['https://basescan.org'],
+        }],
+      })
+    }
+  }, [])
+
+  const switchToOptimism = useCallback(async () => {
+    if (typeof window === 'undefined' || !window.ethereum) return
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0xa' }], // Optimism = 10
+      })
+    } catch {
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId: '0xa',
+          chainName: 'Optimism',
+          rpcUrls: ['https://mainnet.optimism.io'],
+          nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+          blockExplorerUrls: ['https://optimistic.etherscan.io'],
+        }],
+      })
+    }
+  }, [])
+
+  const switchToMainnet = useCallback(async () => {
+    if (typeof window === 'undefined' || !window.ethereum) return
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: '0x1' }], // Ethereum Mainnet = 1
+    })
+  }, [])
+
   return {
     address: address ?? null,
     chainId: chainId ?? null,
@@ -122,6 +172,9 @@ export function useWallet() {
     switchToArbitrum,
     switchToArbitrumSepolia,
     switchToBaseSepolia,
+    switchToBase,
+    switchToOptimism,
+    switchToMainnet,
     provider,
     signer,
   }

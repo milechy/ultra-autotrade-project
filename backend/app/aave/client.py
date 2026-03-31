@@ -337,7 +337,19 @@ class Web3AaveClient(AaveClientBase):
             effective_rpc_url = rpc_url
             effective_pool_address = pool_address
 
-        self._w3 = Web3(Web3.HTTPProvider(effective_rpc_url))
+        # RPCProvider でフェイルオーバーを有効化
+        _secondary_url: Optional[str] = None
+        if settings is not None:
+            _secondary_url = getattr(settings, "rpc_url_secondary", None)
+        from .rpc_provider import RPCProvider  # noqa: PLC0415
+
+        self._rpc_provider = RPCProvider(effective_rpc_url, _secondary_url, web3_cls=Web3)
+        try:
+            self._w3 = self._rpc_provider.get_web3()
+        except ConnectionError as exc:
+            raise AaveClientError(
+                f"RPC に接続できません: {effective_rpc_url[:20]}..."
+            ) from exc  # URLを切り詰めてログ
         if not self._w3.is_connected():
             raise AaveClientError(
                 f"RPC に接続できません: {effective_rpc_url[:20]}..."

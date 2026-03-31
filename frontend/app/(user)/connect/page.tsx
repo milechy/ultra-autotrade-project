@@ -9,9 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useWallet } from '@/hooks/useWallet'
 import { useAuth } from '@/lib/auth'
 import { useMinimumBalance } from '@/hooks/useMinimumBalance'
-
-// Arbitrum One (mainnet), Arbitrum Sepolia (testnet), and Base Sepolia (testnet)
-const ARBITRUM_CHAIN_IDS = [42161, 421614, 84532]
+import { ARBITRUM_CHAIN_IDS } from '@/lib/web3/config'
 
 const STEP_LABELS = [
   'ウォレット接続',
@@ -65,7 +63,7 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 export default function ConnectPage() {
   const router = useRouter()
   const { loginWithWallet } = useAuth()
-  const { address, isConnected, chainId, connect, switchToArbitrum, switchToArbitrumSepolia, switchToBaseSepolia, signer } = useWallet()
+  const { address, isConnected, chainId, connect, switchToArbitrum, switchToArbitrumSepolia, switchToBaseSepolia, switchToBase, switchToOptimism, switchToMainnet, signer } = useWallet()
   const { checkMinimum, minimumUSD } = useMinimumBalance()
 
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -170,7 +168,7 @@ export default function ConnectPage() {
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
                     <span className="text-sm text-emerald-400 font-medium">
-                      テストネットに接続済み
+                      対応ネットワークに接続済み
                     </span>
                   </div>
                 ) : (
@@ -178,16 +176,17 @@ export default function ConnectPage() {
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="h-5 w-5 text-yellow-400 shrink-0 mt-0.5" />
                       <p className="text-sm text-yellow-300">
-                        テストネット（Base Sepolia / Arbitrum Sepolia）に切り替えてください
+                        対応ネットワークに切り替えてください
                       </p>
                     </div>
+                    <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wide">テストネット</p>
                     <Button
                       variant="outline"
                       size="sm"
                       className="w-full border-blue-600 text-blue-400 hover:bg-blue-950/40"
                       onClick={switchToBaseSepolia}
                     >
-                      Base Sepolia (testnet) に切り替える
+                      Base Sepolia (テスト用) に切り替える
                     </Button>
                     <Button
                       variant="outline"
@@ -195,7 +194,16 @@ export default function ConnectPage() {
                       className="w-full border-yellow-600 text-yellow-400 hover:bg-yellow-950/40"
                       onClick={switchToArbitrumSepolia}
                     >
-                      Arbitrum Sepolia (testnet) に切り替える
+                      Arbitrum Sepolia (テスト用) に切り替える
+                    </Button>
+                    <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wide pt-1">メインネット</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-zinc-600 text-zinc-400 hover:bg-zinc-800/40"
+                      onClick={switchToBase}
+                    >
+                      Base に切り替える
                     </Button>
                     <Button
                       variant="outline"
@@ -203,7 +211,23 @@ export default function ConnectPage() {
                       className="w-full border-zinc-600 text-zinc-400 hover:bg-zinc-800/40"
                       onClick={switchToArbitrum}
                     >
-                      Arbitrum One (mainnet) に切り替える
+                      Arbitrum One に切り替える
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-zinc-600 text-zinc-400 hover:bg-zinc-800/40"
+                      onClick={switchToOptimism}
+                    >
+                      Optimism に切り替える
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-zinc-600 text-zinc-400 hover:bg-zinc-800/40"
+                      onClick={switchToMainnet}
+                    >
+                      Ethereum に切り替える
                     </Button>
                   </div>
                 )}

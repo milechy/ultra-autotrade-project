@@ -62,20 +62,41 @@ export const SUPPORTED_CHAINS = {
     name: 'Base Sepolia',
     rpc: process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC || 'https://sepolia.base.org',
   },
+  base: {
+    id: 8453,
+    name: 'Base',
+    rpc: process.env.NEXT_PUBLIC_BASE_RPC || 'https://mainnet.base.org',
+  },
+  optimism: {
+    id: 10,
+    name: 'Optimism',
+    rpc: process.env.NEXT_PUBLIC_OPTIMISM_RPC || 'https://mainnet.optimism.io',
+  },
+  mainnet: {
+    id: 1,
+    name: 'Ethereum',
+    rpc: process.env.NEXT_PUBLIC_MAINNET_RPC || 'https://cloudflare-eth.com',
+  },
 } as const
 
 export type SupportedChainKey = keyof typeof SUPPORTED_CHAINS
+export type AaveChainKey = keyof typeof AAVE_V3_ADDRESSES
 export type SupportedToken = keyof typeof TOKEN_ADDRESSES.arbitrum
 
 export const DEFAULT_CHAIN: SupportedChainKey =
   (process.env.NEXT_PUBLIC_DEFAULT_CHAIN as SupportedChainKey) || 'base-sepolia'
 
 export const MINIMUM_USD_BALANCE = 3000
-export const ARBITRUM_CHAIN_IDS = [42161, 421614, 84532]
+
+// Supported chain IDs (testnet + mainnet)
+export const ARBITRUM_CHAIN_IDS = [42161, 421614, 84532, 8453, 10, 1]
 
 export function getChainKey(chainId: number): SupportedChainKey | null {
   if (chainId === 42161) return 'arbitrum'
   if (chainId === 421614) return 'arbitrum-sepolia'
   if (chainId === 84532) return 'base-sepolia'
+  if (chainId === 8453) return 'base'
+  if (chainId === 10) return 'optimism'
+  if (chainId === 1) return 'mainnet'
   return null
 }

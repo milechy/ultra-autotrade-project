@@ -47,6 +47,7 @@ class AaveSettings:
     wallet_private_key: Optional[str] = None
     usdc_address: Optional[str] = None
     flashbots_rpc_url: Optional[str] = None
+    rpc_url_secondary: Optional[str] = None
     chain_name: Optional[str] = None
 
 
@@ -115,6 +116,7 @@ def get_aave_settings() -> AaveSettings:
 
     # RPC URL と秘密鍵は任意（staging 環境用）
     rpc_url = get_env("AAVE_RPC_URL", required=False)
+    rpc_url_secondary = get_env("AAVE_RPC_URL_SECONDARY", required=False)
     private_key = get_env("AAVE_PRIVATE_KEY_STAGING", required=False)
 
     # 動作モードと状態ファイル設定
@@ -156,6 +158,7 @@ def get_aave_settings() -> AaveSettings:
         wallet_private_key=wallet_private_key,
         usdc_address=usdc_address,
         flashbots_rpc_url=flashbots_rpc_url,
+        rpc_url_secondary=rpc_url_secondary,
     )
 
 

@@ -5,7 +5,7 @@ import { useCallback } from 'react'
 import { ethers } from 'ethers'
 import { toast } from 'sonner'
 import { useWallet } from './useWallet'
-import { AAVE_V3_ADDRESSES, TOKEN_ADDRESSES, getChainKey, SupportedToken } from '@/lib/web3/config'
+import { AAVE_V3_ADDRESSES, TOKEN_ADDRESSES, getChainKey, SupportedToken, AaveChainKey } from '@/lib/web3/config'
 import { AAVE_POOL_ABI } from '@/lib/web3/abi/aavePool'
 import { ERC20_ABI } from '@/lib/web3/abi/erc20'
 import type { AaveUserAccountData, InterestRateMode } from '@/types/web3'
@@ -16,15 +16,15 @@ export function useAaveV3() {
   const getPoolContract = useCallback(() => {
     if (!signer || !chainId) throw new Error('ウォレット未接続')
     const chainKey = getChainKey(chainId)
-    if (!chainKey) throw new Error('非対応ネットワーク')
-    const poolAddress = AAVE_V3_ADDRESSES[chainKey].Pool
+    if (!chainKey || !(chainKey in AAVE_V3_ADDRESSES)) throw new Error('このネットワークはAave V3未対応')
+    const poolAddress = AAVE_V3_ADDRESSES[chainKey as AaveChainKey].Pool
     return new ethers.Contract(poolAddress, AAVE_POOL_ABI, signer)
   }, [signer, chainId])
 
   const getTokenAddress = useCallback((token: SupportedToken): string => {
     const chainKey = getChainKey(chainId ?? 0)
-    if (!chainKey) throw new Error('非対応ネットワーク')
-    return TOKEN_ADDRESSES[chainKey][token]
+    if (!chainKey || !(chainKey in TOKEN_ADDRESSES)) throw new Error('非対応ネットワーク')
+    return TOKEN_ADDRESSES[chainKey as AaveChainKey][token]
   }, [chainId])
 
   const getUserAccountData = useCallback(async (userAddress?: string): Promise<AaveUserAccountData> => {
@@ -46,8 +46,8 @@ export function useAaveV3() {
     if (!signer || !chainId) throw new Error('ウォレット未接続')
     const tokenAddress = getTokenAddress(token)
     const chainKey = getChainKey(chainId)
-    if (!chainKey) throw new Error('非対応ネットワーク')
-    const poolAddress = AAVE_V3_ADDRESSES[chainKey].Pool
+    if (!chainKey || !(chainKey in AAVE_V3_ADDRESSES)) throw new Error('このネットワークはAave V3未対応')
+    const poolAddress = AAVE_V3_ADDRESSES[chainKey as AaveChainKey].Pool
     const erc20 = new ethers.Contract(tokenAddress, ERC20_ABI, signer)
     try {
       const tx = await erc20.approve(poolAddress, amount)

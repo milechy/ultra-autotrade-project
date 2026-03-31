@@ -5,11 +5,11 @@
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.automation.router import _compute_next_scheduled_run, router as automation_router
+from app.automation.router import _compute_next_scheduled_run
+from app.automation.router import router as automation_router
 from app.automation.schemas import AutomationStatus
 from app.automation.state import get_monitoring_service
 from app.database import get_db
