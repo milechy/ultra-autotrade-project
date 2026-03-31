@@ -8,7 +8,6 @@ This test verifies that the AI module imports correctly in both cases.
 
 import importlib
 import os
-import sys
 
 
 class TestAIModuleImports:
