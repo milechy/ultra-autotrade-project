@@ -1,0 +1,18 @@
+# Cloudflare Named Tunnel 設定ファイル
+#
+# 使用前に以下を実施:
+#   1. Hetzner VPS で `cloudflared tunnel create ultra-autotrade` を実行
+#   2. <TUNNEL_ID> を実際の Tunnel ID に置換
+#   3. credentials-file パスを確認
+#
+# 参照: docs/32_named_tunnel_migration.md
+
+tunnel: <TUNNEL_ID>
+credentials-file: /root/.cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  - hostname: api.ultra-autotrade.com
+    service: http://localhost:8000
+  - hostname: app.ultra-autotrade.com
+    service: http://localhost:3000
+  - service: http_status:404
