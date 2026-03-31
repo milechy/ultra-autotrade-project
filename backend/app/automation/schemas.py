@@ -176,6 +176,10 @@ class AutomationStatus(BaseModel):
         default_factory=list,
         description="最近のイベント。件数は MonitoringService 側で制御する。",
     )
+    next_scheduled_run: Optional[datetime] = Field(
+        None,
+        description="次回AI判定スケジューラー実行予定時刻（UTC）",
+    )
 
     @field_validator("last_health_factor", mode="before")
     @classmethod
