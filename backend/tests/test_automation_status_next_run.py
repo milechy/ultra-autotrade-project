@@ -70,14 +70,14 @@ class TestComputeNextScheduledRun:
 
     def test_next_run_calculation(self):
         """last_decision + interval_hours = next_run の計算が正しいこと。"""
-        last_decision_time = datetime(2026, 3, 31, 10, 0, 0, tzinfo=timezone.utc)
+        last_decision_time = datetime(2099, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
         mock_db = MagicMock()
         mock_db.scalars.return_value.first.return_value = last_decision_time
 
         with patch.dict("os.environ", {"AI_JUDGMENT_INTERVAL_HOURS": "4"}):
             result = _compute_next_scheduled_run(mock_db)
 
-        expected = datetime(2026, 3, 31, 14, 0, 0, tzinfo=timezone.utc)
+        expected = datetime(2099, 1, 1, 14, 0, 0, tzinfo=timezone.utc)
         assert result == expected
 
     def test_next_run_none_when_no_decisions(self):
@@ -105,7 +105,7 @@ class TestComputeNextScheduledRun:
 
     def test_next_run_naive_datetime_becomes_utc(self):
         """naive datetime (tzinfo=None) が渡された場合も UTC として扱われること。"""
-        naive_time = datetime(2026, 3, 31, 10, 0, 0)  # no tzinfo
+        naive_time = datetime(2099, 1, 1, 10, 0, 0)  # no tzinfo
         mock_db = MagicMock()
         mock_db.scalars.return_value.first.return_value = naive_time
 
@@ -114,5 +114,5 @@ class TestComputeNextScheduledRun:
 
         assert result is not None
         assert result.tzinfo is not None
-        expected = datetime(2026, 3, 31, 14, 0, 0, tzinfo=timezone.utc)
+        expected = datetime(2099, 1, 1, 14, 0, 0, tzinfo=timezone.utc)
         assert result == expected
