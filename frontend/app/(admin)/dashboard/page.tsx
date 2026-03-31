@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { fetchExchangeStatus } from "@/lib/api/exchange";
 
 export default function DashboardPage() {
   const { token } = useAuth();
@@ -11,7 +12,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!token) return;
-    
+
     fetch("/api/automation/status", {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -26,10 +27,7 @@ export default function DashboardPage() {
       .then((d) => setHf(d.health_factor ?? "—"))
       .catch(() => setHf("取得失敗"));
 
-    fetch("/exchange/status", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.json())
+    fetchExchangeStatus(token)
       .then((d) => setTrades(`${d.daily_trades_used ?? 0}件`))
       .catch(() => setTrades("取得失敗"));
   }, [token]);
