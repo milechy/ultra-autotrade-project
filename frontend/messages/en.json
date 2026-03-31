@@ -108,7 +108,18 @@
     "requestedAt": "Requested At",
     "expiresAt": "Expires At",
     "confirmApprove": "Approve this trade?",
-    "confirmReject": "Reject this trade?"
+    "confirmReject": "Reject this trade?",
+    "emptyState": {
+      "title": "No pending proposals",
+      "aiStatus": "AI Judgment Status",
+      "latestDecision": "Latest AI Judgment",
+      "nextRun": "Next AI Judgment",
+      "nextRunCalculating": "Calculating",
+      "nextRunSoon": "Running soon",
+      "nextRunHoursLater": "In about {hours} hour(s) (runs every 4 hours)",
+      "description": "AI is analyzing the market. A proposal will be created when a BUY or SELL judgment is made. No proposal is created for HOLD judgments.",
+      "noDecisionYet": "No AI judgment has been run yet"
+    }
   },
   "History": {
     "title": "Trade History",

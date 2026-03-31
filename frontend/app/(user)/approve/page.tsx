@@ -3,11 +3,11 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { apiFetch, apiPost } from '@/lib/api/client'
 import { useAuth } from '@/lib/auth'
+import { EmptyStateWithAIStatus } from '@/components/approve/EmptyStateWithAIStatus'
 import {
   ProposalCard,
   RecentApprovals,
@@ -186,11 +186,7 @@ export default function ApprovePage() {
 
         {/* Proposal list */}
         {proposals.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
-            <Clock className="h-10 w-10 opacity-40" />
-            <p className="text-sm font-medium">承認待ちの提案はありません</p>
-            <p className="text-xs">AIが新しい提案を作成するとここに表示されます</p>
-          </div>
+          <EmptyStateWithAIStatus />
         ) : (
           <div className="space-y-4">
             {proposals.map((proposal) => {
