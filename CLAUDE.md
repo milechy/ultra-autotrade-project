@@ -223,3 +223,13 @@ curl -s -X POST "$WEBHOOK" \
 - **Cursor**: 廃止（Agent Teamsに統合）
 - **Slack #ultra-auto-project**: 完了通知・CI・承認リクエスト
 - **Asana**: タスク管理（プロジェクトGID: 1213741124336104）
+
+## Skills & Hooks
+
+### スキル（.claude/skills/）
+- single-function-edit.md — 1回1関数ルール
+- pre-commit-diff.md — コミット前diff確認
+
+### フック
+- pre-large-edit.sh (PreToolUse) — 50行超の変更を警告
+- post-commit-diff.sh (PostToolUse) — コミット時にdiff表示
