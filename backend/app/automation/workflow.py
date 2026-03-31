@@ -293,6 +293,9 @@ class _SingleItemResult:
 
 def check_rule_engine(
     monitoring_service: Optional[MonitoringService] = None,
+    *,
+    daily_traded_usd: Optional[Decimal] = None,
+    total_assets_usd: Optional[Decimal] = None,
 ) -> Tuple[bool, str]:
     """Check rule engine constraints before LLM call.
 
@@ -301,7 +304,8 @@ def check_rule_engine(
 
     Check order (most specific first):
     1. HF below threshold (hf_below_threshold)
-    2. Generic emergency stop (emergency_stop)
+    2. Daily 30% limit reached (daily_limit_reached)
+    3. Generic emergency stop (emergency_stop)
     """
     if monitoring_service is None:
         return True, "no_monitoring"
@@ -310,6 +314,16 @@ def check_rule_engine(
     if status.last_health_factor is not None:
         if status.last_health_factor < Decimal("1.6"):
             return False, "hf_below_threshold"
+
+    # Execution Order #3: daily limit 30% reached? → HOLD
+    if (
+        daily_traded_usd is not None
+        and total_assets_usd is not None
+        and total_assets_usd > Decimal("0")
+    ):
+        daily_limit = total_assets_usd * Decimal("30") / Decimal("100")
+        if daily_traded_usd >= daily_limit:
+            return False, "daily_limit_reached"
 
     if not monitoring_service.is_trading_allowed():
         return False, "emergency_stop"

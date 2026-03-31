@@ -21,7 +21,7 @@ import json
 import logging
 import os
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Optional
 
@@ -197,6 +197,10 @@ class RebalanceService:
         self._db_session_factory = db_session_factory
         self._risk_profile_manager = RiskProfileManager()
 
+        # Daily trade tracking (UTC date reset)
+        self._daily_traded_usd: Decimal = Decimal("0")
+        self._daily_reset_date: date = datetime.now(timezone.utc).date()
+
     # ---- Internal helpers --------------------------------------------------
 
     def _now(self) -> datetime:
@@ -223,6 +227,14 @@ class RebalanceService:
         elapsed = (now - last).total_seconds()
         remaining = self._rb_settings.cooldown_seconds - elapsed
         return max(0, int(remaining))
+
+    def _get_daily_traded_usd(self, now: datetime) -> Decimal:
+        """Return total USD traded today (UTC). Resets at UTC midnight."""
+        today = now.date()
+        if today != self._daily_reset_date:
+            self._daily_traded_usd = Decimal("0")
+            self._daily_reset_date = today
+        return self._daily_traded_usd
 
     def _resolve_risk_mode(self, user_id: Optional[str], fallback: str = "conservative") -> str:
         """
@@ -439,6 +451,19 @@ class RebalanceService:
                         f"amount {op.amount_usd} USD exceeds 10% of total assets "
                         f"({max_single_usd} USD)"
                     )
+
+        # Daily trade cap: 30% of total assets (CLAUDE.md Security Rule #4)
+        if total_usd > _MIN_TOTAL_USD:
+            daily_limit_usd = total_usd * Decimal("30") / Decimal("100")
+            now_for_daily = datetime.now(timezone.utc)
+            daily_traded = self._get_daily_traded_usd(now_for_daily)
+            total_ops_usd = sum(op.amount_usd for op in operations)
+            if daily_traded + total_ops_usd > daily_limit_usd:
+                reasons.append(
+                    f"Daily trade limit reached: {daily_traded + total_ops_usd} USD would exceed "
+                    f"30% of total assets ({daily_limit_usd} USD). "
+                    f"Already traded today: {daily_traded} USD"
+                )
 
         return reasons
 
@@ -854,13 +879,18 @@ class RebalanceService:
             final_status.value,
         )
 
-        # 8. Update _last_rebalance_at
+        # 8. Update _last_rebalance_at and daily traded amount
         if final_status in (RebalanceExecutionStatus.SUCCESS, RebalanceExecutionStatus.PARTIAL):
             self._last_rebalance_at = executed_at
             logger.info(
                 "execute: updated _last_rebalance_at to %s",
                 executed_at.isoformat(),
             )
+            # Update daily traded amount
+            from app.aave.schemas import AaveOperationStatus as _AOS  # noqa: PLC0415
+
+            total_executed_usd = sum(r.amount for r in executed_results if r.status == _AOS.SUCCESS)
+            self._daily_traded_usd = self._get_daily_traded_usd(executed_at) + total_executed_usd
 
         # 9. Remove from pending
         self._pending_proposals.pop(proposal_id, None)
