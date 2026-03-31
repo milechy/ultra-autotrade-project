@@ -101,7 +101,7 @@ export function EmptyStateWithAIStatus() {
                 <div className="flex items-center gap-2">
                   <ActionBadge action={decision.action} />
                   <span className="text-muted-foreground">
-                    ({Math.round(decision.confidence * 100)}%)
+                    ({decision.confidence}%)
                   </span>
                   <span className="text-muted-foreground">{formatDate(decision.created_at)}</span>
                 </div>

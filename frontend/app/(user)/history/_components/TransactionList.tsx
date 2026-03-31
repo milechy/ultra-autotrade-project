@@ -28,7 +28,7 @@ export interface Transaction {
   amountUSD: number
   status: TransactionStatus
   txHash: string
-  chain: 'arbitrum' | 'base' | 'ethereum'
+  chain: 'arbitrum' | 'arbitrum-sepolia' | 'base' | 'base-sepolia' | 'ethereum'
   timestamp: string
 }
 

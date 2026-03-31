@@ -6,15 +6,17 @@ import { ExternalLink } from 'lucide-react'
 
 export interface TxHashLinkProps {
   hash: string
-  chain?: 'arbitrum' | 'base' | 'ethereum'
+  chain?: 'arbitrum' | 'arbitrum-sepolia' | 'base' | 'base-sepolia' | 'ethereum'
   truncate?: boolean
 }
 
-const explorerBaseUrl = {
+const explorerBaseUrl: Record<string, string> = {
   arbitrum: 'https://arbiscan.io/tx',
+  'arbitrum-sepolia': 'https://sepolia.arbiscan.io/tx',
   base: 'https://basescan.org/tx',
+  'base-sepolia': 'https://sepolia.basescan.org/tx',
   ethereum: 'https://etherscan.io/tx',
-} as const
+}
 
 function truncateHash(hash: string): string {
   if (hash.length <= 12) return hash
@@ -22,7 +24,7 @@ function truncateHash(hash: string): string {
 }
 
 export function TxHashLink({ hash, chain = 'arbitrum', truncate = true }: TxHashLinkProps) {
-  const url = `${explorerBaseUrl[chain]}/${hash}`
+  const url = `${explorerBaseUrl[chain] ?? explorerBaseUrl['arbitrum']}/${hash}`
   const display = truncate ? truncateHash(hash) : hash
 
   return (
