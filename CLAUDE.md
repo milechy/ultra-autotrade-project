@@ -57,6 +57,11 @@ Based on:
 4. `pytest tests/ --cov=app --cov-fail-under=80 -q` — 全テスト通過 + coverage 80%+
 5. `ruff check . --select S` — セキュリティ警告の確認（新規の critical なし）
 
+### 一括検証（コミット前に必ず実行）
+```bash
+./scripts/verify.sh
+```
+
 ### Core Principles (3つのみ)
 
 1. **Simplicity First** — 最小限の変更で目的を達成する。過剰な抽象化・将来対応は不要
