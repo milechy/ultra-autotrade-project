@@ -3,8 +3,9 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useEffect, useState } from 'react'
-import { Clock, AlertCircle } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
 import {
   PortfolioSummary,
   PositionList,
@@ -17,10 +18,57 @@ import { apiFetch } from '@/lib/api/client'
 // ---- Types ----
 
 type UserMode = 'managed' | 'active' | 'pro'
+type RiskMode = 'conservative' | 'balanced' | 'aggressive'
 
 interface UserSettings {
   user_mode: UserMode
   execution_policy?: string
+}
+
+interface RiskModeData {
+  mode: RiskMode
+}
+
+const RISK_MODE_DISPLAY: Record<RiskMode, { label: string; badgeLabel: string; className: string }> = {
+  conservative: {
+    label: '保守的',
+    badgeLabel: '保守モード運用中',
+    className: 'border-emerald-500/50 bg-emerald-950/30 text-emerald-400',
+  },
+  balanced: {
+    label: 'バランス',
+    badgeLabel: 'バランスモード運用中',
+    className: 'border-blue-500/50 bg-blue-950/30 text-blue-400',
+  },
+  aggressive: {
+    label: '積極的',
+    badgeLabel: '積極モード運用中',
+    className: 'border-orange-500/50 bg-orange-950/30 text-orange-400',
+  },
+}
+
+// ---- RiskModeBadge ----
+
+function RiskModeBadge() {
+  const [riskMode, setRiskMode] = useState<RiskMode | null>(null)
+
+  useEffect(() => {
+    apiFetch<RiskModeData>('/auth/risk-mode')
+      .then((data) => setRiskMode(data.mode))
+      .catch(() => {/* silently ignore */})
+  }, [])
+
+  if (!riskMode) return null
+
+  const display = RISK_MODE_DISPLAY[riskMode]
+  return (
+    <Badge
+      variant="outline"
+      className={display.className}
+    >
+      {display.badgeLabel}
+    </Badge>
+  )
 }
 
 interface Transaction {
@@ -113,10 +161,13 @@ function RecentOpsCard() {
 function ManagedDashboard() {
   return (
     <div className="px-4 py-6 max-w-md mx-auto space-y-6">
-      {/* AI running badge */}
-      <div className="flex items-center gap-2 rounded-2xl border border-emerald-800 bg-emerald-950/40 px-4 py-3">
-        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="text-sm font-semibold text-emerald-400">AIが運用中です</span>
+      {/* AI running badge + Risk mode badge */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 rounded-2xl border border-emerald-800 bg-emerald-950/40 px-4 py-3">
+          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-sm font-semibold text-emerald-400">AIが運用中です</span>
+        </div>
+        <RiskModeBadge />
       </div>
 
       {/* Portfolio KPIs */}
@@ -147,6 +198,11 @@ function ManagedDashboard() {
 function ActiveDashboard() {
   return (
     <div className="px-4 py-6 max-w-md mx-auto space-y-6">
+      {/* Risk mode badge */}
+      <div className="flex items-center gap-2">
+        <RiskModeBadge />
+      </div>
+
       <section>
         <PortfolioSummary />
       </section>

@@ -266,6 +266,19 @@
       "saved": "保存しました"
     }
   },
+  "riskMode": {
+    "badge": {
+      "conservative": "保守モード運用中",
+      "balanced": "バランスモード運用中",
+      "aggressive": "積極モード運用中"
+    },
+    "changed": "{mode}に変更しました",
+    "description": {
+      "conservative": "ステーブルコインのみで安全に運用します",
+      "balanced": "安定性と収益のバランスを取って運用します",
+      "aggressive": "高リターンを重視して積極的に運用します"
+    }
+  },
   "CopyTrading": {
     "title": "コピートレード",
     "subtitle": "プロのストラテジストをフォローして自動コピー",

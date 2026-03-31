@@ -26,10 +26,10 @@ interface RiskSettingsCardProps {
   onMaxDailyTradeUsdChange: (value: number) => void
 }
 
-const riskOptions: { mode: RiskMode; label: string; emoji: string; description: string }[] = [
-  { mode: 'conservative', label: '保守的', emoji: '🛡️', description: '安全重視、低リスク' },
-  { mode: 'balanced', label: 'バランス', emoji: '⚖️', description: '標準設定' },
-  { mode: 'aggressive', label: '積極的', emoji: '🚀', description: '高リターン、高リスク' },
+const riskOptions: { mode: RiskMode; label: string; emoji: string; description: string; toastDescription: string }[] = [
+  { mode: 'conservative', label: '保守的', emoji: '🛡️', description: '安全重視、低リスク', toastDescription: 'ステーブルコインのみで安全に運用します' },
+  { mode: 'balanced', label: 'バランス', emoji: '⚖️', description: '標準設定', toastDescription: '安定性と収益のバランスを取って運用します' },
+  { mode: 'aggressive', label: '積極的', emoji: '🚀', description: '高リターン、高リスク', toastDescription: '高リターンを重視して積極的に運用します' },
 ]
 
 const modeActiveClass: Record<RiskMode, string> = {
@@ -54,7 +54,10 @@ export function RiskSettingsCard({
     try {
       await apiPut<RiskModeResponse>('/auth/risk-mode', { mode })
       onRiskModeChange(mode)
-      toast.success('リスクモードを保存しました')
+      const opt = riskOptions.find((o) => o.mode === mode)
+      toast.success(`${opt?.label ?? mode}に変更しました`, {
+        description: opt?.toastDescription,
+      })
     } catch {
       toast.error('リスクモードの保存に失敗しました')
     } finally {
