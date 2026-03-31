@@ -16,16 +16,17 @@ test.describe('ナビゲーション全体テスト', () => {
     await context.close();
   });
 
-  test('ボトムナビの5タブが存在する（BottomNav.tsx の navItems から）', async ({ browser }) => {
+  test('ボトムナビの4タブが存在する（BottomNav.tsx の navItems から）', async ({ browser }) => {
     const context = await browser.newContext({ ...devices['iPhone 14'] });
     const page = await context.newPage();
-    await page.goto('/decisions');
-    // BottomNav 内のリンクを特定して検証
+    // shared/BottomNav.tsx: navItems = ホーム, 承認, AI判定, 設定 (4タブ)
+    // (user) グループ内のページ /approve でレイアウトが適用される
+    await page.goto('/approve');
+    // BottomNav: fixed bottom-0, md:hidden → mobile では visible
     const bottomNav = page.locator('nav[class*="bottom-0"]');
-    await expect(bottomNav.getByText('ダッシュボード')).toBeVisible();
-    await expect(bottomNav.getByText('AI')).toBeVisible();
+    await expect(bottomNav.getByText('ホーム')).toBeVisible();
     await expect(bottomNav.getByText('承認')).toBeVisible();
-    await expect(bottomNav.getByText('履歴')).toBeVisible();
+    await expect(bottomNav.getByText('AI判定')).toBeVisible();
     await expect(bottomNav.getByText('設定')).toBeVisible();
     await context.close();
   });
@@ -37,10 +38,10 @@ test.describe('ナビゲーション全体テスト', () => {
   });
 
   test('緊急停止ボタンが表示される（フローティング）', async ({ page }) => {
-    await page.goto('/decisions');
-    // UserLayout: <div class="fixed bottom-20 right-4 z-50"> 内の EmergencyStopButton (variant=inline)
-    const floatingContainer = page.locator('div[class*="bottom-20"]');
-    const emergencyBtn = floatingContainer.getByRole('button', { name: '緊急停止' });
+    await page.goto('/approve');
+    // emergency/EmergencyStopButton.tsx: <button class="fixed bottom-20 right-4 z-50 ..." aria-label="緊急停止">
+    // aria-label は isStopped によって「緊急停止」または「停止解除」に変わる
+    const emergencyBtn = page.locator('button[aria-label="緊急停止"], button[aria-label="停止解除"]').first();
     await expect(emergencyBtn).toBeVisible();
   });
 });
