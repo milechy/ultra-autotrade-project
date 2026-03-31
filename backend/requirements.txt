@@ -39,3 +39,6 @@ lxml>=5.0.0
 
 # Web Push (Phase PWA)
 pywebpush>=2.0.0
+
+# Cython (AI logic protection)
+Cython>=3.0.0

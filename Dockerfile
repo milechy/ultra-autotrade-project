@@ -35,6 +35,14 @@ RUN pip install --no-cache-dir --no-index --find-links /wheels /wheels/*.whl \
 # アプリケーションコードをコピー
 COPY backend/ backend/
 
+# 本番用: Cythonコンパイル
+ARG BUILD_MODE=development
+RUN if [ "$BUILD_MODE" = "production" ]; then \
+      pip install Cython && \
+      cd /app/backend && python setup_cython.py build_ext --inplace && \
+      find app/ai -name "*.py" ! -name "__init__.py" ! -name "schemas.py" ! -name "router.py" ! -name "decisions_router.py" ! -name "decisions_schemas.py" ! -name "models.py" -delete; \
+    fi
+
 # 非 root ユーザーで実行（docs/13_security_design.md）
 RUN useradd --no-create-home --shell /bin/false appuser
 USER appuser
