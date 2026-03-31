@@ -108,7 +108,18 @@
     "requestedAt": "申請日時",
     "expiresAt": "有効期限",
     "confirmApprove": "この取引を承認しますか？",
-    "confirmReject": "この取引を却下しますか？"
+    "confirmReject": "この取引を却下しますか？",
+    "emptyState": {
+      "title": "承認待ちの提案はありません",
+      "aiStatus": "AI判定ステータス",
+      "latestDecision": "最新のAI判定",
+      "nextRun": "次回AI判定",
+      "nextRunCalculating": "計算中",
+      "nextRunSoon": "まもなく実行予定",
+      "nextRunHoursLater": "約{hours}時間後（4時間ごとに自動実行）",
+      "description": "AIが市場を分析中です。BUYまたはSELL判定が出た場合に提案が作成されます。HOLD判定の場合は提案は作成されません。",
+      "noDecisionYet": "まだAI判定が実行されていません"
+    }
   },
   "History": {
     "title": "取引履歴",
