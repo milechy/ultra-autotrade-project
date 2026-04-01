@@ -5,9 +5,16 @@
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from decimal import Decimal
 from typing import Any
+
+from app.protocols.base import (
+    BaseProtocolClient,
+    ProtocolHealthMetrics,
+    ProtocolPosition,
+    TransactionResult,
+)
 
 from .config import LidoConfig
 from .schemas import TxResult
@@ -56,8 +63,83 @@ _STETH_ABI: list[dict[str, Any]] = [
 _WEI_PER_ETH = Decimal("1000000000000000000")
 
 
-class AbstractLidoClient(ABC):
+class AbstractLidoClient(BaseProtocolClient):
     """Lido クライアントの抽象基底クラス。"""
+
+    # --- BaseProtocolClient 実装 ---
+
+    def get_protocol_name(self) -> str:
+        """プロトコル名を返す。"""
+        return "lido"
+
+    def get_supported_assets(self) -> list[str]:
+        """サポートするアセット一覧を返す。"""
+        return ["ETH", "stETH"]
+
+    async def get_current_apy(self) -> Decimal:
+        """現在の APY を返す（staking APR と同値）。"""
+        return await self.get_staking_apr()
+
+    async def supply(self, amount: Decimal, asset: str) -> TransactionResult:
+        """ETH を Lido にステーキングする（BaseProtocolClient インターフェース）。"""
+        if asset not in ("ETH",):
+            return TransactionResult(
+                success=False,
+                tx_hash=None,
+                amount=amount,
+                error=f"Lido は ETH のみサポートしています。指定アセット: {asset}",
+            )
+        amount_wei = int(amount * _WEI_PER_ETH)
+        result = await self.stake_eth(amount_wei)
+        return TransactionResult(
+            success=result.success,
+            tx_hash=result.tx_hash,
+            amount=amount,
+            error=result.error,
+        )
+
+    async def withdraw(self, amount: Decimal, asset: str) -> TransactionResult:
+        """stETH の引き出し（Lido では withdraw は未サポート / PoC スタブ）。"""
+        return TransactionResult(
+            success=False,
+            tx_hash=None,
+            amount=amount,
+            error="Lido の引き出しは現在サポートされていません（PoC）",
+        )
+
+    async def get_position(self) -> ProtocolPosition:
+        """ポジション情報を返す（PoC: デフォルトアドレスの残高）。"""
+        balance = Decimal("0")
+        return ProtocolPosition(
+            protocol_name=self.get_protocol_name(),
+            asset="stETH",
+            balance=balance,
+            value_usd=balance,
+        )
+
+    async def get_health_metrics(self) -> ProtocolHealthMetrics:
+        """ヘルスメトリクスを返す。"""
+        try:
+            apr = await self.get_staking_apr()
+            ratio = await self.get_steth_eth_ratio()
+            deviation_pct = abs(Decimal("1") - ratio) * Decimal("100")
+            is_healthy = Decimal("0") <= apr <= Decimal("20") and deviation_pct <= Decimal("2")
+            risk_score = min(deviation_pct / Decimal("10"), Decimal("1"))
+            return ProtocolHealthMetrics(
+                protocol_name=self.get_protocol_name(),
+                is_healthy=is_healthy,
+                risk_score=risk_score,
+                details={"staking_apr": str(apr), "steth_eth_ratio": str(ratio)},
+            )
+        except Exception as exc:
+            return ProtocolHealthMetrics(
+                protocol_name=self.get_protocol_name(),
+                is_healthy=False,
+                risk_score=Decimal("1"),
+                details={"error": str(exc)},
+            )
+
+    # --- Lido 固有の抽象メソッド ---
 
     @abstractmethod
     async def stake_eth(self, amount_wei: int) -> TxResult:

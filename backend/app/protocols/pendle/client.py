@@ -5,10 +5,17 @@
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
+
+from app.protocols.base import (
+    BaseProtocolClient,
+    ProtocolHealthMetrics,
+    ProtocolPosition,
+    TransactionResult,
+)
 
 from .config import PendleConfig
 from .schemas import PendleMarketInfo
@@ -16,8 +23,119 @@ from .schemas import PendleMarketInfo
 logger = logging.getLogger(__name__)
 
 
-class AbstractPendleClient(ABC):
+class AbstractPendleClient(BaseProtocolClient):
     """Pendle クライアントの抽象基底クラス。"""
+
+    # --- BaseProtocolClient 実装 ---
+
+    def get_protocol_name(self) -> str:
+        """プロトコル名を返す。"""
+        return "pendle"
+
+    def get_supported_assets(self) -> list[str]:
+        """サポートするアセット一覧を返す。"""
+        return ["stETH", "PT", "YT", "SY"]
+
+    async def get_current_apy(self) -> Decimal:
+        """現在の implied APY を返す（デフォルトマーケット使用）。"""
+        from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
+
+        config = get_pendle_config()
+        market_info = await self.get_market_info(config.market_address)
+        return market_info.implied_apy
+
+    async def supply(self, amount: Decimal, asset: str) -> TransactionResult:
+        """アセットを Pendle に預け入れる（SY ミントとして実装）。
+
+        Args:
+            amount: 預け入れ量
+            asset: アセットアドレスまたは識別子
+
+        Returns:
+            TransactionResult: トランザクション結果
+        """
+        result = await self.mint_sy(asset, amount)
+        success = bool(result.get("success", False))
+        return TransactionResult(
+            success=success,
+            tx_hash=result.get("tx_hash"),
+            amount=amount,
+            error=None if success else result.get("error", "mint_sy 失敗"),
+        )
+
+    async def withdraw(self, amount: Decimal, asset: str) -> TransactionResult:
+        """PT をリデームして引き出す（BaseProtocolClient インターフェース）。"""
+        from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
+
+        config = get_pendle_config()
+        result = await self.redeem_pt(amount, config.market_address)
+        success = bool(result.get("success", False))
+        return TransactionResult(
+            success=success,
+            tx_hash=result.get("tx_hash"),
+            amount=amount,
+            error=None if success else result.get("error", "redeem_pt 失敗"),
+        )
+
+    async def get_position(self) -> ProtocolPosition:
+        """ポジション情報を返す（PoC: デフォルトマーケットの情報使用）。"""
+        from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
+
+        config = get_pendle_config()
+        try:
+            market_info = await self.get_market_info(config.market_address)
+            return ProtocolPosition(
+                protocol_name=self.get_protocol_name(),
+                asset="PT",
+                balance=Decimal("0"),
+                value_usd=market_info.tvl_usd,
+            )
+        except Exception:
+            return ProtocolPosition(
+                protocol_name=self.get_protocol_name(),
+                asset="PT",
+                balance=Decimal("0"),
+                value_usd=Decimal("0"),
+            )
+
+    async def get_health_metrics(self) -> ProtocolHealthMetrics:
+        """ヘルスメトリクスを返す。"""
+        from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
+
+        config = get_pendle_config()
+        try:
+            market_info = await self.get_market_info(config.market_address)
+            implied_apy = market_info.implied_apy
+            tvl = market_info.tvl_usd
+            is_healthy = tvl >= Decimal("1000000") and implied_apy <= Decimal("100")
+            # リスクスコア: TVL 不足 or APY 異常で上昇
+            risk_score = Decimal("0")
+            if tvl < Decimal("1000000"):
+                risk_score += Decimal("0.5")
+            if implied_apy > Decimal("100"):
+                risk_score += Decimal("0.5")
+            elif implied_apy > Decimal("50"):
+                risk_score += Decimal("0.2")
+            risk_score = min(risk_score, Decimal("1"))
+            return ProtocolHealthMetrics(
+                protocol_name=self.get_protocol_name(),
+                is_healthy=is_healthy,
+                risk_score=risk_score,
+                details={
+                    "implied_apy": str(implied_apy),
+                    "tvl_usd": str(tvl),
+                    "days_to_maturity": str(market_info.days_to_maturity),
+                },
+            )
+        except Exception as exc:
+            return ProtocolHealthMetrics(
+                protocol_name=self.get_protocol_name(),
+                is_healthy=False,
+                risk_score=Decimal("1"),
+                details={"error": str(exc)},
+            )
+
+    # --- Pendle 固有の抽象メソッド ---
 
     @abstractmethod
     async def mint_sy(self, token_address: str, amount: Decimal) -> dict[str, Any]:
