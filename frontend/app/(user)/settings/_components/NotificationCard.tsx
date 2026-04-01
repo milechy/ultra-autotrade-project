@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { PushNotificationToggle } from '@/components/pwa'
 
 type NotificationFrequency = 'all' | 'important' | 'emergency'
 
@@ -52,6 +53,11 @@ export function NotificationCard({
             placeholder="email@example.com"
             className="bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-500"
           />
+        </div>
+
+        {/* プッシュ通知 */}
+        <div className="space-y-1.5">
+          <PushNotificationToggle />
         </div>
 
         {/* 通知頻度 */}

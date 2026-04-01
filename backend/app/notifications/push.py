@@ -158,10 +158,16 @@ class WebPushSender:
 
 
 def get_vapid_config() -> Optional[VAPIDConfig]:
-    """環境変数から VAPID 設定を読み込む。未設定なら None を返す。"""
+    """環境変数から VAPID 設定を読み込む。未設定なら None を返す。
+
+    VAPID_SUBJECT (例: mailto:admin@example.com) または VAPID_MAILTO を受け付ける。
+    """
     public_key = os.getenv("VAPID_PUBLIC_KEY")
     private_key = os.getenv("VAPID_PRIVATE_KEY")
-    mailto = os.getenv("VAPID_MAILTO")
+    # VAPID_SUBJECT (標準名) と VAPID_MAILTO (旧名) の両方をサポート
+    subject = os.getenv("VAPID_SUBJECT") or os.getenv("VAPID_MAILTO")
+    # "mailto:" プレフィックスは vapid_claims 内で付加するため除去
+    mailto = subject.removeprefix("mailto:") if subject else None
 
     if not public_key or not private_key or not mailto:
         logger.debug("VAPID 設定が未設定のため Web Push は無効です。")

@@ -103,6 +103,7 @@ Docker ビルド・CI が失敗する。`npm install` は `package.json` ベー�
 
 ## Security Rules (ABSOLUTE — docs/13_security_design.md)
 
+## [CRITICAL] Security Rules
 1. Private keys: environment variables ONLY. Never hardcode. Never log.
 2. Health Factor < 1.6 → automatic HARD_STOP
 3. Max single trade: 10% of total assets
@@ -115,18 +116,23 @@ Docker ビルド・CI が失敗する。`npm install` は `package.json` ベー�
 10. LLM output MUST be JSON Schema validated — parse failure → HOLD
 11. Financial calculations: Decimal type ONLY (never float)
 
----
+## [CRITICAL] Definition of Done (DoD)
+コミット前に以下を全通過:
+1. `ruff check .` — lint エラー 0
+2. `ruff format --check .` — フォーマット違反 0
+3. `mypy app/ --config-file ../pyproject.toml` — 型エラー 0
+4. `pytest tests/ --cov=app --cov-fail-under=80 -q` — 全通過 + coverage 80%+
+5. `ruff check . --select S` — セキュリティ警告確認
 
-## Execution Order (Rule Engine BEFORE LLM)
+## Core Principles
+1. **Simplicity First** — 最小限の変更で目的を達成。過剰な抽象化不要
+2. **No Laziness** — テスト・lint・フォーマットを省略しない
+3. **Minimal Impact** — 既存コードへの影響を最小化
 
-1. Rule engine: HF < 1.6? → HOLD (skip LLM call, save cost)
-2. Rule engine: cooldown active? → HOLD
-3. Rule engine: daily limit 30% reached? → HOLD
-4. RAG: Knowledge Hub → context generation
-5. Phase A: Claude Sonnet 4.6 judgment → JSON
-6. Phase B: (conditional) GPT-4o cross-verify on BUY/SELL
-7. Rule engine: final guardrail check
-8. Execution: ccxt → Bybit
+## Frontend ルール
+- package.json変更時は `npm install --legacy-peer-deps` → package-lock.json も一緒にコミット
+- rechartsは必ず `dynamic(() => import('./XxxRecharts'), { ssr: false })` で読み込む（SSRクラッシュ防止）
+- `grep -E "ignoreBuildErrors|ignoreDuringBuilds" frontend/next.config.js` でOOMワークアラウンド確認
 
 ---
 
@@ -238,13 +244,6 @@ Review gateは全コード変更で自動レビューが走り、使用量を大
 
 ---
 
-## Current Phase: PoC (Local)
-
-- Goal: Knowledge input → RAG → AI judge → Bybit Sandbox order, end-to-end
-- Stack: Docker Compose local (PostgreSQL + pgvector + FastAPI)
-- NO frontend needed yet — curl + pytest only
-- Bybit: Sandbox mode (sandbox=True)
-- AI: Claude Opus → JSON → validate → execute OR hold
 ## Agent Teams 運用ルール
 
 ### Slack通知（必須）
@@ -256,12 +255,14 @@ curl -s -X POST "$WEBHOOK" \
   -d '{"text": "✅ [チームメイト名] 完了: [タスク名]\n結果: [1行サマリー]\nファイル: [変更したファイル一覧]"}'
 ```
 
-### エラー時の通知
+エラー時:
 ```bash
 curl -s -X POST "$WEBHOOK" \
   -H "Content-Type: application/json" \
   -d '{"text": "❌ [チームメイト名] エラー: [タスク名]\n原因: [エラー内容]"}'
 ```
+
+---
 
 ## 開発体制 v2（2026-03-20〜）
 
@@ -304,3 +305,26 @@ curl -s -X POST "$WEBHOOK" \
 
 **孤立Dockerコンテナ:**
 - `docker compose down --remove-orphans` で消えない場合は `docker rm -f <container-name>` で強制削除してから `up -d`
+
+---
+
+## 参照ファイル
+
+| ファイル | 内容 | いつ読むか |
+|---------|------|----------|
+| docs/13_security_design.md | セキュリティ設計詳細 | Aave/認証関連の実装時 |
+| docs/14_test_strategy.md | テスト戦略詳細 | テスト設計時 |
+| docs/28_staging_cors_csp_postmortem.md | CORS/CSPインシデント対策 | CORS/CSP問題発生時 |
+| docs/29_tunnel_ops_guide.md | Cloudflare Tunnel運用手順 | Tunnel再起動時 |
+| docs/34_phase2_protocols_guide.md | Phase 2 マルチプロトコル技術ガイド | Lido/Pendle/Optimizer/Risk Engine実装時 |
+
+---
+
+## Current Phase: Phase 2 コア実装完了（dev マージ済み）
+
+- Phase 2コア実装完了: Lido PoC / Pendle PoC / AI Optimizer（ENB）/ Risk Engine
+- BaseProtocolClient インターフェース（OCP準拠）導入済み
+- Optimizer ↔ Risk Engine 統合済み（動的リスクスコア取得）
+- フロントエンド: 戦略選択画面（/user/strategies）+ プロトコルヘルスモニター（/admin/protocols）
+- テスト: 1762 passed（dev ブランチ）
+- 次: staging デプロイ → E2Eテスト → main マージ
