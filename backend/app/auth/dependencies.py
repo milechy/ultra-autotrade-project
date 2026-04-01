@@ -9,7 +9,7 @@ FastAPI の Depends で使用する認証関連の依存関数。
 
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -180,3 +180,17 @@ async def require_viewer(
         認証済みユーザー
     """
     return user
+
+
+def verify_internal_token(
+    x_internal_token: Optional[str] = Header(default=None, alias="X-Internal-Token"),
+) -> None:
+    """内部スケジューラー用APIキー認証。INTERNAL_API_TOKEN 環境変数と照合する。"""
+    import os  # noqa: PLC0415
+
+    token = os.getenv("INTERNAL_API_TOKEN", "")
+    if not token or x_internal_token != token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Valid X-Internal-Token header required",
+        )
