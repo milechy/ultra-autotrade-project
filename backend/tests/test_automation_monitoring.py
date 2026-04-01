@@ -361,7 +361,11 @@ def test_state_sync_with_hf_none(temp_state_file) -> None:
 
 
 def test_activate_emergency_stop_sends_notification() -> None:
-    """activate_emergency_stop() が通知サービスに EMERGENCY を送信することを確認。"""
+    """activate_emergency_stop() が通知サービスに EMERGENCY を送信することを確認。
+
+    Note: 緊急停止通知 + EmergencyReport の2回 send が呼ばれる。
+    最初の呼び出しが EMERGENCY であることを確認する。
+    """
     from unittest.mock import MagicMock
 
     from app.notifications.schemas import NotificationSeverity
@@ -374,9 +378,10 @@ def test_activate_emergency_stop_sends_notification() -> None:
         component=ComponentType.SYSTEM,
     )
 
-    mock_notif.send.assert_called_once()
-    call_args = mock_notif.send.call_args[0][0]
-    assert call_args.severity == NotificationSeverity.EMERGENCY
+    assert mock_notif.send.called
+    # 最初の呼び出しが EMERGENCY 通知であることを確認
+    first_call_args = mock_notif.send.call_args_list[0][0][0]
+    assert first_call_args.severity == NotificationSeverity.EMERGENCY
 
 
 def test_clear_emergency_stop_sends_notification() -> None:

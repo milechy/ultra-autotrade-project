@@ -428,6 +428,8 @@ class MonitoringService:
                 recorded_at=now,
             )
             self._append_event(event)
+            # LINE notifications for HF emergency (best-effort)
+            self._notify_hf_line(value, is_protection=True)
 
         elif value < self._hf_warning_threshold:
             level = AlertLevel.WARNING
@@ -447,6 +449,8 @@ class MonitoringService:
                 recorded_at=now,
             )
             self._append_event(event)
+            # LINE notification for HF warning (best-effort)
+            self._notify_hf_line(value, is_protection=False)
 
         # state.json への同期
         self._sync_state_file(
@@ -605,7 +609,50 @@ class MonitoringService:
             f"{reason}{hf_info}",
         )
 
+        # EmergencyReportService でレポートを生成して Slack 通知
+        self._send_emergency_report()
+
         return self._append_event(event)
+
+    def _notify_hf_line(self, value: Decimal, *, is_protection: bool) -> None:
+        """LINE 通知で HF アラートを送る。トークン未設定 / 失敗時はスキップ。"""
+        try:
+            import os  # noqa: PLC0415
+
+            if not os.getenv("LINE_NOTIFY_TOKEN"):
+                return
+            from app.notifications.line_notifier import (  # noqa: PLC0415
+                notify_health_factor,
+                notify_hf_protection,
+            )
+
+            notify_health_factor(value)
+            if is_protection:
+                notify_hf_protection(asset="USDC", amount=0.0)
+        except Exception as exc:
+            logger.warning("LINE HF notification failed: %s", exc)
+
+    def _send_emergency_report(self) -> None:
+        """EmergencyReportService でレポートを生成して Slack 通知する。失敗時はスキップ。"""
+        try:
+            from app.automation.emergency_report_service import (
+                EmergencyReportService,  # noqa: PLC0415
+            )
+            from app.automation.reporting_service import ReportingService  # noqa: PLC0415
+            from app.automation.schemas import ReportPeriod  # noqa: PLC0415
+
+            reporting = ReportingService(self)
+            summary = reporting.generate_summary_report(ReportPeriod.DAILY)
+            events = list(self._events)
+            report = EmergencyReportService().build_emergency_report(summary, events)
+            self._notify(
+                NotificationSeverity.EMERGENCY,
+                report.title,
+                report.body,
+            )
+            logger.info("Emergency report sent: %s", report.title)
+        except Exception as exc:
+            logger.warning("Failed to send emergency report: %s", exc)
 
     def clear_emergency_stop(self) -> None:
         """
