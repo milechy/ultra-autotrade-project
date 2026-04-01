@@ -21,9 +21,10 @@ import { toast } from 'sonner'
 interface OperationModeCardProps {
   isRunning: boolean
   onToggle: (value: boolean) => void
+  disabled?: boolean
 }
 
-export function OperationModeCard({ isRunning, onToggle }: OperationModeCardProps) {
+export function OperationModeCard({ isRunning, onToggle, disabled = false }: OperationModeCardProps) {
   const [pendingValue, setPendingValue] = useState<boolean | null>(null)
 
   const handleSwitchClick = (value: boolean) => {
@@ -49,9 +50,12 @@ export function OperationModeCard({ isRunning, onToggle }: OperationModeCardProp
 
   return (
     <>
-      <Card className="bg-zinc-900 border-zinc-800">
+      <Card className={`bg-zinc-900 border-zinc-800 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base text-zinc-100">運用モード</CardTitle>
+          <CardTitle className="text-base text-zinc-100">
+            運用モード
+            {disabled && <span className="ml-2 text-xs font-normal text-zinc-500">（管理者のみ変更可）</span>}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
