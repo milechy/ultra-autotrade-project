@@ -4,7 +4,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Brain, CheckCircle, History, Settings } from 'lucide-react'
+import { LayoutDashboard, Brain, CheckCircle, History, Settings, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface BottomNavProps {
@@ -14,6 +14,7 @@ interface BottomNavProps {
 const navItems = [
   { href: '/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
   { href: '/decisions', label: 'AI判定', icon: Brain },
+  { href: '/strategies', label: '戦略', icon: Layers },
   { href: '/approve', label: '承認', icon: CheckCircle },
   { href: '/history', label: '履歴', icon: History },
   { href: '/settings', label: '設定', icon: Settings },

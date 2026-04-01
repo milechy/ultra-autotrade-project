@@ -18,6 +18,10 @@ const CHAIN_INFO: Record<number, { name: string; colorClass: string }> = {
     name: 'Base Sepolia',
     colorClass: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30',
   },
+  84532: {
+    name: 'Base Sepolia',
+    colorClass: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
+  },
 }
 
 function NetworkBadge({ chainId }: { chainId: number | null }) {
