@@ -360,6 +360,17 @@ def process_pending_knowledge(
 
     logger.info("Processing %d pending knowledge items", len(pending))
 
+    # News staleness check (warning only, does not stop processing)
+    if monitoring_service is not None:
+        try:
+            if monitoring_service.is_news_stale():
+                logger.warning(
+                    "News is stale: last fetched at %s",
+                    monitoring_service.get_last_news_fetched_at(),
+                )
+        except Exception as _stale_exc:  # noqa: BLE001
+            logger.debug("News staleness check failed (skipping): %s", _stale_exc)
+
     # Refresh HF and record in MonitoringService (used for rule engine decision)
     hf: Optional[Decimal] = None  # Initialize before try block
     if monitoring_service is not None:
@@ -418,6 +429,40 @@ def process_pending_knowledge(
                         stress_eval.stage,
                         stress_eval.reason,
                     )
+                    # Withdraw plan (dry_run=True: plan only, no actual withdrawal)
+                    try:
+                        stress_ctrl = StressController()
+                        withdraw_plan = stress_ctrl.get_withdraw_plan(stress_eval.stage)
+                        logger.info("Withdraw plan: %s", withdraw_plan)
+                        # Slack notification (best-effort)
+                        if monitoring_service is not None:
+                            try:
+                                from app.notifications.schemas import (  # noqa: PLC0415
+                                    NotificationChannel,
+                                    NotificationMessage,
+                                    NotificationSeverity,
+                                )
+                                from app.notifications.service import (  # noqa: PLC0415
+                                    CompositeNotificationService,
+                                )
+
+                                notif_svc: Optional[CompositeNotificationService] = getattr(
+                                    monitoring_service, "_notification_service", None
+                                )
+                                if notif_svc is not None:
+                                    notif_svc.send(
+                                        NotificationMessage(
+                                            channel=NotificationChannel.SLACK,
+                                            severity=NotificationSeverity.WARNING,
+                                            title=f"SAFE_MODE Withdraw Plan (stage={stress_eval.stage})",
+                                            body=f"dry_run plan: {withdraw_plan.model_dump()}",
+                                        )
+                                    )
+                            except Exception as _notif_exc:
+                                logger.debug("Withdraw plan Slack notify failed: %s", _notif_exc)
+                    except Exception as _plan_exc:
+                        logger.warning("get_withdraw_plan failed (skipping): %s", _plan_exc)
+
                     for item in pending:
                         try:
                             knowledge_service.update_status(
@@ -563,6 +608,20 @@ def _create_proposal_from_judgment(
         action.value,
         expires_at,
     )
+    # LINE notification for proposal created (best-effort)
+    try:
+        import os  # noqa: PLC0415
+
+        from app.notifications.line_notifier import notify_proposal_created  # noqa: PLC0415
+
+        if os.getenv("LINE_NOTIFY_TOKEN"):
+            notify_proposal_created(
+                operation=action.value,
+                asset="USDC",
+                amount=float(trade_amount_usd),
+            )
+    except Exception as _line_exc:
+        logger.debug("notify_proposal_created failed (skipping): %s", _line_exc)
 
 
 def _process_single_item(
@@ -665,6 +724,22 @@ def _process_single_item(
             order_result.status.value,
             order_result.order_id,
         )
+        # LINE notification for auto-executed trade (best-effort)
+        if order_result.status == OrderStatus.SUCCESS:
+            try:
+                import os  # noqa: PLC0415
+
+                from app.notifications.line_notifier import notify_auto_executed  # noqa: PLC0415
+
+                if os.getenv("LINE_NOTIFY_TOKEN"):
+                    notify_auto_executed(
+                        operation=action.value,
+                        asset="USDC",
+                        amount=float(trade_amount_usd),
+                        apy=0.0,
+                    )
+            except Exception as _line_exc:
+                logger.debug("notify_auto_executed failed (skipping): %s", _line_exc)
     else:
         logger.info(
             "Skip trade for item %d: action=%s, confidence=%d", item.id, action.value, confidence
