@@ -7,12 +7,12 @@
 #
 # 参照: docs/32_named_tunnel_migration.md
 
-tunnel: <TUNNEL_ID>
-credentials-file: /root/.cloudflared/<TUNNEL_ID>.json
+tunnel: e558c833-014f-40a0-ad84-4562cf01af20
+credentials-file: /home/ultra/.cloudflared/e558c833-014f-40a0-ad84-4562cf01af20.json
 
 ingress:
-  - hostname: api.ultra-autotrade.com
+  - hostname: api.ultra-auto-trade.com
     service: http://localhost:8000
-  - hostname: app.ultra-autotrade.com
+  - hostname: app.ultra-auto-trade.com
     service: http://localhost:3000
   - service: http_status:404
