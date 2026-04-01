@@ -160,7 +160,7 @@ function RecentOpsCard() {
 
 function ManagedDashboard() {
   return (
-    <div className="px-4 py-6 max-w-md mx-auto space-y-6">
+    <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
       {/* AI running badge + Risk mode badge */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-2 rounded-2xl border border-emerald-800 bg-emerald-950/40 px-4 py-3">
@@ -197,7 +197,7 @@ function ManagedDashboard() {
 
 function ActiveDashboard() {
   return (
-    <div className="px-4 py-6 max-w-md mx-auto space-y-6">
+    <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
       {/* Risk mode badge */}
       <div className="flex items-center gap-2">
         <RiskModeBadge />
@@ -247,7 +247,7 @@ export default function DashboardPage() {
   // Loading skeleton
   if (userMode === null && !loadError) {
     return (
-      <div className="px-4 py-6 max-w-md mx-auto space-y-4">
+      <div className="px-4 py-6 max-w-4xl mx-auto space-y-4">
         <Skeleton className="h-28 rounded-xl" />
         <Skeleton className="h-20 rounded-xl" />
         <Skeleton className="h-36 rounded-xl" />
