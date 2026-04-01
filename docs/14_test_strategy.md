@@ -346,13 +346,75 @@ PR マージ前に、既存機能が壊れていないことを担保する。
 
 1. pytest（自動） — Unit + Integration + Scenario。CI/CDで毎PR実行。カバレッジ80%+必須
 2. Playwright E2E（自動） — smoke test。CI/CDで毎PR実行
-3. Codex Review（手動トリガー） — PR作成前に `/codex:review --base main --background`
-4. Claude in Chrome（半自動） — UIアップデート時のみ
-5. 手動UIテスト（最後） — iPhone MetaMask / PCブラウザでの実機確認
+3. 孤立コード検出（PR前） — 新モジュール追加時・DeFi安全系変更時は必須
+4. Codex Review（手動トリガー） — PR作成前に `/codex:review --base main --background`
+5. Claude in Chrome（半自動） — UIアップデート時のみ
+6. 手動UIテスト（最後） — iPhone MetaMask / PCブラウザでの実機確認
 
 ---
 
-# 11. 最低合格ライン（MVP）
+# 11. 孤立コード検出（Dead Code / Disconnected Safety Scan）
+
+## 概要
+
+爆速開発では「実装したが配線を繋ぎ忘れた」安全装置が発生しやすい。pytest/Playwright/Chromeは**動いているコードのバグ**を検出するが、**呼ばれていないコードの孤立**は検出できない。本スキャンはその隙間を埋める。
+
+## 検出対象
+
+| カテゴリ | 代表ファイル | チェック観点 |
+|---|---|---|
+| 安全装置 | `automation/stress_controller.py` | SAFE_MODE/HARD_STOP がworkflowから呼ばれているか |
+| ストレス制御 | `automation/monitoring_service.py` | `record_price_change_24h` が実際に呼ばれているか |
+| リスクエンジン | `protocols/risk/` | RiskEngine/Scorerがoptimizer等から参照されているか |
+| 退避ロジック | `protocols/risk/auto_evacuate.py` | `execute_evacuation` がworkflowから呼ばれているか |
+| AI/Optimizer | `ai/optimizer/` | アロケーターが実際の判定フローに接続されているか |
+| 監視・通知 | `automation/monitoring_service.py` | アラートメソッドが定期ジョブから呼ばれているか |
+
+## 実行タイミング
+
+- **PR作成前**（Codex Review前に実行）— 新モジュール追加時は必須
+- **大量タスク一括完了後** — 爆速開発後は特にリスクが高い
+- **DeFi安全系の変更時** — `aave/`, `automation/`, `protocols/` の変更時
+
+## 実行方法（Claude Codeプロンプト）
+
+```
+プロジェクト全体で「実装されているが呼ばれていない」孤立コードを検出して。
+重点チェック対象: backend/app/aave/, automation/, protocols/, ai/
+方法: 各モジュールのpublicクラス/関数をリストアップ → grep -r でアプリコード内（tests/除外）の参照確認 → 参照0件=孤立
+出力: | ファイル | クラス/関数 | アプリコードからの参照 | 状態(孤立/接続済み) |
+```
+
+## 検出後の対応優先度
+
+| 優先度 | カテゴリ | 対応 | 期限 |
+|---|---|---|---|
+| **P0** | 安全装置系（emergency, stress, circuit_breaker） | 即修正（workflow.py/scheduled_tasks.pyに配線） | 当日 |
+| **P1** | リスク管理系（risk, health_factor, limit, cooldown） | 1-2日以内に修正 | 翌営業日 |
+| **P2** | ユーティリティ系（helper, util） | 将来使用予定なら許容、不要なら削除 | 次スプリント |
+
+## 実際の検出事例（2026-04-01）
+
+| 孤立コード | ファイル | 修正内容 | 優先度 |
+|---|---|---|---|
+| `StressController.evaluate()` | `automation/stress_controller.py` | `workflow.py` の `process_pending_knowledge()` 冒頭に接続 | P0 |
+| `record_price_change_24h()` | `automation/monitoring_service.py` | `scheduled_tasks.py` の定期ジョブから呼び出し | P0 |
+| PENDLE_YT 配分キャップ | `ai/optimizer/` | constraints に永続化するよう修正 | P1 |
+| `execute_evacuation()` | `protocols/risk/auto_evacuate.py` | リスクエンジン連携として接続 | P0 |
+
+## pytest/Playwright/Chrome/Codex/孤立検出の使い分け
+
+| ツール | 検出できるもの | 検出できないもの |
+|---|---|---|
+| pytest | 実装バグ、ロジック誤り、型エラー | 呼ばれていないコード |
+| Playwright E2E | UIフロー破綻、API疎通 | バックエンドの未接続ロジック |
+| Claude in Chrome | 表示崩れ、UX問題 | コードレベルの孤立 |
+| Codex Review | コード品質、セキュリティ | 動的な呼び出しパス |
+| **孤立コード検出** | **未配線の安全装置・監視ロジック** | **実行時バグ** |
+
+---
+
+# 12. 最低合格ライン（MVP）
 
 - エラー率：5% 以下  
 - フロー成功率：95% 以上  

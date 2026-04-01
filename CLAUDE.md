@@ -197,11 +197,12 @@ feature/* (各LLM担当) → dev (Opus統合) → staging (Codex最終レビュ�
 - E2E: Playwright (mobile viewport)
 - Browser UI: Claude in Chrome (`claude --chrome`) — UIアップデート時のみ
 - Codex Review: PR作成前に `/codex:review --base main --background`
+- Dead Code Scan: PR作成前に孤立コード検出（新モジュール追加時・DeFi安全系変更時は必須）
 - Aave: Sepolia testnet before mainnet
 - Exchange: Bybit Sandbox API
 - Coverage gate: 80%+ (pyproject.toml --cov-fail-under=80)
 - CI: GitHub Actions (lint → test → security-check)
-- テスト順序: pytest(自動) → Playwright E2E(自動) → Codex Review(PR前) → Claude in Chrome(UI変更時) → 手動UIテスト(最後)
+- テスト順序: pytest(自動) → Playwright E2E(自動) → 孤立コード検出(PR前) → Codex Review(PR前) → Claude in Chrome(UI変更時) → 手動UIテスト(最後)
 
 ---
 
@@ -241,6 +242,30 @@ Review gateは全コード変更で自動レビューが走り、使用量を大
 - review gate ON（使用量10-20倍になる）
 - 小さな変更ごとのレビュー（PR前にまとめて1回）
 - Codexだけに頼る（Claude Code + Codex の補完関係）
+
+---
+
+## 孤立コード検出（Dead Code / Disconnected Safety Scan）
+
+### 背景
+爆速開発で安全装置やリスク管理のコードを実装しても、配線（呼び出し元）が切れているケースが発生する。
+UIテスト（/chrome）やpytestでは検出できない。2026-04-01に StressController、record_price_change_24h、PENDLE_YTキャップ、execute_evacuation の4件が孤立していた。
+
+### 実行タイミング
+- PR作成前（Codex Review前に実行）— 新モジュール追加時は必須
+- 大量タスク一括完了後 — 爆速開発後は特にリスクが高い
+- DeFi安全系の変更時 — aave/, automation/, protocols/ の変更時
+
+### 実行方法（Claude Codeプロンプト）
+プロジェクト全体で「実装されているが呼ばれていない」孤立コードを検出して。
+重点チェック対象: backend/app/aave/, automation/, protocols/, ai/
+方法: 各モジュールのpublicクラス/関数をリストアップ → grep -r でアプリコード内（tests/除外）の参照確認 → 参照0件=孤立
+出力: | ファイル | クラス/関数 | アプリコードからの参照 | 状態(孤立/接続済み) |
+
+### 検出後の対応
+- P0: 安全装置系の孤立 → 即修正（workflow.pyやscheduled_tasks.pyに配線）
+- P1: リスク管理系の孤立 → 1-2日以内に修正
+- P2: ユーティリティ系の孤立 → 将来使用予定なら許容、不要なら削除
 
 ---
 
