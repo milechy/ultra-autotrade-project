@@ -113,3 +113,66 @@ class TestExchangeService:
         assert status.connected is True
         assert status.balance_usdt is not None
         assert status.daily_trades_used == 0
+
+
+class TestGetPriceChange24h:
+    def test_returns_decimal_when_percentage_present(self):
+        """percentage フィールドが存在する場合は Decimal(percentage/100) を返す。"""
+        from decimal import Decimal
+        from unittest.mock import MagicMock
+
+        client = MagicMock()
+        client.fetch_ticker.return_value = {
+            "symbol": "BTC/USDT",
+            "last": 50000.0,
+            "percentage": -12.5,
+        }
+        service = ExchangeService(client=client, settings=_make_settings())
+        result = service.get_price_change_24h()
+
+        assert result is not None
+        assert isinstance(result, Decimal)
+        assert result == Decimal("-0.125")
+
+    def test_returns_decimal_from_info_field(self):
+        """percentage がなく info.priceChangePercent がある場合も Decimal を返す。"""
+        from decimal import Decimal
+        from unittest.mock import MagicMock
+
+        client = MagicMock()
+        client.fetch_ticker.return_value = {
+            "symbol": "BTC/USDT",
+            "last": 50000.0,
+            "percentage": None,
+            "info": {"priceChangePercent": "5.0"},
+        }
+        service = ExchangeService(client=client, settings=_make_settings())
+        result = service.get_price_change_24h()
+
+        assert result is not None
+        assert result == Decimal("0.05")
+
+    def test_returns_none_when_percentage_missing(self):
+        """percentage フィールドがない場合は None を返す。"""
+        from unittest.mock import MagicMock
+
+        client = MagicMock()
+        client.fetch_ticker.return_value = {
+            "symbol": "BTC/USDT",
+            "last": 50000.0,
+        }
+        service = ExchangeService(client=client, settings=_make_settings())
+        result = service.get_price_change_24h()
+
+        assert result is None
+
+    def test_returns_none_on_exception(self):
+        """fetch_ticker が例外を投げた場合は None を返す（例外は catch）。"""
+        from unittest.mock import MagicMock
+
+        client = MagicMock()
+        client.fetch_ticker.side_effect = RuntimeError("connection error")
+        service = ExchangeService(client=client, settings=_make_settings())
+        result = service.get_price_change_24h()
+
+        assert result is None

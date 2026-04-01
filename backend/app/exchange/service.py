@@ -273,6 +273,38 @@ class ExchangeService:
             last_trade_at=last_trade,
         )
 
+    def get_price_change_24h(self, symbol: Optional[str] = None) -> Optional[Decimal]:
+        """
+        24 時間の価格変動率を取得する（小数表現、例: -0.12 = -12%）。
+
+        ccxt の fetch_ticker が返す percentage フィールドを使用する。
+        percentage はパーセント表現（例: -12.5）なので 100 で割って小数に変換する。
+        取得失敗時は None を返す（例外をキャッチしてログに記録）。
+
+        Args:
+            symbol: 取引シンボル（省略時は設定のデフォルトシンボル）
+
+        Returns:
+            Decimal | None: 小数表現の変動率（-0.12 = -12%）
+        """
+        target = symbol or self._settings.default_symbol
+        try:
+            ticker = self._client.fetch_ticker(target)
+            raw = ticker.get("percentage")
+            if raw is None:
+                # Bybit の info フィールドにある priceChangePercent を試みる
+                info = ticker.get("info", {})
+                raw = info.get("priceChangePercent")
+            if raw is None:
+                logger.debug(
+                    "price_change_24h: percentage field not found in ticker for %s", target
+                )
+                return None
+            return Decimal(str(raw)) / Decimal("100")
+        except Exception as exc:
+            logger.warning("Failed to get price_change_24h for %s: %s", target, exc)
+            return None
+
     # ---- Internal helpers --------------------------------------------------
 
     def _get_daily_trade_count(self, now: datetime) -> int:

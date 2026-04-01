@@ -376,6 +376,68 @@ async def dca_loop(
             await asyncio.sleep(60)
 
 
+async def price_change_monitor_loop(
+    *,
+    interval_seconds: int = 300,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """
+    24 時間価格変動率の定期取得・記録ループ。
+
+    5 分ごとに ExchangeService.get_price_change_24h() を呼び、
+    MonitoringService.record_price_change_24h() に記録する。
+
+    Args:
+        interval_seconds: 取得間隔（秒）。デフォルト 300 秒（5 分）
+        on_error: エラー発生時のコールバック
+
+    Note:
+        - このコルーチンは無限ループで動作する
+        - 停止は asyncio.CancelledError で行う
+        - エラー発生時もループは継続（fail-safe）
+    """
+    logger.info(
+        "Starting price change monitor loop (interval: %ds)",
+        interval_seconds,
+    )
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+
+            def _run_monitor() -> None:
+                from app.automation.monitoring_service import MonitoringService  # noqa: PLC0415
+                from app.exchange.client import DummyExchangeClient  # noqa: PLC0415
+                from app.exchange.service import ExchangeService  # noqa: PLC0415
+
+                client = DummyExchangeClient()
+                exchange_service = ExchangeService(client=client)
+                monitoring_service = MonitoringService()
+
+                pct = exchange_service.get_price_change_24h()
+                if pct is not None:
+                    monitoring_service.record_price_change_24h(float(pct))
+                    logger.info("price_change_24h recorded: %s", pct)
+                else:
+                    logger.debug("price_change_24h: no data available, skipping")
+
+            await asyncio.to_thread(_run_monitor)
+
+        except asyncio.CancelledError:
+            logger.info("Price change monitor loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in price change monitor loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            await asyncio.sleep(600)
+
+
 class ScheduledTaskManager:
     """
     スケジュールタスクのライフサイクル管理。
@@ -392,6 +454,7 @@ class ScheduledTaskManager:
         self._rss_task: Optional[asyncio.Task[None]] = None
         self._dca_task: Optional[asyncio.Task[None]] = None
         self._rebalance_task: Optional[asyncio.Task[None]] = None
+        self._price_monitor_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -417,6 +480,11 @@ class ScheduledTaskManager:
     def is_rebalance_running(self) -> bool:
         """リバランスチェックタスクが動作中かどうか。"""
         return self._rebalance_task is not None and not self._rebalance_task.done()
+
+    @property
+    def is_price_monitor_running(self) -> bool:
+        """価格変動モニタータスクが動作中かどうか。"""
+        return self._price_monitor_task is not None and not self._price_monitor_task.done()
 
     async def start_daily_reports(
         self,
@@ -722,6 +790,67 @@ class ScheduledTaskManager:
         self._rebalance_task = None
         logger.info("Rebalance check task stopped")
 
+    async def start_price_monitor(
+        self,
+        *,
+        interval_seconds: int = 300,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """
+        価格変動モニタータスクを開始する。
+
+        Args:
+            interval_seconds: 取得間隔（秒）
+            on_error: エラー時コールバック
+
+        Raises:
+            RuntimeError: 既に価格変動モニターが開始されている場合
+        """
+        if self.is_price_monitor_running:
+            raise RuntimeError("Price change monitor already running")
+
+        logger.info("Starting price change monitor task")
+
+        self._price_monitor_task = asyncio.create_task(
+            price_change_monitor_loop(
+                interval_seconds=interval_seconds,
+                on_error=on_error,
+            )
+        )
+
+        logger.info("Price change monitor task started")
+
+    async def stop_price_monitor(self, timeout: float = 5.0) -> None:
+        """
+        価格変動モニタータスクを停止する。
+
+        Args:
+            timeout: キャンセル待機のタイムアウト秒数
+        """
+        if not self.is_price_monitor_running:
+            logger.debug("Price change monitor not running - nothing to stop")
+            return
+
+        logger.info("Stopping price change monitor task")
+
+        assert self._price_monitor_task is not None  # noqa: S101
+        self._price_monitor_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._price_monitor_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Price change monitor task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Price change monitor task did not stop within %.1fs timeout",
+                timeout,
+            )
+        except Exception as exc:
+            logger.error("Error while stopping price change monitor task: %s", exc)
+
+        self._price_monitor_task = None
+        logger.info("Price change monitor task stopped")
+
     async def stop_all(self, timeout: float = 5.0) -> None:
         """
         全てのスケジュールタスクを停止する。
@@ -737,6 +866,7 @@ class ScheduledTaskManager:
             self.stop_rss_fetch(timeout=timeout),
             self.stop_dca(timeout=timeout),
             self.stop_rebalance_check(timeout=timeout),
+            self.stop_price_monitor(timeout=timeout),
             return_exceptions=True,
         )
 
