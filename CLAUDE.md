@@ -189,10 +189,52 @@ feature/* (各LLM担当) → dev (Opus統合) → staging (Codex最終レビュ�
 - Unit: pytest + mypy strict + ruff
 - LLM: VCR replay (record once, replay in CI = zero API cost)
 - E2E: Playwright (mobile viewport)
+- Browser UI: Claude in Chrome (`claude --chrome`) — UIアップデート時のみ
+- Codex Review: PR作成前に `/codex:review --base main --background`
 - Aave: Sepolia testnet before mainnet
 - Exchange: Bybit Sandbox API
-- Coverage gate: 80%+
-- CI: GitHub Actions (lint → test → security-check → codex-review)
+- Coverage gate: 80%+ (pyproject.toml --cov-fail-under=80)
+- CI: GitHub Actions (lint → test → security-check)
+- テスト順序: pytest(自動) → Playwright E2E(自動) → Codex Review(PR前) → Claude in Chrome(UI変更時) → 手動UIテスト(最後)
+
+---
+
+## Codex Plugin 運用ルール (codex-plugin-cc)
+
+### セットアップ済み
+```
+/plugin marketplace add openai/codex-plugin-cc
+/plugin install codex@openai-codex
+```
+
+### Review Gate: 常時OFF
+Review gateは全コード変更で自動レビューが走り、使用量を大量消費する。常時OFFにする。
+```
+/codex:setup --disable-review-gate
+```
+
+### コスト最適化運用ルール
+1. **普段の開発** → review gate OFF。Claude Code Agent Teamsで通常開発
+2. **PR作成前のみ手動レビュー（1日1-2回）:**
+   ```
+   /codex:review --base main --background
+   /codex:status
+   /codex:result
+   ```
+3. **Aave/セキュリティ変更時のみ adversarial review:**
+   ```
+   /codex:adversarial-review --base main --background challenge the Aave safety logic and DeFi risk handling
+   ```
+4. **問題検出時** → Codexの指摘をClaude Codeに貼って修正させる
+5. **バグ調査をCodexに委任:**
+   ```
+   /codex:rescue investigate why the tests started failing
+   ```
+
+### やらないこと
+- review gate ON（使用量10-20倍になる）
+- 小さな変更ごとのレビュー（PR前にまとめて1回）
+- Codexだけに頼る（Claude Code + Codex の補完関係）
 
 ---
 
