@@ -8,7 +8,7 @@
 # 参照: docs/32_named_tunnel_migration.md
 
 tunnel: e558c833-014f-40a0-ad84-4562cf01af20
-credentials-file: /home/ultra/.cloudflared/e558c833-014f-40a0-ad84-4562cf01af20.json
+credentials-file: /root/.cloudflared/e558c833-014f-40a0-ad84-4562cf01af20.json
 
 ingress:
   - hostname: api.ultra-auto-trade.com

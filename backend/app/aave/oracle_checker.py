@@ -164,7 +164,7 @@ def check_sequencer_uptime(
             address=Web3.to_checksum_address(sequencer_feed_address),
             abi=_SEQUENCER_ABI,
         )
-        _round_id, answer, _started_at, started_at_ts, _answered_in_round = (
+        _round_id, answer, started_at_ts, _updated_at, _answered_in_round = (
             feed.functions.latestRoundData().call()
         )
     except Exception as exc:  # noqa: BLE001

@@ -190,10 +190,9 @@ class TestCheckSequencerUptime:
         from app.aave.oracle_checker import check_sequencer_uptime
 
         now_ts = int(datetime.now(timezone.utc).timestamp())
-        # answer=0 = UP, startedAt (index 2) = ignored, started_at_ts (index 3) = 2 hours ago
-        # (past grace period)
+        # answer=0 = UP, startedAt (index 2) = 2 hours ago (past grace period)
         started_at = now_ts - 7200
-        round_data = (1, 0, now_ts, started_at, 1)
+        round_data = (1, 0, started_at, now_ts, 1)
         mock_mod = _make_web3_mock(round_data)
 
         with patch.dict(sys.modules, {"web3": mock_mod}):
@@ -222,9 +221,9 @@ class TestCheckSequencerUptime:
         from app.aave.oracle_checker import check_sequencer_uptime
 
         now_ts = int(datetime.now(timezone.utc).timestamp())
-        # answer=0 = UP, started_at_ts (index 3) = 30 mins ago (within grace period)
+        # answer=0 = UP, startedAt (index 2) = 30 mins ago (within grace period)
         started_at = now_ts - 1800
-        round_data = (1, 0, now_ts, started_at, 1)
+        round_data = (1, 0, started_at, now_ts, 1)
         mock_mod = _make_web3_mock(round_data)
 
         with patch.dict(sys.modules, {"web3": mock_mod}):
