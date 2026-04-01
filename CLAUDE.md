@@ -63,3 +63,15 @@ curl -s -X POST "$WEBHOOK" \
 | docs/29_tunnel_ops_guide.md | Cloudflare Tunnel運用手順 | Tunnel再起動時 |
 | deploy_staging.md | Stagingデプロイ手順 | デプロイ時 |
 | tester_onboarding_runbook.md | テスター環境構築 | テスターオンボーディング時 |
+| docs/34_phase2_protocols_guide.md | Phase 2 マルチプロトコル技術ガイド | Lido/Pendle/Optimizer/Risk Engine実装時 |
+
+---
+
+## Current Phase: Phase 2 コア実装完了（feature/phase2-protocols）
+
+- Phase 2コア実装完了: Lido PoC / Pendle PoC / AI Optimizer（ENB）/ Risk Engine
+- BaseProtocolClient インターフェース（OCP準拠）導入済み
+- Optimizer ↔ Risk Engine 統合済み（動的リスクスコア取得）
+- フロントエンド: 戦略選択画面（/user/strategies）+ プロトコルヘルスモニター（/admin/protocols）
+- テスト: 1754 passed（feature/phase2-protocols ブランチ）
+- 残り: テスター運用完了確認 → dev マージ → staging デプロイ → E2Eテスト
