@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.ai.service import AIService
-from app.auth.dependencies import require_active_user, require_admin
+from app.auth.dependencies import require_active_user, require_admin, verify_internal_token
 from app.automation.monitoring_service import MonitoringService
 from app.automation.rate_limiter import RateLimiterService, get_rate_limiter
 from app.automation.rate_limiter_schemas import RateLimitStatus
@@ -68,6 +68,7 @@ def process_news(
     dry_run: bool = Query(default=True, description="If true, simulate trades"),
     db: Session = Depends(get_db),
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
+    _: None = Depends(verify_internal_token),
 ) -> ProcessNewsResponse:
     """
     Knowledge Hub の pending アイテムを取得し、
@@ -84,6 +85,7 @@ def process_news(
             monitoring_service=monitoring_service,
             dry_run=dry_run,
         )
+        monitoring_service.record_news_fetch()
     except Exception as exc:
         logger.error("Workflow execution failed: %s", exc, exc_info=True)
         raise HTTPException(

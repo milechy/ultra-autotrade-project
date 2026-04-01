@@ -297,7 +297,41 @@ E2E テストは頻度を絞り（例: デイリー、リリース前）、コ�
 
 ---
 
-# 7. Regression Test
+# 7. Browser UI Test（Claude in Chrome）
+
+UIアップデート時に `claude --chrome` を使い、実際のブラウザ上でUI/UXを検証する。
+実行タイミング: UIアップデート時のみ。バックエンドのみの変更時は不要。
+注意: 複数プロジェクトで同時に `/chrome` を使うとバッティングする → 1プロジェクトずつ実行。
+
+---
+
+# 8. Codex Review（PR前コードレビュー）
+
+## 概要
+OpenAI Codex Plugin for Claude Code (`codex-plugin-cc`) を使い、PR作成前にコードレビューを実行。
+
+## Review Gate: 常時OFF
+使用量を大量消費するため常時OFF: `/codex:setup --disable-review-gate`
+
+## コスト最適化運用ルール
+| シナリオ | コマンド | 頻度 |
+|---------|---------|------|
+| PR作成前の標準レビュー | `/codex:review --base main --background` | 1日1-2回 |
+| Aave/セキュリティ変更時 | `/codex:adversarial-review --base main --background` | 対象変更時のみ |
+| バグ調査委任 | `/codex:rescue investigate <問題>` | 必要時のみ |
+| 進捗確認 | `/codex:status` → `/codex:result` | レビュー実行後 |
+
+## Playwright / Claude in Chrome / Codex Review の使い分け
+| 観点 | Playwright | Claude in Chrome | Codex Review |
+|------|-----------|-----------------|--------------|
+| 目的 | 機能の回帰テスト | UI/UXユーザビリティ検証 | コード品質・セキュリティ |
+| 実行タイミング | CI/CD（毎PR） | UI変更時のみ | PR作成前（1日1-2回） |
+| 自動化 | 完全自動 | 半自動 | 手動トリガー |
+| コスト | CI実行時間のみ | Claude Code使用量 | Codex/OpenAI使用量 |
+
+---
+
+# 9. Regression Test
 
 GitHub PR 時に自動実行する想定：
 
@@ -308,7 +342,17 @@ PR マージ前に、既存機能が壊れていないことを担保する。
 
 ---
 
-# 8. 最低合格ライン（MVP）
+# 10. テスト実行順序（全体フロー）
+
+1. pytest（自動） — Unit + Integration + Scenario。CI/CDで毎PR実行。カバレッジ80%+必須
+2. Playwright E2E（自動） — smoke test。CI/CDで毎PR実行
+3. Codex Review（手動トリガー） — PR作成前に `/codex:review --base main --background`
+4. Claude in Chrome（半自動） — UIアップデート時のみ
+5. 手動UIテスト（最後） — iPhone MetaMask / PCブラウザでの実機確認
+
+---
+
+# 11. 最低合格ライン（MVP）
 
 - エラー率：5% 以下  
 - フロー成功率：95% 以上  

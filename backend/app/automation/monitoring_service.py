@@ -103,6 +103,7 @@ class MonitoringService:
         self._last_health_factor: Optional[Decimal] = None
         self._last_price_change_24h: Optional[float] = None
         self._last_event_level: AlertLevel = AlertLevel.INFO
+        self._last_news_fetched_at: Optional[datetime] = None
 
         # 起動時に state.json から緊急停止状態を復元（OR 条件維持）
         if enable_state_sync:
@@ -680,6 +681,30 @@ class MonitoringService:
 
             except Exception as exc:
                 logger.warning("Failed to sync state file on clear_emergency_stop: %s", exc)
+
+    # ------------------------------------------------------------------
+    # 公開 API: ニュース取得追跡
+    # ------------------------------------------------------------------
+    def record_news_fetch(self) -> None:
+        """ニュース取得時刻を記録する。スケジューラーが呼び出す。"""
+        self._last_news_fetched_at = datetime.now(timezone.utc)
+        logger.info("News fetch recorded at %s", self._last_news_fetched_at.isoformat())
+
+    def get_last_news_fetched_at(self) -> Optional[datetime]:
+        """最後にニュースを取得した時刻を返す。未取得の場合は None。"""
+        return self._last_news_fetched_at
+
+    def is_news_stale(self, threshold_hours: int = 5) -> bool:
+        """
+        ニュースが古くなっているかを返す。
+
+        Returns True if last_news_fetched_at is None OR if
+        now - last_news_fetched_at > threshold_hours hours.
+        """
+        if self._last_news_fetched_at is None:
+            return True
+        age = datetime.now(timezone.utc) - self._last_news_fetched_at
+        return age.total_seconds() > threshold_hours * 3600
 
     def get_recent_events(self, limit: int = 100) -> List[MonitoringEvent]:
         """

@@ -87,6 +87,8 @@ addopts = [
     "-v",
     "--tb=short",
     "--strict-markers",
+    "--cov=app",
+    "--cov-fail-under=80",
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
