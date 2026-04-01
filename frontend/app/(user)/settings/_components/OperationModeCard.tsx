@@ -17,15 +17,54 @@ import {
 } from '@/components/ui/alert-dialog'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { toast } from 'sonner'
+import { apiPut } from '@/lib/api/client'
+
+type UserMode = 'managed' | 'active' | 'pro'
 
 interface OperationModeCardProps {
   isRunning: boolean
   onToggle: (value: boolean) => void
   disabled?: boolean
+  userMode?: string
+  onModeChange?: (mode: string) => void
 }
 
-export function OperationModeCard({ isRunning, onToggle, disabled = false }: OperationModeCardProps) {
+const MODE_OPTIONS: { value: UserMode; label: string; description: string; color: string }[] = [
+  {
+    value: 'managed',
+    label: 'おまかせ運用',
+    description: 'AIが自動実行。初心者向け。',
+    color: 'border-green-600 bg-green-950/40',
+  },
+  {
+    value: 'active',
+    label: '確認して運用',
+    description: 'AIが提案→ユーザーが承認→実行。中級者向け。',
+    color: 'border-yellow-600 bg-yellow-950/40',
+  },
+  {
+    value: 'pro',
+    label: '提案のみ',
+    description: 'AIが提案→手動判断。上級者向け。',
+    color: 'border-blue-600 bg-blue-950/40',
+  },
+]
+
+const MODE_ACTIVE_RING: Record<UserMode, string> = {
+  managed: 'ring-2 ring-green-500',
+  active: 'ring-2 ring-yellow-500',
+  pro: 'ring-2 ring-blue-500',
+}
+
+export function OperationModeCard({
+  isRunning,
+  onToggle,
+  disabled = false,
+  userMode = 'managed',
+  onModeChange,
+}: OperationModeCardProps) {
   const [pendingValue, setPendingValue] = useState<boolean | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   const handleSwitchClick = (value: boolean) => {
     if (!value) {
@@ -48,6 +87,22 @@ export function OperationModeCard({ isRunning, onToggle, disabled = false }: Ope
     setPendingValue(null)
   }
 
+  const handleModeChange = async (mode: UserMode) => {
+    if (disabled || isSaving) return
+    setIsSaving(true)
+    try {
+      await apiPut('/api/user/settings', { user_mode: mode })
+      onModeChange?.(mode)
+      toast('運用モードを変更しました')
+    } catch {
+      toast('モードの変更に失敗しました')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const currentMode = (userMode as UserMode) in MODE_ACTIVE_RING ? (userMode as UserMode) : 'managed'
+
   return (
     <>
       <Card className={`bg-zinc-900 border-zinc-800 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -58,6 +113,7 @@ export function OperationModeCard({ isRunning, onToggle, disabled = false }: Ope
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* ON/OFF スイッチ */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span
@@ -85,6 +141,29 @@ export function OperationModeCard({ isRunning, onToggle, disabled = false }: Ope
           <div className="flex items-center gap-2">
             <span className="text-xs text-zinc-500">現在のステータス:</span>
             <StatusBadge status={isRunning ? 'NORMAL' : 'PAUSED'} />
+          </div>
+
+          {/* モード選択 */}
+          <div className="pt-2 border-t border-zinc-800">
+            <p className="text-xs text-zinc-400 mb-3">実行ポリシー</p>
+            <div className="space-y-2">
+              {MODE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => handleModeChange(option.value)}
+                  className={`w-full text-left rounded-lg border p-3 transition-all ${option.color} ${
+                    currentMode === option.value
+                      ? MODE_ACTIVE_RING[option.value]
+                      : 'opacity-60 hover:opacity-90'
+                  } ${isSaving ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <p className="text-sm font-medium text-zinc-100">{option.label}</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">{option.description}</p>
+                </button>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>

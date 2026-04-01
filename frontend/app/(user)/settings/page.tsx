@@ -29,6 +29,7 @@ interface UserSettingsResponse {
   max_single_trade_usd?: number
   max_daily_trade_usd?: number
   is_active?: boolean
+  user_mode?: string
 }
 
 interface SettingsState {
@@ -39,6 +40,7 @@ interface SettingsState {
   email: string
   notificationFrequency: NotificationFrequency
   language: Language
+  userMode: string
 }
 
 const DEFAULT_SETTINGS: SettingsState = {
@@ -49,6 +51,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   email: '',
   notificationFrequency: 'important',
   language: 'ja',
+  userMode: 'managed',
 }
 
 export default function SettingsPage() {
@@ -76,6 +79,7 @@ export default function SettingsPage() {
           ...(data.notification_frequency !== undefined && { notificationFrequency: data.notification_frequency }),
           ...(data.max_single_trade_usd !== undefined && { maxSingleTradeUsd: data.max_single_trade_usd }),
           ...(data.max_daily_trade_usd !== undefined && { maxDailyTradeUsd: data.max_daily_trade_usd }),
+          ...(data.user_mode !== undefined && { userMode: data.user_mode }),
         }))
       })
       .catch(() => {/* keep defaults */})
@@ -137,6 +141,8 @@ export default function SettingsPage() {
           isRunning={settings.isRunning}
           onToggle={handleToggleRunning}
           disabled={isStopped}
+          userMode={settings.userMode}
+          onModeChange={(mode) => setSettings((prev) => ({ ...prev, userMode: mode }))}
         />
 
         {/* 2. リスク設定 — riskMode synced with PUT /auth/risk-mode */}
