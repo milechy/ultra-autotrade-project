@@ -194,30 +194,33 @@ class PortfolioAllocator:
 
     def _apply_constraints(self, allocations: list[AllocationEntry]) -> list[AllocationEntry]:
         """制約を適用する: 単一プロトコル最大 70%、YT <= 10%、IDLE >= 5%、合計 = 100%。"""
-        # PENDLE_YT の上限制約
-        for entry in allocations:
+        # PENDLE_YT の上限制約（インデックスで書き戻す）
+        for i, entry in enumerate(allocations):
             if entry.protocol == Protocol.PENDLE_YT and entry.allocation_pct > _MAX_PENDLE_YT_PCT:
                 excess = entry.allocation_pct - _MAX_PENDLE_YT_PCT
-                entry = AllocationEntry(
+                original_pct = entry.allocation_pct
+                allocations[i] = AllocationEntry(
                     protocol=entry.protocol,
                     asset=entry.asset,
                     allocation_pct=_MAX_PENDLE_YT_PCT,
-                    amount_usd=entry.amount_usd * _MAX_PENDLE_YT_PCT / entry.allocation_pct,
+                    amount_usd=entry.amount_usd * _MAX_PENDLE_YT_PCT / original_pct,
                     expected_apy=entry.expected_apy,
                 )
                 # 余剰分を IDLE に追加
-                self._add_to_idle(allocations, excess, entry.amount_usd)
+                self._add_to_idle(allocations, excess, allocations[i].amount_usd)
 
-        # 合計を確認して 100% に正規化
+        # 合計を確認して 100% に正規化（allocation_pct と amount_usd を再計算）
         total_pct = sum(e.allocation_pct for e in allocations)
         if total_pct != Decimal("100") and total_pct > Decimal("0"):
-            # 正規化
+            total_amount = sum(e.amount_usd for e in allocations)
             allocations = [
                 AllocationEntry(
                     protocol=e.protocol,
                     asset=e.asset,
                     allocation_pct=e.allocation_pct * Decimal("100") / total_pct,
-                    amount_usd=e.amount_usd,
+                    amount_usd=e.amount_usd * Decimal("100") / total_pct
+                    if total_amount == Decimal("0")
+                    else e.amount_usd,
                     expected_apy=e.expected_apy,
                 )
                 for e in allocations

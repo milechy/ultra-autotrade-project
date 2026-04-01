@@ -287,3 +287,48 @@ class TestConstraints:
         """説明文に免責事項が含まれること。"""
         result = allocator.allocate(ranked_results, Decimal("10000"), "conservative")
         assert "保証するものではありません" in result.explanation
+
+    def test_pendle_yt_cap_is_enforced(
+        self,
+        allocator: PortfolioAllocator,
+    ) -> None:
+        """PENDLE_YT配分が10%を超えても制約後は10%以下になること。"""
+        from app.ai.optimizer.schemas import NetBenefitResult
+
+        # PENDLE_YT を 50% にしたいケースを直接 _apply_constraints に渡す
+        from app.ai.optimizer.schemas import AllocationEntry, Protocol
+
+        allocations = [
+            AllocationEntry(
+                protocol=Protocol.AAVE,
+                asset="USDC",
+                allocation_pct=Decimal("45"),
+                amount_usd=Decimal("4500"),
+                expected_apy=Decimal("5"),
+            ),
+            AllocationEntry(
+                protocol=Protocol.PENDLE_YT,
+                asset="YT-stETH",
+                allocation_pct=Decimal("50"),
+                amount_usd=Decimal("5000"),
+                expected_apy=Decimal("20"),
+            ),
+            AllocationEntry(
+                protocol=Protocol.IDLE,
+                asset="CASH",
+                allocation_pct=Decimal("5"),
+                amount_usd=Decimal("500"),
+                expected_apy=Decimal("0"),
+            ),
+        ]
+        constrained = allocator._apply_constraints(allocations)
+        yt_entry = next((e for e in constrained if e.protocol == Protocol.PENDLE_YT), None)
+        assert yt_entry is not None, "PENDLE_YT エントリが存在すること"
+        assert yt_entry.allocation_pct <= Decimal("10"), (
+            f"PENDLE_YT は 10% 以下のはずだが {yt_entry.allocation_pct}% になった"
+        )
+        # 合計が 100% になっていること
+        total = sum(e.allocation_pct for e in constrained)
+        assert abs(total - Decimal("100")) < Decimal("0.01"), (
+            f"配分合計が 100% のはずだが {total}% になった"
+        )
