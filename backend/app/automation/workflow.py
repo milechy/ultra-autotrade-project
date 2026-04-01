@@ -387,6 +387,52 @@ def process_pending_knowledge(
             status="completed",
         )
 
+    # StressController check: high-volatility HOLD
+    if monitoring_service is not None:
+        try:
+            from app.aave.schemas import AaveOperationMode  # noqa: PLC0415
+            from app.automation.stress_controller import (  # noqa: PLC0415
+                MarketStressData,
+                StressController,
+            )
+
+            last_pct = monitoring_service._last_price_change_24h
+            if last_pct is not None:
+                # _last_price_change_24h はパーセント値（例: -15.0）で保存されている。
+                # StressController は小数形式（例: -0.15）を期待するため /100 で変換する。
+                stress_data = MarketStressData(
+                    price_change_24h=Decimal(str(last_pct)) / Decimal("100"),
+                    health_factor=hf if hf is not None else Decimal("999"),
+                    manual_stop=not monitoring_service.is_trading_allowed(),
+                    current_mode=AaveOperationMode.NORMAL,
+                    current_stage=0,
+                )
+                stress_eval = StressController().evaluate(stress_data)
+                if stress_eval.mode in (
+                    AaveOperationMode.SAFE_MODE,
+                    AaveOperationMode.HARD_STOP,
+                ):
+                    logger.warning(
+                        "StressController triggered %s (stage=%d, reason=%s) — all items HOLD",
+                        stress_eval.mode.value,
+                        stress_eval.stage,
+                        stress_eval.reason,
+                    )
+                    for item in pending:
+                        try:
+                            knowledge_service.update_status(
+                                db, item.id, KnowledgeItemStatus.SKIPPED
+                            )
+                        except Exception:
+                            logger.warning("Failed to update status for item %d", item.id)
+                    return WorkflowRunResult(
+                        fetched_count=len(pending),
+                        hold_count=len(pending),
+                        status="completed",
+                    )
+        except Exception as _stress_exc:  # noqa: BLE001
+            logger.warning("StressController check failed (skipping): %s", _stress_exc)
+
     errors: List[WorkflowStepError] = []
     traded_count = 0
     hold_count = 0

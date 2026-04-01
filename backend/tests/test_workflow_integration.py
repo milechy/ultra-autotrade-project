@@ -359,3 +359,83 @@ class TestProcessPendingKnowledge:
         assert result.traded_count == 1
         assert result.proposed_count == 0
         ex.execute_trade.assert_called_once()
+
+
+class TestStressControllerInWorkflow:
+    """StressController → workflow integration tests."""
+
+    def _make_mocks(self, action: TradeAction = TradeAction.BUY):
+        db = MagicMock()
+        ks = MagicMock()
+        ai = MagicMock()
+        ex = MagicMock()
+        item = _make_knowledge_item()
+        ks.get_pending.return_value = [item]
+        ks.search.return_value = [
+            KnowledgeSearchResult(
+                chunk_id=1,
+                document_id=1,
+                content="BTC news",
+                similarity=0.9,
+            )
+        ]
+        ai.judge_with_rag.return_value = _make_cross_validation(action, 85)
+        ex.execute_trade.return_value = _make_order_result(OrderStatus.SUCCESS)
+        return db, ks, ai, ex
+
+    def test_safe_mode_when_price_drop_15pct(self):
+        """-15% price drop → StressController SAFE_MODE → all items HOLD."""
+        db, ks, ai, ex = self._make_mocks()
+        ms = MonitoringService(enable_state_sync=False)
+        # -15% をパーセント値（float）として記録（MonitoringServiceのinterfaceに合わせる）
+        ms.record_price_change_24h(-15.0)  # -15% = -0.15 as Decimal in stress check
+
+        result = process_pending_knowledge(
+            db,
+            knowledge_service=ks,
+            ai_service=ai,
+            exchange_service=ex,
+            monitoring_service=ms,
+        )
+
+        assert result.status == "completed"
+        assert result.hold_count == 1
+        assert result.traded_count == 0
+        ex.execute_trade.assert_not_called()
+
+    def test_normal_when_price_drop_5pct(self):
+        """-5% price drop → no stress trigger → normal processing continues."""
+        db, ks, ai, ex = self._make_mocks()
+        ms = MonitoringService(enable_state_sync=False)
+        ms.record_price_change_24h(-5.0)  # -5% = -0.05 → below stage 1 threshold (-10%)
+
+        result = process_pending_knowledge(
+            db,
+            knowledge_service=ks,
+            ai_service=ai,
+            exchange_service=ex,
+            monitoring_service=ms,
+        )
+
+        # StressController stage 0 → normal flow → BUY should be executed
+        assert result.status == "completed"
+        assert result.traded_count == 1
+        ex.execute_trade.assert_called_once()
+
+    def test_no_price_data_proceeds_normally(self):
+        """price_change_24h=None (未取得) → stress check skip → normal processing."""
+        db, ks, ai, ex = self._make_mocks()
+        ms = MonitoringService(enable_state_sync=False)
+        # record_price_change_24h を呼ばない → _last_price_change_24h = None
+
+        result = process_pending_knowledge(
+            db,
+            knowledge_service=ks,
+            ai_service=ai,
+            exchange_service=ex,
+            monitoring_service=ms,
+        )
+
+        assert result.status == "completed"
+        assert result.traded_count == 1
+        ex.execute_trade.assert_called_once()
