@@ -267,3 +267,141 @@ class TestScheduleConstants:
     def test_weekly_report_day_is_monday(self):
         """週次レポート曜日が月曜であることを確認"""
         assert WEEKLY_REPORT_DAY == 0  # Monday
+
+
+# ---------------------------------------------------------------------------
+# Task 2: health_check_loop (check_health_factors_concurrent + check_all_positions_safe)
+# ---------------------------------------------------------------------------
+
+
+class TestHealthCheckLoop:
+    """health_check_loop 関連のテスト"""
+
+    @pytest.mark.asyncio
+    async def test_start_stop_health_check(self):
+        """HFヘルスチェックタスクの開始・停止"""
+        manager = ScheduledTaskManager()
+
+        assert not manager.is_health_check_running
+
+        with patch("app.automation.scheduled_tasks.health_check_loop") as mock_loop:
+
+            async def mock_coro(*args, **kwargs):
+                await asyncio.sleep(100)
+
+            mock_loop.return_value = mock_coro()
+
+            await manager.start_health_check()
+            assert manager.is_health_check_running
+
+        await manager.stop_health_check()
+        assert not manager.is_health_check_running
+
+    @pytest.mark.asyncio
+    async def test_start_health_check_raises_if_already_running(self):
+        """既に実行中の場合に例外が発生することを確認"""
+        manager = ScheduledTaskManager()
+
+        with patch("app.automation.scheduled_tasks.health_check_loop") as mock_loop:
+
+            async def mock_coro(*args, **kwargs):
+                await asyncio.sleep(100)
+
+            mock_loop.return_value = mock_coro()
+
+            await manager.start_health_check()
+
+            with pytest.raises(RuntimeError, match="already running"):
+                await manager.start_health_check()
+
+        await manager.stop_health_check()
+
+
+# ---------------------------------------------------------------------------
+# Task 3: latency_monitor_loop (record_latency)
+# ---------------------------------------------------------------------------
+
+
+class TestLatencyMonitorLoop:
+    """latency_monitor_loop 関連のテスト"""
+
+    @pytest.mark.asyncio
+    async def test_start_stop_latency_monitor(self):
+        """レイテンシモニタータスクの開始・停止"""
+        manager = ScheduledTaskManager()
+
+        assert not manager.is_latency_monitor_running
+
+        with patch("app.automation.scheduled_tasks.latency_monitor_loop") as mock_loop:
+
+            async def mock_coro(*args, **kwargs):
+                await asyncio.sleep(100)
+
+            mock_loop.return_value = mock_coro()
+
+            await manager.start_latency_monitor()
+            assert manager.is_latency_monitor_running
+
+        await manager.stop_latency_monitor()
+        assert not manager.is_latency_monitor_running
+
+
+# ---------------------------------------------------------------------------
+# Task 6 (proposal_timeout): proposal_timeout_loop
+# ---------------------------------------------------------------------------
+
+
+class TestProposalTimeoutLoop:
+    """proposal_timeout_loop 関連のテスト"""
+
+    @pytest.mark.asyncio
+    async def test_start_stop_proposal_timeout(self):
+        """期限切れProposalチェックタスクの開始・停止"""
+        manager = ScheduledTaskManager()
+
+        assert not manager.is_proposal_timeout_running
+
+        with patch("app.automation.scheduled_tasks.proposal_timeout_loop") as mock_loop:
+
+            async def mock_coro(*args, **kwargs):
+                await asyncio.sleep(100)
+
+            mock_loop.return_value = mock_coro()
+
+            await manager.start_proposal_timeout()
+            assert manager.is_proposal_timeout_running
+
+        await manager.stop_proposal_timeout()
+        assert not manager.is_proposal_timeout_running
+
+    @pytest.mark.asyncio
+    async def test_stop_all_includes_new_tasks(self):
+        """stop_all が health_check, latency_monitor, proposal_timeout も停止することを確認"""
+        manager = ScheduledTaskManager()
+
+        with (
+            patch("app.automation.scheduled_tasks.health_check_loop") as mock_hc,
+            patch("app.automation.scheduled_tasks.latency_monitor_loop") as mock_lat,
+            patch("app.automation.scheduled_tasks.proposal_timeout_loop") as mock_prop,
+        ):
+
+            async def mock_coro(*args, **kwargs):
+                await asyncio.sleep(100)
+
+            mock_hc.return_value = mock_coro()
+            mock_lat.return_value = mock_coro()
+            mock_prop.return_value = mock_coro()
+
+            await manager.start_health_check()
+            await manager.start_latency_monitor()
+            await manager.start_proposal_timeout()
+
+            assert manager.is_health_check_running
+            assert manager.is_latency_monitor_running
+            assert manager.is_proposal_timeout_running
+
+            await manager.stop_all()
+
+            assert not manager.is_health_check_running
+            assert not manager.is_latency_monitor_running
+            assert not manager.is_proposal_timeout_running
