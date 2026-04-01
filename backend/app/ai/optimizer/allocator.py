@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
+from typing import Optional
 
 from .schemas import (
     AllocationEntry,
@@ -262,6 +263,72 @@ class PortfolioAllocator:
 
         return total_weighted
 
+    # フォールバック用の固定リスクスコア（プロトコル別）
+    _FALLBACK_RISK_MAP: dict[Protocol, Decimal] = {
+        Protocol.AAVE: Decimal("0.05"),
+        Protocol.LIDO: Decimal("0.15"),
+        Protocol.LIDO_AAVE: Decimal("0.20"),
+        Protocol.PENDLE_PT: Decimal("0.10"),
+        Protocol.PENDLE_YT: Decimal("0.30"),
+        Protocol.IDLE: Decimal("0.00"),
+    }
+
+    # リスクエンジンのレベルから Decimal スコアへのマッピング
+    _RISK_LEVEL_TO_SCORE: dict[str, Decimal] = {
+        "low": Decimal("0.05"),
+        "medium": Decimal("0.25"),
+        "high": Decimal("0.60"),
+        "critical": Decimal("0.90"),
+    }
+
+    # リスクエンジンのプロトコル名からオプティマイザー Protocol への対応
+    _PROTOCOL_NAME_MAP: dict[str, list[Protocol]] = {
+        "aave": [Protocol.AAVE],
+        "lido": [Protocol.LIDO, Protocol.LIDO_AAVE],
+        "pendle": [Protocol.PENDLE_PT, Protocol.PENDLE_YT],
+    }
+
+    def _build_dynamic_risk_map(self) -> Optional[dict[Protocol, Decimal]]:
+        """リスクエンジンから動的リスクスコアマップを構築する。
+
+        Returns:
+            プロトコル → リスクスコアのマップ。取得失敗時は None。
+        """
+        try:
+            import asyncio  # noqa: PLC0415
+
+            from app.protocols.risk.protocol_monitor import ProtocolMonitor  # noqa: PLC0415
+
+            monitor = ProtocolMonitor()
+
+            # 既存のイベントループがある場合は asyncio.get_event_loop で実行
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # 同期コンテキストから非同期を呼び出せない場合は None を返す
+                    logger.debug("event loop is running, skipping dynamic risk score fetch")
+                    return None
+                protocol_healths = loop.run_until_complete(monitor.check_all())
+            except RuntimeError:
+                protocol_healths = asyncio.run(monitor.check_all())
+
+            risk_map: dict[Protocol, Decimal] = {}
+            for health in protocol_healths:
+                protocols = self._PROTOCOL_NAME_MAP.get(health.protocol, [])
+                score = self._RISK_LEVEL_TO_SCORE.get(health.risk_level.value, Decimal("0.10"))
+                for protocol in protocols:
+                    risk_map[protocol] = score
+
+            # IDLE は常に 0
+            risk_map[Protocol.IDLE] = Decimal("0.00")
+
+            logger.debug("using dynamic risk score from risk engine: %s", risk_map)
+            return risk_map
+
+        except Exception as exc:
+            logger.warning("risk engine unavailable, using fallback risk scores: %s", exc)
+            return None
+
     def _calculate_risk_score(
         self,
         allocations: list[AllocationEntry],
@@ -269,17 +336,12 @@ class PortfolioAllocator:
     ) -> Decimal:
         """加重平均リスクスコアを計算する。
 
-        リスクスコアは配分比率で加重平均した値。
+        リスクエンジンから動的スコアを取得し、失敗時はフォールバック固定値を使用する。
         """
-        # 簡易リスクスコア（プロトコル別の固定値）
-        risk_map: dict[Protocol, Decimal] = {
-            Protocol.AAVE: Decimal("0.05"),
-            Protocol.LIDO: Decimal("0.15"),
-            Protocol.LIDO_AAVE: Decimal("0.20"),
-            Protocol.PENDLE_PT: Decimal("0.10"),
-            Protocol.PENDLE_YT: Decimal("0.30"),
-            Protocol.IDLE: Decimal("0.00"),
-        }
+        risk_map = self._build_dynamic_risk_map()
+        if risk_map is None:
+            # フォールバック: 固定値を使用
+            risk_map = dict(self._FALLBACK_RISK_MAP)
 
         total_risk = Decimal("0")
         for entry in allocations:
