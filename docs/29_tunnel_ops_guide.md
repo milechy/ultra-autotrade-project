@@ -101,6 +101,14 @@ docker compose -f docker-compose.staging.yml restart backend
 
 ---
 
+## インシデント履歴
+
+| 日付 | 症状 | 原因 | 対応 | 再発防止 |
+|---|---|---|---|---|
+| 2026-04-01 | CORS→実は500（不足カラム）+ Mixed Content + .env改行欠落 | (1) terms_version等9カラムがDBに未追加→500→CORSヘッダーなし→CORSエラーに見えた (2) NEXT_PUBLIC_BACKEND_BASE_URL=http://でトンネルhttps経由アクセス→Mixed Content (3) echo追記で改行なし連結 | ALTER TABLE全カラム追加、IP直接アクセスに切り替え、printf使用 | — |
+
+---
+
 ## トラブルシューティング
 
 | 症状 | 原因 | 対応 |
@@ -109,6 +117,9 @@ docker compose -f docker-compose.staging.yml restart backend
 | `/root/.cloudflared` がマウントできない | 認証情報ファイル未生成 | `cloudflared tunnel create` を先に実行 |
 | 502 Bad Gateway | backend が起動していない | `docker compose ps` で状態確認 |
 | DNS エラー | DNS プロパゲーション未完了 | 最大48時間待機 |
+| CORSエラーだがOPTIONSは正常 | バックエンドが500を返している（CORSヘッダーはエラー時に付かない） | `docker logs <backend> 2>&1 \| grep error` でDB不足カラム等を確認→修正 |
+| httpsページからhttpバックエンドへのリクエストがブロック | Mixed Content（https→http） | IP直接アクセス（http同士）を使うか、バックエンドもトンネル経由にする |
+| echo追記した環境変数が効かない | 前行の末尾に改行がなく連結された | `grep <KEY> .env.staging` で確認。`printf '\nKEY=VALUE\n' >> file` を使う |
 
 ---
 

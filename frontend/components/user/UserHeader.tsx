@@ -103,6 +103,8 @@ export function UserHeader() {
                     'text-xs hidden sm:flex',
                     chain?.id === 42161
                       ? 'border-green-500/50 text-green-400'
+                      : [421614, 84532, 11155111].includes(chain?.id ?? 0)
+                      ? 'border-yellow-500/50 text-yellow-400'
                       : 'border-red-500/50 text-red-400'
                   )}
                 >
@@ -142,26 +144,6 @@ export function UserHeader() {
           </div>
         </div>
 
-        {/* Mobile nav scroll */}
-        <div className="md:hidden flex overflow-x-auto border-t scrollbar-none">
-          {navItems.map(({ href, label }) => {
-            const isActive = pathname === href || pathname.startsWith(href + '/')
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  'px-3 py-2 text-xs whitespace-nowrap shrink-0 border-b-2 transition-colors',
-                  isActive
-                    ? 'border-primary text-primary font-medium'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {label}
-              </Link>
-            )
-          })}
-        </div>
       </header>
 
       {/* Emergency stop confirmation dialog */}

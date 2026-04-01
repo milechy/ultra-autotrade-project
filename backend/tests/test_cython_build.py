@@ -67,11 +67,7 @@ class TestCythonBuildArtifacts:
             "models.py",
         }
         ai_dir = os.path.join(os.path.dirname(__file__), "..", "app", "ai")
-        remaining_py = [
-            f
-            for f in os.listdir(ai_dir)
-            if f.endswith(".py") and f not in exclude
-        ]
+        remaining_py = [f for f in os.listdir(ai_dir) if f.endswith(".py") and f not in exclude]
         assert remaining_py == [], (
             f"BUILD_MODE=production but .py source files still present: {remaining_py}"
         )

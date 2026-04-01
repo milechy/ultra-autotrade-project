@@ -119,7 +119,7 @@ export default function ConnectPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="max-w-md mx-auto px-4 py-8">
+      <div className="max-w-2xl mx-auto px-4 py-8">
 
         {/* Step Indicator */}
         <StepIndicator currentStep={currentStep} />
@@ -329,7 +329,7 @@ export default function ConnectPage() {
           {allChecksPass && (
             <Button
               size="lg"
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-6 text-base disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-6 text-base disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!termsAccepted || !riskAccepted || isAuthenticating || !signer}
               onClick={handleStart}
             >

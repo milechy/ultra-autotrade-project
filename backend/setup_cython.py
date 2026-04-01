@@ -1,4 +1,5 @@
 """Cython build script for AI judgment logic protection."""
+
 import os
 
 from Cython.Build import cythonize

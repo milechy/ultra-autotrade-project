@@ -238,3 +238,27 @@ curl -s -X POST "$WEBHOOK" \
 ### フック
 - pre-large-edit.sh (PreToolUse) — 50行超の変更を警告
 - post-commit-diff.sh (PostToolUse) — コミット時にdiff表示
+
+---
+
+## デプロイ時の教訓
+
+### 2026-04-01追加
+
+**環境変数:**
+- `echo 'KEY=VALUE' >> .env.staging` は前行に改行がないと連結される（例: `OCTOBOT_API_KEY=dummyNEXT_PUBLIC_BACKEND_BASE_URL=...`）。必ず `printf '\nKEY=VALUE\n' >> file` を使う
+- `docker compose restart` は環境変数を再読み込みしない場合がある。確実に反映するには `docker compose up -d --no-deps --build <service>`
+
+**DB マイグレーション:**
+- 新しいSQLAlchemyカラム追加後のデプロイでは、必ずモデル定義とDBカラムを比較して `ALTER TABLE ADD COLUMN IF NOT EXISTS` を実行。確認コマンド:
+  `docker exec <postgres-container> psql -U ultra -d ultra_autotrade -c "SELECT column_name FROM information_schema.columns WHERE table_name='users' ORDER BY ordinal_position;"`
+
+**CORS と 500エラーの混同:**
+- FastAPIは500エラー時にCORSヘッダーを付けない。ブラウザではCORSエラーに見えるが、実態はバックエンドの500（DB不足カラム等）。CORS問題に見えたらまずバックエンドログを確認:
+  `docker logs <backend-container> 2>&1 | grep -i 'error\|undefined.*column\|does not exist'`
+
+**Mixed Content:**
+- httpsトンネル経由のフロントエンドから httpバックエンドへのリクエストはブラウザにブロックされる（Mixed Content）。トンネル使用時はフロントエンド・バックエンド両方をトンネル経由にするか、IP直接アクセス（PCのみ）を使う
+
+**孤立Dockerコンテナ:**
+- `docker compose down --remove-orphans` で消えない場合は `docker rm -f <container-name>` で強制削除してから `up -d`

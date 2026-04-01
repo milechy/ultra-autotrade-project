@@ -12,15 +12,11 @@ const CHAIN_INFO: Record<number, { name: string; colorClass: string }> = {
   },
   421614: {
     name: 'Arbitrum Sepolia',
-    colorClass: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+    colorClass: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30',
   },
   84532: {
     name: 'Base Sepolia',
-    colorClass: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  },
-  84532: {
-    name: 'Base Sepolia',
-    colorClass: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    colorClass: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30',
   },
 }
 

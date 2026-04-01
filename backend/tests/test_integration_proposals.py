@@ -25,9 +25,7 @@ from app.main import create_app
 @pytest.fixture()
 def test_db():
     fd, path = tempfile.mkstemp(suffix=".db")
-    test_engine = create_engine(
-        f"sqlite:///{path}", connect_args={"check_same_thread": False}
-    )
+    test_engine = create_engine(f"sqlite:///{path}", connect_args={"check_same_thread": False})
     TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
 
@@ -65,7 +63,9 @@ def get_admin_token(client: TestClient) -> str:
     return r.json()["access_token"]
 
 
-def _create_proposal(client: TestClient, token: str, user_id: int, expires_at: str | None = None) -> dict:
+def _create_proposal(
+    client: TestClient, token: str, user_id: int, expires_at: str | None = None
+) -> dict:
     """テスト用 proposal を作成して返す。"""
     payload = {
         "user_id": user_id,

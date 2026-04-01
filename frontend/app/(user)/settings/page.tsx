@@ -131,11 +131,12 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="space-y-4 px-4 py-4 pb-24 max-w-2xl mx-auto">
+      <div className="space-y-4 px-4 py-4 pb-24 max-w-4xl mx-auto">
         {/* 1. 運用モード — state loaded from GET /api/automation/status */}
         <OperationModeCard
           isRunning={settings.isRunning}
           onToggle={handleToggleRunning}
+          disabled={isStopped}
         />
 
         {/* 2. リスク設定 — riskMode synced with PUT /auth/risk-mode */}

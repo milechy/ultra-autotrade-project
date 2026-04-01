@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from typing import Optional, cast
+from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -71,7 +71,8 @@ def _parse_published_at(entry: object) -> Optional[datetime]:
     published = getattr(entry, "published", None)
     if published:
         try:
-            return cast(datetime, parsedate_to_datetime(published))
+            result: datetime = parsedate_to_datetime(published)
+            return result
         except Exception:
             logger.debug("Failed to parse published date string for RSS entry")
 
