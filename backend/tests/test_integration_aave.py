@@ -61,9 +61,7 @@ def _make_mock_multi_chain_service() -> MagicMock:
 @pytest.fixture()
 def test_db():
     fd, path = tempfile.mkstemp(suffix=".db")
-    test_engine = create_engine(
-        f"sqlite:///{path}", connect_args={"check_same_thread": False}
-    )
+    test_engine = create_engine(f"sqlite:///{path}", connect_args={"check_same_thread": False})
     TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
 
