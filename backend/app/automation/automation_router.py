@@ -84,6 +84,7 @@ def process_news(
             exchange_service=get_exchange_service(),
             monitoring_service=monitoring_service,
             dry_run=dry_run,
+            execution_policy="auto_execute",
         )
         monitoring_service.record_news_fetch()
     except Exception as exc:

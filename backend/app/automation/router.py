@@ -182,6 +182,7 @@ def run_workflow(
         exchange_service=exchange_service,
         monitoring_service=monitoring,
         dry_run=dry_run,
+        execution_policy="auto_execute",
     )
 
     # Sanitize error messages (no internal details in API response)

@@ -144,6 +144,7 @@ def run_workflow(
         exchange_service=exchange_service,
         monitoring_service=monitoring_service,
         dry_run=dry_run,
+        execution_policy=current_user.execution_policy,
     )
 
     sanitized_errors = [

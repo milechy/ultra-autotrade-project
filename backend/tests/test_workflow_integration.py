@@ -293,3 +293,69 @@ class TestProcessPendingKnowledge:
 
         assert result.status == "no_items"
         assert result.fetched_count == 0
+
+    def test_require_approval_creates_proposal(self):
+        """execution_policy=require_approval → proposal created, no immediate trade."""
+        db = MagicMock()
+        ks = MagicMock()
+        ai = MagicMock()
+        ex = MagicMock()
+
+        item = _make_knowledge_item()
+        ks.get_pending.return_value = [item]
+        ks.search.return_value = [
+            KnowledgeSearchResult(
+                chunk_id=1,
+                document_id=1,
+                content="BTC up",
+                similarity=0.9,
+            )
+        ]
+        ai.judge_with_rag.return_value = _make_cross_validation(TradeAction.BUY, 85)
+
+        result = process_pending_knowledge(
+            db,
+            knowledge_service=ks,
+            ai_service=ai,
+            exchange_service=ex,
+            execution_policy="require_approval",
+        )
+
+        assert result.fetched_count == 1
+        # proposal created → proposed_count incremented, no direct trade
+        assert result.proposed_count == 1
+        assert result.traded_count == 0
+        ex.execute_trade.assert_not_called()
+
+    def test_auto_execute_performs_immediate_trade(self):
+        """execution_policy=auto_execute → trade executed immediately."""
+        db = MagicMock()
+        ks = MagicMock()
+        ai = MagicMock()
+        ex = MagicMock()
+
+        item = _make_knowledge_item()
+        ks.get_pending.return_value = [item]
+        ks.search.return_value = [
+            KnowledgeSearchResult(
+                chunk_id=1,
+                document_id=1,
+                content="BTC up",
+                similarity=0.9,
+            )
+        ]
+        ai.judge_with_rag.return_value = _make_cross_validation(TradeAction.BUY, 85)
+        ex.execute_trade.return_value = _make_order_result(OrderStatus.SUCCESS)
+
+        result = process_pending_knowledge(
+            db,
+            knowledge_service=ks,
+            ai_service=ai,
+            exchange_service=ex,
+            execution_policy="auto_execute",
+        )
+
+        assert result.fetched_count == 1
+        assert result.traded_count == 1
+        assert result.proposed_count == 0
+        ex.execute_trade.assert_called_once()
