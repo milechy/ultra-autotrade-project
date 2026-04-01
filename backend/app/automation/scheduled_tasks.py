@@ -376,6 +376,233 @@ async def dca_loop(
             await asyncio.sleep(60)
 
 
+async def proposal_timeout_loop(
+    *,
+    interval_seconds: int = 300,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """
+    期限切れ Proposal を検出して LINE 通知する定期ループ。
+
+    5 分ごとに pending かつ expires_at が過去の Proposal を検索し、
+    canceled に更新して LINE 通知を送る。
+
+    Args:
+        interval_seconds: チェック間隔（秒）。デフォルト 300 秒（5 分）
+        on_error: エラー発生時のコールバック
+
+    Note:
+        - このコルーチンは無限ループで動作する
+        - 停止は asyncio.CancelledError で行う
+        - エラー発生時もループは継続（fail-safe）
+    """
+    logger.info(
+        "Starting proposal timeout loop (interval: %ds)",
+        interval_seconds,
+    )
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+
+            def _run_timeout_check() -> None:
+                import os  # noqa: PLC0415
+                from datetime import datetime, timezone  # noqa: PLC0415
+
+                from app.database import SessionLocal  # noqa: PLC0415
+
+                db = SessionLocal()
+                try:
+                    from app.proposals.models import Proposal  # noqa: PLC0415
+
+                    now = datetime.now(timezone.utc)
+                    expired = (
+                        db.query(Proposal)
+                        .filter(Proposal.status == "pending", Proposal.expires_at < now)
+                        .all()
+                    )
+                    for proposal in expired:
+                        try:
+                            proposal.status = "canceled"
+                            db.flush()
+                            logger.info(
+                                "Proposal %d expired (op=%s, asset=%s)",
+                                proposal.id,
+                                proposal.operation,
+                                proposal.asset,
+                            )
+                            if os.getenv("LINE_NOTIFY_TOKEN"):
+                                try:
+                                    from app.notifications.line_notifier import (  # noqa: PLC0415
+                                        notify_proposal_timeout,
+                                    )
+
+                                    notify_proposal_timeout(
+                                        operation=proposal.operation,
+                                        asset=proposal.asset,
+                                    )
+                                except Exception as _line_exc:
+                                    logger.debug("notify_proposal_timeout failed: %s", _line_exc)
+                        except Exception as _item_exc:
+                            logger.warning(
+                                "Failed to cancel proposal %d: %s", proposal.id, _item_exc
+                            )
+                    if expired:
+                        db.commit()
+                        logger.info("Canceled %d expired proposals", len(expired))
+                except Exception as _db_exc:
+                    db.rollback()
+                    logger.warning("Proposal timeout check DB error: %s", _db_exc)
+                finally:
+                    db.close()
+
+            await asyncio.to_thread(_run_timeout_check)
+
+        except asyncio.CancelledError:
+            logger.info("Proposal timeout loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in proposal timeout loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            await asyncio.sleep(600)
+
+
+async def health_check_loop(
+    *,
+    interval_seconds: int = 300,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """
+    HF 並列チェック・ポジション安全確認の定期実行ループ。
+
+    5 分ごとに check_health_factors_concurrent() と check_all_positions_safe() を実行する。
+
+    Args:
+        interval_seconds: 取得間隔（秒）。デフォルト 300 秒（5 分）
+        on_error: エラー発生時のコールバック
+
+    Note:
+        - このコルーチンは無限ループで動作する
+        - 停止は asyncio.CancelledError で行う
+        - エラー発生時もループは継続（fail-safe）
+    """
+    logger.info(
+        "Starting health check loop (interval: %ds)",
+        interval_seconds,
+    )
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+
+            async def _run_health_check() -> None:
+                from app.automation.monitoring_service import MonitoringService  # noqa: PLC0415
+                from app.automation.schemas import ComponentType  # noqa: PLC0415
+
+                monitoring_service = MonitoringService()
+
+                try:
+                    from app.aave.monitor import get_health_factor  # noqa: PLC0415
+
+                    is_safe = await monitoring_service.check_all_positions_safe(get_health_factor)
+                    if not is_safe:
+                        logger.warning("Position safety check failed: HF below emergency threshold")
+                        monitoring_service.record_error(ComponentType.AAVE)
+                except Exception as hf_exc:
+                    logger.warning("check_all_positions_safe skipped: %s", hf_exc)
+
+            await _run_health_check()
+
+        except asyncio.CancelledError:
+            logger.info("Health check loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in health check loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            await asyncio.sleep(600)
+
+
+async def latency_monitor_loop(
+    *,
+    interval_seconds: int = 60,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """
+    API 応答時間の定期計測ループ。
+
+    1 分ごとに /api/automation/status エンドポイントの応答時間を計測し
+    MonitoringService.record_latency() に記録する。
+
+    Args:
+        interval_seconds: 計測間隔（秒）。デフォルト 60 秒（1 分）
+        on_error: エラー発生時のコールバック
+
+    Note:
+        - このコルーチンは無限ループで動作する
+        - 停止は asyncio.CancelledError で行う
+        - エラー発生時もループは継続（fail-safe）
+    """
+    import os  # noqa: PLC0415
+
+    logger.info(
+        "Starting latency monitor loop (interval: %ds)",
+        interval_seconds,
+    )
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+
+            def _run_latency_check() -> None:
+                import time  # noqa: PLC0415
+
+                import httpx  # noqa: PLC0415
+
+                from app.automation.monitoring_service import MonitoringService  # noqa: PLC0415
+                from app.automation.schemas import ComponentType  # noqa: PLC0415
+
+                base_url = os.getenv("BACKEND_BASE_URL", "http://localhost:8000")
+                url = f"{base_url}/api/automation/status"
+
+                monitoring_service = MonitoringService()
+                start = time.monotonic()
+                try:
+                    httpx.get(url, timeout=35)
+                    elapsed = time.monotonic() - start
+                    monitoring_service.record_latency(ComponentType.SYSTEM, elapsed)
+                    logger.debug("Latency recorded: %.3fs for %s", elapsed, url)
+                except Exception as req_exc:
+                    logger.warning("Latency check request failed (skipping): %s", req_exc)
+
+            await asyncio.to_thread(_run_latency_check)
+
+        except asyncio.CancelledError:
+            logger.info("Latency monitor loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in latency monitor loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            await asyncio.sleep(600)
+
+
 async def price_change_monitor_loop(
     *,
     interval_seconds: int = 300,
@@ -455,6 +682,9 @@ class ScheduledTaskManager:
         self._dca_task: Optional[asyncio.Task[None]] = None
         self._rebalance_task: Optional[asyncio.Task[None]] = None
         self._price_monitor_task: Optional[asyncio.Task[None]] = None
+        self._health_check_task: Optional[asyncio.Task[None]] = None
+        self._latency_monitor_task: Optional[asyncio.Task[None]] = None
+        self._proposal_timeout_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -485,6 +715,21 @@ class ScheduledTaskManager:
     def is_price_monitor_running(self) -> bool:
         """価格変動モニタータスクが動作中かどうか。"""
         return self._price_monitor_task is not None and not self._price_monitor_task.done()
+
+    @property
+    def is_health_check_running(self) -> bool:
+        """HFヘルスチェックタスクが動作中かどうか。"""
+        return self._health_check_task is not None and not self._health_check_task.done()
+
+    @property
+    def is_latency_monitor_running(self) -> bool:
+        """レイテンシモニタータスクが動作中かどうか。"""
+        return self._latency_monitor_task is not None and not self._latency_monitor_task.done()
+
+    @property
+    def is_proposal_timeout_running(self) -> bool:
+        """期限切れProposalチェックタスクが動作中かどうか。"""
+        return self._proposal_timeout_task is not None and not self._proposal_timeout_task.done()
 
     async def start_daily_reports(
         self,
@@ -851,6 +1096,180 @@ class ScheduledTaskManager:
         self._price_monitor_task = None
         logger.info("Price change monitor task stopped")
 
+    async def start_proposal_timeout(
+        self,
+        *,
+        interval_seconds: int = 300,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """
+        期限切れProposalチェックタスクを開始する。
+
+        Raises:
+            RuntimeError: 既に開始されている場合
+        """
+        if self.is_proposal_timeout_running:
+            raise RuntimeError("Proposal timeout check already running")
+
+        logger.info("Starting proposal timeout task")
+
+        self._proposal_timeout_task = asyncio.create_task(
+            proposal_timeout_loop(
+                interval_seconds=interval_seconds,
+                on_error=on_error,
+            )
+        )
+
+        logger.info("Proposal timeout task started")
+
+    async def stop_proposal_timeout(self, timeout: float = 5.0) -> None:
+        """期限切れProposalチェックタスクを停止する。"""
+        if not self.is_proposal_timeout_running:
+            logger.debug("Proposal timeout check not running - nothing to stop")
+            return
+
+        logger.info("Stopping proposal timeout task")
+
+        assert self._proposal_timeout_task is not None  # noqa: S101
+        self._proposal_timeout_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._proposal_timeout_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Proposal timeout task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Proposal timeout task did not stop within %.1fs timeout",
+                timeout,
+            )
+        except Exception as exc:
+            logger.error("Error while stopping proposal timeout task: %s", exc)
+
+        self._proposal_timeout_task = None
+        logger.info("Proposal timeout task stopped")
+
+    async def start_latency_monitor(
+        self,
+        *,
+        interval_seconds: int = 60,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """
+        レイテンシモニタータスクを開始する。
+
+        Args:
+            interval_seconds: 計測間隔（秒）
+            on_error: エラー時コールバック
+
+        Raises:
+            RuntimeError: 既にレイテンシモニターが開始されている場合
+        """
+        if self.is_latency_monitor_running:
+            raise RuntimeError("Latency monitor already running")
+
+        logger.info("Starting latency monitor task")
+
+        self._latency_monitor_task = asyncio.create_task(
+            latency_monitor_loop(
+                interval_seconds=interval_seconds,
+                on_error=on_error,
+            )
+        )
+
+        logger.info("Latency monitor task started")
+
+    async def stop_latency_monitor(self, timeout: float = 5.0) -> None:
+        """
+        レイテンシモニタータスクを停止する。
+
+        Args:
+            timeout: キャンセル待機のタイムアウト秒数
+        """
+        if not self.is_latency_monitor_running:
+            logger.debug("Latency monitor not running - nothing to stop")
+            return
+
+        logger.info("Stopping latency monitor task")
+
+        assert self._latency_monitor_task is not None  # noqa: S101
+        self._latency_monitor_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._latency_monitor_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Latency monitor task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Latency monitor task did not stop within %.1fs timeout",
+                timeout,
+            )
+        except Exception as exc:
+            logger.error("Error while stopping latency monitor task: %s", exc)
+
+        self._latency_monitor_task = None
+        logger.info("Latency monitor task stopped")
+
+    async def start_health_check(
+        self,
+        *,
+        interval_seconds: int = 300,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """
+        HFヘルスチェックタスクを開始する。
+
+        Args:
+            interval_seconds: チェック間隔（秒）
+            on_error: エラー時コールバック
+
+        Raises:
+            RuntimeError: 既にヘルスチェックが開始されている場合
+        """
+        if self.is_health_check_running:
+            raise RuntimeError("Health check already running")
+
+        logger.info("Starting health check task")
+
+        self._health_check_task = asyncio.create_task(
+            health_check_loop(
+                interval_seconds=interval_seconds,
+                on_error=on_error,
+            )
+        )
+
+        logger.info("Health check task started")
+
+    async def stop_health_check(self, timeout: float = 5.0) -> None:
+        """
+        HFヘルスチェックタスクを停止する。
+
+        Args:
+            timeout: キャンセル待機のタイムアウト秒数
+        """
+        if not self.is_health_check_running:
+            logger.debug("Health check not running - nothing to stop")
+            return
+
+        logger.info("Stopping health check task")
+
+        assert self._health_check_task is not None  # noqa: S101
+        self._health_check_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._health_check_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Health check task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Health check task did not stop within %.1fs timeout",
+                timeout,
+            )
+        except Exception as exc:
+            logger.error("Error while stopping health check task: %s", exc)
+
+        self._health_check_task = None
+        logger.info("Health check task stopped")
+
     async def stop_all(self, timeout: float = 5.0) -> None:
         """
         全てのスケジュールタスクを停止する。
@@ -867,6 +1286,9 @@ class ScheduledTaskManager:
             self.stop_dca(timeout=timeout),
             self.stop_rebalance_check(timeout=timeout),
             self.stop_price_monitor(timeout=timeout),
+            self.stop_health_check(timeout=timeout),
+            self.stop_latency_monitor(timeout=timeout),
+            self.stop_proposal_timeout(timeout=timeout),
             return_exceptions=True,
         )
 
