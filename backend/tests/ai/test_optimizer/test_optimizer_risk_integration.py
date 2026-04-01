@@ -96,25 +96,26 @@ def _make_protocol_health(protocol: str, risk_level: RiskLevel) -> ProtocolHealt
 class TestDynamicRiskScoreUsed:
     """リスクエンジンが正常に動作する場合、動的スコアが使われることを検証する。"""
 
-    def test_dynamic_risk_map_used_when_engine_available(
+    @pytest.mark.asyncio
+    async def test_dynamic_risk_map_used_when_engine_available(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """リスクエンジンが利用可能な場合、動的リスクスコアが使われること。"""
+        dynamic_map = {
+            Protocol.AAVE: Decimal("0.05"),
+            Protocol.LIDO: Decimal("0.05"),
+            Protocol.LIDO_AAVE: Decimal("0.05"),
+            Protocol.PENDLE_PT: Decimal("0.05"),
+            Protocol.PENDLE_YT: Decimal("0.05"),
+            Protocol.IDLE: Decimal("0.00"),
+        }
         with patch(
-            "app.ai.optimizer.allocator.PortfolioAllocator._build_dynamic_risk_map"
+            "app.ai.optimizer.allocator.PortfolioAllocator._build_dynamic_risk_map",
+            new=AsyncMock(return_value=dynamic_map),
         ) as mock_build:
-            # LOW リスク時のスコアを動的マップとして返す
-            mock_build.return_value = {
-                Protocol.AAVE: Decimal("0.05"),
-                Protocol.LIDO: Decimal("0.05"),
-                Protocol.LIDO_AAVE: Decimal("0.05"),
-                Protocol.PENDLE_PT: Decimal("0.05"),
-                Protocol.PENDLE_YT: Decimal("0.05"),
-                Protocol.IDLE: Decimal("0.00"),
-            }
-            result = allocator.allocate(ranked_results, Decimal("10000"), "balanced")
+            result = await allocator.allocate(ranked_results, Decimal("10000"), "balanced")
 
         # _build_dynamic_risk_map が呼ばれたことを確認
         mock_build.assert_called_once()
@@ -123,37 +124,41 @@ class TestDynamicRiskScoreUsed:
         # LOW リスクなので全プロトコルのスコアが低いため、総合スコアも低い
         assert result.total_risk_score < Decimal("0.20")
 
-    def test_dynamic_high_risk_increases_total_score(
+    @pytest.mark.asyncio
+    async def test_dynamic_high_risk_increases_total_score(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """リスクエンジンが HIGH リスクを返す場合、総合スコアが上昇すること。"""
-        with patch(
-            "app.ai.optimizer.allocator.PortfolioAllocator._build_dynamic_risk_map"
-        ) as mock_build:
-            mock_build.return_value = {
-                Protocol.AAVE: Decimal("0.60"),
-                Protocol.LIDO: Decimal("0.60"),
-                Protocol.LIDO_AAVE: Decimal("0.60"),
-                Protocol.PENDLE_PT: Decimal("0.60"),
-                Protocol.PENDLE_YT: Decimal("0.60"),
-                Protocol.IDLE: Decimal("0.00"),
-            }
-            result_high = allocator.allocate(ranked_results, Decimal("10000"), "balanced")
+        high_map = {
+            Protocol.AAVE: Decimal("0.60"),
+            Protocol.LIDO: Decimal("0.60"),
+            Protocol.LIDO_AAVE: Decimal("0.60"),
+            Protocol.PENDLE_PT: Decimal("0.60"),
+            Protocol.PENDLE_YT: Decimal("0.60"),
+            Protocol.IDLE: Decimal("0.00"),
+        }
+        low_map = {
+            Protocol.AAVE: Decimal("0.05"),
+            Protocol.LIDO: Decimal("0.05"),
+            Protocol.LIDO_AAVE: Decimal("0.05"),
+            Protocol.PENDLE_PT: Decimal("0.05"),
+            Protocol.PENDLE_YT: Decimal("0.05"),
+            Protocol.IDLE: Decimal("0.00"),
+        }
 
         with patch(
-            "app.ai.optimizer.allocator.PortfolioAllocator._build_dynamic_risk_map"
-        ) as mock_build:
-            mock_build.return_value = {
-                Protocol.AAVE: Decimal("0.05"),
-                Protocol.LIDO: Decimal("0.05"),
-                Protocol.LIDO_AAVE: Decimal("0.05"),
-                Protocol.PENDLE_PT: Decimal("0.05"),
-                Protocol.PENDLE_YT: Decimal("0.05"),
-                Protocol.IDLE: Decimal("0.00"),
-            }
-            result_low = allocator.allocate(ranked_results, Decimal("10000"), "balanced")
+            "app.ai.optimizer.allocator.PortfolioAllocator._build_dynamic_risk_map",
+            new=AsyncMock(return_value=high_map),
+        ):
+            result_high = await allocator.allocate(ranked_results, Decimal("10000"), "balanced")
+
+        with patch(
+            "app.ai.optimizer.allocator.PortfolioAllocator._build_dynamic_risk_map",
+            new=AsyncMock(return_value=low_map),
+        ):
+            result_low = await allocator.allocate(ranked_results, Decimal("10000"), "balanced")
 
         assert result_high.total_risk_score > result_low.total_risk_score
 
@@ -161,7 +166,8 @@ class TestDynamicRiskScoreUsed:
 class TestFallbackRiskScoreUsed:
     """リスクエンジンが例外を投げる場合、フォールバック固定値が使われることを検証する。"""
 
-    def test_fallback_used_when_engine_raises(
+    @pytest.mark.asyncio
+    async def test_fallback_used_when_engine_raises(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
@@ -169,15 +175,16 @@ class TestFallbackRiskScoreUsed:
         """リスクエンジンが例外を投げた場合、フォールバック固定値が使われること。"""
         with patch(
             "app.ai.optimizer.allocator.PortfolioAllocator._build_dynamic_risk_map",
-            return_value=None,
+            new=AsyncMock(return_value=None),
         ):
-            result = allocator.allocate(ranked_results, Decimal("10000"), "balanced")
+            result = await allocator.allocate(ranked_results, Decimal("10000"), "balanced")
 
         # フォールバック使用時もリスクスコアは Decimal で返ること
         assert isinstance(result.total_risk_score, Decimal)
         assert result.total_risk_score >= Decimal("0")
 
-    def test_fallback_matches_original_fixed_scores(
+    @pytest.mark.asyncio
+    async def test_fallback_matches_original_fixed_scores(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
@@ -185,16 +192,17 @@ class TestFallbackRiskScoreUsed:
         """フォールバック固定値が元の実装と同じスコアを返すこと。"""
         with patch(
             "app.ai.optimizer.allocator.PortfolioAllocator._build_dynamic_risk_map",
-            return_value=None,
+            new=AsyncMock(return_value=None),
         ):
-            result = allocator.allocate(ranked_results, Decimal("10000"), "conservative")
+            result = await allocator.allocate(ranked_results, Decimal("10000"), "conservative")
 
         # conservative: AAVE(95%) + IDLE(5%)
         # fallback: AAVE=0.05, IDLE=0.00 → 0.05*0.95 + 0.00*0.05 = 0.0475
         expected = Decimal("0.05") * Decimal("95") / Decimal("100")
         assert abs(result.total_risk_score - expected) < Decimal("0.001")
 
-    def test_engine_exception_triggers_fallback(
+    @pytest.mark.asyncio
+    async def test_engine_exception_triggers_fallback(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
@@ -203,9 +211,9 @@ class TestFallbackRiskScoreUsed:
         """_build_dynamic_risk_map が None を返した場合にフォールバックが使われること。"""
         with patch(
             "app.ai.optimizer.allocator.PortfolioAllocator._build_dynamic_risk_map",
-            return_value=None,
+            new=AsyncMock(return_value=None),
         ):
-            result = allocator.allocate(ranked_results, Decimal("10000"), "balanced")
+            result = await allocator.allocate(ranked_results, Decimal("10000"), "balanced")
 
         # フォールバック時もレスポンスが正常に返ること
         assert result is not None
@@ -215,7 +223,8 @@ class TestFallbackRiskScoreUsed:
 class TestFallbackWarningLog:
     """フォールバック時に warning ログが出ることを検証する。"""
 
-    def test_warning_log_on_engine_exception(
+    @pytest.mark.asyncio
+    async def test_warning_log_on_engine_exception(
         self,
         allocator: PortfolioAllocator,
         caplog: pytest.LogCaptureFixture,
@@ -228,7 +237,7 @@ class TestFallbackWarningLog:
                 MockMonitor.return_value = mock_instance
 
                 # _build_dynamic_risk_map を直接呼び出してテスト
-                result = allocator._build_dynamic_risk_map()
+                result = await allocator._build_dynamic_risk_map()
 
         # エンジンが失敗した場合は None が返ること
         assert result is None
@@ -236,7 +245,8 @@ class TestFallbackWarningLog:
         warning_messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]
         assert any("risk engine unavailable" in msg for msg in warning_messages)
 
-    def test_debug_log_on_engine_success(
+    @pytest.mark.asyncio
+    async def test_debug_log_on_engine_success(
         self,
         allocator: PortfolioAllocator,
         caplog: pytest.LogCaptureFixture,
@@ -280,35 +290,35 @@ class TestFallbackWarningLog:
                 mock_instance.check_all = AsyncMock(return_value=mock_healths)
                 MockMonitor.return_value = mock_instance
 
-                result = allocator._build_dynamic_risk_map()
+                result = await allocator._build_dynamic_risk_map()
 
         # 成功時は None でないマップが返ること
-        # (イベントループが running の場合 None になる可能性もあるため緩い検証)
-        # ログに debug メッセージが含まれるか、またはエンジンが正常動作すること
         assert result is None or isinstance(result, dict)
 
 
 class TestRiskScoreDecimalType:
     """リスクスコアの計算が常に Decimal で行われることを確認する。"""
 
-    def test_risk_score_is_decimal_with_dynamic_map(
+    @pytest.mark.asyncio
+    async def test_risk_score_is_decimal_with_dynamic_map(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """動的マップ使用時も total_risk_score が Decimal 型であること。"""
+        dynamic_map = {
+            Protocol.AAVE: Decimal("0.05"),
+            Protocol.LIDO: Decimal("0.15"),
+            Protocol.LIDO_AAVE: Decimal("0.20"),
+            Protocol.PENDLE_PT: Decimal("0.10"),
+            Protocol.PENDLE_YT: Decimal("0.30"),
+            Protocol.IDLE: Decimal("0.00"),
+        }
         with patch(
-            "app.ai.optimizer.allocator.PortfolioAllocator._build_dynamic_risk_map"
-        ) as mock_build:
-            mock_build.return_value = {
-                Protocol.AAVE: Decimal("0.05"),
-                Protocol.LIDO: Decimal("0.15"),
-                Protocol.LIDO_AAVE: Decimal("0.20"),
-                Protocol.PENDLE_PT: Decimal("0.10"),
-                Protocol.PENDLE_YT: Decimal("0.30"),
-                Protocol.IDLE: Decimal("0.00"),
-            }
-            result = allocator.allocate(ranked_results, Decimal("10000"), "aggressive")
+            "app.ai.optimizer.allocator.PortfolioAllocator._build_dynamic_risk_map",
+            new=AsyncMock(return_value=dynamic_map),
+        ):
+            result = await allocator.allocate(ranked_results, Decimal("10000"), "aggressive")
 
         assert isinstance(result.total_risk_score, Decimal)
         # float が混入していないこと

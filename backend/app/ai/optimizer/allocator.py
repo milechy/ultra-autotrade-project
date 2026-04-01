@@ -59,7 +59,7 @@ class PortfolioAllocator:
     # 最小アイドル/現金リザーブ
     MIN_IDLE_PCT = _MIN_IDLE_PCT
 
-    def allocate(
+    async def allocate(
         self,
         ranked_results: list[NetBenefitResult],
         total_usd: Decimal,
@@ -109,7 +109,7 @@ class PortfolioAllocator:
 
         # 合計 APY とリスクスコアを計算
         total_expected_apy = self._calculate_weighted_apy(allocations, ranked_results)
-        total_risk_score = self._calculate_risk_score(allocations, ranked_results)
+        total_risk_score = await self._calculate_risk_score(allocations, ranked_results)
 
         explanation = self._generate_explanation(allocations, risk_mode_lower, total_expected_apy)
 
@@ -291,29 +291,17 @@ class PortfolioAllocator:
         "pendle": [Protocol.PENDLE_PT, Protocol.PENDLE_YT],
     }
 
-    def _build_dynamic_risk_map(self) -> Optional[dict[Protocol, Decimal]]:
-        """リスクエンジンから動的リスクスコアマップを構築する。
+    async def _build_dynamic_risk_map(self) -> Optional[dict[Protocol, Decimal]]:
+        """リスクエンジンから動的リスクスコアマップを構築する（async）。
 
         Returns:
             プロトコル → リスクスコアのマップ。取得失敗時は None。
         """
         try:
-            import asyncio  # noqa: PLC0415
-
             from app.protocols.risk.protocol_monitor import ProtocolMonitor  # noqa: PLC0415
 
             monitor = ProtocolMonitor()
-
-            # 既存のイベントループがある場合は asyncio.get_event_loop で実行
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # 同期コンテキストから非同期を呼び出せない場合は None を返す
-                    logger.debug("event loop is running, skipping dynamic risk score fetch")
-                    return None
-                protocol_healths = loop.run_until_complete(monitor.check_all())
-            except RuntimeError:
-                protocol_healths = asyncio.run(monitor.check_all())
+            protocol_healths = await monitor.check_all()
 
             risk_map: dict[Protocol, Decimal] = {}
             for health in protocol_healths:
@@ -332,16 +320,16 @@ class PortfolioAllocator:
             logger.warning("risk engine unavailable, using fallback risk scores: %s", exc)
             return None
 
-    def _calculate_risk_score(
+    async def _calculate_risk_score(
         self,
         allocations: list[AllocationEntry],
         ranked_results: list[NetBenefitResult],
     ) -> Decimal:
-        """加重平均リスクスコアを計算する。
+        """加重平均リスクスコアを計算する（async）。
 
         リスクエンジンから動的スコアを取得し、失敗時はフォールバック固定値を使用する。
         """
-        risk_map = self._build_dynamic_risk_map()
+        risk_map = await self._build_dynamic_risk_map()
         if risk_map is None:
             # フォールバック: 固定値を使用
             risk_map = dict(self._FALLBACK_RISK_MAP)

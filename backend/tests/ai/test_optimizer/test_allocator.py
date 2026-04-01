@@ -25,46 +25,50 @@ def ranked_results(
 class TestConservativeMode:
     """conservative モードのテスト。"""
 
-    def test_conservative_only_aave_and_idle(
+    @pytest.mark.asyncio
+    async def test_conservative_only_aave_and_idle(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """conservative モードでは AAVE と IDLE のみ配分されること。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "conservative")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "conservative")
         protocols = {e.protocol for e in result.allocations}
         assert protocols <= {Protocol.AAVE, Protocol.IDLE}
 
-    def test_conservative_no_lido_or_pendle(
+    @pytest.mark.asyncio
+    async def test_conservative_no_lido_or_pendle(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """conservative モードでは Lido や Pendle が含まれないこと。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "conservative")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "conservative")
         protocols = {e.protocol for e in result.allocations}
         assert Protocol.LIDO not in protocols
         assert Protocol.LIDO_AAVE not in protocols
         assert Protocol.PENDLE_PT not in protocols
         assert Protocol.PENDLE_YT not in protocols
 
-    def test_conservative_aave_gets_95_pct(
+    @pytest.mark.asyncio
+    async def test_conservative_aave_gets_95_pct(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """conservative モードで AAVE が 95% 配分されること。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "conservative")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "conservative")
         aave_alloc = next(e for e in result.allocations if e.protocol == Protocol.AAVE)
         assert aave_alloc.allocation_pct == Decimal("95")
 
-    def test_conservative_idle_gets_5_pct(
+    @pytest.mark.asyncio
+    async def test_conservative_idle_gets_5_pct(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """conservative モードで IDLE が 5% 配分されること。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "conservative")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "conservative")
         idle_alloc = next(e for e in result.allocations if e.protocol == Protocol.IDLE)
         assert idle_alloc.allocation_pct == Decimal("5")
 
@@ -72,35 +76,38 @@ class TestConservativeMode:
 class TestBalancedMode:
     """balanced モードのテスト。"""
 
-    def test_balanced_aave_approx_60_pct(
+    @pytest.mark.asyncio
+    async def test_balanced_aave_approx_60_pct(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """balanced モードで AAVE が約 60% 配分されること。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "balanced")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "balanced")
         aave_alloc = next((e for e in result.allocations if e.protocol == Protocol.AAVE), None)
         assert aave_alloc is not None
         # 正規化により若干ずれる可能性があるため許容範囲を設ける
         assert Decimal("55") <= aave_alloc.allocation_pct <= Decimal("65")
 
-    def test_balanced_no_pendle_yt(
+    @pytest.mark.asyncio
+    async def test_balanced_no_pendle_yt(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """balanced モードでは PENDLE_YT が含まれないこと。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "balanced")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "balanced")
         protocols = {e.protocol for e in result.allocations}
         assert Protocol.PENDLE_YT not in protocols
 
-    def test_balanced_has_lido_aave(
+    @pytest.mark.asyncio
+    async def test_balanced_has_lido_aave(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """balanced モードで LIDO_AAVE が含まれること。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "balanced")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "balanced")
         protocols = {e.protocol for e in result.allocations}
         assert Protocol.LIDO_AAVE in protocols
 
@@ -108,23 +115,25 @@ class TestBalancedMode:
 class TestAggressiveMode:
     """aggressive モードのテスト。"""
 
-    def test_aggressive_includes_pendle_yt(
+    @pytest.mark.asyncio
+    async def test_aggressive_includes_pendle_yt(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """aggressive モードで PENDLE_YT が含まれること。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "aggressive")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "aggressive")
         protocols = {e.protocol for e in result.allocations}
         assert Protocol.PENDLE_YT in protocols
 
-    def test_aggressive_pendle_yt_max_10_pct(
+    @pytest.mark.asyncio
+    async def test_aggressive_pendle_yt_max_10_pct(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """aggressive モードで PENDLE_YT が 10% 以下であること。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "aggressive")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "aggressive")
         yt_alloc = next((e for e in result.allocations if e.protocol == Protocol.PENDLE_YT), None)
         if yt_alloc is not None:
             assert yt_alloc.allocation_pct <= Decimal("10")
@@ -133,48 +142,53 @@ class TestAggressiveMode:
 class TestConstraints:
     """配分制約のテスト。"""
 
-    def test_allocations_sum_to_100_conservative(
+    @pytest.mark.asyncio
+    async def test_allocations_sum_to_100_conservative(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """conservative モードで配分合計が 100% になること。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "conservative")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "conservative")
         total = sum(e.allocation_pct for e in result.allocations)
         assert abs(total - Decimal("100")) < Decimal("0.01")
 
-    def test_allocations_sum_to_100_balanced(
+    @pytest.mark.asyncio
+    async def test_allocations_sum_to_100_balanced(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """balanced モードで配分合計が 100% になること。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "balanced")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "balanced")
         total = sum(e.allocation_pct for e in result.allocations)
         assert abs(total - Decimal("100")) < Decimal("0.01")
 
-    def test_allocations_sum_to_100_aggressive(
+    @pytest.mark.asyncio
+    async def test_allocations_sum_to_100_aggressive(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """aggressive モードで配分合計が 100% になること。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "aggressive")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "aggressive")
         total = sum(e.allocation_pct for e in result.allocations)
         assert abs(total - Decimal("100")) < Decimal("0.01")
 
-    def test_idle_always_at_least_5_pct_conservative(
+    @pytest.mark.asyncio
+    async def test_idle_always_at_least_5_pct_conservative(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """conservative モードで IDLE が常に 5% 以上であること。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "conservative")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "conservative")
         idle = next((e for e in result.allocations if e.protocol == Protocol.IDLE), None)
         assert idle is not None
         assert idle.allocation_pct >= Decimal("5")
 
-    def test_avoid_protocols_get_zero_allocation(
+    @pytest.mark.asyncio
+    async def test_avoid_protocols_get_zero_allocation(
         self,
         allocator: PortfolioAllocator,
         sample_candidates: list[StrategyCandidate],
@@ -235,43 +249,46 @@ class TestConstraints:
                 recommendation=Recommendation.AVOID,  # AVOID!
             ),
         ]
-        result = allocator.allocate(ranked, Decimal("10000"), "balanced")
+        result = await allocator.allocate(ranked, Decimal("10000"), "balanced")
         for entry in result.allocations:
             if entry.protocol in (Protocol.PENDLE_PT, Protocol.PENDLE_YT):
                 assert entry.allocation_pct == Decimal("0"), (
                     f"{entry.protocol} should be 0% but got {entry.allocation_pct}%"
                 )
 
-    def test_explanation_is_non_empty(
+    @pytest.mark.asyncio
+    async def test_explanation_is_non_empty(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """説明文が空でないこと。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "conservative")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "conservative")
         assert result.explanation
         assert len(result.explanation) > 0
 
-    def test_explanation_contains_no_english_jargon(
+    @pytest.mark.asyncio
+    async def test_explanation_contains_no_english_jargon(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """説明文に英語の専門用語が含まれないこと。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "balanced")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "balanced")
         jargon = ["APY", "yield", "protocol", "leverage", "staking", "liquidity"]
         for term in jargon:
             assert term not in result.explanation, (
                 f"Jargon '{term}' found in explanation: {result.explanation}"
             )
 
-    def test_all_amounts_are_decimal(
+    @pytest.mark.asyncio
+    async def test_all_amounts_are_decimal(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """全ての金額が Decimal 型であること。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "balanced")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "balanced")
         for entry in result.allocations:
             assert isinstance(entry.allocation_pct, Decimal)
             assert isinstance(entry.amount_usd, Decimal)
@@ -279,13 +296,14 @@ class TestConstraints:
         assert isinstance(result.total_expected_apy, Decimal)
         assert isinstance(result.total_risk_score, Decimal)
 
-    def test_explanation_contains_disclaimer(
+    @pytest.mark.asyncio
+    async def test_explanation_contains_disclaimer(
         self,
         allocator: PortfolioAllocator,
         ranked_results: list,
     ) -> None:
         """説明文に免責事項が含まれること。"""
-        result = allocator.allocate(ranked_results, Decimal("10000"), "conservative")
+        result = await allocator.allocate(ranked_results, Decimal("10000"), "conservative")
         assert "保証するものではありません" in result.explanation
 
     def test_pendle_yt_cap_is_enforced(
@@ -293,9 +311,6 @@ class TestConstraints:
         allocator: PortfolioAllocator,
     ) -> None:
         """PENDLE_YT配分が10%を超えても制約後は10%以下になること。"""
-        from app.ai.optimizer.schemas import NetBenefitResult
-
-        # PENDLE_YT を 50% にしたいケースを直接 _apply_constraints に渡す
         from app.ai.optimizer.schemas import AllocationEntry, Protocol
 
         allocations = [
