@@ -41,7 +41,7 @@ class PendleConfig:
     )
     # サンドボックスモード（True の場合 DummyPendleClient を使用）
     sandbox: bool = field(
-        default_factory=lambda: os.getenv("PENDLE_SANDBOX", "true").lower() == "true"
+        default_factory=lambda: os.getenv("PENDLE_SANDBOX", "false").lower() == "true"
     )
     # 満期まで最低日数（この日数未満の場合はオペレーションを拒否）
     min_days_to_maturity: int = 7

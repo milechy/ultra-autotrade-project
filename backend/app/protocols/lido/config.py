@@ -39,7 +39,7 @@ class LidoConfig:
     )
     # サンドボックスモード（True の場合 DummyLidoClient を使用）
     sandbox: bool = field(
-        default_factory=lambda: os.getenv("LIDO_SANDBOX", "true").lower() == "true"
+        default_factory=lambda: os.getenv("LIDO_SANDBOX", "false").lower() == "true"
     )
     # peg 乖離警告閾値（2%）
     peg_deviation_warn_pct: float = 2.0

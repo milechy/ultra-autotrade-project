@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.protocols.lido.client import DummyLidoClient, get_lido_client
+from app.protocols.lido.client import DummyLidoClient, LidoClient, get_lido_client
 from app.protocols.lido.config import LidoConfig
 
 
@@ -66,8 +66,27 @@ class TestGetLidoClient:
         assert isinstance(client, DummyLidoClient)
 
     def test_non_sandbox_returns_lido_client(self) -> None:
-        from app.protocols.lido.client import LidoClient
-
         config = LidoConfig(sandbox=False)
         client = get_lido_client(config)
         assert isinstance(client, LidoClient)
+
+    def test_production_env_with_sandbox_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """APP_ENV=production + sandbox=True でエラーが発生すること。"""
+        monkeypatch.setenv("APP_ENV", "production")
+        config = LidoConfig(sandbox=True)
+        with pytest.raises(RuntimeError, match="DummyClient cannot be used in production"):
+            get_lido_client(config)
+
+    def test_staging_env_with_sandbox_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """APP_ENV=staging + sandbox=True でエラーが発生すること。"""
+        monkeypatch.setenv("APP_ENV", "staging")
+        config = LidoConfig(sandbox=True)
+        with pytest.raises(RuntimeError, match="DummyClient cannot be used in staging"):
+            get_lido_client(config)
+
+    def test_development_env_with_sandbox_allowed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """APP_ENV=development + sandbox=True は正常動作すること。"""
+        monkeypatch.setenv("APP_ENV", "development")
+        config = LidoConfig(sandbox=True)
+        client = get_lido_client(config)
+        assert isinstance(client, DummyLidoClient)

@@ -264,7 +264,14 @@ class DummyPendleClient(AbstractPendleClient):
 
 def get_pendle_client(config: PendleConfig) -> AbstractPendleClient:
     """設定に基づいて適切な PendleClient を返す。"""
+    import os  # noqa: PLC0415
+
+    app_env = os.getenv("APP_ENV", "development")
+    if app_env in ("staging", "production") and config.sandbox:
+        logger.error("DummyClient is forbidden in %s environment", app_env)
+        raise RuntimeError(f"DummyClient cannot be used in {app_env} environment")
     if config.sandbox:
+        logger.warning("Using DummyClient — not for production")
         return DummyPendleClient(config)
     # 本番実装は web3.py ベースの PendleClient（Phase 3 以降）
     logger.warning(

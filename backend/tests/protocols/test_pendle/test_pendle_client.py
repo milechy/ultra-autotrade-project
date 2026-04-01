@@ -136,3 +136,24 @@ class TestGetPendleClient:
         config = PendleConfig(sandbox=False)
         client = get_pendle_client(config)
         assert isinstance(client, DummyPendleClient)
+
+    def test_production_env_with_sandbox_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """APP_ENV=production + sandbox=True でエラーが発生すること。"""
+        monkeypatch.setenv("APP_ENV", "production")
+        config = PendleConfig(sandbox=True)
+        with pytest.raises(RuntimeError, match="DummyClient cannot be used in production"):
+            get_pendle_client(config)
+
+    def test_staging_env_with_sandbox_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """APP_ENV=staging + sandbox=True でエラーが発生すること。"""
+        monkeypatch.setenv("APP_ENV", "staging")
+        config = PendleConfig(sandbox=True)
+        with pytest.raises(RuntimeError, match="DummyClient cannot be used in staging"):
+            get_pendle_client(config)
+
+    def test_development_env_with_sandbox_allowed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """APP_ENV=development + sandbox=True は正常動作すること。"""
+        monkeypatch.setenv("APP_ENV", "development")
+        config = PendleConfig(sandbox=True)
+        client = get_pendle_client(config)
+        assert isinstance(client, DummyPendleClient)
