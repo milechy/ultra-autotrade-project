@@ -37,7 +37,7 @@ export function HealthFactorGauge({ value, size = 'md', className }: HealthFacto
     return (
       <div className={cn('flex flex-col gap-1', className)}>
         <span className="text-sm text-muted-foreground">Health Factor</span>
-        <span className={cn('font-bold text-muted-foreground', sizeMap[size])}>借入なし</span>
+        <span className="text-sm font-medium text-muted-foreground truncate">借入なし</span>
       </div>
     )
   }
