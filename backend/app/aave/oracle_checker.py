@@ -6,6 +6,7 @@ Aave V3 Oracle (Chainlink) 鮮度チェック・Circuit Breaker。
 - staleness_threshold_seconds を超えたら WARNING → HOLD
 - 前回価格から deviation_threshold_pct (デフォルト 10%) 超の乖離で circuit breaker
 """
+
 from __future__ import annotations
 
 import logging

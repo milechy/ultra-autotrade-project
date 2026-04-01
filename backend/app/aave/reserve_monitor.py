@@ -5,6 +5,7 @@ Aave V3 Reserve Pause/Freeze/Cap 状態監視。
 Pool Data Provider の getReserveConfigurationData() を呼び出して
 isPaused / isFrozen / borrowCap / supplyCap の異常を検知する。
 """
+
 from __future__ import annotations
 
 import logging

@@ -5,6 +5,7 @@ APIキー・秘密情報のログマスクユーティリティ。
 CLAUDE.md Security Rules #8:
   No tokens/keys in logs — mask to first 6 + last 4 chars
 """
+
 from __future__ import annotations
 
 import re

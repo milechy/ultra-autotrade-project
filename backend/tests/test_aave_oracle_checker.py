@@ -2,6 +2,7 @@
 """
 Tests for Aave V3 oracle staleness and circuit breaker checks.
 """
+
 from __future__ import annotations
 
 import sys
@@ -254,9 +255,7 @@ class TestCheckSequencerUptime:
         mock_web3_module.Web3.HTTPProvider = MagicMock()
         mock_web3_module.Web3.to_checksum_address = lambda x: x
         mock_w3.eth.contract.return_value = mock_contract
-        mock_contract.functions.latestRoundData.return_value.call.side_effect = Exception(
-            "timeout"
-        )
+        mock_contract.functions.latestRoundData.return_value.call.side_effect = Exception("timeout")
 
         with patch.dict(sys.modules, {"web3": mock_web3_module}):
             result = check_sequencer_uptime(

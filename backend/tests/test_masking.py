@@ -2,6 +2,7 @@
 """
 Tests for API key log masking utility.
 """
+
 from __future__ import annotations
 
 import pytest

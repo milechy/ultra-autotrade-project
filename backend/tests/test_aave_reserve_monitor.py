@@ -2,6 +2,7 @@
 """
 Tests for Aave V3 reserve pause/freeze/cap monitoring.
 """
+
 from __future__ import annotations
 
 import sys

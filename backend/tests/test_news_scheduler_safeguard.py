@@ -2,6 +2,7 @@
 """
 Tests for news scheduler safeguard: is_news_stale, record_news_fetch.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
