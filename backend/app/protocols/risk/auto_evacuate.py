@@ -239,15 +239,17 @@ class AutoEvacuator:
             )
         else:
             # PoC: 実装は未対応（本番フェーズで実装）
-            logger.warning("execute_evacuation: 本番実行は未実装のため dry_run として扱います")
-            steps_completed = len(plan.steps)
+            logger.error(
+                "EVACUATION NOT EXECUTED — real execution not yet implemented. "
+                "Use dry_run=True for simulation."
+            )
             return EvacuationResult(
                 plan=plan,
-                executed=False,  # Fixed: always False since unimplemented
-                dry_run=True,  # Fixed: force dry_run=True
-                steps_completed=steps_completed,
+                executed=False,
+                dry_run=False,
+                steps_completed=0,
                 steps_total=len(plan.steps),
-                errors=[],
+                errors=["Real execution not yet implemented. Use dry_run=True for simulation."],
             )
 
     def _prioritize_steps(self, steps: list[EvacuationStep]) -> list[EvacuationStep]:

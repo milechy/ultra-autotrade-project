@@ -235,7 +235,7 @@ class TestExecuteEvacuation:
 
     @pytest.mark.asyncio
     async def test_execute_unimplemented_returns_false(self, evacuator: AutoEvacuator) -> None:
-        """dry_run=False + 承認あり → executed=False, dry_run=True（未実装のため）。"""
+        """dry_run=False + 承認あり → executed=False（未実装のため）。"""
         assessment = _make_assessment(should_evacuate=True)
         plan = await evacuator.create_evacuation_plan(assessment)
         assert plan is not None
@@ -243,7 +243,20 @@ class TestExecuteEvacuation:
             plan, dry_run=False, manual_approval=True, operation_mode="active"
         )
         assert result.executed is False
-        assert result.dry_run is True
+
+    @pytest.mark.asyncio
+    async def test_real_execution_returns_failure(self, evacuator: AutoEvacuator) -> None:
+        """dry_run=False は未実装エラーを返すこと。"""
+        assessment = _make_assessment(should_evacuate=True)
+        plan = await evacuator.create_evacuation_plan(assessment)
+        assert plan is not None
+        result = await evacuator.execute_evacuation(
+            plan, dry_run=False, manual_approval=True, operation_mode="active"
+        )
+        assert result.executed is False
+        assert result.steps_completed == 0
+        assert len(result.errors) > 0
+        assert "not yet implemented" in result.errors[0]
 
 
 class TestPrioritizeSteps:
