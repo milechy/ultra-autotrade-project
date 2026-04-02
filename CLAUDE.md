@@ -355,6 +355,25 @@ curl -s -X POST "$WEBHOOK" \
 4. `docker logs <cloudflared>` で `connection refused` が出ていないか確認
 5. 502 の多くはデプロイ中の空白期間が原因（数秒で自然解消）
 
+### 2026-04-02追加（Named Tunnel移行時の環境変数）
+
+**NEXT_PUBLIC_BACKEND_BASE_URL の更新忘れ:**
+- Named Tunnel（trycloudflare → api.ultra-auto-trade.com）移行時、`.env.staging` の `NEXT_PUBLIC_BACKEND_BASE_URL` が古い trycloudflare URL のままになっていた
+- Next.js の `NEXT_PUBLIC_` 変数はビルド時に JS に埋め込まれるため、`.env` を変更しただけではダメで **フロントエンドの再ビルドが必須**
+
+**3点セット（必ず同時に実施）:**
+1. `NEXT_PUBLIC_BACKEND_BASE_URL=https://api.ultra-auto-trade.com` に更新
+2. `CORS_ORIGINS` に `https://app.ultra-auto-trade.com` を追加
+3. `docker compose build --no-cache frontend` でフロントエンド再ビルド → コンテナ入れ替え
+
+**確認コマンド:**
+```bash
+# CORS ヘッダーが新ドメインを返しているか
+curl -s -I -H 'Origin: https://app.ultra-auto-trade.com' https://api.ultra-auto-trade.com/health | grep access-control-allow-origin
+# 新 URL がビルドに埋め込まれているか
+docker exec <frontend> grep -rl 'api.ultra-auto-trade.com' /app/.next/static/chunks/ | wc -l
+```
+
 ---
 
 ## 参照ファイル

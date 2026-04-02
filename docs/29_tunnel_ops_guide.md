@@ -107,6 +107,7 @@ docker compose -f docker-compose.staging.yml restart backend
 |---|---|---|---|---|
 | 2026-04-01 | CORS→実は500（不足カラム）+ Mixed Content + .env改行欠落 | (1) terms_version等9カラムがDBに未追加→500→CORSヘッダーなし→CORSエラーに見えた (2) NEXT_PUBLIC_BACKEND_BASE_URL=http://でトンネルhttps経由アクセス→Mixed Content (3) echo追記で改行なし連結 | ALTER TABLE全カラム追加、IP直接アクセスに切り替え、printf使用 | — |
 | 2026-04-02 | cloudflared 30時間停止 → 502多発 | (1) `/root/.cloudflared` が存在しない (2) config.yml 方式では credentials JSON が必要だが未生成 | token方式（`--token ${CLOUDFLARE_TUNNEL_TOKEN}`）に変更 + `network_mode: host` 追加 | `.env.staging` にトークンを保存、`network_mode: host` を必須化 |
+| 2026-04-02 | フロントエンドが旧 trycloudflare URL を参照し CORS エラー | `.env.staging` の `NEXT_PUBLIC_BACKEND_BASE_URL` が Named Tunnel 移行後も古い trycloudflare URL のまま。Next.js ビルド時埋め込みのため `.env` 変更だけでは反映されない | `NEXT_PUBLIC_BACKEND_BASE_URL` と `CORS_ORIGINS` を更新 → `docker compose build --no-cache frontend` → コンテナ入れ替え | Tunnel 切替時は必ず「NEXT_PUBLIC 更新 + CORS 更新 + frontend 再ビルド」の3点セット |
 
 ---
 
