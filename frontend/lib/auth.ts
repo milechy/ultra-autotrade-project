@@ -20,6 +20,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { login as apiLogin, getMe, logout as apiLogout, walletConnect, type UserResponse, type TokenResponse } from "./api/auth";
+import { resolveAuthReady } from "./auth-state";
 
 const TOKEN_KEY = "ultra_auth_token";
 const TOKEN_EXPIRES_KEY = "ultra_auth_expires";
@@ -67,12 +68,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             // Network error: keep token — user may still be authenticated
           })
-          .finally(() => setIsLoading(false));
+          .finally(() => {
+            resolveAuthReady()
+            setIsLoading(false)
+          });
         return;
       }
       // Clear auth if token is expired
       clearAuth();
     }
+    resolveAuthReady()
     setIsLoading(false);
   }, []);
 
