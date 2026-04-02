@@ -106,6 +106,7 @@ docker compose -f docker-compose.staging.yml restart backend
 | 日付 | 症状 | 原因 | 対応 | 再発防止 |
 |---|---|---|---|---|
 | 2026-04-01 | CORS→実は500（不足カラム）+ Mixed Content + .env改行欠落 | (1) terms_version等9カラムがDBに未追加→500→CORSヘッダーなし→CORSエラーに見えた (2) NEXT_PUBLIC_BACKEND_BASE_URL=http://でトンネルhttps経由アクセス→Mixed Content (3) echo追記で改行なし連結 | ALTER TABLE全カラム追加、IP直接アクセスに切り替え、printf使用 | — |
+| 2026-04-02 | cloudflared 30時間停止 → 502多発 | (1) `/root/.cloudflared` が存在しない (2) config.yml 方式では credentials JSON が必要だが未生成 | token方式（`--token ${CLOUDFLARE_TUNNEL_TOKEN}`）に変更 + `network_mode: host` 追加 | `.env.staging` にトークンを保存、`network_mode: host` を必須化 |
 
 ---
 
@@ -120,6 +121,8 @@ docker compose -f docker-compose.staging.yml restart backend
 | CORSエラーだがOPTIONSは正常 | バックエンドが500を返している（CORSヘッダーはエラー時に付かない） | `docker logs <backend> 2>&1 \| grep error` でDB不足カラム等を確認→修正 |
 | httpsページからhttpバックエンドへのリクエストがブロック | Mixed Content（https→http） | IP直接アクセス（http同士）を使うか、バックエンドもトンネル経由にする |
 | echo追記した環境変数が効かない | 前行の末尾に改行がなく連結された | `grep <KEY> .env.staging` で確認。`printf '\nKEY=VALUE\n' >> file` を使う |
+| デプロイ後に一時的に 502 | `docker rm -f` 後の空白期間に cloudflared が接続できない | 正常動作。`docker rm -f && docker compose up -d --no-deps` を素早く実行することで空白時間を最小化 |
+| `dial tcp [::1]:3000: connection refused` | frontend コンテナが起動していない / まだ起動中 | `docker logs <frontend>` で `✓ Ready` を確認してから外部アクセス |
 
 ---
 

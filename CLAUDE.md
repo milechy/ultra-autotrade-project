@@ -331,6 +331,30 @@ curl -s -X POST "$WEBHOOK" \
 **孤立Dockerコンテナ:**
 - `docker compose down --remove-orphans` で消えない場合は `docker rm -f <container-name>` で強制削除してから `up -d`
 
+### 2026-04-02追加（cloudflared + network_mode:host）
+
+**cloudflared token方式の Ingress Rules:**
+- `--token` 方式では ingress ルールは Cloudflare ダッシュボードで管理される（config.yml は無視される）
+- ダッシュボードの ingress に `http://localhost:3000` / `http://localhost:8000` が設定されている場合、`network_mode: "host"` が必須
+
+**network_mode: host 使用時の注意:**
+- cloudflared コンテナが `localhost` に届くには `network_mode: "host"` が必要
+- frontend/backend は `ports: "3000:3000"` / `"8000:8000"` でホストに公開されている必要がある
+- `[::1]:3000`（IPv6）と `127.0.0.1:3000`（IPv4）両方で到達可能であること確認済み
+
+**デプロイ手順（502防止）:**
+- 正しい手順: `docker rm -f <container> && docker compose up -d --no-deps <service>`
+- 空白時間を最小化するため stop → rm → up を連続実行する
+- `restart` コマンドは旧イメージのまま再起動するため、新ビルド後には使わない
+- cloudflared は `--no-deps` で単独起動（postgres 競合を避ける）
+
+**502デバッグ手順:**
+1. `docker ps -a` でコンテナが存在・起動しているか確認
+2. `docker logs <frontend>` で Next.js の Ready ログを確認
+3. `curl http://127.0.0.1:3000` でホスト → frontend の疎通確認
+4. `docker logs <cloudflared>` で `connection refused` が出ていないか確認
+5. 502 の多くはデプロイ中の空白期間が原因（数秒で自然解消）
+
 ---
 
 ## 参照ファイル
