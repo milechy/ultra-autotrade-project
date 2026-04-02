@@ -110,6 +110,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: ultra-autotrade-cloudflared-staging
     command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    network_mode: "host"
     env_file:
       - .env.staging
     depends_on:
