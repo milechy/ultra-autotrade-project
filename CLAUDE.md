@@ -413,6 +413,36 @@ curl -s -I -H 'Origin: https://app.ultra-auto-trade.com' https://api.ultra-auto-
 docker exec <frontend> grep -rl 'api.ultra-auto-trade.com' /app/.next/static/chunks/ | wc -l
 ```
 
+### 2026-04-03追加（フロントエンドAPI系環境変数 → Mixed Content）
+
+**フロントエンドのAPI系環境変数は3つある:**
+- `NEXT_PUBLIC_BACKEND_BASE_URL` — Knowledge Hub / AI 等バックエンド全般
+- `NEXT_PUBLIC_API_BASE_URL` — 認証・汎用 API（`/api/` プレフィックス）
+- `NEXT_PUBLIC_API_URL` — 一部コンポーネントが直接参照する API URL
+
+**すべて `frontend/Dockerfile` の `ARG`/`ENV` と `docker-compose.staging.yml` の `build.args` に定義が必要。**
+1つでも欠けると Dockerfile ビルド時にフォールバック値（`http://77.42.46.155:8000` 等）がJSバンドルに埋め込まれ、
+HTTPS（Named Tunnel）経由のモバイルアクセスで Mixed Content エラーになる（2026-04-03 iPhoneインシデント）。
+
+**PCで顕在化しにくい理由:** ブラウザキャッシュ・Service Worker キャッシュが旧ビルドを返し続けるため、
+モバイルや初回アクセスでのみ症状が出ることがある。
+
+**確認・修正手順:**
+```bash
+# 1. Dockerfile に ARG/ENV が揃っているか確認
+grep -E "NEXT_PUBLIC_API" frontend/Dockerfile
+
+# 2. docker-compose.staging.yml の build.args に揃っているか確認
+grep -A 20 "build:" docker-compose.staging.yml | grep "NEXT_PUBLIC_API"
+
+# 3. 不足があれば .env.staging に追加し、フロントエンド再ビルド
+docker compose -f docker-compose.staging.yml build --no-cache frontend
+docker compose -f docker-compose.staging.yml up -d --no-deps frontend
+
+# 4. 埋め込み URL を確認（http:// が残っていないか）
+docker exec <frontend> grep -r "http://77" /app/.next/static/chunks/ | wc -l
+```
+
 ---
 
 ## 参照ファイル
