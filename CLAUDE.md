@@ -355,6 +355,21 @@ curl -s -X POST "$WEBHOOK" \
 4. `docker logs <cloudflared>` で `connection refused` が出ていないか確認
 5. 502 の多くはデプロイ中の空白期間が原因（数秒で自然解消）
 
+### 2026-04-02追加（Docker Composeプロジェクト名の統一）
+
+**docker compose は必ず同一プロジェクト名で実行すること:**
+- プロジェクト名が異なると各コンテナが別ネットワークに配置され、`postgres` ホスト名が解決できず DB 接続が 500 エラーになる
+- 原因: `docker compose up` 実行時のカレントディレクトリや `-p` フラグによりプロジェクト名が変わることがある
+- 対策: `.env.staging` に `COMPOSE_PROJECT_NAME=ultra-autotrade-project` を設定済み（この値が自動適用される）
+- 確認: `docker inspect <container> --format "{{index .Config.Labels \"com.docker.compose.project\"}}"` で全コンテナのプロジェクト名が同一か確認
+- 緊急修正: プロジェクト名が異なる場合は `docker network connect <正しいnetwork> <コンテナ名>` で即座に接続可能
+
+**DB接続500エラーのデバッグ手順:**
+1. `docker logs <backend> 2>&1 | grep "could not translate host name"` — postgres名前解決失敗なら本問題
+2. `docker inspect <backend> --format "{{json .NetworkSettings.Networks}}"` でネットワーク確認
+3. `docker inspect <postgres> --format "{{json .NetworkSettings.Networks}}"` と比較
+4. ネットワーク名が異なれば `docker network connect <postgres側network> <backend>` → `docker restart <backend>`
+
 ### 2026-04-02追加（Named Tunnel移行時の環境変数）
 
 **NEXT_PUBLIC_BACKEND_BASE_URL の更新忘れ:**
