@@ -24,6 +24,44 @@ type AiDecisionRecord = {
   reason?: string;
 };
 
+// Backend response shape from GET /api/ai/decisions
+type ApiDecisionItem = {
+  id: number;
+  created_at: string;
+  query: string;
+  action: string;
+  confidence: number;
+  primary_action: string;
+  secondary_action?: string | null;
+  agreed: boolean;
+  reason?: string | null;
+};
+
+type ApiDecisionListResponse = {
+  items: ApiDecisionItem[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+function mapApiDecisionToRecord(d: ApiDecisionItem): AiDecisionRecord {
+  const toAction = (s: string | null | undefined): "BUY" | "SELL" | "HOLD" => {
+    if (s === "BUY" || s === "SELL" || s === "HOLD") return s;
+    return "HOLD";
+  };
+  return {
+    id: d.id,
+    timestamp: d.created_at,
+    pair: "BTC/USDT",
+    phase_a: toAction(d.primary_action),
+    phase_b: d.secondary_action != null ? toAction(d.secondary_action) : null,
+    final_decision: toAction(d.action),
+    confidence: d.confidence / 100,
+    executed: d.agreed,
+    reason: d.reason ?? undefined,
+  };
+}
+
 // ─── Mock data (shown when API returns 404) ───────────────────────────────────
 
 const MOCK_RECORDS: AiDecisionRecord[] = [
@@ -140,10 +178,10 @@ function AiMonitorContent() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getJson<AiDecisionRecord[]>("/api/ai/history", {
+      const data = await getJson<ApiDecisionListResponse>("/api/ai/decisions?limit=50", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setRecords(data);
+      setRecords(data.items.map(mapApiDecisionToRecord));
       setIsFeatureReady(true);
       setLastUpdated(new Date());
       setCountdown(POLL_INTERVAL_SEC);

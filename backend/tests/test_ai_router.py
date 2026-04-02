@@ -64,7 +64,7 @@ def test_ai_analyze_success():
                 }
             ]
         }
-        resp = client.post("/ai/analyze", json=payload)
+        resp = client.post("/api/ai/analyze", json=payload)
 
     assert resp.status_code == 200
     body = resp.json()
@@ -81,6 +81,6 @@ def test_ai_analyze_unexpected_error():
         side_effect=Exception("unexpected error"),
     ):
         payload = {"items": []}
-        resp = client.post("/ai/analyze", json=payload)
+        resp = client.post("/api/ai/analyze", json=payload)
 
     assert resp.status_code >= 500

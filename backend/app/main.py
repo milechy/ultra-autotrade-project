@@ -110,7 +110,7 @@ def create_app() -> FastAPI:
     # --- Router registration ---
     app.include_router(auth_router)  # Auth (Phase12)
     app.include_router(users_router)  # Users (Phase12)
-    app.include_router(ai_router)  # AI (Phase2)
+    app.include_router(ai_router, prefix="/api")  # AI (Phase2)
     app.include_router(octobot_router)  # OctoBot (Phase3)
     app.include_router(aave_router, prefix="/api")  # Aave (Phase4)
     app.include_router(rebalance_router, prefix="/api")  # Aave Rebalance (Stream-T)
