@@ -9,6 +9,35 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useWallet } from '@/hooks/useWallet'
 import { useAuth } from '@/lib/auth'
 import { useMinimumBalance } from '@/hooks/useMinimumBalance'
+import { apiPut } from '@/lib/api/client'
+
+type UserMode = 'managed' | 'active' | 'pro'
+
+const USER_MODE_STORAGE_KEY = 'ultra_user_mode'
+
+const MODE_OPTIONS: { value: UserMode; label: string; description: string; borderColor: string; ringColor: string }[] = [
+  {
+    value: 'managed',
+    label: 'フルオート',
+    description: 'AIが全自動で判断・実行。初心者向け。',
+    borderColor: 'border-green-600 bg-green-950/40',
+    ringColor: 'ring-2 ring-green-500',
+  },
+  {
+    value: 'active',
+    label: 'セミオート',
+    description: 'AIが提案→ユーザーが承認→実行。中級者向け。',
+    borderColor: 'border-yellow-600 bg-yellow-950/40',
+    ringColor: 'ring-2 ring-yellow-500',
+  },
+  {
+    value: 'pro',
+    label: 'マニュアル',
+    description: 'AIが提案→手動判断。上級者向け。',
+    borderColor: 'border-blue-600 bg-blue-950/40',
+    ringColor: 'ring-2 ring-blue-500',
+  },
+]
 
 // Arbitrum One (mainnet), Arbitrum Sepolia (testnet), Base Sepolia (testnet)
 const SUPPORTED_CHAIN_IDS = [42161, 421614, 84532]
@@ -83,6 +112,20 @@ export default function ConnectPage() {
   const [riskAccepted, setRiskAccepted] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [userMode, setUserMode] = useState<UserMode>('managed')
+
+  // Load saved mode from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(USER_MODE_STORAGE_KEY)
+    if (saved === 'managed' || saved === 'active' || saved === 'pro') {
+      setUserMode(saved)
+    }
+  }, [])
+
+  const handleModeSelect = (mode: UserMode) => {
+    setUserMode(mode)
+    localStorage.setItem(USER_MODE_STORAGE_KEY, mode)
+  }
 
   // Simulate minimum balance check with a mock value when connected
   // In production this would come from Aave account data
@@ -122,6 +165,12 @@ export default function ConnectPage() {
     setIsAuthenticating(true)
     try {
       await loginWithWallet(address, signer)
+      // Sync user mode to backend (fire-and-forget; auth continues on failure)
+      try {
+        await apiPut('/api/user/settings', { user_mode: userMode })
+      } catch (modeErr) {
+        console.error('Failed to sync user mode:', modeErr)
+      }
       router.push('/user/dashboard')
     } catch (err) {
       setAuthError('認証に失敗しました。もう一度お試しください。')
@@ -280,6 +329,35 @@ export default function ConnectPage() {
                     </span>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Operation Mode Selector — shown after all checks pass */}
+          {allChecksPass && (
+            <Card className="border-zinc-800 bg-zinc-900/60">
+              <CardContent className="pt-4 pb-4">
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
+                  運用モード選択
+                </p>
+                <div className="space-y-2" data-testid="mode-selector">
+                  {MODE_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleModeSelect(option.value)}
+                      data-mode={option.value}
+                      className={`w-full text-left rounded-lg border p-3 transition-all ${option.borderColor} ${
+                        userMode === option.value
+                          ? option.ringColor
+                          : 'opacity-60 hover:opacity-90'
+                      } cursor-pointer`}
+                    >
+                      <p className="text-sm font-medium text-zinc-100">{option.label}</p>
+                      <p className="text-xs text-zinc-400 mt-0.5">{option.description}</p>
+                    </button>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           )}

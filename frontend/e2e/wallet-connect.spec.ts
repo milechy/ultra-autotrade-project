@@ -373,3 +373,64 @@ test.describe('[Mobile 375px] 基本フロー', () => {
     ).toBeVisible()
   })
 })
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 11. 運用モード選択UI (allChecksPass 時のみ表示)
+// ──────────────────────────────────────────────────────────────────────────────
+
+test.describe('[Connect] 運用モード選択UI', () => {
+  /**
+   * NOTE: allChecksPass = isConnected && isCorrectNetwork
+   * The mode selector is rendered only when allChecksPass is true.
+   * These tests use Arbitrum One (42161) mock so the network check passes.
+   *
+   * Because balanceCheck is always isBelowMinimum=true (mock data), the
+   * balance card shows a warning, but allChecksPass is NOT gated on balance —
+   * it only requires isConnected && isCorrectNetwork. Therefore the mode
+   * selector IS rendered after a successful connection on a correct network.
+   */
+
+  test.beforeEach(async ({ page }) => {
+    // Clear ultra_user_mode to ensure default state
+    await page.addInitScript(() => {
+      localStorage.removeItem('ultra_user_mode')
+    })
+    await mockEthereum(page, { chainId: 42161 })
+    await page.goto('/connect')
+    await clearWagmiStorage(page)
+    await page.reload()
+    await clickConnectAndWait(page)
+    await expect(page.getByText('Arbitrum One に接続済み')).toBeVisible({
+      timeout: 5_000,
+    })
+  })
+
+  test('connect ページにモード選択UIが表示される', async ({ page }) => {
+    await expect(page.getByText('運用モード選択')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('フルオート')).toBeVisible()
+    await expect(page.getByText('セミオート')).toBeVisible()
+    await expect(page.getByText('マニュアル')).toBeVisible()
+  })
+
+  test('デフォルトは managed（フルオート）', async ({ page }) => {
+    // The managed button should have the active ring class (ring-green-500)
+    // We verify by checking that the フルオート button has a ring style applied
+    const managedBtn = page.locator('[data-mode="managed"]')
+    await expect(managedBtn).toBeVisible({ timeout: 5_000 })
+    await expect(managedBtn).toHaveClass(/ring-green-500/)
+  })
+
+  test('モード選択がlocalStorageに保存される', async ({ page }) => {
+    // Click the セミオート (active) button
+    const activeBtn = page.locator('[data-mode="active"]')
+    await expect(activeBtn).toBeVisible({ timeout: 5_000 })
+    await activeBtn.click()
+
+    // Verify localStorage was updated
+    const stored = await page.evaluate(() => localStorage.getItem('ultra_user_mode'))
+    expect(stored).toBe('active')
+
+    // Verify the active button now has the ring style
+    await expect(activeBtn).toHaveClass(/ring-yellow-500/)
+  })
+})
