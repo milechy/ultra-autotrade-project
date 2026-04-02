@@ -355,6 +355,30 @@ curl -s -X POST "$WEBHOOK" \
 4. `docker logs <cloudflared>` で `connection refused` が出ていないか確認
 5. 502 の多くはデプロイ中の空白期間が原因（数秒で自然解消）
 
+### 2026-04-02追加（AIスケジューラー デフォルト有効化）
+
+**スケジューラーはデフォルト有効（DISABLE_ で明示的に停止する方式）:**
+- 旧方式: `ENABLE_AI_JUDGMENT_SCHEDULER=1`（デフォルト無効） → 設定漏れで無音停止していた
+- 新方式: `DISABLE_AI_JUDGMENT_SCHEDULER=1`（デフォルト有効） → 設定しなければ動く
+- 同様に `DISABLE_BACKGROUND_MONITORING=1`（デフォルト有効）
+- 旧 `ENABLE_=1` 変数は後方互換として引き続き機能する
+
+**スケジューラーが無効で起動した場合:**
+- ERROR ログ + Slack `#ultra-auto-project` に `⚠️ AIスケジューラーが無効状態で起動しました` 通知
+- `/health` が `"status": "degraded"` を返す
+
+**デプロイ後の確認手順:**
+```bash
+curl https://api.ultra-auto-trade.com/health
+# → {"status": "ok", "scheduler": true, "last_judgment": "...", "next_judgment": "..."}
+```
+
+**`.env.staging.example` との差分確認（デプロイ前必須）:**
+```bash
+diff <(grep -v '^#' backend/.env.staging.example | grep '=' | cut -d= -f1 | sort) \
+     <(grep -v '^#' /opt/ultra-autotrade/.env.staging | grep '=' | cut -d= -f1 | sort)
+```
+
 ### 2026-04-02追加（Docker Composeプロジェクト名の統一）
 
 **docker compose は必ず同一プロジェクト名で実行すること:**

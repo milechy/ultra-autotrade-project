@@ -26,6 +26,21 @@ from app.proposals.models import Proposal
 
 logger = logging.getLogger(__name__)
 
+# --- スケジューラー実行状態（/health から参照） ---
+_scheduler_started: bool = False
+_last_run_at: "datetime | None" = None
+_next_run_at: "datetime | None" = None
+
+
+def get_scheduler_status() -> "dict[str, Any]":
+    """スケジューラーの稼働状態を返す（/health エンドポイント用）。"""
+    return {
+        "running": _scheduler_started,
+        "last_run": _last_run_at.isoformat() if _last_run_at else None,
+        "next_run": _next_run_at.isoformat() if _next_run_at else None,
+    }
+
+
 _DEFAULT_QUERY = "DeFi market analysis"
 _PROPOSAL_ASSET = "USDC"
 _PROPOSAL_AMOUNT = Decimal("1000")
@@ -182,12 +197,16 @@ async def ai_judgment_loop(interval_hours: int = 4) -> None:
     Args:
         interval_hours: 実行間隔（時間）。デフォルト 4 時間。
     """
+    global _scheduler_started, _last_run_at, _next_run_at
+    _scheduler_started = True
     await asyncio.sleep(0)  # イベントループに制御を返す
     while True:
         try:
             loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(None, run_ai_judgment_job)
+            _last_run_at = datetime.now(timezone.utc)
             logger.info("AI judgment completed: %s", result)
         except Exception as exc:
             logger.error("AI judgment job failed: %s", exc)
+        _next_run_at = datetime.now(timezone.utc) + timedelta(hours=interval_hours)
         await asyncio.sleep(interval_hours * 3600)

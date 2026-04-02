@@ -20,7 +20,7 @@ Responsibilities added in Phase 12:
 
 import logging
 import os
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -67,6 +67,55 @@ from app.webhook.router import router as webhook_router
 logger = logging.getLogger(__name__)
 # Ensure app.* loggers output at INFO level regardless of root logger config
 logging.getLogger("app").setLevel(logging.INFO)
+
+
+def _is_scheduler_enabled() -> bool:
+    """AIスケジューラーの有効/無効判定。デフォルト有効。
+
+    判定ロジック:
+    - DISABLE_AI_JUDGMENT_SCHEDULER=1 → 無効（新方式）
+    - ENABLE_AI_JUDGMENT_SCHEDULER=0  → 無効（旧方式後方互換）
+    - それ以外 → 有効
+    """
+    if os.getenv("DISABLE_AI_JUDGMENT_SCHEDULER", "0") == "1":
+        return False
+    if os.getenv("ENABLE_AI_JUDGMENT_SCHEDULER") == "0":
+        return False
+    return True
+
+
+def _is_background_monitoring_enabled() -> bool:
+    """バックグラウンド監視の有効/無効判定。デフォルト有効。
+
+    判定ロジック:
+    - DISABLE_BACKGROUND_MONITORING=1 → 無効（新方式）
+    - ENABLE_BACKGROUND_MONITORING=0  → 無効（旧方式後方互換）
+    - それ以外 → 有効
+    """
+    if os.getenv("DISABLE_BACKGROUND_MONITORING", "0") == "1":
+        return False
+    if os.getenv("ENABLE_BACKGROUND_MONITORING") == "0":
+        return False
+    return True
+
+
+async def _notify_slack_warning(text: str) -> None:
+    """Slack webhook に警告メッセージを送る（失敗しても起動は継続）。"""
+    webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+    if not webhook_url:
+        return
+    try:
+        import asyncio as _asyncio
+
+        import httpx
+
+        loop = _asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: httpx.post(webhook_url, json={"text": text}, timeout=5),
+        )
+    except Exception as exc:
+        logger.error("Slack warning notification failed: %s", exc)
 
 
 def create_app() -> FastAPI:
@@ -144,8 +193,18 @@ def create_app() -> FastAPI:
     register_error_handlers(app)
 
     @app.get("/health", tags=["health"])
-    def health_check() -> dict[str, str]:
-        return {"status": "ok", "env": os.getenv("APP_ENV", "dev")}
+    def health_check() -> dict[str, Any]:
+        from app.automation.ai_judgment_scheduler import get_scheduler_status
+
+        scheduler = get_scheduler_status()
+        status = "ok" if scheduler["running"] else "degraded"
+        return {
+            "status": status,
+            "env": os.getenv("APP_ENV", "dev"),
+            "scheduler": scheduler["running"],
+            "last_judgment": scheduler.get("last_run"),
+            "next_judgment": scheduler.get("next_run"),
+        }
 
     # --- Database initialization (Phase12) ---
     @app.on_event("startup")
@@ -182,15 +241,11 @@ def create_app() -> FastAPI:
         """
         Start background monitoring on application startup.
 
-        Enabled by setting ENABLE_BACKGROUND_MONITORING=1.
-        Disabled by default in development.
+        Default: enabled. Set DISABLE_BACKGROUND_MONITORING=1 to disable.
+        Legacy: ENABLE_BACKGROUND_MONITORING=0 also disables.
         """
-        enable_monitoring = os.getenv("ENABLE_BACKGROUND_MONITORING", "0") == "1"
-
-        if not enable_monitoring:
-            logger.info(
-                "Background monitoring disabled (set ENABLE_BACKGROUND_MONITORING=1 to enable)"
-            )
+        if not _is_background_monitoring_enabled():
+            logger.info("Background monitoring disabled")
             return
 
         try:
@@ -302,14 +357,17 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def startup_ai_judgment_scheduler() -> None:
-        """4時間ごとのAI判定スケジューラーを開始する。"""
-        logger.info("startup_ai_judgment_scheduler: entry")
+        """4時間ごとのAI判定スケジューラーを開始する。デフォルト有効。"""
         import asyncio
 
-        enable_scheduler = os.getenv("ENABLE_AI_JUDGMENT_SCHEDULER", "0") == "1"
-        if not enable_scheduler:
-            logger.info(
-                "AI judgment scheduler disabled (set ENABLE_AI_JUDGMENT_SCHEDULER=1 to enable)"
+        if not _is_scheduler_enabled():
+            logger.error(
+                "AI judgment scheduler is DISABLED. "
+                "Set DISABLE_AI_JUDGMENT_SCHEDULER=1 intentionally, or check env vars."
+            )
+            await _notify_slack_warning(
+                "⚠️ [Ultra AutoTrade] AIスケジューラーが無効状態で起動しました。\n"
+                "AI判定が実行されません。DISABLE_AI_JUDGMENT_SCHEDULER=1 が設定されているか確認してください。"
             )
             return
         try:
