@@ -109,12 +109,9 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: ultra-autotrade-cloudflared-staging
-    command: tunnel --config /etc/cloudflared/config.yml run
-    volumes:
-      - ./config/cloudflared/config.yml:/etc/cloudflared/config.yml:ro
-      # Tunnel 認証情報（Hetzner VPS 上の実ファイルをマウント）
-      # `cloudflared tunnel create ultra-autotrade` 実行後に生成される
-      - /root/.cloudflared:/root/.cloudflared:ro
+    command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    env_file:
+      - .env.staging
     depends_on:
       - backend
       - frontend
