@@ -2,12 +2,19 @@
 // Unauthorized copying or distribution is strictly prohibited.
 import { test, expect } from '@playwright/test';
 
+// NOTE: このファイルのテストはモックデータ（prop-001, past-1 等）に依存した古い仕様テストです。
+// 現在の /approve ページは認証（JWT）が必要で、未認証時はログインページへリダイレクトされます。
+// また「2件待ち」「SUPPLY」「2,000 USDC」等の固定モックデータは現在の実装に存在しません。
+// smoke/approve.spec.ts が最新のスモークテストとして代替しています。
+// TODO: 認証フロー実装後に、認証済みE2Eテストとして書き直す。
+
 test.describe('U-05 取引承認フロー 詳細テスト (/approve)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/approve');
   });
 
   test('提案カードの詳細コンテンツ（バッジ・資産・金額・理由・メトリクス）が表示される', async ({ page }) => {
+    test.skip(true, '理由: 古い仕様テスト。現在の /approve は認証必須でリダイレクトされ、固定モックデータは存在しない。smoke/approve.spec.ts を参照。')
     // 操作バッジ: "SUPPLY" が表示されること
     const supplyBadge = page.getByText('SUPPLY').first();
     await expect(supplyBadge).toBeVisible();
@@ -34,11 +41,13 @@ test.describe('U-05 取引承認フロー 詳細テスト (/approve)', () => {
   });
 
   test('待ち件数バッジ「2件待ち」が表示される', async ({ page }) => {
+    test.skip(true, '理由: 古い仕様テスト。現在の /approve は認証必須でリダイレクトされ、固定モックデータ「2件待ち」は存在しない。')
     const badge = page.getByText('2件待ち');
     await expect(badge).toBeVisible();
   });
 
   test('承認フロー: ボタンクリックから完了まで状態遷移が正しく表示される', async ({ page }) => {
+    test.skip(true, '理由: 古い仕様テスト。現在の /approve は認証必須でリダイレクトされ、承認ボタン操作のモックデータが存在しない。')
     // 最初の承認ボタンをクリック
     const approveBtn = page.getByRole('button', { name: '承認' }).first();
     await expect(approveBtn).toBeVisible();
@@ -70,6 +79,7 @@ test.describe('U-05 取引承認フロー 詳細テスト (/approve)', () => {
   });
 
   test('拒否フロー: 却下ボタンクリックでそのカードが消える', async ({ page }) => {
+    test.skip(true, '理由: 古い仕様テスト。現在の /approve は認証必須でリダイレクトされ、固定モックデータ（prop-001）は存在しない。')
     // prop-001 カード（SUPPLY USDC 1500）が表示されていることを確認
     const firstCard = page.getByText('1,500').first();
     await expect(firstCard).toBeVisible();
@@ -84,6 +94,7 @@ test.describe('U-05 取引承認フロー 詳細テスト (/approve)', () => {
   });
 
   test('全提案を却下した後「承認待ちの提案はありません」が表示される', async ({ page }) => {
+    test.skip(true, '理由: 古い仕様テスト。現在の /approve は認証必須でリダイレクトされ、固定モックデータが存在しない。')
     // 1件目を却下
     const firstRejectBtn = page.getByRole('button', { name: '却下' }).first();
     await expect(firstRejectBtn).toBeVisible();
@@ -100,6 +111,7 @@ test.describe('U-05 取引承認フロー 詳細テスト (/approve)', () => {
   });
 
   test('最近の承認履歴コンテンツ（SUPPLY・2,000 USDC・成功バッジ）が表示される', async ({ page }) => {
+    test.skip(true, '理由: 古い仕様テスト。現在の /approve は認証必須でリダイレクトされ、固定モックデータ（past-1: 2,000 USDC）は存在しない。')
     // セクションタイトル
     const sectionTitle = page.getByText('最近の承認履歴');
     await expect(sectionTitle).toBeVisible();
@@ -117,6 +129,7 @@ test.describe('U-05 取引承認フロー 詳細テスト (/approve)', () => {
   });
 
   test('「全履歴を見る →」リンクが /history を指す', async ({ page }) => {
+    test.skip(true, '理由: 古い仕様テスト。現在の /approve は認証必須でリダイレクトされ、「全履歴を見る →」リンクは表示されない。')
     const historyLink = page.getByText('全履歴を見る →');
     await expect(historyLink).toBeVisible();
 
@@ -135,6 +148,7 @@ test.describe('U-05 取引承認 モバイルビューポート (375px)', () => 
   });
 
   test('モバイルで「取引承認」ヘッダーと提案カードが表示される', async ({ page }) => {
+    test.skip(true, '理由: 古い仕様テスト。現在の /approve は認証必須でリダイレクトされ、提案カードのモックデータが存在しない。')
     const heading = page.getByRole('heading', { name: '取引承認' });
     await expect(heading).toBeVisible();
 
@@ -144,11 +158,13 @@ test.describe('U-05 取引承認 モバイルビューポート (375px)', () => 
   });
 
   test('モバイルで待ち件数バッジが表示される', async ({ page }) => {
+    test.skip(true, '理由: 古い仕様テスト。現在の /approve は認証必須でリダイレクトされ、固定モックデータ「2件待ち」は存在しない。')
     const badge = page.getByText('2件待ち');
     await expect(badge).toBeVisible();
   });
 
   test('モバイルで「最近の承認履歴」セクションが表示される', async ({ page }) => {
+    test.skip(true, '理由: 古い仕様テスト。現在の /approve は認証必須でリダイレクトされ、履歴モックデータが存在しない。')
     const recentSection = page.getByText('最近の承認履歴');
     await expect(recentSection).toBeVisible();
   });

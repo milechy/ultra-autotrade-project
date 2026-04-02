@@ -37,8 +37,10 @@ test.describe('U-07 設定 (/settings)', () => {
   });
 
   test('ウォレット情報セクションが存在する', async ({ page }) => {
-    // WalletInfoCard: CardTitle は 'ウォレット'（'ウォレット情報' ではない）
-    const section = page.getByText('ウォレット', { exact: true });
+    // WalletInfoCard: CardTitle は h3 として 'ウォレット' を表示する
+    // ナビリンク（/user/wallet の <a>）も 'ウォレット' を含むが hidden なため、
+    // role=heading でフィルタリングして visible な CardTitle（h3）のみを対象にする
+    const section = page.getByRole('heading', { name: 'ウォレット', exact: true });
     await expect(section.first()).toBeVisible();
   });
 
