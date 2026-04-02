@@ -31,3 +31,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# next-pwa generated files (rebuild on each deploy)
+/public/sw.js
+/public/workbox-*.js
