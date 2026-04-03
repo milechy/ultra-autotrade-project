@@ -106,7 +106,7 @@ export default function ApprovePage() {
   const [error, setError] = useState<string | null>(null)
   const [proposalStates, setProposalStates] = useState<Record<string, ProposalState>>({})
 
-  const chain = chainIdToName(chainId)
+  const chain = chainIdToName(chainId ?? undefined)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
