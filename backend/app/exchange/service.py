@@ -275,17 +275,20 @@ class ExchangeService:
 
     def get_price_change_24h(self, symbol: Optional[str] = None) -> Optional[Decimal]:
         """
-        24 時間の価格変動率を取得する（小数表現、例: -0.12 = -12%）。
+        24 時間の価格変動率を取得する（パーセント表現、例: -12.5 = -12.5%）。
 
         ccxt の fetch_ticker が返す percentage フィールドを使用する。
-        percentage はパーセント表現（例: -12.5）なので 100 で割って小数に変換する。
+        percentage はすでにパーセント単位（例: -12.5）なのでそのまま返す。
         取得失敗時は None を返す（例外をキャッチしてログに記録）。
+
+        戻り値の単位: パーセント（-12.5 = -12.5%）
+        呼び出し元の workflow.py は /100 して StressController の小数形式に変換する。
 
         Args:
             symbol: 取引シンボル（省略時は設定のデフォルトシンボル）
 
         Returns:
-            Decimal | None: 小数表現の変動率（-0.12 = -12%）
+            Decimal | None: パーセント表現の変動率（-12.5 = -12.5%）
         """
         target = symbol or self._settings.default_symbol
         try:
@@ -300,7 +303,7 @@ class ExchangeService:
                     "price_change_24h: percentage field not found in ticker for %s", target
                 )
                 return None
-            return Decimal(str(raw)) / Decimal("100")
+            return Decimal(str(raw))
         except Exception as exc:
             logger.warning("Failed to get price_change_24h for %s: %s", target, exc)
             return None

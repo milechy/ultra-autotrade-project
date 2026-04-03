@@ -117,7 +117,7 @@ class TestExchangeService:
 
 class TestGetPriceChange24h:
     def test_returns_decimal_when_percentage_present(self):
-        """percentage フィールドが存在する場合は Decimal(percentage/100) を返す。"""
+        """percentage フィールドが存在する場合はパーセント値をそのまま Decimal で返す（/100 しない）。"""
         from decimal import Decimal
         from unittest.mock import MagicMock
 
@@ -132,10 +132,12 @@ class TestGetPriceChange24h:
 
         assert result is not None
         assert isinstance(result, Decimal)
-        assert result == Decimal("-0.125")
+        # percentage はパーセント単位のまま返す（-12.5 = -12.5%）
+        # workflow.py が /100 して StressController の小数形式に変換する
+        assert result == Decimal("-12.5")
 
     def test_returns_decimal_from_info_field(self):
-        """percentage がなく info.priceChangePercent がある場合も Decimal を返す。"""
+        """percentage がなく info.priceChangePercent がある場合もパーセント値をそのまま返す。"""
         from decimal import Decimal
         from unittest.mock import MagicMock
 
@@ -150,7 +152,7 @@ class TestGetPriceChange24h:
         result = service.get_price_change_24h()
 
         assert result is not None
-        assert result == Decimal("0.05")
+        assert result == Decimal("5.0")
 
     def test_returns_none_when_percentage_missing(self):
         """percentage フィールドがない場合は None を返す。"""

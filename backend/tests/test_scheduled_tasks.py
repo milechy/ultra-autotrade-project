@@ -10,7 +10,7 @@ python-async-patterns.md の「Pattern 8: Testing Async Code」に準拠。
 
 import asyncio
 from datetime import datetime, time
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -405,3 +405,80 @@ class TestProposalTimeoutLoop:
             assert not manager.is_health_check_running
             assert not manager.is_latency_monitor_running
             assert not manager.is_proposal_timeout_running
+
+
+# ---------------------------------------------------------------------------
+# P1-1 regression: loops must use shared get_monitoring_service() singleton
+# ---------------------------------------------------------------------------
+
+
+class TestMonitoringServiceSingletonUsage:
+    """各ループが MonitoringService() を直接インスタンス化せず
+    get_monitoring_service() シングルトンを使うことを確認するリグレッションテスト。"""
+
+    @pytest.mark.asyncio
+    async def test_health_check_loop_uses_shared_monitoring_service(self):
+        """health_check_loop が get_monitoring_service() を呼ぶこと（MonitoringService() 直接生成しない）。"""
+        from app.automation.scheduled_tasks import health_check_loop
+
+        calls: list[str] = []
+        mock_ms = MagicMock()
+        mock_ms.check_all_positions_safe = AsyncMock(return_value=True)
+
+        sleep_count = 0
+
+        async def fake_sleep(seconds: float) -> None:
+            nonlocal sleep_count
+            sleep_count += 1
+            if sleep_count >= 2:
+                raise asyncio.CancelledError
+
+        def fake_get_ms() -> MagicMock:
+            calls.append("get_monitoring_service")
+            return mock_ms
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=fake_sleep),
+            patch("app.automation.state.get_monitoring_service", side_effect=fake_get_ms),
+        ):
+            try:
+                await health_check_loop(interval_seconds=1)
+            except asyncio.CancelledError:
+                pass
+
+        assert "get_monitoring_service" in calls, (
+            "health_check_loop must call get_monitoring_service() not MonitoringService()"
+        )
+
+    @pytest.mark.asyncio
+    async def test_price_monitor_loop_uses_shared_monitoring_service(self):
+        """price_monitor_loop が get_monitoring_service() を呼ぶこと（MonitoringService() 直接生成しない）。"""
+        from app.automation.scheduled_tasks import price_change_monitor_loop
+
+        calls: list[str] = []
+        mock_ms = MagicMock()
+
+        sleep_count = 0
+
+        async def fake_sleep(seconds: float) -> None:
+            nonlocal sleep_count
+            sleep_count += 1
+            if sleep_count >= 2:
+                raise asyncio.CancelledError
+
+        def fake_get_ms() -> MagicMock:
+            calls.append("get_monitoring_service")
+            return mock_ms
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=fake_sleep),
+            patch("app.automation.state.get_monitoring_service", side_effect=fake_get_ms),
+        ):
+            try:
+                await price_change_monitor_loop(interval_seconds=1)
+            except asyncio.CancelledError:
+                pass
+
+        assert "get_monitoring_service" in calls, (
+            "price_change_monitor_loop must call get_monitoring_service() not MonitoringService()"
+        )
