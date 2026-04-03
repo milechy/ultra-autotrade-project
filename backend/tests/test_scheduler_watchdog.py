@@ -17,7 +17,6 @@ from app.automation.scheduler_watchdog import (  # noqa: E402
     scheduler_watchdog_loop,
 )
 
-
 # ---------------------------------------------------------------------------
 # compute_scheduler_health — pure function tests
 # ---------------------------------------------------------------------------
