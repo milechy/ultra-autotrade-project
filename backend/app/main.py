@@ -18,8 +18,11 @@ Responsibilities added in Phase 12:
 - User authentication and account management
 """
 
+import json
 import logging
 import os
+import urllib.request
+from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
@@ -97,6 +100,33 @@ def _is_background_monitoring_enabled() -> bool:
     if os.getenv("ENABLE_BACKGROUND_MONITORING") == "0":
         return False
     return True
+
+
+def _make_scheduler_error_handler(name: str) -> Callable[[Exception], None]:
+    """スケジューラー失敗時の同期 Slack 通知コールバックを生成する。
+
+    on_error コールバックとして各スケジューラーに渡す。
+    通知自体が失敗してもスケジューラーは継続する。
+    """
+
+    def handler(exc: Exception) -> None:
+        webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+        if not webhook_url:
+            return
+        try:
+            ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            text = f"⚠️ [Scheduler] {name}実行失敗\n原因: {type(exc).__name__}: {exc}\n時刻: {ts}"
+            data = json.dumps({"text": text}).encode()
+            req = urllib.request.Request(
+                webhook_url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+            )
+            urllib.request.urlopen(req, timeout=5)  # noqa: S310
+        except Exception as notify_exc:
+            logger.error("Scheduler Slack notification failed: %s", notify_exc)
+
+    return handler
 
 
 async def _notify_slack_warning(text: str) -> None:
@@ -204,6 +234,7 @@ def create_app() -> FastAPI:
             "scheduler": scheduler["running"],
             "last_judgment": scheduler.get("last_run"),
             "next_judgment": scheduler.get("next_run"),
+            "scheduler_last_error": scheduler.get("last_error"),
         }
 
     # --- Database initialization (Phase12) ---
@@ -342,12 +373,14 @@ def create_app() -> FastAPI:
             if enable_daily:
                 await scheduled_manager.start_daily_reports(
                     channel=settings.default_channel,
+                    on_error=_make_scheduler_error_handler("日次レポートスケジューラー"),
                 )
                 logger.info("Daily reports scheduled successfully")
 
             if enable_weekly:
                 await scheduled_manager.start_weekly_reports(
                     channel=settings.default_channel,
+                    on_error=_make_scheduler_error_handler("週次レポートスケジューラー"),
                 )
                 logger.info("Weekly reports scheduled successfully")
 
@@ -374,7 +407,12 @@ def create_app() -> FastAPI:
             from app.automation.ai_judgment_scheduler import ai_judgment_loop
 
             interval = int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS", "4"))
-            asyncio.create_task(ai_judgment_loop(interval_hours=interval))
+            asyncio.create_task(
+                ai_judgment_loop(
+                    interval_hours=interval,
+                    on_error=_make_scheduler_error_handler("AI判定スケジューラー"),
+                )
+            )
             logger.info("AI judgment scheduler started (interval=%dh)", interval)
         except BaseException as exc:
             logger.error("Failed to start AI judgment scheduler: %s", exc)

@@ -25,6 +25,7 @@ from app.ai.schemas import (  # noqa: E402
 from app.auth.models import User  # noqa: E402
 from app.automation.ai_judgment_scheduler import (  # noqa: E402
     ai_judgment_loop,
+    get_scheduler_status,
     run_ai_judgment_job,
     save_ai_decision,
 )
@@ -278,3 +279,120 @@ async def test_scheduler_repeats_after_interval():
             pass
 
     assert job_call_count >= 2  # ran at least twice
+
+
+# ---------------------------------------------------------------------------
+# get_scheduler_status のテスト
+# ---------------------------------------------------------------------------
+
+
+def test_get_scheduler_status_has_last_error_key():
+    """get_scheduler_status が last_error キーを含むこと。"""
+    status = get_scheduler_status()
+    assert "last_error" in status
+
+
+# ---------------------------------------------------------------------------
+# ai_judgment_loop の on_error コールバックテスト
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_scheduler_calls_on_error_on_failure():
+    """AI判定が失敗した場合、on_error コールバックが呼ばれること。"""
+    import app.automation.ai_judgment_scheduler as sched_module
+
+    errors_received: list[Exception] = []
+
+    def fake_on_error(exc: Exception) -> None:
+        errors_received.append(exc)
+
+    sleep_call_count = 0
+
+    async def fake_sleep(seconds: float) -> None:
+        nonlocal sleep_call_count
+        sleep_call_count += 1
+        if sleep_call_count >= 2:
+            raise asyncio.CancelledError
+
+    def failing_job() -> dict:
+        raise RuntimeError("fake AI failure")
+
+    # Reset state before test
+    sched_module._last_error_msg = None
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.run_ai_judgment_job", side_effect=failing_job),
+        patch("asyncio.sleep", side_effect=fake_sleep),
+    ):
+        try:
+            await ai_judgment_loop(interval_hours=1, on_error=fake_on_error)
+        except asyncio.CancelledError:
+            pass
+
+    assert len(errors_received) >= 1
+    assert isinstance(errors_received[0], RuntimeError)
+    assert sched_module._last_error_msg is not None
+    assert "RuntimeError" in sched_module._last_error_msg
+
+
+@pytest.mark.asyncio
+async def test_scheduler_clears_error_on_success():
+    """成功時に _last_error_msg が None にリセットされること。"""
+    import app.automation.ai_judgment_scheduler as sched_module
+
+    sched_module._last_error_msg = "previous error"
+    sleep_call_count = 0
+
+    async def fake_sleep(seconds: float) -> None:
+        nonlocal sleep_call_count
+        sleep_call_count += 1
+        if sleep_call_count >= 2:
+            raise asyncio.CancelledError
+
+    def success_job() -> dict:
+        return {"action": "HOLD", "confidence": 70, "proposals_created": 0, "decision_id": 1}
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.run_ai_judgment_job", side_effect=success_job),
+        patch("asyncio.sleep", side_effect=fake_sleep),
+    ):
+        try:
+            await ai_judgment_loop(interval_hours=1)
+        except asyncio.CancelledError:
+            pass
+
+    assert sched_module._last_error_msg is None
+
+
+@pytest.mark.asyncio
+async def test_scheduler_on_error_failure_does_not_crash_loop():
+    """on_error コールバック自体が例外を投げても、ループが継続すること。"""
+    job_call_count = 0
+    sleep_call_count = 0
+
+    async def fake_sleep(seconds: float) -> None:
+        nonlocal sleep_call_count
+        sleep_call_count += 1
+        if sleep_call_count >= 4:
+            raise asyncio.CancelledError
+
+    def failing_job() -> dict:
+        nonlocal job_call_count
+        job_call_count += 1
+        raise RuntimeError("job error")
+
+    def bad_callback(exc: Exception) -> None:
+        raise ValueError("callback also fails")
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.run_ai_judgment_job", side_effect=failing_job),
+        patch("asyncio.sleep", side_effect=fake_sleep),
+    ):
+        try:
+            await ai_judgment_loop(interval_hours=1, on_error=bad_callback)
+        except asyncio.CancelledError:
+            pass
+
+    # Loop continued despite callback failure
+    assert job_call_count >= 2
