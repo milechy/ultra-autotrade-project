@@ -18,7 +18,8 @@ import AuthGuard from '@/components/AuthGuard'
 import { EmergencyStop } from '@/components/user/EmergencyStop'
 import { useAuth } from '@/lib/auth'
 import { useAutomationStatus } from '@/components/user/UserProviders'
-import { getJson, putJson } from '@/lib/api/http'
+import { getJson, putJson, postJson } from '@/lib/api/http'
+import { OperationModeSelector } from '@/components/OperationModeSelector'
 
 type NotificationLevel = 'all' | 'alert' | 'emergency'
 
@@ -32,6 +33,7 @@ type UserSettings = {
   max_position_pct: number
   max_daily_trades: number
   hf_threshold: number
+  user_mode: string
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -44,6 +46,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   max_position_pct: 10,
   max_daily_trades: 30,
   hf_threshold: 1.6,
+  user_mode: 'managed',
 }
 
 function Toggle({
@@ -87,15 +90,18 @@ function SectionHeader({ icon: Icon, title }: { icon: React.ElementType; title: 
 
 function SettingsPage() {
   const { token, isAdmin } = useAuth()
-  const { isStopped, refreshStatus } = useAutomationStatus()
+  const { systemStatus, isStopped, refreshStatus } = useAutomationStatus()
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isModeChanging, setIsModeChanging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [riskProfiles, setRiskProfiles] = useState<RiskProfile[]>([])
   const [selectedRiskProfile, setSelectedRiskProfile] = useState<string>('')
   const [riskProfileLoading, setRiskProfileLoading] = useState(true)
+
+  const isRunning = systemStatus === 'NORMAL'
 
   const fetchSettings = useCallback(async () => {
     if (!token) return
@@ -182,6 +188,36 @@ function SettingsPage() {
     }
   }
 
+  const handleToggleRunning = async (value: boolean) => {
+    if (!token) return
+    try {
+      if (value) {
+        await postJson('/api/user/resume', {}, { headers: { Authorization: `Bearer ${token}` } })
+      } else {
+        await postJson('/api/user/pause', {}, { headers: { Authorization: `Bearer ${token}` } })
+      }
+      await refreshStatus()
+    } catch {
+      toast.error('操作に失敗しました')
+    }
+  }
+
+  const handleModeChange = async (mode: string) => {
+    if (!token || isModeChanging) return
+    setIsModeChanging(true)
+    try {
+      await putJson('/api/user/settings', { user_mode: mode }, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setSettings(prev => ({ ...prev, user_mode: mode }))
+      toast.success('運用モードを変更しました')
+    } catch {
+      toast.error('モードの変更に失敗しました')
+    } finally {
+      setIsModeChanging(false)
+    }
+  }
+
   const notificationLevelOptions: { value: NotificationLevel; label: string }[] = [
     { value: 'all', label: '全て' },
     { value: 'alert', label: 'ALERT以上' },
@@ -212,12 +248,6 @@ function SettingsPage() {
       </div>
 
       <div className="space-y-4 px-4 py-4 pb-8">
-        {!isAdmin && (
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>設定の変更は管理者のみ可能です</AlertDescription>
-          </Alert>
-        )}
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -229,7 +259,66 @@ function SettingsPage() {
           </Alert>
         )}
 
-        {/* 通知設定 */}
+        {/* 1. 運用モード */}
+        <Card className={isStopped ? 'opacity-50 pointer-events-none' : ''}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">運用モード</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* ON/OFFスイッチ */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">{isRunning ? '運用中' : '一時停止'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {isRunning
+                    ? 'AIによる分析と提案が有効です'
+                    : 'AI分析と提案を停止中です。手動で再開してください'}
+                </p>
+              </div>
+              <Toggle
+                checked={isRunning}
+                onChange={(v) => { void handleToggleRunning(v) }}
+              />
+            </div>
+
+            {/* フルオート/セミオート/マニュアル */}
+            <div className="pt-2 border-t">
+              <p className="text-xs text-muted-foreground mb-3">実行ポリシー</p>
+              <OperationModeSelector
+                currentMode={settings.user_mode}
+                onModeChange={(mode) => { void handleModeChange(mode) }}
+                disabled={isModeChanging || isStopped}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 2. リスクモード */}
+        <Card>
+          <CardHeader className="pb-3">
+            <SectionHeader icon={ShieldAlert} title="リスクモード" />
+            <CardTitle className="text-base">リスクモード選択</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {riskProfileLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full rounded-lg" />
+                <Skeleton className="h-16 w-full rounded-lg" />
+                <Skeleton className="h-16 w-full rounded-lg" />
+              </div>
+            ) : riskProfiles.length > 0 ? (
+              <RiskModeSelector
+                profiles={riskProfiles}
+                current={selectedRiskProfile}
+                onSelect={(name) => { void handleRiskModeSelect(name) }}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">リスクプロファイルを取得できませんでした</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 3. 通知設定 */}
         <Card>
           <CardHeader className="pb-3">
             <SectionHeader icon={Bell} title="通知設定" />
@@ -280,60 +369,7 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* 取引設定 */}
-        <Card>
-          <CardHeader className="pb-3">
-            <SectionHeader icon={TrendingUp} title="取引設定" />
-            <CardTitle className="text-base">取引</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Shadow Mode</p>
-                <p className="text-xs text-muted-foreground">ONにすると実際の注文は発生しません</p>
-              </div>
-              <Toggle
-                checked={settings.shadow_mode}
-                onChange={v => set('shadow_mode', v)}
-                disabled={!isAdmin}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">取引ペア</label>
-              <Input
-                value={settings.exchange_symbol}
-                onChange={e => set('exchange_symbol', e.target.value)}
-                placeholder="例: BTC/USDT"
-                disabled={!isAdmin}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">レバレッジ</label>
-              <Input
-                type="number"
-                min={1}
-                max={20}
-                value={settings.leverage}
-                onChange={e => set('leverage', Number(e.target.value))}
-                disabled={!isAdmin}
-              />
-            </div>
-
-            {/* Bot売買設定 */}
-            <div className="flex items-center justify-between p-4 border rounded-lg opacity-60">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">Bot売買</span>
-                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">Coming Soon</span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">Phase 2で対応予定</p>
-              </div>
-              <input type="checkbox" disabled checked={false} className="w-5 h-5 cursor-not-allowed" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* リスク管理 */}
+        {/* 4. リスク管理 */}
         <Card>
           <CardHeader className="pb-3">
             <SectionHeader icon={ShieldAlert} title="リスク管理" />
@@ -380,28 +416,63 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* リスクモード */}
+        {/* 5. 取引設定 — 管理者専用セクション */}
         <Card>
           <CardHeader className="pb-3">
-            <SectionHeader icon={ShieldAlert} title="リスクモード" />
-            <CardTitle className="text-base">リスクモード選択</CardTitle>
+            <SectionHeader icon={TrendingUp} title="取引設定" />
+            <CardTitle className="text-base">取引</CardTitle>
           </CardHeader>
-          <CardContent>
-            {riskProfileLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-16 w-full rounded-lg" />
-                <Skeleton className="h-16 w-full rounded-lg" />
-                <Skeleton className="h-16 w-full rounded-lg" />
-              </div>
-            ) : riskProfiles.length > 0 ? (
-              <RiskModeSelector
-                profiles={riskProfiles}
-                current={selectedRiskProfile}
-                onSelect={(name) => { void handleRiskModeSelect(name) }}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">リスクプロファイルを取得できませんでした</p>
+          <CardContent className="space-y-4">
+            {/* 管理者のみ変更可能バナー（非管理者向け） */}
+            {!isAdmin && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>取引設定の変更は管理者のみ可能です</AlertDescription>
+              </Alert>
             )}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Shadow Mode</p>
+                <p className="text-xs text-muted-foreground">ONにすると実際の注文は発生しません</p>
+              </div>
+              <Toggle
+                checked={settings.shadow_mode}
+                onChange={v => set('shadow_mode', v)}
+                disabled={!isAdmin}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">取引ペア</label>
+              <Input
+                value={settings.exchange_symbol}
+                onChange={e => set('exchange_symbol', e.target.value)}
+                placeholder="例: BTC/USDT"
+                disabled={!isAdmin}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">レバレッジ</label>
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                value={settings.leverage}
+                onChange={e => set('leverage', Number(e.target.value))}
+                disabled={!isAdmin}
+              />
+            </div>
+
+            {/* Bot売買設定 */}
+            <div className="flex items-center justify-between p-4 border rounded-lg opacity-60">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">Bot売買</span>
+                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">Coming Soon</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">Phase 2で対応予定</p>
+              </div>
+              <input type="checkbox" disabled checked={false} className="w-5 h-5 cursor-not-allowed" />
+            </div>
           </CardContent>
         </Card>
 
