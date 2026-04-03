@@ -5,7 +5,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Bell, TrendingUp, ShieldAlert, Save, RefreshCw, Info } from 'lucide-react'
+import { Bell, TrendingUp, ShieldAlert, Save, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RiskModeSelector } from '@/components/transparency'
@@ -238,12 +238,10 @@ function SettingsPage() {
       <div className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
         <div className="flex items-center justify-between px-4 py-3">
           <h1 className="text-lg font-semibold">設定</h1>
-          {isAdmin && (
-            <Button size="sm" onClick={handleSave} disabled={isSaving}>
-              <Save className="mr-1.5 h-3.5 w-3.5" />
-              {isSaving ? '保存中...' : '保存'}
-            </Button>
-          )}
+          <Button size="sm" onClick={handleSave} disabled={isSaving}>
+            <Save className="mr-1.5 h-3.5 w-3.5" />
+            {isSaving ? '保存中...' : '保存'}
+          </Button>
         </div>
       </div>
 
@@ -272,7 +270,7 @@ function SettingsPage() {
                 <p className="text-xs text-muted-foreground">
                   {isRunning
                     ? 'AIによる分析と提案が有効です'
-                    : 'AI分析と提案を停止中です。手動で再開してください'}
+                    : 'AIによる分析・提案を停止中です。資金はそのまま安全に保持されます。'}
                 </p>
               </div>
               <Toggle
@@ -333,7 +331,6 @@ function SettingsPage() {
               <Toggle
                 checked={settings.slack_enabled}
                 onChange={v => set('slack_enabled', v)}
-                disabled={!isAdmin}
               />
             </div>
             <div className="flex items-center justify-between">
@@ -344,7 +341,6 @@ function SettingsPage() {
               <Toggle
                 checked={settings.line_enabled}
                 onChange={v => set('line_enabled', v)}
-                disabled={!isAdmin}
               />
             </div>
             <div className="space-y-2">
@@ -353,9 +349,8 @@ function SettingsPage() {
                 {notificationLevelOptions.map(opt => (
                   <button
                     key={opt.value}
-                    onClick={() => isAdmin && set('notification_level', opt.value)}
-                    disabled={!isAdmin}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    onClick={() => set('notification_level', opt.value)}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                       settings.notification_level === opt.value
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -369,8 +364,8 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* 4. リスク管理 */}
-        <Card>
+        {/* 4. リスク管理 — admin のみ表示 */}
+        {isAdmin && <Card>
           <CardHeader className="pb-3">
             <SectionHeader icon={ShieldAlert} title="リスク管理" />
             <CardTitle className="text-base">リスク</CardTitle>
@@ -414,22 +409,15 @@ function SettingsPage() {
               />
             </div>
           </CardContent>
-        </Card>
+        </Card>}
 
-        {/* 5. 取引設定 — 管理者専用セクション */}
-        <Card>
+        {/* 5. 取引設定 — admin のみ表示 */}
+        {isAdmin && <Card>
           <CardHeader className="pb-3">
             <SectionHeader icon={TrendingUp} title="取引設定" />
             <CardTitle className="text-base">取引</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* 管理者のみ変更可能バナー（非管理者向け） */}
-            {!isAdmin && (
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>取引設定の変更は管理者のみ可能です</AlertDescription>
-              </Alert>
-            )}
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Shadow Mode</p>
@@ -474,7 +462,7 @@ function SettingsPage() {
               <input type="checkbox" disabled checked={false} className="w-5 h-5 cursor-not-allowed" />
             </div>
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* 緊急停止 (admin のみ表示) */}
         {isAdmin && (
@@ -484,12 +472,10 @@ function SettingsPage() {
           />
         )}
 
-        {isAdmin && (
-          <Button className="w-full" onClick={handleSave} disabled={isSaving}>
-            <Save className="mr-2 h-4 w-4" />
-            {isSaving ? '保存中...' : '設定を保存'}
-          </Button>
-        )}
+        <Button className="w-full" onClick={handleSave} disabled={isSaving}>
+          <Save className="mr-2 h-4 w-4" />
+          {isSaving ? '保存中...' : '設定を保存'}
+        </Button>
       </div>
     </div>
   )
