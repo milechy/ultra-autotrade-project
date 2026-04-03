@@ -199,6 +199,24 @@ else
 fi
 
 # ───────────────────────────────────────────────
+# スケジューラー健全性チェック（警告のみ、デプロイは止めない）
+# ───────────────────────────────────────────────
+if ! "${FRONTEND_ONLY}"; then
+  log "15秒待機してスケジューラー状態を確認中..."
+  sleep 15
+  HEALTH_JSON=$(curl -sf --max-time 5 "http://localhost:8000/health" 2>/dev/null || echo '{}')
+  SCHED_HEALTHY=$(echo "${HEALTH_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('scheduler_healthy','unknown'))" 2>/dev/null || echo "unknown")
+  if [ "${SCHED_HEALTHY}" = "False" ] || [ "${SCHED_HEALTHY}" = "false" ]; then
+    log "⚠️  WARNING: scheduler_healthy=false — スケジューラーが overdue 状態です"
+    log "   詳細: ${HEALTH_JSON}"
+  elif [ "${SCHED_HEALTHY}" = "unknown" ]; then
+    log "⚠️  WARNING: /health からスケジューラー状態を取得できませんでした"
+  else
+    log "scheduler_healthy=${SCHED_HEALTHY} ✓"
+  fi
+fi
+
+# ───────────────────────────────────────────────
 # 完了報告
 # ───────────────────────────────────────────────
 log "コンテナ状態:"

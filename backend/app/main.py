@@ -225,16 +225,26 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["health"])
     def health_check() -> dict[str, Any]:
         from app.automation.ai_judgment_scheduler import get_scheduler_status
+        from app.automation.scheduler_watchdog import compute_scheduler_health
 
         scheduler = get_scheduler_status()
         status = "ok" if scheduler["running"] else "degraded"
+
+        interval_hours = int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS", "4"))
+        health = compute_scheduler_health(scheduler.get("last_run"), interval_hours)
+        warnings: list[str] = []
+        if not health["healthy"]:
+            warnings.append("scheduler_overdue")
+
         return {
             "status": status,
             "env": os.getenv("APP_ENV", "dev"),
             "scheduler": scheduler["running"],
+            "scheduler_healthy": health["healthy"],
             "last_judgment": scheduler.get("last_run"),
             "next_judgment": scheduler.get("next_run"),
             "scheduler_last_error": scheduler.get("last_error"),
+            "warnings": warnings,
         }
 
     # --- Database initialization (Phase12) ---
@@ -405,6 +415,7 @@ def create_app() -> FastAPI:
             return
         try:
             from app.automation.ai_judgment_scheduler import ai_judgment_loop
+            from app.automation.scheduler_watchdog import scheduler_watchdog_loop
 
             interval = int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS", "4"))
             asyncio.create_task(
@@ -414,6 +425,8 @@ def create_app() -> FastAPI:
                 )
             )
             logger.info("AI judgment scheduler started (interval=%dh)", interval)
+            asyncio.create_task(scheduler_watchdog_loop())
+            logger.info("Scheduler watchdog started (check interval=30min)")
         except BaseException as exc:
             logger.error("Failed to start AI judgment scheduler: %s", exc)
 
