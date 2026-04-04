@@ -328,6 +328,26 @@ def check_rule_engine(
     if not monitoring_service.is_trading_allowed():
         return False, "emergency_stop"
 
+    # Aave oracle freshness check (fail-closed)
+    try:
+        from app.aave.oracle_checker import is_oracle_fresh  # noqa: PLC0415
+
+        if not is_oracle_fresh():
+            return False, "oracle_stale"
+    except Exception as exc:
+        logger.error("Oracle check failed - fail-closed: %s", exc)
+        return False, "oracle_check_failed"
+
+    # Aave reserve status check (fail-closed)
+    try:
+        from app.aave.reserve_monitor import is_reserve_healthy  # noqa: PLC0415
+
+        if not is_reserve_healthy():
+            return False, "reserve_paused_or_frozen"
+    except Exception as exc:
+        logger.error("Reserve check failed - fail-closed: %s", exc)
+        return False, "reserve_check_failed"
+
     return True, "ok"
 
 
@@ -495,8 +515,20 @@ def process_pending_knowledge(
                 hold_count=len(pending),
                 status="completed",
             )
-    except Exception as _macro_exc:  # noqa: BLE001
-        logger.warning("MacroSafeMode check failed (skipping): %s", _macro_exc)
+    except Exception as _macro_exc:
+        logger.error(
+            "MacroSafeMode evaluation FAILED - fail-closed, blocking trades: %s", _macro_exc
+        )
+        for item in pending:
+            try:
+                knowledge_service.update_status(db, item.id, KnowledgeItemStatus.SKIPPED)
+            except Exception:
+                logger.warning("Failed to update status for item %d", item.id)
+        return WorkflowRunResult(
+            fetched_count=len(pending),
+            hold_count=len(pending),
+            status="completed",
+        )
 
     errors: List[WorkflowStepError] = []
     traded_count = 0

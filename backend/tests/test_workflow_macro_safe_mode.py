@@ -148,8 +148,8 @@ class TestMacroSafeModeWiring:
         # No items should have been traded (HOLD)
         assert result.traded_count == 0
 
-    def test_macro_safe_mode_exception_continues_normal_flow(self):
-        """MacroSafeMode raises exception → log warning, continue normal flow (do not block)."""
+    def test_macro_safe_mode_exception_fail_closed(self):
+        """MacroSafeMode raises exception → fail-closed: block all trades (all items SKIPPED)."""
         items = [_make_item(1)]
         knowledge_svc = _make_knowledge_service(items)
         ai_svc = _make_ai_service(TradeAction.HOLD)
@@ -167,6 +167,9 @@ class TestMacroSafeModeWiring:
                 exchange_service=exchange_svc,
             )
 
-        # Normal flow continues despite exception
-        ai_svc.judge_with_rag.assert_called_once()
-        assert result.status in ("completed", "completed_with_errors")
+        # fail-closed: safety guard failure blocks all trades
+        ai_svc.judge_with_rag.assert_not_called()
+        assert result.fetched_count == 1
+        assert result.hold_count == 1
+        assert result.traded_count == 0
+        assert result.status == "completed"

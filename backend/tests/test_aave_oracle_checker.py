@@ -241,10 +241,10 @@ class TestCheckSequencerUptime:
                 sequencer_feed_address="0xSEQ",
                 rpc_url="http://localhost:8545",
             )
-        # fail-open: returns True
-        assert result is True
+        # fail-closed: web3 unavailable → block trades
+        assert result is False
 
-    def test_rpc_failure_fail_open(self) -> None:
+    def test_rpc_failure_fail_closed(self) -> None:
         from app.aave.oracle_checker import check_sequencer_uptime
 
         mock_web3_module = MagicMock()
@@ -261,5 +261,5 @@ class TestCheckSequencerUptime:
                 sequencer_feed_address="0xSEQ",
                 rpc_url="http://localhost:8545",
             )
-        # fail-open
-        assert result is True
+        # fail-closed: RPC failure → block trades
+        assert result is False
