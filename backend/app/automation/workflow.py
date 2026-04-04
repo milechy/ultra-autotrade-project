@@ -478,6 +478,26 @@ def process_pending_knowledge(
         except Exception as _stress_exc:  # noqa: BLE001
             logger.warning("StressController check failed (skipping): %s", _stress_exc)
 
+    # MacroSafeMode check: FOMC/CPI event windows block all trades
+    try:
+        from app.automation.macro_safe_mode import MacroSafeMode  # noqa: PLC0415
+
+        macro_status = MacroSafeMode().is_safe_mode_active()
+        if macro_status.active:
+            logger.info("MacroSafeMode active: blocking trades (%s)", macro_status.reason)
+            for item in pending:
+                try:
+                    knowledge_service.update_status(db, item.id, KnowledgeItemStatus.SKIPPED)
+                except Exception:
+                    logger.warning("Failed to update status for item %d", item.id)
+            return WorkflowRunResult(
+                fetched_count=len(pending),
+                hold_count=len(pending),
+                status="completed",
+            )
+    except Exception as _macro_exc:  # noqa: BLE001
+        logger.warning("MacroSafeMode check failed (skipping): %s", _macro_exc)
+
     errors: List[WorkflowStepError] = []
     traded_count = 0
     hold_count = 0
