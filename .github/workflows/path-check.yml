@@ -56,6 +56,12 @@ jobs:
             "backend/requirements.txt"
           )
 
+          # backend_deps.md が変更に含まれていれば「申請済み」とみなす
+          HAS_BACKEND_DEPS_UPDATE=0
+          if echo "$CHANGED_FILES" | grep -q '^docs/integration/backend_deps\.md$'; then
+            HAS_BACKEND_DEPS_UPDATE=1
+          fi
+
           while IFS= read -r file; do
             [ -z "$file" ] && continue
 
@@ -67,7 +73,11 @@ jobs:
             # 凍結ファイルチェック
             for pattern in "${FROZEN_PATTERNS[@]}"; do
               if echo "$file" | grep -q "^$pattern"; then
-                VIOLATIONS="${VIOLATIONS}\n- ❌ 凍結ファイル変更: \`$file\` (申請が必要)"
+                if [ "$HAS_BACKEND_DEPS_UPDATE" -eq "1" ]; then
+                  WARNINGS="${WARNINGS}\n- ⚠️ 凍結ファイル変更（backend_deps.md に申請済み）: \`$file\`"
+                else
+                  VIOLATIONS="${VIOLATIONS}\n- ❌ 凍結ファイル変更: \`$file\` (docs/integration/backend_deps.md への申請が必要)"
+                fi
               fi
             done
 
