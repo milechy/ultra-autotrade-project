@@ -502,10 +502,10 @@ async def health_check_loop(
             await asyncio.sleep(interval_seconds)
 
             async def _run_health_check() -> None:
-                from app.automation.monitoring_service import MonitoringService  # noqa: PLC0415
                 from app.automation.schemas import ComponentType  # noqa: PLC0415
+                from app.automation.state import get_monitoring_service  # noqa: PLC0415
 
-                monitoring_service = MonitoringService()
+                monitoring_service = get_monitoring_service()
 
                 try:
                     from app.aave.monitor import get_health_factor  # noqa: PLC0415
@@ -570,13 +570,13 @@ async def latency_monitor_loop(
 
                 import httpx  # noqa: PLC0415
 
-                from app.automation.monitoring_service import MonitoringService  # noqa: PLC0415
                 from app.automation.schemas import ComponentType  # noqa: PLC0415
+                from app.automation.state import get_monitoring_service  # noqa: PLC0415
 
                 base_url = os.getenv("BACKEND_BASE_URL", "http://localhost:8000")
                 url = f"{base_url}/api/automation/status"
 
-                monitoring_service = MonitoringService()
+                monitoring_service = get_monitoring_service()
                 start = time.monotonic()
                 try:
                     httpx.get(url, timeout=35)
@@ -633,13 +633,13 @@ async def price_change_monitor_loop(
             await asyncio.sleep(interval_seconds)
 
             def _run_monitor() -> None:
-                from app.automation.monitoring_service import MonitoringService  # noqa: PLC0415
+                from app.automation.state import get_monitoring_service  # noqa: PLC0415
                 from app.exchange.client import DummyExchangeClient  # noqa: PLC0415
                 from app.exchange.service import ExchangeService  # noqa: PLC0415
 
                 client = DummyExchangeClient()
                 exchange_service = ExchangeService(client=client)
-                monitoring_service = MonitoringService()
+                monitoring_service = get_monitoring_service()
 
                 pct = exchange_service.get_price_change_24h()
                 if pct is not None:

@@ -153,3 +153,44 @@ def check_reserve_status(
         alert=alert,
         alert_reasons=alert_reasons,
     )
+
+
+def is_reserve_healthy(
+    chain_name: Optional[str] = None,
+    asset_address: Optional[str] = None,
+    data_provider_address: Optional[str] = None,
+    rpc_url: Optional[str] = None,
+) -> bool:
+    """Zero-arg convenience wrapper for use in rule engine.
+
+    Reads AAVE_ASSET_ADDRESS, AAVE_DATA_PROVIDER_ADDRESS, and WEB3_RPC_URL
+    from environment if not provided.
+    Returns True if reserve is active and healthy (safe to trade).
+    Returns False (fail-closed) if RPC fails or reserve is paused/frozen/inactive.
+    If env vars are not configured, reserve check is skipped (returns True).
+    """
+    import os  # noqa: PLC0415
+
+    _chain: str = chain_name or os.getenv("AAVE_CHAIN_NAME", "polygon") or "polygon"
+    _asset = asset_address or os.getenv("AAVE_ASSET_ADDRESS")
+    _provider = data_provider_address or os.getenv("AAVE_DATA_PROVIDER_ADDRESS")
+    _rpc = rpc_url or os.getenv("WEB3_RPC_URL") or os.getenv("POLYGON_RPC_URL")
+
+    if not _asset or not _provider or not _rpc:
+        logger.warning(
+            "[reserve_monitor] AAVE_ASSET_ADDRESS, AAVE_DATA_PROVIDER_ADDRESS, or RPC URL "
+            "not configured - reserve check skipped (treating as healthy)"
+        )
+        return True  # env not configured → skip check
+
+    try:
+        result = check_reserve_status(_chain, _asset, _provider, _rpc)
+    except Exception as exc:
+        logger.error("[reserve_monitor] is_reserve_healthy call failed - fail-closed: %s", exc)
+        return False
+
+    if result is None:
+        logger.error("[reserve_monitor] Reserve check returned None (RPC failure) - fail-closed")
+        return False
+
+    return not result.alert

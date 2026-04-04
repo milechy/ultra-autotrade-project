@@ -331,6 +331,136 @@ curl -s -X POST "$WEBHOOK" \
 **孤立Dockerコンテナ:**
 - `docker compose down --remove-orphans` で消えない場合は `docker rm -f <container-name>` で強制削除してから `up -d`
 
+### 2026-04-02追加（cloudflared + network_mode:host）
+
+**cloudflared token方式の Ingress Rules:**
+- `--token` 方式では ingress ルールは Cloudflare ダッシュボードで管理される（config.yml は無視される）
+- ダッシュボードの ingress に `http://localhost:3000` / `http://localhost:8000` が設定されている場合、`network_mode: "host"` が必須
+
+**network_mode: host 使用時の注意:**
+- cloudflared コンテナが `localhost` に届くには `network_mode: "host"` が必要
+- frontend/backend は `ports: "3000:3000"` / `"8000:8000"` でホストに公開されている必要がある
+- `[::1]:3000`（IPv6）と `127.0.0.1:3000`（IPv4）両方で到達可能であること確認済み
+
+**デプロイ手順（502防止）:**
+- 正しい手順: `docker rm -f <container> && docker compose up -d --no-deps <service>`
+- 空白時間を最小化するため stop → rm → up を連続実行する
+- `restart` コマンドは旧イメージのまま再起動するため、新ビルド後には使わない
+- cloudflared は `--no-deps` で単独起動（postgres 競合を避ける）
+
+**502デバッグ手順:**
+1. `docker ps -a` でコンテナが存在・起動しているか確認
+2. `docker logs <frontend>` で Next.js の Ready ログを確認
+3. `curl http://127.0.0.1:3000` でホスト → frontend の疎通確認
+4. `docker logs <cloudflared>` で `connection refused` が出ていないか確認
+5. 502 の多くはデプロイ中の空白期間が原因（数秒で自然解消）
+
+### 2026-04-02追加（AIスケジューラー デフォルト有効化）
+
+**スケジューラーはデフォルト有効（DISABLE_ で明示的に停止する方式）:**
+- 旧方式: `ENABLE_AI_JUDGMENT_SCHEDULER=1`（デフォルト無効） → 設定漏れで無音停止していた
+- 新方式: `DISABLE_AI_JUDGMENT_SCHEDULER=1`（デフォルト有効） → 設定しなければ動く
+- 同様に `DISABLE_BACKGROUND_MONITORING=1`（デフォルト有効）
+- 旧 `ENABLE_=1` 変数は後方互換として引き続き機能する
+
+**スケジューラーが無効で起動した場合:**
+- ERROR ログ + Slack `#ultra-auto-project` に `⚠️ AIスケジューラーが無効状態で起動しました` 通知
+- `/health` が `"status": "degraded"` を返す
+
+**デプロイ後の確認手順:**
+```bash
+curl https://api.ultra-auto-trade.com/health
+# → {"status": "ok", "scheduler": true, "last_judgment": "...", "next_judgment": "..."}
+```
+
+**`.env.staging.example` との差分確認（デプロイ前必須）:**
+```bash
+diff <(grep -v '^#' backend/.env.staging.example | grep '=' | cut -d= -f1 | sort) \
+     <(grep -v '^#' /opt/ultra-autotrade/.env.staging | grep '=' | cut -d= -f1 | sort)
+```
+
+### 2026-04-02追加（Docker Composeプロジェクト名の統一）
+
+**docker compose は必ず同一プロジェクト名で実行すること:**
+- プロジェクト名が異なると各コンテナが別ネットワークに配置され、`postgres` ホスト名が解決できず DB 接続が 500 エラーになる
+- 原因: `docker compose up` 実行時のカレントディレクトリや `-p` フラグによりプロジェクト名が変わることがある
+- 対策: `.env.staging` に `COMPOSE_PROJECT_NAME=ultra-autotrade-project` を設定済み（この値が自動適用される）
+- 確認: `docker inspect <container> --format "{{index .Config.Labels \"com.docker.compose.project\"}}"` で全コンテナのプロジェクト名が同一か確認
+- 緊急修正: プロジェクト名が異なる場合は `docker network connect <正しいnetwork> <コンテナ名>` で即座に接続可能
+
+**DB接続500エラーのデバッグ手順:**
+1. `docker logs <backend> 2>&1 | grep "could not translate host name"` — postgres名前解決失敗なら本問題
+2. `docker inspect <backend> --format "{{json .NetworkSettings.Networks}}"` でネットワーク確認
+3. `docker inspect <postgres> --format "{{json .NetworkSettings.Networks}}"` と比較
+4. ネットワーク名が異なれば `docker network connect <postgres側network> <backend>` → `docker restart <backend>`
+
+### 2026-04-02追加（Named Tunnel移行時の環境変数）
+
+**NEXT_PUBLIC_BACKEND_BASE_URL の更新忘れ:**
+- Named Tunnel（trycloudflare → api.ultra-auto-trade.com）移行時、`.env.staging` の `NEXT_PUBLIC_BACKEND_BASE_URL` が古い trycloudflare URL のままになっていた
+- Next.js の `NEXT_PUBLIC_` 変数はビルド時に JS に埋め込まれるため、`.env` を変更しただけではダメで **フロントエンドの再ビルドが必須**
+
+**3点セット（必ず同時に実施）:**
+1. `NEXT_PUBLIC_BACKEND_BASE_URL=https://api.ultra-auto-trade.com` に更新
+2. `CORS_ORIGINS` に `https://app.ultra-auto-trade.com` を追加
+3. `docker compose build --no-cache frontend` でフロントエンド再ビルド → コンテナ入れ替え
+
+**確認コマンド:**
+```bash
+# CORS ヘッダーが新ドメインを返しているか
+curl -s -I -H 'Origin: https://app.ultra-auto-trade.com' https://api.ultra-auto-trade.com/health | grep access-control-allow-origin
+# 新 URL がビルドに埋め込まれているか
+docker exec <frontend> grep -rl 'api.ultra-auto-trade.com' /app/.next/static/chunks/ | wc -l
+```
+
+### 2026-04-03追加（フロントエンドAPI系環境変数 → Mixed Content）
+
+**フロントエンドのAPI系環境変数は3つある:**
+- `NEXT_PUBLIC_BACKEND_BASE_URL` — Knowledge Hub / AI 等バックエンド全般
+- `NEXT_PUBLIC_API_BASE_URL` — 認証・汎用 API（`/api/` プレフィックス）
+- `NEXT_PUBLIC_API_URL` — 一部コンポーネントが直接参照する API URL
+
+**すべて `frontend/Dockerfile` の `ARG`/`ENV` と `docker-compose.staging.yml` の `build.args` に定義が必要。**
+1つでも欠けると Dockerfile ビルド時にフォールバック値（`http://77.42.46.155:8000` 等）がJSバンドルに埋め込まれ、
+HTTPS（Named Tunnel）経由のモバイルアクセスで Mixed Content エラーになる（2026-04-03 iPhoneインシデント）。
+
+**PCで顕在化しにくい理由:** ブラウザキャッシュ・Service Worker キャッシュが旧ビルドを返し続けるため、
+モバイルや初回アクセスでのみ症状が出ることがある。
+
+**確認・修正手順:**
+```bash
+# 1. Dockerfile に ARG/ENV が揃っているか確認
+grep -E "NEXT_PUBLIC_API" frontend/Dockerfile
+
+# 2. docker-compose.staging.yml の build.args に揃っているか確認
+grep -A 20 "build:" docker-compose.staging.yml | grep "NEXT_PUBLIC_API"
+
+# 3. 不足があれば .env.staging に追加し、フロントエンド再ビルド
+docker compose -f docker-compose.staging.yml build --no-cache frontend
+docker compose -f docker-compose.staging.yml up -d --no-deps frontend
+
+# 4. 埋め込み URL を確認（http:// が残っていないか）
+docker exec <frontend> grep -r "http://77" /app/.next/static/chunks/ | wc -l
+```
+
+### 2026-04-03追加（デプロイ・運用）
+
+- **`scripts/deploy_staging.sh` を必ず使う。** 手打ちデプロイは孤立コンテナ（Conflict）、`--env-file` 忘れ（`NEXT_PUBLIC_*` 未焼き込み）、ビルドスキップ（古いイメージ起動）の3問題を毎回引き起こす。`deploy_staging.sh` は `down --remove-orphans` → `docker rm -f` → `build --no-cache` → `up -d` → ヘルスチェック → Slack通知まで全自動。`--frontend-only` / `--backend-only` / `--no-build` オプションあり
+- **`docker system prune -af` の後は全コンテナリビルドが必須。** イメージが削除されるため `up -d` しても起動しない。prune後は必ず `deploy_staging.sh`（フルビルド）を実行
+- **テストアカウント（@ultra-autotrade.com系）は DB ボリューム再作成で消える可能性がある。** 消えた場合は `bcrypt` でハッシュ生成 → `INSERT INTO users` で再作成。Registration API が無効化されている場合がある（`INITIAL_ADMIN_EMAIL` 未設定）
+
+### 2026-04-03追加（スケジューラー・監視）
+
+- **`/health` が 200 でもスケジューラーが死んでることがある。** `/health` はアプリ起動の確認であって、バックグラウンドジョブの健全性は保証しない。`scheduler_healthy` フィールドと `warnings` 配列で確認すること
+- **`INTERNAL_API_TOKEN` が `.env.staging` に未設定だとスケジューラー内部 API 呼び出しが 401 で失敗する。** AI 判定が実質走らず、テスターは「承認待ちの提案はありません」を見続ける。デプロイ後に `docker logs | grep 401` で確認
+- **フロントエンドが最後の判定結果を表示し続けるため「AI が動いてる」と誤認しやすい。** HOLD (45%) が表示されていても、それが何時間も前の結果なら実際にはスケジューラーが停止している可能性がある
+- **Watchdog（`scheduler_watchdog.py`）が 30 分ごとに監視。** `interval_hours * 2` を超えて未実行なら Slack 通知。`deploy_staging.sh` もデプロイ後に `scheduler_healthy` を確認する
+
+### 2026-04-03追加（Codex Review P1 安全装置バグ → 修正済み）
+
+- **`MonitoringService` は必ずシングルトン（`get_monitoring_service()`）を使う。** 新規インスタンス化するとHF低下を検知しても緊急停止フラグが global state に伝わらない。`scheduled_tasks.py` の3ループ（`health_check_loop` / `latency_monitor_loop` / `price_change_monitor_loop`）で修正済み
+- **`exchange/service.py` の `get_price_change_24h()` は `fetch_ticker().percentage` をそのまま返す（`/100` しない）。** `percentage` はすでにパーセント単位（`-15.0` = -15%）。`/100` すると変動率が 100 分の 1 に縮小され、`SAFE_MODE`（-10%）や `HARD_STOP`（-20%）が発動しなくなる。`workflow.py` 側が `/100` して `StressController` の小数形式に変換する責務を持つ
+
 ---
 
 ## 参照ファイル

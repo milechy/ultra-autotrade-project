@@ -10,7 +10,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -25,6 +25,23 @@ from app.knowledge.service import KnowledgeService
 from app.proposals.models import Proposal
 
 logger = logging.getLogger(__name__)
+
+# --- スケジューラー実行状態（/health から参照） ---
+_scheduler_started: bool = False
+_last_run_at: "datetime | None" = None
+_next_run_at: "datetime | None" = None
+_last_error_msg: "str | None" = None
+
+
+def get_scheduler_status() -> "dict[str, Any]":
+    """スケジューラーの稼働状態を返す（/health エンドポイント用）。"""
+    return {
+        "running": _scheduler_started,
+        "last_run": _last_run_at.isoformat() if _last_run_at else None,
+        "next_run": _next_run_at.isoformat() if _next_run_at else None,
+        "last_error": _last_error_msg,
+    }
+
 
 _DEFAULT_QUERY = "DeFi market analysis"
 _PROPOSAL_ASSET = "USDC"
@@ -176,18 +193,33 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
             db.close()
 
 
-async def ai_judgment_loop(interval_hours: int = 4) -> None:
+async def ai_judgment_loop(
+    interval_hours: int = 4,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
     """interval_hours ごとに run_ai_judgment_job() を実行するループ。
 
     Args:
         interval_hours: 実行間隔（時間）。デフォルト 4 時間。
+        on_error: 失敗時に呼び出す同期コールバック（Slack 通知等）。
     """
+    global _scheduler_started, _last_run_at, _next_run_at, _last_error_msg
+    _scheduler_started = True
     await asyncio.sleep(0)  # イベントループに制御を返す
     while True:
         try:
             loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(None, run_ai_judgment_job)
+            _last_run_at = datetime.now(timezone.utc)
+            _last_error_msg = None
             logger.info("AI judgment completed: %s", result)
         except Exception as exc:
+            _last_error_msg = f"{type(exc).__name__}: {exc}"
             logger.error("AI judgment job failed: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as cb_exc:
+                    logger.error("on_error callback failed: %s", cb_exc)
+        _next_run_at = datetime.now(timezone.utc) + timedelta(hours=interval_hours)
         await asyncio.sleep(interval_hours * 3600)

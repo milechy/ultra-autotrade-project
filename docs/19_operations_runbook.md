@@ -43,11 +43,28 @@ Phase7 時点では **staging 環境** を対象とし、
    - `/var/log/ultra/healthcheck.log`
    の最新行を確認し、明らかなエラーがないかを見る。
 
-3. **ヘルスチェック**
-   - 必要に応じて、手動で `/health` を叩いてレスポンスを確認する：
+3. **ヘルスチェック（AIスケジューラー状態を含む）**
+   - `/health` を叩いてスケジューラーが稼働中か確認する：
      ```bash
-     curl -fsS http://localhost:8000/health
+     curl -s https://api.ultra-auto-trade.com/health | python3 -m json.tool
+     # 期待値: {"status": "ok", "scheduler": true, "last_judgment": "...", "next_judgment": "..."}
+     # 異常値: {"status": "degraded", "scheduler": false, ...}
      ```
+   - `"status": "degraded"` の場合はスケジューラーが停止している。Slack にも通知が来るはず。
+   - 対応: backend コンテナを再起動し、再度 `/health` で `"scheduler": true` を確認する。
+     ```bash
+     ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155 \
+       'cd /opt/ultra-autotrade && docker compose -f docker-compose.staging.yml restart backend'
+     ```
+
+4. **スケジューラー無効起動の防止（デプロイ時）**
+   - `.env.staging.example` との差分を確認してキー漏れがないか検証する：
+     ```bash
+     diff <(grep -v '^#' backend/.env.staging.example | grep '=' | cut -d= -f1 | sort) \
+          <(grep -v '^#' /opt/ultra-autotrade/.env.staging | grep '=' | cut -d= -f1 | sort)
+     ```
+   - スケジューラーはデフォルト有効（DISABLE_AI_JUDGMENT_SCHEDULER=1 で明示的に停止）。
+   - ENABLE_AI_JUDGMENT_SCHEDULER=0 でも停止可（後方互換）。
 
 ### 2.2 週次のチェック項目（例）
 

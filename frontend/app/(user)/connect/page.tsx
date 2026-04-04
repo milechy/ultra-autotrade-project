@@ -9,6 +9,12 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useWallet } from '@/hooks/useWallet'
 import { useAuth } from '@/lib/auth'
 import { useMinimumBalance } from '@/hooks/useMinimumBalance'
+import { apiPut } from '@/lib/api/client'
+import { OperationModeSelector } from '@/components/OperationModeSelector'
+
+type UserMode = 'managed' | 'active' | 'pro'
+
+const USER_MODE_STORAGE_KEY = 'ultra_user_mode'
 
 // Arbitrum One (mainnet), Arbitrum Sepolia (testnet), Base Sepolia (testnet)
 const SUPPORTED_CHAIN_IDS = [42161, 421614, 84532]
@@ -83,6 +89,20 @@ export default function ConnectPage() {
   const [riskAccepted, setRiskAccepted] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [userMode, setUserMode] = useState<UserMode>('managed')
+
+  // Load saved mode from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(USER_MODE_STORAGE_KEY)
+    if (saved === 'managed' || saved === 'active' || saved === 'pro') {
+      setUserMode(saved)
+    }
+  }, [])
+
+  const handleModeSelect = (mode: UserMode) => {
+    setUserMode(mode)
+    localStorage.setItem(USER_MODE_STORAGE_KEY, mode)
+  }
 
   // Simulate minimum balance check with a mock value when connected
   // In production this would come from Aave account data
@@ -122,6 +142,12 @@ export default function ConnectPage() {
     setIsAuthenticating(true)
     try {
       await loginWithWallet(address, signer)
+      // Sync user mode to backend (fire-and-forget; auth continues on failure)
+      try {
+        await apiPut('/api/user/settings', { user_mode: userMode })
+      } catch (modeErr) {
+        console.error('Failed to sync user mode:', modeErr)
+      }
       router.push('/user/dashboard')
     } catch (err) {
       setAuthError('認証に失敗しました。もう一度お試しください。')
@@ -280,6 +306,21 @@ export default function ConnectPage() {
                     </span>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Operation Mode Selector — shown after all checks pass */}
+          {allChecksPass && (
+            <Card className="border-zinc-800 bg-zinc-900/60">
+              <CardContent className="pt-4 pb-4">
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
+                  運用モード選択
+                </p>
+                <OperationModeSelector
+                  currentMode={userMode}
+                  onModeChange={(mode) => handleModeSelect(mode as UserMode)}
+                />
               </CardContent>
             </Card>
           )}

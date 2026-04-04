@@ -151,12 +151,13 @@ def check_sequencer_uptime(
 
     Returns True if sequencer is UP and grace period has passed.
     Returns False (-> HOLD) if sequencer is DOWN or in grace period.
-    Returns True if web3 unavailable (fail-open).
+    Returns False if web3 unavailable (fail-closed).
     """
     try:
         from web3 import Web3  # noqa: PLC0415
     except ImportError:
-        return True
+        logger.error("[oracle_checker] web3 not installed; sequencer check fail-closed")
+        return False
 
     try:
         w3 = Web3(Web3.HTTPProvider(rpc_url))
@@ -167,9 +168,9 @@ def check_sequencer_uptime(
         _round_id, answer, started_at_ts, _updated_at, _answered_in_round = (
             feed.functions.latestRoundData().call()
         )
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("[oracle_checker] sequencer feed check failed: %s", exc)
-        return True  # fail-open
+    except Exception as exc:
+        logger.error("[oracle_checker] sequencer feed check failed - fail-closed: %s", exc)
+        return False  # fail-closed
 
     # answer=0 means sequencer is UP
     if answer != 0:
@@ -188,3 +189,39 @@ def check_sequencer_uptime(
         return False
 
     return True
+
+
+def is_oracle_fresh(
+    feed_address: Optional[str] = None,
+    rpc_url: Optional[str] = None,
+) -> bool:
+    """Zero-arg convenience wrapper for use in rule engine.
+
+    Reads AAVE_ORACLE_FEED_ADDRESS and WEB3_RPC_URL from environment if not provided.
+    Returns True if oracle data is fresh (safe to trade).
+    Returns False (fail-closed) if RPC fails or oracle is stale.
+    If env vars are not configured, oracle check is skipped (returns True).
+    """
+    import os  # noqa: PLC0415
+
+    _feed = feed_address or os.getenv("AAVE_ORACLE_FEED_ADDRESS")
+    _rpc = rpc_url or os.getenv("WEB3_RPC_URL") or os.getenv("POLYGON_RPC_URL")
+
+    if not _feed or not _rpc:
+        logger.warning(
+            "[oracle_checker] AAVE_ORACLE_FEED_ADDRESS or RPC URL not configured - "
+            "oracle check skipped (treating as fresh)"
+        )
+        return True  # env not configured → skip check
+
+    try:
+        result = check_oracle_staleness(_feed, _rpc)
+    except Exception as exc:
+        logger.error("[oracle_checker] is_oracle_fresh call failed - fail-closed: %s", exc)
+        return False
+
+    if result is None:
+        logger.error("[oracle_checker] Oracle check returned None (RPC failure) - fail-closed")
+        return False
+
+    return not result.should_hold

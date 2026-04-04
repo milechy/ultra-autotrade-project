@@ -17,7 +17,7 @@ services:
     image: grafana/loki:2.9.0
     container_name: ultra-autotrade-loki-production
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     volumes:
       - ./docker/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki-data-production:/loki
@@ -63,8 +63,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-ultra}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-ultra_autotrade}
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     volumes:
       - postgres-data-production:/var/lib/postgresql/data
     restart: always
@@ -104,7 +104,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade}
       REBALANCE_SHADOW_MODE: "false"
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ultra-state-production:/var/run/ultra:rw
       - ./backend/data:/app/backend/data:rw
@@ -143,7 +143,7 @@ services:
       NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api.ultra-auto-trade.com}
       BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://backend:8000}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - backend
     restart: always

@@ -740,7 +740,7 @@ class TestEditorRolePermissions:
             client, admin_token, "viewer@example.com", "viewer", "viewer"
         )
         response = client.post(
-            "/ai/analyze",
+            "/api/ai/analyze",
             json={"items": []},
             headers={"Authorization": f"Bearer {viewer_token}"},
         )

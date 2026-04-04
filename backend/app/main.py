@@ -18,9 +18,12 @@ Responsibilities added in Phase 12:
 - User authentication and account management
 """
 
+import json
 import logging
 import os
-from typing import Awaitable, Callable
+import urllib.request
+from datetime import datetime, timezone
+from typing import Any, Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -69,6 +72,82 @@ logger = logging.getLogger(__name__)
 logging.getLogger("app").setLevel(logging.INFO)
 
 
+def _is_scheduler_enabled() -> bool:
+    """AIスケジューラーの有効/無効判定。デフォルト有効。
+
+    判定ロジック:
+    - DISABLE_AI_JUDGMENT_SCHEDULER=1 → 無効（新方式）
+    - ENABLE_AI_JUDGMENT_SCHEDULER=0  → 無効（旧方式後方互換）
+    - それ以外 → 有効
+    """
+    if os.getenv("DISABLE_AI_JUDGMENT_SCHEDULER", "0") == "1":
+        return False
+    if os.getenv("ENABLE_AI_JUDGMENT_SCHEDULER") == "0":
+        return False
+    return True
+
+
+def _is_background_monitoring_enabled() -> bool:
+    """バックグラウンド監視の有効/無効判定。デフォルト有効。
+
+    判定ロジック:
+    - DISABLE_BACKGROUND_MONITORING=1 → 無効（新方式）
+    - ENABLE_BACKGROUND_MONITORING=0  → 無効（旧方式後方互換）
+    - それ以外 → 有効
+    """
+    if os.getenv("DISABLE_BACKGROUND_MONITORING", "0") == "1":
+        return False
+    if os.getenv("ENABLE_BACKGROUND_MONITORING") == "0":
+        return False
+    return True
+
+
+def _make_scheduler_error_handler(name: str) -> Callable[[Exception], None]:
+    """スケジューラー失敗時の同期 Slack 通知コールバックを生成する。
+
+    on_error コールバックとして各スケジューラーに渡す。
+    通知自体が失敗してもスケジューラーは継続する。
+    """
+
+    def handler(exc: Exception) -> None:
+        webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+        if not webhook_url:
+            return
+        try:
+            ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            text = f"⚠️ [Scheduler] {name}実行失敗\n原因: {type(exc).__name__}: {exc}\n時刻: {ts}"
+            data = json.dumps({"text": text}).encode()
+            req = urllib.request.Request(
+                webhook_url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+            )
+            urllib.request.urlopen(req, timeout=5)  # noqa: S310
+        except Exception as notify_exc:
+            logger.error("Scheduler Slack notification failed: %s", notify_exc)
+
+    return handler
+
+
+async def _notify_slack_warning(text: str) -> None:
+    """Slack webhook に警告メッセージを送る（失敗しても起動は継続）。"""
+    webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+    if not webhook_url:
+        return
+    try:
+        import asyncio as _asyncio
+
+        import httpx
+
+        loop = _asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: httpx.post(webhook_url, json={"text": text}, timeout=5),
+        )
+    except Exception as exc:
+        logger.error("Slack warning notification failed: %s", exc)
+
+
 def create_app() -> FastAPI:
     _is_dev = os.getenv("APP_ENV", "development") == "development"
     app = FastAPI(
@@ -110,7 +189,7 @@ def create_app() -> FastAPI:
     # --- Router registration ---
     app.include_router(auth_router)  # Auth (Phase12)
     app.include_router(users_router)  # Users (Phase12)
-    app.include_router(ai_router)  # AI (Phase2)
+    app.include_router(ai_router, prefix="/api")  # AI (Phase2)
     app.include_router(octobot_router)  # OctoBot (Phase3)
     app.include_router(aave_router, prefix="/api")  # Aave (Phase4)
     app.include_router(rebalance_router, prefix="/api")  # Aave Rebalance (Stream-T)
@@ -144,8 +223,29 @@ def create_app() -> FastAPI:
     register_error_handlers(app)
 
     @app.get("/health", tags=["health"])
-    def health_check() -> dict[str, str]:
-        return {"status": "ok", "env": os.getenv("APP_ENV", "dev")}
+    def health_check() -> dict[str, Any]:
+        from app.automation.ai_judgment_scheduler import get_scheduler_status
+        from app.automation.scheduler_watchdog import compute_scheduler_health
+
+        scheduler = get_scheduler_status()
+        status = "ok" if scheduler["running"] else "degraded"
+
+        interval_hours = int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS", "4"))
+        health = compute_scheduler_health(scheduler.get("last_run"), interval_hours)
+        warnings: list[str] = []
+        if not health["healthy"]:
+            warnings.append("scheduler_overdue")
+
+        return {
+            "status": status,
+            "env": os.getenv("APP_ENV", "dev"),
+            "scheduler": scheduler["running"],
+            "scheduler_healthy": health["healthy"],
+            "last_judgment": scheduler.get("last_run"),
+            "next_judgment": scheduler.get("next_run"),
+            "scheduler_last_error": scheduler.get("last_error"),
+            "warnings": warnings,
+        }
 
     # --- Database initialization (Phase12) ---
     @app.on_event("startup")
@@ -182,15 +282,11 @@ def create_app() -> FastAPI:
         """
         Start background monitoring on application startup.
 
-        Enabled by setting ENABLE_BACKGROUND_MONITORING=1.
-        Disabled by default in development.
+        Default: enabled. Set DISABLE_BACKGROUND_MONITORING=1 to disable.
+        Legacy: ENABLE_BACKGROUND_MONITORING=0 also disables.
         """
-        enable_monitoring = os.getenv("ENABLE_BACKGROUND_MONITORING", "0") == "1"
-
-        if not enable_monitoring:
-            logger.info(
-                "Background monitoring disabled (set ENABLE_BACKGROUND_MONITORING=1 to enable)"
-            )
+        if not _is_background_monitoring_enabled():
+            logger.info("Background monitoring disabled")
             return
 
         try:
@@ -287,12 +383,14 @@ def create_app() -> FastAPI:
             if enable_daily:
                 await scheduled_manager.start_daily_reports(
                     channel=settings.default_channel,
+                    on_error=_make_scheduler_error_handler("日次レポートスケジューラー"),
                 )
                 logger.info("Daily reports scheduled successfully")
 
             if enable_weekly:
                 await scheduled_manager.start_weekly_reports(
                     channel=settings.default_channel,
+                    on_error=_make_scheduler_error_handler("週次レポートスケジューラー"),
                 )
                 logger.info("Weekly reports scheduled successfully")
 
@@ -302,22 +400,33 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def startup_ai_judgment_scheduler() -> None:
-        """4時間ごとのAI判定スケジューラーを開始する。"""
-        logger.info("startup_ai_judgment_scheduler: entry")
+        """4時間ごとのAI判定スケジューラーを開始する。デフォルト有効。"""
         import asyncio
 
-        enable_scheduler = os.getenv("ENABLE_AI_JUDGMENT_SCHEDULER", "0") == "1"
-        if not enable_scheduler:
-            logger.info(
-                "AI judgment scheduler disabled (set ENABLE_AI_JUDGMENT_SCHEDULER=1 to enable)"
+        if not _is_scheduler_enabled():
+            logger.error(
+                "AI judgment scheduler is DISABLED. "
+                "Set DISABLE_AI_JUDGMENT_SCHEDULER=1 intentionally, or check env vars."
+            )
+            await _notify_slack_warning(
+                "⚠️ [Ultra AutoTrade] AIスケジューラーが無効状態で起動しました。\n"
+                "AI判定が実行されません。DISABLE_AI_JUDGMENT_SCHEDULER=1 が設定されているか確認してください。"
             )
             return
         try:
             from app.automation.ai_judgment_scheduler import ai_judgment_loop
+            from app.automation.scheduler_watchdog import scheduler_watchdog_loop
 
             interval = int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS", "4"))
-            asyncio.create_task(ai_judgment_loop(interval_hours=interval))
+            asyncio.create_task(
+                ai_judgment_loop(
+                    interval_hours=interval,
+                    on_error=_make_scheduler_error_handler("AI判定スケジューラー"),
+                )
+            )
             logger.info("AI judgment scheduler started (interval=%dh)", interval)
+            asyncio.create_task(scheduler_watchdog_loop())
+            logger.info("Scheduler watchdog started (check interval=30min)")
         except BaseException as exc:
             logger.error("Failed to start AI judgment scheduler: %s", exc)
 

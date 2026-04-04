@@ -58,6 +58,20 @@ docker compose -f docker-compose.staging.yml up -d cloudflared
 
 ---
 
+## 現在の Tunnel URL
+
+> Quick Tunnel は廃止済み。Named Tunnel（systemd 管理）で固定 URL 運用中。
+
+| 用途 | URL |
+|---|---|
+| フロントエンド | https://app.ultra-auto-trade.com |
+| バックエンド | https://api.ultra-auto-trade.com |
+| PC 直接アクセス（ローカル検証用） | http://77.42.46.155:3000 / :8000 |
+
+> **注意:** モバイル（iPhone 等）では PC 直接アクセスは使用不可。必ず Named Tunnel URL を使うこと。
+
+---
+
 ## 日常運用
 
 ### 状態確認
@@ -106,6 +120,9 @@ docker compose -f docker-compose.staging.yml restart backend
 | 日付 | 症状 | 原因 | 対応 | 再発防止 |
 |---|---|---|---|---|
 | 2026-04-01 | CORS→実は500（不足カラム）+ Mixed Content + .env改行欠落 | (1) terms_version等9カラムがDBに未追加→500→CORSヘッダーなし→CORSエラーに見えた (2) NEXT_PUBLIC_BACKEND_BASE_URL=http://でトンネルhttps経由アクセス→Mixed Content (3) echo追記で改行なし連結 | ALTER TABLE全カラム追加、IP直接アクセスに切り替え、printf使用 | — |
+| 2026-04-02 | cloudflared 30時間停止 → 502多発 | (1) `/root/.cloudflared` が存在しない (2) config.yml 方式では credentials JSON が必要だが未生成 | token方式（`--token ${CLOUDFLARE_TUNNEL_TOKEN}`）に変更 + `network_mode: host` 追加 | `.env.staging` にトークンを保存、`network_mode: host` を必須化 |
+| 2026-04-02 | フロントエンドが旧 trycloudflare URL を参照し CORS エラー | `.env.staging` の `NEXT_PUBLIC_BACKEND_BASE_URL` が Named Tunnel 移行後も古い trycloudflare URL のまま。Next.js ビルド時埋め込みのため `.env` 変更だけでは反映されない | `NEXT_PUBLIC_BACKEND_BASE_URL` と `CORS_ORIGINS` を更新 → `docker compose build --no-cache frontend` → コンテナ入れ替え | Tunnel 切替時は必ず「NEXT_PUBLIC 更新 + CORS 更新 + frontend 再ビルド」の3点セット |
+| 2026-04-03 | iPhone で「認証に失敗しました」（Tunnel 正常・CORS 正常） | `NEXT_PUBLIC_API_BASE_URL` / `NEXT_PUBLIC_API_URL` が `frontend/Dockerfile` に `ARG`/`ENV` 未定義 → ビルド時フォールバック値 `http://77.42.46.155:8000` がJSバンドルに埋め込まれ、HTTPS経由のモバイルアクセスでMixed Contentブロック発生。PC はキャッシュで顕在化せず | `frontend/Dockerfile` に `ARG`/`ENV` 追加 + `docker-compose.staging.yml` の `build.args`/`environment` に追加 → フロントエンド再ビルド | フロントエンドのAPI系環境変数3つ（`NEXT_PUBLIC_BACKEND_BASE_URL`, `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_API_URL`）はすべて Dockerfile ARG + compose build.args に定義必須 |
 
 ---
 
@@ -119,7 +136,10 @@ docker compose -f docker-compose.staging.yml restart backend
 | DNS エラー | DNS プロパゲーション未完了 | 最大48時間待機 |
 | CORSエラーだがOPTIONSは正常 | バックエンドが500を返している（CORSヘッダーはエラー時に付かない） | `docker logs <backend> 2>&1 \| grep error` でDB不足カラム等を確認→修正 |
 | httpsページからhttpバックエンドへのリクエストがブロック | Mixed Content（https→http） | IP直接アクセス（http同士）を使うか、バックエンドもトンネル経由にする |
+| iPhone で「認証に失敗」（Tunnel 正常・CORS 正常） | `NEXT_PUBLIC_API_BASE_URL` / `NEXT_PUBLIC_API_URL` が Dockerfile ARG 未定義 → http://IP フォールバック値がJSに埋め込まれ Mixed Content ブロック | `frontend/Dockerfile` に ARG/ENV 追加 + `docker-compose.staging.yml` の `build.args` に追加 → `docker compose build --no-cache frontend` でフロントエンド再ビルド |
 | echo追記した環境変数が効かない | 前行の末尾に改行がなく連結された | `grep <KEY> .env.staging` で確認。`printf '\nKEY=VALUE\n' >> file` を使う |
+| デプロイ後に一時的に 502 | `docker rm -f` 後の空白期間に cloudflared が接続できない | 正常動作。`docker rm -f && docker compose up -d --no-deps` を素早く実行することで空白時間を最小化 |
+| `dial tcp [::1]:3000: connection refused` | frontend コンテナが起動していない / まだ起動中 | `docker logs <frontend>` で `✓ Ready` を確認してから外部アクセス |
 
 ---
 

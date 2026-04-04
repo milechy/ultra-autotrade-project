@@ -40,7 +40,10 @@ ufw default allow outgoing
 ufw allow 22/tcp    # SSH
 ufw allow 80/tcp    # HTTP (Cloudflare Tunnel)
 ufw allow 443/tcp   # HTTPS (Cloudflare Tunnel)
-# Note: port 8000 is NOT exposed — Cloudflare Tunnel handles routing
+# Note: ports 3000/8000/3100/5432 are NOT opened here.
+# Docker bypasses UFW by default. All ports in docker-compose.production.yml
+# are bound to 127.0.0.1 to prevent external access.
+# External access is via Cloudflare Named Tunnel only.
 ufw --force enable
 ufw status
 
