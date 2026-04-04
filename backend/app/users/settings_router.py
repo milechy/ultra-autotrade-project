@@ -68,6 +68,14 @@ def update_user_settings(
             )
         current_user.user_mode = request.user_mode
         current_user.execution_policy = _USER_MODE_TO_POLICY[request.user_mode]
+    if request.execution_policy is not None:
+        _VALID_POLICIES = ("auto_execute", "require_approval", "proposal_only")
+        if request.execution_policy not in _VALID_POLICIES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="execution_policy must be one of: auto_execute, require_approval, proposal_only",
+            )
+        current_user.execution_policy = request.execution_policy
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
