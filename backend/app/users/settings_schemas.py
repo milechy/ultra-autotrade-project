@@ -29,3 +29,4 @@ class UserSettingsUpdate(BaseModel):
     max_single_trade_usd: Optional[Decimal] = None
     max_daily_trade_usd: Optional[Decimal] = None
     user_mode: Optional[str] = None
+    execution_policy: Optional[str] = None

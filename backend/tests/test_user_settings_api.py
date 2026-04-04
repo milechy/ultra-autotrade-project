@@ -141,3 +141,49 @@ class TestUserSettingsAPI:
         r = client.post("/api/automation/resume", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         assert r.json()["is_active"] is True
+
+    def test_update_execution_policy_require_approval(self, client: TestClient) -> None:
+        token = register_and_login(client)
+        r = client.put(
+            "/api/user/settings",
+            json={"execution_policy": "require_approval"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["execution_policy"] == "require_approval"
+
+    def test_update_execution_policy_auto_execute(self, client: TestClient) -> None:
+        token = register_and_login(client)
+        r = client.put(
+            "/api/user/settings",
+            json={"execution_policy": "auto_execute"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["execution_policy"] == "auto_execute"
+
+    def test_update_execution_policy_proposal_only(self, client: TestClient) -> None:
+        token = register_and_login(client)
+        r = client.put(
+            "/api/user/settings",
+            json={"execution_policy": "proposal_only"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["execution_policy"] == "proposal_only"
+
+    def test_update_execution_policy_invalid(self, client: TestClient) -> None:
+        token = register_and_login(client)
+        r = client.put(
+            "/api/user/settings",
+            json={"execution_policy": "invalid_policy"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 422
+
+    def test_execution_policy_in_response(self, client: TestClient) -> None:
+        """GET /settings レスポンスに execution_policy が含まれること。"""
+        token = register_and_login(client)
+        r = client.get("/api/user/settings", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        assert "execution_policy" in r.json()
