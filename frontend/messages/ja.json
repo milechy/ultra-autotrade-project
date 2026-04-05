@@ -25,6 +25,7 @@
   "Nav": {
     "dashboard": "ダッシュボード",
     "decisions": "AI判定",
+    "strategies": "戦略",
     "approve": "承認",
     "history": "履歴",
     "settings": "設定"
@@ -72,10 +73,16 @@
     "pnl": "損益",
     "lastUpdated": "最終更新",
     "connectWalletPrompt": "ウォレットを接続してください",
-    "loading": "データを読み込み中..."
+    "loading": "データを読み込み中...",
+    "aiRunning": "AIが運用中です",
+    "recentOps": "最近の自動操作",
+    "noOpsHistory": "まだ操作履歴がありません",
+    "managedFootnote": "詳細はアクティブモードで確認できます"
   },
   "Decisions": {
     "title": "AI判定履歴",
+    "aiFeedTitle": "AI判定フィード",
+    "subtitle": "最新のAI判定結果と判定履歴",
     "action": "判定",
     "confidence": "確信度",
     "timestamp": "日時",
@@ -92,10 +99,12 @@
     "filterAll": "すべて",
     "filterBuy": "BUY",
     "filterSell": "SELL",
-    "filterHold": "HOLD"
+    "filterHold": "HOLD",
+    "fetchError": "データを取得できません"
   },
   "Approve": {
     "title": "取引承認",
+    "description": "AIが提案した取引を確認・承認してください",
     "pending": "承認待ち",
     "approved": "承認済み",
     "rejected": "却下済み",
@@ -109,6 +118,11 @@
     "expiresAt": "有効期限",
     "confirmApprove": "この取引を承認しますか？",
     "confirmReject": "この取引を却下しますか？",
+    "walletConnected": "ウォレット接続済み — 承認時にMetaMaskで署名が必要です",
+    "approveFailed": "承認に失敗しました",
+    "rejectFailed": "拒否に失敗しました",
+    "fetchError": "データを取得できません",
+    "pendingBadge": "{count}件待ち",
     "emptyState": {
       "title": "承認待ちの提案はありません",
       "aiStatus": "AI判定ステータス",
@@ -136,7 +150,20 @@
     "withdraw": "引出",
     "filterAll": "すべて",
     "dateFrom": "開始日",
-    "dateTo": "終了日"
+    "dateTo": "終了日",
+    "aaveTab": "Aave操作履歴",
+    "exchangeTab": "取引所履歴（Coming Soon）",
+    "loadMore": "もっと見る",
+    "totalCount": "全 {total} 件",
+    "refresh": "更新",
+    "success": "成功",
+    "failed": "失敗",
+    "pending": "処理中",
+    "apply": "適用",
+    "reset": "リセット",
+    "action": "アクション",
+    "noAaveHistory": "取引履歴がありません",
+    "fetchError": "取引履歴を取得できません"
   },
   "Settings": {
     "title": "設定",

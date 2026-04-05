@@ -5,23 +5,25 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, Brain, CheckCircle, History, Settings, Layers } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 
 interface BottomNavProps {
   pendingCount?: number
 }
 
-const navItems = [
-  { href: '/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
-  { href: '/decisions', label: 'AI判定', icon: Brain },
-  { href: '/strategies', label: '戦略', icon: Layers },
-  { href: '/approve', label: '承認', icon: CheckCircle },
-  { href: '/history', label: '履歴', icon: History },
-  { href: '/settings', label: '設定', icon: Settings },
-]
-
 export function BottomNav({ pendingCount }: BottomNavProps) {
   const pathname = usePathname()
+  const t = useTranslations('Nav')
+
+  const navItems = [
+    { href: '/dashboard', label: t('dashboard'), icon: LayoutDashboard },
+    { href: '/decisions', label: t('decisions'), icon: Brain },
+    { href: '/strategies', label: t('strategies'), icon: Layers },
+    { href: '/approve', label: t('approve'), icon: CheckCircle },
+    { href: '/history', label: t('history'), icon: History },
+    { href: '/settings', label: t('settings'), icon: Settings },
+  ]
 
   return (
     <nav

@@ -25,6 +25,7 @@
   "Nav": {
     "dashboard": "Dashboard",
     "decisions": "AI",
+    "strategies": "Strategies",
     "approve": "Approve",
     "history": "History",
     "settings": "Settings"
@@ -72,10 +73,16 @@
     "pnl": "PnL",
     "lastUpdated": "Last Updated",
     "connectWalletPrompt": "Please connect your wallet",
-    "loading": "Loading data..."
+    "loading": "Loading data...",
+    "aiRunning": "AI is running",
+    "recentOps": "Recent auto operations",
+    "noOpsHistory": "No operation history yet",
+    "managedFootnote": "Details available in active mode"
   },
   "Decisions": {
     "title": "AI Decision History",
+    "aiFeedTitle": "AI Decision Feed",
+    "subtitle": "Latest AI decisions and history",
     "action": "Action",
     "confidence": "Confidence",
     "timestamp": "Timestamp",
@@ -92,10 +99,12 @@
     "filterAll": "All",
     "filterBuy": "BUY",
     "filterSell": "SELL",
-    "filterHold": "HOLD"
+    "filterHold": "HOLD",
+    "fetchError": "Unable to fetch data"
   },
   "Approve": {
     "title": "Trade Approval",
+    "description": "Review and approve AI-proposed transactions",
     "pending": "Pending",
     "approved": "Approved",
     "rejected": "Rejected",
@@ -109,6 +118,11 @@
     "expiresAt": "Expires At",
     "confirmApprove": "Approve this trade?",
     "confirmReject": "Reject this trade?",
+    "walletConnected": "Wallet connected — MetaMask signature required for approval",
+    "approveFailed": "Approval failed",
+    "rejectFailed": "Rejection failed",
+    "fetchError": "Unable to fetch data",
+    "pendingBadge": "{count} pending",
     "emptyState": {
       "title": "No pending proposals",
       "aiStatus": "AI Judgment Status",
@@ -136,7 +150,20 @@
     "withdraw": "Withdraw",
     "filterAll": "All",
     "dateFrom": "From",
-    "dateTo": "To"
+    "dateTo": "To",
+    "aaveTab": "Aave Operations",
+    "exchangeTab": "Exchange History (Coming Soon)",
+    "loadMore": "Load More",
+    "totalCount": "Total {total}",
+    "refresh": "Refresh",
+    "success": "Success",
+    "failed": "Failed",
+    "pending": "Processing",
+    "apply": "Apply",
+    "reset": "Reset",
+    "action": "Action",
+    "noAaveHistory": "No transaction history",
+    "fetchError": "Unable to fetch trade history"
   },
   "Settings": {
     "title": "Settings",

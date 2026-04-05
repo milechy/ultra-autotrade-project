@@ -5,6 +5,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import { RefreshCw, ChevronLeft, ChevronRight, Filter, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -75,12 +76,6 @@ const aaveOperationConfig: Record<AaveOperation, { label: string; className: str
   REPAY: { label: 'REPAY', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
 }
 
-function aaveStatusConfig(status: AaveTransactionStatus) {
-  if (status === 'success') return { label: '成功', variant: 'default' as const }
-  if (status === 'failed') return { label: '失敗', variant: 'destructive' as const }
-  return { label: '処理中', variant: 'secondary' as const }
-}
-
 function getExplorerUrl(txHash: string, chain: string): string {
   if (chain === 'arbitrum') return `https://arbiscan.io/tx/${txHash}`
   if (chain === 'arbitrum-sepolia') return `https://sepolia.arbiscan.io/tx/${txHash}`
@@ -96,6 +91,8 @@ function AaveHistoryTab() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [operationFilter, setOperationFilter] = useState<AaveOperation | ''>('')
+  const t = useTranslations('History')
+  const tCommon = useTranslations('Common')
 
   const fetchAave = useCallback(async (newOffset = 0) => {
     setLoading(true)
@@ -114,7 +111,7 @@ function AaveHistoryTab() {
       setTotal(res.total)
       setOffset(newOffset)
     } catch {
-      setError('取引履歴を取得できません')
+      setError(t('fetchError'))
     } finally {
       setLoading(false)
     }
@@ -138,7 +135,7 @@ function AaveHistoryTab() {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950 dark:border-red-800 p-4 text-center space-y-2">
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-        <button onClick={() => fetchAave(0)} className="text-xs text-blue-500 underline">再試行</button>
+        <button onClick={() => fetchAave(0)} className="text-xs text-blue-500 underline">{tCommon('retry')}</button>
       </div>
     )
   }
@@ -157,22 +154,23 @@ function AaveHistoryTab() {
                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >
-            {op === '' ? '全て' : op}
+            {op === '' ? tCommon('all') : op}
           </button>
         ))}
       </div>
 
       {transactions.length === 0 ? (
         <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">
-          取引履歴がありません
+          {t('noAaveHistory')}
         </div>
       ) : (
         <>
-          <div className="text-xs text-muted-foreground">全 {total} 件</div>
+          <div className="text-xs text-muted-foreground">{t('totalCount', { total })}</div>
           <div className="space-y-2">
             {transactions.map(tx => {
               const opCfg = aaveOperationConfig[tx.operation as AaveOperation] ?? aaveOperationConfig.SUPPLY
-              const stCfg = aaveStatusConfig(tx.status)
+              const stVariant = tx.status === 'success' ? 'default' : tx.status === 'failed' ? 'destructive' : 'secondary'
+              const stLabel = tx.status === 'success' ? t('success') : tx.status === 'failed' ? t('failed') : t('pending')
               return (
                 <div key={tx.id} className="rounded-lg border bg-card p-3 space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
@@ -187,7 +185,7 @@ function AaveHistoryTab() {
                         </span>
                       )}
                     </div>
-                    <Badge variant={stCfg.variant} className="text-xs shrink-0">{stCfg.label}</Badge>
+                    <Badge variant={stVariant} className="text-xs shrink-0">{stLabel}</Badge>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium">{parseFloat(tx.amount).toLocaleString()} {tx.asset}</span>
@@ -225,7 +223,7 @@ function AaveHistoryTab() {
               disabled={loading}
               className="w-full py-2 text-sm text-muted-foreground hover:text-foreground border border-muted rounded-lg"
             >
-              {loading ? '読み込み中...' : 'もっと見る'}
+              {loading ? tCommon('loading') : t('loadMore')}
             </button>
           )}
         </>
@@ -321,6 +319,8 @@ function HistoryTable({ records }: { records: TradeRecord[] }) {
 
 function HistoryPage() {
   const { token } = useAuth()
+  const t = useTranslations('History')
+  const tCommon = useTranslations('Common')
   const [activeTab, setActiveTab] = useState<'exchange' | 'aave'>('aave')
   const [records, setRecords] = useState<TradeRecord[]>([])
   const [total, setTotal] = useState(0)
@@ -383,12 +383,12 @@ function HistoryPage() {
     <div className="min-h-screen bg-background">
       <div className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
         <div className="flex items-center justify-between px-4 py-3">
-          <h1 className="text-lg font-semibold">取引履歴</h1>
+          <h1 className="text-lg font-semibold">{t('title')}</h1>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowFilters(v => !v)}
               className="rounded-full p-1.5 text-muted-foreground hover:bg-muted"
-              aria-label="フィルター"
+              aria-label={tCommon('filter')}
             >
               <Filter className="h-4 w-4" />
             </button>
@@ -396,7 +396,7 @@ function HistoryPage() {
               onClick={fetchHistory}
               disabled={isLoading}
               className="rounded-full p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-50"
-              aria-label="更新"
+              aria-label={t('refresh')}
             >
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
@@ -411,13 +411,13 @@ function HistoryPage() {
             onClick={() => setActiveTab('aave')}
             className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'aave' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600'}`}
           >
-            Aave操作履歴
+            {t('aaveTab')}
           </button>
           <button
             onClick={() => setActiveTab('exchange')}
             className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'exchange' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600'}`}
           >
-            取引所履歴（Coming Soon）
+            {t('exchangeTab')}
           </button>
         </div>
 

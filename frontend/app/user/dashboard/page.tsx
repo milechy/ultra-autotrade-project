@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { Clock } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -29,28 +30,17 @@ interface RiskModeData {
   mode: RiskMode
 }
 
-const RISK_MODE_DISPLAY: Record<RiskMode, { label: string; badgeLabel: string; className: string }> = {
-  conservative: {
-    label: '保守的',
-    badgeLabel: '保守モード運用中',
-    className: 'border-emerald-500/50 bg-emerald-950/30 text-emerald-400',
-  },
-  balanced: {
-    label: 'バランス',
-    badgeLabel: 'バランスモード運用中',
-    className: 'border-blue-500/50 bg-blue-950/30 text-blue-400',
-  },
-  aggressive: {
-    label: '積極的',
-    badgeLabel: '積極モード運用中',
-    className: 'border-orange-500/50 bg-orange-950/30 text-orange-400',
-  },
+const RISK_MODE_CLASS: Record<RiskMode, string> = {
+  conservative: 'border-emerald-500/50 bg-emerald-950/30 text-emerald-400',
+  balanced: 'border-blue-500/50 bg-blue-950/30 text-blue-400',
+  aggressive: 'border-orange-500/50 bg-orange-950/30 text-orange-400',
 }
 
 // ---- RiskModeBadge ----
 
 function RiskModeBadge() {
   const [riskMode, setRiskMode] = useState<RiskMode | null>(null)
+  const t = useTranslations('riskMode')
 
   useEffect(() => {
     apiFetch<RiskModeData>('/auth/risk-mode')
@@ -60,13 +50,12 @@ function RiskModeBadge() {
 
   if (!riskMode) return null
 
-  const display = RISK_MODE_DISPLAY[riskMode]
   return (
     <Badge
       variant="outline"
-      className={display.className}
+      className={RISK_MODE_CLASS[riskMode]}
     >
-      {display.badgeLabel}
+      {t(`badge.${riskMode}`)}
     </Badge>
   )
 }
@@ -89,6 +78,7 @@ function RecentOpsCard() {
   const [items, setItems] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
+  const t = useTranslations('Dashboard')
 
   useEffect(() => {
     apiFetch<TransactionsResponse>('/api/transactions?limit=5')
@@ -101,7 +91,7 @@ function RecentOpsCard() {
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Clock className="h-4 w-4 text-zinc-500" />
-        <h2 className="text-sm font-semibold text-zinc-400">最近の自動操作</h2>
+        <h2 className="text-sm font-semibold text-zinc-400">{t('recentOps')}</h2>
       </div>
 
       {loading && (
@@ -113,7 +103,7 @@ function RecentOpsCard() {
       )}
 
       {!loading && (hasError || items.length === 0) && (
-        <p className="text-sm text-zinc-500 py-4 text-center">まだ操作履歴がありません</p>
+        <p className="text-sm text-zinc-500 py-4 text-center">{t('noOpsHistory')}</p>
       )}
 
       {!loading && !hasError && items.length > 0 && (
@@ -159,13 +149,14 @@ function RecentOpsCard() {
 }
 
 function ManagedDashboard() {
+  const t = useTranslations('Dashboard')
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
       {/* AI running badge + Risk mode badge */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-2 rounded-2xl border border-emerald-800 bg-emerald-950/40 px-4 py-3">
           <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-sm font-semibold text-emerald-400">AIが運用中です</span>
+          <span className="text-sm font-semibold text-emerald-400">{t('aiRunning')}</span>
         </div>
         <RiskModeBadge />
       </div>
@@ -187,7 +178,7 @@ function ManagedDashboard() {
 
       {/* Footer note */}
       <p className="text-center text-xs text-zinc-600">
-        詳細はアクティブモードで確認できます
+        {t('managedFootnote')}
       </p>
     </div>
   )
@@ -196,6 +187,7 @@ function ManagedDashboard() {
 // ---- Full (active / pro) Dashboard ----
 
 function ActiveDashboard() {
+  const t = useTranslations('Dashboard')
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
       {/* Risk mode badge */}
@@ -212,17 +204,17 @@ function ActiveDashboard() {
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold text-zinc-400 mb-3">ポジション一覧</h2>
+        <h2 className="text-sm font-semibold text-zinc-400 mb-3">{t('positions')}</h2>
         <PositionList />
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold text-zinc-400 mb-3">資産推移</h2>
+        <h2 className="text-sm font-semibold text-zinc-400 mb-3">{t('assetChart')}</h2>
         <AssetChart />
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold text-zinc-400 mb-3">最新AI判定</h2>
+        <h2 className="text-sm font-semibold text-zinc-400 mb-3">{t('latestDecision')}</h2>
         <LatestDecision />
       </section>
     </div>

@@ -2,6 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import { LatestDecisionDetail, FactorAnalysis, DecisionTimeline } from './_components'
 import { apiFetch } from '@/lib/api/client'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -89,6 +90,8 @@ export default function DecisionsPage() {
   const [history, setHistory] = useState<AIDecisionResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const t = useTranslations('Decisions')
+  const tCommon = useTranslations('Common')
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -101,11 +104,11 @@ export default function DecisionsPage() {
       setLatest(latestData)
       setHistory(listData.items)
     } catch {
-      setError('データを取得できません')
+      setError(t('fetchError'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     fetchData()
@@ -113,16 +116,16 @@ export default function DecisionsPage() {
 
   return (
     <>
-      <title>AI判定フィード - Ultra AutoTrade</title>
+      <title>{t('aiFeedTitle')} - Ultra AutoTrade</title>
 
       <div className="space-y-6">
         {/* Page header */}
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            AI判定フィード
+            {t('aiFeedTitle')}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            最新のAI判定結果と判定履歴
+            {t('subtitle')}
           </p>
         </div>
 
@@ -136,12 +139,12 @@ export default function DecisionsPage() {
 
         {!loading && error && (
           <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-center space-y-3">
-            <p className="text-sm text-red-400">データを取得できません</p>
+            <p className="text-sm text-red-400">{t('fetchError')}</p>
             <button
               onClick={fetchData}
               className="text-xs text-blue-400 hover:text-blue-300 underline"
             >
-              再試行
+              {tCommon('retry')}
             </button>
           </div>
         )}

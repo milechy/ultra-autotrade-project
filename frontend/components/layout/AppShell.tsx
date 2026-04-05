@@ -4,12 +4,24 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React from "react";
+import React, { useState } from "react";
 import { useAuth } from "../../lib/auth";
+
+const navLinks = [
+  { href: "/dashboard/automation", label: "自動売買" },
+  { href: "/reports", label: "レポート" },
+  { href: "/knowledge", label: "ナレッジ" },
+  { href: "/ai-decisions", label: "AI判定" },
+  { href: "/protocols", label: "プロトコル" },
+  { href: "/events", label: "データ" },
+  { href: "/trades", label: "取引所管理" },
+  { href: "/user/dashboard", label: "ユーザーアプリ →", highlight: true },
+];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout, isLoading } = useAuth();
   const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -26,15 +38,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
             <Link href="/dashboard" style={{ textDecoration: "none", color: "#666", fontSize: 12 }}>運用ダッシュボード</Link>
           </div>
-          <nav style={{ display: "flex", gap: 12, fontSize: 14, alignItems: "center" }}>
-            <Link href="/dashboard/automation" style={navLinkStyle}>自動売買</Link>
-            <Link href="/reports" style={navLinkStyle}>レポート</Link>
-            <Link href="/knowledge" style={navLinkStyle}>ナレッジ</Link>
-            <Link href="/ai-decisions" style={navLinkStyle}>AI判定</Link>
-            <Link href="/protocols" style={navLinkStyle}>プロトコル</Link>
-            <Link href="/events" style={navLinkStyle}>データ</Link>
-            <Link href="/trades" style={navLinkStyle}>取引所管理</Link>
-            <Link href="/user/dashboard" style={{ ...navLinkStyle, color: "#2563eb" }}>ユーザーアプリ →</Link>
+
+          {/* Desktop nav */}
+          <nav style={{ display: "flex", gap: 12, fontSize: 14, alignItems: "center" }} className="mobile-hamburger-desktop-nav">
+            {navLinks.map(({ href, label, highlight }) => (
+              <Link key={href} href={href} style={highlight ? { ...navLinkStyle, color: "#2563eb" } : navLinkStyle}>{label}</Link>
+            ))}
             {!isLoading && user && (
               <>
                 <span style={{ color: "#999" }}>|</span>
@@ -50,8 +59,58 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/login" style={navLinkStyle}>ログイン</Link>
             )}
           </nav>
+
+          {/* Hamburger button (mobile only) */}
+          <button
+            onClick={() => setMenuOpen(v => !v)}
+            style={hamburgerButtonStyle}
+            className="mobile-hamburger"
+            aria-label="メニュー"
+            aria-expanded={menuOpen}
+          >
+            <span style={hamburgerLineStyle} />
+            <span style={hamburgerLineStyle} />
+            <span style={hamburgerLineStyle} />
+          </button>
         </div>
+
+        {/* Mobile dropdown menu */}
+        {menuOpen && (
+          <nav style={mobileMenuStyle} className="mobile-hamburger-menu">
+            {navLinks.map(({ href, label, highlight }) => (
+              <Link
+                key={href}
+                href={href}
+                style={highlight ? { ...mobileNavLinkStyle, color: "#2563eb" } : mobileNavLinkStyle}
+                onClick={() => setMenuOpen(false)}
+              >
+                {label}
+              </Link>
+            ))}
+            {!isLoading && user && (
+              <>
+                <Link href="/settings/config" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>設定</Link>
+                {user.role === "admin" && (
+                  <Link href="/users" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>ユーザー管理</Link>
+                )}
+                <button onClick={handleLogout} style={mobileLogoutStyle}>ログアウト</button>
+              </>
+            )}
+            {!isLoading && !user && (
+              <Link href="/login" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>ログイン</Link>
+            )}
+          </nav>
+        )}
       </header>
+
+      <style>{`
+        @media (min-width: 640px) {
+          .mobile-hamburger { display: none !important; }
+        }
+        @media (max-width: 639px) {
+          .mobile-hamburger-desktop-nav { display: none !important; }
+        }
+      `}</style>
 
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "16px" }}>{children}</main>
 
@@ -84,4 +143,51 @@ const logoutButtonStyle: React.CSSProperties = {
   fontSize: 12,
   cursor: "pointer",
   color: "#666",
+};
+
+const hamburgerButtonStyle: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  padding: 8,
+  display: "flex",
+  flexDirection: "column",
+  gap: 5,
+};
+
+const hamburgerLineStyle: React.CSSProperties = {
+  display: "block",
+  width: 22,
+  height: 2,
+  background: "#333",
+  borderRadius: 2,
+};
+
+const mobileMenuStyle: React.CSSProperties = {
+  borderTop: "1px solid #eee",
+  padding: "8px 16px 12px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  background: "rgba(255,255,255,0.98)",
+};
+
+const mobileNavLinkStyle: React.CSSProperties = {
+  textDecoration: "none",
+  color: "#333",
+  padding: "10px 4px",
+  fontSize: 14,
+  borderBottom: "1px solid #f0f0f0",
+};
+
+const mobileLogoutStyle: React.CSSProperties = {
+  background: "none",
+  border: "1px solid #ddd",
+  borderRadius: 6,
+  padding: "8px 10px",
+  fontSize: 14,
+  cursor: "pointer",
+  color: "#666",
+  textAlign: "left",
+  marginTop: 4,
 };
