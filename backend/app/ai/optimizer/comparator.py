@@ -113,14 +113,14 @@ class StrategyComparator:
             rname = _RECOMMENDATION_DISPLAY.get(
                 result.recommendation.value, result.recommendation.value
             )
-            benefit_val = float(result.expected_net_benefit)  # float OK
+            benefit_val = float(result.expected_net_benefit)
             ranking_lines.append(f"{result.rank}. {pname}: 期待利益 ${benefit_val:.2f} ({rname})")
 
         ranking_text = "\n".join(ranking_lines)
 
         # 推奨プロトコルの詳細
-        net_benefit_val = float(recommended.expected_net_benefit)  # float OK
-        idle_cost = float(comparison.idle_benefit)  # float OK
+        net_benefit_val = float(recommended.expected_net_benefit)
+        idle_cost = float(comparison.idle_benefit)
 
         # 保有日数（利益から逆算は難しいため省略表示）
         report = f"""=== 戦略比較レポート ===
@@ -149,5 +149,5 @@ class StrategyComparator:
         )
         return (
             f"{result.rank}. {protocol_name} ({result.asset}): "
-            f"期待利益 ${float(result.expected_net_benefit):.2f}, {rec_name}"  # float OK
+            f"期待利益 ${float(result.expected_net_benefit):.2f}, {rec_name}"
         )

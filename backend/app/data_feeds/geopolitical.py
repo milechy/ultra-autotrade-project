@@ -15,6 +15,8 @@ Architecture:
 
 import asyncio
 import logging
+import random
+import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
@@ -81,13 +83,14 @@ GDELT_GKG_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 
 _GDELT_MAX_RETRIES = 3
 _GDELT_BASE_BACKOFF_SECONDS = 30
+_GDELT_BUDGET_SECONDS = 20
 
 
 async def fetch_gdelt_events(client: httpx.AsyncClient) -> GDELTEvent:
     """Fetch conflict/instability events from GDELT GKG API.
 
-    Retries up to _GDELT_MAX_RETRIES times on 429 with exponential backoff.
-    Returns empty GDELTEvent on other errors (fail-safe).
+    Retries up to _GDELT_MAX_RETRIES times on 429 with exponential backoff + jitter.
+    Returns empty GDELTEvent if budget (_GDELT_BUDGET_SECONDS) is exceeded or on errors.
     """
     params = {
         "query": "conflict OR military OR sanctions OR crisis OR war",
@@ -95,6 +98,7 @@ async def fetch_gdelt_events(client: httpx.AsyncClient) -> GDELTEvent:
         "timespan": "24h",
         "format": "json",
     }
+    budget_start = time.monotonic()
     for attempt in range(_GDELT_MAX_RETRIES):
         try:
             resp = await client.get(GDELT_GKG_URL, params=params, timeout=10.0)
@@ -103,9 +107,19 @@ async def fetch_gdelt_events(client: httpx.AsyncClient) -> GDELTEvent:
             return GDELTEvent()
 
         if resp.status_code == 429:
-            delay = _GDELT_BASE_BACKOFF_SECONDS * (2**attempt)
+            delay = _GDELT_BASE_BACKOFF_SECONDS * (2**attempt) + random.uniform(0, 1)  # noqa: S311
+            elapsed = time.monotonic() - budget_start
+            if elapsed + delay > _GDELT_BUDGET_SECONDS:
+                logger.warning(
+                    "GDELT 429: budget exhausted (elapsed=%.1fs, next_delay=%.1fs > budget=%ds). "
+                    "Returning degraded fallback.",
+                    elapsed,
+                    delay,
+                    _GDELT_BUDGET_SECONDS,
+                )
+                return GDELTEvent()
             logger.warning(
-                "GDELT 429 Too Many Requests: backing off %ds (attempt %d/%d)",
+                "GDELT 429 Too Many Requests: backing off %.1fs (attempt %d/%d)",
                 delay,
                 attempt + 1,
                 _GDELT_MAX_RETRIES,

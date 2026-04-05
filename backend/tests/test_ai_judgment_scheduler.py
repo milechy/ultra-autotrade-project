@@ -420,3 +420,60 @@ async def test_scheduler_on_error_failure_does_not_crash_loop():
 
     # Loop continued despite callback failure
     assert job_call_count >= 2
+
+
+# ---------------------------------------------------------------------------
+# Fix 1: build_market_context() fault tolerance
+# ---------------------------------------------------------------------------
+
+
+def test_run_job_continues_when_build_market_context_fails(db_session):
+    """build_market_context() が例外を投げても AI 判定が実行されること。"""
+    mock_result = _make_cross_validation_result(TradeAction.HOLD)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+        patch(
+            "app.automation.ai_judgment_scheduler.build_market_context",
+            side_effect=RuntimeError("geo feed down"),
+        ),
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        result = run_ai_judgment_job(db=db_session)
+
+    # Job must still succeed with degraded context
+    assert result["action"] == "HOLD"
+    assert result["decision_id"] is not None
+
+    # judge_with_rag must have been called with degraded dict context
+    call_kwargs = MockAIService.return_value.judge_with_rag.call_args
+    market_context_arg = call_kwargs.kwargs.get("market_context")
+    assert isinstance(market_context_arg, dict)
+    assert market_context_arg.get("degraded") is True
+    assert "geo feed down" in market_context_arg.get("reason", "")
+
+
+def test_run_job_degraded_context_has_required_keys(db_session):
+    """降格コンテキストが geopolitical_events と market_data キーを持つこと。"""
+    mock_result = _make_cross_validation_result(TradeAction.HOLD)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+        patch(
+            "app.automation.ai_judgment_scheduler.build_market_context",
+            side_effect=ConnectionError("network unreachable"),
+        ),
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        run_ai_judgment_job(db=db_session)
+
+    call_kwargs = MockAIService.return_value.judge_with_rag.call_args
+    ctx = call_kwargs.kwargs.get("market_context")
+    assert ctx["geopolitical_events"] == []
+    assert ctx["market_data"] == {}

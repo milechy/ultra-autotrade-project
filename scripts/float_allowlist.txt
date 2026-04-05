@@ -1,0 +1,28 @@
+# float_allowlist.txt
+# Approved float() usages — logging/display/interface conversion only.
+# Financial calculations (amounts, balances, rates) MUST use Decimal.
+# Format: path/to/file.py:LINENO — reason
+
+# === exchange/ ===
+backend/app/exchange/service.py — ccxt API requires float for order quantity (interface conversion, not storage)
+backend/app/exchange/config.py — config env var parsing for usd_to_jpy_rate (config only, converted to Decimal before use)
+backend/app/exchange/copy_trading.py — float("-inf") as sort key sentinel (not a financial value)
+
+# === aave/ ===
+backend/app/aave/rebalance_service.py:155 — timestamp comparison (exp claim from JWT, not financial)
+backend/app/aave/rebalance_service.py:566 — logging only (drawdown_pct formatted for logger.warning %f)
+
+# === ai/ ===
+backend/app/ai/prefilter.py — OHLCV candle values converted for RSI/MA indicator libraries (display only)
+backend/app/ai/optimizer/comparator.py — logging/display of expected_net_benefit values
+backend/app/ai/optimizer/net_benefit.py — logging/display of yield and cost values
+backend/app/ai/agents.py — HF/utilization threshold comparisons for scoring (not financial calculations)
+backend/app/ai/explanation_service.py — float() for f-string formatting of utilization/volatility (display only)
+
+# === protocols/ ===
+backend/app/protocols/lido/service.py — logging only (deviation_pct in warning message)
+backend/app/protocols/lido/aave_integration.py — logging only (APR values in log message)
+backend/app/protocols/pendle/service.py — logging only (implied_apy and yield values in log messages)
+backend/app/protocols/pendle/strategy.py — logging only (yield/APR values in log messages)
+backend/app/protocols/risk/protocol_monitor.py — logging only (float() in f-string alert messages)
+backend/app/protocols/risk/peg_monitor.py — logging only (deviation_pct in log message)

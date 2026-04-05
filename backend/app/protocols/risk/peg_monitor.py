@@ -73,6 +73,6 @@ class PegMonitor:
         if result:
             logger.warning(
                 "should_trigger_evacuation: CRITICAL ペグ乖離検知（%.4f%%）",
-                float(peg_status.deviation_pct),  # float OK
+                float(peg_status.deviation_pct),
             )
         return result

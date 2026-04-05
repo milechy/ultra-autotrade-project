@@ -269,7 +269,11 @@ class TestGDELTFallback:
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=[rate_limit_response, success_response])
 
-        with patch("app.data_feeds.geopolitical.asyncio.sleep", new=AsyncMock()):
+        with (
+            patch("app.data_feeds.geopolitical.asyncio.sleep", new=AsyncMock()),
+            patch("app.data_feeds.geopolitical.time.monotonic", return_value=0.0),
+            patch("app.data_feeds.geopolitical._GDELT_BUDGET_SECONDS", 120),
+        ):
             result = await fetch_gdelt_events(mock_client)
 
         assert mock_client.get.call_count == 2
@@ -292,12 +296,90 @@ class TestGDELTFallback:
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(return_value=rate_limit_response)
 
-        with patch("app.data_feeds.geopolitical.asyncio.sleep", new=AsyncMock()):
+        with (
+            patch("app.data_feeds.geopolitical.asyncio.sleep", new=AsyncMock()),
+            patch("app.data_feeds.geopolitical.time.monotonic", return_value=0.0),
+            patch("app.data_feeds.geopolitical._GDELT_BUDGET_SECONDS", 120),
+        ):
             result = await fetch_gdelt_events(mock_client)
 
         assert mock_client.get.call_count == _GDELT_MAX_RETRIES
         assert result.avg_tone == Decimal("0")
         assert result.event_count == 0
+
+    @pytest.mark.asyncio
+    async def test_gdelt_429_budget_exceeded_returns_empty(self) -> None:
+        """20秒バジェットを超えそうな場合は即座に空の GDELTEvent を返すこと。"""
+        from unittest.mock import patch  # noqa: PLC0415
+
+        from app.data_feeds.geopolitical import (  # noqa: PLC0415
+            _GDELT_BUDGET_SECONDS,
+            fetch_gdelt_events,
+        )
+
+        rate_limit_response = MagicMock()
+        rate_limit_response.status_code = 429
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=rate_limit_response)
+
+        # Simulate that elapsed time is already close to budget
+        # budget=20s, base_backoff=30s → first delay (30+jitter) will exceed budget
+        start_time = 0.0
+
+        def mock_monotonic() -> float:
+            # Return elapsed=19s on first call so any backoff exceeds remaining budget
+            return start_time + 19.0
+
+        with (
+            patch("app.data_feeds.geopolitical.time.monotonic", side_effect=mock_monotonic),
+            patch("app.data_feeds.geopolitical.asyncio.sleep", new=AsyncMock()),
+        ):
+            result = await fetch_gdelt_events(mock_client)
+
+        # Should return immediately without sleeping
+        assert result.avg_tone == Decimal("0")
+        assert result.event_count == 0
+        _ = _GDELT_BUDGET_SECONDS  # ensure import works
+
+    @pytest.mark.asyncio
+    async def test_gdelt_429_jitter_added_to_delay(self) -> None:
+        """バックオフにジッターが加算されること（delay >= base_backoff）。"""
+        from unittest.mock import patch  # noqa: PLC0415
+
+        from app.data_feeds.geopolitical import (  # noqa: PLC0415
+            _GDELT_BASE_BACKOFF_SECONDS,
+            fetch_gdelt_events,
+        )
+
+        rate_limit_response = MagicMock()
+        rate_limit_response.status_code = 429
+
+        success_response = MagicMock()
+        success_response.status_code = 200
+        success_response.raise_for_status = MagicMock()
+        success_response.json.return_value = [{"value": -1.0}]
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[rate_limit_response, success_response])
+
+        sleep_delays: list[float] = []
+
+        async def capture_sleep(seconds: float) -> None:
+            sleep_delays.append(seconds)
+
+        with (
+            patch("app.data_feeds.geopolitical.asyncio.sleep", side_effect=capture_sleep),
+            patch("app.data_feeds.geopolitical.time.monotonic", return_value=0.0),
+            # Set budget large enough that 30+jitter doesn't exceed it
+            patch("app.data_feeds.geopolitical._GDELT_BUDGET_SECONDS", 120),
+        ):
+            result = await fetch_gdelt_events(mock_client)
+
+        assert result.event_count == 1
+        assert len(sleep_delays) == 1
+        # delay must be >= base backoff (jitter only adds, never subtracts)
+        assert sleep_delays[0] >= _GDELT_BASE_BACKOFF_SECONDS
 
     def test_ai_judgment_continues_without_news_context(self) -> None:
         """ニュース/GDELT両方失敗でもAI判定が完走すること。"""

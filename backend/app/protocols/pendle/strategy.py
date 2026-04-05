@@ -67,8 +67,8 @@ class PendleFixedYieldStrategy:
 
         logger.info(
             "PendleFixedYieldStrategy: fixed_yield=%.4f%%, aave_apr=%.2f%%, recommended=%s",
-            float(fixed_yield_pct),  # float OK
-            float(aave_apr),  # float OK
+            float(fixed_yield_pct),
+            float(aave_apr),
             recommended,
         )
 
@@ -130,8 +130,8 @@ class PendleYieldLeverageStrategy:
 
         logger.info(
             "PendleYieldLeverageStrategy: breakeven=%.4f%%, staking_apr=%.2f%%, profitable=%s",
-            float(breakeven_pct),  # float OK
-            float(current_staking_apr),  # float OK
+            float(breakeven_pct),
+            float(current_staking_apr),
             is_profitable,
         )
 
@@ -270,7 +270,7 @@ class LidoPendleCompoundStrategy:
             "LidoPendleCompoundStrategy.execute: strategy=%s, amount=%s, total_apy=%.4f%%, dry_run=%s",
             strategy,
             amount_eth,
-            float(total_apy),  # float OK
+            float(total_apy),
             dry_run,
         )
 
@@ -340,9 +340,9 @@ class LidoPendleCompoundStrategy:
 
         logger.info(
             "compare_strategies: aave_only=%.2f%%, lido_aave=%.2f%%, lido_pendle=%.4f%%, best=%s",
-            float(aave_only_apy),  # float OK
-            float(lido_aave_apy),  # float OK
-            float(lido_pendle_apy),  # float OK
+            float(aave_only_apy),
+            float(lido_aave_apy),
+            float(lido_pendle_apy),
             best.strategy,
         )
 

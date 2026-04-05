@@ -152,7 +152,7 @@ def _verify_confirmation_token(
         raise RebalanceTokenError("Token missing 'exp' field")
 
     now_ts = datetime.now(timezone.utc).timestamp()
-    if now_ts > float(exp):  # float OK
+    if now_ts > float(exp):
         raise RebalanceTokenError("Token has expired")
 
     # proposal_id match check
@@ -563,7 +563,7 @@ class RebalanceService:
             logger.warning(
                 "simulate: MDD warning for risk_mode=%s, drawdown=%.1f%%",
                 effective_risk_mode,
-                float(mdd_status.drawdown_pct * 100),  # float OK
+                float(mdd_status.drawdown_pct * 100),
             )
 
         default_symbol = self._aave_settings.default_asset_symbol

@@ -161,7 +161,22 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
             rag_ctx = RAGContext(chunks=[], query=_DEFAULT_QUERY, source_count=0)
 
         # Market context（ニュース・地政学リスク・マクロ）をキャッシュから取得
-        market_ctx = build_market_context()
+        context_degraded = False
+        market_ctx: Any
+        try:
+            market_ctx = build_market_context()
+        except Exception as exc:
+            context_degraded = True
+            logger.warning("build_market_context() failed, using degraded context: %s", exc)
+            market_ctx = {
+                "degraded": True,
+                "reason": str(exc),
+                "geopolitical_events": [],
+                "market_data": {},
+            }
+
+        if context_degraded:
+            logger.warning("AI judgment proceeding with degraded market context")
 
         # AI 判定実行
         result: CrossValidationResult = AIService().judge_with_rag(

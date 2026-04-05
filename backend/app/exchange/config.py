@@ -157,7 +157,7 @@ def get_exchange_settings() -> ExchangeSettings:
         default=30,
     )
     hostname = get_env("BYBIT_HOSTNAME", required=False) or "bybit.com"
-    usd_to_jpy_rate = float(get_env("USD_TO_JPY_RATE", required=False) or "150.0")  # float OK
+    usd_to_jpy_rate = float(get_env("USD_TO_JPY_RATE", required=False) or "150.0")
 
     return ExchangeSettings(
         api_key=api_key,
@@ -198,7 +198,7 @@ def get_bitflyer_settings() -> ExchangeSettings:
     daily_trade_limit = _get_env_int("EXCHANGE_DAILY_TRADE_LIMIT", default=10)
     cooldown_seconds = _get_env_int("EXCHANGE_COOLDOWN_SECONDS", default=300)
     timeout_seconds = _get_env_int("EXCHANGE_TIMEOUT_SECONDS", default=30)
-    usd_to_jpy_rate = float(get_env("USD_TO_JPY_RATE", required=False) or "150.0")  # float OK
+    usd_to_jpy_rate = float(get_env("USD_TO_JPY_RATE", required=False) or "150.0")
 
     return ExchangeSettings(
         api_key=api_key,
@@ -241,7 +241,7 @@ def get_okx_settings() -> ExchangeSettings:
     daily_trade_limit = _get_env_int("EXCHANGE_DAILY_TRADE_LIMIT", default=10)
     cooldown_seconds = _get_env_int("EXCHANGE_COOLDOWN_SECONDS", default=300)
     timeout_seconds = _get_env_int("EXCHANGE_TIMEOUT_SECONDS", default=30)
-    usd_to_jpy_rate = float(get_env("USD_TO_JPY_RATE", required=False) or "150.0")  # float OK
+    usd_to_jpy_rate = float(get_env("USD_TO_JPY_RATE", required=False) or "150.0")
 
     return ExchangeSettings(
         api_key=api_key,
@@ -283,7 +283,7 @@ def get_kraken_settings() -> ExchangeSettings:
     daily_trade_limit = _get_env_int("EXCHANGE_DAILY_TRADE_LIMIT", default=10)
     cooldown_seconds = _get_env_int("EXCHANGE_COOLDOWN_SECONDS", default=300)
     timeout_seconds = _get_env_int("EXCHANGE_TIMEOUT_SECONDS", default=30)
-    usd_to_jpy_rate = float(get_env("USD_TO_JPY_RATE", required=False) or "150.0")  # float OK
+    usd_to_jpy_rate = float(get_env("USD_TO_JPY_RATE", required=False) or "150.0")
 
     return ExchangeSettings(
         api_key=api_key,

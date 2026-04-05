@@ -227,7 +227,7 @@ def run_prefilter(
         )
 
     # OHLCV形式: [timestamp, open, high, low, close, volume]
-    closes = [float(candle[4]) for candle in ohlcv]  # float OK
+    closes = [float(candle[4]) for candle in ohlcv]
 
     rsi = calculate_rsi(closes, period=RSI_PERIOD)
     ma_short = calculate_ma(closes, period=MA_SHORT_PERIOD)
@@ -240,9 +240,9 @@ def run_prefilter(
     logger.info(
         "Prefilter result: symbol=%s rsi=%.2f ma_short=%.2f ma_long=%.2f signal=%s",
         symbol,
-        rsi if rsi is not None else float("nan"),  # float OK
-        ma_short if ma_short is not None else float("nan"),  # float OK
-        ma_long if ma_long is not None else float("nan"),  # float OK
+        rsi if rsi is not None else float("nan"),
+        ma_short if ma_short is not None else float("nan"),
+        ma_long if ma_long is not None else float("nan"),
         signal,
     )
 
