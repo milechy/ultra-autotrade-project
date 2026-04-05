@@ -78,7 +78,7 @@ def _send_watchdog_slack(text: str) -> None:
         return
     try:
         data = json.dumps({"text": text}).encode()
-        req = urllib.request.Request(
+        req = urllib.request.Request(  # noqa: S310
             webhook_url,
             data=data,
             headers={"Content-Type": "application/json"},

@@ -326,11 +326,11 @@ def seed_portfolio_snapshots(db, user_id: int) -> None:
 
     for i in range(30, -1, -1):
         # ±3% の変動をシミュレート
-        drift = Decimal(str(random.uniform(-0.03, 0.04)))
+        drift = Decimal(str(random.uniform(-0.03, 0.04)))  # noqa: S311
         total_value = (base_value * (1 + drift)).quantize(Decimal("0.01"))
         supply = (total_value * Decimal("0.75")).quantize(Decimal("0.01"))
         borrow = (total_value * Decimal("0.20")).quantize(Decimal("0.01"))
-        hf = (base_hf + Decimal(str(random.uniform(-0.15, 0.15)))).quantize(Decimal("0.0001"))
+        hf = (base_hf + Decimal(str(random.uniform(-0.15, 0.15)))).quantize(Decimal("0.0001"))  # noqa: S311
         hf = max(Decimal("1.5"), min(Decimal("3.0"), hf))
 
         snapshots.append(

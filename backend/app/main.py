@@ -117,7 +117,7 @@ def _make_scheduler_error_handler(name: str) -> Callable[[Exception], None]:
             ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             text = f"⚠️ [Scheduler] {name}実行失敗\n原因: {type(exc).__name__}: {exc}\n時刻: {ts}"
             data = json.dumps({"text": text}).encode()
-            req = urllib.request.Request(
+            req = urllib.request.Request(  # noqa: S310
                 webhook_url,
                 data=data,
                 headers={"Content-Type": "application/json"},

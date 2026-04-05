@@ -19,7 +19,7 @@ from .models import User, UserRole
 
 logger = logging.getLogger(__name__)
 
-LINE_TOKEN_VERIFY_URL = "https://api.line.me/oauth2/v2.1/verify"
+LINE_TOKEN_VERIFY_URL = "https://api.line.me/oauth2/v2.1/verify"  # noqa: S105
 
 
 class LineAuthError(Exception):

@@ -141,7 +141,8 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
     _own_session = db is None
     if _own_session:
         db = SessionLocal()
-    assert db is not None
+    if db is None:
+        raise RuntimeError("db is None after SessionLocal()")
 
     try:
         # RAG コンテキスト取得（失敗時は空のコンテキストでフォールバック）
@@ -190,7 +191,7 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
         logger.error("AI judgment job failed: %s", exc)
         try:
             db.rollback()
-        except Exception:
+        except Exception:  # noqa: S110
             pass
         raise
     finally:

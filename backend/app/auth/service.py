@@ -10,7 +10,7 @@ docs/13_security_design.md に準拠。
 
 import logging
 import os
-import random
+import secrets
 import string
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -377,14 +377,15 @@ class AuthService:
         email = base_email
         username = base_username
         if cls.get_user_by_email(db, email):
-            suffix = "".join(random.choices(string.digits, k=4))
+            suffix = "".join(secrets.choice(string.digits) for _ in range(4))
             email = f"wallet_{base_slug}{suffix}@wallet.local"
         if cls.get_user_by_username(db, username):
-            suffix = "".join(random.choices(string.digits, k=4))
+            suffix = "".join(secrets.choice(string.digits) for _ in range(4))
             username = f"wallet_{base_slug}{suffix}"
 
         # 使用しないランダムパスワードをハッシュ化
-        random_password = "".join(random.choices(string.ascii_letters + string.digits, k=64))
+        alphabet = string.ascii_letters + string.digits
+        random_password = "".join(secrets.choice(alphabet) for _ in range(64))
         hashed = cls.hash_password(random_password)
 
         user = User(

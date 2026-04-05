@@ -334,7 +334,8 @@ def wallet_connect(
     if is_new_user:
         user = AuthService.create_wallet_user(db, request.wallet_address)
     else:
-        assert existing_user is not None
+        if existing_user is None:
+            raise RuntimeError("existing_user is None after wallet lookup")
         user = existing_user
 
     token, expires_in = AuthService.create_access_token(

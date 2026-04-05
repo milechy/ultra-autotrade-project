@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 JUDGMENT_LOG_DIR = os.getenv("JUDGMENT_LOG_DIR", "/var/log/ultra-autotrade")
-_FALLBACK_LOG_DIR = "/tmp/ultra-autotrade"
+_FALLBACK_LOG_DIR = "/tmp/ultra-autotrade"  # noqa: S108
 JUDGMENT_LOG_FILE = "judgment_log.jsonl"
 MAX_RECENT = 20
 

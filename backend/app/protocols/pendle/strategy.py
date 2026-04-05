@@ -180,7 +180,7 @@ class LidoPendleCompoundStrategy:
             from ..lido.config import get_lido_config  # noqa: PLC0415
 
             lido_config_obj = get_lido_config()
-        except Exception:
+        except Exception:  # noqa: S110
             pass
 
         if lido_config_obj is not None:

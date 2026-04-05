@@ -147,7 +147,7 @@ class PendleService:
     async def redeem(self, request: PendleRedeemRequest) -> PendleRedeemResponse:
         """PT または YT のリデーム実行。"""
         # 満期チェック（PT の場合のみ）
-        if request.token_type == "PT":
+        if request.token_type == "PT":  # noqa: S105
             market_info = await self._client.get_market_info(request.market_address)
             if market_info.days_to_maturity > 0:
                 raise ValueError(
@@ -163,7 +163,7 @@ class PendleService:
                 request.amount,
             )
             # dry_run シミュレーション
-            if request.token_type == "PT":
+            if request.token_type == "PT":  # noqa: S105
                 return PendleRedeemResponse(
                     operation="REDEEM_PT",
                     redeemed_amount=request.amount,
@@ -183,7 +183,7 @@ class PendleService:
                 )
 
         # 実行
-        if request.token_type == "PT":
+        if request.token_type == "PT":  # noqa: S105
             result = await self._client.redeem_pt(request.amount, request.market_address)
             operation = "REDEEM_PT"
         else:
