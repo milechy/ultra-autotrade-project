@@ -67,3 +67,5 @@ user/config.json*
 
 # Claude settings backup (contains Slack tokens)
 .claude/settings.local.json.bak
+backups/
+slack-handler/
