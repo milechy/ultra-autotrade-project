@@ -6,6 +6,7 @@ import { WagmiRootProvider } from '@/lib/wallet/WagmiRootProvider'
 import { UserProviders } from '@/components/user/UserProviders'
 import { UserHeader } from '@/components/user/UserHeader'
 import { BottomNav } from '@/components/shared/BottomNav'
+import { UserErrorBoundary } from './_components/UserErrorBoundary'
 
 export default async function UserLayout({
   children,
@@ -18,11 +19,13 @@ export default async function UserLayout({
     <NextIntlClientProvider locale={locale} messages={messages}>
       <WagmiRootProvider>
         <UserProviders>
-          <UserHeader />
-          <div className="min-h-screen pb-16">
-            {children}
-          </div>
-          <BottomNav />
+          <UserErrorBoundary>
+            <UserHeader />
+            <div className="min-h-screen pb-16">
+              {children}
+            </div>
+            <BottomNav />
+          </UserErrorBoundary>
         </UserProviders>
       </WagmiRootProvider>
     </NextIntlClientProvider>

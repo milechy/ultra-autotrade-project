@@ -21,6 +21,7 @@ const withPWA = require('next-pwa')({
     /app-build-manifest\.json$/,
     /build-manifest\.json$/,
     /middleware-manifest\.json$/,
+    /react-loadable-manifest\.json$/,
   ],
 });
 
