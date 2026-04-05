@@ -52,6 +52,23 @@ else
 fi
 
 echo ""
+echo "--- [6/7] Financial float チェック ---"
+if bash "$(dirname "$0")/check_financial_float.sh"; then
+  echo "✅ financial float check passed"
+else
+  echo "❌ financial float check FAILED"
+  FAIL=1
+fi
+
+echo ""
+echo "--- [7/7] NEXT_PUBLIC 同期チェック ---"
+if bash "$(dirname "$0")/check_next_public_sync.sh"; then
+  echo "✅ NEXT_PUBLIC sync check passed"
+else
+  echo "⚠️  NEXT_PUBLIC sync check: issues found (review manually)"
+fi
+
+echo ""
 echo "========================================="
 if [ "$FAIL" -eq 0 ]; then
   echo "✅ ALL CHECKS PASSED — ready to commit"

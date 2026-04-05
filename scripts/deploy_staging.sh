@@ -18,6 +18,8 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="docker-compose.staging.yml"
 ENV_FILE=".env.staging"
 FRONTEND_CONTAINER="ultra-autotrade-frontend-staging"
+BACKEND_CONTAINER="ultra-autotrade-backend-staging"
+POSTGRES_CONTAINER="ultra-autotrade-postgres-staging"
 HEALTH_TIMEOUT=60
 
 # ───────────────────────────────────────────────
@@ -214,6 +216,131 @@ if ! "${FRONTEND_ONLY}"; then
   else
     log "scheduler_healthy=${SCHED_HEALTHY} ✓"
   fi
+fi
+
+# ───────────────────────────────────────────────
+# デプロイ後 追加検証（WARNING のみ / デプロイは止めない）
+# ───────────────────────────────────────────────
+
+# 検証 1: Mixed Content 検出
+check_mixed_content() {
+  log "=== Mixed Content チェック ==="
+  local http_count
+  http_count=$(docker exec "${FRONTEND_CONTAINER}" \
+    grep -r "http://77\|http://localhost:8000" /app/.next/static/chunks/ 2>/dev/null \
+    | wc -l || echo "0")
+  if [ "${http_count}" -gt 0 ]; then
+    log "⚠️  WARNING: フロントエンドバンドルに http:// URL が ${http_count} 件残っています"
+    log "   → NEXT_PUBLIC_* 環境変数が docker-compose build.args に反映されていない可能性"
+    log "   → docker compose build --no-cache frontend を実行してください"
+  else
+    log "✅ Mixed Content なし"
+  fi
+}
+
+# 検証 2: Cloudflare Tunnel 確認
+check_tunnel() {
+  log "=== Cloudflare Tunnel チェック ==="
+  local named_tunnel
+  named_tunnel=$(pgrep -f "cloudflared.*tunnel.*run" 2>/dev/null | wc -l || echo "0")
+  if [ "${named_tunnel}" -ge 1 ]; then
+    log "✅ Named Tunnel 稼働中 (${named_tunnel} プロセス)"
+  else
+    # docker コンテナ内の cloudflared を確認
+    local container_running
+    container_running=$(docker inspect --format='{{.State.Running}}' \
+      "ultra-autotrade-cloudflared-staging" 2>/dev/null || echo "false")
+    if [ "${container_running}" = "true" ]; then
+      log "✅ cloudflared コンテナ稼働中"
+    else
+      log "⚠️  WARNING: Cloudflare Tunnel が検出されませんでした"
+      log "   → フロントエンド(:3000) + バックエンド(:8000) 両方のトンネルが必要"
+      log "   → docker compose logs ultra-autotrade-cloudflared-staging で確認してください"
+    fi
+  fi
+}
+
+# 検証 3: DB カラム drift 検出
+check_db_drift() {
+  log "=== DB カラム drift チェック ==="
+  local db_columns
+  db_columns=$(docker exec "${POSTGRES_CONTAINER}" psql -U ultra -d ultra_autotrade -t -c \
+    "SELECT string_agg(column_name, ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_name='users';" \
+    2>/dev/null | tr -d ' \n' || echo "")
+  if [ -z "${db_columns}" ]; then
+    log "⚠️  WARNING: DB から users テーブルのカラムを取得できませんでした"
+    return
+  fi
+  log "  DB users columns: ${db_columns}"
+  local model_columns
+  model_columns=$(docker exec "${BACKEND_CONTAINER}" python -c \
+    "from app.auth.models import User; cols=[c.key for c in User.__table__.columns]; print(','.join(sorted(cols)))" \
+    2>/dev/null || echo "")
+  if [ -z "${model_columns}" ]; then
+    log "⚠️  WARNING: モデルからカラムを取得できませんでした"
+    return
+  fi
+  log "  Model columns: ${model_columns}"
+  local diff
+  diff=$(comm -23 \
+    <(echo "${model_columns}" | tr ',' '\n' | sort) \
+    <(echo "${db_columns}" | tr ',' '\n' | sort) || true)
+  if [ -n "${diff}" ]; then
+    log "⚠️  WARNING: 以下のカラムがモデルにあるが DB にありません:"
+    log "   ${diff}"
+    log "   → ALTER TABLE users ADD COLUMN IF NOT EXISTS ... で追加してください"
+  else
+    log "✅ DB カラム drift なし"
+  fi
+}
+
+# 検証 4: 401 エラー確認（INTERNAL_API_TOKEN 問題検出）
+check_auth_errors() {
+  log "=== 内部 API 認証エラーチェック ==="
+  local auth_errors
+  auth_errors=$(docker logs "${BACKEND_CONTAINER}" 2>&1 | tail -100 \
+    | grep -c "401 Unauthorized" || echo "0")
+  if [ "${auth_errors}" -gt 5 ]; then
+    log "⚠️  WARNING: 直近100行に 401 Unauthorized が ${auth_errors} 件"
+    log "   → INTERNAL_API_TOKEN が .env.staging に設定されているか確認してください"
+  else
+    log "✅ 401 エラー ${auth_errors} 件（正常範囲）"
+  fi
+}
+
+# 検証 5: CORS preflight 自動検証
+check_cors() {
+  log "=== CORS preflight チェック ==="
+  local frontend_origin="https://app.ultra-auto-trade.com"
+  local cors_header
+  cors_header=$(curl -s -I \
+    -H "Origin: ${frontend_origin}" \
+    -H "Access-Control-Request-Method: GET" \
+    --max-time 5 \
+    http://localhost:8000/health 2>/dev/null \
+    | grep -i "access-control-allow-origin" | tr -d '\r' || echo "")
+  if echo "${cors_header}" | grep -q "${frontend_origin}\|\*"; then
+    log "✅ CORS: ${frontend_origin} が許可されています"
+  else
+    log "⚠️  WARNING: CORS ヘッダーに ${frontend_origin} が含まれていません"
+    log "   → .env.staging の CORS_ORIGINS に ${frontend_origin} を追加してください"
+    log "   → レスポンス: ${cors_header:-（ヘッダーなし）}"
+  fi
+}
+
+# 全追加検証を実行（各ステップは独立して動作）
+run_post_deploy_checks() {
+  log "=== デプロイ後追加検証 開始 ==="
+  check_mixed_content || true
+  check_tunnel        || true
+  check_db_drift      || true
+  check_auth_errors   || true
+  check_cors          || true
+  log "=== デプロイ後追加検証 完了 ==="
+}
+
+if ! "${BACKEND_ONLY}"; then
+  run_post_deploy_checks
 fi
 
 # ───────────────────────────────────────────────
