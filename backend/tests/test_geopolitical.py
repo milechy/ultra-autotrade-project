@@ -215,16 +215,60 @@ class TestGDELTFallback:
     @pytest.mark.asyncio
     async def test_gdelt_fallback_on_error(self) -> None:
         """パースエラー時にデフォルトGDELTEventを返すこと。"""
-        from app.data_feeds.geopolitical import fetch_gdelt_events
+        from unittest.mock import patch  # noqa: PLC0415
+
+        from app.data_feeds.geopolitical import fetch_gdelt_events  # noqa: PLC0415
 
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
+        mock_response.text = "not-json"
         mock_response.json.side_effect = ValueError("Expecting value")  # JSON parse error
 
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(return_value=mock_response)
 
-        result = await fetch_gdelt_events(mock_client)
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await fetch_gdelt_events(mock_client)
+
+        assert result.avg_tone == Decimal("0")
+        assert result.event_count == 0
+
+    @pytest.mark.asyncio
+    async def test_gdelt_fallback_on_empty_response(self) -> None:
+        """空レスポンス時にデフォルトGDELTEventを返しWARNINGを出すこと。"""
+        from unittest.mock import patch  # noqa: PLC0415
+
+        from app.data_feeds.geopolitical import fetch_gdelt_events  # noqa: PLC0415
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.text = ""  # empty body
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await fetch_gdelt_events(mock_client)
+
+        assert result.avg_tone == Decimal("0")
+        assert result.event_count == 0
+
+    @pytest.mark.asyncio
+    async def test_gdelt_fallback_on_json_decode_error(self) -> None:
+        """JSONDecodeError時にデフォルトGDELTEventを返すこと。"""
+        from unittest.mock import patch  # noqa: PLC0415
+
+        from app.data_feeds.geopolitical import fetch_gdelt_events  # noqa: PLC0415
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.text = "   "  # whitespace-only, triggers JSONDecodeError
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await fetch_gdelt_events(mock_client)
 
         assert result.avg_tone == Decimal("0")
         assert result.event_count == 0
@@ -232,6 +276,8 @@ class TestGDELTFallback:
     @pytest.mark.asyncio
     async def test_gdelt_fallback_on_http_error(self) -> None:
         """HTTP エラー時にデフォルトGDELTEventを返すこと。"""
+        from unittest.mock import patch  # noqa: PLC0415
+
         import httpx  # noqa: PLC0415
 
         from app.data_feeds.geopolitical import fetch_gdelt_events  # noqa: PLC0415
@@ -243,7 +289,8 @@ class TestGDELTFallback:
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(return_value=mock_response)
 
-        result = await fetch_gdelt_events(mock_client)
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await fetch_gdelt_events(mock_client)
 
         assert result.event_count == 0
 

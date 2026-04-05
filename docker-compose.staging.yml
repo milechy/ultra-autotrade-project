@@ -11,6 +11,8 @@ volumes:
     driver: local
   loki-data:
     driver: local
+  ultra-log-staging:
+    driver: local
 
 services:
   loki:
@@ -93,6 +95,7 @@ services:
     volumes:
       - ultra-state:/var/run/ultra:rw
       - ./backend/data:/app/backend/data:rw
+      - ultra-log-staging:/var/log/ultra-autotrade
     depends_on:
       postgres:
         condition: service_healthy
