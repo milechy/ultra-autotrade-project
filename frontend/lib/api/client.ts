@@ -8,6 +8,7 @@
 import { getStoredToken } from '../auth'
 import { authReadyPromise } from '../auth-state'
 import { getJson, postJson, putJson } from './http'
+import type { HttpError } from './http'
 
 /**
  * Paths that do not require an authenticated token.
@@ -31,32 +32,56 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+/**
+ * On 401, redirect to /login (client-side only).
+ * This prevents unhandled HttpError from propagating up and crashing React.
+ */
+function handle401(err: unknown): never {
+  const httpErr = err as HttpError
+  if (httpErr?.status === 401 && typeof window !== 'undefined') {
+    window.location.href = '/login'
+  }
+  throw err
+}
+
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   if (!isAuthSkipPath(path)) {
     await authReadyPromise
   }
-  return getJson<T>(path, {
-    ...options,
-    headers: { ...authHeaders(), ...options?.headers },
-  })
+  try {
+    return await getJson<T>(path, {
+      ...options,
+      headers: { ...authHeaders(), ...options?.headers },
+    })
+  } catch (err) {
+    return handle401(err)
+  }
 }
 
 export async function apiPost<T>(path: string, data: unknown, options?: RequestInit): Promise<T> {
   if (!isAuthSkipPath(path)) {
     await authReadyPromise
   }
-  return postJson<T>(path, data, {
-    ...options,
-    headers: { ...authHeaders(), ...options?.headers },
-  })
+  try {
+    return await postJson<T>(path, data, {
+      ...options,
+      headers: { ...authHeaders(), ...options?.headers },
+    })
+  } catch (err) {
+    return handle401(err)
+  }
 }
 
 export async function apiPut<T>(path: string, data: unknown, options?: RequestInit): Promise<T> {
   if (!isAuthSkipPath(path)) {
     await authReadyPromise
   }
-  return putJson<T>(path, data, {
-    ...options,
-    headers: { ...authHeaders(), ...options?.headers },
-  })
+  try {
+    return await putJson<T>(path, data, {
+      ...options,
+      headers: { ...authHeaders(), ...options?.headers },
+    })
+  } catch (err) {
+    return handle401(err)
+  }
 }
