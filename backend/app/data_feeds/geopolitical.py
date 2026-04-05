@@ -79,32 +79,61 @@ def get_cached_geo_risk() -> GeoRiskResult:
 # ============================================================
 GDELT_GKG_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 
+_GDELT_MAX_RETRIES = 3
+_GDELT_BASE_BACKOFF_SECONDS = 30
+
 
 async def fetch_gdelt_events(client: httpx.AsyncClient) -> GDELTEvent:
-    """Fetch conflict/instability events from GDELT GKG API."""
-    try:
-        params = {
-            "query": "conflict OR military OR sanctions OR crisis OR war",
-            "mode": "tonechart",
-            "timespan": "24h",
-            "format": "json",
-        }
-        resp = await client.get(GDELT_GKG_URL, params=params, timeout=10.0)
-        resp.raise_for_status()
-        data = resp.json()
+    """Fetch conflict/instability events from GDELT GKG API.
 
-        if isinstance(data, list) and len(data) > 0:
-            tones = [float(item.get("value", 0)) for item in data if "value" in item]
-            avg_tone = Decimal(str(sum(tones) / len(tones))) if tones else Decimal("0")
-            event_count = len(data)
-        else:
-            avg_tone = Decimal("0")
-            event_count = 0
+    Retries up to _GDELT_MAX_RETRIES times on 429 with exponential backoff.
+    Returns empty GDELTEvent on other errors (fail-safe).
+    """
+    params = {
+        "query": "conflict OR military OR sanctions OR crisis OR war",
+        "mode": "tonechart",
+        "timespan": "24h",
+        "format": "json",
+    }
+    for attempt in range(_GDELT_MAX_RETRIES):
+        try:
+            resp = await client.get(GDELT_GKG_URL, params=params, timeout=10.0)
+        except Exception as exc:
+            logger.warning("GDELT fetch failed: %s", exc)
+            return GDELTEvent()
 
-        return GDELTEvent(avg_tone=avg_tone, event_count=event_count)
-    except Exception as exc:
-        logger.warning("GDELT fetch failed: %s", exc)
-        return GDELTEvent()
+        if resp.status_code == 429:
+            delay = _GDELT_BASE_BACKOFF_SECONDS * (2**attempt)
+            logger.warning(
+                "GDELT 429 Too Many Requests: backing off %ds (attempt %d/%d)",
+                delay,
+                attempt + 1,
+                _GDELT_MAX_RETRIES,
+            )
+            await asyncio.sleep(delay)
+            continue
+
+        try:
+            resp.raise_for_status()
+            data = resp.json()
+
+            if isinstance(data, list) and len(data) > 0:
+                tones = [float(item.get("value", 0)) for item in data if "value" in item]
+                avg_tone = Decimal(str(sum(tones) / len(tones))) if tones else Decimal("0")
+                event_count = len(data)
+            else:
+                avg_tone = Decimal("0")
+                event_count = 0
+
+            return GDELTEvent(avg_tone=avg_tone, event_count=event_count)
+        except Exception as exc:
+            logger.warning("GDELT fetch failed: %s", exc)
+            return GDELTEvent()
+
+    logger.error(
+        "GDELT: max retries (%d) exceeded after repeated 429 responses", _GDELT_MAX_RETRIES
+    )
+    return GDELTEvent()
 
 
 # ============================================================

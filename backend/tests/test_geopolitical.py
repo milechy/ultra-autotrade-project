@@ -237,6 +237,7 @@ class TestGDELTFallback:
         from app.data_feeds.geopolitical import fetch_gdelt_events  # noqa: PLC0415
 
         mock_response = MagicMock()
+        mock_response.status_code = 500
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
             "500", request=MagicMock(), response=mock_response
         )
@@ -245,6 +246,57 @@ class TestGDELTFallback:
 
         result = await fetch_gdelt_events(mock_client)
 
+        assert result.event_count == 0
+
+    @pytest.mark.asyncio
+    async def test_gdelt_429_triggers_retry_then_succeeds(self) -> None:
+        """429受信後にリトライし、成功レスポンスを返すこと。"""
+        from unittest.mock import patch  # noqa: PLC0415
+
+        from app.data_feeds.geopolitical import fetch_gdelt_events  # noqa: PLC0415
+
+        rate_limit_response = MagicMock()
+        rate_limit_response.status_code = 429
+
+        success_response = MagicMock()
+        success_response.status_code = 200
+        success_response.raise_for_status = MagicMock()
+        success_response.json.return_value = [
+            {"value": -5.0},
+            {"value": -3.0},
+        ]
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[rate_limit_response, success_response])
+
+        with patch("app.data_feeds.geopolitical.asyncio.sleep", new=AsyncMock()):
+            result = await fetch_gdelt_events(mock_client)
+
+        assert mock_client.get.call_count == 2
+        assert result.event_count == 2
+        assert result.avg_tone == Decimal("-4.0")
+
+    @pytest.mark.asyncio
+    async def test_gdelt_429_max_retries_returns_empty(self) -> None:
+        """最大リトライ回数（3回）すべて429の場合、空のGDELTEventを返すこと。"""
+        from unittest.mock import patch  # noqa: PLC0415
+
+        from app.data_feeds.geopolitical import (  # noqa: PLC0415
+            _GDELT_MAX_RETRIES,
+            fetch_gdelt_events,
+        )
+
+        rate_limit_response = MagicMock()
+        rate_limit_response.status_code = 429
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=rate_limit_response)
+
+        with patch("app.data_feeds.geopolitical.asyncio.sleep", new=AsyncMock()):
+            result = await fetch_gdelt_events(mock_client)
+
+        assert mock_client.get.call_count == _GDELT_MAX_RETRIES
+        assert result.avg_tone == Decimal("0")
         assert result.event_count == 0
 
     def test_ai_judgment_continues_without_news_context(self) -> None:

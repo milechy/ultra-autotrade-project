@@ -116,6 +116,30 @@ def test_save_ai_decision_creates_record(db_session):
 # ---------------------------------------------------------------------------
 
 
+def test_run_job_passes_market_context_to_judge_with_rag(db_session):
+    """run_ai_judgment_job が market_context を judge_with_rag に渡すこと。"""
+    from unittest.mock import MagicMock  # noqa: PLC0415
+
+    mock_result = _make_cross_validation_result(TradeAction.HOLD)
+    mock_market_ctx = MagicMock()
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+        patch(
+            "app.automation.ai_judgment_scheduler.build_market_context",
+            return_value=mock_market_ctx,
+        ),
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        run_ai_judgment_job(db=db_session)
+
+    call_kwargs = MockAIService.return_value.judge_with_rag.call_args
+    assert call_kwargs.kwargs.get("market_context") is mock_market_ctx
+
+
 def test_run_job_hold_no_proposals(db_session):
     """HOLD 判定のとき Proposal が作成されないこと。"""
     mock_result = _make_cross_validation_result(TradeAction.HOLD)

@@ -19,6 +19,7 @@ from app.ai.models import AIDecision
 from app.ai.schemas import CrossValidationResult, RAGContext, TradeAction
 from app.ai.service import AIService
 from app.auth.models import User
+from app.data_feeds.context import build_market_context
 from app.database import SessionLocal
 from app.knowledge.schemas import KnowledgeSearchRequest
 from app.knowledge.service import KnowledgeService
@@ -158,10 +159,14 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
             logger.warning("RAG context retrieval failed, using empty context: %s", exc)
             rag_ctx = RAGContext(chunks=[], query=_DEFAULT_QUERY, source_count=0)
 
+        # Market context（ニュース・地政学リスク・マクロ）をキャッシュから取得
+        market_ctx = build_market_context()
+
         # AI 判定実行
         result: CrossValidationResult = AIService().judge_with_rag(
             query=_DEFAULT_QUERY,
             rag_context=rag_ctx,
+            market_context=market_ctx,
         )
 
         # DB 保存
