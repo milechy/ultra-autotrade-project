@@ -53,6 +53,7 @@ RUN if [ "$BUILD_MODE" = "production" ]; then \
 
 # 非 root ユーザーで実行（docs/13_security_design.md）
 RUN useradd --no-create-home --shell /bin/false appuser
+RUN mkdir -p /var/log/ultra-autotrade && chown appuser:appuser /var/log/ultra-autotrade
 USER appuser
 
 EXPOSE 8000

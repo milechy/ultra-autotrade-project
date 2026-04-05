@@ -14,6 +14,7 @@ Architecture:
 """
 
 import asyncio
+import json
 import logging
 import random
 import time
@@ -87,13 +88,16 @@ _GDELT_BUDGET_SECONDS = 20
 
 
 async def fetch_gdelt_events(client: httpx.AsyncClient) -> GDELTEvent:
-    """Fetch conflict/instability events from GDELT GKG API.
+    """Fetch crypto/DeFi sentiment events from GDELT GKG API.
 
     Retries up to _GDELT_MAX_RETRIES times on 429 with exponential backoff + jitter.
     Returns empty GDELTEvent if budget (_GDELT_BUDGET_SECONDS) is exceeded or on errors.
+    On empty or malformed response: returns empty GDELTEvent (WARNING, not ERROR).
     """
     params = {
-        "query": "conflict OR military OR sanctions OR crisis OR war",
+        "query": (
+            'cryptocurrency OR DeFi OR Aave OR USDC OR stablecoin OR ethereum OR "interest rate"'
+        ),
         "mode": "tonechart",
         "timespan": "24h",
         "format": "json",
@@ -103,7 +107,7 @@ async def fetch_gdelt_events(client: httpx.AsyncClient) -> GDELTEvent:
         try:
             resp = await client.get(GDELT_GKG_URL, params=params, timeout=10.0)
         except Exception as exc:
-            logger.warning("GDELT fetch failed: %s", exc)
+            logger.warning("GDELT fetch failed — returning empty GDELTEvent: %s", exc)
             return GDELTEvent()
 
         if resp.status_code == 429:
@@ -129,19 +133,35 @@ async def fetch_gdelt_events(client: httpx.AsyncClient) -> GDELTEvent:
 
         try:
             resp.raise_for_status()
-            data = resp.json()
+
+            raw = resp.text
+            if not raw or not raw.strip():
+                logger.warning("GDELT returned empty response body. Returning empty GDELTEvent.")
+                return GDELTEvent()
+
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                logger.warning("GDELT JSON decode failed (empty/malformed response): %s", exc)
+                return GDELTEvent()
 
             if isinstance(data, list) and len(data) > 0:
                 tones = [float(item.get("value", 0)) for item in data if "value" in item]
                 avg_tone = Decimal(str(sum(tones) / len(tones))) if tones else Decimal("0")
                 event_count = len(data)
             else:
+                logger.warning("GDELT returned no data records. Returning empty GDELTEvent.")
                 avg_tone = Decimal("0")
                 event_count = 0
 
             return GDELTEvent(avg_tone=avg_tone, event_count=event_count)
+        except httpx.HTTPStatusError as exc:
+            logger.warning(
+                "GDELT HTTP error %s — returning empty GDELTEvent.", exc.response.status_code
+            )
+            return GDELTEvent()
         except Exception as exc:
-            logger.warning("GDELT fetch failed: %s", exc)
+            logger.warning("GDELT fetch failed — returning empty GDELTEvent: %s", exc)
             return GDELTEvent()
 
     logger.error(
