@@ -461,6 +461,31 @@ docker exec <frontend> grep -r "http://77" /app/.next/static/chunks/ | wc -l
 - **`MonitoringService` は必ずシングルトン（`get_monitoring_service()`）を使う。** 新規インスタンス化するとHF低下を検知しても緊急停止フラグが global state に伝わらない。`scheduled_tasks.py` の3ループ（`health_check_loop` / `latency_monitor_loop` / `price_change_monitor_loop`）で修正済み
 - **`exchange/service.py` の `get_price_change_24h()` は `fetch_ticker().percentage` をそのまま返す（`/100` しない）。** `percentage` はすでにパーセント単位（`-15.0` = -15%）。`/100` すると変動率が 100 分の 1 に縮小され、`SAFE_MODE`（-10%）や `HARD_STOP`（-20%）が発動しなくなる。`workflow.py` 側が `/100` して `StressController` の小数形式に変換する責務を持つ
 
+### 本番デプロイフロー（2026-04-05 インシデントから）
+
+- **Hetznerは pull only。直接 git merge / git commit / nano 編集をしない。**
+  正規デプロイフロー: ローカルMac → GitHub push → Hetzner `git pull origin main`。
+  `22_production_release_checklist.md` 参照。Hetzner上で直接マージすると、
+  Hetzner / ローカルMac / GitHub のブランチが不整合になり、復旧に時間がかかる。
+
+- **docker-compose.production.yml の command に alembic を入れない。**
+  alembicは requirements.txt に含まれておらず、実行すると exit code 127 でバックエンドが起動しない。
+  DB マイグレーションは手動 `ALTER TABLE` 方式（auto-migration なし）。
+
+- **docker-compose.production.yml を手動編集した場合:**
+  1. ローカルMacで同じ変更を行う
+  2. `git commit` → `git push origin main`
+  3. Hetznerで `git pull origin main`
+  絶対にHetzner上でコミットしない（push手段がないため行き止まりになる）。
+
+- **NEXT_PUBLIC_* 変数は docker-compose.production.yml の build.args にも必要:**
+  `.env.production` に書くだけでは不十分。`build.args` に以下の5つが必要:
+  - `NEXT_PUBLIC_BACKEND_BASE_URL`
+  - `NEXT_PUBLIC_API_BASE_URL`
+  - `NEXT_PUBLIC_API_URL`
+  - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
+  - `NEXT_PUBLIC_CHAIN_ID`
+
 ---
 
 ## 参照ファイル
