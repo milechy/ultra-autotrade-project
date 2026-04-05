@@ -59,8 +59,8 @@ function getJapaneseLabel(score: number | string): string {
 }
 
 export function SafetyScore({ data, className }: SafetyScoreProps) {
-  if (!data || typeof data !== 'object') return null
   const [expanded, setExpanded] = useState(false)
+  if (!data || typeof data !== 'object') return null
 
   const colors = getColorSet(data.total_score)
   const label = getJapaneseLabel(data.total_score)
