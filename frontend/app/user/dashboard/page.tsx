@@ -2,7 +2,6 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
-import { useEffect, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -14,7 +13,7 @@ import {
   LatestDecision,
   SafetyScore,
 } from './_components'
-import { apiFetch } from '@/lib/api/client'
+import { useAuthFetch } from '@/hooks/useAuthFetch'
 
 // ---- Types ----
 
@@ -39,14 +38,9 @@ const RISK_MODE_CLASS: Record<RiskMode, string> = {
 // ---- RiskModeBadge ----
 
 function RiskModeBadge() {
-  const [riskMode, setRiskMode] = useState<RiskMode | null>(null)
+  const { data } = useAuthFetch<RiskModeData>('/auth/risk-mode')
+  const riskMode = data?.mode ?? null
   const t = useTranslations('riskMode')
-
-  useEffect(() => {
-    apiFetch<RiskModeData>('/auth/risk-mode')
-      .then((data) => setRiskMode(data.mode))
-      .catch(() => {/* silently ignore */})
-  }, [])
 
   if (!riskMode) return null
 
@@ -75,17 +69,9 @@ interface TransactionsResponse {
 // ---- ManagedDashboard ----
 
 function RecentOpsCard() {
-  const [items, setItems] = useState<Transaction[]>([])
-  const [loading, setLoading] = useState(true)
-  const [hasError, setHasError] = useState(false)
+  const { data, loading, error: fetchError } = useAuthFetch<TransactionsResponse>('/api/transactions?limit=5')
+  const items = data?.items ?? []
   const t = useTranslations('Dashboard')
-
-  useEffect(() => {
-    apiFetch<TransactionsResponse>('/api/transactions?limit=5')
-      .then((res) => setItems(res.items ?? []))
-      .catch(() => setHasError(true))
-      .finally(() => setLoading(false))
-  }, [])
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
@@ -102,11 +88,11 @@ function RecentOpsCard() {
         </div>
       )}
 
-      {!loading && (hasError || items.length === 0) && (
+      {!loading && (fetchError || items.length === 0) && (
         <p className="text-sm text-zinc-500 py-4 text-center">{t('noOpsHistory')}</p>
       )}
 
-      {!loading && !hasError && items.length > 0 && (
+      {!loading && !fetchError && items.length > 0 && (
         <ul className="space-y-2">
           {items.map((tx, i) => (
             <li
@@ -224,20 +210,11 @@ function ActiveDashboard() {
 // ---- Page ----
 
 export default function DashboardPage() {
-  const [userMode, setUserMode] = useState<UserMode | null>(null)
-  const [loadError, setLoadError] = useState(false)
-
-  useEffect(() => {
-    apiFetch<UserSettings>('/api/user/settings')
-      .then((res) => setUserMode(res.user_mode ?? 'active'))
-      .catch(() => {
-        setLoadError(true)
-        setUserMode('active') // fallback to full dashboard on error
-      })
-  }, [])
+  const { data: settings, error: settingsError } = useAuthFetch<UserSettings>('/api/user/settings')
+  const userMode: UserMode | null = settings?.user_mode ?? (settingsError ? 'active' : null)
 
   // Loading skeleton
-  if (userMode === null && !loadError) {
+  if (userMode === null) {
     return (
       <div className="px-4 py-6 max-w-4xl mx-auto space-y-4">
         <Skeleton className="h-28 rounded-xl" />

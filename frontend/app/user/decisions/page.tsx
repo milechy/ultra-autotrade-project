@@ -1,10 +1,10 @@
 'use client'
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { LatestDecisionDetail, FactorAnalysis, DecisionTimeline } from './_components'
-import { apiFetch } from '@/lib/api/client'
+import { useAuthFetch } from '@/hooks/useAuthFetch'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface AIDecisionResponse {
@@ -86,33 +86,22 @@ function extractFactors(ragContextJson: unknown): Factors {
 }
 
 export default function DecisionsPage() {
-  const [latest, setLatest] = useState<AIDecisionResponse | null>(null)
-  const [history, setHistory] = useState<AIDecisionResponse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data: latest, loading: latestLoading, error: latestError, refetch: refetchLatest } =
+    useAuthFetch<AIDecisionResponse>('/api/ai/decisions/latest')
+  const { data: listData, loading: listLoading, error: listError, refetch: refetchList } =
+    useAuthFetch<AIDecisionListResponse>('/api/ai/decisions?limit=20')
+
   const t = useTranslations('Decisions')
   const tCommon = useTranslations('Common')
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [latestData, listData] = await Promise.all([
-        apiFetch<AIDecisionResponse>('/api/ai/decisions/latest'),
-        apiFetch<AIDecisionListResponse>('/api/ai/decisions?limit=20'),
-      ])
-      setLatest(latestData)
-      setHistory(listData.items)
-    } catch {
-      setError(t('fetchError'))
-    } finally {
-      setLoading(false)
-    }
-  }, [t])
+  const loading = latestLoading || listLoading
+  const error = latestError ?? listError
+  const history = listData?.items ?? []
 
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  const fetchData = useCallback(() => {
+    void refetchLatest()
+    void refetchList()
+  }, [refetchLatest, refetchList])
 
   return (
     <>
