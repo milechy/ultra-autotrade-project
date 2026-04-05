@@ -101,7 +101,9 @@ services:
     env_file:
       - .env.production       # production 用の環境変数ファイル（Git 管理外）
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade}
+      # DATABASE_URL は .env.production から取得（URL-encoded password 対応）
+      # POSTGRES_PASSWORD に特殊文字(@等)が含まれる場合、ここで直接構築すると
+      # psycopg2 が URL パースに失敗するため env_file に委譲する
       REBALANCE_SHADOW_MODE: "false"
     ports:
       - "127.0.0.1:8000:8000"
