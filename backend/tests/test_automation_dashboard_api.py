@@ -2,16 +2,21 @@
 # Unauthorized copying or distribution is strictly prohibited.
 from __future__ import annotations
 
+import os
+import tempfile
 from datetime import datetime, timedelta, timezone
-from typing import Any, get_args, get_origin
+from typing import Any, Generator, get_args, get_origin
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.automation_dashboard import get_monitoring_service, get_reporting_service
 from app.auth.dependencies import require_viewer
 from app.auth.models import UserRole
 from app.automation.schemas import AutomationReportSummary, AutomationStatus, DashboardSnapshot
+from app.database import Base, get_db
 from app.main import create_app
 
 
@@ -118,12 +123,32 @@ class _StubReportingService:
         )
 
 
+def _make_sqlite_session_factory() -> tuple[sessionmaker, str]:  # type: ignore[type-arg]
+    """SQLite in-memory DBセッションファクトリを返す。"""
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    engine = create_engine(f"sqlite:///{path}", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(bind=engine)
+    factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    return factory, path
+
+
 def _make_client() -> TestClient:
     admin_user = _make_admin_user()
     app = create_app()
+    session_factory, _db_path = _make_sqlite_session_factory()
+
+    def override_get_db() -> Generator[Session, None, None]:
+        db = session_factory()
+        try:
+            yield db
+        finally:
+            db.close()
+
     app.dependency_overrides[get_monitoring_service] = lambda: _StubMonitoringService()
     app.dependency_overrides[get_reporting_service] = lambda: _StubReportingService()
     app.dependency_overrides[require_viewer] = lambda: admin_user
+    app.dependency_overrides[get_db] = override_get_db
     return TestClient(app)
 
 

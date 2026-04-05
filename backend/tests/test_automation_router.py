@@ -61,6 +61,13 @@ def _build_test_app(
     return app
 
 
+def _make_mock_db() -> MagicMock:
+    """_compute_next_scheduled_run が None を返すよう db をモックする。"""
+    mock_db = MagicMock()
+    mock_db.scalars.return_value.first.return_value = None
+    return mock_db
+
+
 class TestGetAutomationStatus:
     """GET /api/automation/status"""
 
@@ -68,7 +75,7 @@ class TestGetAutomationStatus:
         mock_monitoring = MagicMock()
         mock_monitoring.get_status.return_value = _make_minimal_automation_status()
 
-        app = _build_test_app(mock_monitoring=mock_monitoring)
+        app = _build_test_app(mock_monitoring=mock_monitoring, db_session=_make_mock_db())
         client = TestClient(app)
 
         response = client.get("/api/automation/status")
@@ -82,7 +89,7 @@ class TestGetAutomationStatus:
             emergency_reason="Test emergency",
         )
 
-        app = _build_test_app(mock_monitoring=mock_monitoring)
+        app = _build_test_app(mock_monitoring=mock_monitoring, db_session=_make_mock_db())
         client = TestClient(app)
 
         response = client.get("/api/automation/status")
