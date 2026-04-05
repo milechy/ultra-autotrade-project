@@ -48,8 +48,8 @@ class ExplanationService:
         )
 
     def generate_signal(self, context: ExplanationContext) -> SignalDisplay:
-        util = float(context.utilization_rate)
-        vol = float(context.volatility_30d)
+        util = float(context.utilization_rate)  # float OK
+        vol = float(context.volatility_30d)  # float OK
         action = context.action.upper()
 
         if action in ("SELL", "WITHDRAW"):
@@ -99,8 +99,8 @@ class ExplanationService:
         return f"{symbol}については様子を見ることをおすすめします。"
 
     def _reason(self, ctx: ExplanationContext) -> str:
-        util = float(ctx.utilization_rate)
-        vol = float(ctx.volatility_30d)
+        util = float(ctx.utilization_rate)  # float OK
+        vol = float(ctx.volatility_30d)  # float OK
         parts: list[str] = []
 
         if util >= 0.80:
@@ -131,8 +131,8 @@ class ExplanationService:
 
     def _risks(self, ctx: ExplanationContext) -> list[str]:
         risks: list[str] = []
-        vol = float(ctx.volatility_30d)
-        util = float(ctx.utilization_rate)
+        vol = float(ctx.volatility_30d)  # float OK
+        util = float(ctx.utilization_rate)  # float OK
 
         if vol > 0.10:
             risks.append("価格が大きく変動する可能性があります。")

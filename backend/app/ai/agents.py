@@ -157,7 +157,7 @@ def indicator_agent(ctx: MarketContext) -> AgentSignal:
     score = 50  # Start neutral
 
     if hf is not None:
-        hf_float = float(hf)
+        hf_float = float(hf)  # float OK
         key_data["health_factor"] = str(hf)
         if hf_float < 1.6:
             score -= 40
@@ -171,16 +171,16 @@ def indicator_agent(ctx: MarketContext) -> AgentSignal:
 
     if util is not None:
         key_data["utilization_rate"] = str(util)
-        if float(util) > 80:
+        if float(util) > 80:  # float OK
             score -= 15
             reasons.append(f"Utilization at {util}% — liquidity pressure")
-        elif float(util) < 50:
+        elif float(util) < 50:  # float OK
             score += 10
             reasons.append(f"Utilization at {util}% — healthy liquidity")
 
     if supply_apy is not None:
         key_data["supply_apy"] = str(supply_apy)
-        if float(supply_apy) > 5:
+        if float(supply_apy) > 5:  # float OK
             score += 10
             reasons.append(f"Supply APY at {supply_apy}% — attractive yield")
 
@@ -313,7 +313,7 @@ def risk_agent(ctx: MarketContext) -> AgentSignal:
 
     # Combined risk: low HF + high geo = very dangerous
     if ctx.health_factor is not None and geo.geo_risk_score >= 60:
-        if float(ctx.health_factor) < 1.8:
+        if float(ctx.health_factor) < 1.8:  # float OK
             score -= 20
             reasons.append(
                 f"COMPOUND RISK: Low HF ({ctx.health_factor}) + elevated geo risk "

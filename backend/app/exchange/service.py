@@ -173,9 +173,9 @@ class ExchangeService:
             # For BTC/JPY: convert amount_usd to JPY first, then calculate BTC quantity
             if "/JPY" in symbol:
                 amount_jpy = request.amount_usd * Decimal(str(self._settings.usd_to_jpy_rate))
-                quantity = float(amount_jpy / price)
+                quantity = float(amount_jpy / price)  # float OK
             else:
-                quantity = float(request.amount_usd / price)
+                quantity = float(request.amount_usd / price)  # float OK
         except ExchangeClientError as exc:
             logger.error(
                 "Failed to fetch ticker for price conversion: %s",

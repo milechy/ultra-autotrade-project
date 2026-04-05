@@ -9,7 +9,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : 3,
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
-    baseURL: process.env.STAGING_URL || 'http://77.42.46.155:3000',
+    baseURL: process.env.STAGING_URL || 'https://app.ultra-auto-trade.com',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'off',

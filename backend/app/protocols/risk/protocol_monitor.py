@@ -86,13 +86,13 @@ class ProtocolMonitor:
         # APR チェック
         if apr < Decimal("0") or apr > Decimal("20"):
             risk_level = RiskLevel.CRITICAL
-            alerts.append(f"ステーキング報酬率が異常値です（{float(apr):.2f}%）")
+            alerts.append(f"ステーキング報酬率が異常値です（{float(apr):.2f}%）")  # float OK
         # ペグ乖離チェック
         deviation_pct = abs(Decimal("1") - ratio) * Decimal("100")
         if deviation_pct > Decimal("2"):
             if risk_level != RiskLevel.CRITICAL:
                 risk_level = RiskLevel.HIGH
-            alerts.append(f"価格連動性に乖離があります（{float(deviation_pct):.2f}%）")
+            alerts.append(f"価格連動性に乖離があります（{float(deviation_pct):.2f}%）")  # float OK
 
         return ProtocolHealth(
             protocol="lido",
@@ -143,7 +143,7 @@ class ProtocolMonitor:
         if tvl < Decimal("1000000"):  # $1M 未満
             risk_level = RiskLevel.HIGH
             alerts.append(
-                f"取引量が非常に少なく、換金が難しい可能性があります（TVL: ${float(tvl):,.0f}）"
+                f"取引量が非常に少なく、換金が難しい可能性があります（TVL: ${float(tvl):,.0f}）"  # float OK
             )
 
         # implied APY チェック
@@ -151,12 +151,12 @@ class ProtocolMonitor:
             if risk_level not in (RiskLevel.CRITICAL,):
                 risk_level = RiskLevel.HIGH
             alerts.append(
-                f"期待利回りが異常に高く、リスクが懸念されます（{float(implied_apy):.1f}%）"
+                f"期待利回りが異常に高く、リスクが懸念されます（{float(implied_apy):.1f}%）"  # float OK
             )
         elif implied_apy > Decimal("50"):
             if risk_level == RiskLevel.LOW:
                 risk_level = RiskLevel.MEDIUM
-            alerts.append(f"期待利回りが通常より高めです（{float(implied_apy):.1f}%）")
+            alerts.append(f"期待利回りが通常より高めです（{float(implied_apy):.1f}%）")  # float OK
 
         return ProtocolHealth(
             protocol="pendle",

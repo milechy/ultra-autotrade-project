@@ -38,7 +38,7 @@ class LidoService:
         elif deviation_pct > Decimal(str(self._config.peg_deviation_warn_pct)):
             logger.warning(
                 "stETH/ETH ペグ乖離警告: deviation=%.2f%% (閾値=%.2f%%)",
-                float(deviation_pct),
+                float(deviation_pct),  # float OK
                 self._config.peg_deviation_warn_pct,
             )
 

@@ -1,24 +1,29 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
+import { NextIntlClientProvider } from 'next-intl'
+import { getMessages } from 'next-intl/server'
 import { WagmiRootProvider } from '@/lib/wallet/WagmiRootProvider'
 import { UserProviders } from '@/components/user/UserProviders'
 import { UserHeader } from '@/components/user/UserHeader'
 import { BottomNav } from '@/components/shared/BottomNav'
 
-export default function UserLayout({
+export default async function UserLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const messages = await getMessages()
   return (
-    <WagmiRootProvider>
-      <UserProviders>
-        <UserHeader />
-        <div className="min-h-screen pb-16">
-          {children}
-        </div>
-        <BottomNav />
-      </UserProviders>
-    </WagmiRootProvider>
+    <NextIntlClientProvider messages={messages}>
+      <WagmiRootProvider>
+        <UserProviders>
+          <UserHeader />
+          <div className="min-h-screen pb-16">
+            {children}
+          </div>
+          <BottomNav />
+        </UserProviders>
+      </WagmiRootProvider>
+    </NextIntlClientProvider>
   )
 }

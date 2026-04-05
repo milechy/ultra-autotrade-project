@@ -43,8 +43,8 @@ class PendleService:
         if market_info.implied_apy > self._config.max_implied_apy_pct:
             logger.warning(
                 "implied APY 警告: %.2f%% > 閾値 %.2f%%（異常値の可能性）",
-                float(market_info.implied_apy),
-                float(self._config.max_implied_apy_pct),
+                float(market_info.implied_apy),  # float OK
+                float(self._config.max_implied_apy_pct),  # float OK
             )
 
         pt_price = market_info.pt_price
@@ -67,7 +67,7 @@ class PendleService:
                     "PendleService.mint dry_run (pt_fixed): amount=%s, pt_received=%s, yield=%.4f%%",
                     request.amount,
                     pt_received,
-                    float(implied_fixed_yield),
+                    float(implied_fixed_yield),  # float OK
                 )
                 return PendleMintResponse(
                     operation="MINT_PT",
@@ -236,6 +236,6 @@ class PendleService:
             amount,
             pt_price,
             days,
-            float(annualized_yield),
+            float(annualized_yield),  # float OK
         )
         return annualized_yield

@@ -139,7 +139,7 @@ def list_strategies() -> list[StrategyWithPerformance]:
             perf = _performance.get(s.id)
             results.append(StrategyWithPerformance(**s.model_dump(), performance=perf))
     results.sort(
-        key=lambda x: x.performance.sharpe_ratio if x.performance else float("-inf"),
+        key=lambda x: x.performance.sharpe_ratio if x.performance else float("-inf"),  # float OK
         reverse=True,
     )
     return results

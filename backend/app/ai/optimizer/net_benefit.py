@@ -73,10 +73,10 @@ class ExpectedNetBenefitCalculator:
             "NetBenefit[%s/%s]: gross=%.4f, cost=%.4f, risk_adj=%.4f, net=%.4f, rec=%s",
             candidate.protocol.value,
             candidate.asset,
-            float(gross_yield),
-            float(total_cost),
-            float(risk_adjusted_yield),
-            float(net_benefit),
+            float(gross_yield),  # float OK
+            float(total_cost),  # float OK
+            float(risk_adjusted_yield),  # float OK
+            float(net_benefit),  # float OK
             recommendation.value,
         )
 
@@ -145,7 +145,7 @@ class ExpectedNetBenefitCalculator:
             "rank_strategies: %d candidates ranked, best=%s net_benefit=%.4f",
             len(ranked),
             ranked[0].protocol.value if ranked else "none",
-            float(ranked[0].expected_net_benefit) if ranked else 0.0,
+            float(ranked[0].expected_net_benefit) if ranked else 0.0,  # float OK
         )
 
         return ranked

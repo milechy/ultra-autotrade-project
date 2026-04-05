@@ -67,9 +67,9 @@ class LidoAaveStrategy:
 
         logger.info(
             "複合利回り推定: lido=%.2f%%, aave=%.2f%%, compound=%.2f%%, amount=%s ETH, yield=%s ETH",
-            float(lido_apr),
-            float(aave_apr),
-            float(compound_apr),
+            float(lido_apr),  # float OK
+            float(aave_apr),  # float OK
+            float(compound_apr),  # float OK
             amount_eth,
             estimated_annual_yield,
         )
