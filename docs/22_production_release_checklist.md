@@ -183,6 +183,11 @@ Ultra AutoTrade – Production リリース前チェックリスト
 
 ## 8. デプロイ手順
 
+> ⚠️ **重要:** Hetzner上での直接的な `git merge` / `git commit` / ファイル編集は禁止。
+> 正規フロー: ローカルMac → `git push origin main` → Hetzner `git pull origin main`。
+> Hetznerには GitHub push 手段（SSH key / PAT）が設定されていないため、
+> Hetzner上でコミットすると同期不能になる。
+
 ```bash
 # 1. main ブランチを最新に同期
 git checkout main && git pull origin main
@@ -194,9 +199,11 @@ git pull origin main
 docker compose -f docker-compose.production.yml pull
 docker compose -f docker-compose.production.yml up -d
 
-# 3. DB マイグレーション
-docker compose -f docker-compose.production.yml exec backend \
-  alembic upgrade head
+# 3. DB マイグレーション（手動方式）
+# ⚠️ alembic は使用しない（未インストール、exit code 127 の原因）
+# 新しいカラムが必要な場合は手動で ALTER TABLE を実行:
+# docker exec <postgres-container> psql -U ultra -d ultra_autotrade -c \
+#   "ALTER TABLE <table> ADD COLUMN IF NOT EXISTS <column> <type>;"
 
 # 4. ヘルスチェック
 curl https://api.ultra-autotrade.com/health
