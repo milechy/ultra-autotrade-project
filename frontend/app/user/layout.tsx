@@ -1,7 +1,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 import { NextIntlClientProvider } from 'next-intl'
-import { getMessages } from 'next-intl/server'
+import { getLocale, getMessages } from 'next-intl/server'
 import { WagmiRootProvider } from '@/lib/wallet/WagmiRootProvider'
 import { UserProviders } from '@/components/user/UserProviders'
 import { UserHeader } from '@/components/user/UserHeader'
@@ -12,9 +12,10 @@ export default async function UserLayout({
 }: {
   children: React.ReactNode
 }) {
+  const locale = await getLocale()
   const messages = await getMessages()
   return (
-    <NextIntlClientProvider messages={messages}>
+    <NextIntlClientProvider locale={locale} messages={messages}>
       <WagmiRootProvider>
         <UserProviders>
           <UserHeader />
