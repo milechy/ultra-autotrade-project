@@ -172,6 +172,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # Store allowed origins so exception handlers can attach CORS headers to 500 responses.
+    # FastAPI does not run CORSMiddleware for unhandled exceptions, so handlers must do it manually.
+    app.state.cors_origins = cors_origins
 
     # Remove server info headers in production
     @app.middleware("http")

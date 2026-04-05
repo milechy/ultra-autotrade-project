@@ -28,7 +28,7 @@ def get_monitoring_service() -> MonitoringService:
     """
     global _monitoring_service
     if _monitoring_service is None:
-        _monitoring_service = MonitoringService()
+        _monitoring_service = MonitoringService(_internal=True)
     return _monitoring_service
 
 

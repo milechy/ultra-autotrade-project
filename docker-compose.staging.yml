@@ -79,10 +79,10 @@ services:
       dockerfile: Dockerfile
     working_dir: /app/backend
     command: >
-      uvicorn app.main:app
+      sh -c "alembic upgrade head && uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
-      --log-level info
+      --log-level info"
     env_file:
       - .env.staging       # staging 用の環境変数ファイル（Git 管理外）
     environment:

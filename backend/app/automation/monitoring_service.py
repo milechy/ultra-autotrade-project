@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import warnings
 from collections import deque
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -72,7 +73,17 @@ class MonitoringService:
         notification_service: Optional[CompositeNotificationService] = None,
         error_rate_window_size: int = 100,
         ai_error_rate_threshold: float = 0.20,
+        _internal: bool = False,
     ) -> None:
+        # 直接インスタンス化の検出。シングルトン以外からの生成は状態が分散するため危険。
+        if not _internal:
+            warnings.warn(
+                "MonitoringService() を直接インスタンス化しないでください。"
+                " get_monitoring_service() を使用してください。"
+                " 直接インスタンス化すると緊急停止フラグが共有されません。",
+                UserWarning,
+                stacklevel=2,
+            )
         # 閾値
         self._latency_warning_threshold_s = float(latency_warning_threshold_s)
         self._latency_alert_threshold_s = float(latency_alert_threshold_s)
