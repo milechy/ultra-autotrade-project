@@ -94,6 +94,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks integration tests requiring external services",
     "vcr: marks tests using VCR cassettes for API replay",
+    "e2e: end-to-end tests (Aave testnet)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",

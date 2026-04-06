@@ -133,6 +133,7 @@ Docker ビルド・CI が失敗する。`npm install` は `package.json` ベー�
 - package.json変更時は `npm install --legacy-peer-deps` → package-lock.json も一緒にコミット
 - rechartsは必ず `dynamic(() => import('./XxxRecharts'), { ssr: false })` で読み込む（SSRクラッシュ防止）
 - `grep -E "ignoreBuildErrors|ignoreDuringBuilds" frontend/next.config.js` でOOMワークアラウンド確認
+- Playwright E2E: デフォルトは本番URL直打ち。ローカルテスト時は `STAGING_URL=http://localhost:3000` + `npm run dev` 必須。77.42.46.155直IPは127.0.0.1バインドにより接続拒否される（正常）
 
 ---
 
@@ -202,7 +203,9 @@ feature/* (各LLM担当) → dev (Opus統合) → staging (Codex最終レビュ�
 - Exchange: Bybit Sandbox API
 - Coverage gate: 80%+ (pyproject.toml --cov-fail-under=80)
 - CI: GitHub Actions (lint → test → security-check)
-- テスト順序: pytest(自動) → Playwright E2E(自動) → 孤立コード検出(PR前) → Codex Review(PR前) → Claude in Chrome(UI変更時) → 手動UIテスト(最後)
+- テスト順序: pytest(自動) → tsc --noEmit(自動) → npm run build(自動) → Playwright E2E(自動) → 孤立コード検出(PR前) → Codex Review(PR前) → Claude in Chrome(UI変更時のみ)
+- 一括検証: ./scripts/verify.sh（1-3を一括実行、コミット前に必須）
+- PR/デプロイ前ゲート: 1-4 必須。5-7 は状況に応じて実施
 
 ---
 

@@ -344,12 +344,23 @@ PR マージ前に、既存機能が壊れていないことを担保する。
 
 # 10. テスト実行順序（全体フロー）
 
-1. pytest（自動） — Unit + Integration + Scenario。CI/CDで毎PR実行。カバレッジ80%+必須
-2. Playwright E2E（自動） — smoke test。CI/CDで毎PR実行
-3. 孤立コード検出（PR前） — 新モジュール追加時・DeFi安全系変更時は必須
-4. Codex Review（手動トリガー） — PR作成前に `/codex:review --base main --background`
-5. Claude in Chrome（半自動） — UIアップデート時のみ
-6. 手動UIテスト（最後） — iPhone MetaMask / PCブラウザでの実機確認
+1. **pytest（自動）** — Unit + Integration + Scenario。CI/CDで毎PR実行。カバレッジ80%+必須
+2. **tsc --noEmit（自動）** — フロントエンド型チェック。verify.shに統合済み
+3. **npm run build（自動）** — フロントエンドビルド確認。verify.shに統合済み。SSR クラッシュ・import エラーを検出
+4. **Playwright E2E（自動）** — 本番URL（https://app.ultra-auto-trade.com）対象。246テスト/18ファイル。認証フロー込み
+
+   > **Playwright実行方法:**
+   > - 本番URL対象（デフォルト）: `cd frontend && npx playwright test`
+   > - ローカル開発サーバー対象: `npm run dev` を起動後、`STAGING_URL=http://localhost:3000 npx playwright test`
+   > - 77.42.46.155 直IPはproduction.ymlで127.0.0.1バインド済みのため接続拒否される（正常動作）
+
+5. **孤立コード検出（手動トリガー）** — PR作成前。安全装置・リスク管理の配線漏れ検出。大量タスク一括完了後は必須
+6. **Codex Review（手動トリガー）** — PR作成前に `/codex:review --base main --background`。Aave/セキュリティ変更時は adversarial review
+7. **Claude in Chrome（半自動）** — UIアップデート時のみ。`claude --chrome` でブラウザUI検証。MetaMask秘密鍵の近くで使わない
+
+※ 手動UIテスト（iPhone MetaMask / PCブラウザ）はテスター参加時に実施。常時ゲートではない。
+※ TestSprite MCP は導入後にステップ追加予定。
+※ PR/デプロイ前に 1-4 は必須ゲート。5-7 は状況に応じて実施。
 
 ---
 
