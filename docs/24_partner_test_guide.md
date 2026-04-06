@@ -26,9 +26,12 @@ Ultra AutoTrade は、ニュース情報を AI が解析し BUY/SELL/HOLD を判
 
 | サービス | URL |
 |----------|-----|
-| フロントエンド（管理画面） | `http://77.42.46.155:3000` |
-| バックエンド API | `http://77.42.46.155:8000` |
-| API ドキュメント（Swagger UI） | `http://77.42.46.155:8000/docs` |
+| フロントエンド | `https://app.ultra-auto-trade.com` |
+| バックエンド API | `https://api.ultra-auto-trade.com` |
+| API ドキュメント（Swagger UI） | 本番では無効化済み（APP_ENV=production） |
+
+> **注意:** 77.42.46.155 への直接アクセスは127.0.0.1バインドにより接続拒否されます（正常動作）。
+> 全てのアクセスはCloudflare Named Tunnel経由の上記URLを使用してください。
 
 > **ログイン情報:** 別途 PM より共有します。
 
@@ -141,9 +144,9 @@ ruff check . --select S
 
 ### シナリオ A: ダッシュボード閲覧
 
-1. `http://77.42.46.155:3000/dashboard/automation` にアクセス
+1. `https://app.ultra-auto-trade.com/dashboard/automation` にアクセス
 2. 稼働状況（`is_trading_paused`、最終取引時刻）を確認
-3. `http://77.42.46.155:3000/dashboard/reports` で最新レポートを確認
+3. `https://app.ultra-auto-trade.com/dashboard/reports` で最新レポートを確認
 
 ---
 
@@ -152,7 +155,7 @@ ruff check . --select S
 **Step 1: AI 判定**
 
 ```bash
-curl -s -X POST http://77.42.46.155:8000/ai/analyze \
+curl -s -X POST https://api.ultra-auto-trade.com/ai/analyze \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -188,7 +191,7 @@ curl -s -X POST http://77.42.46.155:8000/ai/analyze \
 **Step 2: シグナル送信**
 
 ```bash
-curl -s -X POST http://77.42.46.155:8000/octobot/signal \
+curl -s -X POST https://api.ultra-auto-trade.com/octobot/signal \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -210,14 +213,14 @@ curl -s -X POST http://77.42.46.155:8000/octobot/signal \
 
 ```bash
 # BUY (dry_run=true)
-curl -s -X POST http://77.42.46.155:8000/aave/rebalance \
+curl -s -X POST https://api.ultra-auto-trade.com/aave/rebalance \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"action": "BUY", "amount": "10.0", "asset_symbol": "USDC", "dry_run": true}' \
   | python3 -m json.tool
 
 # SELL (dry_run=true)
-curl -s -X POST http://77.42.46.155:8000/aave/rebalance \
+curl -s -X POST https://api.ultra-auto-trade.com/aave/rebalance \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"action": "SELL", "amount": "10.0", "asset_symbol": "USDC", "dry_run": true}' \
@@ -246,7 +249,7 @@ curl -s -X POST http://77.42.46.155:8000/aave/rebalance \
 ### シナリオ D: 緊急停止状態の確認
 
 ```bash
-curl -s http://77.42.46.155:8000/api/automation/status \
+curl -s https://api.ultra-auto-trade.com/api/automation/status \
   -H "Authorization: Bearer <token>" \
   | python3 -m json.tool
 ```

@@ -66,9 +66,9 @@ docker compose -f docker-compose.staging.yml up -d cloudflared
 |---|---|
 | フロントエンド | https://app.ultra-auto-trade.com |
 | バックエンド | https://api.ultra-auto-trade.com |
-| PC 直接アクセス（ローカル検証用） | http://77.42.46.155:3000 / :8000 |
+| PC 直接アクセス | 廃止（127.0.0.1バインド） |
 
-> **注意:** モバイル（iPhone 等）では PC 直接アクセスは使用不可。必ず Named Tunnel URL を使うこと。
+> **注意:** 全てのアクセスはNamed Tunnel経由の上記URLを使用すること。77.42.46.155への直接アクセスは127.0.0.1バインドにより接続拒否される（正常動作）。
 
 ---
 
