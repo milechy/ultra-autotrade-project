@@ -1,8 +1,8 @@
 # 22_production_release_checklist.md
 Ultra AutoTrade – Production リリース前チェックリスト
 
-> 最終更新: 2026-03-31  
-> 本ドキュメントは現在の実装状態（2026-03-31時点）を反映している。
+> 最終更新: 2026-04-06  
+> 本ドキュメントは現在の実装状態（2026-04-06時点）を反映している。BVI法人なしでパートナーが実資金運用する現状に合わせて更新済み。
 
 ---
 
@@ -17,68 +17,70 @@ Ultra AutoTrade – Production リリース前チェックリスト
 
 ## 1. 事前準備（法人・クラウド・ドメイン）
 
-### 法人設立
-- [ ] 法人登記完了（BVI / シンガポール / 国内法人 選択済み）
-- [ ] 法人口座開設（Bybit / OKX 法人アカウント紐付け）
-- [ ] AML/KYC 書類提出・承認済み
+### 法人設立（将来対応 — 現在の実運用はブロックしない）
+- [ ] 法人登記完了（BVI / シンガポール / 国内法人 選択済み）— **将来対応**
+- [ ] 法人口座開設（Bybit / OKX 法人アカウント紐付け）— **将来対応**
+- [ ] AML/KYC 書類提出・承認済み — **将来対応**
 
-### AWS / クラウドアカウント
-- [ ] AWS KMS キーを本番用に作成（キーポリシー: バックエンドサービスロールのみ許可）
-- [ ] AWS Secrets Manager に秘密鍵を登録（`/ultra-autotrade/prod/` プレフィックス）
-- [ ] IAM ロール（EC2 or ECS 用）に KMS DecryptOnly 権限のみ付与
+### 秘密鍵管理（現状: .env.production + chmod 600 で代替運用中）
+- [x] `.env.production` のパーミッションが `chmod 600`（root 専用）✅
+- [ ] AWS KMS / HashiCorp Vault 移行 — **将来対応**（スケール拡大時）
+- [ ] AWS Secrets Manager への秘密鍵登録 — **将来対応**
 
 ### ドメイン・DNS
-- [ ] `ultra-autotrade.com`（または選定ドメイン）の本番サブドメイン設定済み
-  - API: `api.ultra-autotrade.com`
-  - Frontend: `app.ultra-autotrade.com`
-- [ ] Cloudflare DNS レコード設定済み（CNAME → Cloudflare Tunnel）
-- [ ] SSL 証明書が有効（Cloudflare 自動発行 or Let's Encrypt）
+- [x] 本番サブドメイン設定済み ✅
+  - API: `api.ultra-auto-trade.com`
+  - Frontend: `app.ultra-auto-trade.com`
+- [x] Cloudflare DNS レコード設定済み（CNAME → Named Tunnel）✅
+- [x] SSL 証明書が有効（Cloudflare 自動発行）✅
 
 ---
 
 ## 2. インフラ（Docker / Tunnel / SSL）
 
 ### docker-compose.production.yml
-- [ ] `docker-compose.production.yml` が本番設定で作成済み（`restart: always`, `logging` 等）
+- [x] `docker-compose.production.yml` が本番設定で作成済み（`restart: always`, Loki logging）✅
 - [ ] イメージタグが `latest` ではなく SHA256 ダイジェスト or 固定バージョンタグ
-- [ ] PostgreSQL データボリュームが名前付きボリューム（`pgdata_prod`）で永続化されている
+- [x] PostgreSQL データボリュームが名前付きボリュームで永続化されている ✅
 - [ ] バックエンドコンテナのメモリ上限が設定されている（例: `memory: 2g`）
 
 ### Cloudflare Tunnel（Named Tunnel）
-- [ ] Quick Tunnel（`trycloudflare.com`）から **Named Tunnel** に移行済み
-  - Quick Tunnel はセッションごとにURLが変わるため本番不可
-  - `cloudflared tunnel create ultra-autotrade-prod` で固定 UUID 取得
-- [ ] `~/.cloudflared/config.yml` に本番設定を記載
-- [ ] `systemd` サービスとして自動起動設定済み
-- [ ] Tunnel 経由で `https://api.ultra-autotrade.com/docs` にアクセス確認済み
+- [x] Named Tunnel 移行済み（`api.ultra-auto-trade.com` / `app.ultra-auto-trade.com`）✅
+  - Quick Tunnel は廃止済み（`trycloudflare.com` は使用しない）
+- [x] Cloudflare ダッシュボードで Ingress ルール設定済み ✅
+- [x] `network_mode: host` で localhost アクセス確認済み ✅
+- [x] Tunnel 経由で `https://api.ultra-auto-trade.com/health` → 200 確認済み ✅
+- [x] API ドキュメント（/docs）は `APP_ENV=production` で無効化済み ✅
 
 ### ネットワーク
-- [ ] バックエンドポート (8000) はローカルホストのみバインド（外部公開しない）
-- [ ] Cloudflare Tunnel のみが外部アクセス経路
-- [ ] UFW / iptables で不要なポートを閉鎖済み
+- [x] バックエンドポート (8000) は `127.0.0.1:8000` バインド（外部公開しない）✅
+- [x] フロントエンドポート (3000) は `127.0.0.1:3000` バインド ✅
+- [x] Cloudflare Tunnel のみが外部アクセス経路 ✅
+- [x] UFW で不要なポートを閉鎖済み（22/SSH のみ公開）✅
 
 ---
 
 ## 3. セキュリティ（ABSOLUTE Rules 準拠）
 
-### 秘密鍵管理
-- [ ] **本番秘密鍵は AWS KMS / HashiCorp Vault に移行済み**（ファイル直置き禁止）
-  - 未実施の場合は `.env.production` を `chmod 600` + root 専用 + バックアップ暗号化で代替
-- [ ] `.env.staging` と `.env.production` で **物理的に異なる** ウォレットアドレスを使用
-- [ ] 本番ウォレット秘密鍵を staging 環境のログ・モニタリングシステムに露出していないことを確認
+### 秘密鍵管理（現状: chmod 600 運用）
+- [x] `.env.production` を `chmod 600` + root 専用で保護済み ✅
+- [x] `.env.staging` と `.env.production` で **物理的に異なる** ウォレットアドレスを使用 ✅
+- [x] 本番ウォレット秘密鍵を staging 環境のログ・モニタリングに露出していないことを確認 ✅
+- [ ] AWS KMS / HashiCorp Vault 移行 — **将来対応**（スケール拡大時）
 
-### Gnosis Safe（マルチシグ）
-- [ ] 本番ウォレットに Gnosis Safe マルチシグを設定（2-of-3 以上推奨）
-- [ ] 初期資金は Gnosis Safe → hot wallet に最小限のみ移動するフローを確立
+### Gnosis Safe（マルチシグ）— 将来対応
+- [ ] 本番ウォレットに Gnosis Safe マルチシグを設定（2-of-3 以上推奨）— **将来対応**
+- [ ] 初期資金は Gnosis Safe → hot wallet に最小限のみ移動するフローを確立 — **将来対応**
 
-### Security Rules 再確認
-- [ ] HF < 1.6 → HARD_STOP（`backend/app/aave/slippage_guard.py` + `rebalance_service.py`）
-- [ ] Max single trade: 総資産の10%（`exchange/service.py`）
-- [ ] Max daily trades: 総資産の30%（`exchange/service.py` + 実装済み: `df5f41a`）
-- [ ] Cooldown: Aave 操作間10分（`aave/state_manager.py`）
-- [ ] Emergency stop フラグ: OR ロジック（手動停止は上書き不可）
-- [ ] LLM 出力は JSON Schema バリデーション必須（parse failure → HOLD）
-- [ ] 金額計算: Decimal 型のみ（float 禁止）
+### Security Rules 再確認（全完了 — P0孤立コード0件確認済み 2026-04-06）
+- [x] HF < 1.6 → HARD_STOP（`slippage_guard.py` + `rebalance_service.py`）✅
+- [x] Max single trade: 総資産の10%（`exchange/service.py`）✅
+- [x] Max daily trades: 総資産の30%（`exchange/service.py` commit `df5f41a`）✅
+- [x] Cooldown: Aave 操作間10分（`aave/state_manager.py`）✅
+- [x] Emergency stop フラグ: OR ロジック（手動停止は上書き不可）✅
+- [x] LLM 出力は JSON Schema バリデーション必須（parse failure → HOLD）✅
+- [x] 金額計算: Decimal 型のみ（float 禁止）✅
+- [x] oracle_checker / reserve_monitor / stress_controller — workflow.py に配線確認済み ✅
 
 ---
 
@@ -97,9 +99,13 @@ Ultra AutoTrade – Production リリース前チェックリスト
 - [ ] `PRIVATE_KEY` が本番ウォレット秘密鍵（staging と完全に異なること）
 - [ ] `SLACK_WEBHOOK_URL` が本番チャネル向け URL
 
-### マイグレーション
-- [ ] `alembic upgrade head` 実行済み（本番 DB）
-- [ ] マイグレーション前にバックアップ取得済み
+### マイグレーション（手動方式）
+- [x] alembic は未インストール。手動 `ALTER TABLE` 方式で運用 ✅
+- [ ] 新カラム追加が必要な場合はバックアップ取得後に手動実行:
+  ```bash
+  docker exec ultra-autotrade-postgres-production psql -U ultra -d ultra_autotrade -c \
+    "ALTER TABLE <table> ADD COLUMN IF NOT EXISTS <column> <type>;"
+  ```
 
 ### ヘルスチェック
 - [ ] `GET /health` が 200 を返すことを確認
@@ -108,76 +114,76 @@ Ultra AutoTrade – Production リリース前チェックリスト
 
 ---
 
-## 5. フロントエンド（Cloudflare Pages）
+## 5. フロントエンド（Hetzner Docker内でビルド・配信）
 
-### 環境変数（Cloudflare Pages ダッシュボードで設定）
-- [ ] `NEXT_PUBLIC_BACKEND_BASE_URL` = `https://api.ultra-autotrade.com`
-  - **ビルド時に設定必須**（CSP `connect-src` にバックエンド URL が含まれるため）
-  - 未設定だと管理者画面から `/exchange/status` 等のAPI呼び出しが失敗する
-- [ ] `BACKEND_BASE_URL` = バックエンド内部 URL（Tunnel 経由または VPC 内部）
-  - Next.js API Route プロキシが使用するサーバーサイド変数
-- [ ] `NEXT_PUBLIC_CHAIN_ID` = 本番チェーン ID（8453 or 42161）
-- [ ] `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` = 本番 WalletConnect Project ID
+> **注意:** フロントエンドは Cloudflare Pages ではなく Hetzner 上の Docker コンテナで稼働中。
+> `docker-compose.production.yml` の `build.args` に NEXT_PUBLIC_* 変数を設定してビルドする。
 
-### チェーン設定
-- [ ] フロントエンドのチェーン設定が本番チェーンを含んでいる
-  - staging: Base Sepolia (84532) のみ
-  - **production: Base (8453) + Arbitrum One (42161) + Ethereum Mainnet (1)**
-- [ ] testnet チェーン（Base Sepolia 等）が本番ビルドに残っていないことを確認
+### 環境変数（docker-compose.production.yml build.args）
+- [x] `NEXT_PUBLIC_BACKEND_BASE_URL` = `https://api.ultra-auto-trade.com` ✅
+- [x] `NEXT_PUBLIC_API_BASE_URL` = `https://api.ultra-auto-trade.com` ✅
+- [x] `NEXT_PUBLIC_API_URL` = `https://api.ultra-auto-trade.com` ✅
+- [x] `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` 設定済み ✅
+- [ ] `NEXT_PUBLIC_DEFAULT_CHAIN_ID` = 本番チェーン ID（8453 or 42161）
+- [ ] RPC URL 群（`NEXT_PUBLIC_*_RPC`）設定済み
 
 ### ビルド確認
-- [ ] `npm run build` がエラーなく完了する
-- [ ] `npx tsc --noEmit` が型エラー 0
-- [ ] Cloudflare Pages ビルドログにエラーなし
+- [x] `npm run build` がエラーなく完了する ✅（verify.sh で確認済み）
+- [x] `npx tsc --noEmit` が型エラー 0 ✅（verify.sh で確認済み）
+- [ ] 本番ビルド後: `docker exec <frontend> grep -r "http://77" /app/.next/static/chunks/ | wc -l` → 0件確認
 
-### CSP 確認（重要）
-- [ ] `NEXT_PUBLIC_BACKEND_BASE_URL` をビルド時に設定したことで、
-      `connect-src` にバックエンド URL が含まれていることをブラウザ DevTools で確認
-- [ ] 管理者画面 (`/admin/exchange`, `/admin/settings/system`) で CSP エラーが出ないことを確認
-- [ ] 管理者ダッシュボード (`/admin/dashboard`) で `/exchange/status` が正常取得できることを確認
+### アクセス確認
+- [x] `https://app.ultra-auto-trade.com/login` → 200 ✅
+- [x] `https://app.ultra-auto-trade.com/user/dashboard` → 200 ✅
+- [ ] 管理者画面でCSPエラーが出ないことをブラウザ DevTools で確認
+- [ ] モバイル（iPhone）での Mixed Content エラーがないことを確認
 
 ---
 
 ## 6. AI / 自動化
 
 ### スケジューラー
-- [ ] `POST /automation/process-news` スケジューラーが 4時間間隔で設定済み
-- [ ] スケジューラーが staging で正常稼働実績あり（ログ確認）
+- [x] AIスケジューラーが 4時間間隔で正常稼働中 ✅
+  - `scheduler_healthy: true` / `warnings: []` 確認済み（2026-04-06）
+  - `last_judgment: 2026-04-05T23:41:32 UTC`
+- [x] `DISABLE_AI_JUDGMENT_SCHEDULER` 未設定（デフォルト有効）✅
 
 ### LLM API
-- [ ] Claude Sonnet 4.6 API キーが本番用（レート制限を確認）
-- [ ] GPT-4o API キーが本番用（Phase B クロス判定用）
+- [x] Claude Sonnet 4.6 API キーが本番用 ✅
+- [x] GPT-4o API キーが本番用（Phase B クロス判定用）✅
 - [ ] Perplexity API（使用する場合）の課金プラン確認済み
 
 ### GDELT / ニュース取得
-- [ ] GDELT 等のニュースソースへのアクセスが本番環境から可能なことを確認
-- [ ] Knowledge Hub（PostgreSQL + pgvector）の本番 DB が初期化済み
+- [x] GDELT ニュースソースへのアクセスが本番環境から可能 ✅（空レスポンス時の graceful handling 実装済み）
+- [x] Knowledge Hub（PostgreSQL + pgvector）の本番 DB 初期化済み ✅
 
 ---
 
 ## 7. Aave（本番チェーン移行）
 
 ### コントラクト確認
-- [ ] 本番チェーンの Aave V3 Pool アドレスが正しく設定済み（`backend/app/aave/chains.py`）
+- [x] 本番チェーンの Aave V3 Pool アドレスが `backend/app/aave/chains.py` に設定済み ✅
   - Base: `0xA238Dd80C259a72e81d7e4664a9801593F98d1c5`
   - Arbitrum: `0x794a61358D6845594F94dc1DB02A252b5b4814aD`
-- [ ] USDC / USDT などのトークンアドレスが本番チェーン用に設定済み
+- [ ] USDC / USDT などのトークンアドレスが本番チェーン用に設定済み（`.env.production` で確認）
 
 ### HF 監視
-- [ ] HF 監視が本番チェーンを対象としている
+- [ ] HF 監視が本番チェーンを対象としている（`AAVE_NETWORK` 設定確認）
 - [ ] HF < 1.6 アラートが Slack 本番チャネルに飛ぶことを確認
 
-### 安全機能（実装済みの確認）
-- [ ] ガス代動的見積もり: `backend/app/aave/gas_estimator.py` ✅（実装済み）
-- [ ] RPCフェイルオーバー: `backend/app/aave/rpc_provider.py` ✅（実装済み）
-  - `docs/30_rpc_plan_requirements.md` のフェイルオーバー設定を本番 `.env` に反映
-- [ ] スリッページ保護: `backend/app/aave/slippage_guard.py` ✅（実装済み）
-- [ ] 日次取引上限30%: `backend/app/exchange/service.py` ✅（実装済み: commit `df5f41a`）
+### 安全機能（実装・配線確認済み 2026-04-06）
+- [x] ガス代動的見積もり: `aave/gas_estimator.py` ✅
+- [x] RPCフェイルオーバー: `aave/rpc_provider.py` ✅
+- [x] スリッページ保護: `aave/slippage_guard.py` ✅
+- [x] 日次取引上限30%: `exchange/service.py` ✅
+- [x] oracle_checker: `workflow.py` から `is_oracle_fresh()` 経由で呼び出し済み ✅
+- [x] reserve_monitor: `workflow.py` から `is_reserve_healthy()` 経由で呼び出し済み ✅
+- [x] stress_controller: `workflow.py:425` から呼び出し済み ✅
 
 ### Aave 本番運用開始前テスト
-- [ ] Mainnet にデプロイ後、**少額（$100 相当）** でデポジット → ウィズドロー 1サイクルを手動実行
+- [ ] パートナーが **少額（$100 USDC）** でデポジット → ウィズドロー 1サイクルを `/user/approve` 画面から実施
 - [ ] トランザクションハッシュと HF の変化を記録
-- [ ] 緊急停止 (`POST /automation/emergency-stop`) → 再開 (`POST /automation/emergency-stop/resume`) フローを確認
+- [ ] 緊急停止ボタン → resume フローをパートナーが確認
 
 ---
 
@@ -189,27 +195,31 @@ Ultra AutoTrade – Production リリース前チェックリスト
 > Hetzner上でコミットすると同期不能になる。
 
 ```bash
-# 1. main ブランチを最新に同期
+# 1. ローカルMacで main ブランチを最新に同期
 git checkout main && git pull origin main
+git push origin main  # GitHub に push
 
-# 2. 本番サーバーで docker-compose.production.yml を使用してデプロイ
-ssh prod-server
+# 2. Hetzner でコードを pull（Hetzner は pull only — 直接コミット禁止）
+ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155
 cd /opt/ultra-autotrade
-git pull origin main
-docker compose -f docker-compose.production.yml pull
-docker compose -f docker-compose.production.yml up -d
+git pull origin main  # ← pull のみ。git commit / merge / nano 編集は禁止
 
-# 3. DB マイグレーション（手動方式）
+# 3. バックエンドのみ再起動（コード変更の場合）
+docker compose -f docker-compose.production.yml up -d --no-deps --build backend
+
+# 4. フロントエンドを再ビルド（NEXT_PUBLIC_* 変数変更時のみ）
+docker compose -f docker-compose.production.yml build --no-cache frontend
+docker compose -f docker-compose.production.yml up -d --no-deps frontend
+
+# 5. DB マイグレーション（手動方式）
 # ⚠️ alembic は使用しない（未インストール、exit code 127 の原因）
 # 新しいカラムが必要な場合は手動で ALTER TABLE を実行:
-# docker exec <postgres-container> psql -U ultra -d ultra_autotrade -c \
+# docker exec ultra-autotrade-postgres-production psql -U ultra -d ultra_autotrade -c \
 #   "ALTER TABLE <table> ADD COLUMN IF NOT EXISTS <column> <type>;"
 
-# 4. ヘルスチェック
-curl https://api.ultra-autotrade.com/health
-
-# 5. Cloudflare Pages に frontend をデプロイ
-# (Cloudflare Pages は main ブランチへのプッシュで自動デプロイ)
+# 6. ヘルスチェック
+curl https://api.ultra-auto-trade.com/health
+# 期待値: {"status": "ok", "scheduler_healthy": true, "warnings": []}
 ```
 
 ---
@@ -244,15 +254,59 @@ git revert HEAD && git push origin main
 
 ---
 
-## 11. 未完了・前提条件（本番移行ブロッカー）
+## 11. 状態サマリー（2026-04-06 現在）
 
-以下は本番移行の前に完了が必要な項目:
-
-| 項目 | 状態 | 担当 |
+### 完了済み（実運用中）
+| 項目 | 状態 | 備考 |
 |------|------|------|
-| AWS KMS / HashiCorp Vault 移行 | ❌ 未実施 | インフラ担当 |
-| Cloudflare Named Tunnel 設定 | ❌ Quick Tunnel から移行必要 | インフラ担当 |
-| 法人設立・AML/KYC | ❌ 未実施 | PO |
-| Gnosis Safe マルチシグ設定 | ❌ 未実施 | PO |
-| 有料 RPC プラン契約 | ❌ 未実施（`docs/30_rpc_plan_requirements.md` 参照） | インフラ担当 |
-| docker-compose.production.yml 最終確認 | ⏳ Agent A が作成中 | |
+| Cloudflare Named Tunnel | ✅ 完了 | api/app.ultra-auto-trade.com 稼働中 |
+| docker-compose.production.yml | ✅ 完了 | 全コンテナ稼働中（healthy）|
+| 127.0.0.1バインド + Tunnel経由のみ公開 | ✅ 完了 | 直IP接続拒否確認済み |
+| AIスケジューラー | ✅ 稼働中 | 4時間間隔、scheduler_healthy: true |
+| Security Rules（安全装置配線） | ✅ 完了 | P0孤立コード0件確認済み |
+| PostgreSQL + pgvector | ✅ 稼働中 | healthy |
+| .env.production chmod 600 | ✅ 完了 | 秘密鍵保護済み |
+| フロントエンドビルド（Mixed Content解消） | ✅ 完了 | NEXT_PUBLIC_* 14変数全設定済み |
+
+### 将来対応（現在の実運用をブロックしない）
+| 項目 | 優先度 | 担当 |
+|------|--------|------|
+| AWS KMS / HashiCorp Vault 移行 | 低（スケール拡大時）| インフラ担当 |
+| 法人設立・AML/KYC | 低（資金規模拡大時）| PO |
+| Gnosis Safe マルチシグ | 低（資金規模拡大時）| PO |
+| 有料 RPC プラン契約 | 中（Aave 実運用本格化時）| インフラ担当（`docs/30_rpc_plan_requirements.md`）|
+| UtilizationMonitor 配線（P1孤立）| 中（今週中）| エンジニア |
+
+---
+
+## 12. パートナー実運用開始手順
+
+パートナーが実資金で運用を開始する際の手順:
+
+1. **パートナー用アカウント作成**（admin or editor ロール）
+   - 管理者が `/admin/settings/users` からアカウントを作成
+2. **パートナーにログイン情報を共有**（Slack DM）
+3. **パートナーがMetaMaskウォレット接続**（`/user/connect`）
+   - Arbitrum One または Base ネットワークを選択
+4. **パートナーがウォレットにUSDC + ガス代ETH入金**
+5. **環境変数の確認・変更（バックエンドのみ）**
+   ```bash
+   # Hetzner上で .env.production を確認
+   grep -E "EXCHANGE_CLIENT_TYPE|AI_SHADOW_MODE|REBALANCE_SHADOW_MODE" /opt/ultra-autotrade/.env.production
+   # → AI_SHADOW_MODE=false, REBALANCE_SHADOW_MODE=false であること
+   ```
+6. **バックエンド再起動**（環境変数変更時のみ）
+   ```bash
+   docker compose -f docker-compose.production.yml up -d --no-deps backend
+   ```
+   > フロントエンド再ビルド不要（バックエンド環境変数のみの変更）
+7. **少額E2Eテスト**: パートナーが `$100 USDC` deposit → withdraw を `/user/approve` 画面から実施
+   - トランザクションハッシュと HF の変化を記録
+8. **緊急停止テスト**: パートナーが緊急停止ボタン → resume を確認
+9. **2時間監視**: `/health` の `scheduler_healthy` + Slack `#ultra-auto-project` アラートを確認
+   ```bash
+   curl https://api.ultra-auto-trade.com/health | python3 -m json.tool
+   # 期待値: {"status": "ok", "scheduler_healthy": true, "warnings": []}
+   ```
+10. **Aave HF 確認**: `GET /aave/status` で HF > 1.6 を確認
+11. **運用開始**: Slack に運用開始通知を送信
