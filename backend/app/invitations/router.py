@@ -11,10 +11,10 @@ GET  /api/invitations/{code} — コード検証（認証不要）
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import require_active_user
+from app.auth.dependencies import require_partner
 from app.auth.models import User
 from app.database import get_db
 
@@ -24,23 +24,6 @@ from .schemas import InvitationCreateRequest, InvitationResponse, InvitationVali
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/invitations", tags=["invitations"])
-
-_PARTNER_ROLES = ("partner", "admin")
-
-
-async def require_partner(user: User = Depends(require_active_user)) -> User:
-    """
-    partner または admin ロールを要求する。
-
-    Note: Wave 1 で auth/dependencies.py に追加予定。
-    それまでの間はここで定義する。
-    """
-    if user.role not in _PARTNER_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Partner or admin access required",
-        )
-    return user
 
 
 @router.post(

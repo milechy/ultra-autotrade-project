@@ -19,7 +19,6 @@ class UserRole(str, Enum):
     PARTNER = "partner"
     EDITOR = "editor"
     VIEWER = "viewer"
-    PARTNER = "partner"
 
 
 class RegisterRequest(BaseModel):
