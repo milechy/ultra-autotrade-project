@@ -4,7 +4,7 @@
 """
 ユーザー管理 API エンドポイント。
 
-GET    /users         - ユーザー一覧（admin のみ）
+GET    /users         - ユーザー一覧（admin: 全件 / partner: 招待ユーザーのみ）
 POST   /users         - ユーザー作成（admin のみ）
 GET    /users/{id}    - ユーザー詳細（自分または admin）
 PUT    /users/{id}    - ユーザー更新（自分または admin）
@@ -39,15 +39,19 @@ router = APIRouter(prefix="/users", tags=["users"])
     summary="ユーザー一覧取得",
 )
 def list_users(
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(require_partner),
     db: Session = Depends(get_db),
 ) -> List[UserResponse]:
     """
-    全ユーザーの一覧を取得する。
+    ユーザーの一覧を取得する。
 
-    管理者のみアクセス可能。
+    - admin: 全ユーザーを返す
+    - partner: 自分が招待したユーザーのみ返す
     """
-    users = AuthService.get_all_users(db)
+    if current_user.role == UserRole.PARTNER.value:
+        users = db.query(User).filter(User.invited_by == current_user.id).all()
+    else:
+        users = AuthService.get_all_users(db)
     return [UserResponse.model_validate(u) for u in users]
 
 

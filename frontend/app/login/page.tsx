@@ -59,7 +59,9 @@ function LoginForm() {
       const loggedInUser = await login(email, password);
       const dest = redirectParam
         ? getSafeRedirect(redirectParam)
-        : loggedInUser.role === "admin" ? "/dashboard" : "/user/dashboard";
+        : loggedInUser.role === "admin" ? "/dashboard"
+        : loggedInUser.role === "partner" ? "/partner/dashboard"
+        : "/user/dashboard";
       router.replace(dest);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "ログインに失敗しました";

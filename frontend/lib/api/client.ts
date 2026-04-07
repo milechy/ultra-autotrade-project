@@ -21,6 +21,7 @@ const AUTH_SKIP_PATHS = [
   '/auth/login',
   '/auth/register',
   '/auth/wallet/connect',
+  '/api/invitations/',
 ]
 
 function isAuthSkipPath(path: string): boolean {
