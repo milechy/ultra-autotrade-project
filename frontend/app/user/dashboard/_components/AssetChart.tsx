@@ -4,12 +4,19 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
-import { DateRangeFilter } from '@/components/shared'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/lib/auth'
 import { apiFetch } from '@/lib/api/client'
 
 const AssetChartRecharts = dynamic(() => import('./AssetChartRecharts'), { ssr: false })
+
+type Period = 'daily' | 'weekly' | 'monthly'
+
+const PERIOD_TABS: { value: Period; label: string }[] = [
+  { value: 'daily', label: '日次' },
+  { value: 'weekly', label: '週次' },
+  { value: 'monthly', label: '月次' },
+]
 
 interface DataPoint {
   date: string
@@ -25,7 +32,7 @@ interface PortfolioHistoryResponse {
 
 export function AssetChart() {
   const { token, isLoading: authLoading } = useAuth()
-  const [period, setPeriod] = useState<string>('30d')
+  const [period, setPeriod] = useState<Period>('daily')
   const [data, setData] = useState<DataPoint[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
@@ -36,7 +43,7 @@ export function AssetChart() {
     setLoading(true)
     try {
       const res = await apiFetch<PortfolioHistoryResponse>(
-        `/api/portfolio/history?period=${period}&interval=daily`,
+        `/api/portfolio/history?period=${period}`,
       )
       const mapped: DataPoint[] = (res?.items ?? []).map((item) => ({
         date: new Date(item.recorded_at).toLocaleDateString('ja-JP', {
@@ -65,26 +72,23 @@ export function AssetChart() {
     return () => clearInterval(id)
   }, [fetchData, token])
 
-  const handleRangeChange = (range: { from: Date; to: Date } | 'all') => {
-    if (range === 'all') {
-      setPeriod('all')
-    } else {
-      const days = Math.round(
-        (range.to.getTime() - range.from.getTime()) / 86_400_000,
-      )
-      if (days <= 7) {
-        setPeriod('7d')
-      } else if (days <= 30) {
-        setPeriod('30d')
-      } else {
-        setPeriod('90d')
-      }
-    }
-  }
-
   return (
     <div className="space-y-3">
-      <DateRangeFilter onChange={handleRangeChange} presets />
+      <div className="flex gap-1 rounded-lg border border-zinc-800 bg-zinc-800/40 p-1 w-fit">
+        {PERIOD_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setPeriod(tab.value)}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              period === tab.value
+                ? 'bg-zinc-700 text-white'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
       {authLoading || loading ? (
         <Skeleton className="h-[200px] rounded-xl" />
       ) : error ? (
