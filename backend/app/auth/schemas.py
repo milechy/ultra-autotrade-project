@@ -18,14 +18,16 @@ class UserRole(str, Enum):
     ADMIN = "admin"
     EDITOR = "editor"
     VIEWER = "viewer"
+    PARTNER = "partner"
 
 
 class RegisterRequest(BaseModel):
-    """初回管理者登録リクエスト。"""
+    """初回管理者登録リクエスト（招待コードがある場合は招待登録）。"""
 
     email: EmailStr
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=8, max_length=100)
+    invitation_code: Optional[str] = None
 
     @field_validator("username")
     @classmethod

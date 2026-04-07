@@ -54,6 +54,7 @@ from app.dca.router import router as dca_router
 from app.error_handlers import register_error_handlers
 from app.exchange.router import router as exchange_router
 from app.hooks.router import router as hooks_router
+from app.invitations.router import router as invitations_router
 from app.knowledge.router import router as knowledge_router
 from app.notifications.router import api_router as notification_api_router
 from app.notifications.router import router as notification_router
@@ -191,6 +192,7 @@ def create_app() -> FastAPI:
 
     # --- Router registration ---
     app.include_router(auth_router)  # Auth (Phase12)
+    app.include_router(invitations_router)  # Invitations (Wave 2)
     app.include_router(users_router)  # Users (Phase12)
     app.include_router(ai_router, prefix="/api")  # AI (Phase2)
     app.include_router(octobot_router)  # OctoBot (Phase3)
