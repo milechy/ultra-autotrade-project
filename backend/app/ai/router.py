@@ -11,12 +11,18 @@ AI 解析用の FastAPI ルーター定義。
 import random
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from app.auth.dependencies import require_editor
+from app.auth.dependencies import require_editor, require_viewer
 from app.auth.models import User
+from app.database import get_db
 
+from .accuracy import calculate_accuracy
 from .schemas import (
     AIAnalysisRequest,
     AIAnalysisResponse,
@@ -30,6 +36,21 @@ from .schemas import (
     XPost,
 )
 from .service import AIService
+
+
+class _ActionAccuracyOut(BaseModel):
+    total: int
+    correct: int
+    pct: Decimal
+
+
+class AccuracyResponse(BaseModel):
+    total_decisions: int
+    correct_count: int
+    accuracy_pct: Decimal
+    last_30d_accuracy_pct: Decimal
+    by_action: dict[str, _ActionAccuracyOut]
+
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -253,3 +274,32 @@ def _aggregate_by_version(data: list[ConfidenceDataPoint]) -> list[PromptVersion
         )
         for v, vals in sorted(buckets.items())
     ]
+
+
+@router.get(
+    "/accuracy",
+    response_model=AccuracyResponse,
+    summary="AI判定的中率サマリー",
+    description="BUY/SELL判定の的中率を返す。HOLDは除外。agreed=Trueを的中として集計。",
+)
+def get_accuracy(
+    days: Optional[int] = None,
+    current_user: User = Depends(require_viewer),
+    db: Session = Depends(get_db),
+) -> AccuracyResponse:
+    """AI判定的中率サマリーを返す。"""
+    result = calculate_accuracy(db, days=days)
+    return AccuracyResponse(
+        total_decisions=result.total_decisions,
+        correct_count=result.correct_count,
+        accuracy_pct=result.accuracy_pct,
+        last_30d_accuracy_pct=result.last_30d_accuracy_pct,
+        by_action={
+            action: _ActionAccuracyOut(
+                total=acc.total,
+                correct=acc.correct,
+                pct=acc.pct,
+            )
+            for action, acc in result.by_action.items()
+        },
+    )
