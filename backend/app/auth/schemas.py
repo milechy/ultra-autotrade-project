@@ -16,6 +16,7 @@ class UserRole(str, Enum):
     """ユーザーロール。"""
 
     ADMIN = "admin"
+    PARTNER = "partner"
     EDITOR = "editor"
     VIEWER = "viewer"
 
@@ -74,6 +75,7 @@ class UserResponse(BaseModel):
     terms_accepted_at: Optional[datetime] = None
     terms_version: Optional[str] = None
     risk_mode: Optional[str] = "conservative"
+    invited_by: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 

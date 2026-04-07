@@ -12,14 +12,14 @@ export interface CreateUserRequest {
   email: string;
   username: string;
   password: string;
-  role?: "admin" | "editor" | "viewer";
+  role?: "admin" | "partner" | "editor" | "viewer";
 }
 
 export interface UpdateUserRequest {
   email?: string;
   username?: string;
   password?: string;
-  role?: "admin" | "editor" | "viewer";
+  role?: "admin" | "partner" | "editor" | "viewer";
   is_active?: boolean;
 }
 

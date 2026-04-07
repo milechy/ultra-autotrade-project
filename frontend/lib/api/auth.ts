@@ -28,10 +28,11 @@ export interface UserResponse {
   id: number;
   email: string;
   username: string;
-  role: "admin" | "editor" | "viewer";
+  role: "admin" | "partner" | "editor" | "viewer";
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  invited_by?: number | null;
 }
 
 export interface PasswordChangeRequest {

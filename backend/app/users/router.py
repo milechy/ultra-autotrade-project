@@ -17,7 +17,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import require_active_user, require_admin
+from app.auth.dependencies import require_active_user, require_admin, require_partner
 from app.auth.models import User
 from app.auth.schemas import (
     UserCreateRequest,
@@ -58,7 +58,7 @@ def list_users(
 )
 def create_user(
     request: UserCreateRequest,
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_partner),
     db: Session = Depends(get_db),
 ) -> UserResponse:
     """

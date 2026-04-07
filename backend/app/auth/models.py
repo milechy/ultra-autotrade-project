@@ -12,7 +12,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Integer, Numeric, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -22,6 +22,7 @@ class UserRole(str, Enum):
     """ユーザーロール。"""
 
     ADMIN = "admin"
+    PARTNER = "partner"
     EDITOR = "editor"
     VIEWER = "viewer"
 
@@ -83,6 +84,9 @@ class User(Base):
     )
     wallet_address: Mapped[Optional[str]] = mapped_column(
         String(42), unique=True, nullable=True, index=True, default=None
+    )
+    invited_by: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True, default=None
     )
 
     def __repr__(self) -> str:
