@@ -54,19 +54,42 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     "/register",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Initial admin registration",
+    summary="Initial admin registration or invitation-based registration",
 )
 def register(
     request: RegisterRequest,
     db: Session = Depends(get_db),
 ) -> UserResponse:
     """
-    Register the initial admin account.
+    Register a user.
 
-    Returns 403 if a user already exists.
-    Only the first registration is allowed; subsequent users must be created via /users by an admin.
+    - With invitation_code: register as viewer via partner invitation.
+    - Without invitation_code: initial admin registration (first user only).
     """
-    # Registration disabled if INITIAL_ADMIN_EMAIL is not configured
+    if request.invitation_code:
+        from app.invitations import service as invitation_service  # noqa: PLC0415
+
+        invitation = invitation_service.validate_code(db, request.invitation_code)
+        if invitation is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired invitation code",
+            )
+        try:
+            user = AuthService.create_user(db, request, role=UserRole.VIEWER.value)
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        # Record which partner invited this user (supports multi-use codes)
+        user.invited_by = invitation.partner_id
+        db.commit()
+        db.refresh(user)
+        invitation_service.increment_usage(db, invitation, user_id=user.id)
+        logger.info(
+            "User registered via invitation: %s (partner_id=%d)", user.email, invitation.partner_id
+        )
+        return UserResponse.model_validate(user)
+
+    # Initial admin registration (no invitation code)
     initial_admin_email = os.getenv("INITIAL_ADMIN_EMAIL")
     if not initial_admin_email:
         raise HTTPException(

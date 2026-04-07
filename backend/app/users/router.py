@@ -4,7 +4,7 @@
 """
 ユーザー管理 API エンドポイント。
 
-GET    /users         - ユーザー一覧（admin のみ）
+GET    /users         - ユーザー一覧（admin: 全件 / partner: 招待ユーザーのみ）
 POST   /users         - ユーザー作成（admin のみ）
 GET    /users/{id}    - ユーザー詳細（自分または admin）
 PUT    /users/{id}    - ユーザー更新（自分または admin）
@@ -17,11 +17,12 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import require_active_user, require_admin
+from app.auth.dependencies import require_active_user, require_admin, require_partner
 from app.auth.models import User
 from app.auth.schemas import (
     UserCreateRequest,
     UserResponse,
+    UserRole,
     UserUpdateRequest,
 )
 from app.auth.service import AuthService
@@ -38,15 +39,19 @@ router = APIRouter(prefix="/users", tags=["users"])
     summary="ユーザー一覧取得",
 )
 def list_users(
-    admin: User = Depends(require_admin),
+    current_user: User = Depends(require_partner),
     db: Session = Depends(get_db),
 ) -> List[UserResponse]:
     """
-    全ユーザーの一覧を取得する。
+    ユーザーの一覧を取得する。
 
-    管理者のみアクセス可能。
+    - admin: 全ユーザーを返す
+    - partner: 自分が招待したユーザーのみ返す
     """
-    users = AuthService.get_all_users(db)
+    if current_user.role == UserRole.PARTNER.value:
+        users = db.query(User).filter(User.invited_by == current_user.id).all()
+    else:
+        users = AuthService.get_all_users(db)
     return [UserResponse.model_validate(u) for u in users]
 
 
@@ -58,17 +63,24 @@ def list_users(
 )
 def create_user(
     request: UserCreateRequest,
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_partner),
     db: Session = Depends(get_db),
 ) -> UserResponse:
     """
     新しいユーザーを作成する。
 
-    管理者のみアクセス可能。
+    - admin: 全ロール作成可能
+    - partner: viewer のみ作成可能（権限昇格防止）
     """
+    # partner は viewer のみ作成可能（admin/editor/partner は作成不可）
+    if admin.role == UserRole.PARTNER.value and request.role != UserRole.VIEWER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Partner can only create viewer users",
+        )
     try:
         user = AuthService.create_user(db, request)
-        logger.info("Admin %s created user: %s", admin.email, user.email)
+        logger.info("%s %s created user: %s", admin.role, admin.email, user.email)
         return UserResponse.model_validate(user)
     except ValueError as e:
         raise HTTPException(

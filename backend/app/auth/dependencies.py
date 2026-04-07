@@ -165,6 +165,29 @@ async def require_editor(
     return user
 
 
+async def require_partner(
+    user: User = Depends(require_active_user),
+) -> User:
+    """
+    Partner 以上（Partner または Admin）を要求する。
+
+    Args:
+        user: アクティブなユーザー
+
+    Returns:
+        Partner 以上のユーザー
+
+    Raises:
+        HTTPException: ユーザーが Partner 以上でない場合
+    """
+    if user.role not in (UserRole.ADMIN.value, UserRole.PARTNER.value):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Partner access required",
+        )
+    return user
+
+
 async def require_viewer(
     user: User = Depends(require_active_user),
 ) -> User:

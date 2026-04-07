@@ -83,7 +83,7 @@ function UsersManagementContent() {
     }
   };
 
-  const handleQuickRoleChange = async (user: UserResponse, newRole: "admin" | "editor" | "viewer") => {
+  const handleQuickRoleChange = async (user: UserResponse, newRole: "admin" | "partner" | "editor" | "viewer") => {
     if (!token) return;
     try {
       await updateUser(token, user.id, { role: newRole });
@@ -179,13 +179,14 @@ function UsersManagementContent() {
                         <select
                           value={user.role}
                           onChange={(e) =>
-                            handleQuickRoleChange(user, e.target.value as "admin" | "editor" | "viewer")
+                            handleQuickRoleChange(user, e.target.value as "admin" | "partner" | "editor" | "viewer")
                           }
                           style={roleSelectStyle}
                           title="ロールを変更"
                         >
                           <option value="viewer">閲覧者</option>
                           <option value="editor">編集者</option>
+                          <option value="partner">パートナー</option>
                           <option value="admin">管理者</option>
                         </select>
                       </div>
@@ -276,9 +277,10 @@ function UsersManagementContent() {
 }
 
 // Role Badge Component
-function RoleBadge({ role }: { role: "admin" | "editor" | "viewer" }) {
-  const config: Record<"admin" | "editor" | "viewer", { variant: "destructive" | "default" | "secondary"; label: string }> = {
+function RoleBadge({ role }: { role: "admin" | "partner" | "editor" | "viewer" }) {
+  const config: Record<"admin" | "partner" | "editor" | "viewer", { variant: "destructive" | "default" | "secondary"; label: string }> = {
     admin: { variant: "destructive", label: "管理者" },
+    partner: { variant: "default", label: "パートナー" },
     editor: { variant: "default", label: "編集者" },
     viewer: { variant: "secondary", label: "閲覧者" },
   };
@@ -308,7 +310,7 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
   const [email, setEmail] = useState(user?.email ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "editor" | "viewer">(user?.role ?? "viewer");
+  const [role, setRole] = useState<"admin" | "partner" | "editor" | "viewer">(user?.role ?? "viewer");
   const [isActive, setIsActive] = useState(user?.is_active ?? true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -397,11 +399,12 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
                 <label style={inputLabelStyle}>ロール</label>
                 <select
                   value={role}
-                  onChange={(e) => setRole(e.target.value as "admin" | "editor" | "viewer")}
+                  onChange={(e) => setRole(e.target.value as "admin" | "partner" | "editor" | "viewer")}
                   style={inputStyle}
                 >
                   <option value="viewer">閲覧者</option>
                   <option value="editor">編集者</option>
+                  <option value="partner">パートナー</option>
                   <option value="admin">管理者</option>
                 </select>
               </div>

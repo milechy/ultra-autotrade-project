@@ -6,6 +6,7 @@ import { WagmiRootProvider } from '@/lib/wallet/WagmiRootProvider'
 import { UserProviders } from '@/components/user/UserProviders'
 import { UserHeader } from '@/components/user/UserHeader'
 import { BottomNav } from '@/components/shared/BottomNav'
+import { EmergencyStopFloat } from '@/components/shared/EmergencyStopFloat'
 
 export default async function UserAppLayout({
   children,
@@ -23,6 +24,7 @@ export default async function UserAppLayout({
             {children}
           </div>
           <BottomNav />
+          <EmergencyStopFloat />
         </UserProviders>
       </WagmiRootProvider>
     </NextIntlClientProvider>

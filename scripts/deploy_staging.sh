@@ -1,6 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 
+# ───────────────────────────────────────────────
+# -v / --volumes フラグ誤使用防止ガード
+# docker compose down -v はDBボリュームを削除してテスターデータが全滅する
+# ───────────────────────────────────────────────
+for _arg in "$@"; do
+  if [[ "$_arg" == "-v" || "$_arg" == "--volumes" ]]; then
+    echo "❌ ERROR: -v / --volumes フラグは禁止です。DBボリュームが削除されテスターデータが全て消えます。"
+    echo "   down のみ使用してください: docker compose ... down"
+    exit 1
+  fi
+done
+
 # Ultra AutoTrade – staging ワンショットデプロイスクリプト
 #
 # 使い方:
@@ -180,6 +192,9 @@ elif "${BACKEND_ONLY}"; then
 else
   # ─── フルデプロイ ──────────────────────────────
   log "フルデプロイ開始"
+
+  log "📦 Pre-deploy backup..."
+  bash "${SCRIPT_DIR}/backup_db.sh" || log "⚠️ Backup failed, continuing deploy..."
 
   log "孤立コンテナを含めて停止・削除"
   ${DC} -f "${COMPOSE_FILE}" down --remove-orphans

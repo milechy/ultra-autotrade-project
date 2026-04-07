@@ -69,3 +69,4 @@ user/config.json*
 .claude/settings.local.json.bak
 backups/
 slack-handler/
+.wolf/

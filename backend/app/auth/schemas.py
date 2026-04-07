@@ -16,16 +16,18 @@ class UserRole(str, Enum):
     """ユーザーロール。"""
 
     ADMIN = "admin"
+    PARTNER = "partner"
     EDITOR = "editor"
     VIEWER = "viewer"
 
 
 class RegisterRequest(BaseModel):
-    """初回管理者登録リクエスト。"""
+    """初回管理者登録リクエスト（招待コードがある場合は招待登録）。"""
 
     email: EmailStr
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=8, max_length=100)
+    invitation_code: Optional[str] = None
 
     @field_validator("username")
     @classmethod
@@ -74,6 +76,7 @@ class UserResponse(BaseModel):
     terms_accepted_at: Optional[datetime] = None
     terms_version: Optional[str] = None
     risk_mode: Optional[str] = "conservative"
+    invited_by: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 

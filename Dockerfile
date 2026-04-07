@@ -32,7 +32,9 @@ FROM python:3.11-slim AS runtime
 WORKDIR /app
 
 # ランタイム依存のみ（gcc 等のビルドツールは除外）
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# apt-get upgrade でOS層のセキュリティパッチを適用（Trivy CVE修正）
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
     && rm -rf /var/lib/apt/lists/*

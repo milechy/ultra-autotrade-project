@@ -7,6 +7,7 @@ import { UserProviders } from '@/components/user/UserProviders'
 import { UserHeader } from '@/components/user/UserHeader'
 import { BottomNav } from '@/components/shared/BottomNav'
 import { UserErrorBoundary } from './_components/UserErrorBoundary'
+import { EmergencyStopFloat } from '@/components/shared/EmergencyStopFloat'
 
 export default async function UserLayout({
   children,
@@ -25,6 +26,7 @@ export default async function UserLayout({
               {children}
             </div>
             <BottomNav />
+            <EmergencyStopFloat />
           </UserErrorBoundary>
         </UserProviders>
       </WagmiRootProvider>

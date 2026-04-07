@@ -36,6 +36,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isPartner: boolean;
   login: (email: string, password: string) => Promise<UserResponse>;
   loginWithWallet: (address: string, signer: WalletSigner) => Promise<UserResponse>;
   logout: () => Promise<void>;
@@ -162,6 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     isAuthenticated: !!(user || token),
     isAdmin: user?.role === "admin",
+    isPartner: (user?.role as string | undefined) === "partner" || user?.role === "admin",
     login,
     loginWithWallet,
     logout,

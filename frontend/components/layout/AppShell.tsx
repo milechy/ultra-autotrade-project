@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import { useAuth } from "../../lib/auth";
 
-const navLinks = [
+const adminNavLinks = [
   { href: "/dashboard/automation", label: "自動売買" },
   { href: "/reports", label: "レポート" },
   { href: "/knowledge", label: "ナレッジ" },
@@ -18,9 +18,16 @@ const navLinks = [
   { href: "/user/dashboard", label: "ユーザーアプリ →", highlight: true },
 ];
 
+const partnerNavLinks: Array<{ href: string; label: string; highlight?: boolean }> = [
+  { href: "/partner/dashboard", label: "ダッシュボード" },
+  { href: "/partner/users", label: "テスター管理" },
+];
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout, isLoading, isAdmin, isPartner } = useAuth();
   const router = useRouter();
+
+  const activeNavLinks = isAdmin ? adminNavLinks : isPartner ? partnerNavLinks : [];
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -36,20 +43,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
               <strong>Ultra AutoTrade</strong>
             </Link>
-            <Link href="/dashboard" style={{ textDecoration: "none", color: "#666", fontSize: 12 }}>運用ダッシュボード</Link>
+            {isAdmin && (
+              <Link href="/dashboard" style={{ textDecoration: "none", color: "#666", fontSize: 12 }}>運用ダッシュボード</Link>
+            )}
           </div>
 
           {/* Desktop nav */}
           <nav style={{ display: "flex", gap: 12, fontSize: 14, alignItems: "center" }} className="mobile-hamburger-desktop-nav">
-            {navLinks.map(({ href, label, highlight }) => (
+            {activeNavLinks.map(({ href, label, highlight }) => (
               <Link key={href} href={href} style={highlight ? { ...navLinkStyle, color: "#2563eb" } : navLinkStyle}>{label}</Link>
             ))}
             {!isLoading && user && (
               <>
                 <span style={{ color: "#999" }}>|</span>
-                <Link href="/settings/config" style={navLinkStyle}>設定</Link>
-                {user.role === "admin" && (
-                  <Link href="/users" style={navLinkStyle}>ユーザー管理</Link>
+                {isAdmin && (
+                  <>
+                    <Link href="/settings/config" style={navLinkStyle}>設定</Link>
+                    <Link href="/users" style={navLinkStyle}>ユーザー管理</Link>
+                    <Link href="/partner/dashboard" style={navLinkStyle}>パートナーダッシュボード</Link>
+                    <Link href="/partner/users" style={navLinkStyle}>テスター管理</Link>
+                  </>
                 )}
                 <span style={{ color: "#666", fontSize: 12 }}>{user.username}</span>
                 <button onClick={handleLogout} style={logoutButtonStyle}>ログアウト</button>
@@ -77,7 +90,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Mobile dropdown menu */}
         {menuOpen && (
           <nav style={mobileMenuStyle} className="mobile-hamburger-menu">
-            {navLinks.map(({ href, label, highlight }) => (
+            {activeNavLinks.map(({ href, label, highlight }) => (
               <Link
                 key={href}
                 href={href}
@@ -89,9 +102,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             ))}
             {!isLoading && user && (
               <>
-                <Link href="/settings/config" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>設定</Link>
-                {user.role === "admin" && (
-                  <Link href="/users" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>ユーザー管理</Link>
+                {isAdmin && (
+                  <>
+                    <Link href="/settings/config" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>設定</Link>
+                    <Link href="/users" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>ユーザー管理</Link>
+                    <Link href="/partner/dashboard" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>パートナーダッシュボード</Link>
+                    <Link href="/partner/users" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>テスター管理</Link>
+                  </>
                 )}
                 <button onClick={handleLogout} style={mobileLogoutStyle}>ログアウト</button>
               </>
