@@ -177,3 +177,32 @@ sudo systemctl status ultra-autotrade-backend
 - 影響範囲と対策メモ
 
 これらは、今後のリリース計画や回帰テストの観点で重要な情報となる。
+
+---
+
+## ⚠️ DB保護ルール（テスター投入後は絶対遵守）
+
+### 禁止事項
+- `docker compose down -v` は絶対に使わない（`-v` はボリューム削除 = テスター全データ消失）
+- `docker volume rm` は絶対に使わない
+- `DROP TABLE` / `TRUNCATE` は絶対に使わない
+- `ALTER TABLE DROP COLUMN` は事前にバックアップ取得後のみ
+
+### ロールバック時のDB保護手順
+1. バックアップ取得: `bash scripts/backup_db.sh`
+2. コード巻き戻し: `git checkout <previous-commit>`
+3. 再ビルド: `docker compose -f docker-compose.staging.yml --env-file .env.staging build --no-cache`
+4. 再起動: `docker compose -f docker-compose.staging.yml --env-file .env.staging down && docker compose -f docker-compose.staging.yml --env-file .env.staging up -d`
+5. DBは触らない（コードだけ戻る）
+
+### DB復元が必要な場合のみ
+```bash
+# バックアップから復元
+gunzip -c /opt/ultra-autotrade/backups/ultra_autotrade_YYYYMMDD_HHMMSS.sql.gz | \
+  docker exec -i $(docker ps -qf "name=postgres") psql -U ultra -d ultra_autotrade
+```
+
+### バックアップ一覧確認
+```bash
+ls -lh /opt/ultra-autotrade/backups/
+```

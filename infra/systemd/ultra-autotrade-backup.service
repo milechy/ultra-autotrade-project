@@ -1,0 +1,8 @@
+[Unit]
+Description=Ultra AutoTrade DB Backup
+After=docker.service
+
+[Service]
+Type=oneshot
+User=ultra
+ExecStart=/opt/ultra-autotrade/scripts/backup_db.sh
