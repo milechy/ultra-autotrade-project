@@ -25,7 +25,7 @@ const AUTH_SKIP_PATHS = [
 ]
 
 function isAuthSkipPath(path: string): boolean {
-  return AUTH_SKIP_PATHS.some((skip) => path === skip || path.startsWith(skip + '?'))
+  return AUTH_SKIP_PATHS.some((skip) => path.startsWith(skip))
 }
 
 function authHeaders(): Record<string, string> {
