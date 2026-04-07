@@ -163,7 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     isAuthenticated: !!(user || token),
     isAdmin: user?.role === "admin",
-    isPartner: user?.role === "partner",
+    isPartner: (user?.role as string | undefined) === "partner" || user?.role === "admin",
     login,
     loginWithWallet,
     logout,
