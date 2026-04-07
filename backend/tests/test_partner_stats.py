@@ -16,10 +16,9 @@ from sqlalchemy.orm import Session, sessionmaker
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-partner-stats")
 
 # noqa: E402 — env vars must be set before importing app modules
-from app.auth.models import User  # noqa: F401
+from app.auth.models import User
 from app.auth.router import router as auth_router
 from app.database import Base, get_db
-from app.invitations.models import Invitation
 from app.partner.router import router as partner_router
 from app.portfolio.models import PortfolioHistory, PortfolioSnapshot
 from app.users.router import router as users_router
@@ -117,19 +116,13 @@ def _create_viewer(
     assert r.status_code == 201, r.text
     user_id = int(r.json()["id"])
 
-    # 招待テーブルに partner→user の紐づきを直接挿入する
+    # users.invited_by に partner_id を設定して紐づきを記録する
     db = session_factory()
     try:
-        inv = Invitation(
-            code=f"TEST-{user_id:08d}",
-            partner_id=partner_id,
-            invited_user_id=user_id,
-            expires_at=datetime.now(timezone.utc) + timedelta(days=1),
-            max_uses=1,
-            used_count=1,
-        )
-        db.add(inv)
-        db.commit()
+        user = db.query(User).filter(User.id == user_id).first()
+        if user is not None:
+            user.invited_by = partner_id
+            db.commit()
     finally:
         db.close()
 

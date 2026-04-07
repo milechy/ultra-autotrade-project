@@ -79,6 +79,10 @@ def register(
             user = AuthService.create_user(db, request, role=UserRole.VIEWER.value)
         except ValueError as e:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        # Record which partner invited this user (supports multi-use codes)
+        user.invited_by = invitation.partner_id
+        db.commit()
+        db.refresh(user)
         invitation_service.increment_usage(db, invitation, user_id=user.id)
         logger.info(
             "User registered via invitation: %s (partner_id=%d)", user.email, invitation.partner_id

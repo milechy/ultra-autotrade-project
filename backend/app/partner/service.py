@@ -10,23 +10,20 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.invitations.models import Invitation
+from app.auth.models import User
 from app.portfolio.models import PortfolioHistory, PortfolioSnapshot
 
 from .schemas import MonthlyStatsResponse, PartnerStatsResponse, UserStatsResponse
 
 
 def _get_partner_user_ids(db: Session, partner_id: int) -> list[int]:
-    """招待テーブルからパートナーに紐づくユーザー ID を取得する。"""
-    invitations = (
-        db.query(Invitation)
-        .filter(
-            Invitation.partner_id == partner_id,
-            Invitation.invited_user_id.isnot(None),
-        )
-        .all()
-    )
-    return [inv.invited_user_id for inv in invitations if inv.invited_user_id is not None]
+    """users.invited_by からパートナーに紐づくユーザー ID を取得する。
+
+    マルチユース招待コード対応: Invitation.invited_user_id（1件のみ）ではなく
+    users.invited_by（ユーザーごとに記録）を参照する。
+    """
+    users = db.query(User.id).filter(User.invited_by == partner_id).all()
+    return [u.id for u in users]
 
 
 def get_partner_stats(db: Session, partner_id: int) -> PartnerStatsResponse:
@@ -136,15 +133,9 @@ def get_user_stats(db: Session, partner_id: int, user_id: int) -> UserStatsRespo
     招待テーブルで partner_id との紐づきを確認する。
     紐づきがない場合は ValueError を送出する。
     """
-    invitation = (
-        db.query(Invitation)
-        .filter(
-            Invitation.partner_id == partner_id,
-            Invitation.invited_user_id == user_id,
-        )
-        .first()
-    )
-    if invitation is None:
+    # users.invited_by でパートナーとの紐づきを確認（マルチユース招待コード対応）
+    target_user = db.query(User).filter(User.id == user_id, User.invited_by == partner_id).first()
+    if target_user is None:
         raise ValueError(f"User {user_id} is not invited by partner {partner_id}")
 
     now = datetime.now(timezone.utc)

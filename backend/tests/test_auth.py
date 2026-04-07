@@ -584,6 +584,94 @@ class TestUsersManagement:
         assert response.status_code == 400
         assert "deactivate" in response.json()["detail"].lower()
 
+    def _create_partner_token(self, client: TestClient, admin_token: str) -> str:
+        """admin が partner ユーザーを作成し、そのトークンを返す。"""
+        client.post(
+            "/users",
+            json={
+                "email": "partner@example.com",
+                "username": "partnertestuser",
+                "password": "partnerpassword123",
+                "role": "partner",
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        login = client.post(
+            "/auth/login",
+            json={"email": "partner@example.com", "password": "partnerpassword123"},
+        )
+        return login.json()["access_token"]
+
+    def test_partner_create_viewer_succeeds(self, client: TestClient):
+        """partner は viewer ユーザーを作成できる。"""
+        admin_token = self._setup_admin(client)
+        partner_token = self._create_partner_token(client, admin_token)
+
+        response = client.post(
+            "/users",
+            json={
+                "email": "newviewer@example.com",
+                "username": "newviewer",
+                "password": "viewerpassword123",
+                "role": "viewer",
+            },
+            headers={"Authorization": f"Bearer {partner_token}"},
+        )
+        assert response.status_code == 201
+        assert response.json()["role"] == "viewer"
+
+    def test_partner_create_admin_blocked(self, client: TestClient):
+        """partner が role=admin でユーザー作成しようとすると 403。"""
+        admin_token = self._setup_admin(client)
+        partner_token = self._create_partner_token(client, admin_token)
+
+        response = client.post(
+            "/users",
+            json={
+                "email": "evil@example.com",
+                "username": "eviladmin",
+                "password": "evilpassword123",
+                "role": "admin",
+            },
+            headers={"Authorization": f"Bearer {partner_token}"},
+        )
+        assert response.status_code == 403
+        assert "viewer" in response.json()["detail"].lower()
+
+    def test_partner_create_editor_blocked(self, client: TestClient):
+        """partner が role=editor でユーザー作成しようとすると 403。"""
+        admin_token = self._setup_admin(client)
+        partner_token = self._create_partner_token(client, admin_token)
+
+        response = client.post(
+            "/users",
+            json={
+                "email": "editor@example.com",
+                "username": "neweditor",
+                "password": "editorpassword123",
+                "role": "editor",
+            },
+            headers={"Authorization": f"Bearer {partner_token}"},
+        )
+        assert response.status_code == 403
+
+    def test_admin_create_partner_succeeds(self, client: TestClient):
+        """admin は role=partner でユーザーを作成できる。"""
+        admin_token = self._setup_admin(client)
+
+        response = client.post(
+            "/users",
+            json={
+                "email": "newpartner@example.com",
+                "username": "newpartner",
+                "password": "partnerpassword123",
+                "role": "partner",
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 201
+        assert response.json()["role"] == "partner"
+
 
 class TestUsernameValidation:
     """ユーザー名バリデーションのテスト。"""

@@ -22,6 +22,7 @@ from app.auth.models import User
 from app.auth.schemas import (
     UserCreateRequest,
     UserResponse,
+    UserRole,
     UserUpdateRequest,
 )
 from app.auth.service import AuthService
@@ -64,11 +65,18 @@ def create_user(
     """
     新しいユーザーを作成する。
 
-    管理者のみアクセス可能。
+    - admin: 全ロール作成可能
+    - partner: viewer のみ作成可能（権限昇格防止）
     """
+    # partner は viewer のみ作成可能（admin/editor/partner は作成不可）
+    if admin.role == UserRole.PARTNER.value and request.role != UserRole.VIEWER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Partner can only create viewer users",
+        )
     try:
         user = AuthService.create_user(db, request)
-        logger.info("Admin %s created user: %s", admin.email, user.email)
+        logger.info("%s %s created user: %s", admin.role, admin.email, user.email)
         return UserResponse.model_validate(user)
     except ValueError as e:
         raise HTTPException(

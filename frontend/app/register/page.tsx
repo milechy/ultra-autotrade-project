@@ -15,10 +15,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
 interface InvitationResponse {
-  code: string;
-  email?: string;
-  is_valid: boolean;
+  valid: boolean;
+  partner_id?: number;
   expires_at?: string;
+  uses_remaining?: number;
 }
 
 interface RegisterResponse {
@@ -48,8 +48,7 @@ function RegisterForm() {
 
     apiFetch<InvitationResponse>(`/api/invitations/${encodeURIComponent(code)}`)
       .then((inv) => {
-        if (inv.is_valid) {
-          if (inv.email) setEmail(inv.email);
+        if (inv.valid) {
           setInvitationStatus("valid");
         } else {
           setInvitationStatus("invalid");
