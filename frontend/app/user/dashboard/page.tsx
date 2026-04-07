@@ -231,7 +231,10 @@ function ActiveDashboard() {
 
 export default function DashboardPage() {
   const { data: settings, error: settingsError } = useAuthFetch<UserSettings>('/api/user/settings')
-  const userMode: UserMode | null = settings?.user_mode ?? (settingsError ? 'active' : null)
+  // Resolve to 'active' as soon as any response arrives (data or error).
+  // Keeps null only during the initial loading state (no response yet).
+  const userMode: UserMode | null =
+    settings?.user_mode ?? (settings !== null || settingsError !== null ? 'active' : null)
 
   // Loading skeleton
   if (userMode === null) {
