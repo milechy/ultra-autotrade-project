@@ -32,8 +32,14 @@ function getSafeRedirect(redirect: string | null): string {
   return defaultPath;
 }
 
+function getRoleDefaultPath(role: string | undefined): string {
+  if (role === "admin") return "/dashboard";
+  if (role === "partner") return "/partner/dashboard";
+  return "/user/dashboard";
+}
+
 function LoginForm() {
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -46,9 +52,12 @@ function LoginForm() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace(getSafeRedirect(redirectParam));
+      const dest = redirectParam
+        ? getSafeRedirect(redirectParam)
+        : getRoleDefaultPath(user?.role);
+      router.replace(dest);
     }
-  }, [isAuthenticated, isLoading, redirectParam, router]);
+  }, [isAuthenticated, isLoading, redirectParam, router, user?.role]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -59,9 +68,7 @@ function LoginForm() {
       const loggedInUser = await login(email, password);
       const dest = redirectParam
         ? getSafeRedirect(redirectParam)
-        : loggedInUser.role === "admin" ? "/dashboard"
-        : loggedInUser.role === "partner" ? "/partner/dashboard"
-        : "/user/dashboard";
+        : getRoleDefaultPath(loggedInUser.role);
       router.replace(dest);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "ログインに失敗しました";

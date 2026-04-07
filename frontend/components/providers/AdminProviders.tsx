@@ -8,7 +8,7 @@ import { AuthProvider, useAuth } from '@/lib/auth'
 import AppShell from '@/components/layout/AppShell'
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isAdmin, isLoading } = useAuth()
+  const { isAuthenticated, isAdmin, isPartner, isLoading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -18,9 +18,9 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
       return
     }
     if (!isAdmin) {
-      router.replace('/user/dashboard')
+      router.replace(isPartner ? '/partner/dashboard' : '/user/dashboard')
     }
-  }, [isLoading, isAuthenticated, isAdmin, router])
+  }, [isLoading, isAuthenticated, isAdmin, isPartner, router])
 
   if (isLoading) {
     return <div style={{ padding: 40, textAlign: 'center' }}>読み込み中...</div>
