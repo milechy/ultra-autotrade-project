@@ -12,6 +12,7 @@ import {
   AssetChart,
   LatestDecision,
   SafetyScore,
+  AiAccuracyCard,
 } from './_components'
 import { useAuthFetch } from '@/hooks/useAuthFetch'
 
@@ -162,9 +163,19 @@ function ManagedDashboard() {
         <RecentOpsCard />
       </section>
 
+      {/* AI accuracy */}
+      <section>
+        <AiAccuracyCard />
+      </section>
+
       {/* Footer note */}
       <p className="text-center text-xs text-zinc-600">
         {t('managedFootnote')}
+      </p>
+
+      {/* Disclaimer */}
+      <p className="text-center text-xs text-zinc-600">
+        ※参考利回りです。将来の収益を保証するものではありません
       </p>
     </div>
   )
@@ -203,6 +214,15 @@ function ActiveDashboard() {
         <h2 className="text-sm font-semibold text-zinc-400 mb-3">{t('latestDecision')}</h2>
         <LatestDecision />
       </section>
+
+      <section>
+        <AiAccuracyCard />
+      </section>
+
+      {/* Disclaimer */}
+      <p className="text-center text-xs text-zinc-600">
+        ※参考利回りです。将来の収益を保証するものではありません
+      </p>
     </div>
   )
 }
