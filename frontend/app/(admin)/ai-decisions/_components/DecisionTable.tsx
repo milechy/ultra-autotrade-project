@@ -20,6 +20,8 @@ interface DecisionTableProps {
   page: number
   onPageChange: (page: number) => void
   onRowClick: (decision: AiDecision) => void
+  /** サーバーサイドページネーション時の総件数。省略時はクライアントサイドで算出。 */
+  totalCount?: number
 }
 
 function formatDateTime(iso: string): string {
@@ -41,9 +43,16 @@ export function DecisionTable({
   page,
   onPageChange,
   onRowClick,
+  totalCount,
 }: DecisionTableProps) {
-  const totalPages = Math.max(1, Math.ceil(decisions.length / PAGE_SIZE))
-  const paginated = decisions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  // totalCount が渡された場合はサーバーサイドページネーション（decisions は既に1ページ分）
+  const isServerPaged = totalCount != null
+  const totalPages = isServerPaged
+    ? Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+    : Math.max(1, Math.ceil(decisions.length / PAGE_SIZE))
+  const paginated = isServerPaged
+    ? decisions
+    : decisions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <div className="space-y-3">
@@ -51,7 +60,7 @@ export function DecisionTable({
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
           判定履歴
           <span className="font-normal text-gray-400 dark:text-gray-500 text-xs ml-2">
-            {decisions.length} 件
+            {isServerPaged ? `${totalCount} 件` : `${decisions.length} 件`}
           </span>
         </h2>
       </div>

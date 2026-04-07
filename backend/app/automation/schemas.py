@@ -232,6 +232,17 @@ class MetricAggregate(BaseModel):
         description="対象期間中に最後に観測された値（観測がなければ None）。",
     )
 
+    @field_validator("min", "max", "avg", "last", mode="before")
+    @classmethod
+    def cap_infinity(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """非有限値（Infinity, -Infinity, NaN）を安全な値に丸める。
+        Aave V3 はポジションなし時に HF=∞ を返し、これが metric_aggregates 経由で流入する。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            if v != v:  # NaN check
+                return None
+            return Decimal("999.0") if v > 0 else Decimal("-999.0")
+        return v
+
 
 class DashboardSnapshot(BaseModel):
     """

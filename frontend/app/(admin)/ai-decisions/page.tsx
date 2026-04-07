@@ -2,8 +2,9 @@
 // Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import AuthGuard from '@/components/AuthGuard'
+import { useAuth } from '@/lib/auth'
 import {
   DecisionKPIs,
   ActionDistributionChart,
@@ -14,73 +15,34 @@ import {
 } from './_components'
 import type { DecisionFiltersState } from './_components/DecisionFilters'
 import type { AiDecision } from './mock-data'
+import {
+  fetchAIDecisions,
+} from '@/lib/api/ai-decisions'
 
-// ─── Spec mock data ────────────────────────────────────────────────────────────
+const PAGE_SIZE = 20
 
-type SpecAction = 'BUY' | 'SELL' | 'HOLD'
+// ─── Filter → API params mapper ───────────────────────────────────────────────
 
-const SPEC_MOCK_DECISIONS: AiDecision[] = Array.from({ length: 50 }, (_, i) => {
-  const queries = [
-    'BTC急落ニュース分析',
-    'ETH 2.0アップデート影響',
-    'Fed利上げ見送り分析',
-    'USDC depeg懸念',
-    'Aave V3 TVL急増',
-  ]
-  const actions: SpecAction[] = ['BUY', 'SELL', 'HOLD']
-  const action = actions[i % 3]
-  const gptAction = actions[(i + (i % 5 === 0 ? 1 : 0)) % 3]
-  const confidence = (50 + (i * 7) % 50) / 100
+function filtersToApiParams(filters: DecisionFiltersState) {
+  let minConfidence: number | undefined
+  let maxConfidence: number | undefined
+  if (filters.confidenceRange === '0-50') { minConfidence = 0; maxConfidence = 50 }
+  else if (filters.confidenceRange === '50-70') { minConfidence = 50; maxConfidence = 70 }
+  else if (filters.confidenceRange === '70-100') { minConfidence = 70; maxConfidence = 100 }
+
+  const agreed =
+    filters.agreeFilter === 'agreed'
+      ? true
+      : filters.agreeFilter === 'disagreed'
+        ? false
+        : undefined
 
   return {
-    id: 'dec-' + String(i).padStart(3, '0'),
-    timestamp: new Date(Date.now() - i * 3600000).toISOString(),
-    query: queries[i % 5],
-    final_action: action,
-    final_confidence: confidence,
-    claude_action: action,
-    claude_confidence: confidence,
-    claude_reason:
-      'テクニカル指標とマクロ経済状況を総合的に判断した結果です。',
-    claude_raw_response: `{"action":"${action}","confidence":${confidence.toFixed(2)},"reasoning":"..."}`,
-    gpt4o_action: gptAction,
-    gpt4o_confidence: Math.max(0.3, confidence - 0.05),
-    gpt4o_reason: 'クロスバリデーション結果に基づく判定です。',
-    gpt4o_raw_response: `{"action":"${gptAction}","confidence":${(confidence - 0.05).toFixed(2)}}`,
-    agreed: i % 5 !== 0,
-    rag_context:
-      i % 3 === 0
-        ? {
-            query: queries[i % 5],
-            chunks: [
-              'Knowledge Hub: 関連ニュース3件を参照',
-              'マクロ経済レポート1件を参照',
-            ],
-            source_count: 4,
-          }
-        : undefined,
-    executed: i % 4 === 0,
+    action: filters.action === 'ALL' ? undefined : filters.action,
+    minConfidence,
+    maxConfidence,
+    agreed,
   }
-})
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function applyFilters(
-  decisions: AiDecision[],
-  filters: DecisionFiltersState
-): AiDecision[] {
-  return decisions.filter((d) => {
-    if (filters.action !== 'ALL' && d.final_action !== filters.action) {
-      return false
-    }
-    const pct = d.final_confidence * 100
-    if (filters.confidenceRange === '0-50' && pct >= 50) return false
-    if (filters.confidenceRange === '50-70' && (pct < 50 || pct >= 70)) return false
-    if (filters.confidenceRange === '70-100' && pct < 70) return false
-    if (filters.agreeFilter === 'agreed' && !d.agreed) return false
-    if (filters.agreeFilter === 'disagreed' && d.agreed) return false
-    return true
-  })
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -96,8 +58,12 @@ export default function AiDecisionsPage() {
 // ─── Page content ─────────────────────────────────────────────────────────────
 
 function AiDecisionsContent() {
-  // TODO: Replace SPEC_MOCK_DECISIONS with GET /api/ai/decisions?page=1&limit=20
-  const decisions = SPEC_MOCK_DECISIONS
+  const { token } = useAuth()
+
+  const [decisions, setDecisions] = useState<AiDecision[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const [filters, setFilters] = useState<DecisionFiltersState>({
     action: 'ALL',
@@ -108,14 +74,51 @@ function AiDecisionsContent() {
   const [selectedDecision, setSelectedDecision] = useState<AiDecision | null>(null)
   const [showTriggerModal, setShowTriggerModal] = useState(false)
 
-  const filtered = useMemo(
-    () => applyFilters(decisions, filters),
-    [decisions, filters]
+  const load = useCallback(
+    async (currentPage: number, currentFilters: DecisionFiltersState) => {
+      if (!token) return
+      setLoading(true)
+      setError(null)
+      try {
+        const params = filtersToApiParams(currentFilters)
+        const result = await fetchAIDecisions(token, {
+          page: currentPage,
+          limit: PAGE_SIZE,
+          ...params,
+        })
+        setDecisions(result.items)
+        setTotal(result.total)
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : (err as { message?: string })?.message ?? 'データ取得に失敗しました'
+        setError(msg)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [token]
   )
+
+  // 初回ロードとフィルター/ページ変更時に再取得
+  useEffect(() => {
+    void load(page, filters)
+  }, [load, page, filters])
 
   function handleFilterChange(next: DecisionFiltersState) {
     setFilters(next)
     setPage(1)
+  }
+
+  function handlePageChange(next: number) {
+    setPage(next)
+  }
+
+  // 手動判定後にリフレッシュ
+  function handleTriggered() {
+    setPage(1)
+    void load(1, filters)
   }
 
   return (
@@ -140,10 +143,26 @@ function AiDecisionsContent() {
         </button>
       </div>
 
+      {/* Error banner */}
+      {error && (
+        <div className="mb-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 p-3 text-sm text-red-700 dark:text-red-300">
+          {error}
+        </div>
+      )}
+
+      {/* Loading skeleton */}
+      {loading && decisions.length === 0 && (
+        <div className="mb-6 py-12 text-center text-sm text-gray-400 dark:text-gray-600">
+          読み込み中...
+        </div>
+      )}
+
       {/* KPI cards */}
-      <div className="mb-6">
-        <DecisionKPIs decisions={decisions} />
-      </div>
+      {decisions.length > 0 && (
+        <div className="mb-6">
+          <DecisionKPIs decisions={decisions} />
+        </div>
+      )}
 
       {/* Chart + Filters */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -152,12 +171,19 @@ function AiDecisionsContent() {
       </div>
 
       {/* Decision table */}
-      <DecisionTable
-        decisions={filtered}
-        page={page}
-        onPageChange={setPage}
-        onRowClick={setSelectedDecision}
-      />
+      {!loading && decisions.length === 0 && !error ? (
+        <div className="py-16 text-center text-sm text-gray-400 dark:text-gray-600">
+          条件に一致する判定履歴がありません。
+        </div>
+      ) : (
+        <DecisionTable
+          decisions={decisions}
+          page={page}
+          onPageChange={handlePageChange}
+          onRowClick={setSelectedDecision}
+          totalCount={total}
+        />
+      )}
 
       {/* Modals */}
       <DecisionDetailModal
@@ -167,6 +193,7 @@ function AiDecisionsContent() {
       <ManualTriggerModal
         open={showTriggerModal}
         onClose={() => setShowTriggerModal(false)}
+        onTriggered={handleTriggered}
       />
     </>
   )

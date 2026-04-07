@@ -15,6 +15,7 @@ const adminNavLinks = [
   { href: "/protocols", label: "プロトコル" },
   { href: "/events", label: "データ" },
   { href: "/trades", label: "取引所管理" },
+  { href: "/proposals", label: "提案管理" },
   { href: "/user/dashboard", label: "ユーザーアプリ →", highlight: true },
 ];
 

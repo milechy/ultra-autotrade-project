@@ -2,7 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import {
   TradeActionBadge,
@@ -10,6 +10,7 @@ import {
   TxHashLink,
   DateRangeFilter,
 } from "@/components/shared";
+import type { TxHashLinkProps } from "@/components/shared/TxHashLink";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,176 +21,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download } from "lucide-react";
+import { Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import {
+  fetchAdminTransactions,
+  type AdminTransaction,
+} from "@/lib/api/admin-transactions";
 
 // -----------------------------------------------------------------------
-// Types
+// Constants
 // -----------------------------------------------------------------------
 
-type TradeAction = "BUY" | "SELL" | "HOLD";
-type TradeStatus = "SUCCESS" | "FAILED" | "PENDING";
-
-interface Trade {
-  id: string;
-  timestamp: string;
-  userId: string;
-  walletAddress: string;
-  action: TradeAction;
-  asset: string;
-  amount: number;
-  amountUSD: number;
-  status: TradeStatus;
-  txHash: string | null;
-  chain: "arbitrum" | "base" | "ethereum";
-  isDryRun: boolean;
-}
-
-// -----------------------------------------------------------------------
-// TODO: GET /api/admin/trades - Replace mock data with real API
-// -----------------------------------------------------------------------
-
-const MOCK_TRADES: Trade[] = [
-  {
-    id: "trade-001",
-    timestamp: "2026-03-22T10:30:00Z",
-    userId: "user-1",
-    walletAddress: "0xAbCdEf1234567890AbCdEf1234567890AbCdEf12",
-    action: "BUY",
-    asset: "USDC",
-    amount: 500,
-    amountUSD: 500,
-    status: "SUCCESS",
-    txHash: "0xabc123def456abc123def456abc123def456abc123def456abc123def456abc1",
-    chain: "arbitrum",
-    isDryRun: false,
-  },
-  {
-    id: "trade-002",
-    timestamp: "2026-03-22T09:15:00Z",
-    userId: "user-2",
-    walletAddress: "0x1234567890AbCdEf1234567890AbCdEf12345678",
-    action: "SELL",
-    asset: "USDC",
-    amount: 200,
-    amountUSD: 200,
-    status: "SUCCESS",
-    txHash: "0xdef456abc789def456abc789def456abc789def456abc789def456abc789def4",
-    chain: "base",
-    isDryRun: false,
-  },
-  {
-    id: "trade-003",
-    timestamp: "2026-03-22T08:00:00Z",
-    userId: "user-1",
-    walletAddress: "0xAbCdEf1234567890AbCdEf1234567890AbCdEf12",
-    action: "HOLD",
-    asset: "USDC",
-    amount: 0,
-    amountUSD: 0,
-    status: "SUCCESS",
-    txHash: null,
-    chain: "arbitrum",
-    isDryRun: true,
-  },
-  {
-    id: "trade-004",
-    timestamp: "2026-03-21T22:45:00Z",
-    userId: "user-3",
-    walletAddress: "0x9876543210FeDcBa9876543210FeDcBa98765432",
-    action: "BUY",
-    asset: "ETH",
-    amount: 0.15,
-    amountUSD: 412,
-    status: "FAILED",
-    txHash: null,
-    chain: "ethereum",
-    isDryRun: false,
-  },
-  {
-    id: "trade-005",
-    timestamp: "2026-03-21T18:30:00Z",
-    userId: "user-2",
-    walletAddress: "0x1234567890AbCdEf1234567890AbCdEf12345678",
-    action: "BUY",
-    asset: "USDC",
-    amount: 1000,
-    amountUSD: 1000,
-    status: "SUCCESS",
-    txHash: "0xfed123abc456fed123abc456fed123abc456fed123abc456fed123abc456fed1",
-    chain: "arbitrum",
-    isDryRun: true,
-  },
-  {
-    id: "trade-006",
-    timestamp: "2026-03-21T14:00:00Z",
-    userId: "user-4",
-    walletAddress: "0xFeDcBa9876543210FeDcBa9876543210FeDcBa98",
-    action: "SELL",
-    asset: "USDC",
-    amount: 750,
-    amountUSD: 750,
-    status: "PENDING",
-    txHash: null,
-    chain: "arbitrum",
-    isDryRun: false,
-  },
-  {
-    id: "trade-007",
-    timestamp: "2026-03-21T10:15:00Z",
-    userId: "user-1",
-    walletAddress: "0xAbCdEf1234567890AbCdEf1234567890AbCdEf12",
-    action: "BUY",
-    asset: "WBTC",
-    amount: 0.005,
-    amountUSD: 325,
-    status: "SUCCESS",
-    txHash: "0x111aaa222bbb333ccc444ddd555eee666fff777aaa888bbb999ccc000ddd111e",
-    chain: "base",
-    isDryRun: false,
-  },
-  {
-    id: "trade-008",
-    timestamp: "2026-03-20T20:00:00Z",
-    userId: "user-5",
-    walletAddress: "0xCaFeBaBe1234567890CaFeBaBe1234567890CaFe",
-    action: "SELL",
-    asset: "ETH",
-    amount: 0.3,
-    amountUSD: 823,
-    status: "SUCCESS",
-    txHash: "0x222bbb333ccc444ddd555eee666fff777aaa888bbb999ccc000ddd111eee222f",
-    chain: "ethereum",
-    isDryRun: false,
-  },
-  {
-    id: "trade-009",
-    timestamp: "2026-03-20T16:30:00Z",
-    userId: "user-3",
-    walletAddress: "0x9876543210FeDcBa9876543210FeDcBa98765432",
-    action: "HOLD",
-    asset: "USDC",
-    amount: 0,
-    amountUSD: 0,
-    status: "SUCCESS",
-    txHash: null,
-    chain: "arbitrum",
-    isDryRun: false,
-  },
-  {
-    id: "trade-010",
-    timestamp: "2026-03-20T09:00:00Z",
-    userId: "user-2",
-    walletAddress: "0x1234567890AbCdEf1234567890AbCdEf12345678",
-    action: "BUY",
-    asset: "USDC",
-    amount: 300,
-    amountUSD: 300,
-    status: "FAILED",
-    txHash: null,
-    chain: "base",
-    isDryRun: true,
-  },
-];
+const PAGE_SIZE = 20;
 
 // -----------------------------------------------------------------------
 // Helpers
@@ -199,43 +41,47 @@ function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
 }
 
-function statusBadgeClass(status: TradeStatus): string {
-  switch (status) {
-    case "SUCCESS":
+/** Backend returns lowercase status ("success", "failed", "pending"). */
+function statusBadgeClass(status: string): string {
+  switch (status.toLowerCase()) {
+    case "success":
       return "bg-green-100 text-green-700 border-green-200";
-    case "FAILED":
+    case "failed":
       return "bg-red-100 text-red-700 border-red-200";
-    case "PENDING":
+    case "pending":
       return "bg-yellow-100 text-yellow-700 border-yellow-200";
+    default:
+      return "bg-gray-100 text-gray-700 border-gray-200";
   }
 }
 
-function statusLabel(status: TradeStatus): string {
-  switch (status) {
-    case "SUCCESS": return "成功";
-    case "FAILED": return "失敗";
-    case "PENDING": return "処理中";
+function statusLabel(status: string): string {
+  switch (status.toLowerCase()) {
+    case "success": return "成功";
+    case "failed": return "失敗";
+    case "pending": return "処理中";
+    default: return status;
   }
 }
 
-function exportCsv(trades: Trade[]) {
+function exportCsv(trades: AdminTransaction[]) {
   const headers = [
     "ID", "日時", "ユーザーID", "ウォレット", "操作", "アセット",
     "数量", "USD相当", "ステータス", "Tx Hash", "チェーン", "Dry Run",
   ];
   const rows = trades.map((t) => [
     t.id,
-    formatDateTime(t.timestamp),
-    t.userId,
-    t.walletAddress,
-    t.action,
+    formatDateTime(t.created_at),
+    t.user_id,
+    t.wallet_address ?? "",
+    t.operation,
     t.asset,
     t.amount,
-    t.amountUSD,
+    t.amount_usd,
     t.status,
-    t.txHash ?? "",
+    t.tx_hash ?? "",
     t.chain,
-    t.isDryRun ? "Yes" : "No",
+    t.is_dry_run ? "Yes" : "No",
   ]);
   const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -252,24 +98,83 @@ function exportCsv(trades: Trade[]) {
 // -----------------------------------------------------------------------
 
 function TradesContent() {
-  const [userFilter, setUserFilter] = useState("");
-  const [actionFilter, setActionFilter] = useState<"ALL" | TradeAction>("ALL");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | TradeStatus>("ALL");
+  const [searchInput, setSearchInput] = useState("");
+  const [actionFilter, setActionFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | "all">("all");
+  const [page, setPage] = useState(0);
 
-  const filtered = useMemo(() => {
-    return MOCK_TRADES.filter((t) => {
-      if (userFilter && !t.walletAddress.toLowerCase().includes(userFilter.toLowerCase()) &&
-          !t.userId.toLowerCase().includes(userFilter.toLowerCase())) return false;
-      if (actionFilter !== "ALL" && t.action !== actionFilter) return false;
-      if (statusFilter !== "ALL" && t.status !== statusFilter) return false;
-      if (dateRange !== "all") {
-        const ts = new Date(t.timestamp);
-        if (ts < dateRange.from || ts > dateRange.to) return false;
+  const [trades, setTrades] = useState<AdminTransaction[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Debounce search input
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedSearch(value);
+      setPage(0);
+    }, 400);
+  };
+
+  const fetchTrades = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const filters: Parameters<typeof fetchAdminTransactions>[0] = {
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+      };
+
+      // Parse search: if numeric treat as user_id, else as wallet_address substring
+      if (debouncedSearch) {
+        const numeric = Number(debouncedSearch);
+        if (!isNaN(numeric) && debouncedSearch.trim() !== "") {
+          filters.user_id = numeric;
+        } else {
+          filters.wallet_address = debouncedSearch;
+        }
       }
-      return true;
-    });
-  }, [userFilter, actionFilter, statusFilter, dateRange]);
+
+      if (actionFilter !== "ALL") filters.operation = actionFilter;
+
+      if (statusFilter !== "ALL") filters.tx_status = statusFilter.toLowerCase();
+
+      if (dateRange !== "all") {
+        filters.date_from = dateRange.from.toISOString();
+        filters.date_to = dateRange.to.toISOString();
+      }
+
+      const res = await fetchAdminTransactions(filters);
+      setTrades(res.items);
+      setTotal(res.total);
+    } catch (err) {
+      setError("取引データの取得に失敗しました");
+      setTrades([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch, actionFilter, statusFilter, dateRange, page]);
+
+  useEffect(() => {
+    fetchTrades();
+  }, [fetchTrades]);
+
+  // Reset page when filters change
+  const handleActionChange = (v: string) => { setActionFilter(v); setPage(0); };
+  const handleStatusChange = (v: string) => { setStatusFilter(v); setPage(0); };
+  const handleDateRangeChange = (v: { from: Date; to: Date } | "all") => {
+    setDateRange(v);
+    setPage(0);
+  };
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -278,10 +183,15 @@ function TradesContent() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">取引履歴</h1>
           <p className="mt-0.5 text-xs text-gray-400">
-            全ユーザーの取引一覧 — {filtered.length} 件表示
+            全ユーザーの取引一覧 — {total.toLocaleString()} 件中 {trades.length} 件表示
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => exportCsv(filtered)}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => exportCsv(trades)}
+          disabled={trades.length === 0}
+        >
           <Download className="mr-2 h-4 w-4" />
           CSV エクスポート
         </Button>
@@ -291,12 +201,12 @@ function TradesContent() {
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm">
         <div className="flex flex-wrap gap-3">
           <Input
-            placeholder="ユーザー / ウォレットで検索..."
-            value={userFilter}
-            onChange={(e) => setUserFilter(e.target.value)}
+            placeholder="ユーザーID / ウォレットで検索..."
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="h-8 w-56 text-xs"
           />
-          <Select value={actionFilter} onValueChange={(v) => setActionFilter(v as typeof actionFilter)}>
+          <Select value={actionFilter} onValueChange={handleActionChange}>
             <SelectTrigger className="h-8 w-36 text-xs">
               <SelectValue placeholder="操作種別" />
             </SelectTrigger>
@@ -307,7 +217,7 @@ function TradesContent() {
               <SelectItem value="HOLD" className="text-xs">HOLD</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+          <Select value={statusFilter} onValueChange={handleStatusChange}>
             <SelectTrigger className="h-8 w-36 text-xs">
               <SelectValue placeholder="ステータス" />
             </SelectTrigger>
@@ -318,9 +228,16 @@ function TradesContent() {
               <SelectItem value="PENDING" className="text-xs">処理中</SelectItem>
             </SelectContent>
           </Select>
-          <DateRangeFilter onChange={setDateRange} presets />
+          <DateRangeFilter onChange={handleDateRangeChange} presets />
         </div>
       </div>
+
+      {/* Error */}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">
+          {error}
+        </div>
+      )}
 
       {/* Desktop Table */}
       <div className="hidden md:block rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
@@ -336,25 +253,35 @@ function TradesContent() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filtered.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center">
+                  <Loader2 className="inline h-5 w-5 animate-spin text-gray-400" />
+                </td>
+              </tr>
+            ) : trades.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
                   条件に一致する取引がありません
                 </td>
               </tr>
             ) : (
-              filtered.map((t) => (
-                <tr key={t.id} className="hover:bg-gray-50 dark:bg-gray-900 transition-colors">
+              trades.map((t) => (
+                <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                   <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                    {formatDateTime(t.timestamp)}
+                    {formatDateTime(t.created_at)}
                   </td>
                   <td className="px-4 py-3">
-                    <WalletAddressMask address={t.walletAddress} />
+                    {t.wallet_address ? (
+                      <WalletAddressMask address={t.wallet_address} />
+                    ) : (
+                      <span className="text-xs text-gray-500">UID: {t.user_id}</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <TradeActionBadge action={t.action} />
-                      {t.isDryRun && (
+                      <TradeActionBadge action={t.operation as "BUY" | "SELL" | "HOLD"} />
+                      {t.is_dry_run && (
                         <Badge variant="outline" className="text-xs px-1.5 py-0 text-purple-600 border-purple-200 bg-purple-50">
                           Dry Run
                         </Badge>
@@ -362,7 +289,7 @@ function TradesContent() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm font-mono text-gray-800 dark:text-gray-200">
-                    {t.action === "HOLD" ? "—" : `$${t.amountUSD.toLocaleString()}`}
+                    {t.operation === "HOLD" ? "—" : `$${Number(t.amount_usd).toLocaleString()}`}
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant="outline" className={`text-xs px-2 py-0.5 ${statusBadgeClass(t.status)}`}>
@@ -370,8 +297,8 @@ function TradesContent() {
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    {t.txHash ? (
-                      <TxHashLink hash={t.txHash} chain={t.chain} truncate />
+                    {t.tx_hash ? (
+                      <TxHashLink hash={t.tx_hash} chain={t.chain as TxHashLinkProps["chain"]} truncate />
                     ) : (
                       <span className="text-xs text-gray-400">—</span>
                     )}
@@ -385,17 +312,21 @@ function TradesContent() {
 
       {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 text-center">
+            <Loader2 className="inline h-5 w-5 animate-spin text-gray-400" />
+          </div>
+        ) : trades.length === 0 ? (
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 text-center text-sm text-gray-400">
             条件に一致する取引がありません
           </div>
         ) : (
-          filtered.map((t) => (
+          trades.map((t) => (
             <div key={t.id} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <TradeActionBadge action={t.action} />
-                  {t.isDryRun && (
+                  <TradeActionBadge action={t.operation as "BUY" | "SELL" | "HOLD"} />
+                  {t.is_dry_run && (
                     <Badge variant="outline" className="text-xs px-1.5 py-0 text-purple-600 border-purple-200 bg-purple-50">
                       Dry Run
                     </Badge>
@@ -405,23 +336,61 @@ function TradesContent() {
                   {statusLabel(t.status)}
                 </Badge>
               </div>
-              <div className="text-xs text-gray-500">{formatDateTime(t.timestamp)}</div>
+              <div className="text-xs text-gray-500">{formatDateTime(t.created_at)}</div>
               <div>
-                <WalletAddressMask address={t.walletAddress} />
+                {t.wallet_address ? (
+                  <WalletAddressMask address={t.wallet_address} />
+                ) : (
+                  <span className="text-xs text-gray-500">UID: {t.user_id}</span>
+                )}
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">{t.asset}</span>
                 <span className="font-mono font-semibold text-gray-800 dark:text-gray-200">
-                  {t.action === "HOLD" ? "—" : `$${t.amountUSD.toLocaleString()}`}
+                  {t.operation === "HOLD" ? "—" : `$${Number(t.amount_usd).toLocaleString()}`}
                 </span>
               </div>
-              {t.txHash && (
-                <TxHashLink hash={t.txHash} chain={t.chain} truncate />
+              {t.tx_hash && (
+                <TxHashLink hash={t.tx_hash} chain={t.chain as TxHashLinkProps["chain"]} truncate />
               )}
             </div>
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <span className="text-xs">
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} / {total.toLocaleString()} 件
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p - 1)}
+              disabled={page === 0 || loading}
+              className="h-8 px-2"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              前へ
+            </Button>
+            <span className="text-xs">
+              {page + 1} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= totalPages - 1 || loading}
+              className="h-8 px-2"
+            >
+              次へ
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -48,3 +48,17 @@ class ProposalResponse(BaseModel):
 class ProposalListResponse(BaseModel):
     items: List[ProposalResponse]
     total: int
+
+
+class AdminProposalItem(ProposalResponse):
+    """管理者向け提案レスポンス（ユーザー名付き）。"""
+
+    username: Optional[str] = None
+    email: Optional[str] = None
+
+
+class AdminProposalListResponse(BaseModel):
+    items: List[AdminProposalItem]
+    total: int
+    page: int
+    limit: int

@@ -6,17 +6,25 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_active_user, require_admin, require_viewer
 from app.auth.models import User
+from app.auth.models import User as UserModel
 from app.database import get_db
 
 from .models import Proposal
-from .schemas import ProposalCreate, ProposalListResponse, ProposalResponse
+from .schemas import (
+    AdminProposalItem,
+    AdminProposalListResponse,
+    ProposalCreate,
+    ProposalListResponse,
+    ProposalResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +120,59 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
     except Exception as exc:  # noqa: BLE001
         logger.error("proposal %d: Aave execution failed — %s", proposal.id, exc, exc_info=True)
         # Aave 実行失敗時は "approved" のまま（再試行可能にする）
+
+
+@router.get(
+    "/admin/all", response_model=AdminProposalListResponse, summary="全ユーザー提案一覧（管理者）"
+)
+def admin_list_proposals(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    user_id: Optional[int] = Query(None),
+    operation: Optional[str] = Query(None),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    _admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> AdminProposalListResponse:
+    """全ユーザーの提案一覧をフィルター付きで返す（管理者専用）。"""
+    stmt = select(Proposal)
+    if status_filter:
+        stmt = stmt.where(Proposal.status == status_filter)
+    if user_id is not None:
+        stmt = stmt.where(Proposal.user_id == user_id)
+    if operation:
+        stmt = stmt.where(Proposal.operation == operation)
+    if date_from:
+        stmt = stmt.where(Proposal.created_at >= date_from)
+    if date_to:
+        stmt = stmt.where(Proposal.created_at <= date_to)
+
+    total_stmt = stmt.with_only_columns(Proposal.id)
+    total = len(db.scalars(total_stmt).all())
+
+    stmt = stmt.order_by(Proposal.created_at.desc()).offset((page - 1) * limit).limit(limit)
+    proposals = db.scalars(stmt).all()
+
+    # ユーザー情報をまとめて取得
+    user_ids = list({p.user_id for p in proposals})
+    users_map: dict[int, UserModel] = {}
+    if user_ids:
+        users = db.scalars(select(UserModel).where(UserModel.id.in_(user_ids))).all()
+        users_map = {u.id: u for u in users}
+
+    items = []
+    for p in proposals:
+        u = users_map.get(p.user_id)
+        item = AdminProposalItem(
+            **ProposalResponse.model_validate(p).model_dump(),
+            username=u.username if u else None,
+            email=u.email if u else None,
+        )
+        items.append(item)
+
+    return AdminProposalListResponse(items=items, total=total, page=page, limit=limit)
 
 
 @router.get("/pending", response_model=ProposalListResponse, summary="保留中の提案リスト")

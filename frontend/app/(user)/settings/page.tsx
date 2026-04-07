@@ -17,6 +17,7 @@ import {
   LanguageCard,
   WalletInfoCard,
   AppInfoCard,
+  PasswordChangeCard,
 } from './_components'
 
 type RiskMode = 'conservative' | 'balanced' | 'aggressive'
@@ -176,7 +177,10 @@ export default function SettingsPage() {
           onDisconnect={disconnect}
         />
 
-        {/* 6. アプリ情報 */}
+        {/* 6. パスワード変更 */}
+        <PasswordChangeCard />
+
+        {/* 7. アプリ情報 */}
         <AppInfoCard />
 
         {/* U-08: 緊急停止 — POST /api/automation/emergency-stop (admin only) */}

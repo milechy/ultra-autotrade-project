@@ -129,6 +129,8 @@ def admin_list_transactions(
     operation: Optional[str] = None,
     asset: Optional[str] = None,
     tx_status: Optional[str] = None,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
     current_user: User = Depends(require_editor),
     db: Session = Depends(get_db),
 ) -> TransactionListResponse:
@@ -138,13 +140,17 @@ def admin_list_transactions(
     if user_id is not None:
         stmt = stmt.where(Transaction.user_id == user_id)
     if wallet_address:
-        stmt = stmt.where(Transaction.wallet_address == wallet_address)
+        stmt = stmt.where(Transaction.wallet_address.ilike(f"%{wallet_address}%"))
     if operation:
         stmt = stmt.where(Transaction.operation == operation)
     if asset:
         stmt = stmt.where(Transaction.asset == asset)
     if tx_status:
         stmt = stmt.where(Transaction.status == tx_status)
+    if date_from:
+        stmt = stmt.where(Transaction.created_at >= date_from)
+    if date_to:
+        stmt = stmt.where(Transaction.created_at <= date_to)
     total = len(db.scalars(stmt).all())
     stmt = stmt.order_by(Transaction.created_at.desc()).offset(offset).limit(limit)
     items = db.scalars(stmt).all()

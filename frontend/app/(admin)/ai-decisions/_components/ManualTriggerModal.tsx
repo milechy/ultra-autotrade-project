@@ -10,41 +10,47 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/lib/auth'
+import { triggerAIJudgment } from '@/lib/api/ai-decisions'
+import type { AITriggerResponse } from '@/lib/api/ai-decisions'
 
 interface ManualTriggerModalProps {
   open: boolean
   onClose: () => void
+  /** 判定完了後に呼ばれるコールバック（一覧リフレッシュ用） */
+  onTriggered?: () => void
 }
 
-export function ManualTriggerModal({ open, onClose }: ManualTriggerModalProps) {
-  const [query, setQuery] = useState('')
+export function ManualTriggerModal({ open, onClose, onTriggered }: ManualTriggerModalProps) {
+  const { token } = useAuth()
   const [running, setRunning] = useState(false)
-  const [resultMsg, setResultMsg] = useState<string | null>(null)
+  const [result, setResult] = useState<AITriggerResponse | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!query.trim()) return
+  async function handleTrigger() {
+    if (!token) {
+      setErrorMsg('認証されていません')
+      return
+    }
     setRunning(true)
-    setResultMsg(null)
+    setResult(null)
+    setErrorMsg(null)
     try {
-      // TODO: POST /api/ai/analyze
-      await new Promise((resolve) => setTimeout(resolve, 1200))
-      setResultMsg('AI判定を開始しました。しばらく後に履歴が更新されます。')
-      setQuery('')
+      const res = await triggerAIJudgment(token)
+      setResult(res)
+      onTriggered?.()
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
-      setResultMsg(`エラー: ${msg}`)
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message ?? String(err)
+      setErrorMsg(msg || 'AI判定の実行に失敗しました')
     } finally {
       setRunning(false)
     }
   }
 
   function handleClose() {
-    setResultMsg(null)
-    setQuery('')
+    setResult(null)
+    setErrorMsg(null)
     onClose()
   }
 
@@ -56,37 +62,32 @@ export function ManualTriggerModal({ open, onClose }: ManualTriggerModalProps) {
             手動判定実行
           </DialogTitle>
           <DialogDescription className="text-gray-600 dark:text-gray-400">
-            分析クエリを入力してAI判定を手動でトリガーします。
+            AI判定ジョブを今すぐ1回実行します。BUY/SELL判定時はアクティブユーザー全員に提案が作成されます。
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label
-              htmlFor="manual-query"
-              className="text-sm text-gray-700 dark:text-gray-300"
-            >
-              クエリ
-            </Label>
-            <Input
-              id="manual-query"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="例: BTC/USDT のトレンド分析..."
-              className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
-              disabled={running}
-            />
-          </div>
+        <div className="space-y-4">
+          {/* Result */}
+          {result && (
+            <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 p-3 space-y-1 text-sm">
+              <p className="font-semibold text-green-700 dark:text-green-300">判定完了</p>
+              <p className="text-green-600 dark:text-green-400">
+                判定: <span className="font-mono font-bold">{result.action}</span>
+                {' '}（信頼度 {result.confidence}%）
+              </p>
+              <p className="text-green-600 dark:text-green-400">
+                作成された提案: {result.proposals_created}件
+              </p>
+              <p className="text-xs text-green-500 dark:text-green-600">
+                判定ID: {result.decision_id}
+              </p>
+            </div>
+          )}
 
-          {resultMsg && (
-            <p
-              className={`text-sm ${
-                resultMsg.startsWith('エラー')
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-green-600 dark:text-green-400'
-              }`}
-            >
-              {resultMsg}
+          {/* Error */}
+          {errorMsg && (
+            <p className="text-sm text-red-600 dark:text-red-400">
+              エラー: {errorMsg}
             </p>
           )}
 
@@ -98,17 +99,20 @@ export function ManualTriggerModal({ open, onClose }: ManualTriggerModalProps) {
               disabled={running}
               className="border-gray-300 dark:border-gray-600"
             >
-              キャンセル
+              {result ? '閉じる' : 'キャンセル'}
             </Button>
-            <Button
-              type="submit"
-              disabled={running || !query.trim()}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {running ? '実行中...' : '実行'}
-            </Button>
+            {!result && (
+              <Button
+                type="button"
+                onClick={() => { void handleTrigger() }}
+                disabled={running}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {running ? '実行中...' : '実行'}
+              </Button>
+            )}
           </div>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   )
