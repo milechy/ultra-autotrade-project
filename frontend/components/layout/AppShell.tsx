@@ -49,7 +49,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <span style={{ color: "#999" }}>|</span>
                 <Link href="/settings/config" style={navLinkStyle}>設定</Link>
                 {user.role === "admin" && (
-                  <Link href="/users" style={navLinkStyle}>ユーザー管理</Link>
+                  <>
+                    <Link href="/users" style={navLinkStyle}>ユーザー管理</Link>
+                    <Link href="/partner/dashboard" style={navLinkStyle}>パートナーダッシュボード</Link>
+                    <Link href="/partner/users" style={navLinkStyle}>テスター管理</Link>
+                  </>
                 )}
                 <span style={{ color: "#666", fontSize: 12 }}>{user.username}</span>
                 <button onClick={handleLogout} style={logoutButtonStyle}>ログアウト</button>
@@ -91,7 +95,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <>
                 <Link href="/settings/config" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>設定</Link>
                 {user.role === "admin" && (
-                  <Link href="/users" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>ユーザー管理</Link>
+                  <>
+                    <Link href="/users" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>ユーザー管理</Link>
+                    <Link href="/partner/dashboard" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>パートナーダッシュボード</Link>
+                    <Link href="/partner/users" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>テスター管理</Link>
+                  </>
                 )}
                 <button onClick={handleLogout} style={mobileLogoutStyle}>ログアウト</button>
               </>
