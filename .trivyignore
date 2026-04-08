@@ -1,0 +1,7 @@
+# Trivy ignore list
+# Format: CVE-ID or GHSA-ID, one per line
+# See: https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/#trivyignore
+
+# Next.js 14→15 major upgrade required — tracked as separate task
+# DoS via HTTP request deserialization in RSC (not exposed externally)
+GHSA-h25m-26qc-wcjf
