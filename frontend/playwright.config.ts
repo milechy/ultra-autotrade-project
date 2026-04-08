@@ -10,6 +10,7 @@ export default defineConfig({
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
     baseURL: process.env.STAGING_URL || 'https://app.ultra-auto-trade.com',
+    locale: 'ja-JP',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'off',

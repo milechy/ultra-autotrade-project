@@ -23,6 +23,7 @@ export interface UserDetailModalProps {
   onClose: () => void
   onUpdated: (user: UserResponse) => void
   onDeleted: (userId: number) => void
+  onEdit?: (user: UserResponse) => void
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -57,6 +58,7 @@ export function UserDetailModal({
   onClose,
   onUpdated,
   onDeleted,
+  onEdit,
 }: UserDetailModalProps) {
   const [editing, setEditing] = useState(false)
   const [editUsername, setEditUsername] = useState('')
@@ -219,22 +221,34 @@ export function UserDetailModal({
               </div>
 
               {!editing && (
-                <div className="flex items-center justify-between pt-2 border-t border-gray-800">
+                <div className="flex items-center justify-between pt-2 border-t border-gray-800 gap-2 flex-wrap">
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => setShowConfirmDelete(true)}
                     className="border-red-800 text-red-400 hover:bg-red-950 hover:text-red-300"
                   >
-                    無効化
+                    削除
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleStartEdit}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    編集
-                  </Button>
+                  <div className="flex gap-2">
+                    {onEdit && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { handleClose(); onEdit(user) }}
+                        className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                      >
+                        ログイン情報を編集
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={handleStartEdit}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      編集
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

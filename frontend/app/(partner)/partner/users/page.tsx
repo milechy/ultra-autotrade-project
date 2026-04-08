@@ -18,6 +18,7 @@ import { apiFetch } from '@/lib/api/client'
 import type { UserResponse } from '@/lib/api/auth'
 import { InviteModal } from './_components/InviteModal'
 import { UserDetailModal } from './_components/UserDetailModal'
+import { UserEditModal } from './_components/UserEditModal'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ export default function PartnerUsersPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [selectedUser, setSelectedUser] = useState<UserResponse | null>(null)
+  const [editingUser, setEditingUser] = useState<UserResponse | null>(null)
   const [showInviteModal, setShowInviteModal] = useState(false)
 
   useEffect(() => {
@@ -85,7 +87,8 @@ export default function PartnerUsersPage() {
 
   function handleUpdated(updated: UserResponse) {
     setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
-    setSelectedUser(updated)
+    setSelectedUser((prev) => (prev?.id === updated.id ? updated : prev))
+    setEditingUser((prev) => (prev?.id === updated.id ? updated : prev))
   }
 
   function handleDeleted(userId: number) {
@@ -186,6 +189,13 @@ export default function PartnerUsersPage() {
         onClose={() => setSelectedUser(null)}
         onUpdated={handleUpdated}
         onDeleted={handleDeleted}
+        onEdit={(u) => setEditingUser(u)}
+      />
+
+      <UserEditModal
+        user={editingUser}
+        onClose={() => setEditingUser(null)}
+        onUpdated={handleUpdated}
       />
     </>
   )

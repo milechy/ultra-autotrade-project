@@ -22,6 +22,7 @@ const adminNavLinks = [
 const partnerNavLinks: Array<{ href: string; label: string; highlight?: boolean }> = [
   { href: "/partner/dashboard", label: "ダッシュボード" },
   { href: "/partner/users", label: "テスター管理" },
+  { href: "/partner/settings", label: "設定" },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {

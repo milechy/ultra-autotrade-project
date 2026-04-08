@@ -135,16 +135,10 @@ def update_user(
     """
     指定したユーザーを更新する。
 
-    自分自身または管理者のみアクセス可能。
-    非管理者は role と is_active を変更できない。
+    - 自分自身または管理者: 全フィールド変更可能（role/is_active は管理者のみ）
+    - パートナー: 自分が招待したユーザー（invited_by == self.id）の
+      email/username/password/is_active を変更可能。role 変更は不可。
     """
-    # 自分自身または管理者かチェック
-    if current_user.id != user_id and not current_user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
-
     user = AuthService.get_user_by_id(db, user_id)
     if user is None:
         raise HTTPException(
@@ -152,15 +146,36 @@ def update_user(
             detail="User not found",
         )
 
-    # 非管理者は role と is_active を変更できない
+    # パートナーが自分の招待テスターを編集するケースを許可
+    is_partner_editing_own_tester = (
+        current_user.role == UserRole.PARTNER.value and user.invited_by == current_user.id
+    )
+
+    if (
+        current_user.id != user_id
+        and not current_user.is_admin
+        and not is_partner_editing_own_tester
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+
     role = request.role.value if request.role else None
     is_active = request.is_active
 
     if not current_user.is_admin:
-        if role is not None or is_active is not None:
+        # role 変更は admin 専用
+        if role is not None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only admins can change role or active status",
+                detail="Only admins can change role",
+            )
+        # is_active 変更はパートナーが自分のテスターに対してのみ許可
+        if is_active is not None and not is_partner_editing_own_tester:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can change active status",
             )
 
     # 最後の admin を降格または無効化できない
