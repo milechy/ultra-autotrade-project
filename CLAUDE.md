@@ -465,6 +465,21 @@ docker exec <frontend> grep -r "http://77" /app/.next/static/chunks/ | wc -l
 - **`MonitoringService` は必ずシングルトン（`get_monitoring_service()`）を使う。** 新規インスタンス化するとHF低下を検知しても緊急停止フラグが global state に伝わらない。`scheduled_tasks.py` の3ループ（`health_check_loop` / `latency_monitor_loop` / `price_change_monitor_loop`）で修正済み
 - **`exchange/service.py` の `get_price_change_24h()` は `fetch_ticker().percentage` をそのまま返す（`/100` しない）。** `percentage` はすでにパーセント単位（`-15.0` = -15%）。`/100` すると変動率が 100 分の 1 に縮小され、`SAFE_MODE`（-10%）や `HARD_STOP`（-20%）が発動しなくなる。`workflow.py` 側が `/100` して `StressController` の小数形式に変換する責務を持つ
 
+### 2026-04-08追加（フロントエンド/バックエンド分離デプロイの罠）
+
+**`--frontend-only` デプロイは「バックエンドに新しいAPIがない」ことを意味する:**
+- フロントエンドが新しいAPIエンドポイントを呼ぶコードを含む場合、`--frontend-only` でデプロイするとフロントは動くがAPI呼び出しが全て404になる
+- 事例: `/admin/proposals` ページが `/api/proposals/admin/all` と `/api/proposals/admin/stats` を呼ぶが、バックエンドが古いまま → KPIカードが「Not Found」エラー
+- **ルール: フロントエンドが新しいAPIエンドポイントを参照する変更では、必ずフルデプロイ（`deploy_staging.sh` 引数なし）を使う**
+- `--frontend-only` は「CSSやテキスト修正など、APIに変更がない場合」のみ使用
+
+**判断基準（デプロイ前に必ず確認）:**
+```bash
+git diff main --name-only | grep "^backend/"          # バックエンド変更あり → フルデプロイ
+git diff main --name-only | grep "^frontend/lib/api/" # 新しいfetch関数 → フルデプロイ（対応APIが必要）
+# 上記に何も出なければ --frontend-only OK
+```
+
 ### 本番デプロイフロー（2026-04-05 インシデントから）
 
 - **Hetznerは pull only。直接 git merge / git commit / nano 編集をしない。**
