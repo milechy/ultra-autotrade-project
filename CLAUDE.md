@@ -449,6 +449,7 @@ docker exec <frontend> grep -r "http://77" /app/.next/static/chunks/ | wc -l
 ### 2026-04-03追加（デプロイ・運用）
 
 - **`scripts/deploy_staging.sh` を必ず使う。** 手打ちデプロイは孤立コンテナ（Conflict）、`--env-file` 忘れ（`NEXT_PUBLIC_*` 未焼き込み）、ビルドスキップ（古いイメージ起動）の3問題を毎回引き起こす。`deploy_staging.sh` は `down --remove-orphans` → `docker rm -f` → `build --no-cache` → `up -d` → ヘルスチェック → Slack通知まで全自動。`--frontend-only` / `--backend-only` / `--no-build` オプションあり
+- **`docker compose build --no-cache` だけでは不十分な場合がある。** `--no-cache` はレイヤーキャッシュをスキップするが、**古いイメージ自体は残る**。COMPOSE_PROJECT_NAMEや--env-fileが不一致だと別名のイメージが使われ続ける。`deploy_staging.sh` ではビルド前に `docker rmi -f` でイメージを完全削除してから再ビルドするため、この問題は自動的に回避される。手動で修正する場合は: `docker images | grep frontend | awk '{print $3}' | xargs -r docker rmi -f && docker compose build --no-cache frontend`
 - **`docker system prune -af` の後は全コンテナリビルドが必須。** イメージが削除されるため `up -d` しても起動しない。prune後は必ず `deploy_staging.sh`（フルビルド）を実行
 - **テストアカウント（@ultra-autotrade.com系）は DB ボリューム再作成で消える可能性がある。** 消えた場合は `bcrypt` でハッシュ生成 → `INSERT INTO users` で再作成。Registration API が無効化されている場合がある（`INITIAL_ADMIN_EMAIL` 未設定）
 

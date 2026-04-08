@@ -166,6 +166,13 @@ if "${FRONTEND_ONLY}"; then
   docker rm -f "${FRONTEND_CONTAINER}" 2>/dev/null || true
 
   if ! "${NO_BUILD}"; then
+    log "古いフロントエンドイメージを完全削除..."
+    # --no-cache でもレイヤーキャッシュが残る場合があるため、イメージ自体を削除してからビルド
+    docker images --format "{{.Repository}} {{.ID}}" \
+      | grep -E "frontend|ultra-autotrade.*front" \
+      | awk '{print $2}' \
+      | xargs -r docker rmi -f 2>/dev/null || true
+
     log "frontend をビルド中..."
     ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build --no-cache frontend
   fi
@@ -173,6 +180,17 @@ if "${FRONTEND_ONLY}"; then
   ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d frontend
 
   wait_healthy "http://localhost:3000" "frontend" || on_failure
+
+  # ビルド確認: 新しいチャンクが生成されたか
+  log "フロントエンド チャンク数確認..."
+  CHUNK_COUNT=$(docker exec "${FRONTEND_CONTAINER}" \
+    sh -c "ls /app/.next/static/chunks/ 2>/dev/null | wc -l" || echo "0")
+  log "  .next/static/chunks/ ファイル数: ${CHUNK_COUNT}"
+  if [ "${CHUNK_COUNT}" -lt 5 ]; then
+    log "⚠️  WARNING: チャンク数が少ない（${CHUNK_COUNT}）。ビルドが正常に完了していない可能性があります"
+  else
+    log "✅ チャンク生成確認 (${CHUNK_COUNT} files)"
+  fi
 
 elif "${BACKEND_ONLY}"; then
   # ─── バックエンドのみ ─────────────────────────
@@ -204,6 +222,12 @@ else
   docker rm -f $(docker ps -aq --filter "name=ultra-autotrade") 2>/dev/null || true
 
   if ! "${NO_BUILD}"; then
+    log "古いフロントエンドイメージを完全削除..."
+    docker images --format "{{.Repository}} {{.ID}}" \
+      | grep -E "frontend|ultra-autotrade.*front" \
+      | awk '{print $2}' \
+      | xargs -r docker rmi -f 2>/dev/null || true
+
     log "frontend / backend をビルド中..."
     ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build --no-cache frontend backend
   fi
@@ -357,6 +381,33 @@ run_post_deploy_checks() {
 if ! "${BACKEND_ONLY}"; then
   run_post_deploy_checks
 fi
+
+# ───────────────────────────────────────────────
+# 最終ヘルスチェック（HTTP ステータス確認）
+# ───────────────────────────────────────────────
+log "=== 最終ヘルスチェック ==="
+
+# バックエンド
+if ! "${FRONTEND_ONLY}"; then
+  BE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:8000/health 2>/dev/null || echo "000")
+  if [ "${BE_STATUS}" = "200" ]; then
+    log "✅ backend  http://localhost:8000/health → ${BE_STATUS}"
+  else
+    log "⚠️  WARNING: backend  http://localhost:8000/health → ${BE_STATUS}"
+  fi
+fi
+
+# フロントエンド
+if ! "${BACKEND_ONLY}"; then
+  FE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:3000 2>/dev/null || echo "000")
+  if [ "${FE_STATUS}" = "200" ]; then
+    log "✅ frontend http://localhost:3000 → ${FE_STATUS}"
+  else
+    log "⚠️  WARNING: frontend http://localhost:3000 → ${FE_STATUS} (リダイレクトや初期化中の可能性あり)"
+  fi
+fi
+
+log "=== 最終ヘルスチェック 完了 ==="
 
 # ───────────────────────────────────────────────
 # 完了報告
