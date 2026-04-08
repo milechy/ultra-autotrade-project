@@ -9,15 +9,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { fetchPerformance, type PerformanceResponse } from '@/lib/api/allocations'
 import { getStoredToken } from '@/lib/auth'
 
-function fmtUsd(v: number): string {
+function fmtUsd(v: number | undefined | null): string {
+  const n = Number(v ?? 0)
   return new Intl.NumberFormat('en-US', {
     notation: 'compact',
     maximumFractionDigits: 1,
-  }).format(v)
+  }).format(n)
 }
 
-function fmtPct(v: number): string {
-  return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
+function fmtPct(v: number | undefined | null): string {
+  const n = Number(v ?? 0)
+  return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
 }
 
 function pnlColor(v: number): string {
@@ -58,7 +60,17 @@ export default function PerformanceSummaryKPI() {
     )
   }
 
-  const s = data?.summary
+  // backend returns flat PerformanceSummary directly (no .summary wrapper)
+  // Number() coercion handles Decimal strings from the API (e.g. "1000.000000")
+  const supplyUsd = Number(data?.total_supply_usd ?? 0)
+  const allocatedUsd = Number(data?.total_allocated_usd ?? 0)
+  const totalPnlUsd = data != null ? supplyUsd - allocatedUsd : 0
+  const totalPnlPct =
+    data != null && allocatedUsd > 0
+      ? (totalPnlUsd / allocatedUsd) * 100
+      : 0
+  const testerCount = data?.testers.length ?? 0
+  const hf = data?.health_factor ?? null
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -70,7 +82,7 @@ export default function PerformanceSummaryKPI() {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {s != null ? `$${fmtUsd(s.total_aum_usd)}` : '—'}
+            {data != null ? `$${fmtUsd(supplyUsd)}` : '—'}
           </div>
         </CardContent>
       </Card>
@@ -82,13 +94,13 @@ export default function PerformanceSummaryKPI() {
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          {s != null ? (
+          {data != null ? (
             <>
-              <div className={`text-2xl font-bold ${pnlColor(s.total_pnl_usd)}`}>
-                {s.total_pnl_usd >= 0 ? '+' : ''}${fmtUsd(Math.abs(s.total_pnl_usd))}
+              <div className={`text-2xl font-bold ${pnlColor(totalPnlUsd)}`}>
+                {totalPnlUsd >= 0 ? '+' : ''}${fmtUsd(Math.abs(totalPnlUsd))}
               </div>
-              <div className={`text-xs mt-1 ${pnlColor(s.total_pnl_percentage)}`}>
-                {fmtPct(s.total_pnl_percentage)}
+              <div className={`text-xs mt-1 ${pnlColor(totalPnlPct)}`}>
+                {fmtPct(totalPnlPct)}
               </div>
             </>
           ) : (
@@ -105,7 +117,7 @@ export default function PerformanceSummaryKPI() {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {s != null ? s.tester_count : '—'}
+            {data != null ? testerCount : '—'}
           </div>
           <div className="text-xs text-muted-foreground mt-1">人</div>
         </CardContent>
@@ -118,12 +130,12 @@ export default function PerformanceSummaryKPI() {
           <Shield className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className={`text-2xl font-bold ${hfColor(s?.health_factor ?? null)}`}>
-            {s?.health_factor != null ? s.health_factor.toFixed(2) : '—'}
+          <div className={`text-2xl font-bold ${hfColor(hf)}`}>
+            {hf != null ? hf.toFixed(2) : '—'}
           </div>
-          {s?.health_factor != null && (
-            <div className={`text-xs mt-1 ${hfColor(s.health_factor)}`}>
-              {s.health_factor > 1.8 ? '安全' : s.health_factor >= 1.6 ? '注意' : '危険'}
+          {hf != null && (
+            <div className={`text-xs mt-1 ${hfColor(hf)}`}>
+              {hf > 1.8 ? '安全' : hf >= 1.6 ? '注意' : '危険'}
             </div>
           )}
         </CardContent>

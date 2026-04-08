@@ -26,41 +26,44 @@ export default function AllocationChartRecharts({ allocations }: Props) {
 
   const data = allocations.map((a) => ({
     name: a.tester_name,
-    value: a.allocated_amount_usd,
+    value: Number(a.allocated_amount_usd),
   }))
 
   return (
-    <ResponsiveContainer width="100%" height={240}>
-      <PieChart>
-        <Pie
-          data={data}
-          dataKey="value"
-          nameKey="name"
-          cx="50%"
-          cy="50%"
-          outerRadius={80}
-          label={({ name, percent }) =>
-            `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
-          }
-          labelLine={false}
-        >
-          {data.map((_, index) => (
-            <Cell key={index} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip
-          formatter={(value: number) => [
-            `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value)}`,
-            '割り当て額',
-          ]}
-          contentStyle={{ fontSize: 12 }}
-        />
-        <Legend
-          iconType="circle"
-          iconSize={8}
-          wrapperStyle={{ fontSize: 11 }}
-        />
-      </PieChart>
-    </ResponsiveContainer>
+    // min-h ensures ResponsiveContainer can measure parent height even in flex/grid layouts
+    <div className="min-h-[240px] w-full">
+      <ResponsiveContainer width="100%" height={240}>
+        <PieChart>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            outerRadius={80}
+            label={({ name, percent }) =>
+              `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
+            }
+            labelLine={false}
+          >
+            {data.map((_, index) => (
+              <Cell key={index} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip
+            formatter={(value: number) => [
+              `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value)}`,
+              '割り当て額',
+            ]}
+            contentStyle={{ fontSize: 12 }}
+          />
+          <Legend
+            iconType="circle"
+            iconSize={8}
+            wrapperStyle={{ fontSize: 11 }}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
   )
 }

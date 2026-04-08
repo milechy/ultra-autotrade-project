@@ -33,7 +33,7 @@ export default function AllocationModal({
   useEffect(() => {
     if (mode === 'edit' && allocation) {
       setTesterName(allocation.tester_name)
-      setAmount(String(allocation.allocated_amount_usd))
+      setAmount(String(Number(allocation.allocated_amount_usd)))
       setNotes(allocation.notes ?? '')
     }
   }, [mode, allocation])

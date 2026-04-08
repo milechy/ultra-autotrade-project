@@ -10,7 +10,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { KPICard } from '@/components/shared/KPICard'
 import { useAuthFetch } from '@/hooks/useAuthFetch'
-import { fetchAllocations, type Allocation } from '@/lib/api/allocations'
+import {
+  fetchAllocations,
+  fetchPerformance,
+  type Allocation,
+  type TesterPerformance,
+} from '@/lib/api/allocations'
 import { getStoredToken } from '@/lib/auth'
 import PerformanceSummaryKPI from './_components/PerformanceSummaryKPI'
 import AllocationTable from './_components/AllocationTable'
@@ -79,16 +84,26 @@ export default function PartnerDashboardPage() {
 
   const [allocations, setAllocations] = useState<Allocation[]>([])
   const [allocationsLoading, setAllocationsLoading] = useState(true)
+  const [performanceMap, setPerformanceMap] = useState<Record<string, TesterPerformance>>({})
 
   const loadAllocations = useCallback(async () => {
     const token = getStoredToken()
     if (!token) return
     setAllocationsLoading(true)
     try {
-      const items = await fetchAllocations(token)
+      const [items, perf] = await Promise.all([
+        fetchAllocations(token),
+        fetchPerformance(token),
+      ])
       setAllocations(items)
+      const map: Record<string, TesterPerformance> = {}
+      for (const t of perf.testers) {
+        map[t.tester_name] = t
+      }
+      setPerformanceMap(map)
     } catch {
       setAllocations([])
+      setPerformanceMap({})
     } finally {
       setAllocationsLoading(false)
     }
@@ -115,7 +130,7 @@ export default function PartnerDashboardPage() {
       {/* Allocation Table + Chart */}
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <AllocationTable />
+          <AllocationTable performanceMap={performanceMap} onRefresh={loadAllocations} />
         </div>
 
         <Card>

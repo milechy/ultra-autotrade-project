@@ -23,6 +23,8 @@ import { getStoredToken } from '@/lib/auth'
 interface Props {
   /** tester_name → TesterPerformance from /api/partner/performance */
   performanceMap?: Record<string, TesterPerformance>
+  /** Called after any CRUD so parent (page.tsx) can re-fetch allocations + performance */
+  onRefresh?: () => void
 }
 
 function pnlColor(v: number): string {
@@ -38,7 +40,7 @@ function fmtUsd(v: number): string {
   }).format(v)
 }
 
-export default function AllocationTable({ performanceMap = {} }: Props) {
+export default function AllocationTable({ performanceMap = {}, onRefresh }: Props) {
   const [allocations, setAllocations] = useState<Allocation[]>([])
   const [loading, setLoading] = useState(true)
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null)
@@ -67,6 +69,7 @@ export default function AllocationTable({ performanceMap = {} }: Props) {
     if (!token) return
     await createAllocation(token, data as CreateAllocationData)
     await load()
+    onRefresh?.()
   }
 
   async function handleUpdate(data: CreateAllocationData | UpdateAllocationData) {
@@ -74,6 +77,7 @@ export default function AllocationTable({ performanceMap = {} }: Props) {
     if (!token || !selected) return
     await updateAllocation(token, selected.id, data as UpdateAllocationData)
     await load()
+    onRefresh?.()
   }
 
   async function handleDelete() {
@@ -81,6 +85,7 @@ export default function AllocationTable({ performanceMap = {} }: Props) {
     if (!token || !selected) return
     await deleteAllocation(token, selected.id)
     await load()
+    onRefresh?.()
   }
 
   function openCreate() {
