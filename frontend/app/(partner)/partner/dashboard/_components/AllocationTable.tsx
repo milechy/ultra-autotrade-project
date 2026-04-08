@@ -147,18 +147,18 @@ export default function AllocationTable({ performanceMap = {}, onRefresh }: Prop
                         className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
                       >
                         <td className="px-4 py-3 font-medium">{item.tester_name}</td>
-                        <td className="px-4 py-3 text-right">${fmtUsd(item.allocated_amount_usd)}</td>
+                        <td className="px-4 py-3 text-right">${fmtUsd(Number(item.allocated_amount_usd))}</td>
                         <td className="px-4 py-3 text-right">
-                          {perf?.current_value_usd != null ? `$${fmtUsd(perf.current_value_usd)}` : '—'}
+                          {perf?.current_value_usd != null ? `$${fmtUsd(Number(perf.current_value_usd))}` : '—'}
                         </td>
-                        <td className={`px-4 py-3 text-right font-medium ${perf?.pnl_usd != null ? pnlColor(perf.pnl_usd) : 'text-muted-foreground'}`}>
+                        <td className={`px-4 py-3 text-right font-medium ${perf?.pnl_usd != null ? pnlColor(Number(perf.pnl_usd)) : 'text-muted-foreground'}`}>
                           {perf?.pnl_usd != null
-                            ? `${perf.pnl_usd >= 0 ? '+' : ''}$${fmtUsd(perf.pnl_usd)}`
+                            ? `${Number(perf.pnl_usd) >= 0 ? '+' : ''}$${fmtUsd(Math.abs(Number(perf.pnl_usd)))}`
                             : '—'}
                         </td>
-                        <td className={`px-4 py-3 text-right font-medium ${perf?.pnl_percentage != null ? pnlColor(perf.pnl_percentage) : 'text-muted-foreground'}`}>
+                        <td className={`px-4 py-3 text-right font-medium ${perf?.pnl_percentage != null ? pnlColor(Number(perf.pnl_percentage)) : 'text-muted-foreground'}`}>
                           {perf?.pnl_percentage != null
-                            ? `${perf.pnl_percentage >= 0 ? '+' : ''}${perf.pnl_percentage.toFixed(2)}%`
+                            ? `${Number(perf.pnl_percentage) >= 0 ? '+' : ''}${Number(perf.pnl_percentage).toFixed(2)}%`
                             : '—'}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
