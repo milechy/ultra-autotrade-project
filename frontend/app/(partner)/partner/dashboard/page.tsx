@@ -4,14 +4,20 @@
 
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import { useCallback, useEffect, useState } from 'react'
 import { DollarSign, TrendingUp, Users, Target } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { KPICard } from '@/components/shared/KPICard'
 import { useAuthFetch } from '@/hooks/useAuthFetch'
+import { fetchAllocations, type Allocation } from '@/lib/api/allocations'
+import { getStoredToken } from '@/lib/auth'
+import PerformanceSummaryKPI from './_components/PerformanceSummaryKPI'
+import AllocationTable from './_components/AllocationTable'
 import type { MonthlyData } from './_components/MonthlyChartRecharts'
 
 const MonthlyChart = dynamic(() => import('./_components/MonthlyChartRecharts'), { ssr: false })
+const AllocationChart = dynamic(() => import('./_components/AllocationChartRecharts'), { ssr: false })
 
 // ---- Types ----
 
@@ -71,6 +77,27 @@ export default function PartnerDashboardPage() {
   const { data: monthly, loading: monthlyLoading } = useAuthFetch<MonthlyData[]>('/api/partner/monthly')
   const { data: accuracy, loading: accuracyLoading } = useAuthFetch<AiAccuracy>('/ai/accuracy')
 
+  const [allocations, setAllocations] = useState<Allocation[]>([])
+  const [allocationsLoading, setAllocationsLoading] = useState(true)
+
+  const loadAllocations = useCallback(async () => {
+    const token = getStoredToken()
+    if (!token) return
+    setAllocationsLoading(true)
+    try {
+      const items = await fetchAllocations(token)
+      setAllocations(items)
+    } catch {
+      setAllocations([])
+    } finally {
+      setAllocationsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadAllocations()
+  }, [loadAllocations])
+
   // Normalize users response (array or {items: [...]})
   const users: PartnerUser[] = Array.isArray(usersRaw)
     ? usersRaw
@@ -79,6 +106,31 @@ export default function PartnerDashboardPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
       <h1 className="text-2xl font-bold">パートナーダッシュボード</h1>
+
+      {/* Performance Summary KPI (allocation-based) */}
+      <section>
+        <PerformanceSummaryKPI />
+      </section>
+
+      {/* Allocation Table + Chart */}
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <AllocationTable />
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">割り振り比率</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {allocationsLoading ? (
+              <Skeleton className="h-48 rounded-lg" />
+            ) : (
+              <AllocationChart allocations={allocations} />
+            )}
+          </CardContent>
+        </Card>
+      </section>
 
       {/* KPI Cards */}
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">

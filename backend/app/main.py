@@ -58,6 +58,7 @@ from app.invitations.router import router as invitations_router
 from app.knowledge.router import router as knowledge_router
 from app.notifications.router import api_router as notification_api_router
 from app.notifications.router import router as notification_router
+from app.partner.allocation_router import router as allocation_router
 from app.partner.router import router as partner_router
 from app.portfolio.router import router as portfolio_router
 from app.proposals.router import router as proposals_router
@@ -195,6 +196,9 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)  # Auth (Phase12)
     app.include_router(invitations_router)  # Invitations (Wave 2)
     app.include_router(partner_router)  # Partner stats (Wave 2)
+    app.include_router(
+        allocation_router, prefix="/api/partner", tags=["partner-allocations"]
+    )  # Fund allocations
     app.include_router(users_router)  # Users (Phase12)
     app.include_router(ai_router, prefix="/api")  # AI (Phase2)
     app.include_router(octobot_router)  # OctoBot (Phase3)
