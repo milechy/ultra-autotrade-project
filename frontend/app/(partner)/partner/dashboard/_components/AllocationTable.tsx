@@ -14,10 +14,16 @@ import {
   updateAllocation,
   deleteAllocation,
   type Allocation,
+  type TesterPerformance,
   type CreateAllocationData,
   type UpdateAllocationData,
 } from '@/lib/api/allocations'
 import { getStoredToken } from '@/lib/auth'
+
+interface Props {
+  /** tester_name → TesterPerformance from /api/partner/performance */
+  performanceMap?: Record<string, TesterPerformance>
+}
 
 function pnlColor(v: number): string {
   if (v > 0) return 'text-green-600 dark:text-green-400'
@@ -32,7 +38,7 @@ function fmtUsd(v: number): string {
   }).format(v)
 }
 
-export default function AllocationTable() {
+export default function AllocationTable({ performanceMap = {} }: Props) {
   const [allocations, setAllocations] = useState<Allocation[]>([])
   const [loading, setLoading] = useState(true)
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null)
@@ -127,26 +133,35 @@ export default function AllocationTable() {
                   </tr>
                 </thead>
                 <tbody>
-                  {allocations.map((item) => (
-                    <tr
-                      key={item.id}
-                      onClick={() => openEdit(item)}
-                      className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
-                    >
-                      <td className="px-4 py-3 font-medium">{item.tester_name}</td>
-                      <td className="px-4 py-3 text-right">${fmtUsd(item.allocated_amount_usd)}</td>
-                      <td className="px-4 py-3 text-right">${fmtUsd(item.current_value_usd)}</td>
-                      <td className={`px-4 py-3 text-right font-medium ${pnlColor(item.pnl_usd)}`}>
-                        {item.pnl_usd >= 0 ? '+' : ''}${fmtUsd(item.pnl_usd)}
-                      </td>
-                      <td className={`px-4 py-3 text-right font-medium ${pnlColor(item.pnl_percentage)}`}>
-                        {item.pnl_percentage >= 0 ? '+' : ''}{item.pnl_percentage.toFixed(2)}%
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {new Date(item.allocated_at).toLocaleDateString('ja-JP')}
-                      </td>
-                    </tr>
-                  ))}
+                  {allocations.map((item) => {
+                    const perf = performanceMap[item.tester_name]
+                    return (
+                      <tr
+                        key={item.id}
+                        onClick={() => openEdit(item)}
+                        className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                      >
+                        <td className="px-4 py-3 font-medium">{item.tester_name}</td>
+                        <td className="px-4 py-3 text-right">${fmtUsd(item.allocated_amount_usd)}</td>
+                        <td className="px-4 py-3 text-right">
+                          {perf?.current_value_usd != null ? `$${fmtUsd(perf.current_value_usd)}` : '—'}
+                        </td>
+                        <td className={`px-4 py-3 text-right font-medium ${perf?.pnl_usd != null ? pnlColor(perf.pnl_usd) : 'text-muted-foreground'}`}>
+                          {perf?.pnl_usd != null
+                            ? `${perf.pnl_usd >= 0 ? '+' : ''}$${fmtUsd(perf.pnl_usd)}`
+                            : '—'}
+                        </td>
+                        <td className={`px-4 py-3 text-right font-medium ${perf?.pnl_percentage != null ? pnlColor(perf.pnl_percentage) : 'text-muted-foreground'}`}>
+                          {perf?.pnl_percentage != null
+                            ? `${perf.pnl_percentage >= 0 ? '+' : ''}${perf.pnl_percentage.toFixed(2)}%`
+                            : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {new Date(item.allocated_at).toLocaleDateString('ja-JP')}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
