@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_active_user, require_admin, require_viewer
@@ -21,6 +21,7 @@ from .models import Proposal
 from .schemas import (
     AdminProposalItem,
     AdminProposalListResponse,
+    AdminProposalStats,
     ProposalCreate,
     ProposalListResponse,
     ProposalResponse,
@@ -173,6 +174,43 @@ def admin_list_proposals(
         items.append(item)
 
     return AdminProposalListResponse(items=items, total=total, page=page, limit=limit)
+
+
+@router.get("/admin/stats", response_model=AdminProposalStats, summary="提案KPI統計（管理者）")
+def admin_proposal_stats(
+    _admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> AdminProposalStats:
+    """KPIカード用の件数を DB 集計で返す（ページネーション不要）。"""
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    pending = db.scalar(select(func.count()).where(Proposal.status == "pending")) or 0
+    today_approved = (
+        db.scalar(
+            select(func.count()).where(
+                Proposal.status.in_(["approved", "executed"]),
+                Proposal.approved_at >= today_start,
+            )
+        )
+        or 0
+    )
+    today_rejected = (
+        db.scalar(
+            select(func.count()).where(
+                Proposal.status == "rejected",
+                Proposal.rejected_at >= today_start,
+            )
+        )
+        or 0
+    )
+    expired = db.scalar(select(func.count()).where(Proposal.status == "expired")) or 0
+
+    return AdminProposalStats(
+        pending=pending,
+        today_approved=today_approved,
+        today_rejected=today_rejected,
+        expired=expired,
+    )
 
 
 @router.get("/pending", response_model=ProposalListResponse, summary="保留中の提案リスト")

@@ -44,8 +44,23 @@ export interface AdminProposalFilters {
   limit?: number;
 }
 
+export interface AdminProposalStats {
+  pending: number;
+  today_approved: number;
+  today_rejected: number;
+  expired: number;
+}
+
 function authHeaders(token: string): HeadersInit {
   return { Authorization: `Bearer ${token}` };
+}
+
+export async function fetchAdminProposalStats(
+  token: string
+): Promise<AdminProposalStats> {
+  return await getJson<AdminProposalStats>("/api/proposals/admin/stats", {
+    headers: authHeaders(token),
+  });
 }
 
 export async function listAdminProposals(

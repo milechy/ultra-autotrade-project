@@ -62,3 +62,12 @@ class AdminProposalListResponse(BaseModel):
     total: int
     page: int
     limit: int
+
+
+class AdminProposalStats(BaseModel):
+    """KPIカード用の提案統計。DB集計値なのでページネーションに依存しない。"""
+
+    pending: int
+    today_approved: int
+    today_rejected: int
+    expired: int

@@ -54,8 +54,6 @@ function ProposalsContent() {
   const [filters, setFilters] = useState<ProposalFiltersState>(DEFAULT_FILTERS)
   const [page, setPage] = useState(1)
   const [selectedProposal, setSelectedProposal] = useState<AdminProposal | null>(null)
-  const [fetched, setFetched] = useState(false)
-
   const fetchProposals = useCallback(
     async (f: ProposalFiltersState, p: number) => {
       if (!token) return
@@ -71,7 +69,6 @@ function ProposalsContent() {
         })
         setProposals(res.items)
         setTotal(res.total)
-        setFetched(true)
       } catch (err: unknown) {
         const msg = err && typeof err === 'object' && 'message' in err
           ? String((err as { message: unknown }).message)
@@ -128,12 +125,10 @@ function ProposalsContent() {
         </button>
       </div>
 
-      {/* KPIs */}
-      {fetched && (
-        <div className="mb-6">
-          <ProposalKPIs proposals={proposals} />
-        </div>
-      )}
+      {/* KPIs — fetches /api/proposals/admin/stats independently */}
+      <div className="mb-6">
+        <ProposalKPIs />
+      </div>
 
       {/* Filters */}
       <div className="mb-4">
