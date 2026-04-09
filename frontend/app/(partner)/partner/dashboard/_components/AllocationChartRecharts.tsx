@@ -29,22 +29,20 @@ export default function AllocationChartRecharts({ allocations }: Props) {
     value: Number(a.allocated_amount_usd),
   }))
 
+  const total = data.reduce((s, d) => s + d.value, 0)
+
   return (
     // min-h ensures ResponsiveContainer can measure parent height even in flex/grid layouts
-    <div className="min-h-[240px] w-full">
-      <ResponsiveContainer width="100%" height={240}>
+    <div className="min-h-[260px] w-full">
+      <ResponsiveContainer width="100%" height={260}>
         <PieChart>
           <Pie
             data={data}
             dataKey="value"
             nameKey="name"
             cx="50%"
-            cy="50%"
+            cy="45%"
             outerRadius={80}
-            label={({ name, percent }) =>
-              `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
-            }
-            labelLine={false}
           >
             {data.map((_, index) => (
               <Cell key={index} fill={COLORS[index % COLORS.length]} />
@@ -61,6 +59,11 @@ export default function AllocationChartRecharts({ allocations }: Props) {
             iconType="circle"
             iconSize={8}
             wrapperStyle={{ fontSize: 11 }}
+            formatter={(value: string, entry) => {
+              const v = (entry as { payload?: { value?: number } }).payload?.value ?? 0
+              const pct = total > 0 ? ((v / total) * 100).toFixed(0) : '0'
+              return `${value} ${pct}%`
+            }}
           />
         </PieChart>
       </ResponsiveContainer>
