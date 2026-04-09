@@ -175,6 +175,9 @@ if "${FRONTEND_ONLY}"; then
 
     log "frontend をビルド中..."
     ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build --no-cache frontend
+
+    log "古いビルドキャッシュを削除（1時間以上前のエントリ）..."
+    docker builder prune --filter until=1h -f 2>/dev/null || true
   fi
 
   ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d frontend
@@ -200,7 +203,7 @@ elif "${BACKEND_ONLY}"; then
 
   if ! "${NO_BUILD}"; then
     log "backend をビルド中..."
-    ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build --no-cache backend
+    ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build backend
   fi
 
   ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d backend
@@ -221,6 +224,9 @@ else
   # shellcheck disable=SC2046
   docker rm -f $(docker ps -aq --filter "name=ultra-autotrade") 2>/dev/null || true
 
+  log "未使用ボリュームを削除（DBボリュームは名前付きのため保護される）..."
+  docker volume prune -f 2>/dev/null || true
+
   if ! "${NO_BUILD}"; then
     log "古いフロントエンドイメージを完全削除..."
     docker images --format "{{.Repository}} {{.ID}}" \
@@ -228,8 +234,12 @@ else
       | awk '{print $2}' \
       | xargs -r docker rmi -f 2>/dev/null || true
 
-    log "frontend / backend をビルド中..."
-    ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build --no-cache frontend backend
+    log "frontend / backend をビルド中（frontend は --no-cache、backend はキャッシュ有効）..."
+    ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build --no-cache frontend
+    ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build backend
+
+    log "古いビルドキャッシュを削除（1時間以上前のエントリ）..."
+    docker builder prune --filter until=1h -f 2>/dev/null || true
   fi
 
   log "全サービスを起動"

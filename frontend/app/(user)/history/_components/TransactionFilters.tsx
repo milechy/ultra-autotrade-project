@@ -17,11 +17,11 @@ export interface TransactionFiltersProps {
 const OPERATION_TYPES: OperationType[] = ['ALL', 'SUPPLY', 'WITHDRAW', 'BORROW', 'REPAY']
 
 const OPERATION_LABELS: Record<OperationType, string> = {
-  ALL: 'ALL',
-  SUPPLY: 'SUPPLY',
-  WITHDRAW: 'WITHDRAW',
-  BORROW: 'BORROW',
-  REPAY: 'REPAY',
+  ALL: '全て',
+  SUPPLY: '供給',
+  WITHDRAW: '引き出し',
+  BORROW: '借入',
+  REPAY: '返済',
 }
 
 export function TransactionFilters({
