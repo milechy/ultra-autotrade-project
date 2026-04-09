@@ -70,7 +70,7 @@ export default function PerformanceSummaryKPI() {
       ? (totalPnlUsd / allocatedUsd) * 100
       : 0
   const testerCount = data?.testers.length ?? 0
-  const hf = data?.health_factor ?? null
+  const hf = data?.health_factor != null ? Number(data.health_factor) : null
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

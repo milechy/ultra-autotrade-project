@@ -216,14 +216,14 @@ export default function PartnerDashboardPage() {
               <div className="space-y-4">
                 <div className="flex flex-col items-center justify-center py-4">
                   <span className="text-4xl font-bold text-blue-600">
-                    {accuracy.accuracy_pct.toFixed(1)}%
+                    {Number(accuracy.accuracy_pct).toFixed(1)}%
                   </span>
                   <span className="text-sm text-muted-foreground mt-1">全体的中率</span>
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-muted px-4 py-2">
                   <span className="text-sm text-muted-foreground">直近30日</span>
                   <span className="text-sm font-semibold">
-                    {accuracy.last_30d_accuracy_pct.toFixed(1)}%
+                    {Number(accuracy.last_30d_accuracy_pct).toFixed(1)}%
                   </span>
                 </div>
                 <div className="flex items-center justify-between px-1">
