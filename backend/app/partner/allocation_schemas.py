@@ -97,8 +97,10 @@ class MyAllocationResponse(BaseModel):
     """テスター自身の割り振り情報レスポンス。"""
 
     allocated_amount_usd: Decimal
+    current_value_usd: Optional[Decimal] = None
     partner_name: str
     status: str
     allocated_at: datetime
     pnl_usd: Optional[Decimal] = None
     pnl_percentage: Optional[Decimal] = None
+    is_live: bool = False

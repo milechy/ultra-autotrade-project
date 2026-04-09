@@ -81,7 +81,7 @@ interface MyAllocation {
 }
 
 function AllocationCard() {
-  const { data, loading } = useAuthFetch<MyAllocation | null>('/api/user/my-allocation')
+  const { data, loading } = useAuthFetch<MyAllocation | null>('/api/user/my-allocation', { refreshInterval: 300000 })
   const t = useTranslations('Dashboard')
 
   if (loading) {

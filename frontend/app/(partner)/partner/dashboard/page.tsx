@@ -77,10 +77,10 @@ function returnTrend(v: number | undefined): 'up' | 'down' | 'flat' {
 // ---- Page ----
 
 export default function PartnerDashboardPage() {
-  const { data: stats, loading: statsLoading } = useAuthFetch<PartnerStats>('/api/partner/stats')
-  const { data: usersRaw, loading: usersLoading } = useAuthFetch<UsersResponse | PartnerUser[]>('/users')
-  const { data: monthly, loading: monthlyLoading } = useAuthFetch<MonthlyData[]>('/api/partner/monthly')
-  const { data: accuracy, loading: accuracyLoading } = useAuthFetch<AiAccuracy>('/ai/accuracy')
+  const { data: stats, loading: statsLoading } = useAuthFetch<PartnerStats>('/api/partner/stats', { refreshInterval: 300000 })
+  const { data: usersRaw, loading: usersLoading } = useAuthFetch<UsersResponse | PartnerUser[]>('/users', { refreshInterval: 300000 })
+  const { data: monthly, loading: monthlyLoading } = useAuthFetch<MonthlyData[]>('/api/partner/monthly', { refreshInterval: 300000 })
+  const { data: accuracy, loading: accuracyLoading } = useAuthFetch<AiAccuracy>('/ai/accuracy', { refreshInterval: 300000 })
 
   const [allocations, setAllocations] = useState<Allocation[]>([])
   const [allocationsLoading, setAllocationsLoading] = useState(true)
@@ -111,6 +111,8 @@ export default function PartnerDashboardPage() {
 
   useEffect(() => {
     void loadAllocations()
+    const id = setInterval(() => { void loadAllocations() }, 300000)
+    return () => clearInterval(id)
   }, [loadAllocations])
 
   // Normalize users response (array or {items: [...]})

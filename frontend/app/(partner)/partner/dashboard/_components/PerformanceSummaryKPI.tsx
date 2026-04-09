@@ -40,14 +40,19 @@ export default function PerformanceSummaryKPI() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = getStoredToken()
-    if (!token) return
+    const load = () => {
+      const token = getStoredToken()
+      if (!token) return
+      fetchPerformance(token)
+        .then(setData)
+        .catch(() => setData(null))
+        .finally(() => setLoading(false))
+    }
 
     setLoading(true)
-    fetchPerformance(token)
-      .then(setData)
-      .catch(() => setData(null))
-      .finally(() => setLoading(false))
+    load()
+    const id = setInterval(load, 300000)
+    return () => clearInterval(id)
   }, [])
 
   if (loading) {

@@ -2,8 +2,8 @@
 """
 GET /api/user/my-allocation エンドポイントの統合テスト。
 
-テスターが自分への割り振り情報を取得できることと、
-割り振りがない場合に null が返ることを検証する。
+- 正常系: 割り振りなし / あり / Live Aave PnL / Snapshotフォールバック
+- 異常系: 未認証
 """
 
 import os
@@ -11,6 +11,7 @@ import tempfile
 from collections.abc import Generator
 from datetime import datetime, timezone
 from decimal import Decimal
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -20,6 +21,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-my-allocation")
 
+from app.aave.client import AccountData  # noqa: E402
 from app.auth.router import router as auth_router  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app.partner.allocation_models import FundAllocation  # noqa: E402
@@ -34,6 +36,13 @@ _PARTNER_EMAIL = "my-alloc-partner@example.com"
 _PARTNER_PASS = "partnerpass123!"
 _TESTER_EMAIL = "my-alloc-tester@example.com"
 _TESTER_PASS = "testerpass123!"
+
+_DUMMY_ACCOUNT_DATA = AccountData(
+    total_collateral_usd=Decimal("1100"),
+    total_debt_usd=Decimal("0"),
+    available_borrows_usd=Decimal("0"),
+    health_factor=Decimal("999"),
+)
 
 SessionFactory = sessionmaker[Session]
 
@@ -85,8 +94,6 @@ def tokens(
     test_db: tuple[SessionFactory, object],
 ) -> dict[str, str]:
     """admin / partner / tester を登録し、各トークンを返す。"""
-    session_factory, _ = test_db
-
     # admin 登録
     client.post(
         "/auth/register",
@@ -114,7 +121,7 @@ def tokens(
     assert r.status_code == 200
     partner_token = r.json()["access_token"]
 
-    # tester 作成（partner 経由、invited_by = partner_id）
+    # tester 作成（partner 経由）
     r = client.post(
         "/users",
         json={
@@ -146,20 +153,21 @@ class TestGetMyAllocation:
         tokens: dict[str, str],
     ) -> None:
         """割り振りがない場合は null を返す（404 ではない）。"""
-        r = client.get(
-            "/api/user/my-allocation",
-            headers={"Authorization": f"Bearer {tokens['tester']}"},
-        )
+        with patch("app.partner.allocation_service.get_default_aave_client") as mock_aave:
+            mock_aave.return_value.get_account_data.side_effect = Exception("no aave")
+            r = client.get(
+                "/api/user/my-allocation",
+                headers={"Authorization": f"Bearer {tokens['tester']}"},
+            )
         assert r.status_code == 200
         assert r.json() is None
 
-    def test_returns_allocation_when_exists(
+    def test_live_aave_pnl(
         self,
         client: TestClient,
         tokens: dict[str, str],
     ) -> None:
-        """パートナーが割り振りを作成後、テスターが取得できる。"""
-        # パートナーが割り振りを作成
+        """Aave 接続成功時は is_live=True + PnL がリアルタイム計算される。"""
         r = client.post(
             "/api/partner/allocations",
             json={"tester_name": "my-alloc-tester", "allocated_amount_usd": "1000.00"},
@@ -167,31 +175,35 @@ class TestGetMyAllocation:
         )
         assert r.status_code == 201
 
-        # テスターが自分の割り振りを取得
-        r = client.get(
-            "/api/user/my-allocation",
-            headers={"Authorization": f"Bearer {tokens['tester']}"},
-        )
+        mock_client = MagicMock()
+        mock_client.get_account_data.return_value = _DUMMY_ACCOUNT_DATA
+
+        with patch("app.partner.allocation_service.get_default_aave_client", return_value=mock_client):
+            r = client.get(
+                "/api/user/my-allocation",
+                headers={"Authorization": f"Bearer {tokens['tester']}"},
+            )
+
         assert r.status_code == 200
         data = r.json()
         assert data is not None
         assert Decimal(data["allocated_amount_usd"]) == Decimal("1000.00")
+        assert Decimal(data["current_value_usd"]) == Decimal("1100.00")
+        assert Decimal(data["pnl_usd"]) == Decimal("100.00")
+        assert Decimal(data["pnl_percentage"]) == Decimal("10.00")
+        assert data["is_live"] is True
         assert data["partner_name"] == "my-alloc-partner"
         assert data["status"] == "active"
-        assert data["allocated_at"] is not None
-        assert data["pnl_usd"] is None
-        assert data["pnl_percentage"] is None
 
-    def test_pnl_calculated_from_portfolio_snapshot(
+    def test_snapshot_fallback_when_aave_fails(
         self,
         client: TestClient,
         tokens: dict[str, str],
         test_db: tuple[SessionFactory, object],
     ) -> None:
-        """PortfolioSnapshot がある場合、PnL が計算される。"""
+        """Aave 接続失敗時は PortfolioSnapshot にフォールバックし is_live=False になる。"""
         session_factory, _ = test_db
 
-        # パートナーが割り振りを作成
         r = client.post(
             "/api/partner/allocations",
             json={"tester_name": "my-alloc-tester", "allocated_amount_usd": "1000.00"},
@@ -199,44 +211,76 @@ class TestGetMyAllocation:
         )
         assert r.status_code == 201
 
-        # パートナーの PortfolioSnapshot を直接 DB に挿入
         partner_id = int(tokens["partner_id"])
         with session_factory() as db:
             snapshot = PortfolioSnapshot(
                 user_id=partner_id,
-                total_value_usd=Decimal("1100.00"),
-                total_supply_usd=Decimal("1100.00"),
+                total_value_usd=Decimal("1050.00"),
+                total_supply_usd=Decimal("1050.00"),
                 total_borrow_usd=Decimal("0"),
                 recorded_at=datetime.now(timezone.utc),
             )
             db.add(snapshot)
             db.commit()
 
-        # テスターが PnL 付きの割り振り情報を取得
-        r = client.get(
-            "/api/user/my-allocation",
-            headers={"Authorization": f"Bearer {tokens['tester']}"},
-        )
+        with patch("app.partner.allocation_service.get_default_aave_client") as mock_aave:
+            mock_aave.return_value.get_account_data.side_effect = Exception("connection error")
+            r = client.get(
+                "/api/user/my-allocation",
+                headers={"Authorization": f"Bearer {tokens['tester']}"},
+            )
+
         assert r.status_code == 200
         data = r.json()
         assert data is not None
-        assert Decimal(data["pnl_usd"]) == Decimal("100.00")
-        assert Decimal(data["pnl_percentage"]) == Decimal("10.00")
+        assert Decimal(data["pnl_usd"]) == Decimal("50.00")
+        assert Decimal(data["pnl_percentage"]) == Decimal("5.00")
+        assert data["is_live"] is False
+
+    def test_no_pnl_when_aave_fails_and_no_snapshot(
+        self,
+        client: TestClient,
+        tokens: dict[str, str],
+    ) -> None:
+        """Aave 失敗 + Snapshot なし → pnl/current_value は null、is_live=False。"""
+        r = client.post(
+            "/api/partner/allocations",
+            json={"tester_name": "my-alloc-tester", "allocated_amount_usd": "1000.00"},
+            headers={"Authorization": f"Bearer {tokens['partner']}"},
+        )
+        assert r.status_code == 201
+
+        with patch("app.partner.allocation_service.get_default_aave_client") as mock_aave:
+            mock_aave.return_value.get_account_data.side_effect = Exception("no aave")
+            r = client.get(
+                "/api/user/my-allocation",
+                headers={"Authorization": f"Bearer {tokens['tester']}"},
+            )
+
+        assert r.status_code == 200
+        data = r.json()
+        assert data is not None
+        assert data["pnl_usd"] is None
+        assert data["pnl_percentage"] is None
+        assert data["current_value_usd"] is None
+        assert data["is_live"] is False
 
     def test_requires_authentication(self, client: TestClient) -> None:
         """未認証では 401 を返す。"""
         r = client.get("/api/user/my-allocation")
         assert r.status_code == 401
 
-    def test_admin_without_invited_by_returns_null(
+    def test_admin_without_allocation_returns_null(
         self,
         client: TestClient,
         tokens: dict[str, str],
     ) -> None:
-        """invited_by がない admin は null を返す。"""
-        r = client.get(
-            "/api/user/my-allocation",
-            headers={"Authorization": f"Bearer {tokens['admin']}"},
-        )
+        """割り振りのない admin は null を返す。"""
+        with patch("app.partner.allocation_service.get_default_aave_client") as mock_aave:
+            mock_aave.return_value.get_account_data.side_effect = Exception("no aave")
+            r = client.get(
+                "/api/user/my-allocation",
+                headers={"Authorization": f"Bearer {tokens['admin']}"},
+            )
         assert r.status_code == 200
         assert r.json() is None
