@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { postJson } from '@/lib/api/http'
 import { useAutomationStatus } from '@/components/user/UserProviders'
 
-const navItems = [
+const adminNavItems = [
   { href: '/user/dashboard', label: 'ダッシュボード' },
   { href: '/user/ai-feed', label: 'AI判定' },
   { href: '/user/approve', label: '取引承認' },
@@ -24,10 +24,16 @@ const navItems = [
   { href: '/user/wallet', label: 'ウォレット' },
 ]
 
+const viewerNavItems = [
+  { href: '/user/dashboard', label: 'ダッシュボード' },
+  { href: '/user/ai-feed', label: 'AI判定' },
+  { href: '/user/history', label: '取引履歴' },
+]
+
 export function UserHeader() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, logout, token } = useAuth()
+  const { user, logout, token, isAdmin } = useAuth()
   const { address, chain } = useAccount()
   const { isStopped, refreshStatus } = useAutomationStatus()
   const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false)
@@ -72,7 +78,7 @@ export function UserHeader() {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1 overflow-x-auto">
-            {navItems.map(({ href, label }) => {
+            {(isAdmin ? adminNavItems : viewerNavItems).map(({ href, label }) => {
               const isActive = pathname === href || pathname.startsWith(href + '/')
               return (
                 <Link
@@ -92,7 +98,7 @@ export function UserHeader() {
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
-            {address && (
+            {isAdmin && address && (
               <>
                 <Badge variant="outline" className="font-mono text-xs hidden sm:flex">
                   {`${address.slice(0, 6)}...${address.slice(-4)}`}
@@ -117,7 +123,7 @@ export function UserHeader() {
                 {user.username}
               </span>
             )}
-            {isStopped ? (
+            {isAdmin && (isStopped ? (
               <button
                 onClick={() => setShowResumeConfirm(true)}
                 className="flex items-center justify-center h-7 w-7 rounded-full bg-amber-500 hover:bg-amber-400 text-white transition-colors"
@@ -134,7 +140,7 @@ export function UserHeader() {
               >
                 <ShieldAlert size={14} />
               </button>
-            )}
+            ))}
             <Link
               href="/user/help"
               className="flex items-center justify-center h-7 w-7 rounded text-muted-foreground hover:text-foreground transition-colors"

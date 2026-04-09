@@ -4,18 +4,27 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, CheckCircle, Brain, Settings } from 'lucide-react'
+import { Home, CheckCircle, Brain, Settings, HelpCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/lib/auth'
 
-const navItems = [
+const adminNavItems = [
   { href: '/user/dashboard', label: 'ホーム', icon: Home },
   { href: '/user/approve', label: '承認', icon: CheckCircle },
   { href: '/user/ai-feed', label: 'AI判定', icon: Brain },
   { href: '/user/settings', label: '設定', icon: Settings },
 ]
 
+const viewerNavItems = [
+  { href: '/user/dashboard', label: 'ホーム', icon: Home },
+  { href: '/user/ai-feed', label: 'AI判定', icon: Brain },
+  { href: '/user/help', label: 'ヘルプ', icon: HelpCircle },
+]
+
 export function BottomNav() {
   const pathname = usePathname()
+  const { isAdmin } = useAuth()
+  const navItems = isAdmin ? adminNavItems : viewerNavItems
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background md:hidden">
