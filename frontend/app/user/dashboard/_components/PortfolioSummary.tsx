@@ -3,7 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useEffect, useState, useCallback } from 'react'
-import { Wallet, TrendingUp, RefreshCw } from 'lucide-react'
+import { Wallet, RefreshCw } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { KPICard, HealthFactorGauge, StatusBadge } from '@/components/shared'
@@ -119,17 +119,7 @@ export function PortfolioSummary() {
           label="総資産額"
           value={collateralUSD}
           prefix="$"
-          trend={data ? 'up' : 'flat'}
-          trendValue="前日比 +0.3%"
           icon={Wallet}
-        />
-        <KPICard
-          label="運用利回り"
-          value={5.2}
-          suffix="%"
-          trend="up"
-          trendValue="+0.1%"
-          icon={TrendingUp}
         />
         <Card className="border-zinc-800 bg-zinc-900">
           <CardHeader className="pb-2 pt-4 px-4">

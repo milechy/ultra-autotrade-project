@@ -20,7 +20,6 @@ from app.aave.safety_score import SafetyScoreCalculator, SafetyScoreParams
 from app.aave.simulation_service import SimulationParams, SimulationService
 from app.ai.explanation_service import ExplanationContext, ExplanationService
 from app.auth.dependencies import get_current_user
-from app.automation.performance_tracker import PerformanceTracker
 
 router = APIRouter(prefix="/api/transparency", tags=["transparency"])
 
@@ -135,27 +134,22 @@ def get_simulation() -> dict[str, Any]:
 
 @router.get("/performance")
 def get_performance() -> dict[str, Any]:
-    """Return mock performance summary (no DB required)."""
-    summary = PerformanceTracker().get_summary_mock(period_days=30)
-    raw = summary.model_dump()
-    # Pydantic already serialises Decimal as-is; convert for JSON safety.
-    return {k: str(v) if isinstance(v, Decimal) else v for k, v in raw.items()}
+    """Return performance summary. Returns nulls when no real data is available."""
+    return {
+        "total_trades": 0,
+        "win_count": 0,
+        "loss_count": 0,
+        "win_rate": None,
+        "total_pnl_jpy": None,
+        "avg_pnl_per_trade_jpy": None,
+        "period_days": 30,
+    }
 
 
 @router.get("/performance/monthly")
 def get_performance_monthly() -> list[dict[str, Any]]:
-    """Return mock monthly P&L data for the last 6 months (no DB required)."""
-    from datetime import date, timedelta
-
-    today = date.today()
-    months = []
-    for i in range(5, -1, -1):
-        first = (today.replace(day=1) - timedelta(days=i * 28)).replace(day=1)
-        months.append(first.strftime("%Y-%m"))
-
-    # Mock data: alternating positive/negative to show chart shape
-    mock_gains = [12000, -3500, 8200, 5100, -1800, 14300]
-    return [{"month": m, "gain_jpy": g} for m, g in zip(months, mock_gains)]
+    """Return monthly P&L data. Returns empty list when no real data is available."""
+    return []
 
 
 # ── 7. Risk Profiles (list) ──────────────────────────────────────────────────

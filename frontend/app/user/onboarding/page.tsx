@@ -2,10 +2,11 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles, Brain, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { apiPut } from '@/lib/api/client'
+import { useAuth } from '@/lib/auth'
 
 type UserMode = 'managed' | 'active'
 
@@ -69,8 +70,18 @@ function ModeCard({ mode, icon, title, badge, bullets, isLoading, onSelect }: Mo
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const { isAdmin, isLoading: authLoading } = useAuth()
   const [loadingMode, setLoadingMode] = useState<UserMode | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Non-admin users don't need onboarding; redirect to dashboard
+  useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      router.replace('/user/dashboard')
+    }
+  }, [authLoading, isAdmin, router])
+
+  if (!isAdmin) return null
 
   const handleSelect = async (mode: UserMode) => {
     setLoadingMode(mode)

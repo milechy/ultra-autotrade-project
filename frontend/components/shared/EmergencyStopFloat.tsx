@@ -21,9 +21,11 @@ import { useAuth } from '@/lib/auth'
 import { useAutomationStatus } from '@/components/user/UserProviders'
 
 export function EmergencyStopFloat() {
-  const { token } = useAuth()
+  const { token, isAdmin } = useAuth()
   const { isStopped, refreshStatus } = useAutomationStatus()
   const [isLoading, setIsLoading] = useState(false)
+
+  if (!isAdmin) return null
 
   const handleStop = async () => {
     if (!token) return

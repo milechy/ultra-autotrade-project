@@ -5,6 +5,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Bell, TrendingUp, ShieldAlert, Save, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -89,8 +90,16 @@ function SectionHeader({ icon: Icon, title }: { icon: React.ElementType; title: 
 }
 
 function SettingsPage() {
-  const { token, isAdmin } = useAuth()
+  const { token, isAdmin, isLoading: authLoading } = useAuth()
+  const router = useRouter()
   const { systemStatus, isStopped, refreshStatus } = useAutomationStatus()
+
+  // Redirect non-admin users to dashboard
+  useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      router.replace('/user/dashboard')
+    }
+  }, [authLoading, isAdmin, router])
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -223,6 +232,8 @@ function SettingsPage() {
     { value: 'alert', label: 'ALERT以上' },
     { value: 'emergency', label: 'EMERGENCYのみ' },
   ]
+
+  if (!isAdmin) return null
 
   if (isLoading) {
     return (

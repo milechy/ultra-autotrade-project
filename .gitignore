@@ -70,3 +70,14 @@ user/config.json*
 backups/
 slack-handler/
 .wolf/
+
+# AI tools / auto-generated knowledge
+.agents/
+.understand-anything/
+claude_ai_knowledge/
+.claude/skills/health/
+
+# Frontend test artifacts
+frontend/playwright-report/
+frontend/test-results/
+frontend/public/worker-*.js

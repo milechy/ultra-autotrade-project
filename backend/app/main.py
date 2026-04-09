@@ -56,7 +56,9 @@ from app.exchange.router import router as exchange_router
 from app.hooks.router import router as hooks_router
 from app.invitations.router import router as invitations_router
 from app.knowledge.router import router as knowledge_router
-from app.notifications.models import NotificationLog  # noqa: F401 — ensure table registered with Base.metadata
+from app.notifications.models import (
+    NotificationLog,  # noqa: F401 — ensure table registered with Base.metadata
+)
 from app.notifications.router import api_router as notification_api_router
 from app.notifications.router import router as notification_router
 from app.partner.allocation_router import router as allocation_router

@@ -14,16 +14,19 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.aave.client import get_default_aave_client
 from app.auth.models import User
+from app.portfolio.models import PortfolioSnapshot
 
 from .allocation_models import FundAllocation
 from .allocation_schemas import (
     AllocationCreateRequest,
     AllocationResponse,
     AllocationUpdateRequest,
+    MyAllocationResponse,
     PerformanceSummary,
     TesterPerformance,
 )
@@ -165,6 +168,114 @@ def _get_wallet_address(partner: User) -> str:
     if partner.wallet_address:
         return partner.wallet_address
     return os.getenv("AAVE_WALLET_ADDRESS", "")
+
+
+def _calc_pnl(
+    allocated: Decimal,
+    total_allocated: Decimal,
+    total_supply: Decimal,
+) -> tuple[Decimal, Decimal, Decimal]:
+    """
+    按分比率・PnL・PnL率を計算して返す。
+
+    Returns:
+        (current_value_usd, pnl_usd, pnl_percentage)
+    """
+    if total_allocated <= Decimal("0") or allocated <= Decimal("0"):
+        return Decimal("0"), Decimal("0"), Decimal("0")
+    ratio = allocated / total_allocated
+    current_value = (ratio * total_supply).quantize(Decimal("0.01"))
+    pnl_usd = (current_value - allocated).quantize(Decimal("0.01"))
+    pnl_percentage = (pnl_usd / allocated * Decimal("100")).quantize(Decimal("0.01"))
+    return current_value, pnl_usd, pnl_percentage
+
+
+def get_my_allocation(
+    db: Session,
+    current_user: User,
+) -> Optional[MyAllocationResponse]:
+    """
+    テスター自身の割り振り情報を返す。
+
+    tester_name == username でマッチングする。invited_by が設定されている場合は
+    そのパートナーの割り振りに絞り込む。
+    割り振りがない場合は None を返す（404 ではなく 200 + null）。
+
+    PnL 計算優先順位:
+      1. Aave aave_client.get_account_data() — リアルタイム（is_live=True）
+      2. PortfolioSnapshot — フォールバック（is_live=False）
+      3. データなし — pnl_usd/pnl_percentage/current_value_usd は None
+    """
+    query = db.query(FundAllocation).filter(
+        FundAllocation.tester_name == current_user.username,
+    )
+    if current_user.invited_by is not None:
+        query = query.filter(FundAllocation.partner_id == current_user.invited_by)
+
+    allocation = query.order_by(FundAllocation.allocated_at.desc()).first()
+    if allocation is None:
+        return None
+
+    partner = db.query(User).filter(User.id == allocation.partner_id).first()
+    if partner is None:
+        return None
+
+    allocated = Decimal(str(allocation.allocated_amount_usd))
+
+    # アクティブ割り振り合計（按分比率の分母）
+    total_allocated_raw = (
+        db.query(func.sum(FundAllocation.allocated_amount_usd))
+        .filter(
+            FundAllocation.partner_id == partner.id,
+            FundAllocation.status == "active",
+        )
+        .scalar()
+    )
+    total_allocated = Decimal(str(total_allocated_raw)) if total_allocated_raw else Decimal("0")
+
+    current_value_usd: Optional[Decimal] = None
+    pnl_usd: Optional[Decimal] = None
+    pnl_percentage: Optional[Decimal] = None
+    is_live = False
+
+    # 1. Live Aave
+    try:
+        wallet_addr = _get_wallet_address(partner)
+        aave_client = get_default_aave_client()
+        account_data = aave_client.get_account_data(wallet_addr)
+        total_supply = Decimal(str(account_data.total_collateral_usd))
+        current_value_usd, pnl_usd, pnl_percentage = _calc_pnl(
+            allocated, total_allocated, total_supply
+        )
+        is_live = True
+    except Exception:
+        logger.warning(
+            "[get_my_allocation] Aave unavailable for partner=%d; falling back to snapshot",
+            partner.id,
+        )
+        # 2. PortfolioSnapshot フォールバック
+        latest_snapshot = (
+            db.query(PortfolioSnapshot)
+            .filter(PortfolioSnapshot.user_id == partner.id)
+            .order_by(PortfolioSnapshot.recorded_at.desc())
+            .first()
+        )
+        if latest_snapshot is not None:
+            total_supply = Decimal(str(latest_snapshot.total_supply_usd))
+            current_value_usd, pnl_usd, pnl_percentage = _calc_pnl(
+                allocated, total_allocated, total_supply
+            )
+
+    return MyAllocationResponse(
+        allocated_amount_usd=allocated,
+        current_value_usd=current_value_usd,
+        partner_name=partner.username,
+        status=allocation.status,
+        allocated_at=allocation.allocated_at,
+        pnl_usd=pnl_usd,
+        pnl_percentage=pnl_percentage,
+        is_live=is_live,
+    )
 
 
 def get_performance(

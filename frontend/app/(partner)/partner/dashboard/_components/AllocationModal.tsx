@@ -6,7 +6,14 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { getStoredToken } from '@/lib/auth'
 import type { Allocation, CreateAllocationData, UpdateAllocationData } from '@/lib/api/allocations'
+
+interface TesterOption {
+  id: number
+  username: string
+  email: string
+}
 
 interface AllocationModalProps {
   mode: 'create' | 'edit'
@@ -29,6 +36,8 @@ export default function AllocationModal({
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [testers, setTesters] = useState<TesterOption[]>([])
+  const [testersLoading, setTestersLoading] = useState(false)
 
   useEffect(() => {
     if (mode === 'edit' && allocation) {
@@ -37,6 +46,20 @@ export default function AllocationModal({
       setNotes(allocation.notes ?? '')
     }
   }, [mode, allocation])
+
+  useEffect(() => {
+    if (mode !== 'create') return
+    const token = getStoredToken()
+    if (!token) return
+    setTestersLoading(true)
+    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? ''}/api/partner/testers`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data: TesterOption[]) => setTesters(data))
+      .catch(() => {})
+      .finally(() => setTestersLoading(false))
+  }, [mode])
 
   function validate(): string | null {
     if (!testerName.trim()) return '名前は必須です'
@@ -105,14 +128,38 @@ export default function AllocationModal({
               <label className="text-sm font-medium" htmlFor="tester-name">
                 テスター名 <span className="text-red-500">*</span>
               </label>
-              <input
-                id="tester-name"
-                type="text"
-                value={testerName}
-                onChange={(e) => setTesterName(e.target.value)}
-                placeholder="例: Alice"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
+              {mode === 'create' ? (
+                <select
+                  id="tester-name"
+                  value={testerName}
+                  onChange={(e) => setTesterName(e.target.value)}
+                  disabled={testersLoading}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="">
+                    {testersLoading ? '読み込み中...' : 'テスターを選択してください'}
+                  </option>
+                  {testers.map((t) => (
+                    <option key={t.id} value={t.username}>
+                      {t.username} ({t.email})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id="tester-name"
+                  type="text"
+                  value={testerName}
+                  onChange={(e) => setTesterName(e.target.value)}
+                  placeholder="例: Alice"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              )}
+              {mode === 'create' && !testersLoading && testers.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  招待済みのテスターがいません。先にユーザーを招待してください。
+                </p>
+              )}
             </div>
 
             <div className="space-y-1">
