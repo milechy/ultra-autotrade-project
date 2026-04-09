@@ -23,7 +23,6 @@ const partnerNavLinks: Array<{ href: string; label: string; highlight?: boolean 
   { href: "/partner/dashboard", label: "ダッシュボード" },
   { href: "/partner/users", label: "テスター管理" },
   { href: "/partner/notifications", label: "通知ログ" },
-  { href: "/partner/settings", label: "設定" },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -135,7 +134,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "16px" }}>{children}</main>
 
       <footer style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px", color: "#777", fontSize: 12 }}>
-        読み取り専用ダッシュボード。バックエンドURL: <code>{process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "(未設定)"}</code>
+        © Ultra AutoTrade
       </footer>
     </div>
   );

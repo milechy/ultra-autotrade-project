@@ -10,9 +10,11 @@ import type { AccuracyPoint } from '@/components/charts/AccuracyChart'
 const AccuracyChart = dynamic(() => import('@/components/charts/AccuracyChart'), { ssr: false })
 
 interface AiAccuracyResponse {
-  accuracy_all: number | null
-  accuracy_30d: number | null
-  history: AccuracyPoint[]
+  accuracy_pct: number | null
+  last_30d_accuracy_pct: number | null
+  total_decisions: number
+  correct_count: number
+  history?: AccuracyPoint[]
 }
 
 function AccuracyValue({ value, label }: { value: number | null; label: string }) {
@@ -56,9 +58,12 @@ export function AiAccuracyCard() {
       {!loading && data && (
         <>
           <div className="grid grid-cols-2 gap-3">
-            <AccuracyValue value={data.accuracy_all} label="全体的中率" />
-            <AccuracyValue value={data.accuracy_30d} label="直近30日" />
+            <AccuracyValue value={data.accuracy_pct} label="全体的中率" />
+            <AccuracyValue value={data.last_30d_accuracy_pct} label="直近30日" />
           </div>
+          <p className="text-xs text-zinc-500 text-center">
+            {data.total_decisions}回提案、{data.correct_count}回でプラス
+          </p>
           {data.history && data.history.length > 0 && (
             <AccuracyChart data={data.history} />
           )}

@@ -16,6 +16,8 @@ import {
 } from './_components'
 import { useAuthFetch } from '@/hooks/useAuthFetch'
 
+// Note: PortfolioSummary, SafetyScore, AiAccuracyCard are used by ActiveDashboard only
+
 // ---- Types ----
 
 type UserMode = 'managed' | 'active' | 'pro'
@@ -213,52 +215,17 @@ function RecentOpsCard() {
 }
 
 function ManagedDashboard() {
-  const t = useTranslations('Dashboard')
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
-      {/* AI running badge + Risk mode badge */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2 rounded-2xl border border-emerald-800 bg-emerald-950/40 px-4 py-3">
-          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-sm font-semibold text-emerald-400">{t('aiRunning')}</span>
-        </div>
-        <RiskModeBadge />
-      </div>
-
-      {/* Portfolio KPIs */}
-      <section>
-        <PortfolioSummary />
-      </section>
-
-      {/* Safety Score */}
-      <section>
-        <SafetyScore />
-      </section>
-
-      {/* Allocation */}
+      {/* 資金割り振り — メインコンテンツ */}
       <section>
         <AllocationCard />
       </section>
 
-      {/* Recent ops */}
+      {/* 最近の自動運用 */}
       <section>
         <RecentOpsCard />
       </section>
-
-      {/* AI accuracy */}
-      <section>
-        <AiAccuracyCard />
-      </section>
-
-      {/* Footer note */}
-      <p className="text-center text-xs text-zinc-600">
-        {t('managedFootnote')}
-      </p>
-
-      {/* Disclaimer */}
-      <p className="text-center text-xs text-zinc-600">
-        ※参考利回りです。将来の収益を保証するものではありません
-      </p>
     </div>
   )
 }

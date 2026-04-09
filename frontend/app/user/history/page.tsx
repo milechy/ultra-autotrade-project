@@ -426,7 +426,7 @@ function HistoryPage() {
         {activeTab === 'exchange' && (
           <div className="relative">
             <div className="absolute inset-0 bg-white dark:bg-gray-900/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
-              <p className="text-gray-500 font-medium">Coming Soon — Phase 2で対応予定</p>
+              <p className="text-gray-500 font-medium">取引所履歴は準備中です</p>
             </div>
             <div className="pointer-events-none select-none opacity-50">
               {showFilters && (
