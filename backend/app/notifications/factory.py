@@ -12,12 +12,15 @@ Phase5 時点では:
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from .config import load_notification_settings
 from .line_sender import LINENotificationSender
 from .schemas import NotificationChannel, NotificationMessage, NotificationSeverity
-from .service import CompositeNotificationService, LoggingNotificationSender
+from .service import CompositeNotificationService, DatabaseNotificationSender, LoggingNotificationSender
 from .slack_sender import SlackNotificationSender
 
 _notification_service: Optional[CompositeNotificationService] = None
@@ -49,6 +52,14 @@ def get_notification_service() -> CompositeNotificationService:
                 user_id=settings.line_user_id,
             )
             senders.append(line_sender)
+
+        # DB永続化: SessionLocal が利用可能な場合のみ追加（テスト環境では上書き可能）
+        try:
+            from app.database import SessionLocal
+            db_sender = DatabaseNotificationSender(SessionLocal)
+            senders.append(db_sender)
+        except Exception:  # noqa: BLE001
+            logger.warning("DatabaseNotificationSender: could not load SessionLocal, DB logging disabled.")
 
         _notification_service = CompositeNotificationService(senders)
     return _notification_service

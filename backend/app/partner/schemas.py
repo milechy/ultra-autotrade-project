@@ -2,6 +2,7 @@
 # backend/app/partner/schemas.py
 """パートナー統計 API スキーマ定義。"""
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -36,3 +37,27 @@ class MonthlyStatsResponse(BaseModel):
     end_value: Decimal
     return_pct: Decimal
     user_count: int
+
+
+class NotificationLogItem(BaseModel):
+    """通知ログ1件分のレスポンス。"""
+
+    id: int
+    channel: str
+    severity: str
+    title: str
+    body: str
+    partner_id: Optional[int]
+    user_id: Optional[int]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class NotificationLogPage(BaseModel):
+    """通知ログ一覧ページネーションレスポンス。"""
+
+    items: list[NotificationLogItem]
+    total: int
+    page: int
+    per_page: int

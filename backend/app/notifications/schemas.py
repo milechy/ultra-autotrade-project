@@ -21,8 +21,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+# Avoid circular import: Optional[int] for partner_id/user_id context.
+# These are set by callers that have partner context (e.g. partner-specific alerts).
+# System-wide notifications leave them as None and won't appear in partner logs.
 
 
 class NotificationChannel(str, Enum):
@@ -82,6 +88,14 @@ class NotificationMessage(BaseModel):
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="通知生成時刻（UTC）。",
+    )
+    partner_id: Optional[int] = Field(
+        default=None,
+        description="対象パートナーの users.id。NULLはシステム全体向け通知（パートナー画面には表示しない）。",
+    )
+    user_id: Optional[int] = Field(
+        default=None,
+        description="対象ユーザーの users.id。",
     )
 
     model_config = ConfigDict(from_attributes=True)

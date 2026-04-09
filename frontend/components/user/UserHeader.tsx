@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ShieldAlert, ShieldOff } from 'lucide-react'
+import { HelpCircle, ShieldAlert, ShieldOff } from 'lucide-react'
 import { useAccount } from 'wagmi'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
@@ -135,6 +135,14 @@ export function UserHeader() {
                 <ShieldAlert size={14} />
               </button>
             )}
+            <Link
+              href="/user/help"
+              className="flex items-center justify-center h-7 w-7 rounded text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="ヘルプ"
+              title="よくある質問"
+            >
+              <HelpCircle size={16} />
+            </Link>
             <button
               onClick={handleLogout}
               className="text-xs border rounded px-2 py-1 text-muted-foreground hover:text-foreground transition-colors"

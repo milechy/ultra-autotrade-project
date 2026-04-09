@@ -87,6 +87,41 @@ class CompositeNotificationService:
                 logger.exception("Notification sender failed. Continuing with others.")
 
 
+class DatabaseNotificationSender:
+    """
+    通知を notification_logs テーブルに保存する Sender。
+
+    SessionLocal（sessionmaker）を受け取り、send() 毎に新しい Session を開いて
+    コミット後にクローズする。失敗しても本処理を止めない（fail-open）。
+    """
+
+    def __init__(self, session_factory: object) -> None:
+        # session_factory: sqlalchemy.orm.sessionmaker (型をここではAnyで扱う、循環import回避)
+        self._session_factory = session_factory
+
+    def send(self, message: NotificationMessage) -> None:
+        from app.notifications.models import NotificationLog  # 循環import回避
+
+        try:
+            db = self._session_factory()
+            try:
+                log = NotificationLog(
+                    channel=message.channel.value,
+                    severity=message.severity.value,
+                    title=message.title,
+                    body=message.body,
+                    partner_id=message.partner_id,
+                    user_id=message.user_id,
+                    created_at=message.created_at,
+                )
+                db.add(log)
+                db.commit()
+            finally:
+                db.close()
+        except Exception:  # noqa: BLE001
+            logger.exception("DatabaseNotificationSender: failed to persist notification log.")
+
+
 class DualChannelNotificationService:
     """
     LINE Flex Message + Web Push の dual-channel 通知サービス（Phase 3）。

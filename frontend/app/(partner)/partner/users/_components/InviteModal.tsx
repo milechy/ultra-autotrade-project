@@ -121,7 +121,7 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
 
             {/* Max uses selection */}
             <div>
-              <p className="text-xs text-gray-400 mb-2">最大使用回数</p>
+              <p className="text-xs text-gray-400 mb-2">招待可能人数</p>
               <div className="flex gap-2">
                 {MAX_USES_OPTIONS.map((n) => (
                   <button
@@ -133,7 +133,7 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
                         : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
                     }`}
                   >
-                    {n}回
+                    {n}人
                   </button>
                 ))}
               </div>
