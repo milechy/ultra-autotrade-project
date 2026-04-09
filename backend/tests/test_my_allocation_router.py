@@ -24,7 +24,6 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-my-allocation")
 from app.aave.client import AccountData  # noqa: E402
 from app.auth.router import router as auth_router  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
-from app.partner.allocation_models import FundAllocation  # noqa: E402
 from app.partner.allocation_router import router as allocation_router  # noqa: E402
 from app.portfolio.models import PortfolioSnapshot  # noqa: E402
 from app.users.router import router as users_router  # noqa: E402
