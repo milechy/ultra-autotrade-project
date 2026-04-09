@@ -50,14 +50,14 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<{ code: string; url: string } | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [copiedField, setCopiedField] = useState<'code' | 'url' | null>(null)
 
   function handleClose() {
     setResult(null)
     setError('')
     setDays(7)
     setMaxUses(1)
-    setCopied(false)
+    setCopiedField(null)
     onClose()
   }
 
@@ -80,11 +80,11 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
     }
   }
 
-  async function handleCopy() {
+  async function handleCopy(field: 'code' | 'url') {
     if (!result) return
-    await navigator.clipboard.writeText(result.url)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    await navigator.clipboard.writeText(field === 'code' ? result.code : result.url)
+    setCopiedField(field)
+    setTimeout(() => setCopiedField(null), 2000)
   }
 
   return (
@@ -161,37 +161,52 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
             </div>
           </div>
         ) : (
-          <div className="space-y-4 pt-2">
+          <div className="space-y-3 pt-2">
             {/* Code display */}
             <div className="rounded-lg bg-gray-800/60 p-4">
-              <div className="text-xs text-gray-500 mb-1">招待コード</div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs text-gray-500">招待コード</div>
+                <button
+                  onClick={() => handleCopy('code')}
+                  className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
+                    copiedField === 'code'
+                      ? 'text-green-400'
+                      : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  {copiedField === 'code' ? (
+                    <><Check className="h-3 w-3" />コピー済み</>
+                  ) : (
+                    <><Copy className="h-3 w-3" />コピー</>
+                  )}
+                </button>
+              </div>
               <div className="font-mono text-lg text-blue-300 font-bold tracking-widest">
                 {result.code}
               </div>
             </div>
 
             {/* URL + copy */}
-            <div>
-              <div className="text-xs text-gray-500 mb-1">招待URL</div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 min-w-0 rounded-lg bg-gray-800 border border-gray-700 px-3 py-2 text-xs text-gray-300 font-mono truncate">
-                  {result.url}
-                </div>
-                <Button
-                  size="sm"
-                  onClick={handleCopy}
-                  className={`shrink-0 ${
-                    copied
-                      ? 'bg-green-600 hover:bg-green-700 text-white'
-                      : 'bg-gray-700 hover:bg-gray-600 text-white'
+            <div className="rounded-lg bg-gray-800/60 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs text-gray-500">招待URL</div>
+                <button
+                  onClick={() => handleCopy('url')}
+                  className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
+                    copiedField === 'url'
+                      ? 'text-green-400'
+                      : 'text-gray-400 hover:text-gray-200'
                   }`}
                 >
-                  {copied ? (
-                    <Check className="h-4 w-4" />
+                  {copiedField === 'url' ? (
+                    <><Check className="h-3 w-3" />コピー済み</>
                   ) : (
-                    <Copy className="h-4 w-4" />
+                    <><Copy className="h-3 w-3" />コピー</>
                   )}
-                </Button>
+                </button>
+              </div>
+              <div className="font-mono text-xs text-gray-300 break-all">
+                {result.url}
               </div>
             </div>
 
