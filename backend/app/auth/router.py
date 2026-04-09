@@ -29,6 +29,7 @@ from .schemas import (
     LoginRequest,
     PasswordChangeRequest,
     RegisterRequest,
+    RegisterResponse,
     RiskModeUpdateRequest,
     TermsAcceptRequest,
     TermsStatusResponse,
@@ -52,14 +53,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post(
     "/register",
-    response_model=UserResponse,
+    response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Initial admin registration or invitation-based registration",
 )
 def register(
     request: RegisterRequest,
     db: Session = Depends(get_db),
-) -> UserResponse:
+) -> RegisterResponse:
     """
     Register a user.
 
@@ -87,7 +88,12 @@ def register(
         logger.info(
             "User registered via invitation: %s (partner_id=%d)", user.email, invitation.partner_id
         )
-        return UserResponse.model_validate(user)
+        token, expires_in = AuthService.create_access_token(user.id, user.email, user.role)
+        return RegisterResponse(
+            **UserResponse.model_validate(user).model_dump(),
+            access_token=token,
+            expires_in=expires_in,
+        )
 
     # Initial admin registration (no invitation code)
     initial_admin_email = os.getenv("INITIAL_ADMIN_EMAIL")
@@ -115,7 +121,12 @@ def register(
             role=UserRole.ADMIN.value,  # First registration is always admin
         )
         logger.info("Initial admin registered: %s", user.email)
-        return UserResponse.model_validate(user)
+        token, expires_in = AuthService.create_access_token(user.id, user.email, user.role)
+        return RegisterResponse(
+            **UserResponse.model_validate(user).model_dump(),
+            access_token=token,
+            expires_in=expires_in,
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

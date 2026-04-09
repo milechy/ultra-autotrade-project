@@ -28,6 +28,9 @@ interface RegisterResponse {
   username: string;
   role: string;
   is_active: boolean;
+  access_token: string;
+  token_type: string;
+  expires_in: number;
 }
 
 type CodeStatus = "idle" | "checking" | "valid" | "invalid";
@@ -66,14 +69,16 @@ function RegisterForm() {
     setError(null);
     setSubmitting(true);
     try {
-      await apiPost<RegisterResponse>("/auth/register", {
+      const result = await apiPost<RegisterResponse>("/auth/register", {
         email,
         username: displayName,
         password,
         invitation_code: code,
       });
-      // 登録完了 → ログインページへ（登録後は手動ログインが必要）
-      router.replace("/login?registered=1");
+      // 登録完了 → トークンを保存して自動ログイン
+      localStorage.setItem("ultra_auth_token", result.access_token);
+      localStorage.setItem("ultra_auth_expires", String(Date.now() + result.expires_in * 1000));
+      router.replace("/user/dashboard");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "登録に失敗しました";
       setError(message);

@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class PartnerStatsResponse(BaseModel):
@@ -52,6 +52,16 @@ class NotificationLogItem(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TesterItem(BaseModel):
+    """パートナーが招待したテスターの一覧アイテム。"""
+
+    id: int
+    username: str
+    email: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NotificationLogPage(BaseModel):

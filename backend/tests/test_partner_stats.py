@@ -517,3 +517,52 @@ class TestMonthlyStats:
         april = next(d for d in data if d["month"] == "2026-04")
         assert april["user_count"] == 1
         assert Decimal(april["start_value"]) == Decimal("5200.00")
+
+
+# ---------------------------------------------------------------------------
+# /api/partner/testers
+# ---------------------------------------------------------------------------
+
+
+class TestGetTesters:
+    def test_returns_invited_users(
+        self,
+        client: TestClient,
+        test_db: tuple[SessionFactory, object],
+    ) -> None:
+        session_factory, _ = test_db
+        admin_token = _register_admin(client)
+        partner_id = _get_user_id(client, admin_token)
+
+        uid = _create_viewer(client, admin_token, session_factory, partner_id, "tester1@x.com", "tester1")
+
+        r = client.get("/api/partner/testers", headers={"Authorization": f"Bearer {admin_token}"})
+        assert r.status_code == 200
+        data = r.json()
+        assert any(t["id"] == uid for t in data)
+        assert all("username" in t and "email" in t for t in data)
+
+    def test_excludes_uninvited_users(
+        self,
+        client: TestClient,
+        test_db: tuple[SessionFactory, object],
+    ) -> None:
+        session_factory, _ = test_db
+        admin_token = _register_admin(client)
+
+        # Create a user with no invited_by
+        r = client.post(
+            "/users",
+            json={"email": "stranger@x.com", "username": "stranger", "password": "pass1234!", "role": "viewer"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert r.status_code == 201
+
+        r = client.get("/api/partner/testers", headers={"Authorization": f"Bearer {admin_token}"})
+        assert r.status_code == 200
+        data = r.json()
+        assert not any(t["username"] == "stranger" for t in data)
+
+    def test_unauthenticated_returns_401(self, client: TestClient) -> None:
+        r = client.get("/api/partner/testers")
+        assert r.status_code == 401

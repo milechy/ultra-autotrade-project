@@ -81,6 +81,14 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class RegisterResponse(UserResponse):
+    """登録レスポンス（トークン含む、自動ログイン用）。"""
+
+    access_token: str
+    token_type: str = "bearer"  # noqa: S105
+    expires_in: int
+
+
 class TermsAcceptRequest(BaseModel):
     """利用規約同意リクエスト。"""
 

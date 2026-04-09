@@ -25,10 +25,30 @@ from .schemas import (
     NotificationLogItem,
     NotificationLogPage,
     PartnerStatsResponse,
+    TesterItem,
     UserStatsResponse,
 )
 
 router = APIRouter(prefix="/api/partner", tags=["partner"])
+
+
+@router.get(
+    "/testers",
+    response_model=list[TesterItem],
+    summary="パートナーが招待したテスター一覧",
+)
+def get_testers(
+    current_user: User = Depends(require_partner),
+    db: Session = Depends(get_db),
+) -> list[TesterItem]:
+    """パートナーが招待した（invited_by = 自分のID）アクティブユーザー一覧を返す。"""
+    users = (
+        db.query(User)
+        .filter(User.invited_by == current_user.id, User.is_active.is_(True))
+        .order_by(User.created_at.desc())
+        .all()
+    )
+    return [TesterItem.model_validate(u) for u in users]
 
 
 @router.get(
@@ -85,7 +105,9 @@ def get_monthly_stats(
 def get_partner_notifications(
     current_user: User = Depends(require_partner),
     db: Session = Depends(get_db),
-    severity: Optional[str] = Query(default=None, description="フィルタ: info/warning/alert/emergency"),
+    severity: Optional[str] = Query(
+        default=None, description="フィルタ: info/warning/alert/emergency"
+    ),
     page: int = Query(default=1, ge=1, description="ページ番号（1始まり）"),
     per_page: int = Query(default=20, ge=1, le=100, description="1ページあたりの件数"),
 ) -> NotificationLogPage:
@@ -93,9 +115,7 @@ def get_partner_notifications(
 
     partner_id が NULL の通知（システム全体向け）は含まない。
     """
-    query = db.query(NotificationLog).filter(
-        NotificationLog.partner_id == current_user.id
-    )
+    query = db.query(NotificationLog).filter(NotificationLog.partner_id == current_user.id)
     if severity:
         query = query.filter(NotificationLog.severity == severity)
 
