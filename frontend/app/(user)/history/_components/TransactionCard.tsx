@@ -35,6 +35,13 @@ const OPERATION_BADGE_CLASSES: Record<Transaction['type'], string> = {
   REPAY: 'bg-green-500/20 text-green-400 border-green-500/30',
 }
 
+const OPERATION_LABELS: Record<Transaction['type'], string> = {
+  SUPPLY: '供給',
+  WITHDRAW: '引き出し',
+  BORROW: '借入',
+  REPAY: '返済',
+}
+
 const STATUS_BADGE_CLASSES: Record<Transaction['status'], string> = {
   success: 'bg-green-500/20 text-green-400 border-green-500/30',
   pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
@@ -66,7 +73,7 @@ export function TransactionCard({ tx }: TransactionCardProps) {
                   variant="outline"
                   className={`text-xs px-2 py-0.5 ${OPERATION_BADGE_CLASSES[tx.type]}`}
                 >
-                  {tx.type}
+                  {OPERATION_LABELS[tx.type]}
                 </Badge>
               </div>
               <div className="text-xs text-zinc-400 mt-0.5">

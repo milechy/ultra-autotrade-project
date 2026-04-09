@@ -527,3 +527,38 @@ git diff main --name-only | grep "^frontend/lib/api/" # 新しいfetch関数 →
 - フロントエンド: 戦略選択画面（/user/strategies）+ プロトコルヘルスモニター（/admin/protocols）
 - テスト: 1762 passed（dev ブランチ）
 - 次: staging デプロイ → E2Eテスト → main マージ
+
+---
+
+## 標準チェックリスト（全実装で必ず確認）
+
+すべてのコード変更（機能追加・バグ修正・リファクタ問わず）で、実装完了前に以下を確認すること。
+
+### UI / フロントエンド
+- [ ] 全テキストが日本語（英語ハードコード禁止。ja.jsonにキーがあればそちらを使用）
+- [ ] admin / partner / viewer(tester) の権限分離（role === "admin" で操作系の表示/非表示）
+- [ ] ダミー/ハードコードデータがないこと（value={5.2} のような固定値禁止。データ未取得時は「データなし」表示）
+- [ ] Decimal型（バックエンドからの文字列）→ Number() ラップしてから .toFixed() 等を呼ぶ
+- [ ] recharts → 別ファイルに分離 + dynamic(() => import('./XxxRecharts'), { ssr: false })
+- [ ] NEXT_PUBLIC_* 環境変数は build-time 埋め込み。変更時はフロントエンド再ビルド必須
+- [ ] フッター/デバッグ情報に内部URL（api.ultra-auto-trade.com等）を露出しない
+
+### バックエンド
+- [ ] 新規テーブル → ALTER TABLE SQL をモデルファイル冒頭にコメントで記載（Alembic未使用）
+- [ ] API レスポンスの Decimal 型は文字列で返却（JSON シリアライズ）
+- [ ] 新規エンドポイント → RBAC（role チェック）を必ず実装
+- [ ] fail-open 設計（外部サービス接続エラーでAPIが500にならない）
+
+### テスト / 品質ゲート（7段階ゲート準拠）
+- [ ] Gate 1-3: scripts/verify.sh 通過（pytest 80%+ / tsc --noEmit / npm run build）
+- [ ] Gate 4: Playwright E2E（UI変更がある場合。baseURL=本番、ローカルはSTAGING_URL指定）
+- [ ] Gate 5: 孤立コード検出（大きなリファクタ時）
+- [ ] Gate 6: Codex Review（PR前に1回。/codex:review --base main --background）
+- [ ] Gate 7: claude --chrome（UI変更時に手動実行。別ターミナルから起動。バックエンド配線の問題は検出できない点に注意）
+- [ ] 新規機能 → pytest 新規テスト追加
+
+### デプロイ
+- [ ] dev ブランチに commit & push → PR作成 → main にマージ → Hetzner で deploy_staging.sh
+- [ ] deploy_staging.sh は Hetzner 上で実行（ローカルMacではない）
+- [ ] --frontend-only はバックエンドAPIに変更なしの場合のみ
+- [ ] DB変更がある場合は Hetzner で事前に CREATE TABLE / ALTER TABLE 実行

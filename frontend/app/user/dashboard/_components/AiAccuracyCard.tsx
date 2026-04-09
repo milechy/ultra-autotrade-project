@@ -61,9 +61,13 @@ export function AiAccuracyCard() {
             <AccuracyValue value={data.accuracy_pct} label="全体的中率" />
             <AccuracyValue value={data.last_30d_accuracy_pct} label="直近30日" />
           </div>
-          <p className="text-xs text-zinc-500 text-center">
-            {data.total_decisions}回提案、{data.correct_count}回でプラス
-          </p>
+          {data.total_decisions > 0 ? (
+            <p className="text-xs text-zinc-500 text-center">
+              {data.total_decisions}回提案、{data.correct_count}回でプラス
+            </p>
+          ) : (
+            <p className="text-xs text-zinc-500 text-center">AI判定データがありません</p>
+          )}
           {data.history && data.history.length > 0 && (
             <AccuracyChart data={data.history} />
           )}
