@@ -234,6 +234,15 @@ async def ai_judgment_loop(
             _last_run_at = datetime.now(timezone.utc)
             _last_error_msg = None
             logger.info("AI judgment completed: %s", result)
+
+            # AI判定直後にポートフォリオスナップショットを記録（fail-open）
+            try:
+                from app.portfolio.snapshot_service import record_portfolio_snapshot  # noqa: PLC0415,I001
+
+                snap_result = await loop.run_in_executor(None, record_portfolio_snapshot)
+                logger.info("Portfolio snapshot recorded: %s", snap_result)
+            except Exception as snap_exc:
+                logger.warning("Portfolio snapshot skipped (non-critical): %s", snap_exc)
         except Exception as exc:
             _last_error_msg = f"{type(exc).__name__}: {exc}"
             logger.error("AI judgment job failed: %s", exc)

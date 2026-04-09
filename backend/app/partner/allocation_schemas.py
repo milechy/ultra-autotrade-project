@@ -91,3 +91,14 @@ class PerformanceSummary(BaseModel):
     total_supply_usd: Decimal  # Aave get_account_data().total_collateral_usd
     health_factor: Decimal  # Infinity → Decimal("999.0")
     testers: list[TesterPerformance]
+
+
+class MyAllocationResponse(BaseModel):
+    """テスター自身の割り振り情報レスポンス。"""
+
+    allocated_amount_usd: Decimal
+    partner_name: str
+    status: str
+    allocated_at: datetime
+    pnl_usd: Optional[Decimal] = None
+    pnl_percentage: Optional[Decimal] = None

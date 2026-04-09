@@ -2,7 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
-import { Clock } from 'lucide-react'
+import { Clock, Wallet } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
@@ -65,6 +65,83 @@ interface Transaction {
 
 interface TransactionsResponse {
   items: Transaction[]
+}
+
+// ---- AllocationCard ----
+
+interface MyAllocation {
+  allocated_amount_usd: string
+  partner_name: string
+  status: string
+  allocated_at: string
+  pnl_usd: string | null
+  pnl_percentage: string | null
+}
+
+function AllocationCard() {
+  const { data, loading } = useAuthFetch<MyAllocation | null>('/api/user/my-allocation')
+  const t = useTranslations('Dashboard')
+
+  if (loading) {
+    return <Skeleton className="h-28 rounded-2xl" />
+  }
+
+  const statusLabel = data?.status === 'active' ? t('allocationActive') : data?.status === 'withdrawn' ? t('allocationWithdrawn') : data?.status ?? ''
+  const pnlPositive = data?.pnl_usd != null && Number(data.pnl_usd) >= 0
+
+  return (
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Wallet className="h-4 w-4 text-zinc-500" />
+        <h2 className="text-sm font-semibold text-zinc-400">{t('myAllocation')}</h2>
+      </div>
+
+      {data == null ? (
+        <p className="text-sm text-zinc-500 py-2 text-center">{t('noAllocation')}</p>
+      ) : (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+          <div>
+            <dt className="text-xs text-zinc-500">{t('allocatedAmount')}</dt>
+            <dd className="text-sm font-semibold text-zinc-100">
+              ${Number(data.allocated_amount_usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </dd>
+          </div>
+
+          <div>
+            <dt className="text-xs text-zinc-500">{t('partnerName')}</dt>
+            <dd className="text-sm font-semibold text-zinc-100">{data.partner_name}</dd>
+          </div>
+
+          <div>
+            <dt className="text-xs text-zinc-500">{t('allocationStatus')}</dt>
+            <dd>
+              <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                data.status === 'active'
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : 'bg-zinc-700 text-zinc-400'
+              }`}>
+                {statusLabel}
+              </span>
+            </dd>
+          </div>
+
+          {data.pnl_usd != null && (
+            <div>
+              <dt className="text-xs text-zinc-500">{t('allocationPnl')}</dt>
+              <dd className={`text-sm font-semibold ${pnlPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                {pnlPositive ? '+' : ''}${Number(data.pnl_usd).toFixed(2)}
+                {data.pnl_percentage != null && (
+                  <span className="ml-1 text-xs">
+                    ({pnlPositive ? '+' : ''}{Number(data.pnl_percentage).toFixed(2)}%)
+                  </span>
+                )}
+              </dd>
+            </div>
+          )}
+        </dl>
+      )}
+    </div>
+  )
 }
 
 // ---- ManagedDashboard ----
@@ -158,6 +235,11 @@ function ManagedDashboard() {
         <SafetyScore />
       </section>
 
+      {/* Allocation */}
+      <section>
+        <AllocationCard />
+      </section>
+
       {/* Recent ops */}
       <section>
         <RecentOpsCard />
@@ -198,6 +280,10 @@ function ActiveDashboard() {
 
       <section>
         <SafetyScore />
+      </section>
+
+      <section>
+        <AllocationCard />
       </section>
 
       <section>

@@ -77,7 +77,15 @@
     "aiRunning": "AI is running",
     "recentOps": "Recent auto operations",
     "noOpsHistory": "No operation history yet",
-    "managedFootnote": "Details available in active mode"
+    "managedFootnote": "Details available in active mode",
+    "myAllocation": "Fund Allocation",
+    "allocatedAmount": "Allocated Amount",
+    "partnerName": "Partner",
+    "allocationStatus": "Status",
+    "allocationPnl": "P&L",
+    "noAllocation": "No funds allocated yet",
+    "allocationActive": "Active",
+    "allocationWithdrawn": "Withdrawn"
   },
   "Decisions": {
     "title": "AI Decision History",

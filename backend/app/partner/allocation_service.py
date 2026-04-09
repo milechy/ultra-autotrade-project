@@ -14,16 +14,19 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.aave.client import get_default_aave_client
 from app.auth.models import User
+from app.portfolio.models import PortfolioSnapshot
 
 from .allocation_models import FundAllocation
 from .allocation_schemas import (
     AllocationCreateRequest,
     AllocationResponse,
     AllocationUpdateRequest,
+    MyAllocationResponse,
     PerformanceSummary,
     TesterPerformance,
 )
@@ -165,6 +168,70 @@ def _get_wallet_address(partner: User) -> str:
     if partner.wallet_address:
         return partner.wallet_address
     return os.getenv("AAVE_WALLET_ADDRESS", "")
+
+
+def get_my_allocation(
+    db: Session,
+    current_user: User,
+) -> Optional[MyAllocationResponse]:
+    """
+    テスター自身の割り振り情報を返す。
+
+    tester_name == username でマッチングする。invited_by が設定されている場合は
+    そのパートナーの割り振りに絞り込む。
+    割り振りがない場合は None を返す（404 ではなく 200 + null）。
+    PnL は最新の PortfolioSnapshot から按分計算する（データなければ None）。
+    """
+    query = db.query(FundAllocation).filter(
+        FundAllocation.tester_name == current_user.username,
+    )
+    if current_user.invited_by is not None:
+        query = query.filter(FundAllocation.partner_id == current_user.invited_by)
+
+    allocation = query.order_by(FundAllocation.allocated_at.desc()).first()
+    if allocation is None:
+        return None
+
+    partner = db.query(User).filter(User.id == allocation.partner_id).first()
+    if partner is None:
+        return None
+
+    allocated = Decimal(str(allocation.allocated_amount_usd))
+    pnl_usd: Optional[Decimal] = None
+    pnl_percentage: Optional[Decimal] = None
+
+    latest_snapshot = (
+        db.query(PortfolioSnapshot)
+        .filter(PortfolioSnapshot.user_id == partner.id)
+        .order_by(PortfolioSnapshot.recorded_at.desc())
+        .first()
+    )
+    if latest_snapshot is not None:
+        total_allocated = (
+            db.query(func.sum(FundAllocation.allocated_amount_usd))
+            .filter(
+                FundAllocation.partner_id == partner.id,
+                FundAllocation.status == "active",
+            )
+            .scalar()
+        )
+        total_allocated_dec = Decimal(str(total_allocated)) if total_allocated else Decimal("0")
+        total_supply = Decimal(str(latest_snapshot.total_supply_usd))
+
+        if total_allocated_dec > Decimal("0") and allocated > Decimal("0"):
+            ratio = allocated / total_allocated_dec
+            current_value = ratio * total_supply
+            pnl_usd = (current_value - allocated).quantize(Decimal("0.01"))
+            pnl_percentage = (pnl_usd / allocated * Decimal("100")).quantize(Decimal("0.01"))
+
+    return MyAllocationResponse(
+        allocated_amount_usd=allocated,
+        partner_name=partner.username,
+        status=allocation.status,
+        allocated_at=allocation.allocated_at,
+        pnl_usd=pnl_usd,
+        pnl_percentage=pnl_percentage,
+    )
 
 
 def get_performance(

@@ -25,7 +25,6 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # Avoid circular import: Optional[int] for partner_id/user_id context.
 # These are set by callers that have partner context (e.g. partner-specific alerts).
 # System-wide notifications leave them as None and won't appear in partner logs.

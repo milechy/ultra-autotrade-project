@@ -23,8 +23,12 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-notif-log")
 from app.auth.router import router as auth_router  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app.notifications.models import NotificationLog  # noqa: E402
+from app.notifications.schemas import (  # noqa: E402
+    NotificationChannel,
+    NotificationMessage,
+    NotificationSeverity,
+)
 from app.notifications.service import DatabaseNotificationSender  # noqa: E402
-from app.notifications.schemas import NotificationChannel, NotificationMessage, NotificationSeverity  # noqa: E402
 from app.partner.router import router as partner_router  # noqa: E402
 from app.users.router import router as users_router  # noqa: E402
 
@@ -93,7 +97,10 @@ def tokens(
     """admin / partner / partner2 / viewer を登録し、各トークンを返す。"""
     session_factory, _ = test_db
 
-    client.post("/auth/register", json={"email": _ADMIN_EMAIL, "username": "notif-admin", "password": _ADMIN_PASS})
+    client.post(
+        "/auth/register",
+        json={"email": _ADMIN_EMAIL, "username": "notif-admin", "password": _ADMIN_PASS},
+    )
     r = client.post("/auth/login", json={"email": _ADMIN_EMAIL, "password": _ADMIN_PASS})
     admin_token = r.json()["access_token"]
 
@@ -137,18 +144,48 @@ def _seed_logs(session_factory: SessionFactory, partner_id: int, other_partner_i
     db = session_factory()
     try:
         logs = [
-            NotificationLog(channel="slack", severity="info", title="Info notice", body="body1",
-                            partner_id=partner_id, created_at=datetime(2026, 1, 1, tzinfo=timezone.utc)),
-            NotificationLog(channel="line", severity="warning", title="Warning notice", body="body2",
-                            partner_id=partner_id, created_at=datetime(2026, 1, 2, tzinfo=timezone.utc)),
-            NotificationLog(channel="slack", severity="emergency", title="Emergency!", body="body3",
-                            partner_id=partner_id, created_at=datetime(2026, 1, 3, tzinfo=timezone.utc)),
+            NotificationLog(
+                channel="slack",
+                severity="info",
+                title="Info notice",
+                body="body1",
+                partner_id=partner_id,
+                created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            ),
+            NotificationLog(
+                channel="line",
+                severity="warning",
+                title="Warning notice",
+                body="body2",
+                partner_id=partner_id,
+                created_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+            ),
+            NotificationLog(
+                channel="slack",
+                severity="emergency",
+                title="Emergency!",
+                body="body3",
+                partner_id=partner_id,
+                created_at=datetime(2026, 1, 3, tzinfo=timezone.utc),
+            ),
             # 別パートナーのログ（partner 1 には見えてはいけない）
-            NotificationLog(channel="slack", severity="alert", title="Other partner log", body="hidden",
-                            partner_id=other_partner_id, created_at=datetime(2026, 1, 4, tzinfo=timezone.utc)),
+            NotificationLog(
+                channel="slack",
+                severity="alert",
+                title="Other partner log",
+                body="hidden",
+                partner_id=other_partner_id,
+                created_at=datetime(2026, 1, 4, tzinfo=timezone.utc),
+            ),
             # partner_id=None のシステム全体向け（誰にも表示しない）
-            NotificationLog(channel="internal_log", severity="info", title="System notice", body="sys",
-                            partner_id=None, created_at=datetime(2026, 1, 5, tzinfo=timezone.utc)),
+            NotificationLog(
+                channel="internal_log",
+                severity="info",
+                title="System notice",
+                body="sys",
+                partner_id=None,
+                created_at=datetime(2026, 1, 5, tzinfo=timezone.utc),
+            ),
         ]
         db.add_all(logs)
         db.commit()
@@ -162,12 +199,13 @@ def _seed_logs(session_factory: SessionFactory, partner_id: int, other_partner_i
 
 
 class TestGetPartnerNotifications:
-    def test_returns_only_own_logs(
+    def test_returns_own_logs_and_system_notices(
         self,
         client: TestClient,
         tokens: dict[str, str],
         test_db: tuple[SessionFactory, object],
     ) -> None:
+        """自分宛ログ + partner_id=NULL のシステム全体通知が返される。"""
         session_factory, _ = test_db
         partner_id = _get_partner_id(client, tokens["partner"])
         partner2_id = _get_partner_id(client, tokens["partner2"])
@@ -179,10 +217,11 @@ class TestGetPartnerNotifications:
         )
         assert r.status_code == 200
         body = r.json()
-        assert body["total"] == 3
+        # 自分宛3件 + システム通知1件（partner_id=NULL）= 4件
+        assert body["total"] == 4
         titles = [item["title"] for item in body["items"]]
         assert "Other partner log" not in titles
-        assert "System notice" not in titles
+        assert "System notice" in titles
 
     def test_returns_empty_for_new_partner(
         self,
@@ -234,7 +273,8 @@ class TestGetPartnerNotifications:
         )
         assert r.status_code == 200
         body = r.json()
-        assert body["total"] == 3
+        # 自分宛3件 + システム通知1件 = 4件
+        assert body["total"] == 4
         assert len(body["items"]) == 2
         assert body["page"] == 1
         assert body["per_page"] == 2
@@ -244,7 +284,29 @@ class TestGetPartnerNotifications:
             headers={"Authorization": f"Bearer {tokens['partner']}"},
         )
         assert r2.status_code == 200
-        assert len(r2.json()["items"]) == 1
+        assert len(r2.json()["items"]) == 2
+
+    def test_system_notices_visible_to_all_partners(
+        self,
+        client: TestClient,
+        tokens: dict[str, str],
+        test_db: tuple[SessionFactory, object],
+    ) -> None:
+        """partner_id=NULL のシステム通知は全パートナーに表示される。"""
+        session_factory, _ = test_db
+        partner_id = _get_partner_id(client, tokens["partner"])
+        partner2_id = _get_partner_id(client, tokens["partner2"])
+        _seed_logs(session_factory, partner_id, partner2_id)
+
+        # partner も partner2 もシステム通知を見られる
+        for token_key in ("partner", "partner2"):
+            r = client.get(
+                "/api/partner/notifications",
+                headers={"Authorization": f"Bearer {tokens[token_key]}"},
+            )
+            assert r.status_code == 200
+            titles = [item["title"] for item in r.json()["items"]]
+            assert "System notice" in titles
 
     def test_viewer_forbidden(
         self,
@@ -341,6 +403,7 @@ class TestDatabaseNotificationSender:
 
     def test_fails_open_on_broken_factory(self) -> None:
         """DBが壊れていても例外を上に伝播しない（fail-open）。"""
+
         def broken_factory():
             raise RuntimeError("DB unavailable")
 

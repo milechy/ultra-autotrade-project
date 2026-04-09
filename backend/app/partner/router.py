@@ -11,7 +11,7 @@ GET /api/partner/notifications            — 自パートナー向け通知ロ�
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_partner
@@ -111,11 +111,17 @@ def get_partner_notifications(
     page: int = Query(default=1, ge=1, description="ページ番号（1始まり）"),
     per_page: int = Query(default=20, ge=1, le=100, description="1ページあたりの件数"),
 ) -> NotificationLogPage:
-    """自パートナー宛の通知ログを返す（partner_id = 自分のID）。
+    """自パートナー宛の通知ログを返す。
 
-    partner_id が NULL の通知（システム全体向け）は含まない。
+    - partner_id = 自分のID: 個別通知
+    - partner_id IS NULL: 全パートナー向けシステム通知（全パートナーに表示）
     """
-    query = db.query(NotificationLog).filter(NotificationLog.partner_id == current_user.id)
+    query = db.query(NotificationLog).filter(
+        or_(
+            NotificationLog.partner_id == current_user.id,
+            NotificationLog.partner_id.is_(None),
+        )
+    )
     if severity:
         query = query.filter(NotificationLog.severity == severity)
 

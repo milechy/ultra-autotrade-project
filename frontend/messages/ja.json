@@ -77,7 +77,15 @@
     "aiRunning": "AIが運用中です",
     "recentOps": "最近の自動操作",
     "noOpsHistory": "まだ操作履歴がありません",
-    "managedFootnote": "詳細はアクティブモードで確認できます"
+    "managedFootnote": "詳細はアクティブモードで確認できます",
+    "myAllocation": "資金割り振り",
+    "allocatedAmount": "割り振り額",
+    "partnerName": "パートナー",
+    "allocationStatus": "ステータス",
+    "allocationPnl": "損益",
+    "noAllocation": "まだ資金が割り振られていません",
+    "allocationActive": "運用中",
+    "allocationWithdrawn": "引き出し済み"
   },
   "Decisions": {
     "title": "AI判定履歴",

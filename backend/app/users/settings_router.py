@@ -2,7 +2,7 @@
 # backend/app/users/settings_router.py
 """ユーザー設定API ルーター定義。"""
 
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import require_active_user
 from app.auth.models import User
 from app.database import get_db
+from app.partner import allocation_service
+from app.partner.allocation_schemas import MyAllocationResponse
 
 from .settings_schemas import UserSettingsResponse, UserSettingsUpdate
 
@@ -80,6 +82,19 @@ def update_user_settings(
     db.commit()
     db.refresh(current_user)
     return UserSettingsResponse.model_validate(current_user)
+
+
+@router.get(
+    "/my-allocation",
+    response_model=Optional[MyAllocationResponse],
+    summary="自分への資金割り振り確認",
+)
+def get_my_allocation(
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> Optional[MyAllocationResponse]:
+    """テスター自身への資金割り振り情報を返す。割り振りがない場合は null。"""
+    return allocation_service.get_my_allocation(db, current_user)
 
 
 @router.post("/pause", summary="運用一時停止")
