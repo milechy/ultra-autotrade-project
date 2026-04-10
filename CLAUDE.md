@@ -607,7 +607,7 @@ git diff main --name-only | grep "^frontend/lib/api/" # 新しいfetch関数 →
   - `NEXT_PUBLIC_API_BASE_URL`
   - `NEXT_PUBLIC_API_URL`
   - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
-  - `NEXT_PUBLIC_CHAIN_ID`
+  - `NEXT_PUBLIC_DEFAULT_CHAIN_ID`
 
 ---
 
