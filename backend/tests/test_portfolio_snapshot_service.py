@@ -254,7 +254,9 @@ class TestRecordPortfolioSnapshot:
         ):
             record_portfolio_snapshot(db_session)
 
-        history = db_session.query(PortfolioHistory).filter_by(user_id=1, period_type="daily").first()
+        history = (
+            db_session.query(PortfolioHistory).filter_by(user_id=1, period_type="daily").first()
+        )
         assert history is not None
         assert Decimal(str(history.open_value_usd)) == Decimal("8000")
         assert history.snapshot_count == 1
