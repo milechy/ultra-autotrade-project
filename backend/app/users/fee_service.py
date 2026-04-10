@@ -12,7 +12,7 @@ B-1 で AI Optimizer ENB ベースの動的計算が追加される予定。
 C-3 では各ティアの手数料率レンジのみを返す。
 """
 
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 
 class FeeRateRange(TypedDict):
