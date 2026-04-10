@@ -88,7 +88,9 @@ class TestCalculateDynamicFeeGeneral:
 
     def test_fee_rate_within_range(self) -> None:
         for enb in [Decimal("10"), Decimal("100"), Decimal("999")]:
-            result = calculate_dynamic_fee(enb=enb, tier="GENERAL", trade_amount_usd=Decimal("1000"))
+            result = calculate_dynamic_fee(
+                enb=enb, tier="GENERAL", trade_amount_usd=Decimal("1000")
+            )
             assert Decimal("0.03") <= result.fee_rate <= Decimal("0.10")
 
     def test_fee_amount_calculation(self) -> None:

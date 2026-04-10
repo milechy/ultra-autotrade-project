@@ -313,12 +313,14 @@ class TestProcessPendingKnowledge:
         ]
         ai.judge_with_rag.return_value = _make_cross_validation(TradeAction.BUY, 85)
 
+        # trade_amount_usd=500 → 30日/4%APY予想利益≒$1.64 > $0.27固定経費 → should_trade=True
         result = process_pending_knowledge(
             db,
             knowledge_service=ks,
             ai_service=ai,
             exchange_service=ex,
             execution_policy="require_approval",
+            trade_amount_usd=Decimal("500"),
         )
 
         assert result.fetched_count == 1

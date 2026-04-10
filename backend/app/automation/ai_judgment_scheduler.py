@@ -149,6 +149,12 @@ def _create_proposals_for_users(
         )
     ).all()
 
+    import os  # noqa: PLC0415
+
+    from app.billing.dynamic_fee import calculate_fee_by_market  # noqa: PLC0415
+
+    fixed_cost = Decimal(os.getenv("TRADE_FIXED_COST_USD", "0.27"))
+
     count = 0
     for user in active_users:
         if not _is_user_due_for_judgment(user, now):
@@ -159,6 +165,29 @@ def _create_proposals_for_users(
                 user.last_judgment_at,
             )
             continue
+
+        # 動的手数料計算: デフォルトAPY 4%（安定期）を使用
+        # 30日保有での予想利益 = amount × (APY/100) × (30/365)
+        _default_apy = Decimal("4")
+        _expected_profit = (
+            _PROPOSAL_AMOUNT_USD * _default_apy / Decimal("100") * Decimal("30") / Decimal("365")
+        )
+        market_fee = calculate_fee_by_market(
+            trade_amount_usd=_PROPOSAL_AMOUNT_USD,
+            tier=user.tier,
+            current_apy=_default_apy,
+            expected_profit_usd=_expected_profit,
+            fixed_cost_usd=fixed_cost,
+        )
+
+        if not market_fee.should_trade:
+            logger.info(
+                "DynamicFee: should_trade=False for user %d — skipping proposal (%s)",
+                user.id,
+                market_fee.reason,
+            )
+            continue
+
         proposal = Proposal(
             user_id=user.id,
             ai_decision_id=decision.id,
@@ -168,6 +197,8 @@ def _create_proposals_for_users(
             amount_usd=_PROPOSAL_AMOUNT_USD,
             reason=reason,
             expires_at=expires_at,
+            fee_rate=market_fee.fee_rate,
+            fee_amount=market_fee.fee_amount,
         )
         db.add(proposal)
         user.last_judgment_at = now
