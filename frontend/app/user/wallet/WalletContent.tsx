@@ -3,34 +3,17 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import Link from 'next/link'
-import { useAccount, useBalance } from 'wagmi'
+import { useAccount, useBalance, useDisconnect } from 'wagmi'
 import { formatUnits } from 'viem'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ConnectWalletButton } from '@/components/shared/ConnectWalletButton'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
-import { createWeb3Modal } from '@web3modal/wagmi/react'
-import { wagmiConfig, projectId } from '@/lib/wallet/config'
-
-// モジュールスコープで同期的に初期化（useEffect より先に実行される）
-try {
-  createWeb3Modal({
-    wagmiConfig,
-    projectId,
-    themeMode: 'dark',
-    themeVariables: {
-      '--w3m-color-mix': '#000000',
-      '--w3m-color-mix-strength': 40,
-    },
-  })
-} catch (e) {
-  console.warn('[WalletContent] web3modal init failed (non-fatal):', e)
-}
 
 export function WalletContent() {
   const { address, isConnected, chain } = useAccount()
   const { data: balance } = useBalance({ address })
+  const { disconnect } = useDisconnect()
   const ALLOWED_CHAIN_IDS = [42161, 421614, 84532]
   const isCorrectChain = chain?.id != null && ALLOWED_CHAIN_IDS.includes(chain.id)
 
@@ -48,7 +31,9 @@ export function WalletContent() {
           </CardContent>
         </Card>
         <div className="flex justify-center pt-2">
-          <ConnectWalletButton />
+          <Button asChild size="sm">
+            <Link href="/connect">ウォレット接続</Link>
+          </Button>
         </div>
       </>
     )
@@ -95,7 +80,9 @@ export function WalletContent() {
       )}
 
       <div className="flex justify-center">
-        <ConnectWalletButton />
+        <Button variant="outline" size="sm" onClick={() => disconnect()}>
+          切断する
+        </Button>
       </div>
     </>
   )
