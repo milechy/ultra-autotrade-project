@@ -635,6 +635,8 @@ def _create_proposal_from_judgment(
     reason: str,
     trade_amount_usd: Decimal,
     user_id: int = 0,
+    fee_rate: Optional[Decimal] = None,
+    fee_amount: Optional[Decimal] = None,
 ) -> None:
     """Create a pending Proposal from AI judgment (require_approval / proposal_only)."""
     from datetime import timedelta  # noqa: PLC0415
@@ -651,6 +653,8 @@ def _create_proposal_from_judgment(
         reason=reason,
         status="pending",
         expires_at=expires_at,
+        fee_rate=fee_rate,
+        fee_amount=fee_amount,
     )
     db.add(proposal)
     db.flush()

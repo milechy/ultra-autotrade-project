@@ -1,6 +1,10 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/proposals/models.py
 """提案モデル定義。"""
+#
+# DB マイグレーション（Alembic未使用 — 手動ALTER）:
+#   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS fee_rate DECIMAL(10, 6);
+#   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS fee_amount DECIMAL(20, 2);
 
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -30,6 +34,12 @@ class Proposal(Base):
     )
     estimated_gas_usd: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(precision=20, scale=6), nullable=True
+    )
+    fee_rate: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(precision=10, scale=6), nullable=True
+    )
+    fee_amount: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(precision=20, scale=2), nullable=True
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -19,6 +19,8 @@ class ProposalCreate(BaseModel):
     reason: str
     expected_hf_after: Optional[Decimal] = None
     estimated_gas_usd: Optional[Decimal] = None
+    fee_rate: Optional[Decimal] = None
+    fee_amount: Optional[Decimal] = None
     expires_at: Optional[datetime] = None
 
 
@@ -35,6 +37,8 @@ class ProposalResponse(BaseModel):
     reason: str
     expected_hf_after: Optional[Decimal]
     estimated_gas_usd: Optional[Decimal]
+    fee_rate: Optional[Decimal]
+    fee_amount: Optional[Decimal]
     status: str
     approved_at: Optional[datetime]
     rejected_at: Optional[datetime]
