@@ -23,6 +23,8 @@ import { getStoredToken } from '@/lib/auth'
 interface Props {
   /** tester_name → TesterPerformance from /api/partner/performance */
   performanceMap?: Record<string, TesterPerformance>
+  /** user_id → tier ("GENERAL" | "UPPER") */
+  tierMap?: Record<number, string>
   /** Called after any CRUD so parent (page.tsx) can re-fetch allocations + performance */
   onRefresh?: () => void
 }
@@ -40,7 +42,23 @@ function fmtUsd(v: number): string {
   }).format(v)
 }
 
-export default function AllocationTable({ performanceMap = {}, onRefresh }: Props) {
+function TierBadge({ tier }: { tier?: string }) {
+  if (!tier) return <span className="text-muted-foreground text-xs">—</span>
+  const isUpper = tier === 'UPPER'
+  return (
+    <span
+      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+        isUpper
+          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+      }`}
+    >
+      {isUpper ? 'アッパー' : '一般'}
+    </span>
+  )
+}
+
+export default function AllocationTable({ performanceMap = {}, tierMap = {}, onRefresh }: Props) {
   const [allocations, setAllocations] = useState<Allocation[]>([])
   const [loading, setLoading] = useState(true)
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null)
@@ -134,12 +152,14 @@ export default function AllocationTable({ performanceMap = {}, onRefresh }: Prop
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground">現在値 (USD)</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground">損益 (USD)</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground">利回り</th>
+                    <th className="text-center px-4 py-3 font-medium text-muted-foreground">ティア</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">割当日</th>
                   </tr>
                 </thead>
                 <tbody>
                   {allocations.map((item) => {
                     const perf = performanceMap[item.tester_name]
+                    const tier = perf?.user_id != null ? tierMap[perf.user_id] : undefined
                     return (
                       <tr
                         key={item.id}
@@ -160,6 +180,9 @@ export default function AllocationTable({ performanceMap = {}, onRefresh }: Prop
                           {perf?.pnl_percentage != null
                             ? `${Number(perf.pnl_percentage) >= 0 ? '+' : ''}${Number(perf.pnl_percentage).toFixed(2)}%`
                             : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <TierBadge tier={tier} />
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
                           {new Date(item.allocated_at).toLocaleDateString('ja-JP')}

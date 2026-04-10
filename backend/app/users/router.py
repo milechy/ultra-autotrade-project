@@ -28,6 +28,7 @@ from app.auth.schemas import (
 )
 from app.auth.service import AuthService
 from app.database import get_db
+from app.users.fee_service import FeeRateRange, get_fee_rate_range, get_full_fee_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,40 @@ def create_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
+
+class FeeScheduleResponse(BaseModel):
+    """手数料体系レスポンス。"""
+
+    schedule: list[FeeRateRange]
+    note: str
+
+
+class UserFeeInfoResponse(BaseModel):
+    """指定ユーザーのティア + 手数料率レンジレスポンス。"""
+
+    user_id: int
+    tier: str
+    fee_rate_range: FeeRateRange
+
+
+@router.get(
+    "/fee-schedule",
+    response_model=FeeScheduleResponse,
+    summary="ティア別手数料体系取得",
+)
+def get_fee_schedule(
+    current_user: User = Depends(require_partner),
+) -> FeeScheduleResponse:
+    """
+    全ティアの手数料率レンジ一覧を返す。
+
+    - partner / admin: アクセス可能
+    """
+    return FeeScheduleResponse(
+        schedule=get_full_fee_schedule(),
+        note="手数料率はAIの判定精度に応じて動的に決定されます",
+    )
 
 
 @router.get(
@@ -296,3 +331,39 @@ def get_user_tier(
             )
 
     return TierResponse(user_id=user_id, tier=user.tier)
+
+
+@router.get(
+    "/{user_id}/fee-info",
+    response_model=UserFeeInfoResponse,
+    summary="指定ユーザーのティア別手数料情報取得",
+)
+def get_user_fee_info(
+    user_id: int,
+    current_user: User = Depends(require_partner),
+    db: Session = Depends(get_db),
+) -> UserFeeInfoResponse:
+    """
+    指定ユーザーのティアと対応する手数料率レンジを返す。
+
+    - partner: 自分が招待したユーザー（または自分自身）のみ参照可能
+    - admin: 全ユーザー参照可能
+    """
+    user = AuthService.get_user_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    if not current_user.is_admin:
+        is_own = current_user.id == user_id
+        is_own_tester = user.invited_by == current_user.id
+        if not is_own and not is_own_tester:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied",
+            )
+
+    fee_range = get_fee_rate_range(user.tier)
+    return UserFeeInfoResponse(user_id=user_id, tier=user.tier, fee_rate_range=fee_range)

@@ -44,6 +44,22 @@ interface PartnerUser {
   return_pct?: number
   is_active?: boolean
   status?: string
+  tier?: string
+}
+
+interface FeeRateRange {
+  tier: string
+  label: string
+  min_rate: string
+  max_rate: string
+  min_rate_pct: string
+  max_rate_pct: string
+  description: string
+}
+
+interface FeeSchedule {
+  schedule: FeeRateRange[]
+  note: string
 }
 
 interface UsersResponse {
@@ -74,6 +90,22 @@ function returnTrend(v: number | undefined): 'up' | 'down' | 'flat' {
   return v > 0 ? 'up' : 'down'
 }
 
+function TierBadge({ tier }: { tier?: string }) {
+  if (!tier) return <span className="text-muted-foreground text-xs">—</span>
+  const isUpper = tier === 'UPPER'
+  return (
+    <span
+      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+        isUpper
+          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+      }`}
+    >
+      {isUpper ? 'アッパー' : '一般'}
+    </span>
+  )
+}
+
 // ---- Page ----
 
 export default function PartnerDashboardPage() {
@@ -81,6 +113,7 @@ export default function PartnerDashboardPage() {
   const { data: usersRaw, loading: usersLoading } = useAuthFetch<UsersResponse | PartnerUser[]>('/users', { refreshInterval: 300000 })
   const { data: monthly, loading: monthlyLoading } = useAuthFetch<MonthlyData[]>('/api/partner/monthly', { refreshInterval: 300000 })
   const { data: accuracy, loading: accuracyLoading } = useAuthFetch<AiAccuracy>('/ai/accuracy', { refreshInterval: 300000 })
+  const { data: feeSchedule, loading: feeLoading } = useAuthFetch<FeeSchedule>('/users/fee-schedule', { refreshInterval: 0 })
 
   const [allocations, setAllocations] = useState<Allocation[]>([])
   const [allocationsLoading, setAllocationsLoading] = useState(true)
@@ -120,6 +153,12 @@ export default function PartnerDashboardPage() {
     ? usersRaw
     : (usersRaw as UsersResponse)?.items ?? []
 
+  // user_id → tier map for AllocationTable
+  const tierMap: Record<number, string> = {}
+  for (const u of users) {
+    if (u.tier) tierMap[u.id] = u.tier
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
       <h1 className="text-2xl font-bold">パートナーダッシュボード</h1>
@@ -132,7 +171,7 @@ export default function PartnerDashboardPage() {
       {/* Allocation Table + Chart */}
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <AllocationTable performanceMap={performanceMap} onRefresh={loadAllocations} />
+          <AllocationTable performanceMap={performanceMap} tierMap={tierMap} onRefresh={loadAllocations} />
         </div>
 
         <Card>
@@ -187,6 +226,46 @@ export default function PartnerDashboardPage() {
             />
           </>
         )}
+      </section>
+
+      {/* 手数料体系 */}
+      <section>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">手数料体系</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {feeLoading ? (
+              <Skeleton className="h-24 rounded-lg" />
+            ) : feeSchedule ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {feeSchedule.schedule.map((item) => (
+                    <div
+                      key={item.tier}
+                      className={`rounded-lg border p-4 ${
+                        item.tier === 'UPPER'
+                          ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20'
+                          : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <TierBadge tier={item.tier} />
+                        <span className="text-sm font-medium">{item.description}</span>
+                      </div>
+                      <p className="text-2xl font-bold">
+                        {item.min_rate_pct}〜{item.max_rate_pct}%
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">{feeSchedule.note}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">データなし</p>
+            )}
+          </CardContent>
+        </Card>
       </section>
 
       {/* Monthly chart + Accuracy side by side on large screens */}
@@ -272,6 +351,7 @@ export default function PartnerDashboardPage() {
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">登録日</th>
                       <th className="text-right px-4 py-3 font-medium text-muted-foreground">運用金額</th>
                       <th className="text-right px-4 py-3 font-medium text-muted-foreground">利回り</th>
+                      <th className="text-center px-4 py-3 font-medium text-muted-foreground">ティア</th>
                       <th className="text-center px-4 py-3 font-medium text-muted-foreground">ステータス</th>
                     </tr>
                   </thead>
@@ -311,6 +391,9 @@ export default function PartnerDashboardPage() {
                             }`}
                           >
                             {returnPct != null ? `${returnPct.toFixed(2)}%` : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <TierBadge tier={u.tier} />
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span
