@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.aave.client import get_default_aave_client
 from app.auth.models import User
 from app.portfolio.models import PortfolioSnapshot
+from app.users.tier_service import refresh_partner_tier
 
 from .allocation_models import FundAllocation
 from .allocation_schemas import (
@@ -62,6 +63,7 @@ def create_allocation(
     db.add(allocation)
     db.commit()
     db.refresh(allocation)
+    refresh_partner_tier(db, partner_id)
     return AllocationResponse.model_validate(allocation)
 
 
@@ -131,6 +133,7 @@ def update_allocation(
     allocation.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(allocation)
+    refresh_partner_tier(db, partner_id)
     return AllocationResponse.model_validate(allocation)
 
 
@@ -150,6 +153,7 @@ def delete_allocation(
         return False
     db.delete(allocation)
     db.commit()
+    refresh_partner_tier(db, partner_id)
     return True
 
 

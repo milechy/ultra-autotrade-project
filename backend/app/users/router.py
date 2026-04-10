@@ -15,6 +15,7 @@ import logging
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_active_user, require_admin, require_partner
@@ -253,3 +254,45 @@ def delete_user(
     AuthService.delete_user(db, user)
     logger.info("Admin %s deleted user: %s", admin.email, user.email)
     return None
+
+
+class TierResponse(BaseModel):
+    """ユーザーティア情報レスポンス。"""
+
+    user_id: int
+    tier: str
+
+
+@router.get(
+    "/{user_id}/tier",
+    response_model=TierResponse,
+    summary="ユーザーティア取得",
+)
+def get_user_tier(
+    user_id: int,
+    current_user: User = Depends(require_partner),
+    db: Session = Depends(get_db),
+) -> TierResponse:
+    """
+    指定ユーザーの投資ティアを返す。
+
+    - partner: 自分が招待したユーザー（または自分自身）のみ参照可能
+    - admin: 全ユーザー参照可能
+    """
+    user = AuthService.get_user_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    if not current_user.is_admin:
+        is_own = current_user.id == user_id
+        is_own_tester = user.invited_by == current_user.id
+        if not is_own and not is_own_tester:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied",
+            )
+
+    return TierResponse(user_id=user_id, tier=user.tier)
