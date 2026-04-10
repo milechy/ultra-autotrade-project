@@ -14,6 +14,8 @@ export interface AdminProposal {
   asset: string;
   amount: string;
   amount_usd: string;
+  fee_rate: string | null;
+  fee_amount: string | null;
   reason: string;
   expected_hf_after: string | null;
   estimated_gas_usd: string | null;

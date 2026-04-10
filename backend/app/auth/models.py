@@ -7,6 +7,7 @@
 docs/13_security_design.md に準拠したセキュリティ要件を満たす。
 
 ALTER TABLE users ADD COLUMN tier VARCHAR(20) NOT NULL DEFAULT 'GENERAL';
+ALTER TABLE users ADD COLUMN last_judgment_at TIMESTAMP WITH TIME ZONE NULL;
 """
 
 from datetime import datetime, timezone
@@ -99,6 +100,9 @@ class User(Base):
     )
     tier: Mapped[str] = mapped_column(
         String(20), nullable=False, default=InvestmentTier.GENERAL.value
+    )
+    last_judgment_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
     )
 
     def __repr__(self) -> str:

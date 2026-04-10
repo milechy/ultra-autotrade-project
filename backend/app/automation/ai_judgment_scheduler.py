@@ -2,12 +2,15 @@
 # backend/app/automation/ai_judgment_scheduler.py
 """AI判定定期スケジューラー。
 
-4時間ごとに AI 判定を実行し、結果を ai_decisions に保存する。
-BUY/SELL 判定時はアクティブユーザー全員に Proposal を作成する。
+ティア別間隔で AI 判定を実行し、結果を ai_decisions に保存する。
+- UPPER ティア: AI_JUDGMENT_INTERVAL_HOURS_UPPER（デフォルト 4 時間）
+- GENERAL ティア: AI_JUDGMENT_INTERVAL_HOURS_GENERAL（デフォルト 8 時間）
+BUY/SELL 判定時はティア間隔を満たすアクティブユーザーに Proposal を作成する。
 """
 
 import asyncio
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Callable, Optional
@@ -18,12 +21,16 @@ from sqlalchemy.orm import Session
 from app.ai.models import AIDecision
 from app.ai.schemas import CrossValidationResult, RAGContext, TradeAction
 from app.ai.service import AIService
-from app.auth.models import User
+from app.auth.models import InvestmentTier, User
 from app.data_feeds.context import build_market_context
 from app.database import SessionLocal
 from app.knowledge.schemas import KnowledgeSearchRequest
 from app.knowledge.service import KnowledgeService
 from app.proposals.models import Proposal
+
+# ティア別デフォルト判定間隔（時間）
+_DEFAULT_INTERVAL_UPPER = 4
+_DEFAULT_INTERVAL_GENERAL = 8
 
 logger = logging.getLogger(__name__)
 
@@ -88,12 +95,39 @@ def save_ai_decision(
     return decision
 
 
+def _get_tier_interval_hours(tier: str) -> int:
+    """ティアに応じた AI 判定間隔（時間）を返す。
+
+    環境変数で上書き可能:
+    - AI_JUDGMENT_INTERVAL_HOURS_UPPER（デフォルト 4）
+    - AI_JUDGMENT_INTERVAL_HOURS_GENERAL（デフォルト 8）
+    """
+    if tier == InvestmentTier.UPPER.value:
+        return int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS_UPPER", str(_DEFAULT_INTERVAL_UPPER)))
+    return int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS_GENERAL", str(_DEFAULT_INTERVAL_GENERAL)))
+
+
+def _is_user_due_for_judgment(user: User, now: datetime) -> bool:
+    """ユーザーがティア別間隔を満たしているか判定する。
+
+    last_judgment_at が None（初回）または interval 経過済みの場合 True を返す。
+    """
+    if user.last_judgment_at is None:
+        return True
+    interval = _get_tier_interval_hours(user.tier)
+    last = user.last_judgment_at
+    # timezone-aware 比較
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    return now >= last + timedelta(hours=interval)
+
+
 def _create_proposals_for_users(
     db: Session,
     decision: AIDecision,
     result: CrossValidationResult,
 ) -> int:
-    """アクティブユーザー全員に Proposal を作成し、作成件数を返す。
+    """ティア別間隔を満たすアクティブユーザーに Proposal を作成し、作成件数を返す。
 
     Args:
         db: SQLAlchemy セッション。
@@ -106,6 +140,7 @@ def _create_proposals_for_users(
     operation = "SUPPLY" if result.final_action == TradeAction.BUY else "WITHDRAW"
     expires_at = datetime.now(timezone.utc) + timedelta(hours=_PROPOSAL_EXPIRES_HOURS)
     reason = result.final_reason or "AI判定による提案"
+    now = datetime.now(timezone.utc)
 
     active_users = db.scalars(
         select(User).where(
@@ -116,6 +151,14 @@ def _create_proposals_for_users(
 
     count = 0
     for user in active_users:
+        if not _is_user_due_for_judgment(user, now):
+            logger.debug(
+                "Skipping proposal for user %d (tier=%s, last_judgment_at=%s)",
+                user.id,
+                user.tier,
+                user.last_judgment_at,
+            )
+            continue
         proposal = Proposal(
             user_id=user.id,
             ai_decision_id=decision.id,
@@ -127,6 +170,7 @@ def _create_proposals_for_users(
             expires_at=expires_at,
         )
         db.add(proposal)
+        user.last_judgment_at = now
         count += 1
 
     return count
@@ -220,13 +264,17 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
 
 
 async def ai_judgment_loop(
-    interval_hours: int = 4,
+    interval_hours: int = _DEFAULT_INTERVAL_UPPER,
     on_error: Optional[Callable[[Exception], None]] = None,
 ) -> None:
-    """interval_hours ごとに run_ai_judgment_job() を実行するループ。
+    """UPPER ティア間隔（最小値）で tick し、ユーザーごとにティア別間隔を適用するループ。
+
+    tick 間隔は AI_JUDGMENT_INTERVAL_HOURS_UPPER（デフォルト 4 時間）に合わせる。
+    各 tick で _create_proposals_for_users がユーザーごとのティア間隔を確認し、
+    GENERAL ティアのユーザーは 8 時間未満の場合はスキップされる。
 
     Args:
-        interval_hours: 実行間隔（時間）。デフォルト 4 時間。
+        interval_hours: tick 間隔（時間）。デフォルトは UPPER ティア間隔。
         on_error: 失敗時に呼び出す同期コールバック（Slack 通知等）。
     """
     global _scheduler_started, _last_run_at, _next_run_at, _last_error_msg

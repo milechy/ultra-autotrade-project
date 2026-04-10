@@ -204,6 +204,8 @@ export default function PartnerProposalsPage() {
                 <th style={thStyle}>操作</th>
                 <th style={thStyle}>アセット</th>
                 <th style={thStyle}>金額（USD）</th>
+                <th style={thStyle}>手数料率</th>
+                <th style={thStyle}>手数料額</th>
                 <th style={thStyle}>理由</th>
                 <th style={thStyle}>作成日時</th>
                 <th style={thStyle}>ステータス</th>
@@ -218,6 +220,12 @@ export default function PartnerProposalsPage() {
                   <td style={tdStyle}>{p.asset}</td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
                     ${Number(p.amount_usd).toFixed(2)}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    {p.fee_rate != null ? `${Number(p.fee_rate).toFixed(2)}%` : '—'}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    {p.fee_amount != null ? `$${Number(p.fee_amount).toFixed(2)}` : '—'}
                   </td>
                   <td style={{ ...tdStyle, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {p.reason}
@@ -243,9 +251,19 @@ export default function PartnerProposalsPage() {
                                 <CheckCircle className="h-5 w-5 text-green-600" />
                                 提案を承認しますか？
                               </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                {p.username ?? `ユーザーID: ${p.user_id}`} の{' '}
-                                {OPERATION_LABELS[p.operation] ?? p.operation} ({p.asset}・${Number(p.amount_usd).toFixed(2)}) を承認してAave操作を実行します。
+                              <AlertDialogDescription asChild>
+                                <div>
+                                  <p>
+                                    {p.username ?? `ユーザーID: ${p.user_id}`} の{' '}
+                                    {OPERATION_LABELS[p.operation] ?? p.operation} ({p.asset}・${Number(p.amount_usd).toFixed(2)}) を承認してAave操作を実行します。
+                                  </p>
+                                  {p.fee_rate != null && p.fee_amount != null && (
+                                    <div style={{ marginTop: 8, padding: '8px 10px', background: 'rgba(37,99,235,0.08)', borderRadius: 6, fontSize: 13 }}>
+                                      <div>手数料: ${Number(p.fee_amount).toFixed(2)}（{Number(p.fee_rate).toFixed(2)}%）</div>
+                                      <div>実行金額: ${(Number(p.amount_usd) - Number(p.fee_amount)).toFixed(2)}（手数料控除後）</div>
+                                    </div>
+                                  )}
+                                </div>
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
