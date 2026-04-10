@@ -49,6 +49,12 @@ const nextConfig = {
       'pino-pretty': false,
       '@safe-global/safe-apps-provider': false,
     };
+    // Privy の optional な Solana / Farcaster 依存をスタブ（未使用）
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@solana/wallet-adapter-react': false,
+      '@farcaster/miniapp-sdk': false,
+    };
     if (!dev && !isServer) {
       config.optimization = {
         ...config.optimization,
