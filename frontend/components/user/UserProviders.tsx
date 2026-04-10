@@ -32,7 +32,7 @@ function toSystemStatus(s: AutomationStatus): SystemStatus {
   return 'NORMAL'
 }
 
-function AutomationStatusProvider({ children }: { children: React.ReactNode }) {
+export function AutomationStatusProvider({ children }: { children: React.ReactNode }) {
   const [systemStatus, setSystemStatus] = useState<SystemStatus>('NORMAL')
   const { token, isLoading } = useAuth()
 

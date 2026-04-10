@@ -181,3 +181,77 @@ class TestAutomationViewerAccess:
             )
 
         assert response.status_code == 200
+
+
+def _create_partner_and_login(client: TestClient, admin_token: str) -> str:
+    """Create a partner user via admin and return partner token."""
+    client.post(
+        "/users",
+        json={
+            "email": "partner@test.com",
+            "username": "partner",
+            "password": "partnerpass123",
+            "role": "partner",
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    r = client.post("/auth/login", json={"email": "partner@test.com", "password": "partnerpass123"})
+    return r.json()["access_token"]
+
+
+class TestEmergencyStopPartnerBoundaries:
+    """partner は緊急停止を発動できるが、解除は admin のみ。"""
+
+    def test_partner_can_emergency_stop(self, client: TestClient) -> None:
+        """partner は POST /api/automation/emergency-stop で 200 になる。"""
+        admin_token = _register_and_login(client, "admin@example.com", "admin", "adminpassword123")
+        partner_token = _create_partner_and_login(client, admin_token)
+
+        response = client.post(
+            "/api/automation/emergency-stop",
+            headers={"Authorization": f"Bearer {partner_token}"},
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "stopped"
+
+    def test_partner_cannot_resume_emergency_stop(self, client: TestClient) -> None:
+        """partner は POST /api/automation/emergency-stop/resume で 403 になる。"""
+        admin_token = _register_and_login(client, "admin@example.com", "admin", "adminpassword123")
+        partner_token = _create_partner_and_login(client, admin_token)
+
+        response = client.post(
+            "/api/automation/emergency-stop/resume",
+            headers={"Authorization": f"Bearer {partner_token}"},
+        )
+        assert response.status_code == 403
+
+    def test_viewer_cannot_emergency_stop(self, client: TestClient) -> None:
+        """viewer は POST /api/automation/emergency-stop で 403 になる。"""
+        admin_token = _register_and_login(client, "admin@example.com", "admin", "adminpassword123")
+        viewer_token = _create_viewer_and_login(client, admin_token)
+
+        response = client.post(
+            "/api/automation/emergency-stop",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert response.status_code == 403
+
+    def test_admin_can_emergency_stop(self, client: TestClient) -> None:
+        """admin は POST /api/automation/emergency-stop で 200 になる。"""
+        admin_token = _register_and_login(client, "admin@example.com", "admin", "adminpassword123")
+
+        response = client.post(
+            "/api/automation/emergency-stop",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 200
+
+    def test_admin_can_resume_emergency_stop(self, client: TestClient) -> None:
+        """admin は POST /api/automation/emergency-stop/resume で 200 になる。"""
+        admin_token = _register_and_login(client, "admin@example.com", "admin", "adminpassword123")
+
+        response = client.post(
+            "/api/automation/emergency-stop/resume",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 200

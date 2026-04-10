@@ -18,7 +18,8 @@ Ultra AutoTrade の緊急停止機能は、資産を守るための最終防波�
 
 | 発動者 | 手段 | 詳細 |
 |--------|------|------|
-| **管理者ユーザー（ADMIN ロール）** | `POST /automation/emergency-stop` | 認証済み管理者がいつでも手動発動可能 |
+| **管理者ユーザー（ADMIN ロール）** | `POST /api/automation/emergency-stop` | 認証済み管理者がいつでも手動発動・解除可能 |
+| **パートナーユーザー（PARTNER ロール）** | `POST /api/automation/emergency-stop` | 手動発動のみ可能。**解除（resume）は ADMIN ロールのみ**。 |
 | **自動監視システム** | `MonitoringService.record_health_factor()` | HF < 1.6 を検知した場合に自動発動 |
 | **サーバー再起動** | state.json 復元 | 起動時に `emergency_stop=True` が保存されていれば自動復元 |
 

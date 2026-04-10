@@ -12,7 +12,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import require_active_user, require_admin, require_viewer
+from app.auth.dependencies import (
+    require_active_user,
+    require_admin,
+    require_partner,
+    require_viewer,
+)
 from app.auth.models import User
 from app.auth.models import User as UserModel
 from app.database import get_db
@@ -134,7 +139,7 @@ def admin_list_proposals(
     date_to: Optional[datetime] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    _admin: User = Depends(require_admin),
+    _partner: User = Depends(require_partner),
     db: Session = Depends(get_db),
 ) -> AdminProposalListResponse:
     """全ユーザーの提案一覧をフィルター付きで返す（管理者専用）。"""
@@ -178,7 +183,7 @@ def admin_list_proposals(
 
 @router.get("/admin/stats", response_model=AdminProposalStats, summary="提案KPI統計（管理者）")
 def admin_proposal_stats(
-    _admin: User = Depends(require_admin),
+    _partner: User = Depends(require_partner),
     db: Session = Depends(get_db),
 ) -> AdminProposalStats:
     """KPIカード用の件数を DB 集計で返す（ページネーション不要）。"""
@@ -259,13 +264,14 @@ def list_proposal_history(
 @router.post("/{proposal_id}/approve", response_model=ProposalResponse, summary="提案承認・実行")
 def approve_proposal(
     proposal_id: int,
-    current_user: User = Depends(require_active_user),
+    current_user: User = Depends(require_partner),
     db: Session = Depends(get_db),
 ) -> ProposalResponse:
-    """提案を承認してAave操作を実行する（本人のみ）。"""
+    """提案を承認してAave操作を実行する（本人・admin・partner）。"""
     stmt = select(Proposal).where(Proposal.id == proposal_id)
     proposal = db.scalars(stmt).first()
-    if proposal is None or proposal.user_id != current_user.id:
+    # admin/partner は他ユーザーの提案も操作可能。一般ユーザーは require_partner で弾かれる。
+    if proposal is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
     if proposal.status != "pending":
         raise HTTPException(
@@ -290,13 +296,14 @@ def approve_proposal(
 @router.post("/{proposal_id}/reject", response_model=ProposalResponse, summary="提案拒否")
 def reject_proposal(
     proposal_id: int,
-    current_user: User = Depends(require_active_user),
+    current_user: User = Depends(require_partner),
     db: Session = Depends(get_db),
 ) -> ProposalResponse:
-    """提案を拒否する（本人のみ）。"""
+    """提案を拒否する（本人・admin・partner）。"""
     stmt = select(Proposal).where(Proposal.id == proposal_id)
     proposal = db.scalars(stmt).first()
-    if proposal is None or proposal.user_id != current_user.id:
+    # admin/partner は他ユーザーの提案も操作可能。一般ユーザーは require_partner で弾かれる。
+    if proposal is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
     if proposal.status != "pending":
         raise HTTPException(

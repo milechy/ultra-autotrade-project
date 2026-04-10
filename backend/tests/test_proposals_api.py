@@ -192,6 +192,18 @@ class TestProposalsAPI:
         assert r.status_code == 200
         assert r.json()["total"] == 1
 
+    def test_admin_can_list_admin_proposals(self, client: TestClient) -> None:
+        token = get_admin_token(client)
+        r = client.get("/api/proposals/admin/all", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+
+    def test_admin_can_fetch_admin_stats(self, client: TestClient) -> None:
+        token = get_admin_token(client)
+        r = client.get("/api/proposals/admin/stats", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        data = r.json()
+        assert "pending" in data
+
     def test_get_proposal_by_id(self, client: TestClient) -> None:
         token = get_admin_token(client)
         create_r = client.post(
@@ -206,3 +218,157 @@ class TestProposalsAPI:
         )
         assert r.status_code == 200
         assert r.json()["id"] == proposal_id
+
+
+def _create_user_and_login(
+    client: TestClient, admin_token: str, role: str, email: str, username: str
+) -> str:
+    client.post(
+        "/users",
+        json={"email": email, "username": username, "password": "testpassword123", "role": role},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    r = client.post("/auth/login", json={"email": email, "password": "testpassword123"})
+    return r.json()["access_token"]
+
+
+class TestPartnerProposalBoundaries:
+    """partner は他ユーザーの提案を承認・拒否できる。viewer は 403。"""
+
+    def test_partner_can_list_admin_proposals(self, client: TestClient) -> None:
+        """partner は GET /api/proposals/admin/all で 200 になる。"""
+        admin_token = get_admin_token(client)
+        partner_token = _create_user_and_login(
+            client, admin_token, "partner", "partner@test.com", "partner"
+        )
+        r = client.get(
+            "/api/proposals/admin/all", headers={"Authorization": f"Bearer {partner_token}"}
+        )
+        assert r.status_code == 200
+
+    def test_partner_can_fetch_admin_stats(self, client: TestClient) -> None:
+        """partner は GET /api/proposals/admin/stats で 200 になる。"""
+        admin_token = get_admin_token(client)
+        partner_token = _create_user_and_login(
+            client, admin_token, "partner", "partner@test.com", "partner"
+        )
+        r = client.get(
+            "/api/proposals/admin/stats", headers={"Authorization": f"Bearer {partner_token}"}
+        )
+        assert r.status_code == 200
+        assert "pending" in r.json()
+
+    def test_viewer_cannot_list_admin_proposals(self, client: TestClient) -> None:
+        """viewer は GET /api/proposals/admin/all で 403 になる。"""
+        admin_token = get_admin_token(client)
+        viewer_token = _create_user_and_login(
+            client, admin_token, "viewer", "viewer@test.com", "viewer"
+        )
+        r = client.get(
+            "/api/proposals/admin/all", headers={"Authorization": f"Bearer {viewer_token}"}
+        )
+        assert r.status_code == 403
+
+    def test_partner_can_reject_proposal_for_other_user(self, client: TestClient) -> None:
+        """partner は他ユーザー（viewer）の提案を拒否できる。"""
+        admin_token = get_admin_token(client)
+        # viewer ユーザーを作成して proposal を作成（admin が代理作成）
+        viewer_r = client.post(
+            "/users",
+            json={
+                "email": "viewer2@test.com",
+                "username": "viewer2",
+                "password": "viewerpass123",
+                "role": "viewer",
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        viewer_id = viewer_r.json()["id"]
+        create_r = client.post(
+            "/api/proposals",
+            json={**SAMPLE_PROPOSAL, "user_id": viewer_id},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert create_r.status_code == 201
+        proposal_id = create_r.json()["id"]
+
+        partner_token = _create_user_and_login(
+            client, admin_token, "partner", "partner@test.com", "partner"
+        )
+        r = client.post(
+            f"/api/proposals/{proposal_id}/reject",
+            headers={"Authorization": f"Bearer {partner_token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["status"] == "rejected"
+
+    def test_partner_can_approve_proposal_for_other_user(self, client: TestClient) -> None:
+        """partner は他ユーザーの提案を承認できる（Aave 実行は内部で fail-open）。"""
+        admin_token = get_admin_token(client)
+        viewer_r = client.post(
+            "/users",
+            json={
+                "email": "viewer3@test.com",
+                "username": "viewer3",
+                "password": "viewerpass123",
+                "role": "viewer",
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        viewer_id = viewer_r.json()["id"]
+        create_r = client.post(
+            "/api/proposals",
+            json={**SAMPLE_PROPOSAL, "user_id": viewer_id},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert create_r.status_code == 201
+        proposal_id = create_r.json()["id"]
+
+        partner_token = _create_user_and_login(
+            client, admin_token, "partner", "partner2@test.com", "partner2"
+        )
+        # Aave 実行は失敗しても "approved" のまま（fail-open）
+        r = client.post(
+            f"/api/proposals/{proposal_id}/approve",
+            headers={"Authorization": f"Bearer {partner_token}"},
+        )
+        # approved または executed（Aave なければ approved のまま）
+        assert r.status_code == 200
+        assert r.json()["status"] in ("approved", "executed")
+        assert r.json()["approved_at"] is not None
+
+    def test_viewer_cannot_approve_proposal(self, client: TestClient) -> None:
+        """viewer は POST /api/proposals/{id}/approve で 403 になる。"""
+        admin_token = get_admin_token(client)
+        create_r = client.post(
+            "/api/proposals",
+            json=SAMPLE_PROPOSAL,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        proposal_id = create_r.json()["id"]
+        viewer_token = _create_user_and_login(
+            client, admin_token, "viewer", "viewer4@test.com", "viewer4"
+        )
+        r = client.post(
+            f"/api/proposals/{proposal_id}/approve",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert r.status_code == 403
+
+    def test_viewer_cannot_reject_proposal(self, client: TestClient) -> None:
+        """viewer は POST /api/proposals/{id}/reject で 403 になる。"""
+        admin_token = get_admin_token(client)
+        create_r = client.post(
+            "/api/proposals",
+            json=SAMPLE_PROPOSAL,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        proposal_id = create_r.json()["id"]
+        viewer_token = _create_user_and_login(
+            client, admin_token, "viewer", "viewer5@test.com", "viewer5"
+        )
+        r = client.post(
+            f"/api/proposals/{proposal_id}/reject",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert r.status_code == 403
