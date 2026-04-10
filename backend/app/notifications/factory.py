@@ -39,7 +39,10 @@ def get_notification_service() -> CompositeNotificationService:
     global _notification_service
     if _notification_service is None:
         senders: list[
-            LoggingNotificationSender | SlackNotificationSender | LINENotificationSender
+            LoggingNotificationSender
+            | SlackNotificationSender
+            | LINENotificationSender
+            | DatabaseNotificationSender
         ] = []
 
         logging_sender = LoggingNotificationSender()

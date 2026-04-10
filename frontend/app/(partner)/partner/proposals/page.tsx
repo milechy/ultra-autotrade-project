@@ -168,9 +168,9 @@ export default function PartnerProposalsPage() {
               padding: '6px 14px',
               borderRadius: 20,
               border: '1px solid',
-              borderColor: statusFilter === opt.value ? '#2563eb' : '#ddd',
-              background: statusFilter === opt.value ? '#2563eb' : '#fff',
-              color: statusFilter === opt.value ? '#fff' : '#333',
+              borderColor: statusFilter === opt.value ? '#2563eb' : '#374151',
+              background: statusFilter === opt.value ? '#2563eb' : 'transparent',
+              color: statusFilter === opt.value ? '#fff' : '#d1d5db',
               fontSize: 13,
               cursor: 'pointer',
             }}
@@ -189,17 +189,17 @@ export default function PartnerProposalsPage() {
       {isLoading ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>
           <Loader2 style={{ width: 24, height: 24, display: 'inline-block' }} className="animate-spin" />
-          <p style={{ marginTop: 8 }}>読み込み中...</p>
+          <p style={{ marginTop: 8, color: '#9ca3af' }}>読み込み中...</p>
         </div>
       ) : proposals.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+        <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>
           該当する提案はありません
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ borderBottom: '2px solid #eee', background: '#f9fafb' }}>
+              <tr style={{ borderBottom: '2px solid #374151', background: 'rgba(255,255,255,0.04)' }}>
                 <th style={thStyle}>ユーザー</th>
                 <th style={thStyle}>操作</th>
                 <th style={thStyle}>アセット</th>
@@ -212,7 +212,7 @@ export default function PartnerProposalsPage() {
             </thead>
             <tbody>
               {proposals.map((p) => (
-                <tr key={p.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                <tr key={p.id} style={{ borderBottom: '1px solid #374151' }}>
                   <td style={tdStyle}>{p.username ?? `UID:${p.user_id}`}</td>
                   <td style={tdStyle}>{OPERATION_LABELS[p.operation] ?? p.operation}</td>
                   <td style={tdStyle}>{p.asset}</td>
@@ -298,7 +298,7 @@ export default function PartnerProposalsPage() {
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
-            style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #ddd', cursor: page <= 1 ? 'default' : 'pointer', opacity: page <= 1 ? 0.4 : 1 }}
+            style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #374151', cursor: page <= 1 ? 'default' : 'pointer', opacity: page <= 1 ? 0.4 : 1 }}
           >
             前へ
           </button>
@@ -308,7 +308,7 @@ export default function PartnerProposalsPage() {
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
-            style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #ddd', cursor: page >= totalPages ? 'default' : 'pointer', opacity: page >= totalPages ? 0.4 : 1 }}
+            style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #374151', cursor: page >= totalPages ? 'default' : 'pointer', opacity: page >= totalPages ? 0.4 : 1 }}
           >
             次へ
           </button>
@@ -322,13 +322,14 @@ const thStyle: React.CSSProperties = {
   padding: '10px 12px',
   textAlign: 'left',
   fontWeight: 600,
-  color: '#555',
+  color: '#d1d5db',
   whiteSpace: 'nowrap',
 }
 
 const tdStyle: React.CSSProperties = {
   padding: '10px 12px',
   verticalAlign: 'middle',
+  color: '#e5e7eb',
 }
 
 function statusBadgeStyle(s: string): React.CSSProperties {

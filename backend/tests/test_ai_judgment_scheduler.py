@@ -78,13 +78,18 @@ def _make_cross_validation_result(action: TradeAction) -> CrossValidationResult:
     )
 
 
-def _add_active_user(session, email: str = "user@example.com") -> User:
+def _add_active_user(
+    session,
+    email: str = "user@example.com",
+    execution_policy: str = "require_approval",
+) -> User:
     """アクティブなテストユーザーを追加するヘルパー。"""
     user = User(
         email=email,
         username=email.split("@")[0],
         hashed_password="hashed",
         is_active=True,
+        execution_policy=execution_policy,
     )
     session.add(user)
     session.flush()
@@ -477,3 +482,53 @@ def test_run_job_degraded_context_has_required_keys(db_session):
     ctx = call_kwargs.kwargs.get("market_context")
     assert ctx["geopolitical_events"] == []
     assert ctx["market_data"] == {}
+
+
+# ---------------------------------------------------------------------------
+# execution_policy フィルタリングのテスト
+# ---------------------------------------------------------------------------
+
+
+def test_buy_creates_proposal_only_for_require_approval_users(db_session):
+    """BUY 判定時、execution_policy='require_approval' のユーザーのみ Proposal が作成されること。"""
+    _add_active_user(db_session, "approval@example.com", execution_policy="require_approval")
+    _add_active_user(db_session, "auto@example.com", execution_policy="auto_execute")
+    _add_active_user(db_session, "proposal@example.com", execution_policy="proposal_only")
+    db_session.commit()
+
+    mock_result = _make_cross_validation_result(TradeAction.BUY)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        result = run_ai_judgment_job(db=db_session)
+
+    assert result["proposals_created"] == 1
+    proposals = db_session.scalars(select(Proposal)).all()
+    assert len(proposals) == 1
+    assert proposals[0].user_id is not None
+
+
+def test_auto_execute_user_gets_no_proposal_on_buy(db_session):
+    """auto_execute ユーザーには BUY 判定でも Proposal が作成されないこと。"""
+    _add_active_user(db_session, "auto@example.com", execution_policy="auto_execute")
+    db_session.commit()
+
+    mock_result = _make_cross_validation_result(TradeAction.BUY)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        result = run_ai_judgment_job(db=db_session)
+
+    assert result["proposals_created"] == 0
+    proposals = db_session.scalars(select(Proposal)).all()
+    assert len(proposals) == 0

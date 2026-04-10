@@ -107,7 +107,12 @@ def _create_proposals_for_users(
     expires_at = datetime.now(timezone.utc) + timedelta(hours=_PROPOSAL_EXPIRES_HOURS)
     reason = result.final_reason or "AI判定による提案"
 
-    active_users = db.scalars(select(User).where(User.is_active == True)).all()  # noqa: E712
+    active_users = db.scalars(
+        select(User).where(
+            User.is_active == True,  # noqa: E712
+            User.execution_policy == "require_approval",
+        )
+    ).all()
 
     count = 0
     for user in active_users:
