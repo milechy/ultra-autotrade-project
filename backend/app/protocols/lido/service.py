@@ -9,7 +9,14 @@ from decimal import Decimal
 
 from .client import AbstractLidoClient
 from .config import LidoConfig
-from .schemas import LidoAprResponse, LidoStakeRequest, LidoStakeResponse, LidoStatus
+from .schemas import (
+    LidoAprResponse,
+    LidoStakeRequest,
+    LidoStakeResponse,
+    LidoStatus,
+    LidoWithdrawRequest,
+    LidoWithdrawResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +89,34 @@ class LidoService:
             received_steth=received_steth,
             tx_hash=result.tx_hash,
             staking_apr=staking_apr,
+            dry_run=False,
+        )
+
+    async def withdraw(self, request: LidoWithdrawRequest) -> LidoWithdrawResponse:
+        """stETH 引き出しリクエスト送信。クレームは待機期間後に別途実行が必要。"""
+        if request.dry_run:
+            logger.info("LidoService.withdraw dry_run: amount_steth=%s", request.amount_steth)
+            return LidoWithdrawResponse(
+                operation="WITHDRAW_REQUEST",
+                amount_steth=request.amount_steth,
+                tx_hash=None,
+                dry_run=True,
+            )
+
+        result = await self._client.withdraw(request.amount_steth, "stETH")
+        if not result.success:
+            logger.error("withdraw 失敗: error=%s", result.error)
+            raise RuntimeError(f"Lido 引き出しリクエスト失敗: {result.error}")
+
+        logger.info(
+            "withdraw リクエスト成功: amount=%s, tx=%s",
+            request.amount_steth,
+            result.tx_hash,
+        )
+        return LidoWithdrawResponse(
+            operation="WITHDRAW_REQUEST",
+            amount_steth=request.amount_steth,
+            tx_hash=result.tx_hash,
             dry_run=False,
         )
 

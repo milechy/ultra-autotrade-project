@@ -60,6 +60,31 @@ class TxResult(BaseModel):
     error: Optional[str] = None
 
 
+class LidoWithdrawRequest(BaseModel):
+    """引き出しリクエスト（stETH → ETH 非同期引き出し）。"""
+
+    amount_steth: Decimal = Field(..., gt=Decimal("0"), description="引き出す stETH 量")
+    dry_run: bool = Field(True, description="True の場合シミュレーションのみ（デフォルト）")
+
+    @field_validator("amount_steth", mode="before")
+    @classmethod
+    def validate_amount(cls, v: object) -> Decimal:
+        return Decimal(str(v))
+
+
+class LidoWithdrawResponse(BaseModel):
+    """引き出しリクエスト送信結果。クレームは別途実行が必要。"""
+
+    operation: str = Field("WITHDRAW_REQUEST", description="操作タイプ")
+    amount_steth: Decimal
+    tx_hash: Optional[str] = None
+    dry_run: bool
+    note: str = Field(
+        default="引き出しリクエスト送信済み。クレームは待機期間（1〜5日）後に実行してください。",
+        description="補足説明",
+    )
+
+
 class CompoundYieldEstimate(BaseModel):
     """複合利回り推定値。"""
 

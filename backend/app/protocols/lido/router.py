@@ -13,7 +13,14 @@ from fastapi import APIRouter, HTTPException
 
 from .client import get_lido_client
 from .config import get_lido_config
-from .schemas import LidoAprResponse, LidoStakeRequest, LidoStakeResponse, LidoStatus
+from .schemas import (
+    LidoAprResponse,
+    LidoStakeRequest,
+    LidoStakeResponse,
+    LidoStatus,
+    LidoWithdrawRequest,
+    LidoWithdrawResponse,
+)
 from .service import LidoService
 
 logger = logging.getLogger(__name__)
@@ -48,6 +55,23 @@ async def stake_eth(request: LidoStakeRequest) -> LidoStakeResponse:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Lido stake 失敗")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/withdraw", response_model=LidoWithdrawResponse)
+async def withdraw_steth(request: LidoWithdrawRequest) -> LidoWithdrawResponse:
+    """stETH → ETH 引き出しリクエスト送信。dry_run=True（デフォルト）でシミュレーション。
+
+    Lido の引き出しは非同期（リクエスト→待機→クレーム）。
+    このエンドポイントはリクエスト送信のみ。クレームは待機期間（1〜5日）後に実行。
+    """
+    service = _get_service()
+    try:
+        return await service.withdraw(request)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Lido withdraw 失敗")
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
