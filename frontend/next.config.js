@@ -50,10 +50,13 @@ const nextConfig = {
       '@safe-global/safe-apps-provider': false,
     };
     // Privy の optional な Solana / Farcaster 依存をスタブ（未使用）
+    // porto は package.json から削除済み。wagmi/connectors 内部参照をスタブ化
     config.resolve.alias = {
       ...config.resolve.alias,
       '@solana/wallet-adapter-react': false,
       '@farcaster/miniapp-sdk': false,
+      'porto': false,
+      'porto/internal': false,
     };
     if (!dev && !isServer) {
       config.optimization = {

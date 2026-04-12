@@ -16,7 +16,12 @@ export function PrivyRootClient({ children }: { children: ReactNode }) {
       appId={appId}
       config={{
         loginMethods: ['email', 'wallet'],
+        appearance: {
+          theme: 'dark',
+          accentColor: '#6366f1',
+        },
         supportedChains: [baseSepolia, base],
+        defaultChain: baseSepolia,
         embeddedWallets: {
           ethereum: { createOnLogin: 'users-without-wallets' },
         },

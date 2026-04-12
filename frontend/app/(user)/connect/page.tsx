@@ -3,10 +3,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { usePrivy, useWallets } from '@privy-io/react-auth'
+import { ethers } from 'ethers'
 import { Wallet, CheckCircle, AlertTriangle, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { useWallet } from '@/hooks/useWallet'
 import { useAuth } from '@/lib/auth'
 import { useMinimumBalance } from '@/hooks/useMinimumBalance'
 import { apiPut } from '@/lib/api/client'
@@ -28,6 +29,14 @@ const CHAIN_DISPLAY_NAMES: Record<number, string> = {
 function getNetworkDisplayName(chainId: number | null): string {
   if (chainId == null) return '不明なネットワーク'
   return CHAIN_DISPLAY_NAMES[chainId] ?? `Chain ${chainId}`
+}
+
+// Privy returns chainId as "eip155:84532" or just "84532"
+function parsePrivyChainId(chainIdStr: string | undefined): number | null {
+  if (!chainIdStr) return null
+  const str = chainIdStr.includes(':') ? chainIdStr.split(':')[1] : chainIdStr
+  const num = parseInt(str, 10)
+  return isNaN(num) ? null : num
 }
 
 const STEP_LABELS = [
@@ -82,7 +91,8 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 export default function ConnectPage() {
   const router = useRouter()
   const { loginWithWallet } = useAuth()
-  const { address, isConnected, chainId, connect, switchToArbitrum, switchToArbitrumSepolia, switchToBaseSepolia, switchToBase, switchToOptimism, switchToMainnet, signer } = useWallet()
+  const { login, authenticated } = usePrivy()
+  const { wallets } = useWallets()
   const { checkMinimum, minimumUSD } = useMinimumBalance()
 
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -104,6 +114,11 @@ export default function ConnectPage() {
     localStorage.setItem(USER_MODE_STORAGE_KEY, mode)
   }
 
+  const wallet = wallets[0] ?? null
+  const address = wallet?.address ?? null
+  const chainId = parsePrivyChainId(wallet?.chainId)
+  const isConnected = authenticated && wallet != null
+
   // Simulate minimum balance check with a mock value when connected
   // In production this would come from Aave account data
   const mockAccountData = {
@@ -123,24 +138,14 @@ export default function ConnectPage() {
   // Calculate current step for indicator
   const currentStep = !isConnected ? 1 : !isCorrectNetwork ? 2 : 3
 
-  // If already connected with correct network and terms accepted → redirect
-  useEffect(() => {
-    if (isConnected && termsAccepted && riskAccepted) {
-      // handled by button click
-    }
-  }, [isConnected, termsAccepted, riskAccepted])
-
-  // If already fully connected on load, skip to dashboard
-  useEffect(() => {
-    // Only redirect if wallet was already connected before this page loaded
-    // We don't auto-redirect here — user must click "運用を開始する"
-  }, [])
-
   const handleStart = async () => {
-    if (!address || !signer) return
+    if (!address || !wallet) return
     setAuthError(null)
     setIsAuthenticating(true)
     try {
+      const eip1193 = await wallet.getEthereumProvider()
+      const ethProvider = new ethers.BrowserProvider(eip1193 as unknown as ethers.Eip1193Provider)
+      const signer = await ethProvider.getSigner()
       await loginWithWallet(address, signer)
       // Sync user mode to backend (fire-and-forget; auth continues on failure)
       try {
@@ -149,7 +154,7 @@ export default function ConnectPage() {
         console.error('Failed to sync user mode:', modeErr)
       }
       router.push('/user/dashboard')
-    } catch (err) {
+    } catch {
       setAuthError('認証に失敗しました。もう一度お試しください。')
     } finally {
       setIsAuthenticating(false)
@@ -167,7 +172,7 @@ export default function ConnectPage() {
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-zinc-100 mb-2">ウォレットを接続</h1>
           <p className="text-sm text-zinc-400">
-            MetaMaskまたはWalletConnect対応ウォレットで接続してください
+            ウォレットまたはメールアドレスで接続してください
           </p>
         </div>
 
@@ -178,7 +183,7 @@ export default function ConnectPage() {
             <Button
               size="lg"
               className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-6 text-base"
-              onClick={connect}
+              onClick={login}
             >
               <Wallet className="mr-2 h-5 w-5" />
               ウォレットを接続する
@@ -222,7 +227,7 @@ export default function ConnectPage() {
                       variant="outline"
                       size="sm"
                       className="w-full border-blue-600 text-blue-400 hover:bg-blue-950/40"
-                      onClick={switchToBaseSepolia}
+                      onClick={() => wallet?.switchChain(84532)}
                     >
                       Base Sepolia (テスト用) に切り替える
                     </Button>
@@ -230,7 +235,7 @@ export default function ConnectPage() {
                       variant="outline"
                       size="sm"
                       className="w-full border-yellow-600 text-yellow-400 hover:bg-yellow-950/40"
-                      onClick={switchToArbitrumSepolia}
+                      onClick={() => wallet?.switchChain(421614)}
                     >
                       Arbitrum Sepolia (テスト用) に切り替える
                     </Button>
@@ -239,23 +244,15 @@ export default function ConnectPage() {
                       variant="outline"
                       size="sm"
                       className="w-full border-zinc-600 text-zinc-400 hover:bg-zinc-800/40"
-                      onClick={switchToBase}
+                      onClick={() => wallet?.switchChain(8453)}
                     >
                       Base に切り替える
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full border-yellow-600 text-yellow-400 hover:bg-yellow-950/40"
-                      onClick={switchToArbitrumSepolia}
-                    >
-                      Arbitrum Sepolia (testnet) に切り替える
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
                       className="w-full border-zinc-600 text-zinc-400 hover:bg-zinc-800/40"
-                      onClick={switchToArbitrum}
+                      onClick={() => wallet?.switchChain(42161)}
                     >
                       Arbitrum One に切り替える
                     </Button>
@@ -263,7 +260,7 @@ export default function ConnectPage() {
                       variant="outline"
                       size="sm"
                       className="w-full border-zinc-600 text-zinc-400 hover:bg-zinc-800/40"
-                      onClick={switchToOptimism}
+                      onClick={() => wallet?.switchChain(10)}
                     >
                       Optimism に切り替える
                     </Button>
@@ -271,7 +268,7 @@ export default function ConnectPage() {
                       variant="outline"
                       size="sm"
                       className="w-full border-zinc-600 text-zinc-400 hover:bg-zinc-800/40"
-                      onClick={switchToMainnet}
+                      onClick={() => wallet?.switchChain(1)}
                     >
                       Ethereum に切り替える
                     </Button>
@@ -391,7 +388,7 @@ export default function ConnectPage() {
             <Button
               size="lg"
               className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-6 text-base disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={!termsAccepted || !riskAccepted || isAuthenticating || !signer}
+              disabled={!termsAccepted || !riskAccepted || isAuthenticating || !wallet}
               onClick={handleStart}
             >
               {isAuthenticating ? '認証中...' : '運用を開始する'}
