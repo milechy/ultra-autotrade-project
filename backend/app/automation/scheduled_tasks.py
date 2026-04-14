@@ -665,6 +665,65 @@ async def price_change_monitor_loop(
             await asyncio.sleep(600)
 
 
+async def learning_loop(
+    *,
+    interval_seconds: int = 21600,  # 6 時間
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """
+    AI継続学習サイクルの定期実行ループ。
+
+    6 時間ごとに AILearningService.run_learning_cycle() を実行する。
+
+    Args:
+        interval_seconds: 実行間隔（秒）。デフォルト 21600 秒（6 時間）
+        on_error: エラー発生時のコールバック
+
+    Note:
+        - このコルーチンは無限ループで動作する
+        - 停止は asyncio.CancelledError で行う
+        - 各ステップは fail-open（AILearningService 内部で try/except 済み）
+        - エラー発生時もループは継続（fail-safe）
+    """
+    logger.info(
+        "Starting AI learning loop (interval: %ds)",
+        interval_seconds,
+    )
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+
+            logger.info("Running AI learning cycle")
+            db = SessionLocal()
+            try:
+                from app.ai.learning_service import AILearningService  # noqa: PLC0415
+
+                svc = AILearningService(db)
+                result = await svc.run_learning_cycle()
+                logger.info(
+                    "AI learning cycle completed at %s",
+                    result.completed_at,
+                )
+            finally:
+                db.close()
+
+        except asyncio.CancelledError:
+            logger.info("AI learning loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in AI learning loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            # エラー発生時は 10 分待機後に再試行
+            await asyncio.sleep(600)
+
+
 class ScheduledTaskManager:
     """
     スケジュールタスクのライフサイクル管理。
@@ -685,6 +744,7 @@ class ScheduledTaskManager:
         self._health_check_task: Optional[asyncio.Task[None]] = None
         self._latency_monitor_task: Optional[asyncio.Task[None]] = None
         self._proposal_timeout_task: Optional[asyncio.Task[None]] = None
+        self._learning_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -730,6 +790,11 @@ class ScheduledTaskManager:
     def is_proposal_timeout_running(self) -> bool:
         """期限切れProposalチェックタスクが動作中かどうか。"""
         return self._proposal_timeout_task is not None and not self._proposal_timeout_task.done()
+
+    @property
+    def is_learning_running(self) -> bool:
+        """AI学習サイクルタスクが動作中かどうか。"""
+        return self._learning_task is not None and not self._learning_task.done()
 
     async def start_daily_reports(
         self,
@@ -1270,6 +1335,67 @@ class ScheduledTaskManager:
         self._health_check_task = None
         logger.info("Health check task stopped")
 
+    async def start_learning(
+        self,
+        *,
+        interval_seconds: int = 21600,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """
+        AI学習サイクルタスクを開始する。
+
+        Args:
+            interval_seconds: 実行間隔（秒）。デフォルト 21600 秒（6 時間）
+            on_error: エラー時コールバック
+
+        Raises:
+            RuntimeError: 既に学習タスクが開始されている場合
+        """
+        if self.is_learning_running:
+            raise RuntimeError("AI learning already running")
+
+        logger.info("Starting AI learning task")
+
+        self._learning_task = asyncio.create_task(
+            learning_loop(
+                interval_seconds=interval_seconds,
+                on_error=on_error,
+            )
+        )
+
+        logger.info("AI learning task started")
+
+    async def stop_learning(self, timeout: float = 5.0) -> None:
+        """
+        AI学習サイクルタスクを停止する。
+
+        Args:
+            timeout: キャンセル待機のタイムアウト秒数
+        """
+        if not self.is_learning_running:
+            logger.debug("AI learning not running - nothing to stop")
+            return
+
+        logger.info("Stopping AI learning task")
+
+        assert self._learning_task is not None  # noqa: S101
+        self._learning_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._learning_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("AI learning task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "AI learning task did not stop within %.1fs timeout",
+                timeout,
+            )
+        except Exception as exc:
+            logger.error("Error while stopping AI learning task: %s", exc)
+
+        self._learning_task = None
+        logger.info("AI learning task stopped")
+
     async def stop_all(self, timeout: float = 5.0) -> None:
         """
         全てのスケジュールタスクを停止する。
@@ -1289,6 +1415,7 @@ class ScheduledTaskManager:
             self.stop_health_check(timeout=timeout),
             self.stop_latency_monitor(timeout=timeout),
             self.stop_proposal_timeout(timeout=timeout),
+            self.stop_learning(timeout=timeout),
             return_exceptions=True,
         )
 
