@@ -95,9 +95,7 @@ class TestAIFeedbackModel:
         from sqlalchemy import select
 
         rows = list(
-            db_session.scalars(
-                select(AIFeedback).where(AIFeedback.ai_decision_id == 99)
-            ).all()
+            db_session.scalars(select(AIFeedback).where(AIFeedback.ai_decision_id == 99)).all()
         )
         assert len(rows) == 2
 

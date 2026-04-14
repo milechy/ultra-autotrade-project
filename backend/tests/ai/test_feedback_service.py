@@ -103,9 +103,7 @@ class TestRecordFeedback:
         svc.record_feedback(data, recorded_by="admin@example.com")
 
         feedbacks = list(
-            db.scalars(
-                select(AIFeedback).where(AIFeedback.ai_decision_id == decision.id)
-            ).all()
+            db.scalars(select(AIFeedback).where(AIFeedback.ai_decision_id == decision.id)).all()
         )
         assert len(feedbacks) == 1
         assert feedbacks[0].actual_outcome == "neutral"
@@ -135,9 +133,7 @@ class TestRecordFeedback:
         decision = _create_decision(db)
         svc = FeedbackService(db)
         data = AIFeedbackCreate(ai_decision_id=decision.id, actual_outcome="unknown")
-        result = svc.record_feedback(
-            data, recorded_by="system", feedback_source="auto_outcome"
-        )
+        result = svc.record_feedback(data, recorded_by="system", feedback_source="auto_outcome")
         assert result.feedback_source == "auto_outcome"
 
 
@@ -219,9 +215,7 @@ class TestGetStats:
         decision = _create_decision(db)
         svc = FeedbackService(db)
         svc.record_feedback(
-            AIFeedbackCreate(
-                ai_decision_id=decision.id, actual_outcome="unknown", is_correct=None
-            ),
+            AIFeedbackCreate(ai_decision_id=decision.id, actual_outcome="unknown", is_correct=None),
             recorded_by="admin@example.com",
         )
 
@@ -235,9 +229,7 @@ class TestGetStats:
 
         for pnl in (Decimal("100"), Decimal("200"), Decimal("300")):
             svc.record_feedback(
-                AIFeedbackCreate(
-                    ai_decision_id=decision.id, actual_outcome="profit", pnl_usd=pnl
-                ),
+                AIFeedbackCreate(ai_decision_id=decision.id, actual_outcome="profit", pnl_usd=pnl),
                 recorded_by="admin@example.com",
             )
 
@@ -294,12 +286,8 @@ class TestBulkAutoFeedback:
         svc = FeedbackService(db)
 
         feedbacks = [
-            AIFeedbackCreate(
-                ai_decision_id=decision.id, actual_outcome="profit", is_correct=True
-            ),
-            AIFeedbackCreate(
-                ai_decision_id=decision.id, actual_outcome="loss", is_correct=False
-            ),
+            AIFeedbackCreate(ai_decision_id=decision.id, actual_outcome="profit", is_correct=True),
+            AIFeedbackCreate(ai_decision_id=decision.id, actual_outcome="loss", is_correct=False),
         ]
         results = svc.bulk_auto_feedback(feedbacks)
 

@@ -271,9 +271,7 @@ class TestGetStats:
 
 
 class TestGetFeedbackByDecision:
-    def test_existing_decision_with_feedback(
-        self, client: TestClient, db_session
-    ) -> None:
+    def test_existing_decision_with_feedback(self, client: TestClient, db_session) -> None:
         """フィードバックのある判定の一覧が取得できる。"""
         token = get_admin_token(client)
         decision_id = create_decision(db_session)
@@ -314,9 +312,7 @@ class TestGetFeedbackByDecision:
         )
         assert r.status_code == 403
 
-    def test_multiple_feedbacks_for_same_decision(
-        self, client: TestClient, db_session
-    ) -> None:
+    def test_multiple_feedbacks_for_same_decision(self, client: TestClient, db_session) -> None:
         """同一判定 ID に複数フィードバックが返る。"""
         token = get_admin_token(client)
         decision_id = create_decision(db_session)
