@@ -36,6 +36,7 @@ from app.aave.rebalance_router import router as rebalance_router
 from app.aave.router import router as aave_router
 from app.aave.transparency_router import router as transparency_router
 from app.ai.decisions_router import router as ai_decisions_router
+from app.ai.feedback_router import router as ai_feedback_router
 from app.ai.router import router as ai_router
 from app.api.alias_router import router as alias_router
 from app.api.automation_dashboard import router as automation_dashboard_router
@@ -227,6 +228,7 @@ def create_app() -> FastAPI:
     app.include_router(reports_router, prefix="/api/reports")  # Monthly reports
     app.include_router(billing_router)
     app.include_router(ai_decisions_router)  # AI Decisions API
+    app.include_router(ai_feedback_router)  # AI Feedback API (Layer 4)
     app.include_router(transactions_router)  # Transactions API
     app.include_router(admin_transactions_router)  # Admin Transactions API
     app.include_router(proposals_router)  # Proposals API
