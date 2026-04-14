@@ -482,3 +482,344 @@ class TestMonitoringServiceSingletonUsage:
         assert "get_monitoring_service" in calls, (
             "price_change_monitor_loop must call get_monitoring_service() not MonitoringService()"
         )
+
+
+# ---------------------------------------------------------------------------
+# ループ本体実行テスト: 各 loop が実際にジョブを呼ぶことを確認
+# ---------------------------------------------------------------------------
+
+
+class TestLoopBodies:
+    """各ループ関数の while-loop 本体が実行されることを確認するテスト群。"""
+
+    @staticmethod
+    def _make_sleep_counter(raise_on: int = 2) -> tuple[list[float], object]:
+        """sleep コールを記録し、指定回数目に CancelledError を発生させるモックを返す。"""
+        calls: list[float] = []
+
+        async def mock_sleep(seconds: float) -> None:
+            calls.append(seconds)
+            if len(calls) >= raise_on:
+                raise asyncio.CancelledError()
+
+        return calls, mock_sleep
+
+    @staticmethod
+    async def _run_in_same_thread(fn: object, *args: object, **kwargs: object) -> object:
+        assert callable(fn)
+        return fn(*args, **kwargs)  # type: ignore[operator]
+
+    @pytest.mark.asyncio
+    async def test_daily_report_loop_calls_run_daily_jobs(self) -> None:
+        """daily_report_loop: スリープ後に run_daily_jobs() が呼ばれる（L126-163）。"""
+        from app.automation.scheduled_tasks import daily_report_loop
+
+        _, mock_sleep = self._make_sleep_counter(raise_on=2)
+        mock_run_daily = MagicMock()
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch("app.automation.scheduled_tasks.asyncio.to_thread", side_effect=self._run_in_same_thread),
+            patch("app.automation.scheduled_tasks.run_daily_jobs", mock_run_daily),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await daily_report_loop()
+
+        mock_run_daily.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_daily_report_loop_on_error_callback(self) -> None:
+        """daily_report_loop: run_daily_jobs() が例外を投げると on_error が呼ばれる（L154-163）。"""
+        from app.automation.scheduled_tasks import daily_report_loop
+
+        sleep_calls: list[float] = []
+
+        async def mock_sleep(seconds: float) -> None:
+            sleep_calls.append(seconds)
+            if seconds == 600:
+                raise asyncio.CancelledError()
+
+        on_error_calls: list[Exception] = []
+
+        def on_error(exc: Exception) -> None:
+            on_error_calls.append(exc)
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch("app.automation.scheduled_tasks.asyncio.to_thread", side_effect=RuntimeError("daily job failed")),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await daily_report_loop(on_error=on_error)
+
+        assert len(on_error_calls) == 1
+        assert isinstance(on_error_calls[0], RuntimeError)
+
+    @pytest.mark.asyncio
+    async def test_weekly_report_loop_calls_run_weekly_jobs(self) -> None:
+        """weekly_report_loop: スリープ後に run_weekly_jobs() が呼ばれる（L187-228）。"""
+        from app.automation.scheduled_tasks import weekly_report_loop
+
+        _, mock_sleep = self._make_sleep_counter(raise_on=2)
+        mock_run_weekly = MagicMock()
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch("app.automation.scheduled_tasks.asyncio.to_thread", side_effect=self._run_in_same_thread),
+            patch("app.automation.scheduled_tasks.run_weekly_jobs", mock_run_weekly),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await weekly_report_loop()
+
+        mock_run_weekly.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_rss_fetch_loop_calls_fetcher(self) -> None:
+        """rss_fetch_loop: fetch_and_register() が呼ばれる（L248-296）。"""
+        from app.automation.scheduled_tasks import rss_fetch_loop
+
+        _, mock_sleep = self._make_sleep_counter(raise_on=2)
+        mock_fetcher_instance = MagicMock()
+        mock_fetcher_instance.fetch_and_register.return_value = {"registered": 1}
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch("app.automation.scheduled_tasks.asyncio.to_thread", side_effect=self._run_in_same_thread),
+            patch("app.knowledge.service.KnowledgeService"),
+            patch("app.rss.fetcher.RSSFetcher", return_value=mock_fetcher_instance),
+            patch("app.automation.scheduled_tasks.SessionLocal"),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await rss_fetch_loop()
+
+        mock_fetcher_instance.fetch_and_register.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_health_check_loop_body_runs(self) -> None:
+        """health_check_loop: check_all_positions_safe() が呼ばれる（L500-534）。"""
+        from unittest.mock import AsyncMock  # noqa: PLC0415
+
+        from app.automation.scheduled_tasks import health_check_loop
+
+        _, mock_sleep = self._make_sleep_counter(raise_on=2)
+        mock_ms = MagicMock()
+        mock_ms.check_all_positions_safe = AsyncMock(return_value=True)
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch("app.automation.state.get_monitoring_service", return_value=mock_ms),
+            patch("app.aave.monitor.get_health_factor"),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await health_check_loop(interval_seconds=1)
+
+        mock_ms.check_all_positions_safe.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_price_change_monitor_loop_body_runs(self) -> None:
+        """price_change_monitor_loop: get_price_change_24h() と record_price_change_24h() が呼ばれる（L631-665）。"""
+        from decimal import Decimal  # noqa: PLC0415
+
+        from app.automation.scheduled_tasks import price_change_monitor_loop
+
+        _, mock_sleep = self._make_sleep_counter(raise_on=2)
+        mock_ms = MagicMock()
+        mock_exchange_svc = MagicMock()
+        mock_exchange_svc.get_price_change_24h.return_value = Decimal("1.5")
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch("app.automation.scheduled_tasks.asyncio.to_thread", side_effect=self._run_in_same_thread),
+            patch("app.automation.state.get_monitoring_service", return_value=mock_ms),
+            patch("app.exchange.service.ExchangeService", return_value=mock_exchange_svc),
+            patch("app.exchange.client.DummyExchangeClient"),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await price_change_monitor_loop(interval_seconds=1)
+
+        mock_exchange_svc.get_price_change_24h.assert_called_once()
+        mock_ms.record_price_change_24h.assert_called_once_with(1.5)
+
+    @pytest.mark.asyncio
+    async def test_learning_loop_body_runs(self) -> None:
+        """learning_loop: AILearningService.run_learning_cycle() が呼ばれる（L688-724）。"""
+        from unittest.mock import AsyncMock  # noqa: PLC0415
+
+        from app.automation.scheduled_tasks import learning_loop
+
+        _, mock_sleep = self._make_sleep_counter(raise_on=2)
+        mock_result = MagicMock()
+        mock_result.completed_at = "2026-01-01T00:00:00Z"
+        mock_svc = MagicMock()
+        mock_svc.run_learning_cycle = AsyncMock(return_value=mock_result)
+        mock_svc_class = MagicMock(return_value=mock_svc)
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch("app.automation.scheduled_tasks.SessionLocal"),
+            patch("app.ai.learning_service.AILearningService", mock_svc_class),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await learning_loop(interval_seconds=1)
+
+        mock_svc.run_learning_cycle.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_dca_loop_disabled_skips_execution(self) -> None:
+        """dca_loop: enabled=False のとき DCAService.execute() は呼ばれない（L317-331）。"""
+        from app.automation.scheduled_tasks import dca_loop
+
+        sleep_calls: list[float] = []
+
+        async def mock_sleep(seconds: float) -> None:
+            sleep_calls.append(seconds)
+            if len(sleep_calls) >= 2:
+                raise asyncio.CancelledError()
+
+        mock_config = MagicMock()
+        mock_config.enabled = False
+        mock_dca_svc = MagicMock()
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch("app.dca.config.load_dca_config", return_value=mock_config),
+            patch("app.dca.service.DCAService", return_value=mock_dca_svc),
+            patch("app.exchange.client.DummyExchangeClient"),
+            patch("app.exchange.service.ExchangeService"),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await dca_loop()
+
+        mock_dca_svc.execute.assert_not_called()
+        # 60s の待機が入る
+        assert 60 in sleep_calls
+
+
+# ---------------------------------------------------------------------------
+# ScheduledTaskManager start/stop — 未カバーのメソッド
+# ---------------------------------------------------------------------------
+
+
+class TestScheduledTaskManagerExtended:
+    """start_rss_fetch / stop_rss_fetch / start_dca / stop_dca / start/stop_price_monitor。"""
+
+    @pytest.mark.asyncio
+    async def test_start_stop_rss_fetch(self) -> None:
+        """RSS フェッチタスクの開始・停止。"""
+        manager = ScheduledTaskManager()
+        assert not manager.is_rss_running
+
+        with patch("app.automation.scheduled_tasks.rss_fetch_loop") as mock_loop:
+
+            async def mock_coro(*args: object, **kwargs: object) -> None:
+                await asyncio.sleep(100)
+
+            mock_loop.return_value = mock_coro()
+            await manager.start_rss_fetch()
+            assert manager.is_rss_running
+
+        await manager.stop_rss_fetch()
+        assert not manager.is_rss_running
+
+    @pytest.mark.asyncio
+    async def test_start_rss_fetch_raises_if_already_running(self) -> None:
+        """既に実行中は RuntimeError。"""
+        manager = ScheduledTaskManager()
+
+        with patch("app.automation.scheduled_tasks.rss_fetch_loop") as mock_loop:
+
+            async def mock_coro(*args: object, **kwargs: object) -> None:
+                await asyncio.sleep(100)
+
+            mock_loop.return_value = mock_coro()
+            await manager.start_rss_fetch()
+            with pytest.raises(RuntimeError, match="already running"):
+                await manager.start_rss_fetch()
+
+        await manager.stop_rss_fetch()
+
+    @pytest.mark.asyncio
+    async def test_start_stop_dca(self) -> None:
+        """DCA タスクの開始・停止。"""
+        manager = ScheduledTaskManager()
+        assert not manager.is_dca_running
+
+        with patch("app.automation.scheduled_tasks.dca_loop") as mock_loop:
+
+            async def mock_coro(*args: object, **kwargs: object) -> None:
+                await asyncio.sleep(100)
+
+            mock_loop.return_value = mock_coro()
+            await manager.start_dca()
+            assert manager.is_dca_running
+
+        await manager.stop_dca()
+        assert not manager.is_dca_running
+
+    @pytest.mark.asyncio
+    async def test_start_stop_price_monitor(self) -> None:
+        """価格変動モニタータスクの開始・停止。"""
+        manager = ScheduledTaskManager()
+        assert not manager.is_price_monitor_running
+
+        with patch("app.automation.scheduled_tasks.price_change_monitor_loop") as mock_loop:
+
+            async def mock_coro(*args: object, **kwargs: object) -> None:
+                await asyncio.sleep(100)
+
+            mock_loop.return_value = mock_coro()
+            await manager.start_price_monitor()
+            assert manager.is_price_monitor_running
+
+        await manager.stop_price_monitor()
+        assert not manager.is_price_monitor_running
+
+    @pytest.mark.asyncio
+    async def test_start_stop_learning(self) -> None:
+        """AI 学習タスクの開始・停止。"""
+        manager = ScheduledTaskManager()
+        assert not manager.is_learning_running
+
+        with patch("app.automation.scheduled_tasks.learning_loop") as mock_loop:
+
+            async def mock_coro(*args: object, **kwargs: object) -> None:
+                await asyncio.sleep(100)
+
+            mock_loop.return_value = mock_coro()
+            await manager.start_learning()
+            assert manager.is_learning_running
+
+        await manager.stop_learning()
+        assert not manager.is_learning_running
+
+    @pytest.mark.asyncio
+    async def test_stop_daily_reports_timeout(self) -> None:
+        """stop_daily_reports: タスクがタイムアウトしても例外が出ない（L885-891）。"""
+        manager = ScheduledTaskManager()
+
+        # キャンセルに反応しないタスクを作成
+        async def never_ends() -> None:
+            try:
+                await asyncio.sleep(9999)
+            except asyncio.CancelledError:
+                # CancelledError を無視してタイムアウトを引き起こす
+                await asyncio.sleep(9999)
+
+        manager._daily_task = asyncio.create_task(never_ends())
+        # タイムアウト 0.05s で停止（TimeoutError branch を踏む）
+        await manager.stop_daily_reports(timeout=0.05)
+        assert not manager.is_daily_running
+
+    @pytest.mark.asyncio
+    async def test_stop_weekly_reports_timeout(self) -> None:
+        """stop_weekly_reports: タスクがタイムアウトしても例外が出ない（L916-922）。"""
+        manager = ScheduledTaskManager()
+
+        async def never_ends() -> None:
+            try:
+                await asyncio.sleep(9999)
+            except asyncio.CancelledError:
+                await asyncio.sleep(9999)
+
+        manager._weekly_task = asyncio.create_task(never_ends())
+        await manager.stop_weekly_reports(timeout=0.05)
+        assert not manager.is_weekly_running
