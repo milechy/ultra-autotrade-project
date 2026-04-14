@@ -12,6 +12,7 @@ const adminNavLinks = [
   { href: "/reports", label: "レポート" },
   { href: "/knowledge", label: "ナレッジ" },
   { href: "/ai-decisions", label: "AI判定" },
+  { href: "/ai-learning", label: "AI学習" },
   { href: "/protocols", label: "プロトコル" },
   { href: "/events", label: "データ" },
   { href: "/trades", label: "取引所管理" },
