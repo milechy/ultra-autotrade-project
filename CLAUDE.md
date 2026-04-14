@@ -609,6 +609,24 @@ git diff main --name-only | grep "^frontend/lib/api/" # 新しいfetch関数 →
   - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
   - `NEXT_PUBLIC_DEFAULT_CHAIN_ID`
 
+### 2026-04-15追加（本番DB操作ルール）
+
+**本番DBに対するALTER TABLE / UPDATE / DELETE等の操作手順書を生成する際、コンテナ名・DBユーザー・テーブル名を絶対に推測しない。**
+手順書の冒頭に必ず「事前確認ステップ」を入れること:
+
+```bash
+# Step 1: コンテナ名を取得
+docker ps | grep postgres
+
+# Step 2: DBユーザー名・DB名を取得
+docker exec <container> env | grep POSTGRES
+
+# Step 3: テーブル一覧を取得
+docker exec <container> psql -U <user> -d <db> -c "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+```
+
+この3ステップの結果を確認してから、本番SQL手順を生成する。**推測で本番SQLを書くことは禁止。**
+
 ---
 
 ## 参照ファイル
