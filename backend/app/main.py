@@ -48,6 +48,7 @@ from app.billing.router import router as billing_router
 from app.bots.router import router as octobot_router
 from app.data_feeds.finance_feed import start_finance_background_task
 from app.data_feeds.geopolitical import start_geo_risk_background_task
+from app.data_feeds.mmt_feed import start_mmt_background_task
 from app.data_feeds.news_feed import start_news_background_task
 from app.data_feeds.router import router as data_feeds_router
 from app.database import init_db
@@ -377,6 +378,11 @@ def create_app() -> FastAPI:
             learning_interval = int(os.getenv("LEARNING_INTERVAL_HOURS", "6")) * 3600
             asyncio.create_task(learning_loop(interval_seconds=learning_interval))
             logger.info("AI learning background task started (interval=%ds)", learning_interval)
+            mmt_enabled = os.getenv("MMT_API_ENABLED", "false").lower() in ("true", "1", "yes")
+            if mmt_enabled:
+                mmt_interval = int(os.getenv("MMT_UPDATE_INTERVAL", "1800")) // 60
+                asyncio.create_task(start_mmt_background_task(interval_minutes=mmt_interval))
+                logger.info("MMT data feed started (interval: %ds)", mmt_interval * 60)
         except BaseException as exc:
             logger.error("Failed to start data feed background tasks: %s", exc)
 
