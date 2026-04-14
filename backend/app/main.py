@@ -372,6 +372,11 @@ def create_app() -> FastAPI:
             howl_interval = int(os.getenv("HOWL_INTERVAL_HOURS", "6"))
             asyncio.create_task(start_howl_background_task(interval_hours=howl_interval))
             logger.info("HOWL review background task started (interval=%dh)", howl_interval)
+            from app.automation.scheduled_tasks import learning_loop  # noqa: PLC0415
+
+            learning_interval = int(os.getenv("LEARNING_INTERVAL_HOURS", "6")) * 3600
+            asyncio.create_task(learning_loop(interval_seconds=learning_interval))
+            logger.info("AI learning background task started (interval=%ds)", learning_interval)
         except BaseException as exc:
             logger.error("Failed to start data feed background tasks: %s", exc)
 
