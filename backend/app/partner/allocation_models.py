@@ -5,6 +5,16 @@
 資金割り振りモデル定義。
 
 fund_allocations テーブル: パートナーが各テスターに割り振った運用資金を管理する。
+
+Phase 1.5 マイグレーション SQL（本番DB適用時）:
+  ALTER TABLE fund_allocations
+    ADD COLUMN tester_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+  CREATE INDEX idx_fund_allocations_tester_user_id ON fund_allocations(tester_user_id);
+  UPDATE fund_allocations fa
+    SET tester_user_id = (
+      SELECT u.id FROM users u WHERE u.username = fa.tester_name LIMIT 1
+    )
+  WHERE tester_user_id IS NULL;
 """
 
 from datetime import datetime, timezone
@@ -44,6 +54,14 @@ class FundAllocation(Base):
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     tester_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    # Phase 1.5: FK to users.id (tester_name is deprecated but kept for backward compat)
+    tester_user_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        default=None,
+    )
     allocated_amount_usd: Mapped[Decimal] = mapped_column(
         Numeric(precision=20, scale=6), nullable=False
     )
