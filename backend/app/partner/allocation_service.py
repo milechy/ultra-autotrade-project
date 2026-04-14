@@ -53,6 +53,7 @@ def create_allocation(
     allocation = FundAllocation(
         partner_id=partner_id,
         tester_name=request.tester_name,
+        tester_user_id=request.tester_user_id,  # Phase 1.5: FK（省略時はNone）
         allocated_amount_usd=request.allocated_amount_usd,
         status="active",
         allocated_at=now,
@@ -194,6 +195,62 @@ def _calc_pnl(
     return current_value, pnl_usd, pnl_percentage
 
 
+def _find_allocation_for_user(
+    db: Session,
+    current_user: User,
+) -> Optional[FundAllocation]:
+    """
+    テスターの資金割り振りレコードを検索する（Phase 1.5 FK優先ロジック）。
+
+    検索順序:
+      1. tester_user_id == current_user.id（新方式・FK）
+      2. tester_user_id IS NULL かつ tester_name == current_user.username（旧方式フォールバック）
+         → マッチした場合に tester_user_id を自動バックフィル
+
+    invited_by が設定されている場合は該当パートナーの割り振りに絞り込む。
+    """
+    partner_filter = []
+    if current_user.invited_by is not None:
+        partner_filter = [FundAllocation.partner_id == current_user.invited_by]
+
+    # Step 1: tester_user_id FK マッチ（新方式）
+    allocation = (
+        db.query(FundAllocation)
+        .filter(
+            FundAllocation.tester_user_id == current_user.id,
+            *partner_filter,
+        )
+        .order_by(FundAllocation.allocated_at.desc())
+        .first()
+    )
+    if allocation is not None:
+        return allocation
+
+    # Step 2: tester_name フォールバック（旧方式・deprecated）
+    allocation = (
+        db.query(FundAllocation)
+        .filter(
+            FundAllocation.tester_user_id.is_(None),
+            FundAllocation.tester_name == current_user.username,
+            *partner_filter,
+        )
+        .order_by(FundAllocation.allocated_at.desc())
+        .first()
+    )
+    if allocation is not None:
+        # 自動バックフィル: 次回以降は FK で直接マッチ
+        allocation.tester_user_id = current_user.id
+        db.commit()
+        logger.info(
+            "Backfilled tester_user_id=%d for allocation id=%d (tester_name=%r)",
+            current_user.id,
+            allocation.id,
+            current_user.username,
+        )
+
+    return allocation
+
+
 def get_my_allocation(
     db: Session,
     current_user: User,
@@ -201,8 +258,7 @@ def get_my_allocation(
     """
     テスター自身の割り振り情報を返す。
 
-    tester_name == username でマッチングする。invited_by が設定されている場合は
-    そのパートナーの割り振りに絞り込む。
+    tester_user_id（FK）優先でマッチング、フォールバックとして tester_name を使用。
     割り振りがない場合は None を返す（404 ではなく 200 + null）。
 
     PnL 計算優先順位:
@@ -210,13 +266,7 @@ def get_my_allocation(
       2. PortfolioSnapshot — フォールバック（is_live=False）
       3. データなし — pnl_usd/pnl_percentage/current_value_usd は None
     """
-    query = db.query(FundAllocation).filter(
-        FundAllocation.tester_name == current_user.username,
-    )
-    if current_user.invited_by is not None:
-        query = query.filter(FundAllocation.partner_id == current_user.invited_by)
-
-    allocation = query.order_by(FundAllocation.allocated_at.desc()).first()
+    allocation = _find_allocation_for_user(db, current_user)
     if allocation is None:
         return None
 

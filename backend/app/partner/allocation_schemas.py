@@ -14,6 +14,7 @@ class AllocationCreateRequest(BaseModel):
     """資金割り振り作成リクエスト。"""
 
     tester_name: str
+    tester_user_id: Optional[int] = None  # Phase 1.5: FK to users.id（省略時はNone）
     allocated_amount_usd: Decimal
     notes: Optional[str] = None
 
@@ -63,6 +64,7 @@ class AllocationResponse(BaseModel):
     id: int
     partner_id: int
     tester_name: str
+    tester_user_id: Optional[int] = None  # Phase 1.5: FK to users.id
     allocated_amount_usd: Decimal
     status: str
     allocated_at: datetime
