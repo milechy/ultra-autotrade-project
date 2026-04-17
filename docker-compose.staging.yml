@@ -1,30 +1,59 @@
 version: "3.9"
 
+# ============================================================
+# docker-compose.staging.yml
+# 真のStaging環境（staging.ultra-auto-trade.com / api-staging.ultra-auto-trade.com）
+#
+# 設計方針 (2026-04-17 B案リネーム):
+#   - Shadow Mode専用 (AI_SHADOW_MODE=true / REBALANCE_SHADOW_MODE=true)
+#   - Base Sepoliaテストネット流用 (AAVE_NETWORK=base-sepolia)
+#   - 完全独立DB (ultra_autotrade_staging)
+#   - portは production と重複しないよう 127.0.0.1 バインドで分離
+#     frontend: 127.0.0.1:3001  (production: 0.0.0.0:3000)
+#     backend:  127.0.0.1:8001  (production: 0.0.0.0:8000)
+#     postgres: 127.0.0.1:5433  (production: 0.0.0.0:5432)
+#   - Cloudflare Tunnel Ingress への staging URL 追加は Phase 4 で実施
+#
+# デプロイ: scripts/deploy_staging.sh
+# 環境変数: .env.staging
+# COMPOSE_PROJECT_NAME: ultra-autotrade-staging  (.env.staging に定義)
+# ============================================================
+#
 # NOTE: The Loki Docker logging driver must be installed on the host before starting this stack:
 #   docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
 # Verify installation with: docker plugin ls
 
 volumes:
-  ultra-state:
+  postgres-data-staging-new:
+    name: ultra-autotrade-staging_postgres-data
     driver: local
-  postgres-data:
+  ultra-state-staging-new:
+    name: ultra-autotrade-staging_ultra-state
     driver: local
-  loki-data:
+  ultra-log-staging-new:
+    name: ultra-autotrade-staging_ultra-log
     driver: local
-  ultra-log-staging:
+  loki-data-staging-new:
+    name: ultra-autotrade-staging_loki-data
     driver: local
+
+networks:
+  staging-net:
+    name: ultra-autotrade-staging_default
 
 services:
   loki:
     image: grafana/loki:2.9.0
-    container_name: ultra-autotrade-loki-staging
+    container_name: ultra-autotrade-loki-staging-new
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3101:3100"
     volumes:
       - ./docker/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
-      - loki-data:/loki
+      - loki-data-staging-new:/loki
     command: -config.file=/etc/loki/loki-config.yaml
     restart: always
+    networks:
+      - staging-net
     logging:
       driver: "json-file"
       options:
@@ -33,7 +62,7 @@ services:
 
   promtail:
     image: grafana/promtail:2.9.0
-    container_name: ultra-autotrade-promtail-staging
+    container_name: ultra-autotrade-promtail-staging-new
     volumes:
       - ./docker/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -42,6 +71,8 @@ services:
     depends_on:
       - loki
     restart: always
+    networks:
+      - staging-net
     logging:
       driver: "json-file"
       options:
@@ -50,16 +81,18 @@ services:
 
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: ultra-autotrade-postgres-staging
+    container_name: ultra-autotrade-postgres-staging-new
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ultra}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-ultra_autotrade}
+      POSTGRES_DB: ${POSTGRES_DB:-ultra_autotrade_staging}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-data-staging-new:/var/lib/postgresql/data
     restart: always
+    networks:
+      - staging-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ultra}"]
       interval: 10s
@@ -75,7 +108,7 @@ services:
         loki-external-labels: "service=postgres,env=staging"
 
   backend:
-    container_name: ultra-autotrade-backend-staging
+    container_name: ultra-autotrade-backend-staging-new
     build:
       context: .
       dockerfile: Dockerfile
@@ -86,20 +119,24 @@ services:
       --port 8000
       --log-level info"
     env_file:
-      - .env.staging       # staging 用の環境変数ファイル（Git 管理外）
+      - .env.staging
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade}
-      REBALANCE_SHADOW_MODE: "false"   # testnet 実行モード（dry-run を無効化）
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade_staging}
+      # Shadow Mode: 実トレード禁止 (Staging専用)
+      REBALANCE_SHADOW_MODE: "true"
+      AI_SHADOW_MODE: "true"
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8001:8000"
     volumes:
-      - ultra-state:/var/run/ultra:rw
+      - ultra-state-staging-new:/var/run/ultra:rw
       - ./backend/data:/app/backend/data:rw
-      - ultra-log-staging:/var/log/ultra-autotrade
+      - ultra-log-staging-new:/var/log/ultra-autotrade
     depends_on:
       postgres:
         condition: service_healthy
     restart: always
+    networks:
+      - staging-net
     logging:
       driver: loki
       options:
@@ -109,35 +146,18 @@ services:
         loki-timeout: "10s"
         loki-external-labels: "service=backend,env=staging"
 
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: ultra-autotrade-cloudflared-staging
-    command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-    network_mode: "host"
-    env_file:
-      - .env.staging
-    depends_on:
-      - backend
-      - frontend
-    restart: always
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   frontend:
-    container_name: ultra-autotrade-frontend-staging
+    container_name: ultra-autotrade-frontend-staging-new
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api.ultra-auto-trade.com}
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://api.ultra-auto-trade.com}
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.ultra-auto-trade.com}
+        NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api-staging.ultra-auto-trade.com}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://api-staging.ultra-auto-trade.com}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api-staging.ultra-auto-trade.com}
         NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:-}
         NEXT_PUBLIC_DEFAULT_CHAIN: ${NEXT_PUBLIC_DEFAULT_CHAIN:-}
-        NEXT_PUBLIC_DEFAULT_CHAIN_ID: ${NEXT_PUBLIC_DEFAULT_CHAIN_ID:-}
+        NEXT_PUBLIC_DEFAULT_CHAIN_ID: ${NEXT_PUBLIC_DEFAULT_CHAIN_ID:-84532}
         NEXT_PUBLIC_MAINNET_RPC: ${NEXT_PUBLIC_MAINNET_RPC:-}
         NEXT_PUBLIC_ARBITRUM_ONE_RPC: ${NEXT_PUBLIC_ARBITRUM_ONE_RPC:-}
         NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC: ${NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC:-}
@@ -148,13 +168,15 @@ services:
         NEXT_PUBLIC_LIFF_ID: ${NEXT_PUBLIC_LIFF_ID:-}
         NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}
     environment:
-      NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api.ultra-auto-trade.com}
+      NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api-staging.ultra-auto-trade.com}
       BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://backend:8000}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3001:3000"
     depends_on:
       - backend
     restart: always
+    networks:
+      - staging-net
     logging:
       driver: loki
       options:
