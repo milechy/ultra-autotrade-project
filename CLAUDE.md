@@ -641,6 +641,29 @@ docker exec <container> psql -U <user> -d <db> -c "SELECT table_name FROM inform
 
 この3ステップの結果を確認してから、本番SQL手順を生成する。**推測で本番SQLを書くことは禁止。**
 
+### 2026-04-17追加（本番フロントエンド操作ルール）
+
+**フロントエンドコンテナ操作は compose ファイルと env-file を必ず明示する。**
+
+```bash
+# 本番（必須）
+docker compose -f docker-compose.production.yml --env-file .env.production \
+  up -d --no-deps --force-recreate frontend
+
+# Staging（必須）
+docker compose -f docker-compose.staging.yml --env-file .env.staging-new \
+  up -d --no-deps --force-recreate frontend
+```
+
+**ルール:**
+- `docker-compose.production.yml + .env.production` ← 本番専用。他の compose/env の組み合わせ禁止
+- `docker-compose.staging.yml + .env.staging-new` ← Staging専用
+- Rolling restart は `--no-deps --force-recreate frontend`（他サービス影響なし、前回実績7秒）
+- `NEXT_PUBLIC_*` 変数変更時は `build --no-cache frontend` → `up -d --no-deps` の2ステップ必須（env_file だけでは JS バンドルに焼き込まれない）
+- デプロイ後は `for i in {1..30}; do curl -s -o /dev/null -w "%{http_code}\n" URL; sleep 1; done` で復旧確認
+
+**過去インシデント（2026-04-17 Phase C）:** `docker-compose.staging.yml` を本番コンテナに誤適用 → 本番502（5分）。正しい compose ファイル指定で12秒で復旧。
+
 ---
 
 ## 参照ファイル

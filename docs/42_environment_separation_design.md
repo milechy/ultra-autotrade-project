@@ -95,3 +95,38 @@ B案は稼働中コンテナに触れず、ファイル・スクリプトのリ�
 - Shadow Mode（AI_SHADOW_MODE=true）はstagingのdeploy_staging.shで強制確認される
 - Staging DB（ultra_autotrade_staging）はProductionとは別DBで完全独立
 - TODO: Staging用ウォレット秘密鍵はBase Sepolia専用のものを生成すること
+
+---
+
+## 実施結果（2026-04-17）
+
+Phase 1〜6 全完了。
+
+### 完了事項
+- 新Staging環境（`*-staging-new`）起動: ports 3001/8001/5433
+- Cloudflare Access 保護設定（hkobayashi + yamamoto の2名）
+- Base Sepolia + Shadow Mode（AI_SHADOW_MODE=true / REBALANCE_SHADOW_MODE=true）強制
+- 完全独立DB（ultra_autotrade_staging）セットアップ
+- 検証ユーザー3名体制（admin / editor / viewer）
+- Privy App ID（cmnv54q5f03ex0cjley894xrp）を両環境に設定
+
+### 本日発見した潜在バグ（本番含む・Staging構築契機で発見）
+
+| # | バグ内容 | 修正コミット |
+|---|---------|------------|
+| 1 | `NEXT_PUBLIC_PRIVY_APP_ID` が `.env.*` 全ファイルで未設定 | Phase A/C（Hetzner直接修正） |
+| 2 | `PrivyRootClient.tsx` の `isPrivyConfigured=false` ブランチに `WagmiProvider` 欠落 | `c809bbb` |
+| 3 | `PrivyProvider` ブランチにも `WagmiProvider` が欠落（`@privy-io/react-auth@3.21.0` は wagmi を内包しない）| `126d245` |
+| 4 | CSP に `frame-src` 未定義 → `auth.privy.io` iframe がブロック | `37ae2e2`, `5a47828` |
+
+### インシデント記録
+
+| 発生時刻 | 内容 | 原因 | 解消 |
+|---------|------|------|------|
+| Phase C 中間 | 本番502 約5分 | `docker-compose.staging.yml` を本番コンテナに誤適用 | 正しい `docker-compose.production.yml` で復旧（12秒） |
+
+### 確立した運用ルール
+1. **本番操作**: 必ず `docker-compose.production.yml + --env-file .env.production`
+2. **Staging操作**: 必ず `docker-compose.staging.yml + --env-file .env.staging-new`
+3. Rolling restart: `up -d --no-deps --force-recreate frontend`（前回実績7秒）
+4. `env_file` は compose ファイル内で明示; CLI `--env-file` 単独では `NEXT_PUBLIC_*` が build.args に伝わらない
