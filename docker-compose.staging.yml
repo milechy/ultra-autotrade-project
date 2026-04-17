@@ -119,7 +119,7 @@ services:
       --port 8000
       --log-level info"
     env_file:
-      - .env.staging
+      - .env.staging-new
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade_staging}
       # Shadow Mode: 実トレード禁止 (Staging専用)
