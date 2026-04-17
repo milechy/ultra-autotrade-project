@@ -1,8 +1,19 @@
 # 16_infra_deployment_guide.md
-Ultra AutoTrade – インフラデプロイガイド（staging 想定）
+Ultra AutoTrade – インフラデプロイガイド
 
 本ドキュメントは、Ultra AutoTrade のバックエンド（FastAPI）を  
-Hetzner などの Linux サーバ上にデプロイし、**staging 環境** として安全に動かすための手順を示す。
+Hetzner などの Linux サーバ上にデプロイし、**production / staging 環境** として安全に動かすための手順を示す。
+
+---
+
+## 環境定義（2026-04-17 B案リネーム後）
+
+| 環境 | URL | compose | env | deploy |
+|------|-----|---------|-----|--------|
+| **production** | app/api.ultra-auto-trade.com | `docker-compose.production.yml` | `.env.production` | `scripts/deploy_production.sh` |
+| **staging** | staging/api-staging.ultra-auto-trade.com（Phase 4で設定予定）| `docker-compose.staging.yml` | `.env.staging` | `scripts/deploy_staging.sh` |
+
+**productionのコンテナ名は稼働中の `*-staging` のまま維持（後日メンテ枠でリネーム予定）。**
 
 ---
 
@@ -26,8 +37,8 @@ Hetzner などの Linux サーバ上にデプロイし、**staging 環境** と�
 本プロジェクトのバックエンドは、以下の 2 つの方法で常駐させることを想定する。
 
 1. **Docker + docker-compose（推奨）**
-   - `Dockerfile` ＋ `docker-compose.staging.yml` でコンテナとして起動
-   - 環境変数は `.env.staging` を `env_file` として注入
+   - `Dockerfile` ＋ `docker-compose.production.yml` または `docker-compose.staging.yml` でコンテナとして起動
+   - 環境変数は `.env.production` / `.env.staging` を `env_file` として注入
 2. **systemd + uvicorn（fallback）**
    - Python 仮想環境上で `uvicorn app.main:app` を起動
    - `infra/systemd/ultra-autotrade-backend.service` をテンプレートとして使用

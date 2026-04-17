@@ -277,7 +277,7 @@ UIテスト（/chrome）やpytestでは検出できない。2026-04-01に Stress
 ### Slack通知（必須）
 タスクを1つ完了するたびに、以下のコマンドでSlack通知を送ること：
 ```bash
-WEBHOOK=$(grep SLACK_WEBHOOK_URL .env.staging | cut -d= -f2-)
+WEBHOOK=$(grep SLACK_WEBHOOK_URL .env.production | cut -d= -f2-)  # 2026-04-17以降: .env.production
 curl -s -X POST "$WEBHOOK" \
   -H "Content-Type: application/json" \
   -d '{"text": "✅ [チームメイト名] 完了: [タスク名]\n結果: [1行サマリー]\nファイル: [変更したファイル一覧]"}'
@@ -289,6 +289,19 @@ curl -s -X POST "$WEBHOOK" \
   -H "Content-Type: application/json" \
   -d '{"text": "❌ [チームメイト名] エラー: [タスク名]\n原因: [エラー内容]"}'
 ```
+
+---
+
+## 環境定義（2026-04-17 B案リネーム後）
+
+| 環境 | URL | compose | env | deploy script |
+|------|-----|---------|-----|---------------|
+| **production** | app/api.ultra-auto-trade.com | `docker-compose.production.yml` | `.env.production` | `scripts/deploy_production.sh` |
+| **staging** | staging/api-staging.ultra-auto-trade.com（Phase 4設定予定）| `docker-compose.staging.yml` | `.env.staging` | `scripts/deploy_staging.sh` |
+
+- **コンテナ名**: productionは稼働中の `*-staging` のまま維持（後日メンテ枠でリネーム予定）
+- **staging**: Shadow Mode専用（`AI_SHADOW_MODE=true` / `REBALANCE_SHADOW_MODE=true`）、Base Sepolia、port 3001/8001/5433
+- **production**: 実資金・実トレード、Base Mainnet、port 3000/8000/5432
 
 ---
 
@@ -482,8 +495,9 @@ curl https://api.ultra-auto-trade.com/health
 
 **`.env.staging.example` との差分確認（デプロイ前必須）:**
 ```bash
+# 2026-04-17以降: productionデプロイ前は .env.production との差分を確認
 diff <(grep -v '^#' backend/.env.staging.example | grep '=' | cut -d= -f1 | sort) \
-     <(grep -v '^#' /opt/ultra-autotrade/.env.staging | grep '=' | cut -d= -f1 | sort)
+     <(grep -v '^#' /opt/ultra-autotrade/.env.production | grep '=' | cut -d= -f1 | sort)
 ```
 
 ### 2026-04-02追加（Docker Composeプロジェクト名の統一）
@@ -527,7 +541,7 @@ docker exec <frontend> grep -rl 'api.ultra-auto-trade.com' /app/.next/static/chu
 - `NEXT_PUBLIC_API_BASE_URL` — 認証・汎用 API（`/api/` プレフィックス）
 - `NEXT_PUBLIC_API_URL` — 一部コンポーネントが直接参照する API URL
 
-**すべて `frontend/Dockerfile` の `ARG`/`ENV` と `docker-compose.staging.yml` の `build.args` に定義が必要。**
+**すべて `frontend/Dockerfile` の `ARG`/`ENV` と `docker-compose.production.yml` の `build.args` に定義が必要。**（2026-04-17以降: 旧 `docker-compose.staging.yml`）
 1つでも欠けると Dockerfile ビルド時にフォールバック値（`http://77.42.46.155:8000` 等）がJSバンドルに埋め込まれ、
 HTTPS（Named Tunnel）経由のモバイルアクセスで Mixed Content エラーになる（2026-04-03 iPhoneインシデント）。
 
@@ -539,12 +553,12 @@ HTTPS（Named Tunnel）経由のモバイルアクセスで Mixed Content エラ
 # 1. Dockerfile に ARG/ENV が揃っているか確認
 grep -E "NEXT_PUBLIC_API" frontend/Dockerfile
 
-# 2. docker-compose.staging.yml の build.args に揃っているか確認
-grep -A 20 "build:" docker-compose.staging.yml | grep "NEXT_PUBLIC_API"
+# 2. docker-compose.production.yml の build.args に揃っているか確認
+grep -A 20 "build:" docker-compose.production.yml | grep "NEXT_PUBLIC_API"
 
-# 3. 不足があれば .env.staging に追加し、フロントエンド再ビルド
-docker compose -f docker-compose.staging.yml build --no-cache frontend
-docker compose -f docker-compose.staging.yml up -d --no-deps frontend
+# 3. 不足があれば .env.production に追加し、フロントエンド再ビルド
+docker compose -f docker-compose.production.yml build --no-cache frontend
+docker compose -f docker-compose.production.yml up -d --no-deps frontend
 
 # 4. 埋め込み URL を確認（http:// が残っていないか）
 docker exec <frontend> grep -r "http://77" /app/.next/static/chunks/ | wc -l
@@ -552,17 +566,17 @@ docker exec <frontend> grep -r "http://77" /app/.next/static/chunks/ | wc -l
 
 ### 2026-04-03追加（デプロイ・運用）
 
-- **`scripts/deploy_staging.sh` を必ず使う。** 手打ちデプロイは孤立コンテナ（Conflict）、`--env-file` 忘れ（`NEXT_PUBLIC_*` 未焼き込み）、ビルドスキップ（古いイメージ起動）の3問題を毎回引き起こす。`deploy_staging.sh` は `down --remove-orphans` → `docker rm -f` → `build --no-cache` → `up -d` → ヘルスチェック → Slack通知まで全自動。`--frontend-only` / `--backend-only` / `--no-build` オプションあり
-- **`docker compose build --no-cache` だけでは不十分な場合がある。** `--no-cache` はレイヤーキャッシュをスキップするが、**古いイメージ自体は残る**。COMPOSE_PROJECT_NAMEや--env-fileが不一致だと別名のイメージが使われ続ける。`deploy_staging.sh` ではビルド前に `docker rmi -f` でイメージを完全削除してから再ビルドするため、この問題は自動的に回避される。手動で修正する場合は: `docker images | grep frontend | awk '{print $3}' | xargs -r docker rmi -f && docker compose build --no-cache frontend`
-- **`docker system prune -af` の後は全コンテナリビルドが必須。** イメージが削除されるため `up -d` しても起動しない。prune後は必ず `deploy_staging.sh`（フルビルド）を実行
+- **`scripts/deploy_production.sh` を必ず使う。**（2026-04-17 B案リネーム: 旧 `deploy_staging.sh`）手打ちデプロイは孤立コンテナ（Conflict）、`--env-file` 忘れ（`NEXT_PUBLIC_*` 未焼き込み）、ビルドスキップ（古いイメージ起動）の3問題を毎回引き起こす。`deploy_production.sh` は `down --remove-orphans` → `docker rm -f` → `build --no-cache` → `up -d` → ヘルスチェック → Slack通知まで全自動。`--frontend-only` / `--backend-only` / `--no-build` オプションあり
+- **`docker compose build --no-cache` だけでは不十分な場合がある。** `--no-cache` はレイヤーキャッシュをスキップするが、**古いイメージ自体は残る**。COMPOSE_PROJECT_NAMEや--env-fileが不一致だと別名のイメージが使われ続ける。`deploy_production.sh` ではビルド前に `docker rmi -f` でイメージを完全削除してから再ビルドするため、この問題は自動的に回避される。手動で修正する場合は: `docker images | grep frontend | awk '{print $3}' | xargs -r docker rmi -f && docker compose build --no-cache frontend`
+- **`docker system prune -af` の後は全コンテナリビルドが必須。** イメージが削除されるため `up -d` しても起動しない。prune後は必ず `deploy_production.sh`（フルビルド）を実行
 - **テストアカウント（@ultra-autotrade.com系）は DB ボリューム再作成で消える可能性がある。** 消えた場合は `bcrypt` でハッシュ生成 → `INSERT INTO users` で再作成。Registration API が無効化されている場合がある（`INITIAL_ADMIN_EMAIL` 未設定）
 
 ### 2026-04-03追加（スケジューラー・監視）
 
 - **`/health` が 200 でもスケジューラーが死んでることがある。** `/health` はアプリ起動の確認であって、バックグラウンドジョブの健全性は保証しない。`scheduler_healthy` フィールドと `warnings` 配列で確認すること
-- **`INTERNAL_API_TOKEN` が `.env.staging` に未設定だとスケジューラー内部 API 呼び出しが 401 で失敗する。** AI 判定が実質走らず、テスターは「承認待ちの提案はありません」を見続ける。デプロイ後に `docker logs | grep 401` で確認
+- **`INTERNAL_API_TOKEN` が `.env.production` に未設定だとスケジューラー内部 API 呼び出しが 401 で失敗する。** AI 判定が実質走らず、テスターは「承認待ちの提案はありません」を見続ける。デプロイ後に `docker logs | grep 401` で確認
 - **フロントエンドが最後の判定結果を表示し続けるため「AI が動いてる」と誤認しやすい。** HOLD (45%) が表示されていても、それが何時間も前の結果なら実際にはスケジューラーが停止している可能性がある
-- **Watchdog（`scheduler_watchdog.py`）が 30 分ごとに監視。** `interval_hours * 2` を超えて未実行なら Slack 通知。`deploy_staging.sh` もデプロイ後に `scheduler_healthy` を確認する
+- **Watchdog（`scheduler_watchdog.py`）が 30 分ごとに監視。** `interval_hours * 2` を超えて未実行なら Slack 通知。`deploy_production.sh` もデプロイ後に `scheduler_healthy` を確認する
 
 ### 2026-04-03追加（Codex Review P1 安全装置バグ → 修正済み）
 
@@ -627,6 +641,29 @@ docker exec <container> psql -U <user> -d <db> -c "SELECT table_name FROM inform
 
 この3ステップの結果を確認してから、本番SQL手順を生成する。**推測で本番SQLを書くことは禁止。**
 
+### 2026-04-17追加（本番フロントエンド操作ルール）
+
+**フロントエンドコンテナ操作は compose ファイルと env-file を必ず明示する。**
+
+```bash
+# 本番（必須）
+docker compose -f docker-compose.production.yml --env-file .env.production \
+  up -d --no-deps --force-recreate frontend
+
+# Staging（必須）
+docker compose -f docker-compose.staging.yml --env-file .env.staging-new \
+  up -d --no-deps --force-recreate frontend
+```
+
+**ルール:**
+- `docker-compose.production.yml + .env.production` ← 本番専用。他の compose/env の組み合わせ禁止
+- `docker-compose.staging.yml + .env.staging-new` ← Staging専用
+- Rolling restart は `--no-deps --force-recreate frontend`（他サービス影響なし、前回実績7秒）
+- `NEXT_PUBLIC_*` 変数変更時は `build --no-cache frontend` → `up -d --no-deps` の2ステップ必須（env_file だけでは JS バンドルに焼き込まれない）
+- デプロイ後は `for i in {1..30}; do curl -s -o /dev/null -w "%{http_code}\n" URL; sleep 1; done` で復旧確認
+
+**過去インシデント（2026-04-17 Phase C）:** `docker-compose.staging.yml` を本番コンテナに誤適用 → 本番502（5分）。正しい compose ファイル指定で12秒で復旧。
+
 ---
 
 ## 参照ファイル
@@ -680,7 +717,7 @@ docker exec <container> psql -U <user> -d <db> -c "SELECT table_name FROM inform
 - [ ] 新規機能 → pytest 新規テスト追加
 
 ### デプロイ
-- [ ] dev ブランチに commit & push → PR作成 → main にマージ → Hetzner で deploy_staging.sh
-- [ ] deploy_staging.sh は Hetzner 上で実行（ローカルMacではない）
+- [ ] dev ブランチに commit & push → PR作成 → main にマージ → Hetzner で **deploy_production.sh**
+- [ ] deploy_production.sh は Hetzner 上で実行（ローカルMacではない）
 - [ ] --frontend-only はバックエンドAPIに変更なしの場合のみ
 - [ ] DB変更がある場合は Hetzner で事前に CREATE TABLE / ALTER TABLE 実行
