@@ -28,17 +28,13 @@ export interface TesterPerformance {
   pnl_percentage: number
 }
 
-export interface PerformanceSummary {
-  total_aum_usd: number
-  total_pnl_usd: number
-  /** Already converted to % by backend. */
-  total_pnl_percentage: number
-  tester_count: number
-  health_factor: number | null
-}
-
 export interface PerformanceResponse {
-  summary: PerformanceSummary
+  /** Total amount allocated to testers (cost basis). */
+  total_allocated_usd: number
+  /** Current Aave collateral value (total_supply_usd). */
+  total_supply_usd: number
+  /** Aave Health Factor. Infinity is encoded as 999.0 by the backend. */
+  health_factor: number | null
   testers: TesterPerformance[]
 }
 

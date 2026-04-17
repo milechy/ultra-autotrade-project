@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from app.ai.judgment_log import CognitiveState
 from app.data_feeds.finance_feed import FinanceFeedResult, get_cached_finance
 from app.data_feeds.geopolitical import GeoRiskResult, get_cached_geo_risk
+from app.data_feeds.mmt_feed import MMTData, get_cached_mmt_data
 from app.data_feeds.news_feed import NewsFeedResult, get_cached_news
 
 
@@ -37,6 +38,9 @@ class MarketContext(BaseModel):
 
     # Macro context (Perplexity Finance Sonar Pro — 60min cache)
     finance: FinanceFeedResult = Field(default_factory=get_cached_finance)
+
+    # MMT market data (mmt.gg — funding rate, OI, candles — 30min cache)
+    mmt_data: Optional[MMTData] = Field(default_factory=get_cached_mmt_data)
 
     # Social sentiment (Phase 2 optional — Santiment)
     social_sentiment_score: Optional[Decimal] = None
@@ -82,6 +86,11 @@ class MarketContext(BaseModel):
 
         if self.social_sentiment_score is not None:
             parts.append(f"[Social Sentiment] {self.social_sentiment_score}/100")
+
+        if self.mmt_data is not None:
+            mmt_section = self.mmt_data.to_prompt_section()
+            if mmt_section:
+                parts.append(mmt_section)
 
         return "\n".join(parts)
 

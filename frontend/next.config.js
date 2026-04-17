@@ -3,10 +3,20 @@ const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
 const cspConnectSrc = [
   "'self'",
   backendUrl,
+  "https://api.ultra-auto-trade.com",
+  "https://api-staging.ultra-auto-trade.com",
   "https://*.infura.io",
   "https://*.alchemy.com",
   "wss://*.walletconnect.org",
+  "wss://relay.walletconnect.com",
+  "wss://relay.walletconnect.org",
+  "wss://www.walletconnect.com",
+  "https://explorer-api.walletconnect.com",
   "https://api.coingecko.com",
+  "https://auth.privy.io",
+  "https://*.privy.io",
+  "https://api.privy.io",
+  "https://telemetry.privy.io",
   "https:",
 ].filter(Boolean).join(' ');
 
@@ -49,6 +59,15 @@ const nextConfig = {
       'pino-pretty': false,
       '@safe-global/safe-apps-provider': false,
     };
+    // Privy の optional な Solana / Farcaster 依存をスタブ（未使用）
+    // porto は package.json から削除済み。wagmi/connectors 内部参照をスタブ化
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@solana/wallet-adapter-react': false,
+      '@farcaster/miniapp-sdk': false,
+      'porto': false,
+      'porto/internal': false,
+    };
     if (!dev && !isServer) {
       config.optimization = {
         ...config.optimization,
@@ -80,12 +99,13 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://static.cloudflareinsights.com",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "img-src 'self' data: blob:",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://static.cloudflareinsights.com https://auth.privy.io",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://auth.privy.io",
+              "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://auth.privy.io",
+              "img-src 'self' data: blob: https://auth.privy.io https://*.privy.io https://imagedelivery.net",
               "font-src 'self' https://fonts.gstatic.com",
               `connect-src ${cspConnectSrc}`,
+              "frame-src 'self' https://auth.privy.io https://verify.walletconnect.com https://verify.walletconnect.org",
               "frame-ancestors 'none'",
               "worker-src 'self' blob:",
             ].join('; '),

@@ -1,0 +1,181 @@
+version: "3.9"
+
+# NOTE: The Loki Docker logging driver must be installed on the host before starting this stack:
+#   docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
+# Verify installation with: docker plugin ls
+
+volumes:
+  ultra-state-production:
+    driver: local
+  postgres-data-production:
+    driver: local
+  loki-data-production:
+    driver: local
+  ultra-log-production:
+    driver: local
+
+services:
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: ultra-autotrade-loki-production
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./docker/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data-production:/loki
+    command: -config.file=/etc/loki/loki-config.yaml
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: ultra-autotrade-promtail-production
+    volumes:
+      - ./docker/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    depends_on:
+      - loki
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ultra-autotrade-postgres-production
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ultra}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ultra_autotrade}
+    expose:
+      - "5432"
+    volumes:
+      - postgres-data-production:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ultra}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-timeout: "10s"
+        loki-external-labels: "service=postgres,env=production"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+
+  backend:
+    container_name: ultra-autotrade-backend-production
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/backend
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --log-level info
+    env_file:
+      - .env.production       # production 用の環境変数ファイル（Git 管理外）
+    environment:
+      # DATABASE_URL は .env.production から取得（URL-encoded password 対応）
+      # POSTGRES_PASSWORD に特殊文字(@等)が含まれる場合、ここで直接構築すると
+      # psycopg2 が URL パースに失敗するため env_file に委譲する
+      REBALANCE_SHADOW_MODE: "false"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ultra-state-production:/var/run/ultra:rw
+      - ./backend/data:/app/backend/data:rw
+      - ultra-log-production:/var/log/ultra-autotrade
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-timeout: "10s"
+        loki-external-labels: "service=backend,env=production"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  frontend:
+    container_name: ultra-autotrade-frontend-production
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api.ultra-auto-trade.com}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://api.ultra-auto-trade.com}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.ultra-auto-trade.com}
+        NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:-}
+        NEXT_PUBLIC_DEFAULT_CHAIN: ${NEXT_PUBLIC_DEFAULT_CHAIN:-}
+        NEXT_PUBLIC_DEFAULT_CHAIN_ID: ${NEXT_PUBLIC_DEFAULT_CHAIN_ID:-}
+        NEXT_PUBLIC_MAINNET_RPC: ${NEXT_PUBLIC_MAINNET_RPC:-}
+        NEXT_PUBLIC_ARBITRUM_ONE_RPC: ${NEXT_PUBLIC_ARBITRUM_ONE_RPC:-}
+        NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC: ${NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC:-}
+        NEXT_PUBLIC_BASE_RPC: ${NEXT_PUBLIC_BASE_RPC:-}
+        NEXT_PUBLIC_BASE_SEPOLIA_RPC: ${NEXT_PUBLIC_BASE_SEPOLIA_RPC:-}
+        NEXT_PUBLIC_OPTIMISM_RPC: ${NEXT_PUBLIC_OPTIMISM_RPC:-}
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+        NEXT_PUBLIC_LIFF_ID: ${NEXT_PUBLIC_LIFF_ID:-}
+        NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}
+    environment:
+      NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api.ultra-auto-trade.com}
+      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://backend:8000}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - backend
+    restart: always
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-timeout: "10s"
+        loki-external-labels: "service=frontend,env=production"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G

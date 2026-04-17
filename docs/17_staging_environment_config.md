@@ -1,10 +1,23 @@
 # 17_staging_environment_config.md
-Ultra AutoTrade – Staging 環境設定ガイド
+Ultra AutoTrade – Staging 環境設定ガイド（2026-04-17 B案リネーム後）
 
-本ドキュメントは、Ultra AutoTrade の **staging 環境** で使用する  
+> **2026-04-17 重要変更**: B案リネームにより旧stagingがProductionとして正式化。
+> 本ドキュメントは「真のStaging」（Shadow Mode専用・Base Sepolia）の定義に更新済み。
+
+本ドキュメントは、Ultra AutoTrade の **真のStaging環境** で使用する  
 `.env.staging` の設定項目を整理したものです。
 
-- ネットワークは原則として **テストネット**
+### 真のStaging環境の定義（2026-04-17以降）
+- **URL**: staging.ultra-auto-trade.com / api-staging.ultra-auto-trade.com（Phase 4で設定予定）
+- **compose**: `docker-compose.staging.yml`
+- **env**: `.env.staging`
+- **deploy**: `scripts/deploy_staging.sh`
+- **ポート**: frontend 127.0.0.1:3001 / backend 127.0.0.1:8001 / postgres 127.0.0.1:5433
+- **コンテナ名**: `*-staging-new` サフィックス
+- **DB**: `ultra_autotrade_staging`（productionと完全独立）
+- **Shadow Mode**: `AI_SHADOW_MODE=true` / `REBALANCE_SHADOW_MODE=true`（必須）
+
+- ネットワークは **テストネット（Base Sepolia）**
 - 資金はテスト用ウォレットに限定
 - 本番用のキー / URL と混ざらないこと
 

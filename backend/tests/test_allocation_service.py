@@ -29,10 +29,12 @@ from app.partner.allocation_schemas import (  # noqa: E402
 )
 from app.partner.allocation_service import (  # noqa: E402
     _HF_INFINITY_DISPLAY,
+    _calc_pnl,
     _get_wallet_address,
     create_allocation,
     delete_allocation,
     get_allocations,
+    get_my_allocation,
     get_performance,
     update_allocation,
 )
@@ -352,6 +354,88 @@ class TestGetPerformance:
 
         assert summary.total_supply_usd == Decimal("0")
         assert summary.testers[0].current_value_usd == Decimal("0")
+
+
+# ---------------------------------------------------------------------------
+# エッジケース: 未カバー行を対象とした追加テスト
+# ---------------------------------------------------------------------------
+
+
+class TestAllocationServiceEdgeCases:
+    def test_update_notes(self, db: Session) -> None:
+        """update_allocation: notes フィールドが更新される（L132）。"""
+        partner = _make_partner(db)
+        alloc = _make_allocation(db, partner.id, "Alice", Decimal("100"))
+        req = AllocationUpdateRequest(notes="updated notes")
+        resp = update_allocation(db, alloc.id, partner.id, req)
+        assert resp is not None
+        assert resp.notes == "updated notes"
+
+    def test_calc_pnl_zero_allocated(self) -> None:
+        """_calc_pnl: allocated=0 のときはゼロタプルを返す（L190 前半ガード）。"""
+        result = _calc_pnl(Decimal("0"), Decimal("1000"), Decimal("5000"))
+        assert result == (Decimal("0"), Decimal("0"), Decimal("0"))
+
+    def test_calc_pnl_zero_total_allocated(self) -> None:
+        """_calc_pnl: total_allocated=0 のときはゼロタプルを返す（L190 後半ガード）。"""
+        result = _calc_pnl(Decimal("500"), Decimal("0"), Decimal("5000"))
+        assert result == (Decimal("0"), Decimal("0"), Decimal("0"))
+
+    def test_get_my_allocation_partner_not_found(self, db: Session) -> None:
+        """get_my_allocation: partner が DB に存在しない場合 None を返す（L275）。"""
+        from datetime import datetime, timezone  # noqa: PLC0415
+
+        tester = _make_partner(db)
+        tester.role = "viewer"
+        db.commit()
+        db.refresh(tester)
+
+        # orphaned partner_id（存在しない）で FundAllocation を直接挿入
+        alloc = FundAllocation(
+            partner_id=999999,  # 存在しないパートナー
+            tester_name=tester.username,
+            tester_user_id=tester.id,
+            allocated_amount_usd=Decimal("500"),
+            status="active",
+            allocated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        db.add(alloc)
+        db.commit()
+
+        result = get_my_allocation(db, tester)
+        assert result is None
+
+    def test_get_performance_zero_amount_allocation(self, db: Session) -> None:
+        """get_performance: allocated_amount_usd=0 の割り振りで ratio=0 と pnl_pct=0 が設定される（L391, L399）。"""
+        from datetime import datetime, timezone  # noqa: PLC0415
+
+        partner = _make_partner(db)
+        # amount=0 の割り振りを直接挿入（create_allocation は 0 を許容しない場合があるため直接挿入）
+        alloc = FundAllocation(
+            partner_id=partner.id,
+            tester_name="zero-tester",
+            allocated_amount_usd=Decimal("0"),
+            status="active",
+            allocated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        db.add(alloc)
+        db.commit()
+
+        with patch("app.partner.allocation_service.get_default_aave_client") as mock_factory:
+            mock_client = MagicMock()
+            mock_client.get_account_data.return_value = _DUMMY_ACCOUNT_DATA
+            mock_factory.return_value = mock_client
+
+            summary = get_performance(db, partner)
+
+        assert len(summary.testers) == 1
+        tester = summary.testers[0]
+        assert tester.allocation_ratio == Decimal("0")
+        assert tester.pnl_percentage == Decimal("0")
 
 
 class TestGetWalletAddress:

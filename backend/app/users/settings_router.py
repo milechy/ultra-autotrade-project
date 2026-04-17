@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_active_user
-from app.auth.models import User
+from app.auth.models import User, UserRole
 from app.database import get_db
 from app.partner import allocation_service
 from app.partner.allocation_schemas import MyAllocationResponse
@@ -62,6 +62,12 @@ def update_user_settings(
                 detail="max_daily_trade_usd must be positive",
             )
         current_user.max_daily_trade_usd = request.max_daily_trade_usd
+    if request.user_mode is not None or request.execution_policy is not None:
+        if current_user.role not in (UserRole.ADMIN.value, UserRole.PARTNER.value):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="execution policy change is not allowed for this role",
+            )
     if request.user_mode is not None:
         if request.user_mode not in _USER_MODE_TO_POLICY:
             raise HTTPException(

@@ -2,11 +2,20 @@
 // Unauthorized copying or distribution is strictly prohibited.
 'use client'
 
+import { useEffect, useState } from 'react'
 import { TrendingUp, Layers, BarChart2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  fetchProtocolsHealth,
+  fetchPendleMarkets,
+  fetchLidoApr,
+  type ProtocolHealth,
+  type PendleMarketInfo,
+  type LidoAprResponse,
+} from '@/lib/api/protocols'
 
-interface Strategy {
+interface StrategyData {
   id: string
   icon: React.ElementType
   name: string
@@ -17,63 +26,111 @@ interface Strategy {
   riskColor: string
   status: 'active' | 'phase2'
   phase: string
+  isOperational: boolean | null
+  riskLevelApi: string | null
 }
 
-const strategies: Strategy[] = [
-  {
-    id: 'aave-v3-usdc',
-    icon: TrendingUp,
-    name: 'Aave V3 USDC',
-    subtitle: 'レンディング戦略',
-    description: 'USDCをAave V3プロトコルに供給し、安定した貸出利息を獲得します。ヘルスファクター監視と自動リバランスで安全に運用します。',
-    apyRange: '3〜5%',
-    riskLevel: '低',
-    riskColor: 'bg-green-500/20 text-green-400 border-green-500/30',
-    status: 'active',
-    phase: 'Phase 1',
-  },
-  {
-    id: 'lido-steth',
-    icon: Layers,
-    name: 'Lido stETH',
-    subtitle: 'リキッドステーキング',
-    description: 'ETHをLidoプロトコルでリキッドステーキングし、stETHとして保有します。バリデーター報酬を受け取りながら流動性を維持できます。',
-    apyRange: '3.5〜4%',
-    riskLevel: '中',
-    riskColor: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    status: 'phase2',
-    phase: 'Phase 2',
-  },
-  {
-    id: 'pendle-pt-yt',
-    icon: BarChart2,
-    name: 'Pendle PT/YT',
-    subtitle: 'イールドトレーディング',
-    description: 'Pendleプロトコルでトークン化された利回りを売買します。元本トークン（PT）と利回りトークン（YT）を活用した高度なイールド最適化戦略です。',
-    apyRange: '5〜15%',
-    riskLevel: '中〜高',
-    riskColor: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-    status: 'phase2',
-    phase: 'Phase 2',
-  },
-]
+function buildStrategies(
+  health: ProtocolHealth[],
+  pendleMarkets: PendleMarketInfo[],
+  lidoApr: LidoAprResponse | null
+): StrategyData[] {
+  const healthMap = Object.fromEntries(health.map((h) => [h.protocol, h]))
 
-function StatusBadge({ status, phase }: { status: Strategy['status']; phase: string }) {
+  const lidoHealth = healthMap['lido'] ?? null
+  const pendleHealth = healthMap['pendle'] ?? null
+
+  // Lido APY 文字列を生成
+  let lidoApyRange = 'データなし'
+  if (lidoApr) {
+    const apr = Number(lidoApr.staking_apr).toFixed(1)
+    lidoApyRange = `${apr}%`
+  }
+
+  // Pendle APY 文字列を生成（最初のマーケットの implied APY を使用）
+  let pendleApyRange = 'データなし'
+  if (pendleMarkets.length > 0) {
+    const impliedApy = Number(pendleMarkets[0].implied_apy).toFixed(1)
+    pendleApyRange = `${impliedApy}%（現在の想定利回り）`
+  }
+
+  return [
+    {
+      id: 'aave-v3-usdc',
+      icon: TrendingUp,
+      name: 'Aave V3 USDC',
+      subtitle: 'レンディング戦略',
+      description:
+        'USDCをAave V3プロトコルに供給し、安定した貸出利息を獲得します。ヘルスファクター監視と自動リバランスで安全に運用します。',
+      apyRange: '3〜5%',
+      riskLevel: '低',
+      riskColor: 'bg-green-500/20 text-green-400 border-green-500/30',
+      status: 'active',
+      phase: 'Phase 1',
+      isOperational: healthMap['aave']?.is_operational ?? null,
+      riskLevelApi: healthMap['aave']?.risk_level ?? null,
+    },
+    {
+      id: 'lido-steth',
+      icon: Layers,
+      name: 'Lido stETH',
+      subtitle: 'リキッドステーキング',
+      description:
+        'ETHをLidoプロトコルでリキッドステーキングし、stETHとして保有します。バリデーター報酬を受け取りながら流動性を維持できます。',
+      apyRange: lidoApyRange,
+      riskLevel: '中',
+      riskColor: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      status: 'phase2',
+      phase: 'Phase 2',
+      isOperational: lidoHealth?.is_operational ?? null,
+      riskLevelApi: lidoHealth?.risk_level ?? null,
+    },
+    {
+      id: 'pendle-pt-yt',
+      icon: BarChart2,
+      name: 'Pendle PT/YT',
+      subtitle: 'イールドトレーディング',
+      description:
+        'Pendleプロトコルでトークン化された利回りを売買します。元本トークン（PT）と利回りトークン（YT）を活用した高度なイールド最適化戦略です。',
+      apyRange: pendleApyRange,
+      riskLevel: '中〜高',
+      riskColor: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+      status: 'phase2',
+      phase: 'Phase 2',
+      isOperational: pendleHealth?.is_operational ?? null,
+      riskLevelApi: pendleHealth?.risk_level ?? null,
+    },
+  ]
+}
+
+function StatusBadge({ status, phase }: { status: StrategyData['status']; phase: string }) {
   if (status === 'active') {
     return (
-      <Badge className="border-green-500/30 bg-green-500/20 text-green-400">
-        稼働中
-      </Badge>
+      <Badge className="border-green-500/30 bg-green-500/20 text-green-400">稼働中</Badge>
     )
   }
   return (
-    <Badge className="border-yellow-500/30 bg-yellow-500/20 text-yellow-400">
-      {phase}
-    </Badge>
+    <Badge className="border-yellow-500/30 bg-yellow-500/20 text-yellow-400">{phase}</Badge>
   )
 }
 
-function StrategyCard({ strategy }: { strategy: Strategy }) {
+function OperationalBadge({ isOperational }: { isOperational: boolean | null }) {
+  if (isOperational === null) return null
+  if (isOperational) {
+    return (
+      <span className="inline-block rounded-full bg-green-500/10 px-2 py-0.5 text-xs text-green-400">
+        正常
+      </span>
+    )
+  }
+  return (
+    <span className="inline-block rounded-full bg-red-500/10 px-2 py-0.5 text-xs text-red-400">
+      異常
+    </span>
+  )
+}
+
+function StrategyCard({ strategy }: { strategy: StrategyData }) {
   const Icon = strategy.icon
   const isPhase2 = strategy.status === 'phase2'
 
@@ -97,7 +154,10 @@ function StrategyCard({ strategy }: { strategy: Strategy }) {
                 <p className="text-xs text-zinc-500 mt-0.5">{strategy.subtitle}</p>
               </div>
             </div>
-            <StatusBadge status={strategy.status} phase={strategy.phase} />
+            <div className="flex flex-col items-end gap-1">
+              <StatusBadge status={strategy.status} phase={strategy.phase} />
+              <OperationalBadge isOperational={strategy.isOperational} />
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -134,6 +194,42 @@ function StrategyCard({ strategy }: { strategy: Strategy }) {
 }
 
 export default function StrategiesPage() {
+  const [strategies, setStrategies] = useState<StrategyData[]>(
+    buildStrategies([], [], null)
+  )
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      try {
+        const [health, pendleMarkets, lidoApr] = await Promise.allSettled([
+          fetchProtocolsHealth(),
+          fetchPendleMarkets(),
+          fetchLidoApr(),
+        ])
+
+        if (cancelled) return
+
+        const healthData = health.status === 'fulfilled' ? health.value : []
+        const pendleData = pendleMarkets.status === 'fulfilled' ? pendleMarkets.value : []
+        const lidoData = lidoApr.status === 'fulfilled' ? lidoApr.value : null
+
+        setStrategies(buildStrategies(healthData, pendleData, lidoData))
+      } catch {
+        // API 失敗時はデフォルト表示を維持
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-zinc-950">
       {/* ヘッダー */}
@@ -145,6 +241,10 @@ export default function StrategiesPage() {
       </div>
 
       <div className="px-4 py-4 pb-24 max-w-4xl mx-auto">
+        {loading && (
+          <p className="mb-4 text-xs text-zinc-500">プロトコル情報を取得中...</p>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {strategies.map((strategy) => (
             <StrategyCard key={strategy.id} strategy={strategy} />

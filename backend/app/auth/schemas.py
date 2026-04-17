@@ -21,6 +21,13 @@ class UserRole(str, Enum):
     VIEWER = "viewer"
 
 
+class InvestmentTier(str, Enum):
+    """投資ティア（二層手数料モデル）。"""
+
+    GENERAL = "GENERAL"
+    UPPER = "UPPER"
+
+
 class RegisterRequest(BaseModel):
     """初回管理者登録リクエスト（招待コードがある場合は招待登録）。"""
 
@@ -77,6 +84,7 @@ class UserResponse(BaseModel):
     terms_version: Optional[str] = None
     risk_mode: Optional[str] = "conservative"
     invited_by: Optional[int] = None
+    tier: InvestmentTier = InvestmentTier.GENERAL
 
     model_config = ConfigDict(from_attributes=True)
 

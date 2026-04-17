@@ -635,6 +635,8 @@ def _create_proposal_from_judgment(
     reason: str,
     trade_amount_usd: Decimal,
     user_id: int = 0,
+    fee_rate: Optional[Decimal] = None,
+    fee_amount: Optional[Decimal] = None,
 ) -> None:
     """Create a pending Proposal from AI judgment (require_approval / proposal_only)."""
     from datetime import timedelta  # noqa: PLC0415
@@ -651,6 +653,8 @@ def _create_proposal_from_judgment(
         reason=reason,
         status="pending",
         expires_at=expires_at,
+        fee_rate=fee_rate,
+        fee_amount=fee_amount,
     )
     db.add(proposal)
     db.flush()
@@ -747,12 +751,53 @@ def _process_single_item(
     order_result: Optional[OrderResult] = None
     if action in (TradeAction.BUY, TradeAction.SELL) and confidence >= 40:
         if execution_policy in ("require_approval", "proposal_only"):
+            # 動的手数料計算 (B-2)
+            import os  # noqa: PLC0415
+
+            from app.billing.dynamic_fee import calculate_fee_by_market  # noqa: PLC0415
+
+            # APYを市場コンテキストから取得、なければデフォルト4%
+            _apy_raw = getattr(ctx, "current_apy", None) if ctx else None
+            if _apy_raw is None and isinstance(ctx, dict):
+                _apy_raw = ctx.get("current_apy")
+            current_apy = Decimal(str(_apy_raw)) if _apy_raw is not None else Decimal("4")
+
+            # 30日保有での予想利益 = trade_amount × (APY/100) × (30/365)
+            expected_profit = (
+                trade_amount_usd * current_apy / Decimal("100") * Decimal("30") / Decimal("365")
+            )
+            fixed_cost = Decimal(os.getenv("TRADE_FIXED_COST_USD", "0.27"))
+
+            market_fee = calculate_fee_by_market(
+                trade_amount_usd=trade_amount_usd,
+                tier="GENERAL",  # ユーザーtier不明の場合は保守的にGENERAL
+                current_apy=current_apy,
+                expected_profit_usd=expected_profit,
+                fixed_cost_usd=fixed_cost,
+            )
+
+            if not market_fee.should_trade:
+                logger.info(
+                    "DynamicFee: should_trade=False for item %d (%s) — treating as HOLD",
+                    item.id,
+                    market_fee.reason,
+                )
+                return _SingleItemResult(
+                    item_id=item.id,
+                    action=TradeAction.HOLD,
+                    confidence=confidence,
+                    order_result=None,
+                    reason=f"手数料計算: {market_fee.reason}",
+                )
+
             _create_proposal_from_judgment(
                 db,
                 item_id=item.id,
                 action=action,
                 reason=reason,
                 trade_amount_usd=trade_amount_usd,
+                fee_rate=market_fee.fee_rate,
+                fee_amount=market_fee.fee_amount,
             )
             return _SingleItemResult(
                 item_id=item.id,

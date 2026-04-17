@@ -10,7 +10,12 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.ai.service import AIService
-from app.auth.dependencies import require_active_user, require_admin, require_viewer
+from app.auth.dependencies import (
+    require_active_user,
+    require_admin,
+    require_partner,
+    require_viewer,
+)
 from app.auth.models import User
 from app.automation.monitoring_service import MonitoringService
 from app.automation.reporting_service import ReportingService
@@ -166,7 +171,7 @@ class EmergencyStopRequest(BaseModel):
 def emergency_stop_api(
     request: EmergencyStopRequest = Body(default=EmergencyStopRequest()),
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
-    current_user: User = Depends(require_active_user),
+    current_user: User = Depends(require_partner),
 ) -> dict[str, Any]:
     """全ての自動取引を即時停止する。"""
     monitoring_service.activate_emergency_stop(
@@ -181,7 +186,7 @@ def emergency_stop_api(
 @router.post("/emergency-stop/resume", summary="緊急停止解除")
 def resume_emergency_stop_api(
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
-    current_user: User = Depends(require_active_user),
+    current_user: User = Depends(require_admin),
 ) -> dict[str, Any]:
     """
     手動緊急停止を解除する。

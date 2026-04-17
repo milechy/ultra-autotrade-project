@@ -58,6 +58,30 @@ _STETH_ABI: list[dict[str, Any]] = [
         "inputs": [],
         "outputs": [{"name": "", "type": "uint256"}],
     },
+    {
+        "name": "approve",
+        "type": "function",
+        "stateMutability": "nonpayable",
+        "inputs": [
+            {"name": "_spender", "type": "address"},
+            {"name": "_amount", "type": "uint256"},
+        ],
+        "outputs": [{"name": "", "type": "bool"}],
+    },
+]
+
+# Lido WithdrawalQueueERC721 ABI（最小限: requestWithdrawals）
+_WITHDRAWAL_QUEUE_ABI: list[dict[str, Any]] = [
+    {
+        "name": "requestWithdrawals",
+        "type": "function",
+        "stateMutability": "nonpayable",
+        "inputs": [
+            {"name": "_amounts", "type": "uint256[]"},
+            {"name": "_owner", "type": "address"},
+        ],
+        "outputs": [{"name": "requestIds", "type": "uint256[]"}],
+    },
 ]
 
 _WEI_PER_ETH = Decimal("1000000000000000000")
@@ -236,6 +260,95 @@ class LidoClient(AbstractLidoClient):
             logger.exception("stake_eth 失敗: amount_wei=%d", amount_wei)
             return TxResult(success=False, error=str(exc))
 
+    async def withdraw(self, amount: Decimal, asset: str) -> TransactionResult:
+        """stETH → ETH 引き出しリクエスト（Lido WithdrawalQueue）。
+
+        引き出しフロー:
+        1. stETH.approve(withdrawalQueueAddress, amount_wei)
+        2. WithdrawalQueueERC721.requestWithdrawals([amount_wei], owner)
+        クレーム（claim）は待機期間後に別途実行が必要。
+        """
+        if asset not in ("ETH", "stETH"):
+            return TransactionResult(
+                success=False,
+                tx_hash=None,
+                amount=amount,
+                error=f"Lido withdraw は ETH/stETH のみサポートしています。指定: {asset}",
+            )
+        self._ensure_initialized()
+        try:
+            from web3 import Web3  # noqa: PLC0415
+
+            if not self._config.wallet_private_key:
+                return TransactionResult(
+                    success=False,
+                    tx_hash=None,
+                    amount=amount,
+                    error="LIDO_WALLET_PRIVATE_KEY が未設定",
+                )
+
+            account = self._w3.eth.account.from_key(self._config.wallet_private_key)
+            amount_wei = int(amount * _WEI_PER_ETH)
+            queue_address = Web3.to_checksum_address(self._config.withdrawal_queue_address)
+            gas_price = self._w3.eth.gas_price
+
+            # Step 1: stETH.approve(withdrawalQueueAddress, amount_wei)
+            nonce = self._w3.eth.get_transaction_count(account.address)
+            approve_tx = self._contract.functions.approve(
+                queue_address, amount_wei
+            ).build_transaction(
+                {
+                    "from": account.address,
+                    "nonce": nonce,
+                    "gasPrice": gas_price,
+                    "gas": 100_000,
+                }
+            )
+            signed_approve = self._w3.eth.account.sign_transaction(
+                approve_tx, self._config.wallet_private_key
+            )
+            self._w3.eth.send_raw_transaction(signed_approve.raw_transaction)
+            logger.info("stETH approve 送信完了: amount_wei=%d", amount_wei)
+
+            # Step 2: WithdrawalQueue.requestWithdrawals([amount_wei], owner)
+            queue_contract = self._w3.eth.contract(address=queue_address, abi=_WITHDRAWAL_QUEUE_ABI)
+            nonce2 = nonce + 1
+            withdraw_tx = queue_contract.functions.requestWithdrawals(
+                [amount_wei], account.address
+            ).build_transaction(
+                {
+                    "from": account.address,
+                    "nonce": nonce2,
+                    "gasPrice": gas_price,
+                    "gas": 200_000,
+                }
+            )
+            signed_withdraw = self._w3.eth.account.sign_transaction(
+                withdraw_tx, self._config.wallet_private_key
+            )
+            tx_hash = self._w3.eth.send_raw_transaction(signed_withdraw.raw_transaction)
+            receipt = self._w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
+
+            if receipt["status"] == 1:
+                logger.info(
+                    "引き出しリクエスト成功: amount_wei=%d, tx=%s", amount_wei, tx_hash.hex()
+                )
+                return TransactionResult(
+                    success=True,
+                    tx_hash=tx_hash.hex(),
+                    amount=amount,
+                    error=None,
+                )
+            return TransactionResult(
+                success=False,
+                tx_hash=tx_hash.hex(),
+                amount=amount,
+                error="引き出しリクエスト失敗（status=0）",
+            )
+        except Exception as exc:
+            logger.exception("withdraw 失敗: amount=%s", amount)
+            return TransactionResult(success=False, tx_hash=None, amount=amount, error=str(exc))
+
     async def get_steth_balance(self, address: str) -> Decimal:
         """stETH 残高取得（ETH単位）。"""
         self._ensure_initialized()
@@ -289,6 +402,16 @@ class DummyLidoClient(AbstractLidoClient):
             tx_hash="0x" + "ab" * 32,
             success=True,
             received_steth_wei=amount_wei,  # 1:1 ratio
+        )
+
+    async def withdraw(self, amount: Decimal, asset: str) -> TransactionResult:
+        """stETH 引き出しリクエストのシミュレーション。"""
+        logger.info("DummyLidoClient.withdraw: amount=%s %s（シミュレーション）", amount, asset)
+        return TransactionResult(
+            success=True,
+            tx_hash="0x" + "cd" * 32,
+            amount=amount,
+            error=None,
         )
 
     async def get_steth_balance(self, address: str) -> Decimal:

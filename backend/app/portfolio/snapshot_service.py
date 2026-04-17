@@ -241,8 +241,8 @@ def record_portfolio_snapshot(db: Optional[Session] = None) -> dict[str, Any]:
         logger.error("portfolio_snapshot failed: %s", exc)
         try:
             db.rollback()
-        except Exception:
-            pass
+        except Exception as rollback_exc:  # noqa: BLE001
+            logger.warning("rollback failed: %s", rollback_exc)
         raise
     finally:
         if _own_session:

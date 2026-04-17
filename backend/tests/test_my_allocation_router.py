@@ -177,7 +177,9 @@ class TestGetMyAllocation:
         mock_client = MagicMock()
         mock_client.get_account_data.return_value = _DUMMY_ACCOUNT_DATA
 
-        with patch("app.partner.allocation_service.get_default_aave_client", return_value=mock_client):
+        with patch(
+            "app.partner.allocation_service.get_default_aave_client", return_value=mock_client
+        ):
             r = client.get(
                 "/api/user/my-allocation",
                 headers={"Authorization": f"Bearer {tokens['tester']}"},

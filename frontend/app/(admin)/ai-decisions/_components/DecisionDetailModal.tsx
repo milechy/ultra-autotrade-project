@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { TradeActionBadge } from '@/components/shared/TradeActionBadge'
 import { ConfidenceBar } from '@/components/shared/ConfidenceBar'
+import { FeedbackSection } from './FeedbackSection'
 import type { AiDecision } from '../mock-data'
 
 interface DecisionDetailModalProps {
@@ -153,6 +154,9 @@ export function DecisionDetailModal({ decision, onClose }: DecisionDetailModalPr
                 ? 'Claude と GPT-4o の判定が一致しました。'
                 : 'Claude と GPT-4o の判定が不一致です。安全側の判定を採用。'}
             </div>
+
+            {/* Feedback section */}
+            <FeedbackSection decisionId={parseInt(decision.id, 10)} />
 
             {/* RAG context */}
             {decision.rag_context && (

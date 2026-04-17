@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Iterable, List, Protocol
+from typing import Any, Callable, Iterable, List, Protocol
 
 from .schemas import NotificationMessage, NotificationSeverity
 
@@ -95,8 +95,8 @@ class DatabaseNotificationSender:
     コミット後にクローズする。失敗しても本処理を止めない（fail-open）。
     """
 
-    def __init__(self, session_factory: object) -> None:
-        # session_factory: sqlalchemy.orm.sessionmaker (型をここではAnyで扱う、循環import回避)
+    def __init__(self, session_factory: Callable[[], Any]) -> None:
+        # session_factory: sqlalchemy.orm.sessionmaker (循環import回避のため Callable で型付け)
         self._session_factory = session_factory
 
     def send(self, message: NotificationMessage) -> None:

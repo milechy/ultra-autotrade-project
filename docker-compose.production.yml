@@ -1,44 +1,51 @@
 version: "3.9"
 
+# ============================================================
+# docker-compose.production.yml
+# 本番環境（app.ultra-auto-trade.com / api.ultra-auto-trade.com）
+#
+# 経緯: 2026-04-17 B案リネームにより旧 docker-compose.staging.yml を
+#       本ファイルとして正式化。コンテナ名は稼働中の *-staging のまま維持。
+#       （*-staging → *-production へのリネームは後日メンテ枠で実施）
+#
+# デプロイ: scripts/deploy_production.sh
+# 環境変数: .env.production
+# ============================================================
+#
 # NOTE: The Loki Docker logging driver must be installed on the host before starting this stack:
 #   docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
 # Verify installation with: docker plugin ls
 
 volumes:
-  ultra-state-production:
+  ultra-state:
     driver: local
-  postgres-data-production:
+  postgres-data:
     driver: local
-  loki-data-production:
+  loki-data:
     driver: local
-  ultra-log-production:
+  ultra-log-staging:
     driver: local
 
 services:
   loki:
     image: grafana/loki:2.9.0
-    container_name: ultra-autotrade-loki-production
+    container_name: ultra-autotrade-loki-staging
     ports:
-      - "127.0.0.1:3100:3100"
+      - "3100:3100"
     volumes:
       - ./docker/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
-      - loki-data-production:/loki
+      - loki-data:/loki
     command: -config.file=/etc/loki/loki-config.yaml
     restart: always
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
-        max-file: "5"
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 512M
+        max-file: "3"
 
   promtail:
     image: grafana/promtail:2.9.0
-    container_name: ultra-autotrade-promtail-production
+    container_name: ultra-autotrade-promtail-staging
     volumes:
       - ./docker/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -51,24 +58,19 @@ services:
       driver: "json-file"
       options:
         max-size: "10m"
-        max-file: "5"
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 512M
+        max-file: "3"
 
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: ultra-autotrade-postgres-production
+    container_name: ultra-autotrade-postgres-staging
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ultra}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-ultra_autotrade}
-    expose:
-      - "5432"
+    ports:
+      - "5432:5432"
     volumes:
-      - postgres-data-production:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     restart: always
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ultra}"]
@@ -83,46 +85,33 @@ services:
         loki-retries: "3"
         loki-timeout: "10s"
         loki-external-labels: "service=postgres,env=production"
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 2G
 
   backend:
-    container_name: ultra-autotrade-backend-production
+    container_name: ultra-autotrade-backend-staging
     build:
       context: .
       dockerfile: Dockerfile
     working_dir: /app/backend
     command: >
-      uvicorn app.main:app
+      sh -c "uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
-      --log-level info
+      --log-level info"
     env_file:
       - .env.production       # production 用の環境変数ファイル（Git 管理外）
     environment:
-      # DATABASE_URL は .env.production から取得（URL-encoded password 対応）
-      # POSTGRES_PASSWORD に特殊文字(@等)が含まれる場合、ここで直接構築すると
-      # psycopg2 が URL パースに失敗するため env_file に委譲する
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade}
       REBALANCE_SHADOW_MODE: "false"
     ports:
-      - "127.0.0.1:8000:8000"
+      - "8000:8000"
     volumes:
-      - ultra-state-production:/var/run/ultra:rw
+      - ultra-state:/var/run/ultra:rw
       - ./backend/data:/app/backend/data:rw
-      - ultra-log-production:/var/log/ultra-autotrade
+      - ultra-log-staging:/var/log/ultra-autotrade
     depends_on:
       postgres:
         condition: service_healthy
     restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
     logging:
       driver: loki
       options:
@@ -131,14 +120,26 @@ services:
         loki-retries: "3"
         loki-timeout: "10s"
         loki-external-labels: "service=backend,env=production"
-    deploy:
-      resources:
-        limits:
-          cpus: "2.0"
-          memory: 2G
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ultra-autotrade-cloudflared-staging
+    command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    network_mode: "host"
+    env_file:
+      - .env.production
+    depends_on:
+      - backend
+      - frontend
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
-    container_name: ultra-autotrade-frontend-production
+    container_name: ultra-autotrade-frontend-staging
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -157,11 +158,12 @@ services:
         NEXT_PUBLIC_OPTIMISM_RPC: ${NEXT_PUBLIC_OPTIMISM_RPC:-}
         NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
         NEXT_PUBLIC_LIFF_ID: ${NEXT_PUBLIC_LIFF_ID:-}
+        NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}
     environment:
       NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api.ultra-auto-trade.com}
       BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://backend:8000}
     ports:
-      - "127.0.0.1:3000:3000"
+      - "3000:3000"
     depends_on:
       - backend
     restart: always
@@ -173,8 +175,3 @@ services:
         loki-retries: "3"
         loki-timeout: "10s"
         loki-external-labels: "service=frontend,env=production"
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 1G

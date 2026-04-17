@@ -1,8 +1,18 @@
 # 21_production_environment_config.md
-Ultra AutoTrade – Production 環境設定ガイド
+Ultra AutoTrade – Production 環境設定ガイド（2026-04-17 B案リネーム後）
 
 本ドキュメントは、Ultra AutoTrade の **production（本番）環境** で使用する  
 `.env.production` の設定項目と運用ポリシーを整理したものです。
+
+### Production環境の定義（2026-04-17以降）
+- **URL**: app.ultra-auto-trade.com / api.ultra-auto-trade.com
+- **compose**: `docker-compose.production.yml`（旧 `docker-compose.staging.yml` を正式化）
+- **env**: `.env.production`（旧 `.env.staging` をリネーム）
+- **deploy**: `scripts/deploy_production.sh`（旧 `scripts/deploy_staging.sh` をリネーム）
+- **コンテナ名**: `*-staging`（稼働中のまま維持。後日メンテ枠でリネーム予定）
+- **DB**: `ultra_autotrade`
+- **ポート**: frontend 0.0.0.0:3000 / backend 0.0.0.0:8000 / postgres 0.0.0.0:5432
+- **Shadow Mode**: `REBALANCE_SHADOW_MODE=false`（実トレード有効）
 
 - すべての資金が **リアル資産**
 - 誤設定 = 直接的な資金リスク

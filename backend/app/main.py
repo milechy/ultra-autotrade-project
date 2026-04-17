@@ -36,6 +36,7 @@ from app.aave.rebalance_router import router as rebalance_router
 from app.aave.router import router as aave_router
 from app.aave.transparency_router import router as transparency_router
 from app.ai.decisions_router import router as ai_decisions_router
+from app.ai.feedback_router import router as ai_feedback_router
 from app.ai.router import router as ai_router
 from app.api.alias_router import router as alias_router
 from app.api.automation_dashboard import router as automation_dashboard_router
@@ -47,6 +48,7 @@ from app.billing.router import router as billing_router
 from app.bots.router import router as octobot_router
 from app.data_feeds.finance_feed import start_finance_background_task
 from app.data_feeds.geopolitical import start_geo_risk_background_task
+from app.data_feeds.mmt_feed import start_mmt_background_task
 from app.data_feeds.news_feed import start_news_background_task
 from app.data_feeds.router import router as data_feeds_router
 from app.database import init_db
@@ -65,6 +67,9 @@ from app.partner.allocation_router import router as allocation_router
 from app.partner.router import router as partner_router
 from app.portfolio.router import router as portfolio_router
 from app.proposals.router import router as proposals_router
+from app.protocols.lido.router import router as lido_router
+from app.protocols.pendle.router import router as pendle_router
+from app.protocols.risk.router import router as protocol_health_router
 from app.reports.router import router as reports_router
 from app.rss.router import router as rss_router
 from app.transactions.router import admin_router as admin_transactions_router
@@ -224,6 +229,7 @@ def create_app() -> FastAPI:
     app.include_router(reports_router, prefix="/api/reports")  # Monthly reports
     app.include_router(billing_router)
     app.include_router(ai_decisions_router)  # AI Decisions API
+    app.include_router(ai_feedback_router)  # AI Feedback API (Layer 4)
     app.include_router(transactions_router)  # Transactions API
     app.include_router(admin_transactions_router)  # Admin Transactions API
     app.include_router(proposals_router)  # Proposals API
@@ -232,6 +238,9 @@ def create_app() -> FastAPI:
     app.include_router(alias_router)  # API aliases (/api/safety-score etc.)
     app.include_router(notification_router)  # Notifications (Phase PWA)
     app.include_router(notification_api_router)  # Notifications /api/* alias (Phase PWA)
+    app.include_router(lido_router)  # Lido Finance (Phase 2)
+    app.include_router(pendle_router)  # Pendle Finance (Phase 2)
+    app.include_router(protocol_health_router)  # Protocol Health Monitor (Phase 2)
 
     # Register global error handlers (production safety)
     register_error_handlers(app)
@@ -364,6 +373,16 @@ def create_app() -> FastAPI:
             howl_interval = int(os.getenv("HOWL_INTERVAL_HOURS", "6"))
             asyncio.create_task(start_howl_background_task(interval_hours=howl_interval))
             logger.info("HOWL review background task started (interval=%dh)", howl_interval)
+            from app.automation.scheduled_tasks import learning_loop  # noqa: PLC0415
+
+            learning_interval = int(os.getenv("LEARNING_INTERVAL_HOURS", "6")) * 3600
+            asyncio.create_task(learning_loop(interval_seconds=learning_interval))
+            logger.info("AI learning background task started (interval=%ds)", learning_interval)
+            mmt_enabled = os.getenv("MMT_API_ENABLED", "false").lower() in ("true", "1", "yes")
+            if mmt_enabled:
+                mmt_interval = int(os.getenv("MMT_UPDATE_INTERVAL", "1800")) // 60
+                asyncio.create_task(start_mmt_background_task(interval_minutes=mmt_interval))
+                logger.info("MMT data feed started (interval: %ds)", mmt_interval * 60)
         except BaseException as exc:
             logger.error("Failed to start data feed background tasks: %s", exc)
 

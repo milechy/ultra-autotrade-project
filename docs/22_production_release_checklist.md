@@ -1,8 +1,14 @@
 # 22_production_release_checklist.md
 Ultra AutoTrade – Production リリース前チェックリスト
 
-> 最終更新: 2026-04-06  
-> 本ドキュメントは現在の実装状態（2026-04-06時点）を反映している。BVI法人なしでパートナーが実資金運用する現状に合わせて更新済み。
+> 最終更新: 2026-04-17  
+> 2026-04-17: B案リネームに伴いデプロイスクリプト・composeファイル名を更新。
+
+### 環境とスクリプトの対応（2026-04-17以降）
+| 環境 | compose | env | deploy script |
+|------|---------|-----|---------------|
+| production | `docker-compose.production.yml` | `.env.production` | `scripts/deploy_production.sh` |
+| staging | `docker-compose.staging.yml` | `.env.staging` | `scripts/deploy_staging.sh` |
 
 ---
 

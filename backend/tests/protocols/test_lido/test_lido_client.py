@@ -58,6 +58,28 @@ class TestDummyLidoClient:
         assert type(apr) is Decimal
         assert type(ratio) is Decimal
 
+    @pytest.mark.asyncio
+    async def test_withdraw_returns_success(self, dummy_client: DummyLidoClient) -> None:
+        """DummyLidoClient.withdraw は成功を返すこと。"""
+        result = await dummy_client.withdraw(Decimal("0.5"), "stETH")
+        assert result.success is True
+        assert result.tx_hash is not None
+        assert result.tx_hash.startswith("0x")
+        assert result.error is None
+
+    @pytest.mark.asyncio
+    async def test_withdraw_amount_preserved(self, dummy_client: DummyLidoClient) -> None:
+        """withdraw の amount が TransactionResult に保持されること。"""
+        amount = Decimal("1.23")
+        result = await dummy_client.withdraw(amount, "stETH")
+        assert result.amount == amount
+
+    @pytest.mark.asyncio
+    async def test_withdraw_eth_asset_accepted(self, dummy_client: DummyLidoClient) -> None:
+        """DummyLidoClient は ETH アセットも受け付けること。"""
+        result = await dummy_client.withdraw(Decimal("0.1"), "ETH")
+        assert result.success is True
+
 
 class TestGetLidoClient:
     def test_sandbox_returns_dummy_client(self) -> None:

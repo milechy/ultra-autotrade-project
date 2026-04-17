@@ -5,6 +5,9 @@
 ユーザーモデル定義。
 
 docs/13_security_design.md に準拠したセキュリティ要件を満たす。
+
+ALTER TABLE users ADD COLUMN tier VARCHAR(20) NOT NULL DEFAULT 'GENERAL';
+ALTER TABLE users ADD COLUMN last_judgment_at TIMESTAMP WITH TIME ZONE NULL;
 """
 
 from datetime import datetime, timezone
@@ -25,6 +28,13 @@ class UserRole(str, Enum):
     PARTNER = "partner"
     EDITOR = "editor"
     VIEWER = "viewer"
+
+
+class InvestmentTier(str, Enum):
+    """投資ティア（二層手数料モデル）。"""
+
+    GENERAL = "GENERAL"  # 〜300万円（〜$20,000）
+    UPPER = "UPPER"  # 300万円〜（$20,000〜）
 
 
 class User(Base):
@@ -87,6 +97,12 @@ class User(Base):
     )
     invited_by: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True, default=None
+    )
+    tier: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=InvestmentTier.GENERAL.value
+    )
+    last_judgment_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
     )
 
     def __repr__(self) -> str:

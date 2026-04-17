@@ -12,6 +12,7 @@ const adminNavLinks = [
   { href: "/reports", label: "レポート" },
   { href: "/knowledge", label: "ナレッジ" },
   { href: "/ai-decisions", label: "AI判定" },
+  { href: "/ai-learning", label: "AI学習" },
   { href: "/protocols", label: "プロトコル" },
   { href: "/events", label: "データ" },
   { href: "/trades", label: "取引所管理" },
@@ -22,7 +23,9 @@ const adminNavLinks = [
 const partnerNavLinks: Array<{ href: string; label: string; highlight?: boolean }> = [
   { href: "/partner/dashboard", label: "ダッシュボード" },
   { href: "/partner/users", label: "テスター管理" },
+  { href: "/partner/proposals", label: "AI提案" },
   { href: "/partner/notifications", label: "通知ログ" },
+  { href: "/partner/settings", label: "設定" },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {

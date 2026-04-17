@@ -22,8 +22,10 @@ from app.ai.schemas import (  # noqa: E402
     LLMProvider,
     TradeAction,
 )
-from app.auth.models import User  # noqa: E402
+from app.auth.models import InvestmentTier, User  # noqa: E402
 from app.automation.ai_judgment_scheduler import (  # noqa: E402
+    _get_tier_interval_hours,
+    _is_user_due_for_judgment,
     ai_judgment_loop,
     get_scheduler_status,
     run_ai_judgment_job,
@@ -78,13 +80,18 @@ def _make_cross_validation_result(action: TradeAction) -> CrossValidationResult:
     )
 
 
-def _add_active_user(session, email: str = "user@example.com") -> User:
+def _add_active_user(
+    session,
+    email: str = "user@example.com",
+    execution_policy: str = "require_approval",
+) -> User:
     """アクティブなテストユーザーを追加するヘルパー。"""
     user = User(
         email=email,
         username=email.split("@")[0],
         hashed_password="hashed",
         is_active=True,
+        execution_policy=execution_policy,
     )
     session.add(user)
     session.flush()
@@ -477,3 +484,242 @@ def test_run_job_degraded_context_has_required_keys(db_session):
     ctx = call_kwargs.kwargs.get("market_context")
     assert ctx["geopolitical_events"] == []
     assert ctx["market_data"] == {}
+
+
+# ---------------------------------------------------------------------------
+# execution_policy フィルタリングのテスト
+# ---------------------------------------------------------------------------
+
+
+def test_buy_creates_proposal_only_for_require_approval_users(db_session):
+    """BUY 判定時、execution_policy='require_approval' のユーザーのみ Proposal が作成されること。"""
+    _add_active_user(db_session, "approval@example.com", execution_policy="require_approval")
+    _add_active_user(db_session, "auto@example.com", execution_policy="auto_execute")
+    _add_active_user(db_session, "proposal@example.com", execution_policy="proposal_only")
+    db_session.commit()
+
+    mock_result = _make_cross_validation_result(TradeAction.BUY)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        result = run_ai_judgment_job(db=db_session)
+
+    assert result["proposals_created"] == 1
+    proposals = db_session.scalars(select(Proposal)).all()
+    assert len(proposals) == 1
+    assert proposals[0].user_id is not None
+
+
+def test_auto_execute_user_gets_no_proposal_on_buy(db_session):
+    """auto_execute ユーザーには BUY 判定でも Proposal が作成されないこと。"""
+    _add_active_user(db_session, "auto@example.com", execution_policy="auto_execute")
+    db_session.commit()
+
+    mock_result = _make_cross_validation_result(TradeAction.BUY)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        result = run_ai_judgment_job(db=db_session)
+
+    assert result["proposals_created"] == 0
+    proposals = db_session.scalars(select(Proposal)).all()
+    assert len(proposals) == 0
+
+
+# ---------------------------------------------------------------------------
+# ティア別間隔のテスト（B-4）
+# ---------------------------------------------------------------------------
+
+
+def test_get_tier_interval_hours_upper_default():
+    """UPPER ティアのデフォルト間隔は 4 時間であること。"""
+    assert _get_tier_interval_hours(InvestmentTier.UPPER.value) == 4
+
+
+def test_get_tier_interval_hours_general_default():
+    """GENERAL ティアのデフォルト間隔は 8 時間であること。"""
+    assert _get_tier_interval_hours(InvestmentTier.GENERAL.value) == 8
+
+
+def test_get_tier_interval_hours_env_override(monkeypatch):
+    """環境変数で間隔を上書きできること。"""
+    monkeypatch.setenv("AI_JUDGMENT_INTERVAL_HOURS_UPPER", "6")
+    monkeypatch.setenv("AI_JUDGMENT_INTERVAL_HOURS_GENERAL", "12")
+    assert _get_tier_interval_hours(InvestmentTier.UPPER.value) == 6
+    assert _get_tier_interval_hours(InvestmentTier.GENERAL.value) == 12
+
+
+def test_is_user_due_first_time():
+    """last_judgment_at が None のユーザーは常に判定対象。"""
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    user = User(
+        email="first@example.com",
+        username="first",
+        hashed_password="x",
+        tier=InvestmentTier.GENERAL.value,
+        last_judgment_at=None,
+    )
+    now = datetime.now(timezone.utc)
+    assert _is_user_due_for_judgment(user, now) is True
+
+
+def test_is_user_due_upper_within_interval():
+    """UPPER ユーザーが 4 時間未満の場合はスキップ。"""
+    from datetime import datetime, timedelta, timezone  # noqa: PLC0415
+
+    now = datetime.now(timezone.utc)
+    user = User(
+        email="upper@example.com",
+        username="upper",
+        hashed_password="x",
+        tier=InvestmentTier.UPPER.value,
+        last_judgment_at=now - timedelta(hours=3),
+    )
+    assert _is_user_due_for_judgment(user, now) is False
+
+
+def test_is_user_due_upper_past_interval():
+    """UPPER ユーザーが 4 時間以上経過した場合は判定対象。"""
+    from datetime import datetime, timedelta, timezone  # noqa: PLC0415
+
+    now = datetime.now(timezone.utc)
+    user = User(
+        email="upper2@example.com",
+        username="upper2",
+        hashed_password="x",
+        tier=InvestmentTier.UPPER.value,
+        last_judgment_at=now - timedelta(hours=4, minutes=1),
+    )
+    assert _is_user_due_for_judgment(user, now) is True
+
+
+def test_is_user_due_general_within_interval():
+    """GENERAL ユーザーが 8 時間未満の場合はスキップ。"""
+    from datetime import datetime, timedelta, timezone  # noqa: PLC0415
+
+    now = datetime.now(timezone.utc)
+    user = User(
+        email="general@example.com",
+        username="general",
+        hashed_password="x",
+        tier=InvestmentTier.GENERAL.value,
+        last_judgment_at=now - timedelta(hours=5),
+    )
+    assert _is_user_due_for_judgment(user, now) is False
+
+
+def test_is_user_due_general_past_interval():
+    """GENERAL ユーザーが 8 時間以上経過した場合は判定対象。"""
+    from datetime import datetime, timedelta, timezone  # noqa: PLC0415
+
+    now = datetime.now(timezone.utc)
+    user = User(
+        email="general2@example.com",
+        username="general2",
+        hashed_password="x",
+        tier=InvestmentTier.GENERAL.value,
+        last_judgment_at=now - timedelta(hours=8, minutes=1),
+    )
+    assert _is_user_due_for_judgment(user, now) is True
+
+
+def test_buy_skips_general_user_within_interval(db_session):
+    """BUY 判定時、GENERAL ユーザーが 8 時間未満の場合は Proposal を作成しないこと。"""
+    from datetime import datetime, timedelta, timezone  # noqa: PLC0415
+
+    recent = datetime.now(timezone.utc) - timedelta(hours=5)
+    user = User(
+        email="general_recent@example.com",
+        username="general_recent",
+        hashed_password="x",
+        is_active=True,
+        execution_policy="require_approval",
+        tier=InvestmentTier.GENERAL.value,
+        last_judgment_at=recent,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    mock_result = _make_cross_validation_result(TradeAction.BUY)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        result = run_ai_judgment_job(db=db_session)
+
+    assert result["proposals_created"] == 0
+
+
+def test_buy_includes_upper_user_within_general_interval(db_session):
+    """BUY 判定時、UPPER ユーザーは 4 時間経過で Proposal が作成されること。"""
+    from datetime import datetime, timedelta, timezone  # noqa: PLC0415
+
+    past_4h = datetime.now(timezone.utc) - timedelta(hours=4, minutes=5)
+    user = User(
+        email="upper_due@example.com",
+        username="upper_due",
+        hashed_password="x",
+        is_active=True,
+        execution_policy="require_approval",
+        tier=InvestmentTier.UPPER.value,
+        last_judgment_at=past_4h,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    mock_result = _make_cross_validation_result(TradeAction.BUY)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        result = run_ai_judgment_job(db=db_session)
+
+    assert result["proposals_created"] == 1
+
+
+def test_buy_updates_last_judgment_at(db_session):
+    """Proposal 作成後、ユーザーの last_judgment_at が更新されること。"""
+    user = User(
+        email="update_check@example.com",
+        username="update_check",
+        hashed_password="x",
+        is_active=True,
+        execution_policy="require_approval",
+        tier=InvestmentTier.UPPER.value,
+        last_judgment_at=None,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    mock_result = _make_cross_validation_result(TradeAction.BUY)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        run_ai_judgment_job(db=db_session)
+
+    db_session.refresh(user)
+    assert user.last_judgment_at is not None

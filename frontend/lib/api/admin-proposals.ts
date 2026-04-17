@@ -2,7 +2,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 // frontend/lib/api/admin-proposals.ts
 
-import { getJson } from "./http";
+import { getJson, postJson } from "./http";
 
 export interface AdminProposal {
   id: number;
@@ -14,6 +14,8 @@ export interface AdminProposal {
   asset: string;
   amount: string;
   amount_usd: string;
+  fee_rate: string | null;
+  fee_amount: string | null;
   reason: string;
   expected_hf_after: string | null;
   estimated_gas_usd: string | null;
@@ -79,6 +81,28 @@ export async function listAdminProposals(
   const qs = params.toString();
   return await getJson<AdminProposalListResponse>(
     `/api/proposals/admin/all${qs ? `?${qs}` : ""}`,
+    { headers: authHeaders(token) }
+  );
+}
+
+export async function approveProposal(
+  id: number,
+  token: string
+): Promise<AdminProposal> {
+  return await postJson<AdminProposal>(
+    `/api/proposals/${id}/approve`,
+    {},
+    { headers: authHeaders(token) }
+  );
+}
+
+export async function rejectProposal(
+  id: number,
+  token: string
+): Promise<AdminProposal> {
+  return await postJson<AdminProposal>(
+    `/api/proposals/${id}/reject`,
+    {},
     { headers: authHeaders(token) }
   );
 }

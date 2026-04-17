@@ -10,6 +10,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
+import httpx
+
 from app.protocols.base import (
     BaseProtocolClient,
     ProtocolHealthMetrics,
@@ -262,6 +264,120 @@ class DummyPendleClient(AbstractPendleClient):
         return self._YT_PRICE
 
 
+class PendleWebClient(AbstractPendleClient):
+    """Pendle Finance 本番 REST API クライアント（読み取り専用）。
+
+    Pendle V2 API（api-v2.pendle.finance）からマーケット情報・APY・PT/YT価格を取得する。
+    オンチェーン操作（mint/redeem）は Phase 3 以降に対応。
+    API 接続失敗時はフォールバック値を返し、500 を発生させない（fail-open 設計）。
+    """
+
+    _API_BASE = "https://api-v2.pendle.finance/core/v1"
+    _CHAIN_ID_MAP: dict[str, str] = {
+        "arbitrum": "42161",
+        "ethereum": "1",
+        "polygon": "137",
+        "sepolia": "421614",  # Arbitrum Sepolia
+    }
+    _REQUEST_TIMEOUT = 10.0
+
+    def __init__(self, config: PendleConfig) -> None:
+        self._config = config
+        self._chain_id = self._CHAIN_ID_MAP.get(config.chain, "42161")
+        logger.info(
+            "PendleWebClient initialized (chain=%s, chain_id=%s)",
+            config.chain,
+            self._chain_id,
+        )
+
+    async def _fetch_market_data(self, market_address: str) -> dict[str, Any]:
+        """Pendle API からマーケットデータを取得する。"""
+        url = f"{self._API_BASE}/{self._chain_id}/markets/{market_address}"
+        async with httpx.AsyncClient(timeout=self._REQUEST_TIMEOUT) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            data: dict[str, Any] = response.json()
+            return data
+
+    async def get_market_info(self, market_address: str) -> PendleMarketInfo:
+        """Pendle API からマーケット情報を取得する。API 失敗時はフォールバック値を返す。"""
+        try:
+            data = await self._fetch_market_data(market_address)
+
+            # 満期日時（UNIX タイムスタンプ）
+            expiry_ts = int(data.get("expiry", 0))
+            maturity = datetime.fromtimestamp(expiry_ts, tz=timezone.utc)
+            days_to_maturity = max(0, (maturity - datetime.now(tz=timezone.utc)).days)
+
+            # implied APY は小数形式（0.052 = 5.2%）→ % 変換
+            implied_apy_raw = data.get("impliedApy", 0)
+            implied_apy = Decimal(str(implied_apy_raw)) * Decimal("100")
+
+            # PT/YT 価格
+            pt_price = Decimal(str(data.get("pt", {}).get("price", {}).get("usd", "0.95")))
+            yt_price = Decimal(str(data.get("yt", {}).get("price", {}).get("usd", "0.05")))
+
+            # TVL（USD）
+            tvl_usd = Decimal(str(data.get("liquidity", {}).get("usd", "0")))
+
+            # 原資産シンボル
+            underlying = data.get("underlyingAsset", {}).get("symbol", "stETH")
+
+            return PendleMarketInfo(
+                market_address=market_address,
+                underlying_asset=underlying,
+                maturity=maturity,
+                days_to_maturity=days_to_maturity,
+                implied_apy=implied_apy,
+                pt_price=pt_price,
+                yt_price=yt_price,
+                tvl_usd=tvl_usd,
+            )
+        except Exception as exc:
+            logger.warning("get_market_info API 失敗、フォールバック値を使用: %s", exc)
+            maturity = datetime.now(tz=timezone.utc) + timedelta(days=30)
+            return PendleMarketInfo(
+                market_address=market_address,
+                underlying_asset="stETH",
+                maturity=maturity,
+                days_to_maturity=30,
+                implied_apy=Decimal("5.2"),
+                pt_price=Decimal("0.95"),
+                yt_price=Decimal("0.05"),
+                tvl_usd=Decimal("0"),
+            )
+
+    async def get_pt_price(self, market_address: str) -> Decimal:
+        """PT 価格を取得する。"""
+        info = await self.get_market_info(market_address)
+        return info.pt_price
+
+    async def get_yt_price(self, market_address: str) -> Decimal:
+        """YT 価格を取得する。"""
+        info = await self.get_market_info(market_address)
+        return info.yt_price
+
+    async def mint_sy(self, token_address: str, amount: Decimal) -> dict[str, Any]:
+        """SY ミント（Phase 2 PoC: オンチェーン操作は未実装）。"""
+        logger.warning("PendleWebClient.mint_sy: Phase 2 PoC のためオンチェーン操作を拒否")
+        return {"success": False, "error": "オンチェーン操作は Phase 3 以降に対応予定です"}
+
+    async def mint_pt_yt(self, sy_amount: Decimal, market_address: str) -> dict[str, Any]:
+        """PT/YT ミント（Phase 2 PoC: オンチェーン操作は未実装）。"""
+        logger.warning("PendleWebClient.mint_pt_yt: Phase 2 PoC のためオンチェーン操作を拒否")
+        return {"success": False, "error": "オンチェーン操作は Phase 3 以降に対応予定です"}
+
+    async def redeem_pt(self, pt_amount: Decimal, market_address: str) -> dict[str, Any]:
+        """PT リデーム（Phase 2 PoC: オンチェーン操作は未実装）。"""
+        logger.warning("PendleWebClient.redeem_pt: Phase 2 PoC のためオンチェーン操作を拒否")
+        return {"success": False, "error": "オンチェーン操作は Phase 3 以降に対応予定です"}
+
+    async def redeem_yt(self, yt_amount: Decimal, market_address: str) -> dict[str, Any]:
+        """YT リデーム（Phase 2 PoC: オンチェーン操作は未実装）。"""
+        logger.warning("PendleWebClient.redeem_yt: Phase 2 PoC のためオンチェーン操作を拒否")
+        return {"success": False, "error": "オンチェーン操作は Phase 3 以降に対応予定です"}
+
+
 def get_pendle_client(config: PendleConfig) -> AbstractPendleClient:
     """設定に基づいて適切な PendleClient を返す。"""
     import os  # noqa: PLC0415
@@ -273,8 +389,5 @@ def get_pendle_client(config: PendleConfig) -> AbstractPendleClient:
     if config.sandbox:
         logger.warning("Using DummyClient — not for production")
         return DummyPendleClient(config)
-    # 本番実装は web3.py ベースの PendleClient（Phase 3 以降）
-    logger.warning(
-        "sandbox=False ですが PendleClient（本番）は未実装のため DummyPendleClient を返します"
-    )
-    return DummyPendleClient(config)
+    logger.info("Using PendleWebClient (Pendle REST API)")
+    return PendleWebClient(config)

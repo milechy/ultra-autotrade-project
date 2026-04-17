@@ -534,7 +534,9 @@ class TestGetTesters:
         admin_token = _register_admin(client)
         partner_id = _get_user_id(client, admin_token)
 
-        uid = _create_viewer(client, admin_token, session_factory, partner_id, "tester1@x.com", "tester1")
+        uid = _create_viewer(
+            client, admin_token, session_factory, partner_id, "tester1@x.com", "tester1"
+        )
 
         r = client.get("/api/partner/testers", headers={"Authorization": f"Bearer {admin_token}"})
         assert r.status_code == 200
@@ -553,7 +555,12 @@ class TestGetTesters:
         # Create a user with no invited_by
         r = client.post(
             "/users",
-            json={"email": "stranger@x.com", "username": "stranger", "password": "pass1234!", "role": "viewer"},
+            json={
+                "email": "stranger@x.com",
+                "username": "stranger",
+                "password": "pass1234!",
+                "role": "viewer",
+            },
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert r.status_code == 201

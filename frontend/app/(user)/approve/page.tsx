@@ -71,7 +71,7 @@ type ProposalState = {
 }
 
 export default function ApprovePage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { isAuthenticated, isLoading: authLoading, isPartner } = useAuth()
   const router = useRouter()
   const [proposals, setProposals] = useState<Proposal[]>([])
   const [recentApprovals, setRecentApprovals] = useState<RecentApproval[]>([])
@@ -101,8 +101,10 @@ export default function ApprovePage() {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace('/login?redirect=/user/approve')
+    } else if (!authLoading && isAuthenticated && !isPartner) {
+      router.replace('/user/dashboard')
     }
-  }, [authLoading, isAuthenticated, router])
+  }, [authLoading, isAuthenticated, isPartner, router])
 
   useEffect(() => {
     if (isAuthenticated) { fetchData() }

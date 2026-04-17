@@ -21,11 +21,11 @@ import { useAuth } from '@/lib/auth'
 import { useAutomationStatus } from '@/components/user/UserProviders'
 
 export function EmergencyStopFloat() {
-  const { token, isAdmin } = useAuth()
+  const { token, isAdmin, isPartner } = useAuth()
   const { isStopped, refreshStatus } = useAutomationStatus()
   const [isLoading, setIsLoading] = useState(false)
 
-  if (!isAdmin) return null
+  if (!isAdmin && !isPartner) return null
 
   const handleStop = async () => {
     if (!token) return
@@ -54,8 +54,9 @@ export function EmergencyStopFloat() {
   }
 
   if (isStopped) {
-    return (
-      <>
+    // admin は再開ボタン付きバナーを表示
+    if (isAdmin) {
+      return (
         <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white text-center text-sm font-semibold py-2 px-4 flex items-center justify-center gap-3">
           <OctagonX className="h-4 w-4 shrink-0" />
           <span>運用を停止中です</span>
@@ -107,7 +108,14 @@ export function EmergencyStopFloat() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
-      </>
+      )
+    }
+    // partner は再開ボタンなしのバナーのみ
+    return (
+      <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white text-center text-sm font-semibold py-2 px-4 flex items-center justify-center gap-3">
+        <OctagonX className="h-4 w-4 shrink-0" />
+        <span>運用を停止中です（再開は管理者のみ）</span>
+      </div>
     )
   }
 
