@@ -18,11 +18,11 @@ export function PrivyRootClient({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
   if (!isPrivyConfigured) {
     return (
-      <QueryClientProvider client={queryClient}>
-        <WagmiProvider config={wagmiConfig}>
+      <WagmiProvider config={wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
           {children}
-        </WagmiProvider>
-      </QueryClientProvider>
+        </QueryClientProvider>
+      </WagmiProvider>
     )
   }
   return (
@@ -41,9 +41,11 @@ export function PrivyRootClient({ children }: { children: ReactNode }) {
         },
       }}
     >
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
+      <WagmiProvider config={wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      </WagmiProvider>
     </PrivyProvider>
   )
 }
