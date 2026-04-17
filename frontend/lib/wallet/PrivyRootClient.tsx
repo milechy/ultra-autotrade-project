@@ -7,10 +7,16 @@ import { base, baseSepolia } from 'wagmi/chains'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactNode, useState } from 'react'
 
-const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || 'clplaceholder000000000000000000000'
+const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || ''
+
+// Skip PrivyProvider when App ID is absent — JWT auth remains fully functional.
+const isPrivyConfigured = appId && appId !== 'clplaceholder000000000000000000000'
 
 export function PrivyRootClient({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
+  if (!isPrivyConfigured) {
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  }
   return (
     <PrivyProvider
       appId={appId}
