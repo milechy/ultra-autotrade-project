@@ -13,22 +13,24 @@ for _arg in "$@"; do
   fi
 done
 
-# Ultra AutoTrade – staging ワンショットデプロイスクリプト
+# Ultra AutoTrade – production ワンショットデプロイスクリプト
+# (2026-04-17 B案リネーム: 旧 deploy_staging.sh → deploy_production.sh)
 #
 # 使い方:
-#   ./scripts/deploy_staging.sh                  # フルデプロイ
-#   ./scripts/deploy_staging.sh --frontend-only  # フロントエンドのみ
-#   ./scripts/deploy_staging.sh --backend-only   # バックエンドのみ
-#   ./scripts/deploy_staging.sh --no-build       # ビルドなし（up -d のみ）
-#   ./scripts/deploy_staging.sh --help
+#   ./scripts/deploy_production.sh                  # フルデプロイ
+#   ./scripts/deploy_production.sh --frontend-only  # フロントエンドのみ
+#   ./scripts/deploy_production.sh --backend-only   # バックエンドのみ
+#   ./scripts/deploy_production.sh --no-build       # ビルドなし（up -d のみ）
+#   ./scripts/deploy_production.sh --help
 
 # ───────────────────────────────────────────────
 # 定数
 # ───────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-COMPOSE_FILE="docker-compose.staging.yml"
-ENV_FILE=".env.staging"
+COMPOSE_FILE="docker-compose.production.yml"
+ENV_FILE=".env.production"
+# コンテナ名は稼働中の *-staging のまま維持（Phase 2方針: 名前変更は後日メンテ枠で実施）
 FRONTEND_CONTAINER="ultra-autotrade-frontend-staging"
 BACKEND_CONTAINER="ultra-autotrade-backend-staging"
 POSTGRES_CONTAINER="ultra-autotrade-postgres-staging"
@@ -51,10 +53,10 @@ slack_notify() {
 
 show_help() {
   cat <<'EOF'
-deploy_staging.sh — Ultra AutoTrade staging デプロイ
+deploy_production.sh — Ultra AutoTrade production デプロイ
 
 使い方:
-  ./scripts/deploy_staging.sh [OPTIONS]
+  ./scripts/deploy_production.sh [OPTIONS]
 
 オプション:
   --frontend-only   フロントエンドのみリビルド＆再起動
@@ -64,7 +66,7 @@ deploy_staging.sh — Ultra AutoTrade staging デプロイ
 
 注意:
   - /opt/ultra-autotrade（または git root）から実行すること
-  - .env.staging が同ディレクトリに存在していること
+  - .env.production が同ディレクトリに存在していること
 EOF
   exit 0
 }
@@ -140,10 +142,10 @@ log "docker compose コマンド: ${DC}"
 # ───────────────────────────────────────────────
 # 共通ステップ 1-4
 # ───────────────────────────────────────────────
-log "git pull origin dev"
-git pull origin dev
+log "git pull origin main"
+git pull origin main
 
-log ".env.staging を読み込み（ビルド ARG 用）"
+log ".env.production を読み込み（ビルド ARG 用）"
 # shellcheck disable=SC2046
 export $(grep -v '^#' "${ENV_FILE}" | grep '=' | xargs)
 
@@ -153,7 +155,7 @@ export $(grep -v '^#' "${ENV_FILE}" | grep '=' | xargs)
 on_failure() {
   err "デプロイ失敗。コンテナログ末尾:"
   ${DC} -f "${COMPOSE_FILE}" logs --tail=20 2>/dev/null || true
-  slack_notify "❌ [deploy_staging.sh] デプロイ失敗\n原因: ヘルスチェックタイムアウトまたはビルドエラー"
+  slack_notify "❌ [deploy_production.sh] デプロイ失敗\n原因: ヘルスチェックタイムアウトまたはビルドエラー"
   exit 1
 }
 trap on_failure ERR
@@ -360,7 +362,8 @@ check_auth_errors() {
 # 検証 5: CORS preflight 自動検証
 check_cors() {
   log "=== CORS preflight チェック ==="
-  local frontend_origin="https://app.ultra-auto-trade.com"
+  local frontend_origin="${CORS_ORIGINS:-https://app.ultra-auto-trade.com}"
+  frontend_origin="${frontend_origin%%,*}"  # 最初のオリジンのみ使用
   local cors_header
   cors_header=$(curl -s -I \
     -H "Origin: ${frontend_origin}" \
@@ -425,6 +428,6 @@ log "=== 最終ヘルスチェック 完了 ==="
 log "コンテナ状態:"
 ${DC} -f "${COMPOSE_FILE}" ps
 
-slack_notify "✅ [deploy_staging.sh] デプロイ成功\n環境: staging\nブランチ: $(git rev-parse --abbrev-ref HEAD) ($(git rev-parse --short HEAD))"
+slack_notify "✅ [deploy_production.sh] デプロイ成功\n環境: production\nブランチ: $(git rev-parse --abbrev-ref HEAD) ($(git rev-parse --short HEAD))"
 
 log "デプロイ完了"
