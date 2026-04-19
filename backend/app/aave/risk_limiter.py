@@ -190,7 +190,7 @@ def notify_slack_if_custom(limits: EffectiveLimits) -> None:
     payload = json.dumps({"text": message}).encode("utf-8")
 
     try:
-        req = urllib.request.Request(
+        req = urllib.request.Request(  # noqa: S310
             webhook_url,
             data=payload,
             headers={"Content-Type": "application/json"},
