@@ -15,6 +15,8 @@ from typing import Optional
 
 from app.utils.config import get_env
 
+from .risk_limiter import get_effective_limits
+
 
 @dataclass
 class AaveSettings:
@@ -102,9 +104,11 @@ def get_aave_settings() -> AaveSettings:
         "AAVE_MAX_SINGLE_TRADE_USD",
         default="100.0",  # 1トレードあたり 100 USD 相当を上限にする（デフォルト）
     )
+
+    _limits = get_effective_limits()
     min_health_factor = _get_env_decimal(
         "AAVE_MIN_HEALTH_FACTOR",
-        default="1.6",  # docs/07_aave_operation_logic.md / 15_rollback_procedures.md を意識した値
+        default=str(_limits.hf_min),
     )
     warn_health_factor = _get_env_decimal(
         "AAVE_WARN_HEALTH_FACTOR",
@@ -112,7 +116,7 @@ def get_aave_settings() -> AaveSettings:
     )
     trade_cooldown_seconds = _get_env_int(
         "AAVE_TRADE_COOLDOWN_SECONDS",
-        default=600,  # 10分
+        default=_limits.cooldown_seconds,
     )
 
     # RPC URL と秘密鍵は任意（staging 環境用）

@@ -282,6 +282,21 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.error("Failed to initialize database: %s", exc)
 
+    # --- Risk limiter startup notification (F-17a) ---
+    @app.on_event("startup")
+    async def startup_risk_limiter_notify() -> None:
+        """Notify Slack when custom risk limits are active (F-17a)."""
+        try:
+            from app.aave.risk_limiter import (  # noqa: PLC0415
+                get_effective_limits,
+                notify_slack_if_custom,
+            )
+
+            limits = get_effective_limits()
+            notify_slack_if_custom(limits)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("risk_limiter startup notification failed: %s", exc)
+
         # Validate JWT secret key strength (rejects weak keys in staging/production)
         try:
             AuthService.validate_secret_key()

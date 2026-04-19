@@ -41,6 +41,7 @@ from .rebalance_schemas import (
     RebalanceResult,
     RebalanceStatusResponse,
 )
+from .risk_limiter import get_effective_limits
 from .risk_profile import RiskProfileManager
 from .schemas import (
     AaveOperationMode,
@@ -442,27 +443,27 @@ class RebalanceService:
                 f"{self._rb_settings.min_health_factor_post}"
             )
 
-        # Single trade cap: 10% of total assets
+        # Single/daily trade caps from risk_limiter (env-configurable with hard limits)
+        _eff = get_effective_limits()
         if total_usd > _MIN_TOTAL_USD:
-            max_single_usd = total_usd * Decimal("10") / Decimal("100")
+            max_single_usd = total_usd * _eff.single_trade_pct_max / Decimal("100")
             for op in operations:
                 if op.amount_usd > max_single_usd:
                     reasons.append(
                         f"Operation {op.asset_symbol} {op.operation.value} "
-                        f"amount {op.amount_usd} USD exceeds 10% of total assets "
+                        f"amount {op.amount_usd} USD exceeds {_eff.single_trade_pct_max}% of total assets "
                         f"({max_single_usd} USD)"
                     )
 
-        # Daily trade cap: 30% of total assets (CLAUDE.md Security Rule #4)
         if total_usd > _MIN_TOTAL_USD:
-            daily_limit_usd = total_usd * Decimal("30") / Decimal("100")
+            daily_limit_usd = total_usd * _eff.daily_trade_pct_max / Decimal("100")
             now_for_daily = datetime.now(timezone.utc)
             daily_traded = self._get_daily_traded_usd(now_for_daily)
             total_ops_usd = sum(op.amount_usd for op in operations)
             if daily_traded + total_ops_usd > daily_limit_usd:
                 reasons.append(
                     f"Daily trade limit reached: {daily_traded + total_ops_usd} USD would exceed "
-                    f"30% of total assets ({daily_limit_usd} USD). "
+                    f"{_eff.daily_trade_pct_max}% of total assets ({daily_limit_usd} USD). "
                     f"Already traded today: {daily_traded} USD"
                 )
 

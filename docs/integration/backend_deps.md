@@ -7,6 +7,16 @@
 
 ## backend/app/main.py
 
+### 変更 #2: F-17a カスタムリミッター startup 通知 (PR #92 / 2026-04-19)
+- **コミット範囲**: `52043f6` (dev ブランチ, feature/risk-limiter-env-toggle マージ)
+- **変更内容**:
+  - `startup_risk_limiter_notify()` startup イベント追加
+  - `CUSTOM_LIMITER_ENABLED=true` の場合のみ Slack #ultra-auto-project に通知
+  - 既存の startup イベント群・エンドポイント登録への影響なし
+- **理由**: F-17a (Asana 1214120353855021) — カスタムリミッター有効時の startup 通知。設定ミスによる意図しない緩和状態の見落とし防止。
+- **影響範囲**: startup シーケンスのみ。`CUSTOM_LIMITER_ENABLED` 未設定時は何もしない。
+- **承認**: dev → main の通常フロー経由（PR #91）
+
 ### 変更 #1: スケジューラー デフォルト有効化 + Watchdog 統合
 - **コミット範囲**: `4fe8725` – `5b98e78` (dev ブランチ)
 - **変更内容**:

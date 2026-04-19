@@ -1,0 +1,30 @@
+name: Environment Separation Check
+
+on:
+  pull_request:
+    paths:
+      - '.env.staging'
+      - '.env.production'
+      - 'docker-compose*.yml'
+      - 'scripts/check_env_separation.sh'
+  push:
+    branches: [main, dev]
+
+jobs:
+  check-env-separation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify env separation
+        run: |
+          if [ -f .env.production.example ] && [ -f .env.staging.example ]; then
+            cp .env.production.example .env.production
+            cp .env.staging.example .env.staging
+            bash scripts/check_env_separation.sh
+          else
+            echo "::warning::.env.*.example が見つからない、検証スキップ"
+          fi
+      - name: Shellcheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
