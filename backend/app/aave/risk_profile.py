@@ -5,6 +5,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
 
+from .risk_limiter import get_effective_limits
+
 
 @dataclass
 class RiskProfile:
@@ -22,7 +24,7 @@ class ActionAllowedResult(BaseModel):
     reason: str
 
 
-_PROFILES: dict[str, RiskProfile] = {
+_BASE_PROFILES: dict[str, RiskProfile] = {
     "conservative": RiskProfile(
         mode="conservative",
         max_utilization=Decimal("0.75"),
@@ -47,9 +49,35 @@ _PROFILES: dict[str, RiskProfile] = {
 }
 
 
+def _get_profiles() -> dict[str, RiskProfile]:
+    """Return profiles, optionally relaxing min_health_factor when custom limiter is active.
+
+    Strict mode: profiles use their base min_health_factor unchanged.
+    Custom mode:  profiles allow HF down to limits.hf_min (relaxed floor for testing),
+                  but never below HF_HARD_MIN (enforced inside get_effective_limits()).
+    """
+    limits = get_effective_limits()
+    result: dict[str, RiskProfile] = {}
+    for key, base in _BASE_PROFILES.items():
+        if limits.is_custom:
+            # Relax: take the lower of base profile floor and custom limiter floor
+            effective_hf = min(base.min_health_factor, limits.hf_min)
+        else:
+            effective_hf = base.min_health_factor
+        result[key] = RiskProfile(
+            mode=base.mode,
+            max_utilization=base.max_utilization,
+            min_health_factor=effective_hf,
+            allowed_assets=base.allowed_assets,
+            min_confidence=base.min_confidence,
+        )
+    return result
+
+
 class RiskProfileManager:
     def get_profile(self, mode: str) -> RiskProfile:
-        return _PROFILES.get(mode, _PROFILES["conservative"])
+        profiles = _get_profiles()
+        return profiles.get(mode, profiles["conservative"])
 
     def is_action_allowed(
         self, mode: str, asset_symbol: str, confidence: Decimal
