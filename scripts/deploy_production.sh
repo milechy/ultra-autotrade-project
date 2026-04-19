@@ -136,6 +136,42 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
+# === Production deploy guardrails (2026-04-19 根本解決原則) ===
+# .env.production が本番固有の値を持っていることを保証する予防層。
+# 2026-04-18 sed 一斉更新インシデント再発防止。
+
+# Guard 1: .env.production 必須キー検証
+if ! grep -q '^APP_ENV=production$' .env.production; then
+  echo "❌ FAIL: .env.production に APP_ENV=production がない"
+  exit 1
+fi
+
+if grep -qE '^BYBIT_SANDBOX=true' .env.production; then
+  echo "❌ FAIL: .env.production で BYBIT_SANDBOX=true (本番は false 必須)"
+  exit 1
+fi
+
+if grep -qE '^AAVE_NETWORK=.*sepolia' .env.production; then
+  echo "❌ FAIL: .env.production で AAVE_NETWORK に sepolia 含む (本番は mainnet 必須)"
+  exit 1
+fi
+
+# Guard 2: 環境分離チェック
+bash scripts/check_env_separation.sh || {
+  echo "❌ FAIL: 環境分離チェック失敗"
+  exit 1
+}
+
+# Guard 3: compose file 指定確認
+if [[ "${COMPOSE_FILE}" != *production.yml* ]] && [[ -z "${FORCE_OVERRIDE:-}" ]]; then
+  echo "❌ FAIL: 本番デプロイは docker-compose.production.yml 必須"
+  echo "   (テスター期間の例外で staging.yml を使う場合は FORCE_OVERRIDE=1 を設定)"
+  exit 1
+fi
+
+echo "✅ All production deploy guards passed"
+# === End of guardrails ===
+
 DC=$(resolve_dc)
 log "docker compose コマンド: ${DC}"
 

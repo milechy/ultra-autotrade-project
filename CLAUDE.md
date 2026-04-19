@@ -623,6 +623,27 @@ git diff main --name-only | grep "^frontend/lib/api/" # 新しいfetch関数 →
   - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
   - `NEXT_PUBLIC_DEFAULT_CHAIN_ID`
 
+## 環境ファイル更新ルール (2026-04-19 根本解決原則)
+
+### 禁止事項
+- sed -i 等で `.env.staging` と `.env.production` を同時更新することは禁止
+  - 理由: 2026-04-18インシデントで両ファイルが完全一致状態に陥り、環境分離の意味を失った
+- `.env.production` に以下の値を設定することは禁止:
+  - `APP_ENV=staging`
+  - `BYBIT_SANDBOX=true`
+  - `AAVE_NETWORK=*sepolia*` (Phase 2メインネット移行後)
+
+### 正しい更新手順
+1. `.env.staging` を先に編集
+2. 内容を確認
+3. `.env.production` を別コマンドで編集 (値が本番固有なら差別化)
+4. `bash scripts/check_env_separation.sh` で検証
+5. コミット
+
+### CIガード
+PR作成時に `.github/workflows/env-separation-check.yml` が自動実行される。
+失敗したPRはmergeできない。
+
 ### 2026-04-15追加（本番DB操作ルール）
 
 **本番DBに対するALTER TABLE / UPDATE / DELETE等の操作手順書を生成する際、コンテナ名・DBユーザー・テーブル名を絶対に推測しない。**
