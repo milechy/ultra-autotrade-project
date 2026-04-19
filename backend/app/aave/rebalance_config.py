@@ -16,6 +16,8 @@ from decimal import Decimal, InvalidOperation
 
 from app.utils.config import get_env
 
+from .risk_limiter import get_effective_limits
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_TOKEN_SECRET = ""  # noqa: S105
@@ -135,6 +137,8 @@ def get_rebalance_settings() -> RebalanceSettings:
     raw_allocations = get_env("REBALANCE_TARGET_ALLOCATIONS", required=False)
     target_allocations = _parse_target_allocations(raw_allocations)
 
+    _limits = get_effective_limits()
+
     deviation_threshold_pct = _get_env_decimal(
         "REBALANCE_DEVIATION_THRESHOLD_PCT",
         default="5",  # 5% のズレでリバランスをトリガー
@@ -145,11 +149,11 @@ def get_rebalance_settings() -> RebalanceSettings:
     )
     min_health_factor_post = _get_env_decimal(
         "REBALANCE_MIN_HF_POST",
-        default="1.8",  # リバランス後に維持すべき最低 Health Factor
+        default=str(_limits.hf_min),
     )
     cooldown_seconds = _get_env_int(
         "REBALANCE_COOLDOWN_SECONDS",
-        default=3600,  # 1時間のクールダウン
+        default=_limits.cooldown_seconds,
     )
     confirmation_token_ttl_seconds = _get_env_int(
         "REBALANCE_TOKEN_TTL_SECONDS",
