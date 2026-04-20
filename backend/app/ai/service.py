@@ -21,7 +21,7 @@ from app.ai.judgment_log import CognitiveState
 from app.data_feeds.context import MarketContext
 from app.notion.schemas import NotionNewsItem
 
-from .config import AISettings, get_ai_settings
+from .config import DEFAULT_FALLBACK_MODEL, AISettings, get_ai_settings
 from .prompts import get_prompt_template
 from .schemas import (
     AIAnalysisResult,
@@ -391,7 +391,7 @@ class AIService:
                 )
 
         # Opus failed twice → fall back to Sonnet
-        fallback_model = getattr(settings, "ai_fallback_model", "claude-sonnet-4-20250514")
+        fallback_model = getattr(settings, "ai_fallback_model", DEFAULT_FALLBACK_MODEL)
         logger.warning(
             "Claude Opus failed after %d attempts; switching to fallback model=%s",
             _MAX_OPUS_RETRIES,

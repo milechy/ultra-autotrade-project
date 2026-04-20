@@ -247,6 +247,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["health"])
     def health_check() -> dict[str, Any]:
+        from app.ai.config import DEFAULT_CLAUDE_MODEL, DEFAULT_FALLBACK_MODEL
         from app.automation.ai_judgment_scheduler import get_scheduler_status
         from app.automation.scheduler_watchdog import compute_scheduler_health
 
@@ -268,6 +269,8 @@ def create_app() -> FastAPI:
             "next_judgment": scheduler.get("next_run"),
             "scheduler_last_error": scheduler.get("last_error"),
             "warnings": warnings,
+            "claude_model": os.getenv("AI_CLAUDE_MODEL") or DEFAULT_CLAUDE_MODEL,
+            "claude_fallback_model": os.getenv("AI_FALLBACK_MODEL") or DEFAULT_FALLBACK_MODEL,
         }
 
     # --- Database initialization (Phase12) ---
