@@ -19,7 +19,7 @@ Ultra AutoTrade の Hetzner VPS（77.42.46.155）で Docker イメージ・ビ�
 | 実行スクリプト | `scripts/docker_cleanup.sh` |
 | 実行コマンド | `docker builder prune -f` + `docker image prune -f` |
 | **禁止コマンド** | **`docker system prune -af`**（使用中イメージ削除リスク） |
-| 実行頻度 | 週次（毎週日曜 03:00 JST = 18:00 UTC 土曜） |
+| 実行頻度 | 週次（毎週日曜 03:00 JST） |
 | ログ | `/opt/ultra-autotrade/logs/docker_cleanup.log` |
 | Slack 通知 | `#ultra-auto-project` （`SLACK_WEBHOOK_URL` via `.env.production`） |
 
@@ -39,6 +39,8 @@ DOCKER_CLEANUP_WARN_THRESHOLD=60 /opt/ultra-autotrade/scripts/docker_cleanup.sh
 
 ## cron 登録手順（Hetzner ultra ユーザ）
 
+> **注**: Hetzner サーバーは JST (Asia/Tokyo) 運用。cron 表記は JST で計算する（UTC ではない）。
+
 1. Hetzner に SSH ログイン:
    ```bash
    ssh hetzner
@@ -51,15 +53,15 @@ DOCKER_CLEANUP_WARN_THRESHOLD=60 /opt/ultra-autotrade/scripts/docker_cleanup.sh
 
 3. 以下の行を追加:
    ```
-   # Docker cleanup - 毎週日曜 03:00 JST (18:00 UTC Saturday)
-   0 18 * * 6 /opt/ultra-autotrade/scripts/docker_cleanup.sh
+   # Docker cleanup - 毎週日曜 03:00 JST
+   0 3 * * 0 /opt/ultra-autotrade/scripts/docker_cleanup.sh
    ```
 
 4. 登録を確認:
    ```bash
    crontab -l | grep docker_cleanup
    ```
-   既存の `backup_db.sh`（毎日 18:00 UTC）と時刻が重複しないことを確認。
+   既存の `backup_db.sh`（毎日 18:00 JST）と時刻が重複しないことを確認。
 
 ## 手動実行
 
