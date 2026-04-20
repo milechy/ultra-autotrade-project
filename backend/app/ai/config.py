@@ -14,6 +14,31 @@ from typing import Optional
 
 from app.utils.config import get_env
 
+# ---------------------------------------------------------------------------
+# モデル名許可リスト（Single source of truth）
+# scripts/validate_anthropic_model.py と同期すること
+# ---------------------------------------------------------------------------
+VALID_CLAUDE_MODELS: list[str] = [
+    "claude-opus-4-7",
+    "claude-opus-4-6",
+    "claude-sonnet-4-6-20250929",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+    "claude-haiku-4-5",
+]
+
+DEFAULT_CLAUDE_MODEL: str = "claude-sonnet-4-6-20250929"
+DEFAULT_FALLBACK_MODEL: str = "claude-haiku-4-5-20251001"
+
+# 非推奨モデル: 起動時検証でブロックされる
+# claude-sonnet-4-20250514 was the cause of the 2026-04-18 production 502 incident
+DEPRECATED_CLAUDE_MODELS: list[str] = [
+    "claude-sonnet-4-20250514",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-sonnet-latest",
+    "claude-3-opus-20240229",
+]
+
 
 @dataclass
 class AISettings:
@@ -67,6 +92,18 @@ def _get_env_bool(name: str, default: bool) -> bool:
     return raw.lower() in ("true", "1", "yes")
 
 
+def _validate_model_config() -> None:
+    """起動時検証: 非推奨モデルが設定されていれば ValueError を raise する。"""
+    current = get_env("AI_CLAUDE_MODEL", required=False) or DEFAULT_CLAUDE_MODEL
+    fallback = get_env("AI_FALLBACK_MODEL", required=False) or DEFAULT_FALLBACK_MODEL
+    for name, value in [("AI_CLAUDE_MODEL", current), ("AI_FALLBACK_MODEL", fallback)]:
+        if value in DEPRECATED_CLAUDE_MODELS:
+            raise ValueError(
+                f"Deprecated Claude model configured: {name}={value!r}. "
+                f"Use one of: {VALID_CLAUDE_MODELS}"
+            )
+
+
 def get_ai_settings() -> AISettings:
     """
     AISettings を構築して返す。
@@ -74,7 +111,7 @@ def get_ai_settings() -> AISettings:
     全キーはオプション（graceful degradation）:
       - ANTHROPIC_API_KEY（未設定時: None）
       - OPENAI_API_KEY（未設定時: None）
-      - AI_CLAUDE_MODEL（デフォルト: claude-sonnet-4-20250514）
+      - AI_CLAUDE_MODEL（デフォルト: claude-sonnet-4-6-20250929）
       - AI_OPENAI_MODEL（デフォルト: gpt-4o）
       - AI_MIN_CONFIDENCE_THRESHOLD（デフォルト: 40）
       - AI_CROSS_VALIDATION_ENABLED（デフォルト: True）
@@ -83,9 +120,9 @@ def get_ai_settings() -> AISettings:
     anthropic_api_key = get_env("ANTHROPIC_API_KEY", required=False)
     openai_api_key = get_env("OPENAI_API_KEY", required=False)
 
-    claude_model = get_env("AI_CLAUDE_MODEL", required=False) or "claude-sonnet-4-20250514"
+    claude_model = get_env("AI_CLAUDE_MODEL", required=False) or DEFAULT_CLAUDE_MODEL
     openai_model = get_env("AI_OPENAI_MODEL", required=False) or "gpt-4o"
-    ai_fallback_model = get_env("AI_FALLBACK_MODEL", required=False) or "claude-sonnet-4-20250514"
+    ai_fallback_model = get_env("AI_FALLBACK_MODEL", required=False) or DEFAULT_FALLBACK_MODEL
 
     min_confidence_threshold = _get_env_int(
         "AI_MIN_CONFIDENCE_THRESHOLD",

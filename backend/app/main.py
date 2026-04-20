@@ -247,6 +247,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["health"])
     def health_check() -> dict[str, Any]:
+        from app.ai.config import DEFAULT_CLAUDE_MODEL, DEFAULT_FALLBACK_MODEL
         from app.automation.ai_judgment_scheduler import get_scheduler_status
         from app.automation.scheduler_watchdog import compute_scheduler_health
 
@@ -268,7 +269,18 @@ def create_app() -> FastAPI:
             "next_judgment": scheduler.get("next_run"),
             "scheduler_last_error": scheduler.get("last_error"),
             "warnings": warnings,
+            "claude_model": os.getenv("AI_CLAUDE_MODEL") or DEFAULT_CLAUDE_MODEL,
+            "claude_fallback_model": os.getenv("AI_FALLBACK_MODEL") or DEFAULT_FALLBACK_MODEL,
         }
+
+    # --- AI model config validation (fail-fast: must be first startup event) ---
+    @app.on_event("startup")
+    async def startup_validate_model_config() -> None:
+        """Fail-fast: reject deprecated Claude model names before any task starts."""
+        from app.ai.config import _validate_model_config  # noqa: PLC0415
+
+        _validate_model_config()
+        logger.info("AI model config validation passed")
 
     # --- Database initialization (Phase12) ---
     @app.on_event("startup")
