@@ -696,6 +696,17 @@ docker compose -f docker-compose.staging.yml --env-file .env.staging-new \
 | docs/28_staging_cors_csp_postmortem.md | CORS/CSPインシデント対策 | CORS/CSP問題発生時 |
 | docs/29_tunnel_ops_guide.md | Cloudflare Tunnel運用手順 | Tunnel再起動時 |
 | docs/34_phase2_protocols_guide.md | Phase 2 マルチプロトコル技術ガイド | Lido/Pendle/Optimizer/Risk Engine実装時 |
+| docs/35_docker_maintenance_runbook.md | Docker 週次クリーンアップ手順 | disk 逼迫時・cron 設定変更時 |
+
+---
+
+## Docker クリーンアップ運用
+
+- 週次自動実行: `scripts/docker_cleanup.sh`（毎週日曜 03:00 JST、Hetzner cron 登録）
+- 使用コマンド: `docker builder prune -f` + `docker image prune -f`
+- **禁止**: `docker system prune -af`（使用中イメージ削除リスク、CLAUDE.md 明記）
+- 閾値: WARN 70% / CRITICAL 85%（Slack `#ultra-auto-project` 通知）
+- 詳細: `docs/35_docker_maintenance_runbook.md`
 
 ---
 
