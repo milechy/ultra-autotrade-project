@@ -270,6 +270,15 @@ def create_app() -> FastAPI:
             "warnings": warnings,
         }
 
+    # --- AI model config validation (fail-fast: must be first startup event) ---
+    @app.on_event("startup")
+    async def startup_validate_model_config() -> None:
+        """Fail-fast: reject deprecated Claude model names before any task starts."""
+        from app.ai.config import _validate_model_config  # noqa: PLC0415
+
+        _validate_model_config()
+        logger.info("AI model config validation passed")
+
     # --- Database initialization (Phase12) ---
     @app.on_event("startup")
     async def startup_database() -> None:

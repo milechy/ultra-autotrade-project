@@ -135,7 +135,7 @@ class TestGetAISettings:
             importlib.reload(ai_config)
             settings = ai_config.get_ai_settings()
 
-        assert settings.claude_model == "claude-sonnet-4-20250514"
+        assert settings.claude_model == "claude-sonnet-4-6-20250929"
         assert settings.openai_model == "gpt-4o"
         assert settings.min_confidence_threshold == 40
         assert settings.cross_validation_enabled is True
