@@ -7,6 +7,16 @@
 
 ## backend/app/main.py
 
+### 変更 #3: /health エンドポイントに AI モデル設定を追加 (PR #95 / 2026-04-20)
+- **コミット範囲**: `408d3ad` (feature/remove-claude-model-hardcodes)
+- **変更内容**:
+  - `/health` レスポンスに `claude_model` / `claude_fallback_model` フィールド追加
+  - `app.ai.config` から `DEFAULT_CLAUDE_MODEL` / `DEFAULT_FALLBACK_MODEL` をインポート
+  - `AI_CLAUDE_MODEL` / `AI_FALLBACK_MODEL` 環境変数の実効値を確認できるようにする
+- **理由**: AIモデル名のハードコード除去 (PR #95) の一環。デプロイ後に稼働中のモデル設定を `/health` で検証できるようにする。
+- **影響範囲**: `/health` エンドポイントのレスポンスフィールド追加のみ。既存フィールド・ロジックへの影響なし。
+- **承認**: feature/remove-claude-model-hardcodes → dev の通常フロー経由（PR #95）
+
 ### 変更 #2: F-17a カスタムリミッター startup 通知 (PR #92 / 2026-04-19)
 - **コミット範囲**: `52043f6` (dev ブランチ, feature/risk-limiter-env-toggle マージ)
 - **変更内容**:

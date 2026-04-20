@@ -50,6 +50,7 @@ def test_valid_models_pass_validation() -> None:
     _validate_model_config()  # should not raise
 
 
+@mock.patch.dict(os.environ, {}, clear=False)
 def test_unset_env_vars_use_defaults_and_pass() -> None:
     env = {k: v for k, v in os.environ.items() if k not in ("AI_CLAUDE_MODEL", "AI_FALLBACK_MODEL")}
     with mock.patch.dict(os.environ, env, clear=True):

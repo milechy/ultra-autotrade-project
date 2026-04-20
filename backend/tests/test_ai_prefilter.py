@@ -178,7 +178,7 @@ class TestOpusSonnetFallback:
         self,
         *,
         opus_model: str = "claude-opus-4-5",
-        fallback_model: str = "claude-sonnet-4-20250514",
+        fallback_model: str = "claude-haiku-4-5-20251001",
     ) -> MagicMock:
         settings = MagicMock()
         settings.anthropic_api_key = "sk-test"

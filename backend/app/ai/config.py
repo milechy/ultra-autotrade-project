@@ -31,6 +31,7 @@ DEFAULT_CLAUDE_MODEL: str = "claude-sonnet-4-6-20250929"
 DEFAULT_FALLBACK_MODEL: str = "claude-haiku-4-5-20251001"
 
 # 非推奨モデル: 起動時検証でブロックされる
+# claude-sonnet-4-20250514 was the cause of the 2026-04-18 production 502 incident
 DEPRECATED_CLAUDE_MODELS: list[str] = [
     "claude-sonnet-4-20250514",
     "claude-3-5-sonnet-20241022",
