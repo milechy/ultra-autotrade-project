@@ -29,20 +29,20 @@ def test_default_model_is_in_valid_list() -> None:
 
 @mock.patch.dict(os.environ, {"AI_CLAUDE_MODEL": "claude-sonnet-4-20250514"})
 def test_deprecated_primary_model_raises_at_startup() -> None:
-    with pytest.raises(ValueError, match="Deprecated Claude model"):
+    with pytest.raises(ValueError, match="Invalid Claude model"):
         _validate_model_config()
 
 
 @mock.patch.dict(os.environ, {"AI_FALLBACK_MODEL": "claude-3-5-sonnet-latest"})
 def test_deprecated_fallback_model_raises_at_startup() -> None:
-    with pytest.raises(ValueError, match="Deprecated Claude model"):
+    with pytest.raises(ValueError, match="Invalid Claude model"):
         _validate_model_config()
 
 
 @mock.patch.dict(
     os.environ,
     {
-        "AI_CLAUDE_MODEL": "claude-sonnet-4-6-20250929",
+        "AI_CLAUDE_MODEL": "claude-sonnet-4-6",
         "AI_FALLBACK_MODEL": "claude-haiku-4-5-20251001",
     },
 )
@@ -63,7 +63,8 @@ def test_opus_model_passes_validation() -> None:
 
 
 @mock.patch.dict(os.environ, {"AI_CLAUDE_MODEL": "claude-unknown-99-99"})
-def test_unknown_model_is_not_in_deprecated_so_passes() -> None:
-    # Unknown models are NOT in DEPRECATED list, so they pass validation.
-    # The allowlist check is intentionally permissive to avoid blocking future models.
-    _validate_model_config()  # should not raise (deprecated-only check)
+def test_unknown_model_not_in_valid_list_raises() -> None:
+    # Allow-list: unknown models must be rejected even if not in DEPRECATED list.
+    # This catches typos and non-existent model IDs like claude-sonnet-4-6-20250929.
+    with pytest.raises(ValueError, match="許可リスト外|Must be one of|Invalid Claude model"):
+        _validate_model_config()
