@@ -1,7 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_ai_config_validation.py
-"""Tests for AI model config validation (Layer 4 guard against deprecated models)."""
+"""Tests for AI model config validation (startup guard against deprecated models)."""
 
 import os
 from unittest import mock
@@ -55,3 +55,15 @@ def test_unset_env_vars_use_defaults_and_pass() -> None:
     env = {k: v for k, v in os.environ.items() if k not in ("AI_CLAUDE_MODEL", "AI_FALLBACK_MODEL")}
     with mock.patch.dict(os.environ, env, clear=True):
         _validate_model_config()  # defaults are valid, should not raise
+
+
+@mock.patch.dict(os.environ, {"AI_CLAUDE_MODEL": "claude-opus-4-7"})
+def test_opus_model_passes_validation() -> None:
+    _validate_model_config()  # should not raise
+
+
+@mock.patch.dict(os.environ, {"AI_CLAUDE_MODEL": "claude-unknown-99-99"})
+def test_unknown_model_is_not_in_deprecated_so_passes() -> None:
+    # Unknown models are NOT in DEPRECATED list, so they pass validation.
+    # The allowlist check is intentionally permissive to avoid blocking future models.
+    _validate_model_config()  # should not raise (deprecated-only check)

@@ -170,6 +170,10 @@ jobs:
             echo "::warning::Possible float usage in financial calculations. Use Decimal instead (see docs/13_security_design.md)."
           fi
 
+      - name: Validate Anthropic Claude model names
+        working-directory: ${{ github.workspace }}
+        run: python scripts/validate_anthropic_model.py
+
   trivy-scan:
     name: Trivy Container & Filesystem Scan
     runs-on: ubuntu-latest
