@@ -21,7 +21,6 @@ from pathlib import Path
 VALID_CLAUDE_MODELS: list[str] = [
     "claude-opus-4-7",
     "claude-opus-4-6",
-    "claude-sonnet-4-6-20250929",
     "claude-sonnet-4-6",
     "claude-haiku-4-5-20251001",
     "claude-haiku-4-5",
@@ -43,7 +42,7 @@ _ALLOWLISTED_FILES = {"config.py"}
 
 
 def check_env_examples(root: Path) -> list[str]:
-    """Check .env.*.example files for deprecated model values."""
+    """Check .env.*.example files against VALID_CLAUDE_MODELS allowlist (strict)."""
     errors: list[str] = []
     for env_file in sorted(root.glob(".env.*.example")):
         for line in env_file.read_text().splitlines():
@@ -54,13 +53,11 @@ def check_env_examples(root: Path) -> list[str]:
             value = m.group(2).strip("'\"").strip()
             if value.startswith("<") or value.startswith("#"):
                 continue  # placeholder, skip
-            if value in DEPRECATED_CLAUDE_MODELS:
+            # Allow-list check (stricter than deny-list: catches unknown model names too)
+            if value not in VALID_CLAUDE_MODELS:
                 errors.append(
-                    f"  ❌ {env_file.name}: {var_name}={value!r} は非推奨モデルです"
-                )
-            elif value not in VALID_CLAUDE_MODELS:
-                errors.append(
-                    f"  ⚠️  {env_file.name}: {var_name}={value!r} が許可リストにありません"
+                    f"  ❌ {env_file.name}: {var_name}={value!r} は許可リスト外です "
+                    f"(VALID: {VALID_CLAUDE_MODELS})"
                 )
     return errors
 

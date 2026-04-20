@@ -21,13 +21,12 @@ from app.utils.config import get_env
 VALID_CLAUDE_MODELS: list[str] = [
     "claude-opus-4-7",
     "claude-opus-4-6",
-    "claude-sonnet-4-6-20250929",
     "claude-sonnet-4-6",
     "claude-haiku-4-5-20251001",
     "claude-haiku-4-5",
 ]
 
-DEFAULT_CLAUDE_MODEL: str = "claude-sonnet-4-6-20250929"
+DEFAULT_CLAUDE_MODEL: str = "claude-sonnet-4-6"
 DEFAULT_FALLBACK_MODEL: str = "claude-haiku-4-5-20251001"
 
 # 非推奨モデル: 起動時検証でブロックされる
@@ -93,14 +92,19 @@ def _get_env_bool(name: str, default: bool) -> bool:
 
 
 def _validate_model_config() -> None:
-    """起動時検証: 非推奨モデルが設定されていれば ValueError を raise する。"""
+    """起動時検証: VALID_CLAUDE_MODELS 許可リスト方式（deny-list ではなく allow-list）。
+
+    許可リストにないモデル名は、非推奨でなくても起動を拒否する。
+    これにより claude-sonnet-4-6-20250929 のような「存在しないが非推奨でもない」
+    モデル名をブロックできる。
+    """
     current = get_env("AI_CLAUDE_MODEL", required=False) or DEFAULT_CLAUDE_MODEL
     fallback = get_env("AI_FALLBACK_MODEL", required=False) or DEFAULT_FALLBACK_MODEL
     for name, value in [("AI_CLAUDE_MODEL", current), ("AI_FALLBACK_MODEL", fallback)]:
-        if value in DEPRECATED_CLAUDE_MODELS:
+        if value not in VALID_CLAUDE_MODELS:
             raise ValueError(
-                f"Deprecated Claude model configured: {name}={value!r}. "
-                f"Use one of: {VALID_CLAUDE_MODELS}"
+                f"Invalid Claude model configured: {name}={value!r}. "
+                f"Must be one of: {VALID_CLAUDE_MODELS}"
             )
 
 
@@ -111,7 +115,7 @@ def get_ai_settings() -> AISettings:
     全キーはオプション（graceful degradation）:
       - ANTHROPIC_API_KEY（未設定時: None）
       - OPENAI_API_KEY（未設定時: None）
-      - AI_CLAUDE_MODEL（デフォルト: claude-sonnet-4-6-20250929）
+      - AI_CLAUDE_MODEL（デフォルト: claude-sonnet-4-6）
       - AI_OPENAI_MODEL（デフォルト: gpt-4o）
       - AI_MIN_CONFIDENCE_THRESHOLD（デフォルト: 40）
       - AI_CROSS_VALIDATION_ENABLED（デフォルト: True）
