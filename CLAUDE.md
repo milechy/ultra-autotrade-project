@@ -623,6 +623,48 @@ git diff main --name-only | grep "^frontend/lib/api/" # 新しいfetch関数 →
   - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
   - `NEXT_PUBLIC_DEFAULT_CHAIN_ID`
 
+## 2026-04-21 教訓: ドキュメント更新でも E2E 先行と3層確認を徹底
+
+### 何が起きたか
+
+`tester_onboarding_guide.md` v2 と関連 docs 4 ファイルを「Privy でログイン」前提でリライトし、
+PR #111/#112 で main 反映。しかし実装の実態は:
+
+- **フロント**: Privy SDK 実装済み（見た目のログイン UI は Privy）
+- **バックエンド**: email/password (bcrypt) のみ。`/auth/privy-login` エンドポイント不在
+- **DB**: `users` テーブルに `privy_did` カラムなし
+
+結果: 公式ドキュメントが「Privy でログイン」と案内しているが、実際にはバックエンド JWT が
+取れずダッシュボードに到達できない状態が本番に出た。Word 版配布用ドキュメントも誤情報で生成済み。
+
+対応: Asana #1214148335864583 でバックエンド Privy 対応タスク化。
+マニュアル修正版 (v3) は実装完了後に作成。
+
+### 再発防止ルール
+
+1. **E2E で通してからマニュアルを書く** (`docs/14_test_strategy.md` §10 に連動)
+   ユーザー向け手順書 (tester_onboarding_guide / partner_tester_distribution 等) を書く・更新する場合:
+   - その手順を Playwright E2E で先に実装して通す
+   - E2E で「ユーザーが書かれた通りに操作して目的に到達できる」ことを確認
+   - 確認できた手順のみドキュメントに反映し、確認できていない手順は main 禁止
+
+2. **認証・権限系は3層確認** (Pre-check 原則の強化版)
+   認証・権限・ログイン・ウォレット接続・ロール分岐の記述を書く前に以下を必ず CLI で全確認:
+   - フロント UI 実装 (`components/` / `hooks/`)
+   - バックエンドエンドポイント (`routers/` / `services/`)
+   - DB スキーマ (`users` / auth 関連カラム)
+   1 つでも欠けていれば「**その機能は使えない**」と判断する。
+
+3. **ドキュメント更新にも同じ Pre-check を適用** (カテゴリ判断禁止)
+   「ドキュメント更新だから安全」という判断で Pre-check を省略しない。
+   ユーザーに影響が出る変更は、コード変更と同じレベルの事前確認を適用。
+
+4. **memory からの推論拡大禁止**
+   memory「Privy App ID を全環境に設定」→「Privy 認証が動いている」という拡大解釈が事故の原因。
+   memory は事実記録。実装状態は都度 CLI で確認する。
+
+---
+
 ## 環境ファイル更新ルール (2026-04-19 根本解決原則)
 
 ### 禁止事項
