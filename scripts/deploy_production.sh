@@ -158,11 +158,15 @@ elif [[ "${FRONTEND_ONLY}" == "true" ]] && grep -qE '^AAVE_NETWORK=.*sepolia' .e
   echo "⚠️  WARN: AAVE_NETWORK に sepolia が含まれています (フロントエンドのみデプロイのためスキップ)"
 fi
 
-# Guard 2: 環境分離チェック
-bash scripts/check_env_separation.sh || {
-  echo "❌ FAIL: 環境分離チェック失敗"
-  exit 1
-}
+# Guard 2: 環境分離チェック (バックエンドに関わるキーのみ必須 — フロントエンドのみデプロイ時はスキップ)
+if [[ "${FRONTEND_ONLY}" == "true" ]]; then
+  echo "⚠️  WARN: --frontend-only のため環境分離チェックをスキップ (バックエンド変更なし)"
+else
+  bash scripts/check_env_separation.sh || {
+    echo "❌ FAIL: 環境分離チェック失敗"
+    exit 1
+  }
+fi
 
 # Guard 3: compose file 指定確認
 if [[ "${COMPOSE_FILE}" != *production.yml* ]] && [[ -z "${FORCE_OVERRIDE:-}" ]]; then
