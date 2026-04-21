@@ -7,17 +7,13 @@ import { useWallet } from '@/hooks/useWallet'
 import { WalletAddressMask } from '@/components/shared'
 import { useTranslations } from 'next-intl'
 const CHAIN_INFO: Record<number, { name: string; colorClass: string }> = {
-  42161: {
-    name: 'Arbitrum One',
-    colorClass: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  },
-  421614: {
-    name: 'Arbitrum Sepolia',
-    colorClass: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30',
-  },
   84532: {
     name: 'Base Sepolia',
     colorClass: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30',
+  },
+  8453: {
+    name: 'Base',
+    colorClass: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   },
 }
 
