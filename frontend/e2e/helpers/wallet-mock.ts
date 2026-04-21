@@ -14,7 +14,7 @@ export const MOCK_ADDRESS_SHORT =
 export type WalletMockOptions = {
   /**
    * EIP-155 chain ID the mock reports.
-   * Default: 42161 (Arbitrum One)
+   * Default: 84532 (Base Sepolia)
    */
   chainId?: number
   /**
@@ -44,7 +44,7 @@ export async function mockEthereum(
   page: Page,
   options: WalletMockOptions = {}
 ): Promise<void> {
-  const chainId = options.chainId ?? 42161
+  const chainId = options.chainId ?? 84532
   const rejectConnect = options.rejectConnect ?? false
   const chainIdHex = '0x' + chainId.toString(16)
 
