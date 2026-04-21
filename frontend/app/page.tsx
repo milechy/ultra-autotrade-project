@@ -61,12 +61,12 @@ const faqItems = [
   {
     question: '対応ウォレットは何ですか？',
     answer:
-      'MetaMask、WalletConnect対応ウォレットに対応予定です。Arbitrum Oneネットワークへの接続が必要です。',
+      'MetaMask、WalletConnect対応ウォレットに対応予定です。Base Sepoliaネットワークへの接続が必要です（テストネット）。',
   },
   {
     question: 'どのチェーン・プロトコルに対応していますか？',
     answer:
-      'Arbitrum One上のAave V3に対応しています。今後、他のチェーンやプロトコルへの対応も検討しています。',
+      'Base Sepolia上のAave V3に対応しています（テストネット）。今後、Base Mainnetや他のチェーンへの対応も検討しています。',
   },
 ]
 
@@ -133,7 +133,7 @@ export default function LandingPage() {
             対応プロトコル・チェーン
           </h2>
           <div className="flex flex-wrap justify-center gap-4">
-            {['Aave V3', 'Arbitrum One'].map((label) => (
+            {['Aave V3', 'Base Sepolia'].map((label) => (
               <span
                 key={label}
                 className="inline-flex items-center rounded-full border border-blue-500/40 bg-blue-500/10 px-5 py-2 text-sm font-medium text-blue-300"

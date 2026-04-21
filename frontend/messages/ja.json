@@ -219,7 +219,7 @@
     "featureSafe": "安全設計",
     "featureSafeDesc": "ヘルスファクター監視 + 緊急停止",
     "featureAave": "Aave V3",
-    "featureAaveDesc": "Polygon/Arbitrum で自動運用"
+    "featureAaveDesc": "Base で自動運用"
   },
   "Connect": {
     "title": "ウォレットを接続",
