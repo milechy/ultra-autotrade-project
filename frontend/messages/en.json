@@ -219,7 +219,7 @@
     "featureSafe": "Safe Design",
     "featureSafeDesc": "Health Factor monitoring + Emergency Stop",
     "featureAave": "Aave V3",
-    "featureAaveDesc": "Auto trading on Polygon/Arbitrum"
+    "featureAaveDesc": "Auto trading on Base"
   },
   "Connect": {
     "title": "Connect Wallet",

@@ -14,7 +14,7 @@ export function WalletContent() {
   const { address, isConnected, chain } = useAccount()
   const { data: balance } = useBalance({ address })
   const { disconnect } = useDisconnect()
-  const ALLOWED_CHAIN_IDS = [42161, 421614, 84532]
+  const ALLOWED_CHAIN_IDS = [84532]
   const isCorrectChain = chain?.id != null && ALLOWED_CHAIN_IDS.includes(chain.id)
 
   if (!isConnected) {
