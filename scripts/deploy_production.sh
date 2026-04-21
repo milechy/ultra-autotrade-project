@@ -151,9 +151,11 @@ if grep -qE '^BYBIT_SANDBOX=true' .env.production; then
   exit 1
 fi
 
-if grep -qE '^AAVE_NETWORK=.*sepolia' .env.production; then
+if [[ "${FRONTEND_ONLY}" != "true" ]] && grep -qE '^AAVE_NETWORK=.*sepolia' .env.production; then
   echo "❌ FAIL: .env.production で AAVE_NETWORK に sepolia 含む (本番は mainnet 必須)"
   exit 1
+elif [[ "${FRONTEND_ONLY}" == "true" ]] && grep -qE '^AAVE_NETWORK=.*sepolia' .env.production; then
+  echo "⚠️  WARN: AAVE_NETWORK に sepolia が含まれています (フロントエンドのみデプロイのためスキップ)"
 fi
 
 # Guard 2: 環境分離チェック
