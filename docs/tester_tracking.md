@@ -1,6 +1,6 @@
 # テスター進捗管理シート
 
-**最終更新:** 2026-03-24
+**最終更新:** 2026-04-21
 **用途:** パートナーと共有してテスター受け入れ状況を管理する
 
 ---
@@ -9,7 +9,7 @@
 
 | # | テスター名 | ウォレットアドレス | デバイス | USDC送金済み | 接続確認済み | フィードバック件数 | 備考 |
 |---|-----------|-----------------|---------|------------|------------|----------------|------|
-| 1 | （例）田中さん | 0x1234...abcd | iPhone | ✅ | ✅ | 2 | MetaMaskアプリ内ブラウザで解決 |
+| 1 | （例）田中さん | 0x1234...abcd | iPhone | ✅ | ✅ | 2 | Privyメールログインで解決 |
 | 2 | | | | | | | |
 | 3 | | | | | | | |
 | 4 | | | | | | | |
@@ -38,9 +38,9 @@
     ↓
 Slack #ultra-auto-project に共有
     ↓
-運営がテストUSDCを送金（Sepolia ETH + テストUSDC）
+運営がテストUSDCを送金（Base Sepolia USDC）
     ↓  ※ scripts/batch_send_test_usdc.py で一括送金可能
-    ↓  ※ Arbitrum Sepolia / Base Sepolia 両対応
+    ↓  ※ Base Sepolia 対応
     ↓  ※ dry-run確認済み (commit: 3a49391)
 テスター「接続確認済み」に ✅
     ↓
@@ -66,8 +66,8 @@ python scripts/batch_send_test_usdc.py
 
 | 項目 | 値 |
 |------|-----|
-| アプリURL | http://77.42.46.155:3000 |
-| ネットワーク | Arbitrum Sepolia（テストネット） |
+| アプリURL | https://app.ultra-auto-trade.com |
+| ネットワーク | Base Sepolia（テストネット、チェーンID: 84532） |
 | テスト用USDC | 運営が配布（本物の資産は不要） |
 | フィードバック先 | Slack #ultra-tester-feedback |
 
@@ -77,6 +77,6 @@ python scripts/batch_send_test_usdc.py
 
 | 症状 | 原因 | 対処 |
 |------|------|------|
-| ウォレットが認識されない（iPhone） | SafariやChromeを使っている | MetaMaskアプリ内ブラウザからアクセス |
-| 接続ボタンが反応しない | ネットワークがMainnetのまま | Arbitrum Sepoliaに切り替え |
+| ログインできない（iPhone） | Privyのメール認証コードの入力ミス | メールを再確認、ワンタイムコードを再送する |
+| 接続ボタンが反応しない | ブラウザのポップアップブロックが有効 | ポップアップを許可してから再試行 |
 | 残高が0のまま | USDC未着（送金から数分かかる場合あり） | 5分待って再確認、それでも駄目なら#ultra-auto-projectに連絡 |
