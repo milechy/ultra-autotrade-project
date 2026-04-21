@@ -107,9 +107,7 @@ export function UserHeader() {
                   variant="outline"
                   className={cn(
                     'text-xs hidden sm:flex',
-                    chain?.id === 42161
-                      ? 'border-green-500/50 text-green-400'
-                      : [421614, 84532, 11155111].includes(chain?.id ?? 0)
+                    chain?.id === 84532
                       ? 'border-yellow-500/50 text-yellow-400'
                       : 'border-red-500/50 text-red-400'
                   )}
