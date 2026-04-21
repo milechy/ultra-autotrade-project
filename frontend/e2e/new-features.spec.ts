@@ -200,9 +200,9 @@ test.describe('メインネットチェーン選択 — /connect', () => {
     await expect(page.getByText('規約同意')).toBeVisible();
   });
 
-  test('ページの説明文（MetaMask / WalletConnect）が表示される', async ({ page }) => {
+  test('ページの説明文（ウォレット接続）が表示される', async ({ page }) => {
     await page.goto('/connect');
-    const description = page.getByText('MetaMaskまたはWalletConnect対応ウォレットで接続してください');
+    const description = page.getByText('ウォレットまたはメールアドレスで接続してください');
     await expect(description).toBeVisible();
   });
 });
