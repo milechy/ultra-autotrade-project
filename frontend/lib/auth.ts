@@ -37,6 +37,12 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isPartner: boolean;
+  /**
+   * 初期化時の getMe() が timeout / ネットワーク失敗した場合に設定される。
+   * 画面上部にバナーを表示して再読み込みを促す用途。401/403 は認証期限切れと
+   * みなして null のまま (通常のログイン画面に誘導される)。
+   */
+  authInitError: string | null;
   login: (email: string, password: string) => Promise<UserResponse>;
   loginWithWallet: (address: string, signer: WalletSigner) => Promise<UserResponse>;
   logout: () => Promise<void>;
@@ -45,10 +51,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const AUTH_INIT_ERROR_MESSAGE = "接続に失敗しました。再読み込みしてください。";
+
+function isAbortError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const name = (err as { name?: unknown }).name;
+  return name === "AbortError" || name === "TimeoutError";
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserResponse | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authInitError, setAuthInitError] = useState<string | null>(null);
 
   // Restore token on initialization
   useEffect(() => {
@@ -59,26 +74,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const expires = parseInt(expiresStr, 10);
       if (Date.now() < expires) {
         setToken(storedToken);
-        // Fetch user information
+        // Fetch user information (getMe には AbortSignal.timeout(8s) が付与済み)
         getMe(storedToken)
-          .then(setUser)
+          .then((u) => {
+            setUser(u);
+            setAuthInitError(null);
+          })
           .catch((err: unknown) => {
-            const status = (err as { status?: number }).status
+            const status = (err as { status?: number }).status;
             if (status === 401 || status === 403) {
-              clearAuth()
+              clearAuth();
+            } else if (isAbortError(err) || typeof status === "undefined") {
+              // 8s タイムアウト or ネットワーク層の失敗。
+              // トークンは保持したまま、ユーザーに再読み込みを促す。
+              setAuthInitError(AUTH_INIT_ERROR_MESSAGE);
             }
-            // Network error: keep token — user may still be authenticated
           })
           .finally(() => {
-            resolveAuthReady()
-            setIsLoading(false)
+            resolveAuthReady();
+            setIsLoading(false);
           });
         return;
       }
       // Clear auth if token is expired
       clearAuth();
     }
-    resolveAuthReady()
+    resolveAuthReady();
     setIsLoading(false);
   }, []);
 
@@ -151,8 +172,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const userInfo = await getMe(token);
         setUser(userInfo);
-      } catch {
-        clearAuth();
+      } catch (err: unknown) {
+        const status = (err as { status?: number }).status;
+        // 401/403 のみ実際のトークン無効化として扱う。
+        // timeout / ネットワーク失敗 (status undefined) で勝手にログアウトしない。
+        if (status === 401 || status === 403) {
+          clearAuth();
+        }
       }
     }
   }, [token, clearAuth]);
@@ -164,13 +190,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!(user || token),
     isAdmin: user?.role === "admin",
     isPartner: (user?.role as string | undefined) === "partner" || user?.role === "admin",
+    authInitError,
     login,
     loginWithWallet,
     logout,
     refresh,
   };
 
-  return React.createElement(AuthContext.Provider, { value }, children);
+  // Timeout 発生時の再読み込み誘導バナー。
+  // children と並列に描画してレイアウトに侵入しないよう position: fixed で固定する。
+  const banner = authInitError
+    ? React.createElement(
+        "div",
+        {
+          role: "alert",
+          "data-testid": "auth-init-error-banner",
+          style: {
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            background: "#dc2626",
+            color: "#fff",
+            padding: "10px 16px",
+            fontSize: 14,
+            textAlign: "center",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+          },
+        },
+        React.createElement("span", null, authInitError),
+        React.createElement(
+          "button",
+          {
+            type: "button",
+            onClick: () => {
+              if (typeof window !== "undefined") window.location.reload();
+            },
+            style: {
+              background: "#fff",
+              color: "#dc2626",
+              border: "none",
+              borderRadius: 4,
+              padding: "4px 10px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+            },
+          },
+          "再読み込み",
+        ),
+      )
+    : null;
+
+  return React.createElement(
+    AuthContext.Provider,
+    { value },
+    banner,
+    children,
+  );
 }
 
 export function useAuth(): AuthContextType {

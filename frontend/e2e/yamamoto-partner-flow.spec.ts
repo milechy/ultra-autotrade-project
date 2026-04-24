@@ -486,3 +486,201 @@ test.describe('TC6: サイドメニュー全リンクの巡回', () => {
     console.log(`[INFO] /dashboard → ${url} (admin ガード正常)`)
   })
 })
+
+// ─── TC7: ゲート7 P2 修正の回帰テスト ────────────────────────────────────
+
+test.describe('TC7: ゲート7 P2 修正 (2026-04-24)', () => {
+  test.skip(!HAS_CREDENTIALS, 'E2E_PARTNER_EMAIL / E2E_PARTNER_PASSWORD 未設定')
+
+  // P2-①: /user/approve に partner が居ても、ナビは partner 用導線になる。
+  test('P2-①: /user/approve のナビが partner 用リンクを出す', async ({ page }) => {
+    await loginAsPartner(page)
+    await page.goto('/user/approve')
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(2000)
+
+    // desktop nav (md:flex) で「テスター管理」リンクが /partner/users を指す
+    const testerLink = page.locator('a', { hasText: 'テスター管理' }).first()
+    // mobile 幅ではヘッダーの desktop nav が hidden のため、ここでは
+    // 「user 用の 取引履歴 / ウォレット 等に飛ばされないこと」を確認する。
+    const dashboardLink = page.locator('a', { hasText: 'ダッシュボード' }).first()
+    const isDashboardVisible = await dashboardLink
+      .isVisible({ timeout: 3000 })
+      .catch(() => false)
+
+    if (isDashboardVisible) {
+      const href = await dashboardLink.getAttribute('href')
+      // partner 用リンクは /partner/dashboard、user 用は /user/dashboard
+      expect(href).toBe('/partner/dashboard')
+    } else {
+      // mobile 時は BottomNav の「ホーム」が /partner/dashboard になっていること
+      const homeNav = page
+        .locator('nav a', { hasText: 'ホーム' })
+        .first()
+      const href = await homeNav.getAttribute('href')
+      expect(href).toBe('/partner/dashboard')
+    }
+
+    // テスター管理リンク (partner 用) が存在
+    if (await testerLink.isVisible({ timeout: 2000 }).catch(() => false)) {
+      const href = await testerLink.getAttribute('href')
+      expect(href).toBe('/partner/users')
+    }
+
+    await saveScreenshot(page, 'tc7-p2-1-approve-partner-nav')
+  })
+
+  // P2-②: partner 画面で EmergencyStopFloat の orange ⊗ ボタンが表示されない。
+  test('P2-②: partner には緊急停止フロートボタンが表示されない', async ({ page }) => {
+    await loginAsPartner(page)
+    // /partner/dashboard と /user/approve 両方で検証
+    for (const pageUrl of ['/partner/dashboard', '/user/approve']) {
+      await page.goto(pageUrl)
+      await page.waitForLoadState('domcontentloaded')
+      await page.waitForTimeout(2000)
+
+      // aria-label="緊急停止" の button が DOM に存在しない
+      const emergencyBtn = page.locator('button[aria-label="緊急停止"]')
+      await expect(emergencyBtn).toHaveCount(0)
+    }
+
+    await saveScreenshot(page, 'tc7-p2-2-no-emergency-stop-float')
+  })
+
+  // P2-③: 375px モバイル幅で partner の BottomNav が水平オーバーフローしない。
+  test('P2-③: モバイル 375px で BottomNav がオーバーフローしない (/user/approve)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await loginAsPartner(page)
+    await page.goto('/user/approve')
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(2000)
+
+    // BottomNav は user layout 下でのみレンダリング (md:hidden)
+    const bottomNav = page.locator('nav.fixed.bottom-0')
+    await expect(bottomNav).toBeVisible()
+
+    const box = await bottomNav.boundingBox()
+    if (box) {
+      // 幅 375 を超えたり負の x を持たないこと
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width).toBeLessThanOrEqual(375 + 1) // 1px の四捨五入誤差許容
+    }
+
+    // scroll 方向オーバーフローしていないこと (horizontal scroll なし)
+    const hasHorizontalScroll = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > document.documentElement.clientWidth
+    })
+    expect(hasHorizontalScroll).toBeFalsy()
+
+    // partner 用 5 項目がすべて描画されている
+    const expectedLabels = ['ホーム', '承認', 'テスター', 'AI提案', '設定']
+    for (const label of expectedLabels) {
+      await expect(bottomNav.getByText(label, { exact: true })).toBeVisible()
+    }
+
+    await saveScreenshot(page, 'tc7-p2-3-mobile-bottomnav-375')
+  })
+})
+
+// ─── TC8: P1-NEW — AuthProvider getMe() タイムアウト防御 ─────────────────
+
+// TC8 は 2026-04-24 に追加した AbortSignal.timeout(8s) の修正を検証する。
+// 本番 (app.ultra-auto-trade.com) は修正前バンドルの可能性があり、
+// その場合はバナーが出ないため常に失敗する。デプロイ前の検証は
+// STAGING_URL=http://localhost:3000 等、修正済みバンドルが走る環境で行うこと。
+const TC8_TARGET_HAS_FIX = (() => {
+  const url = process.env.STAGING_URL || 'https://app.ultra-auto-trade.com'
+  // localhost / staging は修正版が走っている想定
+  if (url.includes('localhost') || url.includes('127.0.0.1') || url.includes('staging')) {
+    return true
+  }
+  // 本番 URL は明示フラグで opt-in
+  return process.env.E2E_EXPECT_AUTH_TIMEOUT_FIX === '1'
+})()
+
+test.describe('TC8: AuthProvider getMe() タイムアウト (2026-04-24 P1-NEW)', () => {
+  test.skip(
+    !TC8_TARGET_HAS_FIX,
+    'デプロイ前: STAGING_URL=localhost 等で実行、本番実行時は E2E_EXPECT_AUTH_TIMEOUT_FIX=1',
+  )
+
+  test('/auth/me が応答しない場合、8 秒以内に再読み込み誘導バナーが表示される', async ({
+    page,
+  }) => {
+    // 方針: /login は token があると /user/dashboard へリダイレクトしてしまい、
+    // AuthProvider が remount されるため、最初から /user/dashboard に直接遷移する。
+    // /user/dashboard の UserProviders 側には redirect ガードが無いので、
+    // getMe 失敗 → banner 表示の 1 サイクルだけで検証可能。
+    await page.addInitScript(
+      (args) => {
+        localStorage.setItem(args.tokenKey, 'dummy-timeout-token')
+        localStorage.setItem(args.expiresKey, String(args.e))
+      },
+      {
+        tokenKey: 'ultra_auth_token',
+        expiresKey: 'ultra_auth_expires',
+        e: Date.now() + 24 * 60 * 60 * 1000,
+      },
+    )
+
+    // /auth/me を握ったまま応答しない (AbortSignal でのみ中断される)
+    await page.route('**/auth/me', async () => {
+      await new Promise((_resolve) => {
+        /* intentionally hang — AbortSignal.timeout が中断する */
+      })
+    })
+
+    await page.goto('/user/dashboard')
+
+    // 8 秒 + 余裕 4 秒でバナーが出現する想定。
+    // 注意: 本番 URL (baseURL 既定) では旧バンドルがデプロイ済みでない場合
+    // AbortSignal.timeout が存在しないコードが走ってしまい常に失敗する。
+    // STAGING_URL=http://localhost:3000 等、修正後のコードが走る環境で検証する。
+    const banner = page.getByTestId('auth-init-error-banner')
+    await expect(banner).toBeVisible({ timeout: 12_000 })
+
+    // メッセージと再読み込みボタン
+    await expect(banner).toContainText('接続に失敗しました')
+    await expect(banner.getByRole('button', { name: '再読み込み' })).toBeVisible()
+  })
+
+  test('/auth/me が正常応答する場合、バナーは表示されない', async ({ page }) => {
+    await page.addInitScript(
+      (args) => {
+        localStorage.setItem(args.tokenKey, 'dummy-ok-token')
+        localStorage.setItem(args.expiresKey, String(args.e))
+      },
+      {
+        tokenKey: 'ultra_auth_token',
+        expiresKey: 'ultra_auth_expires',
+        e: Date.now() + 24 * 60 * 60 * 1000,
+      },
+    )
+
+    // /auth/me を即応答で 200 (UserResponse の最小形)
+    await page.route('**/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 1,
+          email: 'ok@example.com',
+          username: 'ok-user',
+          role: 'partner',
+          is_active: true,
+          created_at: '2026-01-01T00:00:00+00:00',
+          updated_at: '2026-01-01T00:00:00+00:00',
+          tier: 'GENERAL',
+        }),
+      })
+    })
+
+    await page.goto('/login')
+    // バナーが出ていないことを 4 秒確認する
+    await page.waitForTimeout(4000)
+    const banner = page.getByTestId('auth-init-error-banner')
+    await expect(banner).toHaveCount(0)
+  })
+})
