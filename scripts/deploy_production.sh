@@ -30,10 +30,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="docker-compose.production.yml"
 ENV_FILE=".env.production"
-# コンテナ名は稼働中の *-staging のまま維持（Phase 2方針: 名前変更は後日メンテ枠で実施）
-FRONTEND_CONTAINER="ultra-autotrade-frontend-staging"
-BACKEND_CONTAINER="ultra-autotrade-backend-staging"
-POSTGRES_CONTAINER="ultra-autotrade-postgres-staging"
+# 2026-04-24 container_name 衝突インシデント後、*-production suffix に統一
+FRONTEND_CONTAINER="ultra-autotrade-frontend-production"
+BACKEND_CONTAINER="ultra-autotrade-backend-production"
+POSTGRES_CONTAINER="ultra-autotrade-postgres-production"
+CLOUDFLARED_CONTAINER="ultra-autotrade-cloudflared-production"
 HEALTH_TIMEOUT=60
 
 # ───────────────────────────────────────────────
@@ -264,9 +265,11 @@ else
   log "孤立コンテナを含めて停止・削除"
   ${DC} -f "${COMPOSE_FILE}" down --remove-orphans
 
-  # docker rm -f で残留コンテナを強制削除
-  # shellcheck disable=SC2046
-  docker rm -f $(docker ps -aq --filter "name=ultra-autotrade") 2>/dev/null || true
+  # 本番コンテナ (*-production) と移行前の旧 *-staging 残留のみ強制削除。
+  # *-staging-new (真の staging 環境) は保護対象なので除外する。
+  docker ps -a --format '{{.Names}}' \
+    | grep -E '^ultra-autotrade-[a-z]+-(production|staging)$' \
+    | xargs -r docker rm -f 2>/dev/null || true
 
   log "未使用ボリュームを削除（DBボリュームは名前付きのため保護される）..."
   docker volume prune -f 2>/dev/null || true
@@ -342,13 +345,13 @@ check_tunnel() {
     # docker コンテナ内の cloudflared を確認
     local container_running
     container_running=$(docker inspect --format='{{.State.Running}}' \
-      "ultra-autotrade-cloudflared-staging" 2>/dev/null || echo "false")
+      "${CLOUDFLARED_CONTAINER}" 2>/dev/null || echo "false")
     if [ "${container_running}" = "true" ]; then
       log "✅ cloudflared コンテナ稼働中"
     else
       log "⚠️  WARNING: Cloudflare Tunnel が検出されませんでした"
       log "   → フロントエンド(:3000) + バックエンド(:8000) 両方のトンネルが必要"
-      log "   → docker compose logs ultra-autotrade-cloudflared-staging で確認してください"
+      log "   → docker compose logs ${CLOUDFLARED_CONTAINER} で確認してください"
     fi
   fi
 }
@@ -395,7 +398,7 @@ check_auth_errors() {
     | grep -c "401 Unauthorized" || echo "0")
   if [ "${auth_errors}" -gt 5 ]; then
     log "⚠️  WARNING: 直近100行に 401 Unauthorized が ${auth_errors} 件"
-    log "   → INTERNAL_API_TOKEN が .env.staging に設定されているか確認してください"
+    log "   → INTERNAL_API_TOKEN が .env.production に設定されているか確認してください"
   else
     log "✅ 401 エラー ${auth_errors} 件（正常範囲）"
   fi
@@ -417,7 +420,7 @@ check_cors() {
     log "✅ CORS: ${frontend_origin} が許可されています"
   else
     log "⚠️  WARNING: CORS ヘッダーに ${frontend_origin} が含まれていません"
-    log "   → .env.staging の CORS_ORIGINS に ${frontend_origin} を追加してください"
+    log "   → .env.production の CORS_ORIGINS に ${frontend_origin} を追加してください"
     log "   → レスポンス: ${cors_header:-（ヘッダーなし）}"
   fi
 }

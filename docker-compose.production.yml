@@ -4,12 +4,17 @@ version: "3.9"
 # docker-compose.production.yml
 # 本番環境（app.ultra-auto-trade.com / api.ultra-auto-trade.com）
 #
-# 経緯: 2026-04-17 B案リネームにより旧 docker-compose.staging.yml を
-#       本ファイルとして正式化。コンテナ名は稼働中の *-staging のまま維持。
-#       （*-staging → *-production へのリネームは後日メンテ枠で実施）
+# 経緯:
+#   - 2026-04-17 B案リネームで旧 docker-compose.staging.yml を本ファイルとして正式化。
+#   - 2026-04-24 container_name 衝突インシデント後、以下を根本解決:
+#       (a) container_name を *-production suffix に変更 (旧 *-staging)
+#       (b) volumes に name: を明示して COMPOSE_PROJECT_NAME 変更から防御
+#       (c) 独自 network を定義して staging.yml との合成を物理的に分離
+#       (d) backend.environment.DATABASE_URL を削除 (env_file の .env.production に直接記述、
+#           compose ${} 展開に依存しない)
 #
 # デプロイ: scripts/deploy_production.sh
-# 環境変数: .env.production
+# 環境変数: .env.production  (DATABASE_URL をフルURLで定義すること)
 # ============================================================
 #
 # NOTE: The Loki Docker logging driver must be installed on the host before starting this stack:
@@ -18,18 +23,26 @@ version: "3.9"
 
 volumes:
   ultra-state:
+    name: ultra-autotrade-project_ultra-state
     driver: local
   postgres-data:
+    name: ultra-autotrade-project_postgres-data
     driver: local
   loki-data:
+    name: ultra-autotrade-project_loki-data
     driver: local
   ultra-log-staging:
+    name: ultra-autotrade-project_ultra-log-staging
     driver: local
+
+networks:
+  production-net:
+    name: ultra-autotrade-project_default
 
 services:
   loki:
     image: grafana/loki:2.9.0
-    container_name: ultra-autotrade-loki-staging
+    container_name: ultra-autotrade-loki-production
     ports:
       - "3100:3100"
     volumes:
@@ -37,6 +50,8 @@ services:
       - loki-data:/loki
     command: -config.file=/etc/loki/loki-config.yaml
     restart: always
+    networks:
+      - production-net
     logging:
       driver: "json-file"
       options:
@@ -45,7 +60,7 @@ services:
 
   promtail:
     image: grafana/promtail:2.9.0
-    container_name: ultra-autotrade-promtail-staging
+    container_name: ultra-autotrade-promtail-production
     volumes:
       - ./docker/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -54,6 +69,8 @@ services:
     depends_on:
       - loki
     restart: always
+    networks:
+      - production-net
     logging:
       driver: "json-file"
       options:
@@ -62,7 +79,7 @@ services:
 
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: ultra-autotrade-postgres-staging
+    container_name: ultra-autotrade-postgres-production
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ultra}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -72,6 +89,8 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     restart: always
+    networks:
+      - production-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ultra}"]
       interval: 10s
@@ -87,7 +106,7 @@ services:
         loki-external-labels: "service=postgres,env=production"
 
   backend:
-    container_name: ultra-autotrade-backend-staging
+    container_name: ultra-autotrade-backend-production
     build:
       context: .
       dockerfile: Dockerfile
@@ -98,9 +117,10 @@ services:
       --port 8000
       --log-level info"
     env_file:
-      - .env.production       # production 用の環境変数ファイル（Git 管理外）
+      - .env.production       # DATABASE_URL はこのファイル内で直接指定すること
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade}
+      # compose ${} 展開に依存しないため DATABASE_URL はここで書かない。
+      # .env.production で DATABASE_URL=postgresql://ultra:<password>@postgres:5432/ultra_autotrade を定義する。
       REBALANCE_SHADOW_MODE: "false"
     ports:
       - "8000:8000"
@@ -112,6 +132,8 @@ services:
       postgres:
         condition: service_healthy
     restart: always
+    networks:
+      - production-net
     logging:
       driver: loki
       options:
@@ -123,7 +145,7 @@ services:
 
   cloudflared:
     image: cloudflare/cloudflared:latest
-    container_name: ultra-autotrade-cloudflared-staging
+    container_name: ultra-autotrade-cloudflared-production
     command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     network_mode: "host"
     env_file:
@@ -139,7 +161,7 @@ services:
         max-file: "3"
 
   frontend:
-    container_name: ultra-autotrade-frontend-staging
+    container_name: ultra-autotrade-frontend-production
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -167,6 +189,8 @@ services:
     depends_on:
       - backend
     restart: always
+    networks:
+      - production-net
     logging:
       driver: loki
       options:
