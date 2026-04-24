@@ -299,7 +299,7 @@ curl -s -X POST "$WEBHOOK" \
 | **production** | app/api.ultra-auto-trade.com | `docker-compose.production.yml` | `.env.production` | `scripts/deploy_production.sh` |
 | **staging** | staging/api-staging.ultra-auto-trade.com（Phase 4設定予定）| `docker-compose.staging.yml` | `.env.staging` | `scripts/deploy_staging.sh` |
 
-- **コンテナ名**: productionは稼働中の `*-staging` のまま維持（後日メンテ枠でリネーム予定）
+- **コンテナ名**: production は `*-production` suffix（2026-04-24 container_name 衝突インシデント後にリネーム済み）
 - **staging**: Shadow Mode専用（`AI_SHADOW_MODE=true` / `REBALANCE_SHADOW_MODE=true`）、Base Sepolia、port 3001/8001/5433
 - **production**: 実資金・実トレード、Base Mainnet、port 3000/8000/5432
 
@@ -739,6 +739,9 @@ docker compose -f docker-compose.staging.yml --env-file .env.staging-new \
 | docs/29_tunnel_ops_guide.md | Cloudflare Tunnel運用手順 | Tunnel再起動時 |
 | docs/34_phase2_protocols_guide.md | Phase 2 マルチプロトコル技術ガイド | Lido/Pendle/Optimizer/Risk Engine実装時 |
 | docs/35_docker_maintenance_runbook.md | Docker 週次クリーンアップ手順 | disk 逼迫時・cron 設定変更時 |
+| docs/ops/01_api_endpoints.md | 全APIエンドポイント一覧（パス・認証・curl例） | curl を書く前・エンドポイントを推測しそうなとき |
+| docs/ops/02_db_tables.md | 全DBテーブル定義（カラム・型・NULL可否） | ALTER TABLE を書く前・DBスキーマを推測しそうなとき |
+| docs/ops/03_deploy_procedures.md | デプロイ手順・コンテナ名・ボリューム・障害対応 | デプロイ前・Docker環境を推測しそうなとき |
 
 ---
 
@@ -760,6 +763,38 @@ docker compose -f docker-compose.staging.yml --env-file .env.staging-new \
 - フロントエンド: 戦略選択画面（/user/strategies）+ プロトコルヘルスモニター（/admin/protocols）
 - テスト: 1762 passed（dev ブランチ）
 - 次: staging デプロイ → E2Eテスト → main マージ
+
+---
+
+## 開発フェーズ別チェックポイント（2026-04-24追加）
+
+> 2026-04-24 インシデント対策: curl推測・Docker実態未確認・DBスキーマ差分見落とし・E2E未検証でのドキュメント公開の4パターンを防ぐ。
+
+### Phase 1: 調査（コードを書く前に必ず実施）
+- [ ] `docs/ops/01_api_endpoints.md` でエンドポイントパスを確認 — curl を推測で書かない
+- [ ] `docs/ops/02_db_tables.md` でDBカラムを確認 — ALTER TABLE を推測で書かない
+- [ ] Docker 環境確認: `docker ps | grep ultra-autotrade` でコンテナ名を実際に取得（`docs/ops/03_deploy_procedures.md` 参照）
+- [ ] 認証・権限系は3層確認（フロント UI / バックエンドエンドポイント / DB カラム）→ 「2026-04-21 教訓」§再発防止ルール 2 参照
+
+### Phase 2: 実装
+- [ ] `./scripts/verify.sh` 全パス（ruff / mypy / pytest 80%+）→ 「Testing」セクション参照
+- [ ] DBカラム追加時: モデルファイル冒頭に ALTER TABLE コメント記載（Alembic 未使用）
+- [ ] 新規エンドポイント追加時: `docs/ops/01_api_endpoints.md` を更新
+
+### Phase 3: デプロイ
+- [ ] `docs/ops/03_deploy_procedures.md` の手順に従う（Hetzner で `deploy_production.sh`）
+- [ ] DBカラム追加がある場合: Hetzner で先に ALTER TABLE を実行してからデプロイ
+- [ ] `docs/22_production_release_checklist.md` §8（デプロイ手順）を確認
+
+### Phase 4: 検証（デプロイ後）
+- [ ] `curl -sf https://api.ultra-auto-trade.com/health | python3 -m json.tool` で `scheduler_healthy: true` 確認
+- [ ] `docker logs --tail=100 ultra-autotrade-backend-production 2>&1 | grep "401\|ERROR"` で 401 確認
+- [ ] `docs/22_production_release_checklist.md` §9（ポストデプロイ確認）を参照
+
+### Phase 5: ユーザー向けドキュメント・連絡
+- [ ] 手順書を書く前に Playwright E2E で動作確認 → `docs/14_test_strategy.md` §10.X 参照
+- [ ] E2E で通過した手順のみドキュメントに記載（未確認の手順は記載禁止）
+- [ ] partner ロール画面の記述: フロント UI / バックエンドエンドポイント / DB カラムの3層確認 → 「2026-04-21 教訓」§再発防止ルール 1・2 参照
 
 ---
 
