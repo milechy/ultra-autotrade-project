@@ -149,9 +149,9 @@ class SimulateRequest(BaseModel):
 class SimulateResponse(BaseModel):
     """``FeeCalculationResult`` の API 露出版 (Decimal → str)。"""
 
-    raw_expense_jpy: str              # 実費 (マークアップ前, F-9)
+    raw_expense_jpy: str  # 実費 (マークアップ前, F-9)
     expense_markup_rate_applied: str  # 適用マークアップ率 (0 なら無効, F-9)
-    expense_markup_amount_jpy: str    # マークアップ加算分 (F-9)
+    expense_markup_amount_jpy: str  # マークアップ加算分 (F-9)
     net_profit_jpy: str
     fee_rate_applied: str
     fee_amount_jpy: str
