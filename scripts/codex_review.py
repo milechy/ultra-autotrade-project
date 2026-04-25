@@ -19,7 +19,7 @@ import json
 import sys
 from pathlib import Path
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 
 SYSTEM_PROMPT_TEMPLATE = """\
 You are Codex 5.3, an expert code reviewer for a crypto auto-trading system (Ultra AutoTrade).
@@ -114,18 +114,33 @@ def run_review(diff: str, security_doc: str) -> dict:
 
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(security_rules=security_doc)
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": f"Review this PR diff:\n\n```diff\n{truncate_diff(diff)}\n```",
-            },
-        ],
-        temperature=0.1,
-        response_format={"type": "json_object"},
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": f"Review this PR diff:\n\n```diff\n{truncate_diff(diff)}\n```",
+                },
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"},
+        )
+    except RateLimitError as e:
+        # クォータ超過は CI をブロックしない — 警告のみ出して skipped 扱いにする
+        print(f"::warning::OpenAI quota exceeded, skipping Codex review: {e}", file=sys.stderr)
+        return {
+            "severity": "info",
+            "security_ok": True,
+            "test_coverage_ok": True,
+            "issues": [
+                {
+                    "severity": "info",
+                    "message": f"Codex review skipped: OpenAI quota exceeded ({e})",
+                }
+            ],
+        }
 
     content = response.choices[0].message.content
     if not content:
