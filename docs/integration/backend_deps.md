@@ -44,6 +44,16 @@
 
 ---
 
+
+### 変更 #4: F-8a v10 fees router 登録 (PR #127 / 2026-04-25)
+- **コミット範囲**: `d55a53c` (feature/f8a-fees-api-readonly)
+- **変更内容**:
+  - `from app.api.v1 import fees as fees_v10_router` を追加
+  - `app.include_router(fees_v10_router.router, prefix="/api/v1")` を `billing_router` の直後に追加
+- **理由**: F-8a (Asana 1214120371503131) — v10 fees API endpoints (/api/v1/fees/*) を FastAPI app に登録。既存 /api/billing/* と /api/fees/calculate|schedule は無変更で併存維持 (F-8b GID 1214288467406433 で廃止予定)。
+- **影響範囲**: 新規 router 追加のみ。既存 endpoint への影響なし。`TestCoexistenceWithLegacyEndpoints` (2件) で既存 endpoint の404でないことを保証。
+- **承認**: feature/f8a-fees-api-readonly → main の通常フロー経由（PR #127）
+
 ## backend/app/database.py
 
 変更なし（現時点）
