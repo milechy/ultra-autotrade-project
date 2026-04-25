@@ -41,6 +41,7 @@ DOCKER_CLEANUP_WARN_THRESHOLD=60 /opt/ultra-autotrade/scripts/docker_cleanup.sh
 
 > **注**: Hetzner サーバーは JST (Asia/Tokyo) 運用。cron 表記は JST で計算する（UTC ではない）。
 
+
 1. Hetzner に SSH ログイン:
    ```bash
    ssh hetzner
