@@ -27,10 +27,10 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from enum import Enum
 from typing import Any, Optional
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -48,6 +48,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+#: PostgreSQL では JSONB、それ以外 (SQLite テスト等) では JSON を使う型 alias。
+#: 本番は PG なので JSONB の挙動 (バイナリ格納・GIN index 可能) は維持される。
+_JSONB_OR_JSON = JSONB().with_variant(JSON(), "sqlite")
+
 
 class V10Base(DeclarativeBase):
     """v10 専用 Declarative Base (旧 billing/models.py との衝突回避用).
@@ -62,17 +66,9 @@ class V10Base(DeclarativeBase):
 #: 後方互換のため alias として残置 (F-13 で v9 物理削除時に消去)。
 from app.auth.models import InvestmentTier as FeeTier  # noqa: E402, F401
 
-
-class FeeRiskMode(str, Enum):
-    """v10 リスクモード (F-3 で正式モジュールへ移管予定).
-
-    既存 ``users.risk_mode`` の値 (conservative/balanced/aggressive) とは別空間。
-    F-3 でマッピング辞書を導入する。
-    """
-
-    LOW = "LOW"
-    MIDDLE = "MIDDLE"
-    HIGH = "HIGH"
+#: F-3 で ``app.auth.models.RiskMode`` (conservative/balanced/aggressive) に統合済み。
+#: 後方互換のため alias として残置 (F-13 で v9 物理削除時に消去)。
+from app.auth.models import RiskMode as FeeRiskMode  # noqa: E402, F401
 
 
 class FeeConfigV10(V10Base):
@@ -84,12 +80,16 @@ class FeeConfigV10(V10Base):
 
     __tablename__ = "fee_configs"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer(), "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
     config_name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
-    tier_thresholds_jpy: Mapped[list[int]] = mapped_column(JSONB, nullable=False)
-    tier_fee_rates: Mapped[list[float]] = mapped_column(JSONB, nullable=False)
-    tier_monthly_yield_caps: Mapped[list[float]] = mapped_column(JSONB, nullable=False)
-    subscription_rates: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    tier_thresholds_jpy: Mapped[list[int]] = mapped_column(_JSONB_OR_JSON, nullable=False)
+    tier_fee_rates: Mapped[list[float]] = mapped_column(_JSONB_OR_JSON, nullable=False)
+    tier_monthly_yield_caps: Mapped[list[float]] = mapped_column(_JSONB_OR_JSON, nullable=False)
+    subscription_rates: Mapped[dict[str, Any]] = mapped_column(_JSONB_OR_JSON, nullable=False)
     expense_markup_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("FALSE")
     )
@@ -136,7 +136,11 @@ class FeeTransaction(V10Base):
 
     __tablename__ = "fee_transactions"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer(), "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
     user_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="CASCADE"),
@@ -201,7 +205,10 @@ class FeeTransaction(V10Base):
             name="chk_fee_tx_tier",
         ),
         CheckConstraint(
-            "risk_mode IN ('LOW', 'MIDDLE', 'HIGH')",
+            # F-4 (046 マイグレーション): F-3 RiskMode 内部値に揃える。
+            # Aave MDD / Optimizer / Risk Profile が conservative/balanced/aggressive を
+            # 直参照しているため、fee_transactions も同じ値を使う。
+            "risk_mode IN ('conservative', 'balanced', 'aggressive')",
             name="chk_fee_tx_risk_mode",
         ),
         UniqueConstraint("user_id", "calculation_month", name="uq_fee_tx_user_month"),
