@@ -3,8 +3,10 @@
 """AI判定定期スケジューラー。
 
 ティア別間隔で AI 判定を実行し、結果を ai_decisions に保存する。
-- UPPER ティア: AI_JUDGMENT_INTERVAL_HOURS_UPPER（デフォルト 4 時間）
-- GENERAL ティア: AI_JUDGMENT_INTERVAL_HOURS_GENERAL（デフォルト 8 時間）
+- UPPER ティア:  AI_JUDGMENT_INTERVAL_HOURS_UPPER (デフォルト 4 時間)
+- MIDDLE ティア: AI_JUDGMENT_INTERVAL_HOURS_MIDDLE (デフォルト 6 時間)
+- LOWER ティア:  AI_JUDGMENT_INTERVAL_HOURS_LOWER (デフォルト 8 時間)
+- GENERAL ティア: AI_JUDGMENT_INTERVAL_HOURS_GENERAL (デフォルト 8 時間、v9 互換)
 BUY/SELL 判定時はティア間隔を満たすアクティブユーザーに Proposal を作成する。
 """
 
@@ -30,7 +32,9 @@ from app.proposals.models import Proposal
 
 # ティア別デフォルト判定間隔（時間）
 _DEFAULT_INTERVAL_UPPER = 4
-_DEFAULT_INTERVAL_GENERAL = 8
+_DEFAULT_INTERVAL_MIDDLE = 6
+_DEFAULT_INTERVAL_LOWER = 8
+_DEFAULT_INTERVAL_GENERAL = 8  # v9 互換 (LOWER と同値)
 
 logger = logging.getLogger(__name__)
 
@@ -99,11 +103,18 @@ def _get_tier_interval_hours(tier: str) -> int:
     """ティアに応じた AI 判定間隔（時間）を返す。
 
     環境変数で上書き可能:
-    - AI_JUDGMENT_INTERVAL_HOURS_UPPER（デフォルト 4）
-    - AI_JUDGMENT_INTERVAL_HOURS_GENERAL（デフォルト 8）
+    - AI_JUDGMENT_INTERVAL_HOURS_UPPER (デフォルト 4)
+    - AI_JUDGMENT_INTERVAL_HOURS_MIDDLE (デフォルト 6)
+    - AI_JUDGMENT_INTERVAL_HOURS_LOWER (デフォルト 8)
+    - AI_JUDGMENT_INTERVAL_HOURS_GENERAL (デフォルト 8、v9 互換)
     """
     if tier == InvestmentTier.UPPER.value:
         return int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS_UPPER", str(_DEFAULT_INTERVAL_UPPER)))
+    if tier == InvestmentTier.MIDDLE.value:
+        return int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS_MIDDLE", str(_DEFAULT_INTERVAL_MIDDLE)))
+    if tier == InvestmentTier.LOWER.value:
+        return int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS_LOWER", str(_DEFAULT_INTERVAL_LOWER)))
+    # GENERAL (v9 互換) または未知の値 → GENERAL のデフォルト (= LOWER と同値)
     return int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS_GENERAL", str(_DEFAULT_INTERVAL_GENERAL)))
 
 

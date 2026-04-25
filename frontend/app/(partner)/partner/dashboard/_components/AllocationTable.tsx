@@ -23,7 +23,7 @@ import { getStoredToken } from '@/lib/auth'
 interface Props {
   /** tester_name → TesterPerformance from /api/partner/performance */
   performanceMap?: Record<string, TesterPerformance>
-  /** user_id → tier ("GENERAL" | "UPPER") */
+  /** user_id → tier ("LOWER" | "MIDDLE" | "UPPER", v9 互換: "GENERAL") */
   tierMap?: Record<number, string>
   /** Called after any CRUD so parent (page.tsx) can re-fetch allocations + performance */
   onRefresh?: () => void

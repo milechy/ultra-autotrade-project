@@ -58,12 +58,9 @@ class V10Base(DeclarativeBase):
     metadata = MetaData()
 
 
-class FeeTier(str, Enum):
-    """v10 投資ティア (F-2 で正式モジュールへ移管予定)."""
-
-    LOWER = "LOWER"
-    MIDDLE = "MIDDLE"
-    UPPER = "UPPER"
+#: F-2 で `app.auth.models.InvestmentTier` に統合済み。
+#: 後方互換のため alias として残置 (F-13 で v9 物理削除時に消去)。
+from app.auth.models import InvestmentTier as FeeTier  # noqa: E402, F401
 
 
 class FeeRiskMode(str, Enum):
