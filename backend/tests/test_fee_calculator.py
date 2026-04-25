@@ -524,3 +524,170 @@ class TestDebugLog:
         )
         joined = "\n".join(result.debug_log)
         assert "SUBSCRIPTION_PROTECTED" in joined
+
+
+# ---------------------------------------------------------------------------
+# Class 9: Expense Markup (F-9)
+# ---------------------------------------------------------------------------
+
+
+class TestExpenseMarkup:
+    """Step 0: expense_markup 適用 (F-9) の境界値テスト。
+
+    デフォルト OFF (expense_markup_enabled=False) 前提を検証し、
+    ON 時のマークアップ計算・保護判定への影響・Decimal 精度を網羅する。
+    """
+
+    def test_markup_disabled_default(self) -> None:
+        """既定 (expense_markup_enabled=False) でマークアップなし。"""
+        calculator = FeeCalculator(make_v10_default_config())
+        result = calculator.calculate_monthly(
+            _make_input(
+                deposit=Decimal("100000"),
+                gross=Decimal("5000"),
+                expense=Decimal("1000"),
+            )
+        )
+        assert result.expense_markup_rate_applied == Decimal("0")
+        assert result.expense_markup_amount_jpy == Decimal("0")
+        assert result.raw_expense_jpy == Decimal("1000")
+        assert result.expense_jpy == Decimal("1000")
+        assert result.net_profit_jpy == Decimal("4000")
+
+    def test_markup_10_percent(self) -> None:
+        """expense_markup_rate=0.10 で実費 × 1.10 が課金対象。
+
+        expense=1000, rate=0.10 → effective=1100, markup_amount=100
+        net = 10000 - 1100 = 8900
+        """
+        config = make_v10_default_config()
+        config.expense_markup_enabled = True
+        config.expense_markup_rate = Decimal("0.10")
+        calculator = FeeCalculator(config)
+        result = calculator.calculate_monthly(
+            _make_input(
+                deposit=Decimal("100000"),
+                gross=Decimal("10000"),
+                expense=Decimal("1000"),
+            )
+        )
+        assert result.raw_expense_jpy == Decimal("1000")
+        assert result.expense_markup_rate_applied == Decimal("0.10")
+        assert result.expense_jpy == Decimal("1100")
+        assert result.expense_markup_amount_jpy == Decimal("100")
+        assert result.net_profit_jpy == Decimal("8900")
+
+    def test_markup_zero_rate_with_enabled_true_is_noop(self) -> None:
+        """enabled=True でも rate=0 なら markup_amount=0 (加算ゼロ)。"""
+        config = make_v10_default_config()
+        config.expense_markup_enabled = True
+        config.expense_markup_rate = Decimal("0")
+        calculator = FeeCalculator(config)
+        result = calculator.calculate_monthly(
+            _make_input(
+                deposit=Decimal("100000"),
+                gross=Decimal("5000"),
+                expense=Decimal("1000"),
+            )
+        )
+        assert result.expense_markup_rate_applied == Decimal("0")
+        assert result.expense_markup_amount_jpy == Decimal("0")
+        assert result.expense_jpy == Decimal("1000")
+        assert result.raw_expense_jpy == Decimal("1000")
+
+    def test_markup_with_subscription_protection(self) -> None:
+        """マークアップ適用後の net_profit がサブスク保護判定に使われること。
+
+        raw_expense=900, markup=0.20 → effective=1080
+        gross=2000, deposit=1_000_000, balanced (sub=3000)
+        net = 2000 - 1080 = 920 < sub(3000) → 保護発動
+        """
+        config = make_v10_default_config()
+        config.expense_markup_enabled = True
+        config.expense_markup_rate = Decimal("0.20")
+        calculator = FeeCalculator(config)
+        result = calculator.calculate_monthly(
+            _make_input(
+                deposit=Decimal("1000000"),
+                gross=Decimal("2000"),
+                expense=Decimal("900"),
+                risk=RiskMode.BALANCED,
+            )
+        )
+        assert result.raw_expense_jpy == Decimal("900")
+        assert result.expense_jpy == Decimal("1080")
+        assert result.expense_markup_amount_jpy == Decimal("180")
+        assert result.net_profit_jpy == Decimal("920")
+        assert result.subscription_protected is True
+        assert result.fee_amount_jpy == Decimal("0")
+        assert result.user_takehome_jpy == Decimal("0")
+
+    def test_markup_decimal_precision(self) -> None:
+        """マークアップ計算でも円未満切り捨て (ROUND_DOWN)。
+
+        expense=333, rate=0.07 → 333*1.07=356.31 → 356
+        markup_amount = 356 - 333 = 23
+        """
+        config = make_v10_default_config()
+        config.expense_markup_enabled = True
+        config.expense_markup_rate = Decimal("0.07")
+        calculator = FeeCalculator(config)
+        result = calculator.calculate_monthly(
+            _make_input(
+                deposit=Decimal("100000"),
+                gross=Decimal("10000"),
+                expense=Decimal("333"),
+            )
+        )
+        assert result.raw_expense_jpy == Decimal("333")
+        assert result.expense_jpy == Decimal("356")
+        assert result.expense_markup_amount_jpy == Decimal("23")
+        assert result.net_profit_jpy == Decimal("9644")
+
+    def test_markup_with_yield_cap(self) -> None:
+        """マークアップで net_profit が減少し yield_cap の計算に影響すること。
+
+        deposit=100000, LOWER cap=0.018 → cap=1800
+        expense=500, rate=0.20 → effective=600
+        net = 10000 - 600 = 9400
+        fee = 9400 * 0.30 = 2820
+        provisional = 6580 > cap(1800) → takehome=1800, excess=4780
+        """
+        config = make_v10_default_config()
+        config.expense_markup_enabled = True
+        config.expense_markup_rate = Decimal("0.20")
+        calculator = FeeCalculator(config)
+        result = calculator.calculate_monthly(
+            _make_input(
+                deposit=Decimal("100000"),
+                gross=Decimal("10000"),
+                expense=Decimal("500"),
+            )
+        )
+        assert result.expense_jpy == Decimal("600")
+        assert result.net_profit_jpy == Decimal("9400")
+        assert result.fee_amount_jpy == Decimal("2820")
+        assert result.user_takehome_jpy == Decimal("1800")
+        assert result.yield_excess_to_uata_jpy == Decimal("4780")
+
+    def test_markup_new_fields_are_decimal_type(self) -> None:
+        """F-9 追加フィールドが全て Decimal 型であること。"""
+        config = make_v10_default_config()
+        config.expense_markup_enabled = True
+        config.expense_markup_rate = Decimal("0.15")
+        calculator = FeeCalculator(config)
+        result = calculator.calculate_monthly(
+            _make_input(
+                deposit=Decimal("100000"),
+                gross=Decimal("5000"),
+                expense=Decimal("500"),
+            )
+        )
+        for field_name, value in [
+            ("raw_expense_jpy", result.raw_expense_jpy),
+            ("expense_markup_rate_applied", result.expense_markup_rate_applied),
+            ("expense_markup_amount_jpy", result.expense_markup_amount_jpy),
+        ]:
+            assert isinstance(value, Decimal), (
+                f"{field_name}: got {type(value).__name__} (expected Decimal)"
+            )
