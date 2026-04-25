@@ -2,14 +2,14 @@
 # Unauthorized copying or distribution is strictly prohibited.
 # backend/app/users/fee_service.py
 """
-tier別手数料率サービス。
+tier 別手数料率サービス。
 
-二層戦略:
-  GENERAL: 手数料率 3〜10%（〜$20,000）
-  UPPER:   手数料率 15〜25%（$20,000〜）
+v10 三層戦略 (F-2 2026-04-25 〜):
+  LOWER:  手数料率 3〜10% (〜100 万円)
+  MIDDLE: 手数料率 8〜18% (100 万〜1000 万円)
+  UPPER:  手数料率 15〜25% (1000 万円〜)
 
-B-1 で AI Optimizer ENB ベースの動的計算が追加される予定。
-C-3 では各ティアの手数料率レンジのみを返す。
+GENERAL は v9 過渡期互換 (LOWER と同一レンジ)。F-13 で削除予定。
 """
 
 from typing_extensions import TypedDict
@@ -27,25 +27,40 @@ class FeeRateRange(TypedDict):
     description: str
 
 
+_LOWER = FeeRateRange(
+    tier="LOWER",
+    label="一般",
+    min_rate="0.03",
+    max_rate="0.10",
+    min_rate_pct="3",
+    max_rate_pct="10",
+    description="デポジット 100 万円以下のティア",
+)
+_MIDDLE = FeeRateRange(
+    tier="MIDDLE",
+    label="ミドル",
+    min_rate="0.08",
+    max_rate="0.18",
+    min_rate_pct="8",
+    max_rate_pct="18",
+    description="デポジット 100 万〜1000 万円のティア",
+)
+_UPPER = FeeRateRange(
+    tier="UPPER",
+    label="アッパー",
+    min_rate="0.15",
+    max_rate="0.25",
+    min_rate_pct="15",
+    max_rate_pct="25",
+    description="デポジット 1000 万円以上のティア",
+)
+
 _FEE_SCHEDULE: dict[str, FeeRateRange] = {
-    "GENERAL": FeeRateRange(
-        tier="GENERAL",
-        label="一般",
-        min_rate="0.03",
-        max_rate="0.10",
-        min_rate_pct="3",
-        max_rate_pct="10",
-        description="運用資産 $20,000 未満のティア",
-    ),
-    "UPPER": FeeRateRange(
-        tier="UPPER",
-        label="アッパー",
-        min_rate="0.15",
-        max_rate="0.25",
-        min_rate_pct="15",
-        max_rate_pct="25",
-        description="運用資産 $20,000 以上のティア",
-    ),
+    "LOWER": _LOWER,
+    "MIDDLE": _MIDDLE,
+    "UPPER": _UPPER,
+    # v9 互換 (DEPRECATED, F-13 で削除)
+    "GENERAL": _LOWER,
 }
 
 
@@ -54,7 +69,7 @@ def get_fee_rate_range(tier: str) -> FeeRateRange:
     ティア文字列から手数料率レンジを返す。
 
     Args:
-        tier: "GENERAL" または "UPPER"
+        tier: "LOWER" / "MIDDLE" / "UPPER" (または v9 互換 "GENERAL")
 
     Returns:
         FeeRateRange dict
@@ -63,12 +78,14 @@ def get_fee_rate_range(tier: str) -> FeeRateRange:
         ValueError: 不明なティアを指定した場合
     """
     if tier not in _FEE_SCHEDULE:
-        raise ValueError(f"Unknown tier: {tier!r}. Must be one of {list(_FEE_SCHEDULE)}")
+        raise ValueError(f"Unknown tier: {tier!r}. Must be one of {sorted(_FEE_SCHEDULE)}")
     return _FEE_SCHEDULE[tier]
 
 
 def get_full_fee_schedule() -> list[FeeRateRange]:
     """
-    全ティアの手数料率レンジ一覧を返す（GENERAL → UPPER の順）。
+    全ティアの手数料率レンジ一覧を返す (LOWER → MIDDLE → UPPER の順)。
+
+    v9 互換の GENERAL は内部 alias のため返却しない。
     """
-    return [_FEE_SCHEDULE["GENERAL"], _FEE_SCHEDULE["UPPER"]]
+    return [_LOWER, _MIDDLE, _UPPER]

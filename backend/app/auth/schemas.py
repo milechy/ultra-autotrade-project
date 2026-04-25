@@ -21,11 +21,9 @@ class UserRole(str, Enum):
     VIEWER = "viewer"
 
 
-class InvestmentTier(str, Enum):
-    """投資ティア（二層手数料モデル）。"""
-
-    GENERAL = "GENERAL"
-    UPPER = "UPPER"
+# InvestmentTier は app.auth.models で定義 (v10 3 層 + GENERAL 過渡期互換)。
+# F-2 までは本ファイルでも重複定義していたが、単一情報源 (auth/models.py) に統合した。
+from app.auth.models import InvestmentTier as InvestmentTier  # noqa: E402, F401
 
 
 class RegisterRequest(BaseModel):
@@ -84,7 +82,7 @@ class UserResponse(BaseModel):
     terms_version: Optional[str] = None
     risk_mode: Optional[str] = "conservative"
     invited_by: Optional[int] = None
-    tier: InvestmentTier = InvestmentTier.GENERAL
+    tier: InvestmentTier = InvestmentTier.LOWER
 
     model_config = ConfigDict(from_attributes=True)
 
