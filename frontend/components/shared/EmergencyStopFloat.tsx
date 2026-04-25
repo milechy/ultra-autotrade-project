@@ -119,6 +119,10 @@ export function EmergencyStopFloat() {
     )
   }
 
+  // 通常時 (停止していない): 緊急停止フロートボタンは admin のみに表示する。
+  // partner の誤タップで本番運用が止まるリスクを避けるため。
+  if (!isAdmin) return null
+
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>

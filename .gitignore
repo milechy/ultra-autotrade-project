@@ -81,3 +81,10 @@ claude_ai_knowledge/
 frontend/playwright-report/
 frontend/test-results/
 frontend/public/worker-*.js
+
+# Manual Gate7 screenshots (root-level, taken during manual testing)
+gate7-*.png
+
+# Claude Code artifacts
+.playwright-mcp/
+.claude/scheduled_tasks.lock

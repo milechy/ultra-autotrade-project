@@ -55,10 +55,9 @@ const TOKEN_DECIMALS: Record<string, number> = {
 const SUPPORTED_TOKENS = new Set<string>(['USDC', 'USDT', 'WBTC', 'WETH', 'DAI'])
 
 function chainIdToName(chainId: number | undefined): string {
-  if (chainId === 42161) return 'arbitrum'
-  if (chainId === 421614) return 'arbitrum-sepolia'
   if (chainId === 84532) return 'base-sepolia'
-  return 'arbitrum-sepolia'
+  if (chainId === 42161) return 'arbitrum'
+  return 'base-sepolia'
 }
 
 function mapToProposal(item: ProposalAPIResponse): Proposal {

@@ -32,7 +32,7 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="docker-compose.staging.yml"
-ENV_FILE=".env.staging"
+ENV_FILE=".env.staging-new"
 FRONTEND_CONTAINER="ultra-autotrade-frontend-staging-new"
 BACKEND_CONTAINER="ultra-autotrade-backend-staging-new"
 POSTGRES_CONTAINER="ultra-autotrade-postgres-staging-new"

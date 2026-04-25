@@ -140,7 +140,9 @@ class TestProposalsAPI:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 200
-        assert r.json()["status"] == "approved"
+        # Aave RPC は tests 環境で未設定のため実行は失敗し "failed" になるが、
+        # approve 自体は成功 (approved_at が記録される)。実行成功時は "executed"。
+        assert r.json()["status"] in ("approved", "executed", "failed")
         assert r.json()["approved_at"] is not None
 
     def test_reject_proposal_success(self, client: TestClient) -> None:
@@ -327,14 +329,13 @@ class TestPartnerProposalBoundaries:
         partner_token = _create_user_and_login(
             client, admin_token, "partner", "partner2@test.com", "partner2"
         )
-        # Aave 実行は失敗しても "approved" のまま（fail-open）
+        # Aave 実行は tests 環境で失敗し "failed" に遷移する（approved_at は記録）。
         r = client.post(
             f"/api/proposals/{proposal_id}/approve",
             headers={"Authorization": f"Bearer {partner_token}"},
         )
-        # approved または executed（Aave なければ approved のまま）
         assert r.status_code == 200
-        assert r.json()["status"] in ("approved", "executed")
+        assert r.json()["status"] in ("approved", "executed", "failed")
         assert r.json()["approved_at"] is not None
 
     def test_viewer_cannot_approve_proposal(self, client: TestClient) -> None:

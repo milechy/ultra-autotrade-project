@@ -22,7 +22,7 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Optional, Protocol
+from typing import Any, Optional, Protocol, cast
 
 from .config import AaveSettings, get_aave_settings
 from .gas_estimator import (
@@ -38,8 +38,10 @@ logger = logging.getLogger(__name__)
 # これにより @patch("app.aave.client.Web3") が正常に機能する。
 try:
     from web3 import Web3
+    from web3.types import Nonce
 except ImportError:
     Web3 = None  # type: ignore[assignment,misc]
+    Nonce = int  # type: ignore[assignment,misc]
 
 # Aave V3 Pool ABI（getUserAccountData + supply — 最小限）
 _POOL_ABI_MINIMAL = [
@@ -121,6 +123,62 @@ _POOL_ADDRESS_ARBITRUM_SEPOLIA = "0xBfC91D59fdAA134A4ED45f7B584cAf96D7792Eff"
 
 # Arbitrum Sepolia USDC
 _USDC_ADDRESS_ARBITRUM_SEPOLIA = "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"
+
+
+class _NonceTracker:
+    """1 フロー内の連続 tx に対してローカルに nonce を管理するトラッカー。
+
+    Alchemy/Infura などの RPC ノードは複数ノード構成で書き込み反映にラグがあり、
+    approve 送信直後に get_transaction_count() を呼ぶと stale (旧 nonce) が返り
+    supply が "nonce too low" / "replacement underpriced" で失敗する事故が起きる
+    (2026-04-22 インシデント)。対策として同一フロー内では以下を行う:
+
+    1. `get_transaction_count(wallet, "pending")` を一度だけ呼ぶ (mempool-aware)
+    2. `peek()` で現在の nonce を覗いて tx を build
+    3. send_raw_transaction が成功してから `advance()` で次の値に進める
+
+    send_raw_transaction が失敗した場合は nonce 未消費のため advance を呼ばない。
+    ブロックチェーンに tx が含まれた後 (receipt が revert) は nonce 消費済みだが、
+    その場合も送信自体は成功しているため本 tracker 上は既に advance 済みで整合する。
+    """
+
+    def __init__(self, w3: Any, wallet: str) -> None:
+        self._w3 = w3
+        self._wallet = wallet
+        # "pending" フラグで mempool に積まれた tx も考慮した最新 nonce を取得
+        self._current: int = int(w3.eth.get_transaction_count(wallet, "pending"))
+        self._start: int = self._current
+        logger.info(
+            "nonce tracker initialized: wallet=%s...%s, start_nonce=%d",
+            wallet[:6] if wallet else "",
+            wallet[-4:] if wallet else "",
+            self._current,
+        )
+
+    def peek(self) -> Nonce:
+        """次に build_transaction に渡すべき nonce を返す (消費しない)。"""
+        return cast(Nonce, self._current)
+
+    def advance(self) -> None:
+        """send_raw_transaction が成功した後に呼び出して nonce を 1 進める。"""
+        self._current += 1
+        logger.debug(
+            "nonce advanced: wallet=%s...%s, next_nonce=%d, consumed=%d",
+            self._wallet[:6] if self._wallet else "",
+            self._wallet[-4:] if self._wallet else "",
+            self._current,
+            self._current - self._start,
+        )
+
+    @property
+    def start(self) -> int:
+        """トラッカー初期化時の nonce (テスト/監査用)。"""
+        return self._start
+
+    @property
+    def consumed(self) -> int:
+        """これまでに advance された回数 (= 送信成功した tx 数)。"""
+        return self._current - self._start
 
 
 @dataclass
@@ -585,11 +643,16 @@ class Web3AaveClient(AaveClientBase):
                 wallet_address if wallet_address else account.address
             )
 
-            # Step 1: ERC-20 approve
+            # approve → supply (→ revoke on failure) は同一フローの連続 tx。
+            # RPC ノードの nonce 伝播遅延を避けるためローカル tracker で明示的に管理する。
+            nonce_tracker = _NonceTracker(self._w3, checksum_wallet)
+
             gas_estimator = GasEstimator(self._w3)
+
+            # Step 1: ERC-20 approve — gas estimation は nonce 消費前に実行 (失敗時 fail-fast)
             approve_params_for_estimate = {
                 "from": checksum_wallet,
-                "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                "nonce": nonce_tracker.peek(),
                 "gasPrice": self._w3.eth.gas_price,
             }
             approve_gas = gas_estimator.estimate_gas_with_buffer(
@@ -602,7 +665,7 @@ class Web3AaveClient(AaveClientBase):
             ).build_transaction(
                 {
                     "from": checksum_wallet,
-                    "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                    "nonce": nonce_tracker.peek(),
                     "gas": approve_gas,
                     "gasPrice": self._w3.eth.gas_price,
                 }
@@ -611,6 +674,10 @@ class Web3AaveClient(AaveClientBase):
                 approve_tx, private_key=account.key
             )
             approve_hash = self._w3_tx.eth.send_raw_transaction(signed_approve.raw_transaction)
+            # 送信成功 → nonce 消費済みとして tracker を進める。
+            # 以降 supply が失敗しても revoke 側が正しい nonce を使えるよう、
+            # wait_for_receipt より前に advance する。
+            nonce_tracker.advance()
             self._w3.eth.wait_for_transaction_receipt(approve_hash)
 
             logger.info("approve tx confirmed: %s", approve_hash.hex())
@@ -619,7 +686,7 @@ class Web3AaveClient(AaveClientBase):
             try:
                 supply_params_for_estimate = {
                     "from": checksum_wallet,
-                    "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                    "nonce": nonce_tracker.peek(),
                     "gasPrice": self._w3.eth.gas_price,
                 }
                 supply_gas = gas_estimator.estimate_gas_with_buffer(
@@ -635,7 +702,7 @@ class Web3AaveClient(AaveClientBase):
                 ).build_transaction(
                     {
                         "from": checksum_wallet,
-                        "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                        "nonce": nonce_tracker.peek(),
                         "gas": supply_gas,
                         "gasPrice": self._w3.eth.gas_price,
                     }
@@ -644,14 +711,20 @@ class Web3AaveClient(AaveClientBase):
                     supply_tx, private_key=account.key
                 )
                 supply_hash = self._w3_tx.eth.send_raw_transaction(signed_supply.raw_transaction)
+                # send 成功 → nonce 消費。receipt が revert しても nonce 自体は消費される
+                # (tx はブロックに含まれる) ため、このタイミングで advance しておく。
+                nonce_tracker.advance()
                 receipt = self._w3.eth.wait_for_transaction_receipt(supply_hash)
             except Exception as supply_exc:
-                # supply 失敗時は allowance を revoke して部分成功状態を解消
+                # supply 失敗時は allowance を revoke して部分成功状態を解消。
+                # nonce_tracker.peek() は supply の成否に応じた正しい値を返す:
+                #   - supply の build/send_raw が失敗 → advance されていないので approve+1
+                #   - supply 送信成功で receipt が revert → advance 済みなので approve+2
                 logger.error("supply 失敗: %s — allowance を revoke します", supply_exc)
                 try:
                     revoke_params_for_estimate = {
                         "from": checksum_wallet,
-                        "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                        "nonce": nonce_tracker.peek(),
                         "gasPrice": self._w3.eth.gas_price,
                     }
                     revoke_gas = gas_estimator.estimate_gas_with_buffer(
@@ -660,7 +733,7 @@ class Web3AaveClient(AaveClientBase):
                     revoke_tx = token_contract.functions.approve(pool_address, 0).build_transaction(
                         {
                             "from": checksum_wallet,
-                            "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                            "nonce": nonce_tracker.peek(),
                             "gas": revoke_gas,
                             "gasPrice": self._w3.eth.gas_price,
                         }
@@ -671,10 +744,16 @@ class Web3AaveClient(AaveClientBase):
                     revoke_hash = self._w3_tx.eth.send_raw_transaction(
                         signed_revoke.raw_transaction
                     )
+                    nonce_tracker.advance()
                     self._w3.eth.wait_for_transaction_receipt(revoke_hash)
                     logger.info("allowance revoke 完了: %s", revoke_hash.hex())
                 except Exception as revoke_exc:
-                    logger.error("allowance revoke 失敗: %s", revoke_exc)
+                    logger.error(
+                        "allowance revoke 失敗: %s (nonce_consumed=%d, start=%d)",
+                        revoke_exc,
+                        nonce_tracker.consumed,
+                        nonce_tracker.start,
+                    )
                 raise AaveClientError(f"deposit 失敗 (supply error): {supply_exc}") from supply_exc
 
             tx_hash_hex = receipt["transactionHash"].hex()
@@ -792,11 +871,14 @@ class Web3AaveClient(AaveClientBase):
                 wallet_address if wallet_address else account.address
             )
 
+            # withdraw は単発 tx だが mempool-aware な nonce (pending) を使うため tracker を経由する。
+            nonce_tracker = _NonceTracker(self._w3, checksum_wallet)
+
             # Pool.withdraw(asset, amount, to)
             gas_estimator = GasEstimator(self._w3)
             withdraw_params_for_estimate = {
                 "from": checksum_wallet,
-                "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                "nonce": nonce_tracker.peek(),
                 "gasPrice": self._w3.eth.gas_price,
             }
             withdraw_gas = gas_estimator.estimate_gas_with_buffer(
@@ -811,13 +893,14 @@ class Web3AaveClient(AaveClientBase):
             ).build_transaction(
                 {
                     "from": checksum_wallet,
-                    "nonce": self._w3.eth.get_transaction_count(checksum_wallet),
+                    "nonce": nonce_tracker.peek(),
                     "gas": withdraw_gas,
                     "gasPrice": self._w3.eth.gas_price,
                 }
             )
             signed_tx = self._w3.eth.account.sign_transaction(withdraw_tx, private_key=account.key)
             tx_hash = self._w3_tx.eth.send_raw_transaction(signed_tx.raw_transaction)
+            nonce_tracker.advance()
             receipt = self._w3.eth.wait_for_transaction_receipt(tx_hash)
 
             tx_hash_hex = receipt["transactionHash"].hex()

@@ -5,6 +5,7 @@
 # DB マイグレーション（Alembic未使用 — 手動ALTER）:
 #   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS fee_rate DECIMAL(10, 6);
 #   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS fee_amount DECIMAL(20, 2);
+#   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS error_message TEXT;
 
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -46,6 +47,7 @@ class Proposal(Base):
     rejected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     executed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     tx_hash: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

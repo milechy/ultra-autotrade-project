@@ -23,10 +23,13 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-# ティア別手数料率レンジ（旧ENBベース — 後方互換）
+# ティア別手数料率レンジ (ENB ベース、後方互換)
+# v10 (F-2 2026-04-25): LOWER/MIDDLE 追加。GENERAL は LOWER alias (F-13 で削除)。
 _TIER_FEE_RANGES: dict[str, tuple[Decimal, Decimal]] = {
-    "GENERAL": (Decimal("0.03"), Decimal("0.10")),
+    "LOWER": (Decimal("0.03"), Decimal("0.10")),
+    "MIDDLE": (Decimal("0.08"), Decimal("0.18")),
     "UPPER": (Decimal("0.15"), Decimal("0.25")),
+    "GENERAL": (Decimal("0.03"), Decimal("0.10")),  # DEPRECATED: LOWER alias
 }
 
 _ZERO = Decimal("0")
@@ -46,19 +49,29 @@ class MarketCondition(str, Enum):
 
 
 # FEE_MATRIX: (tier, market_condition) → (min_rate, max_rate)
+# v10 (F-2): LOWER/MIDDLE/UPPER の 3 層 + GENERAL 互換。
 _MARKET_FEE_MATRIX: dict[tuple[str, MarketCondition], tuple[Decimal, Decimal]] = {
-    ("GENERAL", MarketCondition.BEAR): (Decimal("0.03"), Decimal("0.05")),
-    ("GENERAL", MarketCondition.STABLE): (Decimal("0.06"), Decimal("0.10")),
-    ("GENERAL", MarketCondition.BULL): (Decimal("0.08"), Decimal("0.15")),
+    ("LOWER", MarketCondition.BEAR): (Decimal("0.03"), Decimal("0.05")),
+    ("LOWER", MarketCondition.STABLE): (Decimal("0.06"), Decimal("0.10")),
+    ("LOWER", MarketCondition.BULL): (Decimal("0.08"), Decimal("0.15")),
+    ("MIDDLE", MarketCondition.BEAR): (Decimal("0.06"), Decimal("0.10")),
+    ("MIDDLE", MarketCondition.STABLE): (Decimal("0.10"), Decimal("0.15")),
+    ("MIDDLE", MarketCondition.BULL): (Decimal("0.12"), Decimal("0.18")),
     ("UPPER", MarketCondition.BEAR): (Decimal("0.10"), Decimal("0.15")),
     ("UPPER", MarketCondition.STABLE): (Decimal("0.15"), Decimal("0.22")),
     ("UPPER", MarketCondition.BULL): (Decimal("0.20"), Decimal("0.25")),
+    # v9 互換 (DEPRECATED, F-13 で削除) — LOWER と同値
+    ("GENERAL", MarketCondition.BEAR): (Decimal("0.03"), Decimal("0.05")),
+    ("GENERAL", MarketCondition.STABLE): (Decimal("0.06"), Decimal("0.10")),
+    ("GENERAL", MarketCondition.BULL): (Decimal("0.08"), Decimal("0.15")),
 }
 
-# キャップ: 一般層15%, アッパー層25%
+# キャップ: LOWER 15% / MIDDLE 18% / UPPER 25% (GENERAL は LOWER 互換)
 _MARKET_FEE_CAPS: dict[str, Decimal] = {
-    "GENERAL": Decimal("0.15"),
+    "LOWER": Decimal("0.15"),
+    "MIDDLE": Decimal("0.18"),
     "UPPER": Decimal("0.25"),
+    "GENERAL": Decimal("0.15"),  # DEPRECATED: LOWER alias
 }
 
 # デフォルト固定経費 ($0.27/トレード = ガス代 + API費用)

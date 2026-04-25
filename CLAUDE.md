@@ -299,7 +299,7 @@ curl -s -X POST "$WEBHOOK" \
 | **production** | app/api.ultra-auto-trade.com | `docker-compose.production.yml` | `.env.production` | `scripts/deploy_production.sh` |
 | **staging** | staging/api-staging.ultra-auto-trade.com（Phase 4設定予定）| `docker-compose.staging.yml` | `.env.staging` | `scripts/deploy_staging.sh` |
 
-- **コンテナ名**: productionは稼働中の `*-staging` のまま維持（後日メンテ枠でリネーム予定）
+- **コンテナ名**: production は `*-production` suffix（2026-04-24 container_name 衝突インシデント後にリネーム済み）
 - **staging**: Shadow Mode専用（`AI_SHADOW_MODE=true` / `REBALANCE_SHADOW_MODE=true`）、Base Sepolia、port 3001/8001/5433
 - **production**: 実資金・実トレード、Base Mainnet、port 3000/8000/5432
 
@@ -623,6 +623,48 @@ git diff main --name-only | grep "^frontend/lib/api/" # 新しいfetch関数 →
   - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
   - `NEXT_PUBLIC_DEFAULT_CHAIN_ID`
 
+## 2026-04-21 教訓: ドキュメント更新でも E2E 先行と3層確認を徹底
+
+### 何が起きたか
+
+`tester_onboarding_guide.md` v2 と関連 docs 4 ファイルを「Privy でログイン」前提でリライトし、
+PR #111/#112 で main 反映。しかし実装の実態は:
+
+- **フロント**: Privy SDK 実装済み（見た目のログイン UI は Privy）
+- **バックエンド**: email/password (bcrypt) のみ。`/auth/privy-login` エンドポイント不在
+- **DB**: `users` テーブルに `privy_did` カラムなし
+
+結果: 公式ドキュメントが「Privy でログイン」と案内しているが、実際にはバックエンド JWT が
+取れずダッシュボードに到達できない状態が本番に出た。Word 版配布用ドキュメントも誤情報で生成済み。
+
+対応: Asana #1214148335864583 でバックエンド Privy 対応タスク化。
+マニュアル修正版 (v3) は実装完了後に作成。
+
+### 再発防止ルール
+
+1. **E2E で通してからマニュアルを書く** (`docs/14_test_strategy.md` §10 に連動)
+   ユーザー向け手順書 (tester_onboarding_guide / partner_tester_distribution 等) を書く・更新する場合:
+   - その手順を Playwright E2E で先に実装して通す
+   - E2E で「ユーザーが書かれた通りに操作して目的に到達できる」ことを確認
+   - 確認できた手順のみドキュメントに反映し、確認できていない手順は main 禁止
+
+2. **認証・権限系は3層確認** (Pre-check 原則の強化版)
+   認証・権限・ログイン・ウォレット接続・ロール分岐の記述を書く前に以下を必ず CLI で全確認:
+   - フロント UI 実装 (`components/` / `hooks/`)
+   - バックエンドエンドポイント (`routers/` / `services/`)
+   - DB スキーマ (`users` / auth 関連カラム)
+   1 つでも欠けていれば「**その機能は使えない**」と判断する。
+
+3. **ドキュメント更新にも同じ Pre-check を適用** (カテゴリ判断禁止)
+   「ドキュメント更新だから安全」という判断で Pre-check を省略しない。
+   ユーザーに影響が出る変更は、コード変更と同じレベルの事前確認を適用。
+
+4. **memory からの推論拡大禁止**
+   memory「Privy App ID を全環境に設定」→「Privy 認証が動いている」という拡大解釈が事故の原因。
+   memory は事実記録。実装状態は都度 CLI で確認する。
+
+---
+
 ## 環境ファイル更新ルール (2026-04-19 根本解決原則)
 
 ### 禁止事項
@@ -696,6 +738,20 @@ docker compose -f docker-compose.staging.yml --env-file .env.staging-new \
 | docs/28_staging_cors_csp_postmortem.md | CORS/CSPインシデント対策 | CORS/CSP問題発生時 |
 | docs/29_tunnel_ops_guide.md | Cloudflare Tunnel運用手順 | Tunnel再起動時 |
 | docs/34_phase2_protocols_guide.md | Phase 2 マルチプロトコル技術ガイド | Lido/Pendle/Optimizer/Risk Engine実装時 |
+| docs/35_docker_maintenance_runbook.md | Docker 週次クリーンアップ手順 | disk 逼迫時・cron 設定変更時 |
+| docs/ops/01_api_endpoints.md | 全APIエンドポイント一覧（パス・認証・curl例） | curl を書く前・エンドポイントを推測しそうなとき |
+| docs/ops/02_db_tables.md | 全DBテーブル定義（カラム・型・NULL可否） | ALTER TABLE を書く前・DBスキーマを推測しそうなとき |
+| docs/ops/03_deploy_procedures.md | デプロイ手順・コンテナ名・ボリューム・障害対応 | デプロイ前・Docker環境を推測しそうなとき |
+
+---
+
+## Docker クリーンアップ運用
+
+- 週次自動実行: `scripts/docker_cleanup.sh`（毎週日曜 03:00 JST、Hetzner cron 登録）
+- 使用コマンド: `docker builder prune -f` + `docker image prune -f`
+- **禁止**: `docker system prune -af`（使用中イメージ削除リスク、CLAUDE.md 明記）
+- 閾値: WARN 70% / CRITICAL 85%（Slack `#ultra-auto-project` 通知）
+- 詳細: `docs/35_docker_maintenance_runbook.md`
 
 ---
 
@@ -707,6 +763,60 @@ docker compose -f docker-compose.staging.yml --env-file .env.staging-new \
 - フロントエンド: 戦略選択画面（/user/strategies）+ プロトコルヘルスモニター（/admin/protocols）
 - テスト: 1762 passed（dev ブランチ）
 - 次: staging デプロイ → E2Eテスト → main マージ
+
+---
+
+## Fee Model v10 (F-1〜F-16 進行中、2026-04-25〜)
+
+詳細は `docs/45_fee_model_v10_migration_plan.md` 参照。F-2/F-3 で確定したルール:
+
+### Tier (投資ティア、F-2)
+- 内部値: `LOWER` / `MIDDLE` / `UPPER` (v10 三層、JPY 境界 100 万 / 1000 万)
+- v9 互換値 `GENERAL` は deprecated として残置 (F-13 で削除)
+- 日本語ラベル辞書: `app.auth.models.TIER_JP_LABELS`
+- 判定関数: `app.users.tier_service.determine_tier_jpy(deposit_jpy)`
+- 既存 6 ユーザーの再判定 SQL: `docs/46_users_tier_migration_plan.md` (F-16 で実行)
+
+### RiskMode (リスクモード、F-3)
+- 内部値: `conservative` / `balanced` / `aggressive` (v9 から **完全維持、リネーム禁止**)
+  - Aave MDD / Optimizer Allocator / Aave Risk Profile が文字列リテラル直参照
+- 表示: `app.auth.models.RISK_MODE_JP_LABELS` (ローリスク / ミドルリスク / ハイリスク) で日本語化
+- Phase 1 制限: `PHASE_1_ALLOWED_RISK_MODES = {CONSERVATIVE}`、API 層 (`PUT /auth/risk-mode`) で 403
+- API レスポンス: UserResponse に `risk_mode_label` (computed_field) 追加、フロントは英語値→日本語化辞書を持たない
+- 関連 endpoint: `GET /auth/risk-modes` (新規、全モード一覧 + Phase + 許可状態)
+- NULL 4 ユーザーの 'conservative' 物理 UPDATE: `docs/47_users_risk_mode_migration_plan.md` (F-16 で実行)
+
+---
+
+## 開発フェーズ別チェックポイント（2026-04-24追加）
+
+> 2026-04-24 インシデント対策: curl推測・Docker実態未確認・DBスキーマ差分見落とし・E2E未検証でのドキュメント公開の4パターンを防ぐ。
+
+### Phase 1: 調査（コードを書く前に必ず実施）
+- [ ] `docs/ops/01_api_endpoints.md` でエンドポイントパスを確認 — curl を推測で書かない
+- [ ] `docs/ops/02_db_tables.md` でDBカラムを確認 — ALTER TABLE を推測で書かない
+- [ ] Docker 環境確認: `docker ps | grep ultra-autotrade` でコンテナ名を実際に取得（`docs/ops/03_deploy_procedures.md` 参照）
+- [ ] 認証・権限系は3層確認（フロント UI / バックエンドエンドポイント / DB カラム）→ 「2026-04-21 教訓」§再発防止ルール 2 参照
+
+### Phase 2: 実装
+- [ ] `./scripts/verify.sh` 全パス（ruff / mypy / pytest 80%+）→ 「Testing」セクション参照
+- [ ] DBカラム追加時: モデルファイル冒頭に ALTER TABLE コメント記載（Alembic 未使用）
+- [ ] 新規エンドポイント追加時: `docs/ops/01_api_endpoints.md` を更新
+
+### Phase 3: デプロイ
+- [ ] `docs/ops/03_deploy_procedures.md` の手順に従う（Hetzner で `deploy_production.sh`）
+- [ ] DBカラム追加がある場合: Hetzner で先に ALTER TABLE を実行してからデプロイ
+- [ ] `docs/22_production_release_checklist.md` §8（デプロイ手順）を確認
+
+### Phase 4: 検証（デプロイ後）
+- [ ] `curl -sf https://api.ultra-auto-trade.com/health | python3 -m json.tool` で `scheduler_healthy: true` 確認
+- [ ] `docker logs --tail=100 ultra-autotrade-backend-production 2>&1 | grep "401\|ERROR"` で 401 確認
+- [ ] `docs/22_production_release_checklist.md` §9（ポストデプロイ確認）を参照
+
+### Phase 5: ユーザー向けドキュメント・連絡
+- [ ] 手順書を書く前に Playwright E2E で動作確認 → `docs/14_test_strategy.md` §10.X 参照
+- [ ] E2E で通過した手順のみドキュメントに記載（未確認の手順は記載禁止）
+- [ ] partner ロール画面の記述: フロント UI / バックエンドエンドポイント / DB カラムの3層確認 → 「2026-04-21 教訓」§再発防止ルール 1・2 参照
 
 ---
 

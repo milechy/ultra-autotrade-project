@@ -58,6 +58,53 @@ def _get_primary_chain() -> str:
     return raw.split(",")[0].strip()
 
 
+def _notify_aave_failure(proposal_id: int, error_message: str, failed_at: datetime) -> None:
+    """Aave 実行失敗を管理者向けに Slack 通知する（失敗しても本処理を止めない）。"""
+    try:
+        from app.notifications.factory import get_notification_service  # noqa: PLC0415
+        from app.notifications.schemas import (  # noqa: PLC0415
+            NotificationChannel,
+            NotificationMessage,
+            NotificationSeverity,
+        )
+
+        message = NotificationMessage(
+            channel=NotificationChannel.SLACK,
+            severity=NotificationSeverity.ALERT,
+            title=f"Aave execution failed (proposal #{proposal_id})",
+            body=(
+                f"proposal_id: {proposal_id}\n"
+                f"reason: {error_message}\n"
+                f"timestamp: {failed_at.isoformat()}"
+            ),
+        )
+        get_notification_service().send(message)
+    except Exception:  # noqa: BLE001 — 通知失敗で本処理を止めない
+        logger.exception("proposal %d: failed to send Slack notification", proposal_id)
+
+
+def _record_failed_transaction(
+    proposal: Proposal, chain: str, error_message: str, db: Session
+) -> None:
+    """Aave 実行失敗時に transactions テーブルに失敗行を追加する。"""
+    from app.transactions.models import Transaction  # noqa: PLC0415
+
+    tx = Transaction(
+        user_id=proposal.user_id,
+        operation=proposal.operation,
+        asset=proposal.asset,
+        amount=proposal.amount,
+        amount_usd=proposal.amount_usd,
+        tx_hash=None,
+        chain=chain,
+        status="failed",
+        ai_decision_id=proposal.ai_decision_id,
+        is_dry_run=False,
+        error_message=error_message,
+    )
+    db.add(tx)
+
+
 def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
     """
     承認された提案に対して Aave 操作を実行し、proposal を更新する。
@@ -65,6 +112,10 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
     - SUPPLY  → TradeAction.BUY (deposit)
     - WITHDRAW → TradeAction.SELL (withdraw)
     - BORROW / REPAY → 現フェーズでは NOOP（approved のまま）
+
+    Aave 実行失敗時は proposal.status を 'failed' に遷移させ、
+    error_message と transactions(status='failed') を記録し、Slack 通知を送る。
+    呼び出し元は db.commit() を実行する責務を持つ。
     """
     from app.aave.service import MultiChainAaveService  # noqa: PLC0415
     from app.ai.schemas import TradeAction  # noqa: PLC0415
@@ -124,8 +175,14 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
             result.status,
         )
     except Exception as exc:  # noqa: BLE001
+        error_message = f"{type(exc).__name__}: {exc}"
         logger.error("proposal %d: Aave execution failed — %s", proposal.id, exc, exc_info=True)
-        # Aave 実行失敗時は "approved" のまま（再試行可能にする）
+        failed_at = datetime.now(timezone.utc)
+        proposal.status = "failed"
+        proposal.error_message = error_message
+        proposal.executed_at = failed_at
+        _record_failed_transaction(proposal, chain, error_message, db)
+        _notify_aave_failure(proposal.id, error_message, failed_at)
 
 
 @router.get(
@@ -250,7 +307,7 @@ def list_proposal_history(
         select(Proposal)
         .where(
             Proposal.user_id == current_user.id,
-            Proposal.status.in_(["approved", "rejected", "executed"]),
+            Proposal.status.in_(["approved", "rejected", "executed", "failed"]),
         )
         .order_by(Proposal.created_at.desc())
     )
@@ -285,7 +342,7 @@ def approve_proposal(
     db.commit()
     db.refresh(proposal)
 
-    # Step 2: Aave 操作を実行（失敗しても approved のまま）
+    # Step 2: Aave 操作を実行（失敗時は 'failed' に遷移）
     _execute_aave_for_proposal(proposal, db)
     db.commit()
     db.refresh(proposal)

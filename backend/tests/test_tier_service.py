@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-tier-service")
 
-from app.auth.models import InvestmentTier, User, UserRole
+from app.auth.models import TIER_JP_LABELS, InvestmentTier, User, UserRole
 from app.auth.router import router as auth_router
 from app.auth.schemas import UserCreateRequest
 from app.auth.service import AuthService
@@ -22,7 +22,7 @@ from app.database import Base, get_db
 from app.partner.allocation_schemas import AllocationCreateRequest, AllocationUpdateRequest
 from app.partner.allocation_service import create_allocation, delete_allocation, update_allocation
 from app.users.router import router as users_router
-from app.users.tier_service import determine_tier, refresh_partner_tier
+from app.users.tier_service import determine_tier, determine_tier_jpy, refresh_partner_tier
 
 SessionFactory = sessionmaker[Session]
 
@@ -44,10 +44,13 @@ def test_db() -> Generator[tuple[SessionFactory, object], None, None]:
 
 
 class TestDetermineTier:
-    """determine_tier の境界値テスト。デフォルト閾値 $20,000。"""
+    """determine_tier の境界値テスト。デフォルト閾値 $20,000。
+
+    F-2 (2026-04-25): 戻り値を v9 GENERAL から v10 LOWER に変更。
+    """
 
     def test_below_threshold(self) -> None:
-        assert determine_tier(Decimal("19999.99")) == InvestmentTier.GENERAL.value
+        assert determine_tier(Decimal("19999.99")) == InvestmentTier.LOWER.value
 
     def test_at_threshold(self) -> None:
         assert determine_tier(Decimal("20000.00")) == InvestmentTier.UPPER.value
@@ -56,11 +59,11 @@ class TestDetermineTier:
         assert determine_tier(Decimal("20000.01")) == InvestmentTier.UPPER.value
 
     def test_zero(self) -> None:
-        assert determine_tier(Decimal("0")) == InvestmentTier.GENERAL.value
+        assert determine_tier(Decimal("0")) == InvestmentTier.LOWER.value
 
     def test_custom_threshold_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("TIER_THRESHOLD_USD", "10000")
-        assert determine_tier(Decimal("9999")) == InvestmentTier.GENERAL.value
+        assert determine_tier(Decimal("9999")) == InvestmentTier.LOWER.value
         assert determine_tier(Decimal("10000")) == InvestmentTier.UPPER.value
 
     def test_invalid_threshold_env_falls_back_to_default(
@@ -68,7 +71,7 @@ class TestDetermineTier:
     ) -> None:
         monkeypatch.setenv("TIER_THRESHOLD_USD", "not-a-number")
         # フォールバック → デフォルト $20,000
-        assert determine_tier(Decimal("19999")) == InvestmentTier.GENERAL.value
+        assert determine_tier(Decimal("19999")) == InvestmentTier.LOWER.value
         assert determine_tier(Decimal("20000")) == InvestmentTier.UPPER.value
 
 
@@ -93,9 +96,9 @@ class TestRefreshPartnerTier:
         with factory() as db:
             partner = _make_partner(db)
             tier = refresh_partner_tier(db, partner.id)
-            assert tier == InvestmentTier.GENERAL.value
+            assert tier == InvestmentTier.LOWER.value
             db.refresh(partner)
-            assert partner.tier == InvestmentTier.GENERAL.value
+            assert partner.tier == InvestmentTier.LOWER.value
 
     def test_below_threshold_gives_general(self, test_db: tuple) -> None:
         factory, _ = test_db
@@ -106,7 +109,7 @@ class TestRefreshPartnerTier:
             )
             create_allocation(db, partner.id, req)
             db.refresh(partner)
-            assert partner.tier == InvestmentTier.GENERAL.value
+            assert partner.tier == InvestmentTier.LOWER.value
 
     def test_at_threshold_gives_upper(self, test_db: tuple) -> None:
         factory, _ = test_db
@@ -128,7 +131,7 @@ class TestRefreshPartnerTier:
             )
             alloc = create_allocation(db, partner.id, req)
             db.refresh(partner)
-            assert partner.tier == InvestmentTier.GENERAL.value
+            assert partner.tier == InvestmentTier.LOWER.value
 
             # 金額を増やして UPPER に
             update_req = AllocationUpdateRequest(allocated_amount_usd=Decimal("25000"))
@@ -149,7 +152,7 @@ class TestRefreshPartnerTier:
 
             delete_allocation(db, alloc.id, partner.id)
             db.refresh(partner)
-            assert partner.tier == InvestmentTier.GENERAL.value
+            assert partner.tier == InvestmentTier.LOWER.value
 
     def test_withdrawn_allocation_excluded_from_tier(self, test_db: tuple) -> None:
         """status=withdrawn の割り振りはティア計算に含まれない。"""
@@ -166,7 +169,7 @@ class TestRefreshPartnerTier:
             update_req = AllocationUpdateRequest(status="withdrawn")
             update_allocation(db, alloc.id, partner.id, update_req)
             db.refresh(partner)
-            assert partner.tier == InvestmentTier.GENERAL.value
+            assert partner.tier == InvestmentTier.LOWER.value
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +210,7 @@ class TestTierAPI:
                 headers={"Authorization": f"Bearer {token}"},
             )
             assert r.status_code == 200
-            assert r.json()["tier"] == InvestmentTier.GENERAL.value
+            assert r.json()["tier"] == InvestmentTier.LOWER.value
 
     def test_viewer_cannot_access_tier(self, test_db: tuple) -> None:
         factory, _ = test_db
@@ -266,3 +269,70 @@ class TestTierAPI:
                 headers={"Authorization": f"Bearer {token}"},
             )
             assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# determine_tier_jpy ユニットテスト (v10 3 層、JPY 境界)
+# ---------------------------------------------------------------------------
+
+
+class TestDetermineTierJpy:
+    """v10 三層判定の境界値テスト。
+
+    境界:
+      LOWER:  deposit_jpy <= 1,000,000
+      MIDDLE: 1,000,001 <= deposit_jpy <= 10,000,000
+      UPPER:  deposit_jpy >= 10,000,001
+    """
+
+    def test_zero(self) -> None:
+        assert determine_tier_jpy(Decimal("0")) == InvestmentTier.LOWER
+
+    def test_just_below_lower_boundary(self) -> None:
+        assert determine_tier_jpy(Decimal("999999")) == InvestmentTier.LOWER
+
+    def test_at_lower_boundary(self) -> None:
+        # 100 万円ジャストは LOWER に含む
+        assert determine_tier_jpy(Decimal("1000000")) == InvestmentTier.LOWER
+
+    def test_just_above_lower_boundary(self) -> None:
+        # 100 万円 +1 円から MIDDLE
+        assert determine_tier_jpy(Decimal("1000001")) == InvestmentTier.MIDDLE
+
+    def test_mid_middle_range(self) -> None:
+        assert determine_tier_jpy(Decimal("5000000")) == InvestmentTier.MIDDLE
+
+    def test_just_below_upper_boundary(self) -> None:
+        assert determine_tier_jpy(Decimal("9999999")) == InvestmentTier.MIDDLE
+
+    def test_at_upper_boundary(self) -> None:
+        # 1000 万円ジャストは MIDDLE に含む
+        assert determine_tier_jpy(Decimal("10000000")) == InvestmentTier.MIDDLE
+
+    def test_just_above_upper_boundary(self) -> None:
+        # 1000 万円 +1 円から UPPER
+        assert determine_tier_jpy(Decimal("10000001")) == InvestmentTier.UPPER
+
+    def test_far_above_upper(self) -> None:
+        assert determine_tier_jpy(Decimal("100000000")) == InvestmentTier.UPPER
+
+
+class TestTierJpLabels:
+    """日本語ラベル辞書テスト。"""
+
+    def test_lower_label(self) -> None:
+        assert TIER_JP_LABELS[InvestmentTier.LOWER] == "一般"
+
+    def test_middle_label(self) -> None:
+        assert TIER_JP_LABELS[InvestmentTier.MIDDLE] == "ミドル"
+
+    def test_upper_label(self) -> None:
+        assert TIER_JP_LABELS[InvestmentTier.UPPER] == "アッパー"
+
+    def test_general_legacy_label(self) -> None:
+        # GENERAL (v9 互換) は LOWER と同じラベル
+        assert TIER_JP_LABELS[InvestmentTier.GENERAL] == "一般"
+
+    def test_all_enum_values_have_labels(self) -> None:
+        for tier in InvestmentTier:
+            assert tier in TIER_JP_LABELS, f"Missing JP label for {tier}"

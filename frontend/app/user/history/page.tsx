@@ -77,11 +77,10 @@ const aaveOperationConfig: Record<AaveOperation, { label: string; className: str
 }
 
 function getExplorerUrl(txHash: string, chain: string): string {
-  if (chain === 'arbitrum') return `https://arbiscan.io/tx/${txHash}`
-  if (chain === 'arbitrum-sepolia') return `https://sepolia.arbiscan.io/tx/${txHash}`
   if (chain === 'base-sepolia') return `https://sepolia.basescan.org/tx/${txHash}`
   if (chain === 'base') return `https://basescan.org/tx/${txHash}`
-  return `https://arbiscan.io/tx/${txHash}`
+  if (chain === 'arbitrum') return `https://arbiscan.io/tx/${txHash}`
+  return `https://sepolia.basescan.org/tx/${txHash}`
 }
 
 function AaveHistoryTab() {

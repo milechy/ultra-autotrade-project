@@ -52,11 +52,6 @@ export const SUPPORTED_CHAINS = {
     name: 'Arbitrum One',
     rpc: process.env.NEXT_PUBLIC_ARBITRUM_ONE_RPC || 'https://arb1.arbitrum.io/rpc',
   },
-  'arbitrum-sepolia': {
-    id: 421614,
-    name: 'Arbitrum Sepolia',
-    rpc: process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC || 'https://sepolia-rollup.arbitrum.io/rpc',
-  },
   'base-sepolia': {
     id: 84532,
     name: 'Base Sepolia',
@@ -88,14 +83,13 @@ export const DEFAULT_CHAIN: SupportedChainKey =
 
 export const MINIMUM_USD_BALANCE = 3000
 
-// Supported chain IDs (testnet + mainnet)
-export const ARBITRUM_CHAIN_IDS = [42161, 421614, 84532, 8453, 10, 1]
+// Supported chain IDs (Base Sepolia testnet only)
+export const SUPPORTED_CHAIN_IDS = [84532]
 
 export function getChainKey(chainId: number): SupportedChainKey | null {
-  if (chainId === 42161) return 'arbitrum'
-  if (chainId === 421614) return 'arbitrum-sepolia'
   if (chainId === 84532) return 'base-sepolia'
   if (chainId === 8453) return 'base'
+  if (chainId === 42161) return 'arbitrum'
   if (chainId === 10) return 'optimism'
   if (chainId === 1) return 'mainnet'
   return null

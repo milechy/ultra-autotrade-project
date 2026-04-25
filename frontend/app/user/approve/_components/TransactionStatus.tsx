@@ -12,10 +12,10 @@ export interface TransactionStatusProps {
 }
 
 function getTxUrl(hash: string, chain?: string): string {
-  if (chain === 'arbitrum-sepolia') return `https://sepolia.arbiscan.io/tx/${hash}`
   if (chain === 'base-sepolia') return `https://sepolia.basescan.org/tx/${hash}`
   if (chain === 'base') return `https://basescan.org/tx/${hash}`
-  return `https://arbiscan.io/tx/${hash}`
+  if (chain === 'arbitrum') return `https://arbiscan.io/tx/${hash}`
+  return `https://sepolia.basescan.org/tx/${hash}`
 }
 
 function TxLink({ hash, chain }: { hash: string; chain?: string }) {

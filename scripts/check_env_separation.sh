@@ -183,6 +183,48 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# AI モデル名検証
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- AI モデル名チェック ---"
+
+_DEPRECATED_AI_MODELS=(
+  "claude-sonnet-4-20250514"
+  "claude-3-5-sonnet-20241022"
+  "claude-3-5-sonnet-latest"
+  "claude-3-opus-20240229"
+)
+
+_validate_ai_model_names() {
+  local env_file="$1"
+  local env_label="$2"
+  local ok=0
+
+  for pattern in "${_DEPRECATED_AI_MODELS[@]}"; do
+    if grep -qE "^(AI_CLAUDE_MODEL|AI_FALLBACK_MODEL)=.*${pattern}" "${env_file}"; then
+      VIOLATIONS+=("非推奨 Claude モデルが ${env_label} に設定されています: ${pattern}")
+      echo "  ❌ 非推奨モデル検出 [${env_label}]: ${pattern}"
+      ok=1
+    fi
+  done
+
+  local claude_model
+  claude_model="$(get_value "${env_file}" "AI_CLAUDE_MODEL")"
+  if [[ -z "${claude_model}" ]]; then
+    VIOLATIONS+=("AI_CLAUDE_MODEL が ${env_label} に未設定です")
+    echo "  ❌ AI_CLAUDE_MODEL 未設定 [${env_label}]"
+    ok=1
+  else
+    echo "  ✅ AI_CLAUDE_MODEL [${env_label}]: ${claude_model}"
+  fi
+
+  return "${ok}"
+}
+
+_validate_ai_model_names "${PRODUCTION_FILE}" "production"
+_validate_ai_model_names "${STAGING_FILE}" "staging"
+
+# ---------------------------------------------------------------------------
 # 結果サマリ
 # ---------------------------------------------------------------------------
 echo ""

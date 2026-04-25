@@ -5,6 +5,8 @@ on:
     paths:
       - '.env.staging'
       - '.env.production'
+      - 'backend/.env.staging.example'
+      - 'backend/.env.production.example'
       - 'docker-compose*.yml'
       - 'scripts/check_env_separation.sh'
   push:
@@ -17,14 +19,19 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify env separation
         run: |
-          if [ -f .env.production.example ] && [ -f .env.staging.example ]; then
-            cp .env.production.example .env.production
-            cp .env.staging.example .env.staging
-            bash scripts/check_env_separation.sh
-          else
-            echo "::warning::.env.*.example が見つからない、検証スキップ"
+          if [ ! -f backend/.env.production.example ]; then
+            echo "::error::backend/.env.production.example が見つかりません"
+            exit 1
           fi
+          if [ ! -f backend/.env.staging.example ]; then
+            echo "::error::backend/.env.staging.example が見つかりません"
+            exit 1
+          fi
+          cp backend/.env.production.example .env.production
+          cp backend/.env.staging.example .env.staging
+          bash scripts/check_env_separation.sh
       - name: Shellcheck
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: './scripts'
+          severity: error

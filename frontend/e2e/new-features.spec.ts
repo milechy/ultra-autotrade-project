@@ -180,26 +180,16 @@ test.describe('メインネットチェーン選択 — /connect', () => {
 
   test('未接続時はネットワーク選択UIが表示されない', async ({ page }) => {
     await page.goto('/connect');
-    // isConnected が false → NetworkCheck Card, Mainnet buttons は非表示
-    const baseBtn = page.getByRole('button', { name: /Base に切り替える/ });
-    const arbitrumBtn = page.getByRole('button', { name: /Arbitrum One に切り替える/ });
-    const optimismBtn = page.getByRole('button', { name: /Optimism に切り替える/ });
-    const ethereumBtn = page.getByRole('button', { name: /Ethereum に切り替える/ });
-
-    await expect(baseBtn).not.toBeVisible();
-    await expect(arbitrumBtn).not.toBeVisible();
-    await expect(optimismBtn).not.toBeVisible();
-    await expect(ethereumBtn).not.toBeVisible();
+    // isConnected が false → NetworkCheck Card は非表示
+    const baseSepoliaBtn = page.getByRole('button', { name: /Base Sepolia \(テスト用\)/ });
+    await expect(baseSepoliaBtn).not.toBeVisible();
   });
 
   test('未接続時はテストネットの切り替えボタンが表示されない', async ({ page }) => {
     await page.goto('/connect');
     // isConnected が false → テストネットボタンも非表示
     const baseSepoliaBtn = page.getByRole('button', { name: /Base Sepolia/ });
-    const arbitrumSepoliaBtn = page.getByRole('button', { name: /Arbitrum Sepolia/ });
-
     await expect(baseSepoliaBtn).not.toBeVisible();
-    await expect(arbitrumSepoliaBtn).not.toBeVisible();
   });
 
   test('ステップインジケーターに3ステップが全て表示される', async ({ page }) => {
@@ -210,9 +200,9 @@ test.describe('メインネットチェーン選択 — /connect', () => {
     await expect(page.getByText('規約同意')).toBeVisible();
   });
 
-  test('ページの説明文（MetaMask / WalletConnect）が表示される', async ({ page }) => {
+  test('ページの説明文（ウォレット接続）が表示される', async ({ page }) => {
     await page.goto('/connect');
-    const description = page.getByText('MetaMaskまたはWalletConnect対応ウォレットで接続してください');
+    const description = page.getByText('ウォレットまたはメールアドレスで接続してください');
     await expect(description).toBeVisible();
   });
 });

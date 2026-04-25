@@ -66,13 +66,25 @@ export async function logout(token: string): Promise<void> {
 }
 
 /**
- * 現在のユーザー情報取得
+ * 現在のユーザー情報取得。
+ *
+ * 8 秒の AbortSignal.timeout を付与する。バックエンドが応答不能な瞬間でも
+ * AuthProvider の初期化が 8 秒で解決し、画面が真っ暗なまま無限ブロックする
+ * (2026-04-24 の山本さんインシデント) のを防ぐ。
+ * timeoutMs に override を渡せば Playwright 等で調整可能。
  */
-export async function getMe(token: string): Promise<UserResponse> {
+const DEFAULT_GET_ME_TIMEOUT_MS = 8000;
+
+export async function getMe(
+  token: string,
+  options?: { timeoutMs?: number }
+): Promise<UserResponse> {
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_GET_ME_TIMEOUT_MS;
   return await getJson<UserResponse>("/auth/me", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+    signal: AbortSignal.timeout(timeoutMs),
   });
 }
 

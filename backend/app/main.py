@@ -40,6 +40,7 @@ from app.ai.feedback_router import router as ai_feedback_router
 from app.ai.router import router as ai_router
 from app.api.alias_router import router as alias_router
 from app.api.automation_dashboard import router as automation_dashboard_router
+from app.api.v1.fees import router as fees_v10_router
 from app.auth.router import router as auth_router
 from app.auth.service import AuthService
 from app.automation.automation_router import router as automation_router
@@ -228,6 +229,8 @@ def create_app() -> FastAPI:
     app.include_router(data_feeds_router)  # External data feeds (Phase 2)
     app.include_router(reports_router, prefix="/api/reports")  # Monthly reports
     app.include_router(billing_router)
+    # F-8a: Fee Model v10 API (/api/v1/fees/*)。既存 billing/fee_router は併存維持 (F-8b で廃止予定)。
+    app.include_router(fees_v10_router, prefix="/api/v1")
     app.include_router(ai_decisions_router)  # AI Decisions API
     app.include_router(ai_feedback_router)  # AI Feedback API (Layer 4)
     app.include_router(transactions_router)  # Transactions API
@@ -247,6 +250,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["health"])
     def health_check() -> dict[str, Any]:
+        from app.ai.config import DEFAULT_CLAUDE_MODEL, DEFAULT_FALLBACK_MODEL
         from app.automation.ai_judgment_scheduler import get_scheduler_status
         from app.automation.scheduler_watchdog import compute_scheduler_health
 
@@ -268,7 +272,18 @@ def create_app() -> FastAPI:
             "next_judgment": scheduler.get("next_run"),
             "scheduler_last_error": scheduler.get("last_error"),
             "warnings": warnings,
+            "claude_model": os.getenv("AI_CLAUDE_MODEL") or DEFAULT_CLAUDE_MODEL,
+            "claude_fallback_model": os.getenv("AI_FALLBACK_MODEL") or DEFAULT_FALLBACK_MODEL,
         }
+
+    # --- AI model config validation (fail-fast: must be first startup event) ---
+    @app.on_event("startup")
+    async def startup_validate_model_config() -> None:
+        """Fail-fast: reject deprecated Claude model names before any task starts."""
+        from app.ai.config import _validate_model_config  # noqa: PLC0415
+
+        _validate_model_config()
+        logger.info("AI model config validation passed")
 
     # --- Database initialization (Phase12) ---
     @app.on_event("startup")

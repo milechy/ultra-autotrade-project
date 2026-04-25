@@ -7,6 +7,16 @@
 
 ## backend/app/main.py
 
+### 変更 #3: /health エンドポイントに AI モデル設定を追加 (PR #95 / 2026-04-20)
+- **コミット範囲**: `408d3ad` (feature/remove-claude-model-hardcodes)
+- **変更内容**:
+  - `/health` レスポンスに `claude_model` / `claude_fallback_model` フィールド追加
+  - `app.ai.config` から `DEFAULT_CLAUDE_MODEL` / `DEFAULT_FALLBACK_MODEL` をインポート
+  - `AI_CLAUDE_MODEL` / `AI_FALLBACK_MODEL` 環境変数の実効値を確認できるようにする
+- **理由**: AIモデル名のハードコード除去 (PR #95) の一環。デプロイ後に稼働中のモデル設定を `/health` で検証できるようにする。
+- **影響範囲**: `/health` エンドポイントのレスポンスフィールド追加のみ。既存フィールド・ロジックへの影響なし。
+- **承認**: feature/remove-claude-model-hardcodes → dev の通常フロー経由（PR #95）
+
 ### 変更 #2: F-17a カスタムリミッター startup 通知 (PR #92 / 2026-04-19)
 - **コミット範囲**: `52043f6` (dev ブランチ, feature/risk-limiter-env-toggle マージ)
 - **変更内容**:
@@ -33,6 +43,16 @@
 - **承認**: dev → staging → main の通常フロー経由
 
 ---
+
+
+### 変更 #4: F-8a v10 fees router 登録 (PR #127 / 2026-04-25)
+- **コミット範囲**: `d55a53c` (feature/f8a-fees-api-readonly)
+- **変更内容**:
+  - `from app.api.v1 import fees as fees_v10_router` を追加
+  - `app.include_router(fees_v10_router.router, prefix="/api/v1")` を `billing_router` の直後に追加
+- **理由**: F-8a (Asana 1214120371503131) — v10 fees API endpoints (/api/v1/fees/*) を FastAPI app に登録。既存 /api/billing/* と /api/fees/calculate|schedule は無変更で併存維持 (F-8b GID 1214288467406433 で廃止予定)。
+- **影響範囲**: 新規 router 追加のみ。既存 endpoint への影響なし。`TestCoexistenceWithLegacyEndpoints` (2件) で既存 endpoint の404でないことを保証。
+- **承認**: feature/f8a-fees-api-readonly → main の通常フロー経由（PR #127）
 
 ## backend/app/database.py
 

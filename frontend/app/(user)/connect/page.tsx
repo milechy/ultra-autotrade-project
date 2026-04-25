@@ -17,12 +17,10 @@ type UserMode = 'managed' | 'active' | 'pro'
 
 const USER_MODE_STORAGE_KEY = 'ultra_user_mode'
 
-// Arbitrum One (mainnet), Arbitrum Sepolia (testnet), Base Sepolia (testnet)
-const SUPPORTED_CHAIN_IDS = [42161, 421614, 84532]
+// Base Sepolia (testnet only)
+const SUPPORTED_CHAIN_IDS = [84532]
 
 const CHAIN_DISPLAY_NAMES: Record<number, string> = {
-  42161: 'Arbitrum One',
-  421614: 'Arbitrum Sepolia',
   84532: 'Base Sepolia',
 }
 
@@ -230,47 +228,6 @@ export default function ConnectPage() {
                       onClick={() => wallet?.switchChain(84532)}
                     >
                       Base Sepolia (テスト用) に切り替える
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-yellow-600 text-yellow-400 hover:bg-yellow-950/40"
-                      onClick={() => wallet?.switchChain(421614)}
-                    >
-                      Arbitrum Sepolia (テスト用) に切り替える
-                    </Button>
-                    <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wide pt-1">メインネット</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-zinc-600 text-zinc-400 hover:bg-zinc-800/40"
-                      onClick={() => wallet?.switchChain(8453)}
-                    >
-                      Base に切り替える
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-zinc-600 text-zinc-400 hover:bg-zinc-800/40"
-                      onClick={() => wallet?.switchChain(42161)}
-                    >
-                      Arbitrum One に切り替える
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-zinc-600 text-zinc-400 hover:bg-zinc-800/40"
-                      onClick={() => wallet?.switchChain(10)}
-                    >
-                      Optimism に切り替える
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-zinc-600 text-zinc-400 hover:bg-zinc-800/40"
-                      onClick={() => wallet?.switchChain(1)}
-                    >
-                      Ethereum に切り替える
                     </Button>
                   </div>
                 )}

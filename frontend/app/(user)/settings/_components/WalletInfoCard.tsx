@@ -31,7 +31,6 @@ function getNetworkName(chainId: number | null): string {
   const names: Record<number, string> = {
     1: 'Ethereum',
     42161: 'Arbitrum One',
-    421614: 'Arbitrum Sepolia',
     84532: 'Base Sepolia',
     137: 'Polygon',
     80001: 'Polygon Mumbai',
@@ -45,7 +44,6 @@ function getNetworkBadgeClass(chainId: number | null): string {
   const colorMap: Record<number, string> = {
     1: 'bg-blue-900/40 text-blue-300 border-blue-700',
     42161: 'bg-sky-900/40 text-sky-300 border-sky-700',
-    421614: 'bg-sky-900/40 text-sky-300 border-sky-700',
     84532: 'bg-indigo-900/40 text-indigo-300 border-indigo-700',
     137: 'bg-purple-900/40 text-purple-300 border-purple-700',
   }

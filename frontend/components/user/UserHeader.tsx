@@ -24,6 +24,16 @@ const adminNavItems = [
   { href: '/user/wallet', label: 'ウォレット' },
 ]
 
+// partner (非 admin) が /user/approve 等の user レイアウト画面に居るとき、
+// user 用ナビではなく partner ポータルへの導線を出す。
+const partnerNavItems = [
+  { href: '/partner/dashboard', label: 'ダッシュボード' },
+  { href: '/user/approve', label: '取引承認' },
+  { href: '/partner/users', label: 'テスター管理' },
+  { href: '/partner/proposals', label: 'AI提案' },
+  { href: '/partner/settings', label: '設定' },
+]
+
 const viewerNavItems = [
   { href: '/user/dashboard', label: 'ダッシュボード' },
   { href: '/user/ai-feed', label: 'AI判定' },
@@ -33,7 +43,7 @@ const viewerNavItems = [
 export function UserHeader() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, logout, token, isAdmin } = useAuth()
+  const { user, logout, token, isAdmin, isPartner } = useAuth()
   const { address, chain } = useAccount()
   const { isStopped, refreshStatus } = useAutomationStatus()
   const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false)
@@ -72,13 +82,21 @@ export function UserHeader() {
     <>
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
         <div className="flex items-center justify-between px-4 py-2">
-          <Link href="/user/dashboard" className="font-bold text-sm shrink-0">
+          <Link
+            href={isAdmin || !isPartner ? '/user/dashboard' : '/partner/dashboard'}
+            className="font-bold text-sm shrink-0"
+          >
             Ultra AutoTrade
           </Link>
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1 overflow-x-auto">
-            {(isAdmin ? adminNavItems : viewerNavItems).map(({ href, label }) => {
+            {(isAdmin
+              ? adminNavItems
+              : isPartner
+                ? partnerNavItems
+                : viewerNavItems
+            ).map(({ href, label }) => {
               const isActive = pathname === href || pathname.startsWith(href + '/')
               return (
                 <Link
@@ -107,9 +125,7 @@ export function UserHeader() {
                   variant="outline"
                   className={cn(
                     'text-xs hidden sm:flex',
-                    chain?.id === 42161
-                      ? 'border-green-500/50 text-green-400'
-                      : [421614, 84532, 11155111].includes(chain?.id ?? 0)
+                    chain?.id === 84532
                       ? 'border-yellow-500/50 text-yellow-400'
                       : 'border-red-500/50 text-red-400'
                   )}
