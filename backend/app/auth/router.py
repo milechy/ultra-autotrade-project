@@ -24,7 +24,16 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 
 from .dependencies import require_active_user
-from .models import User, UserRole
+from .models import (
+    PHASE_1_ALLOWED_RISK_MODES,
+    RISK_MODE_JP_LABELS,
+    RISK_MODE_PHASE,
+    RISK_MODE_PROTOCOLS,
+    RISK_MODE_SUBSCRIPTION_RATES,
+    RiskMode,
+    User,
+    UserRole,
+)
 from .schemas import (
     LoginRequest,
     PasswordChangeRequest,
@@ -311,8 +320,15 @@ def get_risk_mode(
     user: User = Depends(require_active_user),
 ) -> dict[str, Any]:
     """Return the current user's risk mode and available options."""
+    current_value = user.risk_mode or "conservative"
+    try:
+        current_enum = RiskMode(current_value)
+        current_label = RISK_MODE_JP_LABELS[current_enum]
+    except ValueError:
+        current_label = RISK_MODE_JP_LABELS[RiskMode.CONSERVATIVE]
     return {
-        "mode": user.risk_mode or "conservative",
+        "mode": current_value,
+        "label": current_label,
         "options": _RISK_OPTIONS,
     }
 
@@ -326,12 +342,64 @@ def update_risk_mode(
     user: User = Depends(require_active_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    """Update the user's risk mode (conservative / balanced / aggressive)."""
-    user.risk_mode = request.mode
+    """Update the user's risk mode (conservative / balanced / aggressive).
+
+    Phase 1 では CONSERVATIVE のみ許可する (BALANCED / AGGRESSIVE は 403)。
+    Phase 2 で ``PHASE_1_ALLOWED_RISK_MODES`` を拡張して解禁する。
+    """
+    # 内部値 (str) を enum に変換 (RiskModeUpdateRequest 側で pattern で制限済み)
+    try:
+        new_mode = RiskMode(request.mode)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unknown risk_mode: {request.mode!r}",
+        ) from exc
+
+    # Phase 1 制限: 許可されていないモードは 403
+    if new_mode not in PHASE_1_ALLOWED_RISK_MODES:
+        jp_label = RISK_MODE_JP_LABELS[new_mode]
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"{jp_label}はPhase 2以降で利用可能です。",
+        )
+
+    user.risk_mode = new_mode.value
     db.commit()
     db.refresh(user)
-    logger.info("User changed risk mode to %s: %s", request.mode, user.email)
-    return {"mode": user.risk_mode, "message": f"Risk mode updated to {request.mode}"}
+    logger.info("User changed risk mode to %s: %s", new_mode.value, user.email)
+    return {
+        "mode": user.risk_mode,
+        "label": RISK_MODE_JP_LABELS[new_mode],
+        "message": f"Risk mode updated to {new_mode.value}",
+    }
+
+
+@router.get(
+    "/risk-modes",
+    summary="List all risk modes (with labels, phase, allow status)",
+)
+def list_risk_modes(
+    _user: User = Depends(require_active_user),
+) -> dict[str, Any]:
+    """全リスクモード一覧を返す (フロント側のモード選択 UI 用)。
+
+    Returns:
+        ``{"modes": [{mode, label, phase, allowed_in_phase_1, subscription_rate, protocols}, ...]}``
+    """
+    modes_payload = []
+    for mode in RiskMode:
+        modes_payload.append(
+            {
+                "mode": mode.value,
+                "label": RISK_MODE_JP_LABELS[mode],
+                "phase": RISK_MODE_PHASE[mode],
+                "allowed_in_phase_1": mode in PHASE_1_ALLOWED_RISK_MODES,
+                "subscription_rate": str(RISK_MODE_SUBSCRIPTION_RATES[mode]),
+                "protocols": sorted(RISK_MODE_PROTOCOLS[mode]),
+            }
+        )
+    return {"modes": modes_payload}
 
 
 @router.post(

@@ -9,7 +9,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
 
 
 class UserRole(str, Enum):
@@ -85,6 +85,19 @@ class UserResponse(BaseModel):
     tier: InvestmentTier = InvestmentTier.LOWER
 
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def risk_mode_label(self) -> str:
+        """日本語表示ラベル (フロントエンドが直接利用可能)。
+
+        F-3 (2026-04-25): 内部値 (conservative/balanced/aggressive) は維持しつつ、
+        表示用の日本語ラベルを computed field として追加。NULL / 不明値は
+        "ローリスク" にフォールバック。
+        """
+        from app.auth.models import get_risk_mode_label  # noqa: PLC0415
+
+        return get_risk_mode_label(self.risk_mode)
 
 
 class RegisterResponse(UserResponse):

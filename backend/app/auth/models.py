@@ -70,6 +70,71 @@ TIER_BOUNDARY_LOWER_JPY = 1_000_000  # LOWER / MIDDLE 境界
 TIER_BOUNDARY_UPPER_JPY = 10_000_000  # MIDDLE / UPPER 境界
 
 
+class RiskMode(str, Enum):
+    """リスクモード。
+
+    内部値は v9 から継続使用 (conservative / balanced / aggressive)。
+    Aave MDD / Optimizer Allocator / Aave Risk Profile が文字列リテラルで直参照しているため
+    **値のリネームは禁止** (F-13 でも維持)。表示は ``RISK_MODE_JP_LABELS`` 経由で日本語化する。
+
+    F-3 (2026-04-25): 本 enum を新規作成 (従来は str リテラル直書き)。
+    """
+
+    CONSERVATIVE = "conservative"
+    BALANCED = "balanced"
+    AGGRESSIVE = "aggressive"
+
+
+#: risk_mode → 日本語表示ラベル (v10 spec)。1:1 マッピング。
+RISK_MODE_JP_LABELS: dict[RiskMode, str] = {
+    RiskMode.CONSERVATIVE: "ローリスク",
+    RiskMode.BALANCED: "ミドルリスク",
+    RiskMode.AGGRESSIVE: "ハイリスク",
+}
+
+#: Phase 1 で選択許可されているモード。
+#: Phase 2 で BALANCED / AGGRESSIVE を解禁する想定 (DB 側の制約ではなく API 層で強制)。
+PHASE_1_ALLOWED_RISK_MODES: frozenset[RiskMode] = frozenset({RiskMode.CONSERVATIVE})
+
+#: 各 risk_mode の解禁 Phase (Phase 2-3 の段階解禁を見据えた設計)。
+RISK_MODE_PHASE: dict[RiskMode, int] = {
+    RiskMode.CONSERVATIVE: 1,
+    RiskMode.BALANCED: 2,
+    RiskMode.AGGRESSIVE: 2,
+}
+
+#: リスクモード別月額サブスク率 (v10 spec §1)。
+#: F-1 で fee_configs.subscription_rates JSONB に投入する想定値と一致する。
+RISK_MODE_SUBSCRIPTION_RATES: dict[RiskMode, Decimal] = {
+    RiskMode.CONSERVATIVE: Decimal("0"),  # ローリスク 0%
+    RiskMode.BALANCED: Decimal("0.003"),  # ミドルリスク 0.3%/月
+    RiskMode.AGGRESSIVE: Decimal("0.010"),  # ハイリスク 1.0%/月
+}
+
+#: リスクモードごとに利用可能なプロトコル (v10 spec §1)。
+#: BALANCED / AGGRESSIVE は Phase 2 解禁時に Lido / Pendle を併用する。
+RISK_MODE_PROTOCOLS: dict[RiskMode, frozenset[str]] = {
+    RiskMode.CONSERVATIVE: frozenset({"aave"}),
+    RiskMode.BALANCED: frozenset({"aave", "lido"}),
+    RiskMode.AGGRESSIVE: frozenset({"aave", "lido", "pendle"}),
+}
+
+
+def get_risk_mode_label(value: str | None) -> str:
+    """``users.risk_mode`` の DB 値から日本語ラベルを取得する。
+
+    NULL / 不明値は CONSERVATIVE のラベル ("ローリスク") にフォールバックする
+    (Phase 1 デフォルト)。F-16 で NULL を 'conservative' に物理 UPDATE 後はフォールバック不要。
+    """
+    if not value:
+        return RISK_MODE_JP_LABELS[RiskMode.CONSERVATIVE]
+    try:
+        mode = RiskMode(value)
+    except ValueError:
+        return RISK_MODE_JP_LABELS[RiskMode.CONSERVATIVE]
+    return RISK_MODE_JP_LABELS[mode]
+
+
 class User(Base):
     """
     ユーザーテーブル。
