@@ -103,12 +103,32 @@
 | GET | `/api/transparency/risk-profile` | 🔑 | リスクプロファイル |
 | GET | `/api/transparency/risk-profile/{mode}` | 🔑 | モード別リスクプロファイル |
 
-## 手数料計算 `/api/fees`
+## 手数料計算 `/api/fees` (v9 旧、F-8b で廃止予定)
 
 | Method | Path | 認証 | 説明 |
 |--------|------|------|------|
-| GET | `/api/fees/calculate` | 🔑 | 手数料計算 |
-| GET | `/api/fees/schedule` | 🔑 | 手数料スケジュール |
+| GET | `/api/fees/calculate` | 🔑 | 手数料計算 (旧) |
+| GET | `/api/fees/schedule` | 🔑 | 手数料スケジュール (旧) |
+
+> **DEPRECATED**: F-8b (Asana 1214288467406433) で廃止予定。F-8a で `/api/v1/fees/*` (下記) に置換。
+> 本タスク (F-8a, PR #126 以降) では併存中。
+
+## 手数料 v10 `/api/v1/fees` (F-8a 新規)
+
+Fee Model v10 read-only 中心 + simulate。F-1〜F-5 (FeeConfigV10 / FeeTransaction / FeeCalculator) を消費する。
+
+| Method | Path | 認証 | 説明 |
+|--------|------|------|------|
+| GET  | `/api/v1/fees/config`              | 🔑 | 現行 active fee_config 取得 |
+| GET  | `/api/v1/fees/my-summary`          | 🔑 | 自分の累計手数料サマリ |
+| GET  | `/api/v1/fees/my-history`          | 🔑 | 自分の月別履歴 (最新 N 件、`?limit=N`) |
+| POST | `/api/v1/fees/simulate`            | 🔑 | v10 計算シミュレーション (DB 書込なし) |
+| GET  | `/api/v1/fees/affiliate-earnings` | 🔑 | 自分が招待者として記録された月別 affiliate 報酬 |
+| GET  | `/api/v1/fees/all-users`           | 👑 | 全ユーザー手数料一覧 (`?month=YYYY-MM-DD`) |
+| POST | `/api/v1/fees/finalize-month`      | 👑 | 月次 finalize (現状 501、F-7 で本実装) |
+| GET  | `/api/v1/fees/uata-income`         | 👑 | UATa 収入集計 (`?month_from&month_to`) |
+
+**Decimal 返却**: 金額系フィールドは Decimal を文字列で返す (例: `"3000"` `"0.30"`)。フロントは `Number(str).toFixed()` で扱う (CLAUDE.md "Decimal型 → Number() ラップ" メモリ準拠)。
 
 ---
 
@@ -218,7 +238,11 @@
 
 ---
 
-## Billing `/api/billing`
+## Billing `/api/billing` (v9 旧、F-8b で廃止予定)
+
+> **DEPRECATED**: F-8b (Asana 1214288467406433) で廃止予定。`/api/v1/fees/*` (上記) に置換。
+> 本タスク (F-8a) 時点では併存中。フロント差し替えも F-8b で対応。
+
 
 | Method | Path | 認証 | 説明 |
 |--------|------|------|------|
