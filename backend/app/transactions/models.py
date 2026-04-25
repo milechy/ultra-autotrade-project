@@ -1,12 +1,15 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/transactions/models.py
 """取引履歴モデル定義。"""
+#
+# DB マイグレーション（Alembic未使用 — 手動ALTER）:
+#   ALTER TABLE transactions ADD COLUMN IF NOT EXISTS error_message TEXT;
 
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Integer, Numeric, String
+from sqlalchemy import Boolean, DateTime, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -35,6 +38,7 @@ class Transaction(Base):
         Numeric(precision=20, scale=9), nullable=True
     )
     is_dry_run: Mapped[bool] = mapped_column(Boolean, default=False)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
