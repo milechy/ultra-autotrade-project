@@ -7,7 +7,8 @@ v10 spec §3 / §7 の 5 収益ロジックを **純粋関数** として実装�
 I/O / 外部 API / DB 接続は一切行わない。
 
 5 収益ロジック:
-    Step 1: net_profit = gross_profit - expense
+    Step 0: expense_markup 適用 (F-9) — expense_jpy に (1+rate) を乗算
+    Step 1: net_profit = gross_profit - effective_expense
     Step 2: subscription = deposit * subscription_rate (初月無料)
     Step 3: サブスク保護 (net_profit < subscription なら全額 UATa, fee 0, takehome 0)
     Step 4: tier-based fee = max(0, net_profit - subscription) * fee_rate
@@ -20,6 +21,7 @@ I/O / 外部 API / DB 接続は一切行わない。
 - ``InvestmentTier`` / ``RiskMode`` (F-2 / F-3)
 - ``FeeTransaction`` 出力先 (F-7 月次バッチ)
 - ``docs/45_fee_model_v10_migration_plan.md`` §4 F-5 行
+- ``docs/49_expense_markup_legal_draft.md`` F-9 経費マークアップ仕様
 """
 
 from __future__ import annotations
@@ -70,6 +72,9 @@ class FeeCalculationResult:
     """月次手数料計算の出力。``FeeTransaction`` レコードに直接マッピング可能。
 
     ``tier`` / ``risk_mode`` は CHECK 制約 (F-1 + F-4 046) に準拠した文字列。
+
+    expense_jpy は Step 0 マークアップ適用後の実効経費 (raw + markup)。
+    透明性確保のために raw_expense_jpy / expense_markup_* フィールドで内訳を提供。
     """
 
     user_id: int
@@ -78,7 +83,10 @@ class FeeCalculationResult:
     risk_mode: str
     deposit_jpy: Decimal
     gross_profit_jpy: Decimal
-    expense_jpy: Decimal
+    expense_jpy: Decimal  # effective expense (raw + markup, F-9)
+    raw_expense_jpy: Decimal  # 実費 (マークアップ前, F-9)
+    expense_markup_rate_applied: Decimal  # 適用されたマークアップ率 (0 なら無効, F-9)
+    expense_markup_amount_jpy: Decimal  # マークアップ加算分 (F-9)
     net_profit_jpy: Decimal
     fee_rate_applied: Decimal
     fee_amount_jpy: Decimal
@@ -128,10 +136,23 @@ class FeeCalculator:
         """
         debug: list[str] = []
 
+        # === Step 0: expense_markup 適用 (F-9) ===
+        raw_expense = payload.expense_jpy
+        markup_rate = self._get_expense_markup_rate()
+        if markup_rate > Decimal("0"):
+            marked_up = self._round_jpy(raw_expense * (Decimal("1") + markup_rate))
+            markup_amount = marked_up - raw_expense
+            debug.append(f"step0 expense_markup: {raw_expense} * (1 + {markup_rate}) = {marked_up}")
+            effective_expense = marked_up
+        else:
+            markup_amount = Decimal("0")
+            effective_expense = raw_expense
+            debug.append(f"step0 expense_markup: disabled, expense as-is = {raw_expense}")
+
         # === Step 1: net_profit ===
-        net_profit = self._round_jpy(payload.gross_profit_jpy - payload.expense_jpy)
+        net_profit = self._round_jpy(payload.gross_profit_jpy - effective_expense)
         debug.append(
-            f"step1 net_profit = {payload.gross_profit_jpy} - {payload.expense_jpy} = {net_profit}"
+            f"step1 net_profit = {payload.gross_profit_jpy} - {effective_expense} = {net_profit}"
         )
 
         # === Step 2: subscription ===
@@ -156,7 +177,10 @@ class FeeCalculator:
                 risk_mode=payload.user_risk_mode.value,
                 deposit_jpy=payload.deposit_jpy,
                 gross_profit_jpy=payload.gross_profit_jpy,
-                expense_jpy=payload.expense_jpy,
+                expense_jpy=effective_expense,
+                raw_expense_jpy=raw_expense,
+                expense_markup_rate_applied=markup_rate,
+                expense_markup_amount_jpy=markup_amount,
                 net_profit_jpy=net_profit,
                 fee_rate_applied=Decimal("0"),
                 fee_amount_jpy=Decimal("0"),
@@ -219,7 +243,10 @@ class FeeCalculator:
             risk_mode=payload.user_risk_mode.value,
             deposit_jpy=payload.deposit_jpy,
             gross_profit_jpy=payload.gross_profit_jpy,
-            expense_jpy=payload.expense_jpy,
+            expense_jpy=effective_expense,
+            raw_expense_jpy=raw_expense,
+            expense_markup_rate_applied=markup_rate,
+            expense_markup_amount_jpy=markup_amount,
             net_profit_jpy=net_profit,
             fee_rate_applied=fee_rate,
             fee_amount_jpy=fee_amount,
@@ -246,6 +273,15 @@ class FeeCalculator:
         負の値: -1234.56 → -1234 (ROUND_DOWN は 0 に向かって切り捨て)
         """
         return value.quantize(JPY_QUANTIZE, rounding=ROUND_DOWN)
+
+    def _get_expense_markup_rate(self) -> Decimal:
+        """fee_config.expense_markup_enabled と rate に応じてマークアップ率を返す。
+
+        enabled=False または rate=0 のとき Decimal("0") を返す。
+        """
+        if not self.config.expense_markup_enabled:
+            return Decimal("0")
+        return Decimal(str(self.config.expense_markup_rate))
 
     def _get_subscription_rate(self, risk_mode: RiskMode, is_first_month: bool) -> Decimal:
         """``FeeConfigV10.subscription_rates`` JSONB から取得。初月は 0。"""
