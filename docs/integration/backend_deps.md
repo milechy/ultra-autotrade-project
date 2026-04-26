@@ -5,7 +5,52 @@
 
 ---
 
-## backend/app/main.py
+## 凍結ファイル登録表
+
+CI チェック (`.github/workflows/path-check.yml`) および pre-commit フック (`scripts/check_frozen_files.sh`) が参照する凍結ファイルの公式リスト。
+新規ファイルを凍結する場合はこの表と `path-check.yml` の `FROZEN_PATTERNS` を同時に更新すること。
+
+| # | パス | 凍結理由 | 解凍条件 |
+|---|------|---------|---------|
+| 1 | `backend/app/main.py` | FastAPI router 登録・startup イベント・health エンドポイントの中核。意図しない変更でスケジューラー・CORS・依存注入が壊れる（2026-04-02 インシデント参照） | アーキテクチャ変更 PR + Opus レビュー + backend_deps.md 申請 |
+| 2 | `backend/app/database.py` | ORM セッション管理・トランザクション制御の中核。変更するとデータ不整合やデッドロックのリスクがある | DB 移行計画 PR + Opus レビュー + backend_deps.md 申請 |
+| 3 | `backend/app/shared/` | 全モジュール共通の定数・型・ユーティリティ。1 ファイル変更が全モジュールに波及する | 変更範囲を tests/ でカバーした上で backend_deps.md 申請 |
+| 4 | `backend/conftest.py` | pytest グローバルフィクスチャ。変更すると全テストの前提が崩れ、カバレッジゲートを突破するバグが混入する（2026-04-25 F-9 lint fail インシデント参照） | テストアーキテクチャ変更 PR + backend_deps.md 申請 |
+| 5 | `backend/requirements.txt` | Python 依存バージョンの master。不用意な変更で CVE が混入する。pip-compile 管理外のため手動編集がデグレを起こしやすい（CVE-2026-24049 インシデント参照） | セキュリティパッチ or 機能追加 PR + backend_deps.md 申請 |
+| 6 | `backend/alembic/versions/*.py` | DB マイグレーション履歴。一度 main にマージされたバージョンを編集すると本番 DB の alembic_version と矛盾して復旧不能になる | 変更禁止（ロールバックは新規マイグレーション作成） |
+| 7 | `frontend/package-lock.json` | npm 依存ロック。CLAUDE.md で `npm install --legacy-peer-deps` に統一済み。手動編集すると Docker ビルド・CI が壊れる | `npm install --legacy-peer-deps` 実行後の自動更新のみ |
+| 8 | `.github/workflows/path-check.yml` | 凍結ファイルガードの CI 本体。変更するとガードが無効化される恐れがある | ガード強化または機能拡張の場合は Opus レビュー必須 |
+| 9 | `.github/workflows/env-separation-check.yml` | env 分離チェック CI（2026-04-18 インシデントの根本対策）。変更するとステージング/本番の誤混入を見落とす | セキュリティ観点のレビュー + Opus 承認必須 |
+| 10 | `pyproject.toml` | ruff/mypy/pytest/coverage 設定。緩和方向の変更（coverage 閾値低下など）は全員への品質影響があるため原則禁止 | 品質向上目的のみ許可。緩和は Opus レビュー必須 |
+
+### 凍結ファイル変更フロー
+
+```
+1. この表で凍結理由・解凍条件を確認
+2. backend_deps.md に「変更 #N」エントリを追加（後述フォーマット参照）
+3. feature ブランチで変更を実装
+4. PR 作成 → path-check CI が自動検証（backend_deps.md 更新済みなら WARN 扱い）
+5. Opus レビュー（解凍条件に「Opus レビュー」が含まれる場合）
+6. main マージ
+```
+
+### 変更申請エントリ フォーマット（テンプレート）
+
+```markdown
+### 変更 #N: <変更タイトル> (PR #xxx / YYYY-MM-DD)
+- **コミット範囲**: `<sha>` (<ブランチ名>)
+- **変更内容**:
+  - <箇条書き>
+- **理由**: <凍結条件のどれに該当するか>
+- **影響範囲**: <変更が波及するモジュール・テスト>
+- **承認**: <レビュアー名 or PR番号>
+```
+
+---
+
+## 変更ログ
+
+### backend/app/main.py
 
 ### 変更 #3: /health エンドポイントに AI モデル設定を追加 (PR #95 / 2026-04-20)
 - **コミット範囲**: `408d3ad` (feature/remove-claude-model-hardcodes)
@@ -117,11 +162,11 @@
 
 変更なし（現時点）
 
-## backend/conftest.py
+### backend/conftest.py
 
 変更なし（現時点）
 
-## backend/requirements.txt
+### backend/requirements.txt
 
 ### 変更 #2: PyJWT[crypto] extra 追加（Privy ID Token 検証対応）(PR #155 / 2026-04-27)
 - **コミット範囲**: `c88dfd2` – `41f77d7` (feature/privy-did-storage)
@@ -140,6 +185,6 @@
 - **影響範囲**: ビルドツールのみ。アプリケーションロジックへの影響なし。
 - **承認**: dev → staging → main の通常フロー経由
 
-## backend/app/shared/
+### backend/app/shared/
 
 変更なし（現時点）
