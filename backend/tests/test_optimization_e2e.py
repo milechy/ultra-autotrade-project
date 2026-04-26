@@ -19,7 +19,6 @@ from app.aave.optimization_rules import (
 )
 from app.aave.risk_profile import RiskProfileManager
 from app.aave.safety_score import SafetyScoreCalculator, SafetyScoreParams
-from app.aave.utilization_monitor import UtilizationData, UtilizationMonitor
 from app.ai.explanation_service import ExplanationContext, ExplanationService
 from app.automation.macro_safe_mode import MacroEvent, MacroSafeMode
 from app.automation.performance_tracker import PerformanceTracker
@@ -28,21 +27,6 @@ from app.automation.stress_controller import MarketStressData, StressController
 # ---------------------------------------------------------------------------
 # Helper factories
 # ---------------------------------------------------------------------------
-
-
-def _make_util_data(**kwargs) -> UtilizationData:
-    """Factory for UtilizationData. Defaults: USDC, util=0.85, apy=5%."""
-    defaults: dict = dict(
-        asset_symbol="USDC",
-        utilization_rate=Decimal("0.85"),
-        supply_apy=Decimal("0.05"),
-        borrow_apy=Decimal("0.08"),
-        available_liquidity=Decimal("1000000"),
-        tvl=Decimal("5000000"),
-        timestamp=datetime.now(tz=timezone.utc),
-    )
-    defaults.update(kwargs)
-    return UtilizationData(**defaults)
 
 
 def _make_stress_data(**kwargs) -> MarketStressData:
@@ -84,14 +68,8 @@ def _make_explanation_context(**kwargs) -> ExplanationContext:
 
 
 def test_e2e_high_utilization_supply_flow() -> None:
-    """util=85% → SUPPLY → positive net_benefit → rules pass → explanation → sunny signal → score≥80."""
-    # Step 1: UtilizationMonitor
-    monitor = UtilizationMonitor()
-    util_data = _make_util_data(utilization_rate=Decimal("0.85"))
-    rec = monitor.evaluate(util_data)
-    assert rec.action == "SUPPLY"
-
-    # Step 2: NetBenefitCalculator — positive net benefit
+    """util=85% → positive net_benefit → rules pass → explanation → sunny signal → score≥80."""
+    # Step 1: NetBenefitCalculator — positive net benefit
     calc = NetBenefitCalculator()
     nb_params = NetBenefitParams(
         asset_symbol="USDC",
@@ -106,7 +84,7 @@ def test_e2e_high_utilization_supply_flow() -> None:
     nb_result = calc.calculate(nb_params)
     assert nb_result.net_benefit > Decimal("0"), "net_benefit must be positive"
 
-    # Step 3: OptimizationRules — all checks pass
+    # Step 2: OptimizationRules — all checks pass
     rules = OptimizationRules()
     current = CurrentPosition(
         asset_symbol="USDC",
@@ -124,7 +102,7 @@ def test_e2e_high_utilization_supply_flow() -> None:
     rule_result = rules.should_rebalance(current, proposed, total_assets=Decimal("10000"))
     assert rule_result.allowed, f"Expected allowed, got: {rule_result.reason}"
 
-    # Step 4: ExplanationService — 5-step explanation
+    # Step 3: ExplanationService — 5-step explanation
     svc = ExplanationService()
     ctx = _make_explanation_context()
     explanation = svc.generate(ctx)
@@ -135,12 +113,12 @@ def test_e2e_high_utilization_supply_flow() -> None:
     assert len(explanation.risks) >= 1
     assert explanation.comparison
 
-    # Step 5: SignalDisplay — should be sunny (util 80-95%, low vol)
+    # Step 4: SignalDisplay — should be sunny (util 80-95%, low vol)
     signal = svc.generate_signal(ctx)
     assert signal.weather == "sunny", f"Expected sunny, got: {signal.weather}"
     assert signal.icon == "☀️"
 
-    # Step 6: SafetyScore — should be 80+
+    # Step 5: SafetyScore — should be 80+
     # Use low utilization (0.30) so util_score=70, hf=2.5 → hf_score=75, vol=0.02 → vol_score=98
     # Score = 70×0.3 + 75×0.4 + 98×0.3 = 21 + 30 + 29.4 = 80.4
     score_calc = SafetyScoreCalculator()
@@ -226,17 +204,11 @@ def test_e2e_macro_event_safe_mode() -> None:
     status = macro.is_safe_mode_active(now=now)
     assert status.active is True, f"Safe mode should be active; reason={status.reason}"
 
-    # Step 2: UtilizationMonitor would say SUPPLY (util=85%)
-    monitor = UtilizationMonitor()
-    util_data = _make_util_data(utilization_rate=Decimal("0.85"))
-    rec = monitor.evaluate(util_data)
-    assert rec.action == "SUPPLY"
-
-    # Step 3: Override to HOLD because safe mode is active
-    final_action = "HOLD" if status.active else rec.action
+    # Step 2: Override to HOLD because safe mode is active (SUPPLY is the nominal action)
+    final_action = "HOLD" if status.active else "SUPPLY"
     assert final_action == "HOLD"
 
-    # Step 4: ExplanationService — HOLD explanation
+    # Step 3: ExplanationService — HOLD explanation
     svc = ExplanationService()
     ctx = _make_explanation_context(
         action="HOLD",
@@ -246,7 +218,7 @@ def test_e2e_macro_event_safe_mode() -> None:
     explanation = svc.generate(ctx)
     assert "様子を見る" in explanation.conclusion
 
-    # Step 5: Signal — cloudy (HOLD action with util outside sweet spot)
+    # Step 4: Signal — cloudy (HOLD action with util outside sweet spot)
     # The signal for util=0.85, vol=0.02, action=HOLD would be sunny (sweet spot).
     # To model the macro safe-mode override producing a "cloudy" signal we use a
     # context that is outside the sweet-spot range.
@@ -386,22 +358,18 @@ def test_e2e_performance_summary() -> None:
 
 
 def test_all_wave_modules_importable() -> None:
-    """Confirm all 11 Wave 1-3 modules are importable without errors."""
-    # All 11 Wave 1-3 modules in isort order (one contiguous block)
+    """Confirm all Wave 1-3 modules (excluding removed utilization_monitor) are importable without errors."""
     from app.aave.impact_calculator import ImpactCalculator as _IC  # noqa: F401
     from app.aave.net_benefit_calculator import NetBenefitCalculator as _NBC  # noqa: F401
     from app.aave.optimization_rules import OptimizationRules as _OR  # noqa: F401
     from app.aave.risk_profile import RiskProfileManager as _RPM  # noqa: F401
     from app.aave.safety_score import SafetyScoreCalculator as _SSC  # noqa: F401
     from app.aave.transparency_router import router as _router  # noqa: F401
-    from app.aave.utilization_monitor import UtilizationMonitor as _UM  # noqa: F401
     from app.ai.explanation_service import ExplanationService as _ES  # noqa: F401
     from app.automation.macro_safe_mode import MacroSafeMode as _MSM  # noqa: F401
     from app.automation.performance_tracker import PerformanceTracker as _PT  # noqa: F401
     from app.automation.stress_controller import StressController as _SC  # noqa: F401
 
-    # Verify each class/object is instantiable / not None
-    assert _UM is not None
     assert _NBC is not None
     assert _OR is not None
     assert _SC is not None
