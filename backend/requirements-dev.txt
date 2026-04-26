@@ -7,7 +7,7 @@ vcrpy>=6.0
 pytest-recording>=0.13.0
 
 # Linting & Type checking
-ruff>=0.4.0
+ruff==0.15.4
 mypy>=1.10
 
 # Type stubs
