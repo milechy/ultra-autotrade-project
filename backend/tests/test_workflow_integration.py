@@ -761,11 +761,11 @@ class TestWorkflowTierNormalization:
         # db.get は呼ばれない (user_id が None なので user 取得スキップ)
         db.get.assert_not_called()
 
-    def test_dynamic_fee_apy_fallback_documented(self):
-        """current_apy 取得バグの回帰テスト: MarketContext に current_apy 属性が無い → Decimal("4") フォールバック。
+    def test_dynamic_fee_apy_fallback_when_aave_supply_apy_none(self):
+        """MarketContext.aave_supply_apy が None の場合 Decimal("4") フォールバックを使うこと。
 
-        TODO(P0 タスク 1214279097935851): MarketContext に Aave データを注入後は
-        current_apy が実値で渡されるよう修正される。本テストはその修正時に更新する。
+        Aave 取得失敗 / 未注入時の安全側挙動。本テストは workflow が
+        MarketContext を実際に build した時 (Aave 未注入パス) の挙動を検証する。
         """
         from unittest.mock import MagicMock, patch
 
@@ -794,8 +794,52 @@ class TestWorkflowTierNormalization:
 
         assert mock_fee.called
         call_kwargs = mock_fee.call_args.kwargs
-        # MarketContext に current_apy 属性が無いため、4% フォールバック値が使われる
-        assert call_kwargs["current_apy"] == Decimal("4"), (
-            "MarketContext に current_apy が注入されるよう修正されたら本テストを更新する "
-            "(P0 タスク 1214279097935851)"
+        # MarketContext.aave_supply_apy が None のため、4% フォールバック値が使われる
+        assert call_kwargs["current_apy"] == Decimal("4")
+
+    def test_workflow_uses_aave_supply_apy_not_current_apy(self):
+        """MarketContext.aave_supply_apy が設定されている場合、その値が dynamic_fee に渡ること。
+
+        P0 (Asana 1214279097935851): workflow.py の current_apy バグ修正の回帰テスト。
+        旧実装は getattr(ctx, "current_apy", None) を読んでいたため常に None →
+        Decimal("4") フォールバックされていた。MarketContext には current_apy 属性は無く、
+        正しくは aave_supply_apy を読むべき。
+        """
+        from unittest.mock import MagicMock, patch
+
+        from app.data_feeds.context import MarketContext
+
+        db = MagicMock()
+        ks = MagicMock()
+        ai = MagicMock()
+        ex = MagicMock()
+
+        item = _make_knowledge_item()
+        ks.get_pending.return_value = [item]
+        ks.search.return_value = []
+        ai.judge_with_rag.return_value = _make_cross_validation(TradeAction.BUY, 85)
+
+        # Aave データを注入した MarketContext を返すように build_market_context をモック
+        injected_ctx = MarketContext(aave_supply_apy=Decimal("6.5"))
+
+        with (
+            patch("app.automation.workflow.build_market_context", return_value=injected_ctx),
+            patch("app.billing.dynamic_fee.calculate_fee_by_market") as mock_fee,
+        ):
+            mock_fee.return_value.should_trade = True
+            mock_fee.return_value.fee_rate = Decimal("0.10")
+            mock_fee.return_value.fee_amount = Decimal("3.00")
+
+            process_pending_knowledge(
+                db,
+                knowledge_service=ks,
+                ai_service=ai,
+                exchange_service=ex,
+                execution_policy="require_approval",
+            )
+
+        assert mock_fee.called
+        call_kwargs = mock_fee.call_args.kwargs
+        assert call_kwargs["current_apy"] == Decimal("6.5"), (
+            f"aave_supply_apy=6.5 が current_apy として渡るべきだが {call_kwargs['current_apy']!r}"
         )
