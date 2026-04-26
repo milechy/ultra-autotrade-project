@@ -1,4 +1,14 @@
 repos:
+  - repo: local
+    hooks:
+      - id: frozen-files-guard
+        name: Frozen Files Guard
+        language: script
+        entry: scripts/check_frozen_files.sh
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
   - repo: https://github.com/awslabs/automated-security-helper
     rev: v3.2.3
     hooks:

@@ -820,6 +820,51 @@ docker compose -f docker-compose.staging.yml --env-file .env.staging-new \
 
 ---
 
+## 凍結ファイルガード運用ルール（2026-04-26追加）
+
+> 背景: F-9 PR #128 lint fail、凍結ファイルの誤編集破損が複数回発生。機械的に防ぐ仕組みを導入。
+
+### 凍結ファイルとは
+変更するとシステム全体または本番環境に重大な影響を与えるファイル。一覧は `docs/integration/backend_deps.md` の「凍結ファイル登録表」参照。
+
+現在の凍結ファイル（抜粋）:
+- `backend/app/main.py` — FastAPI アプリ本体（router 登録・startup）
+- `backend/app/database.py` — ORM セッション管理
+- `backend/app/shared/` — 全モジュール共通定数・型
+- `backend/conftest.py` — pytest グローバルフィクスチャ
+- `backend/requirements.txt` — Python 依存バージョン master
+- `backend/alembic/versions/*.py` — DB マイグレーション履歴（**変更絶対禁止**）
+- `.github/workflows/path-check.yml` — CI 凍結ファイルガード本体
+- `pyproject.toml` — ruff/mypy/pytest 設定
+
+### 凍結ファイルを変更する手順
+1. `docs/integration/backend_deps.md` の凍結ファイル登録表で解凍条件を確認
+2. 同ファイルに「変更 #N」エントリを記載（テンプレートは同ファイル内参照）
+3. feature ブランチで変更を実装
+4. `git commit` — pre-commit フック (`scripts/check_frozen_files.sh`) が検証
+   - `docs/integration/backend_deps.md` が staged に含まれていれば ⚠️ WARN（続行可）
+   - 含まれていなければ ❌ FAIL（コミット中断）
+5. PR 作成 → `.github/workflows/path-check.yml` が CI でも検証
+
+### やってはいけないこと
+- `alembic/versions/*.py` は一切編集禁止（ロールバックは新規マイグレーション作成）
+- CI を `--no-verify` でスキップして凍結ファイルを変更すること
+- `pyproject.toml` の coverage 閾値を緩和方向に変更すること（Opus 承認なしでは禁止）
+
+### ローカル pre-commit 設定（初回のみ）
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+### 手動チェック（コミット前確認）
+```bash
+./scripts/check_frozen_files.sh        # staged ファイルを検査
+./scripts/check_frozen_files.sh --all  # HEAD との全差分を検査
+```
+
+---
+
 ## 標準チェックリスト（全実装で必ず確認）
 
 すべてのコード変更（機能追加・バグ修正・リファクタ問わず）で、実装完了前に以下を確認すること。
