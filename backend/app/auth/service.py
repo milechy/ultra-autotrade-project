@@ -18,7 +18,9 @@ from typing import Any, Optional
 import bcrypt
 import jwt as pyjwt
 from eth_account.messages import encode_defunct
+from fastapi import HTTPException, status
 from jwt import InvalidTokenError as JWTError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from web3 import Web3
 
@@ -402,7 +404,22 @@ class AuthService:
             privy_did=privy_did,
         )
         db.add(user)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            # privy_did UNIQUE 違反 (= 別ユーザーが同じ DID を保持) や
+            # wallet_address 競合 (並行リクエスト) を 409 Conflict で返す。
+            db.rollback()
+            logger.warning(
+                "Wallet user creation conflict (wallet=%s..., privy_did=%s): %s",
+                wallet_address[:10],
+                (privy_did[:20] + "...") if privy_did else None,
+                exc.orig if hasattr(exc, "orig") else exc,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="DID already in use",
+            ) from exc
         db.refresh(user)
 
         logger.info("Created wallet user: %s (wallet=%s...)", user.email, wallet_address[:10])

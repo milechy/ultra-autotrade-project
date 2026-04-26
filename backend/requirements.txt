@@ -16,7 +16,7 @@ python-dotenv>=1.0.0
 # Authentication & Database (Phase 12)
 sqlalchemy>=2.0.0
 bcrypt>=4.1.0
-PyJWT>=2.9.0
+PyJWT[crypto]>=2.9.0    # [crypto] extra で cryptography (RS256/ES256 等) を有効化 — Privy ID Token 検証に必要
 pydantic[email]>=2.0.0
 
 # PostgreSQL + pgvector (PoC Pivot)
