@@ -176,14 +176,54 @@ class PasswordChangeRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=100)
 
 
+class CustomRiskParams(BaseModel):
+    """CUSTOM リスクモードのカスタムパラメータ。partner 専用。"""
+
+    hf_lower_bound: float = Field(
+        ge=1.3,
+        le=3.0,
+        description="最小ヘルスファクター (1.3〜3.0)",
+    )
+    supply_ratio: float = Field(
+        ge=0.1,
+        le=0.9,
+        description="供給比率 (0.1〜0.9)",
+    )
+    max_position_size_usd: float = Field(
+        ge=100.0,
+        le=100000.0,
+        description="最大ポジションサイズ USD (100〜100000)",
+    )
+
+
 class RiskModeUpdateRequest(BaseModel):
     """リスクモード変更リクエスト。"""
 
     mode: str = Field(
         ...,
-        description="conservative / balanced / aggressive",
-        pattern="^(conservative|balanced|aggressive)$",
+        description="conservative / balanced / aggressive / custom",
+        pattern="^(conservative|balanced|aggressive|custom)$",
     )
+    custom_params: Optional[CustomRiskParams] = Field(
+        default=None,
+        description="CUSTOM モード時のパラメータ (mode=custom の場合必須)",
+    )
+
+
+class AuditLogEntry(BaseModel):
+    """監査ログエントリー (admin 向けレスポンス)。"""
+
+    id: int
+    user_id: int
+    actor_id: Optional[int] = None
+    action: str
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    created_at: datetime
+    user_email: Optional[str] = None
+    actor_email: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WalletConnectRequest(BaseModel):

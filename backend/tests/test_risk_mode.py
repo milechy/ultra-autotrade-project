@@ -25,6 +25,7 @@ os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["INITIAL_ADMIN_EMAIL"] = "risk_admin@example.com"
 
 from app.auth.models import (  # noqa: E402
+    PARTNER_ONLY_RISK_MODES,
     PHASE_1_ALLOWED_RISK_MODES,
     RISK_MODE_JP_LABELS,
     RISK_MODE_PHASE,
@@ -53,8 +54,18 @@ class TestRiskModeEnum:
     def test_aggressive_value_is_lowercase(self) -> None:
         assert RiskMode.AGGRESSIVE.value == "aggressive"
 
-    def test_all_three_values(self) -> None:
-        assert {m.value for m in RiskMode} == {"conservative", "balanced", "aggressive"}
+    def test_custom_value_is_lowercase(self) -> None:
+        assert RiskMode.CUSTOM.value == "custom"
+
+    def test_all_four_values(self) -> None:
+        assert {m.value for m in RiskMode} == {"conservative", "balanced", "aggressive", "custom"}
+
+    def test_core_three_values_unchanged(self) -> None:
+        assert {m.value for m in RiskMode if m != RiskMode.CUSTOM} == {
+            "conservative",
+            "balanced",
+            "aggressive",
+        }
 
 
 class TestRiskModeJpLabels:
@@ -69,6 +80,7 @@ class TestRiskModeJpLabels:
         assert RISK_MODE_JP_LABELS[RiskMode.CONSERVATIVE] == "ローリスク"
         assert RISK_MODE_JP_LABELS[RiskMode.BALANCED] == "ミドルリスク"
         assert RISK_MODE_JP_LABELS[RiskMode.AGGRESSIVE] == "ハイリスク"
+        assert RISK_MODE_JP_LABELS[RiskMode.CUSTOM] == "カスタム"
 
     def test_get_risk_mode_label_for_known_value(self) -> None:
         assert get_risk_mode_label("conservative") == "ローリスク"
@@ -95,6 +107,13 @@ class TestPhase1RiskMode:
         assert RISK_MODE_PHASE[RiskMode.CONSERVATIVE] == 1
         assert RISK_MODE_PHASE[RiskMode.BALANCED] == 2
         assert RISK_MODE_PHASE[RiskMode.AGGRESSIVE] == 2
+        assert RISK_MODE_PHASE[RiskMode.CUSTOM] == 1
+
+    def test_custom_is_partner_only(self) -> None:
+        assert RiskMode.CUSTOM in PARTNER_ONLY_RISK_MODES
+        assert RiskMode.CONSERVATIVE not in PARTNER_ONLY_RISK_MODES
+        assert RiskMode.BALANCED not in PARTNER_ONLY_RISK_MODES
+        assert RiskMode.AGGRESSIVE not in PARTNER_ONLY_RISK_MODES
 
 
 class TestRiskModeMetadata:
@@ -107,6 +126,12 @@ class TestRiskModeMetadata:
 
     def test_subscription_rates_cover_all_modes(self) -> None:
         assert set(RISK_MODE_SUBSCRIPTION_RATES.keys()) == set(RiskMode)
+
+    def test_custom_subscription_rate_exists(self) -> None:
+        assert RiskMode.CUSTOM in RISK_MODE_SUBSCRIPTION_RATES
+
+    def test_protocols_cover_all_modes(self) -> None:
+        assert set(RISK_MODE_PROTOCOLS.keys()) == set(RiskMode)
 
     def test_protocols_conservative_aave_only(self) -> None:
         assert RISK_MODE_PROTOCOLS[RiskMode.CONSERVATIVE] == frozenset({"aave"})
@@ -227,7 +252,34 @@ class TestRiskModesListEndpoint:
         r = client.get("/auth/risk-modes")
         assert r.status_code == 401
 
-    def test_returns_three_modes(self, client: TestClient) -> None:
+    def test_returns_three_modes_for_regular_user(self, client: TestClient) -> None:
+        # admin ユーザー (INITIAL_ADMIN_EMAIL) は admin ロールなので 4 件になる
+        # viewer ユーザーを作成して 3 件を確認する
+        token_admin = _register_and_login(client)
+        client.post(
+            "/users",
+            json={
+                "email": "viewer@example.com",
+                "username": "vieweruser",
+                "password": "password123",
+                "role": "viewer",
+            },
+            headers={"Authorization": f"Bearer {token_admin}"},
+        )
+        r_login = client.post(
+            "/auth/login", json={"email": "viewer@example.com", "password": "password123"}
+        )
+        token_viewer = r_login.json()["access_token"]
+        r = client.get(
+            "/auth/risk-modes",
+            headers={"Authorization": f"Bearer {token_viewer}"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert "modes" in body
+        assert len(body["modes"]) == 3  # viewer は CUSTOM を見えない
+
+    def test_returns_four_modes_for_admin(self, client: TestClient) -> None:
         token = _register_and_login(client)
         r = client.get(
             "/auth/risk-modes",
@@ -236,7 +288,7 @@ class TestRiskModesListEndpoint:
         assert r.status_code == 200
         body = r.json()
         assert "modes" in body
-        assert len(body["modes"]) == 3
+        assert len(body["modes"]) == 4  # admin は CUSTOM も見える
 
     def test_modes_payload_structure(self, client: TestClient) -> None:
         token = _register_and_login(client)
@@ -263,6 +315,132 @@ class TestRiskModesListEndpoint:
         assert modes["aggressive"]["allowed_in_phase_1"] is False
         assert modes["aggressive"]["subscription_rate"] == "0.010"
         assert "pendle" in modes["aggressive"]["protocols"]
+
+
+class TestCustomRiskMode:
+    """F-17b: CUSTOM リスクモードの API テスト。"""
+
+    def test_update_to_custom_as_viewer_returns_403(self, client: TestClient) -> None:
+        token_admin = _register_and_login(client)
+        client.post(
+            "/users",
+            json={
+                "email": "viewer2@example.com",
+                "username": "vieweruser2",
+                "password": "password123",
+                "role": "viewer",
+            },
+            headers={"Authorization": f"Bearer {token_admin}"},
+        )
+        r_login = client.post(
+            "/auth/login", json={"email": "viewer2@example.com", "password": "password123"}
+        )
+        token_viewer = r_login.json()["access_token"]
+        r = client.put(
+            "/auth/risk-mode",
+            json={
+                "mode": "custom",
+                "custom_params": {
+                    "hf_lower_bound": 1.8,
+                    "supply_ratio": 0.5,
+                    "max_position_size_usd": 1000,
+                },
+            },
+            headers={"Authorization": f"Bearer {token_viewer}"},
+        )
+        assert r.status_code == 403
+        assert "パートナー専用" in r.json()["detail"]
+
+    def test_update_to_custom_without_params_returns_422(self, client: TestClient) -> None:
+        token = _register_and_login(client)
+        r = client.put(
+            "/auth/risk-mode",
+            json={"mode": "custom"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 422
+
+    def test_update_to_custom_as_admin_succeeds(self, client: TestClient) -> None:
+        token = _register_and_login(client)
+        r = client.put(
+            "/auth/risk-mode",
+            json={
+                "mode": "custom",
+                "custom_params": {
+                    "hf_lower_bound": 1.8,
+                    "supply_ratio": 0.5,
+                    "max_position_size_usd": 1000,
+                },
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["mode"] == "custom"
+        assert body["label"] == "カスタム"
+
+    def test_custom_params_invalid_values_rejected(self, client: TestClient) -> None:
+        token = _register_and_login(client)
+        r = client.put(
+            "/auth/risk-mode",
+            json={
+                "mode": "custom",
+                "custom_params": {
+                    "hf_lower_bound": 0.5,
+                    "supply_ratio": 0.5,
+                    "max_position_size_usd": 1000,
+                },
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 422
+
+    def test_admin_can_access_audit_log(self, client: TestClient) -> None:
+        token = _register_and_login(client)
+        # まず CUSTOM に変更 (監査ログ作成)
+        client.put(
+            "/auth/risk-mode",
+            json={
+                "mode": "custom",
+                "custom_params": {
+                    "hf_lower_bound": 1.8,
+                    "supply_ratio": 0.5,
+                    "max_position_size_usd": 1000,
+                },
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r = client.get(
+            "/auth/admin/risk-modes/custom-audit",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert "entries" in body
+        assert "total" in body
+        assert body["total"] >= 1
+
+    def test_viewer_cannot_access_audit_log(self, client: TestClient) -> None:
+        token_admin = _register_and_login(client)
+        client.post(
+            "/users",
+            json={
+                "email": "viewer3@example.com",
+                "username": "vieweruser3",
+                "password": "password123",
+                "role": "viewer",
+            },
+            headers={"Authorization": f"Bearer {token_admin}"},
+        )
+        r_login = client.post(
+            "/auth/login", json={"email": "viewer3@example.com", "password": "password123"}
+        )
+        token_viewer = r_login.json()["access_token"]
+        r = client.get(
+            "/auth/admin/risk-modes/custom-audit",
+            headers={"Authorization": f"Bearer {token_viewer}"},
+        )
+        assert r.status_code == 403
 
 
 class TestUserResponseRiskModeLabel:

@@ -10,15 +10,27 @@ ALTER TABLE users ADD COLUMN tier VARCHAR(20) NOT NULL DEFAULT 'LOWER';
 ALTER TABLE users ADD COLUMN last_judgment_at TIMESTAMP WITH TIME ZONE NULL;
 -- 注: F-2 で DEFAULT を 'GENERAL' から 'LOWER' に変更。本番 DB の DEFAULT 切替は
 -- F-16 マイグレーションで実施 (docs/46_users_tier_migration_plan.md 参照)。
+
+-- F-17b: CUSTOM リスクモード
+ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_risk_params JSONB NULL;
+CREATE TABLE IF NOT EXISTS audit_log (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    actor_id INTEGER REFERENCES users(id),
+    action VARCHAR(50) NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
 """
 
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -81,11 +93,13 @@ class RiskMode(str, Enum):
     **値のリネームは禁止** (F-13 でも維持)。表示は ``RISK_MODE_JP_LABELS`` 経由で日本語化する。
 
     F-3 (2026-04-25): 本 enum を新規作成 (従来は str リテラル直書き)。
+    F-17b (2026-04-26): CUSTOM 追加 (partner 専用)。
     """
 
     CONSERVATIVE = "conservative"
     BALANCED = "balanced"
     AGGRESSIVE = "aggressive"
+    CUSTOM = "custom"  # F-17b: partner 専用カスタムモード
 
 
 #: risk_mode → 日本語表示ラベル (v10 spec)。1:1 マッピング。
@@ -93,17 +107,23 @@ RISK_MODE_JP_LABELS: dict[RiskMode, str] = {
     RiskMode.CONSERVATIVE: "ローリスク",
     RiskMode.BALANCED: "ミドルリスク",
     RiskMode.AGGRESSIVE: "ハイリスク",
+    RiskMode.CUSTOM: "カスタム",
 }
 
 #: Phase 1 で選択許可されているモード。
 #: Phase 2 で BALANCED / AGGRESSIVE を解禁する想定 (DB 側の制約ではなく API 層で強制)。
+#: CUSTOM は partner/admin のみ許可 (Phase 1 から利用可能)。
 PHASE_1_ALLOWED_RISK_MODES: frozenset[RiskMode] = frozenset({RiskMode.CONSERVATIVE})
+
+#: partner/admin のみ選択可能なモード。
+PARTNER_ONLY_RISK_MODES: frozenset[RiskMode] = frozenset({RiskMode.CUSTOM})
 
 #: 各 risk_mode の解禁 Phase (Phase 2-3 の段階解禁を見据えた設計)。
 RISK_MODE_PHASE: dict[RiskMode, int] = {
     RiskMode.CONSERVATIVE: 1,
     RiskMode.BALANCED: 2,
     RiskMode.AGGRESSIVE: 2,
+    RiskMode.CUSTOM: 1,  # partner 向け Phase 1 から利用可能
 }
 
 #: リスクモード別月額サブスク率 (v10 spec §1)。
@@ -112,6 +132,7 @@ RISK_MODE_SUBSCRIPTION_RATES: dict[RiskMode, Decimal] = {
     RiskMode.CONSERVATIVE: Decimal("0"),  # ローリスク 0%
     RiskMode.BALANCED: Decimal("0.003"),  # ミドルリスク 0.3%/月
     RiskMode.AGGRESSIVE: Decimal("0.010"),  # ハイリスク 1.0%/月
+    RiskMode.CUSTOM: Decimal("0"),  # カスタム: 個別契約 (TBD)
 }
 
 #: リスクモードごとに利用可能なプロトコル (v10 spec §1)。
@@ -120,6 +141,7 @@ RISK_MODE_PROTOCOLS: dict[RiskMode, frozenset[str]] = {
     RiskMode.CONSERVATIVE: frozenset({"aave"}),
     RiskMode.BALANCED: frozenset({"aave", "lido"}),
     RiskMode.AGGRESSIVE: frozenset({"aave", "lido", "pendle"}),
+    RiskMode.CUSTOM: frozenset({"aave"}),  # カスタムはパラメータで範囲を調整
 }
 
 
@@ -136,6 +158,31 @@ def get_risk_mode_label(value: str | None) -> str:
     except ValueError:
         return RISK_MODE_JP_LABELS[RiskMode.CONSERVATIVE]
     return RISK_MODE_JP_LABELS[mode]
+
+
+class AuditLog(Base):
+    """監査ログ。リスクモード変更等の重要操作を記録する。
+
+    F-17b (2026-04-26): 新規作成。CUSTOM リスクモード変更履歴の記録に使用。
+    """
+
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    actor_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True, default=None
+    )
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    old_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+    new_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    def __repr__(self) -> str:
+        return f"<AuditLog(id={self.id}, user_id={self.user_id}, action={self.action!r})>"
 
 
 def normalize_tier(raw_tier: str | None, *, user_id: int | None = None) -> InvestmentTier:
@@ -238,6 +285,9 @@ class User(Base):
     )
     last_judgment_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
+    )
+    custom_risk_params: Mapped[Optional[dict[str, Any]]] = mapped_column(
+        JSON, nullable=True, default=None
     )
 
     def __repr__(self) -> str:

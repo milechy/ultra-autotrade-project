@@ -305,13 +305,24 @@
     "badge": {
       "conservative": "保守モード運用中",
       "balanced": "バランスモード運用中",
-      "aggressive": "積極モード運用中"
+      "aggressive": "積極モード運用中",
+      "custom": "カスタムモード運用中"
     },
     "changed": "{mode}に変更しました",
     "description": {
       "conservative": "ステーブルコインのみで安全に運用します",
       "balanced": "安定性と収益のバランスを取って運用します",
-      "aggressive": "高リターンを重視して積極的に運用します"
+      "aggressive": "高リターンを重視して積極的に運用します",
+      "custom": "パートナー専用のカスタムパラメータで運用します"
+    },
+    "custom": {
+      "title": "カスタムモード設定",
+      "hfLowerBound": "最小ヘルスファクター",
+      "supplyRatio": "供給比率",
+      "maxPositionSizeUsd": "最大ポジションサイズ (USD)",
+      "partnerOnly": "パートナー専用",
+      "auditTitle": "CUSTOMリスクモード 変更履歴",
+      "auditDesc": "パートナーによるカスタムリスクモード変更の監査ログ"
     }
   },
   "CopyTrading": {

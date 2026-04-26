@@ -305,13 +305,24 @@
     "badge": {
       "conservative": "Conservative Mode Active",
       "balanced": "Balanced Mode Active",
-      "aggressive": "Aggressive Mode Active"
+      "aggressive": "Aggressive Mode Active",
+      "custom": "Custom Mode Active"
     },
     "changed": "Changed to {mode}",
     "description": {
       "conservative": "Operating safely with stablecoins only",
       "balanced": "Balancing stability and returns",
-      "aggressive": "Aggressively pursuing high returns"
+      "aggressive": "Aggressively pursuing high returns",
+      "custom": "Operating with partner-customized parameters"
+    },
+    "custom": {
+      "title": "Custom Mode Settings",
+      "hfLowerBound": "Min Health Factor",
+      "supplyRatio": "Supply Ratio",
+      "maxPositionSizeUsd": "Max Position Size (USD)",
+      "partnerOnly": "Partners only",
+      "auditTitle": "CUSTOM Risk Mode Change History",
+      "auditDesc": "Audit log of custom risk mode changes by partners"
     }
   },
   "CopyTrading": {

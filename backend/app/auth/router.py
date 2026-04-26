@@ -23,18 +23,21 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 
-from .dependencies import require_active_user
+from .dependencies import require_active_user, require_admin
 from .models import (
+    PARTNER_ONLY_RISK_MODES,
     PHASE_1_ALLOWED_RISK_MODES,
     RISK_MODE_JP_LABELS,
     RISK_MODE_PHASE,
     RISK_MODE_PROTOCOLS,
     RISK_MODE_SUBSCRIPTION_RATES,
+    AuditLog,
     RiskMode,
     User,
     UserRole,
 )
 from .schemas import (
+    AuditLogEntry,
     LoginRequest,
     PasswordChangeRequest,
     RegisterRequest,
@@ -342,12 +345,11 @@ def update_risk_mode(
     user: User = Depends(require_active_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    """Update the user's risk mode (conservative / balanced / aggressive).
+    """Update the user's risk mode.
 
-    Phase 1 では CONSERVATIVE のみ許可する (BALANCED / AGGRESSIVE は 403)。
-    Phase 2 で ``PHASE_1_ALLOWED_RISK_MODES`` を拡張して解禁する。
+    Phase 1 では CONSERVATIVE のみ許可 (BALANCED / AGGRESSIVE は 403)。
+    CUSTOM は partner / admin のみ許可 (Phase 1 から利用可能)。
     """
-    # 内部値 (str) を enum に変換 (RiskModeUpdateRequest 側で pattern で制限済み)
     try:
         new_mode = RiskMode(request.mode)
     except ValueError as exc:
@@ -356,15 +358,47 @@ def update_risk_mode(
             detail=f"Unknown risk_mode: {request.mode!r}",
         ) from exc
 
-    # Phase 1 制限: 許可されていないモードは 403
-    if new_mode not in PHASE_1_ALLOWED_RISK_MODES:
+    # CUSTOM モード: partner/admin 限定 + custom_params 必須
+    if new_mode in PARTNER_ONLY_RISK_MODES:
+        if user.role not in (UserRole.ADMIN.value, UserRole.PARTNER.value):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="カスタムモードはパートナー専用です。",
+            )
+        if request.custom_params is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="カスタムモード選択時は custom_params が必要です。",
+            )
+    # 通常モード: Phase 1 制限
+    elif new_mode not in PHASE_1_ALLOWED_RISK_MODES:
         jp_label = RISK_MODE_JP_LABELS[new_mode]
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"{jp_label}はPhase 2以降で利用可能です。",
         )
 
+    old_mode = user.risk_mode
     user.risk_mode = new_mode.value
+
+    if new_mode in PARTNER_ONLY_RISK_MODES and request.custom_params is not None:
+        user.custom_risk_params = request.custom_params.model_dump()
+    elif new_mode not in PARTNER_ONLY_RISK_MODES:
+        user.custom_risk_params = None
+
+    # 監査ログ記録 (CUSTOM モード変更時)
+    if new_mode in PARTNER_ONLY_RISK_MODES or (
+        old_mode and RiskMode(old_mode) in PARTNER_ONLY_RISK_MODES
+    ):
+        audit_entry = AuditLog(
+            user_id=user.id,
+            actor_id=user.id,
+            action="risk_mode_change",
+            old_value=old_mode,
+            new_value=new_mode.value,
+        )
+        db.add(audit_entry)
+
     db.commit()
     db.refresh(user)
     logger.info("User changed risk mode to %s: %s", new_mode.value, user.email)
@@ -380,15 +414,20 @@ def update_risk_mode(
     summary="List all risk modes (with labels, phase, allow status)",
 )
 def list_risk_modes(
-    _user: User = Depends(require_active_user),
+    user: User = Depends(require_active_user),
 ) -> dict[str, Any]:
     """全リスクモード一覧を返す (フロント側のモード選択 UI 用)。
 
+    CUSTOM モードは partner/admin のみに表示する。
+
     Returns:
-        ``{"modes": [{mode, label, phase, allowed_in_phase_1, subscription_rate, protocols}, ...]}``
+        ``{"modes": [{mode, label, phase, allowed_in_phase_1, subscription_rate, protocols, partner_only}, ...]}``
     """
+    is_partner_or_admin = user.role in (UserRole.ADMIN.value, UserRole.PARTNER.value)
     modes_payload = []
     for mode in RiskMode:
+        if mode in PARTNER_ONLY_RISK_MODES and not is_partner_or_admin:
+            continue
         modes_payload.append(
             {
                 "mode": mode.value,
@@ -397,9 +436,68 @@ def list_risk_modes(
                 "allowed_in_phase_1": mode in PHASE_1_ALLOWED_RISK_MODES,
                 "subscription_rate": str(RISK_MODE_SUBSCRIPTION_RATES[mode]),
                 "protocols": sorted(RISK_MODE_PROTOCOLS[mode]),
+                "partner_only": mode in PARTNER_ONLY_RISK_MODES,
             }
         )
     return {"modes": modes_payload}
+
+
+@router.get(
+    "/admin/risk-modes/custom-audit",
+    summary="List CUSTOM risk mode change audit log (admin only)",
+)
+def list_custom_risk_mode_audit(
+    limit: int = 50,
+    offset: int = 0,
+    _user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """CUSTOM リスクモード変更の監査ログ一覧を返す (admin 専用)。
+
+    Returns:
+        ``{"entries": [...], "total": int}``
+    """
+    from sqlalchemy import func, select  # noqa: PLC0415
+
+    total_row = db.execute(
+        select(func.count()).select_from(AuditLog).where(AuditLog.action == "risk_mode_change")
+    ).scalar_one()
+
+    rows = (
+        db.execute(
+            select(AuditLog)
+            .where(AuditLog.action == "risk_mode_change")
+            .order_by(AuditLog.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        .scalars()
+        .all()
+    )
+
+    # user_id / actor_id → email のルックアップ
+    user_ids = {r.user_id for r in rows} | {r.actor_id for r in rows if r.actor_id}
+    users_map: dict[int, str] = {}
+    if user_ids:
+        user_rows = db.execute(select(User.id, User.email).where(User.id.in_(user_ids))).all()
+        users_map = {row.id: row.email for row in user_rows}
+
+    entries = [
+        AuditLogEntry(
+            id=row.id,
+            user_id=row.user_id,
+            actor_id=row.actor_id,
+            action=row.action,
+            old_value=row.old_value,
+            new_value=row.new_value,
+            created_at=row.created_at,
+            user_email=users_map.get(row.user_id),
+            actor_email=users_map.get(row.actor_id) if row.actor_id else None,
+        )
+        for row in rows
+    ]
+
+    return {"entries": [e.model_dump() for e in entries], "total": total_row}
 
 
 @router.post(

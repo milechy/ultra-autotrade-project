@@ -42,7 +42,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import select  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
-from app.auth.models import RISK_MODE_SUBSCRIPTION_RATES, RiskMode  # noqa: E402
+from app.auth.models import (  # noqa: E402
+    PARTNER_ONLY_RISK_MODES,
+    RISK_MODE_SUBSCRIPTION_RATES,
+    RiskMode,
+)
 from app.billing.v10_models import FeeConfigV10  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
 
@@ -74,9 +78,12 @@ def build_v10_default_config() -> dict[str, object]:
         "tier_fee_rates": [0.30, 0.25, 0.20],
         "tier_monthly_yield_caps": [0.018, 0.023, 0.030],
         "subscription_rates": {
-            mode.value: float(RISK_MODE_SUBSCRIPTION_RATES[mode]) for mode in RiskMode
+            mode.value: float(RISK_MODE_SUBSCRIPTION_RATES[mode])
+            for mode in RiskMode
+            if mode not in PARTNER_ONLY_RISK_MODES
         },
         # → {"conservative": 0.0, "balanced": 0.003, "aggressive": 0.01}
+        # CUSTOM (partner-only) は個別契約のため標準 fee config に含めない (F-17b)
         "expense_markup_enabled": False,
         "expense_markup_rate": Decimal("0"),
         "affiliate_rate": Decimal("0.30"),
