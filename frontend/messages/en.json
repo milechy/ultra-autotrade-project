@@ -299,6 +299,45 @@
       "apiKeys": "API Keys",
       "save": "Save",
       "saved": "Saved"
+    },
+    "fees": {
+      "title": "Fee Management",
+      "tabOverview": "User Summary",
+      "tabMonthly": "Monthly Entries",
+      "userId": "User ID",
+      "username": "Username",
+      "email": "Email",
+      "tier": "Tier",
+      "riskMode": "Risk Mode",
+      "totalManagementFee": "Total Mgmt Fee",
+      "totalPerformanceFee": "Total Perf Fee",
+      "totalFee": "Total Fee",
+      "lastCalculationDate": "Last Calc Date",
+      "actions": "Actions",
+      "refund": "Refund",
+      "month": "Month",
+      "reload": "Reload",
+      "exportCsv": "Export CSV",
+      "managementFeeTotal": "Total Mgmt Fee",
+      "performanceFeeTotal": "Total Perf Fee",
+      "feeTotal": "Total Fee",
+      "userCount": "Users",
+      "entryCount": "Entries",
+      "noData": "No data available",
+      "loading": "Loading...",
+      "refundModal": {
+        "title": "Process Refund",
+        "amount": "Refund Amount (JPY)",
+        "reason": "Reason",
+        "cancel": "Cancel",
+        "submit": "Process Refund",
+        "submitting": "Processing..."
+      },
+      "periodType": {
+        "daily": "Daily",
+        "monthly": "Monthly",
+        "refund": "Refund"
+      }
     }
   },
   "riskMode": {
@@ -339,6 +378,30 @@
       "consent": "I consent to the referrer viewing my transaction history (type/amount/date, excluding wallet info)",
       "required": "An invitation code is required. Please access via the referral link (/r/<code>) provided by your referrer."
     }
+  },
+  "FeeSimulator": {
+    "title": "Fee Simulator",
+    "subtitle": "Estimate fees from projected AUM and monthly yield",
+    "depositLabel": "AUM (JPY)",
+    "yieldLabel": "Monthly yield rate",
+    "riskModeLabel": "Risk mode",
+    "tierLabel": "Investment tier",
+    "firstMonthFree": "First month free",
+    "resultTitle": "Fee breakdown",
+    "grossProfit": "Gross monthly profit",
+    "netProfit": "Net profit (after expenses)",
+    "subscriptionFee": "Monthly subscription",
+    "performanceFee": "Performance fee",
+    "userTakehome": "User take-home",
+    "uataShare": "Yield cap excess (UATa)",
+    "simulateError": "Calculation failed. Please try again.",
+    "historyTitle": "Fee history",
+    "historyEmpty": "No fee history yet",
+    "historyMonth": "Month",
+    "historyTier": "Tier",
+    "historyFee": "Fee",
+    "historySub": "Subscription",
+    "historyTakehome": "Take-home"
   },
   "CopyTrading": {
     "title": "Copy Trading",
