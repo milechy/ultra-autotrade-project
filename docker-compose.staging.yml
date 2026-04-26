@@ -10,13 +10,19 @@ version: "3.9"
 #   - 完全独立DB (ultra_autotrade_staging)
 #   - portは production と重複しないよう 127.0.0.1 バインドで分離
 #     frontend: 127.0.0.1:3001  (production: 0.0.0.0:3000)
-#     backend:  127.0.0.1:8001  (production: 0.0.0.0:8000)
+#     backend (旧 single): 127.0.0.1:8001  (production blue: 127.0.0.1:8010)
 #     postgres: 127.0.0.1:5433  (production: 0.0.0.0:5432)
 #   - Cloudflare Tunnel Ingress への staging URL 追加は Phase 4 で実施
 #
+# 2026-04-27 ゼロダウンタイムデプロイ (Asana 1214253004741363) で導入:
+#   - backend を backend-blue / backend-green に分割
+#   - nginx (127.0.0.1:8082) を前段に追加 (production の 8080 と区別)
+#   - host側ポートは production (8010/8011) と衝突回避のため 8020/8021 を使用
+#   - staging は外部公開なしのため cloudflared フォールバックは無し
+#
 # デプロイ: scripts/deploy_staging.sh
-# 環境変数: .env.staging
-# COMPOSE_PROJECT_NAME: ultra-autotrade-staging  (.env.staging に定義)
+# 環境変数: .env.staging-new
+# COMPOSE_PROJECT_NAME: ultra-autotrade-staging  (.env.staging-new に定義)
 # ============================================================
 #
 # NOTE: The Loki Docker logging driver must be installed on the host before starting this stack:
@@ -35,6 +41,9 @@ volumes:
     driver: local
   loki-data-staging-new:
     name: ultra-autotrade-staging_loki-data
+    driver: local
+  nginx-log-staging-new:
+    name: ultra-autotrade-staging_nginx-log
     driver: local
 
 networks:
@@ -107,8 +116,12 @@ services:
         loki-timeout: "10s"
         loki-external-labels: "service=postgres,env=staging"
 
-  backend:
-    container_name: ultra-autotrade-backend-staging-new
+  # ===== Blue/Green Backend =====
+  # active 側のみ nginx の upstream.conf に登録される。
+  # host側 port は production (8010/8011) と衝突回避のため 8020/8021。
+
+  backend-blue:
+    container_name: ultra-autotrade-backend-blue-staging-new
     build:
       context: .
       dockerfile: Dockerfile
@@ -122,11 +135,12 @@ services:
       - .env.staging-new
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade_staging}
-      # Shadow Mode: 実トレード禁止 (Staging専用)
       REBALANCE_SHADOW_MODE: "true"
       AI_SHADOW_MODE: "true"
+      DEPLOY_SLOT: "blue"
     ports:
-      - "127.0.0.1:8001:8000"
+      # 内部検証用 (deploy script が /health を直接ポーリング)。外部公開なし。
+      - "127.0.0.1:8020:8000"
     volumes:
       - ultra-state-staging-new:/var/run/ultra:rw
       - ./backend/data:/app/backend/data:rw
@@ -144,7 +158,72 @@ services:
         loki-batch-size: "400"
         loki-retries: "3"
         loki-timeout: "10s"
-        loki-external-labels: "service=backend,env=staging"
+        loki-external-labels: "service=backend-blue,env=staging"
+
+  backend-green:
+    container_name: ultra-autotrade-backend-green-staging-new
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/backend
+    command: >
+      sh -c "uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --log-level info"
+    env_file:
+      - .env.staging-new
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade_staging}
+      REBALANCE_SHADOW_MODE: "true"
+      AI_SHADOW_MODE: "true"
+      DEPLOY_SLOT: "green"
+    ports:
+      - "127.0.0.1:8021:8000"
+    volumes:
+      - ultra-state-staging-new:/var/run/ultra:rw
+      - ./backend/data:/app/backend/data:rw
+      - ultra-log-staging-new:/var/log/ultra-autotrade
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    networks:
+      - staging-net
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-timeout: "10s"
+        loki-external-labels: "service=backend-green,env=staging"
+
+  # ===== Reverse Proxy =====
+  # production の :8080 と区別するため staging は 127.0.0.1:8082 にバインド。
+  # dry-run 検証は curl http://127.0.0.1:8082/health で実施 (staging URL は Phase 4 以降)。
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ultra-autotrade-nginx-staging-new
+    ports:
+      - "127.0.0.1:8082:8080"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/upstream.conf:/etc/nginx/conf.d/upstream.conf:rw
+      - nginx-log-staging-new:/var/log/nginx
+    depends_on:
+      - backend-blue
+    restart: always
+    networks:
+      - staging-net
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-timeout: "10s"
+        loki-external-labels: "service=nginx,env=staging"
 
   frontend:
     container_name: ultra-autotrade-frontend-staging-new
@@ -169,11 +248,13 @@ services:
         NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}
     environment:
       NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api-staging.ultra-auto-trade.com}
-      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://backend:8000}
+      # SSR は Docker ネットワーク内の nginx (内部ポート 8080) 経由で backend に到達する。
+      # Blue/Green 切替時にも frontend の再起動なしでバックエンドが追従する。
+      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://nginx:8080}
     ports:
       - "127.0.0.1:3001:3000"
     depends_on:
-      - backend
+      - nginx
     restart: always
     networks:
       - staging-net

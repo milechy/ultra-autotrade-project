@@ -12,6 +12,13 @@ version: "3.9"
 #       (c) 独自 network を定義して staging.yml との合成を物理的に分離
 #       (d) backend.environment.DATABASE_URL を削除 (env_file の .env.production に直接記述、
 #           compose ${} 展開に依存しない)
+#   - 2026-04-27 ゼロダウンタイムデプロイ (Asana 1214253004741363) で導入:
+#       (e) 旧 backend を backend-blue / backend-green に分割し Blue/Green 化
+#       (f) nginx (8080) を前段に追加。docker/nginx/upstream.conf の単一行を
+#           書き換えて nginx -s reload することで無停止切替
+#       (g) frontend SSR の BACKEND_BASE_URL を http://nginx:8080 に変更 (内部 Docker DNS)
+#       (h) cloudflared Ingress を localhost:8000 → localhost:8080 に Cloudflare Dashboard で
+#           手動切替する (docs/19_operations_runbook.md §ゼロダウンタイムデプロイ運用 参照)
 #
 # デプロイ: scripts/deploy_production.sh
 # 環境変数: .env.production  (DATABASE_URL をフルURLで定義すること)
@@ -33,6 +40,9 @@ volumes:
     driver: local
   ultra-log-staging:
     name: ultra-autotrade-project_ultra-log-staging
+    driver: local
+  nginx-log:
+    name: ultra-autotrade-project_nginx-log
     driver: local
 
 networks:
@@ -105,8 +115,12 @@ services:
         loki-timeout: "10s"
         loki-external-labels: "service=postgres,env=production"
 
-  backend:
-    container_name: ultra-autotrade-backend-production
+  # ===== Blue/Green Backend =====
+  # 両者は build / env / volume が同一。container_name と公開ポートのみ異なる。
+  # active 側のみ nginx の upstream.conf に登録される。
+
+  backend-blue:
+    container_name: ultra-autotrade-backend-blue-production
     build:
       context: .
       dockerfile: Dockerfile
@@ -117,13 +131,19 @@ services:
       --port 8000
       --log-level info"
     env_file:
-      - .env.production       # DATABASE_URL はこのファイル内で直接指定すること
+      - .env.production
     environment:
-      # compose ${} 展開に依存しないため DATABASE_URL はここで書かない。
-      # .env.production で DATABASE_URL=postgresql://ultra:<password>@postgres:5432/ultra_autotrade を定義する。
       REBALANCE_SHADOW_MODE: "false"
+      DEPLOY_SLOT: "blue"
     ports:
-      - "8000:8000"
+      # 内部検証用 (deploy script が /health を直接ポーリング)。外部公開なし。
+      - "127.0.0.1:8010:8000"
+      # ── Cloudflare Tunnel フォールバック (任意) ──
+      # nginx 死亡時に cloudflared を直接 backend-blue に向け直すための追加公開。
+      # 有効化する場合は下記のコメントアウトを外し、Cloudflare Dashboard で
+      # ingress に http://localhost:8000 のフォールバックエントリを追加する。
+      # 詳細: docs/19_operations_runbook.md §ゼロダウンタイムデプロイ運用
+      # - "8000:8000"
     volumes:
       - ultra-state:/var/run/ultra:rw
       - ./backend/data:/app/backend/data:rw
@@ -141,7 +161,70 @@ services:
         loki-batch-size: "400"
         loki-retries: "3"
         loki-timeout: "10s"
-        loki-external-labels: "service=backend,env=production"
+        loki-external-labels: "service=backend-blue,env=production"
+
+  backend-green:
+    container_name: ultra-autotrade-backend-green-production
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/backend
+    command: >
+      sh -c "uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --log-level info"
+    env_file:
+      - .env.production
+    environment:
+      REBALANCE_SHADOW_MODE: "false"
+      DEPLOY_SLOT: "green"
+    ports:
+      - "127.0.0.1:8011:8000"
+    volumes:
+      - ultra-state:/var/run/ultra:rw
+      - ./backend/data:/app/backend/data:rw
+      - ultra-log-staging:/var/log/ultra-autotrade
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    networks:
+      - production-net
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-timeout: "10s"
+        loki-external-labels: "service=backend-green,env=production"
+
+  # ===== Reverse Proxy =====
+  # nginx -s reload は POSIX 仕様で既存接続を引き継ぐため、ゼロダウンタイム保証。
+  # upstream.conf を書き換えて reload するだけで Blue/Green 切替が完了する。
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ultra-autotrade-nginx-production
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/upstream.conf:/etc/nginx/conf.d/upstream.conf:rw
+      - nginx-log:/var/log/nginx
+    depends_on:
+      - backend-blue
+    restart: always
+    networks:
+      - production-net
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://loki:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-timeout: "10s"
+        loki-external-labels: "service=nginx,env=production"
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -151,7 +234,7 @@ services:
     env_file:
       - .env.production
     depends_on:
-      - backend
+      - nginx
       - frontend
     restart: always
     logging:
@@ -183,11 +266,13 @@ services:
         NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}
     environment:
       NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api.ultra-auto-trade.com}
-      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://backend:8000}
+      # SSR (Next.js サーバー側) は内部 nginx 経由で backend に到達する。
+      # Blue/Green 切替時にも frontend の再起動なしでバックエンドが追従する。
+      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://nginx:8080}
     ports:
       - "3000:3000"
     depends_on:
-      - backend
+      - nginx
     restart: always
     networks:
       - production-net
