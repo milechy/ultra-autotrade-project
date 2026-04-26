@@ -59,8 +59,11 @@ const nextConfig = {
       'pino-pretty': false,
       '@safe-global/safe-apps-provider': false,
     };
-    // Privy の optional な Solana / Farcaster 依存をスタブ（未使用）
-    // porto は package.json から削除済み。wagmi/connectors 内部参照をスタブ化
+    // Stub unused optional deps that are pulled in transitively:
+    // - @solana/wallet-adapter-react, @farcaster/miniapp-sdk: optional Privy features we don't use
+    // - porto / porto/internal: removed from direct deps (E-4). Remains as transitive dep via
+    //   @privy-io/react-auth → x402 → wagmi@2.x → @wagmi/connectors@6.x (regular dep there).
+    //   Setting to `false` excludes PortoConnector from the bundle; we don't use Porto wallet.
     config.resolve.alias = {
       ...config.resolve.alias,
       '@solana/wallet-adapter-react': false,
