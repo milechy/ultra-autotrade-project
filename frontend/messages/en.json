@@ -299,6 +299,45 @@
       "apiKeys": "API Keys",
       "save": "Save",
       "saved": "Saved"
+    },
+    "fees": {
+      "title": "Fee Management",
+      "tabOverview": "User Summary",
+      "tabMonthly": "Monthly Entries",
+      "userId": "User ID",
+      "username": "Username",
+      "email": "Email",
+      "tier": "Tier",
+      "riskMode": "Risk Mode",
+      "totalManagementFee": "Total Mgmt Fee",
+      "totalPerformanceFee": "Total Perf Fee",
+      "totalFee": "Total Fee",
+      "lastCalculationDate": "Last Calc Date",
+      "actions": "Actions",
+      "refund": "Refund",
+      "month": "Month",
+      "reload": "Reload",
+      "exportCsv": "Export CSV",
+      "managementFeeTotal": "Total Mgmt Fee",
+      "performanceFeeTotal": "Total Perf Fee",
+      "feeTotal": "Total Fee",
+      "userCount": "Users",
+      "entryCount": "Entries",
+      "noData": "No data available",
+      "loading": "Loading...",
+      "refundModal": {
+        "title": "Process Refund",
+        "amount": "Refund Amount (JPY)",
+        "reason": "Reason",
+        "cancel": "Cancel",
+        "submit": "Process Refund",
+        "submitting": "Processing..."
+      },
+      "periodType": {
+        "daily": "Daily",
+        "monthly": "Monthly",
+        "refund": "Refund"
+      }
     }
   },
   "riskMode": {

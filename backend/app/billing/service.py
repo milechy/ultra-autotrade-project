@@ -8,6 +8,8 @@ Billing サービスロジック。
 全ての数値計算は decimal.Decimal で行い、float は一切使用しない。
 """
 
+import csv
+import io
 import logging
 from datetime import date, datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
@@ -15,8 +17,17 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.auth.models import User
+
 from .models import FeeCalculation, FeeConfig, HighWaterMark
-from .schemas import BatchResult, FeeSummaryResponse
+from .schemas import (
+    AdminFeeMonthlyEntry,
+    AdminFeeRefundResponse,
+    AdminFeeUserRow,
+    AdminMonthlyAggregate,
+    BatchResult,
+    FeeSummaryResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -365,6 +376,206 @@ class BillingService:
             total_fee=Decimal(str(result.total_fee)),
             calculation_count=result.calculation_count,
         )
+
+    # ── Admin methods (F-12) ────────────────────────────────────────────────
+
+    def get_all_users_fee_overview(self, db: Session) -> list[AdminFeeUserRow]:
+        """全ユーザーの手数料累計サマリーを返す (admin 専用)。"""
+        rows = (
+            db.query(
+                FeeCalculation.user_id,
+                User.username,
+                User.email,
+                User.tier,
+                User.risk_mode,
+                func.coalesce(func.sum(FeeCalculation.management_fee), Decimal("0")).label(
+                    "total_management_fee"
+                ),
+                func.coalesce(func.sum(FeeCalculation.performance_fee), Decimal("0")).label(
+                    "total_performance_fee"
+                ),
+                func.coalesce(func.sum(FeeCalculation.total_fee), Decimal("0")).label("total_fee"),
+                func.max(FeeCalculation.calculation_date).label("last_calculation_date"),
+                func.count(FeeCalculation.id).label("calculation_count"),
+            )
+            .join(User, User.id == FeeCalculation.user_id)
+            .group_by(
+                FeeCalculation.user_id,
+                User.username,
+                User.email,
+                User.tier,
+                User.risk_mode,
+            )
+            .order_by(func.sum(FeeCalculation.total_fee).desc())
+            .all()
+        )
+        return [
+            AdminFeeUserRow(
+                user_id=r.user_id,
+                username=r.username,
+                email=r.email,
+                tier=r.tier,
+                risk_mode=r.risk_mode,
+                total_management_fee=Decimal(str(r.total_management_fee)),
+                total_performance_fee=Decimal(str(r.total_performance_fee)),
+                total_fee=Decimal(str(r.total_fee)),
+                last_calculation_date=r.last_calculation_date,
+                calculation_count=r.calculation_count,
+            )
+            for r in rows
+        ]
+
+    def get_monthly_fee_entries(
+        self,
+        db: Session,
+        month: str,
+    ) -> list[AdminFeeMonthlyEntry]:
+        """指定月 (YYYY-MM) の手数料明細を全ユーザー分返す (admin 専用)。"""
+        year_str, mon_str = month.split("-")
+        year, mon = int(year_str), int(mon_str)
+        from calendar import monthrange
+
+        last_day = monthrange(year, mon)[1]
+        month_start = date(year, mon, 1)
+        month_end = date(year, mon, last_day)
+
+        rows = (
+            db.query(FeeCalculation, User)
+            .join(User, User.id == FeeCalculation.user_id)
+            .filter(
+                FeeCalculation.calculation_date >= month_start,
+                FeeCalculation.calculation_date <= month_end,
+            )
+            .order_by(FeeCalculation.calculation_date.desc(), FeeCalculation.user_id)
+            .all()
+        )
+        return [
+            AdminFeeMonthlyEntry(
+                id=fc.id,
+                user_id=fc.user_id,
+                username=u.username,
+                email=u.email,
+                tier=u.tier,
+                risk_mode=u.risk_mode,
+                aum_snapshot=fc.aum_snapshot,
+                management_fee=fc.management_fee,
+                performance_fee=fc.performance_fee,
+                total_fee=fc.total_fee,
+                calculation_date=fc.calculation_date,
+                period_type=fc.period_type,
+            )
+            for fc, u in rows
+        ]
+
+    def get_monthly_aggregate(self, db: Session, month: str) -> AdminMonthlyAggregate:
+        """指定月 (YYYY-MM) の集計サマリーを返す (admin 専用)。"""
+        year_str, mon_str = month.split("-")
+        year, mon = int(year_str), int(mon_str)
+        from calendar import monthrange
+
+        last_day = monthrange(year, mon)[1]
+        month_start = date(year, mon, 1)
+        month_end = date(year, mon, last_day)
+
+        result = (
+            db.query(
+                func.coalesce(func.sum(FeeCalculation.management_fee), Decimal("0")).label("mgmt"),
+                func.coalesce(func.sum(FeeCalculation.performance_fee), Decimal("0")).label("perf"),
+                func.coalesce(func.sum(FeeCalculation.total_fee), Decimal("0")).label("total"),
+                func.count(func.distinct(FeeCalculation.user_id)).label("user_count"),
+                func.count(FeeCalculation.id).label("entry_count"),
+            )
+            .filter(
+                FeeCalculation.calculation_date >= month_start,
+                FeeCalculation.calculation_date <= month_end,
+            )
+            .one()
+        )
+        return AdminMonthlyAggregate(
+            month=month,
+            total_management_fee=Decimal(str(result.mgmt)),
+            total_performance_fee=Decimal(str(result.perf)),
+            total_fee=Decimal(str(result.total)),
+            user_count=result.user_count,
+            entry_count=result.entry_count,
+        )
+
+    def create_refund(
+        self,
+        db: Session,
+        user_id: int,
+        amount: Decimal,
+        reason: str,
+    ) -> AdminFeeRefundResponse:
+        """リファンドを period_type='refund' の負 total_fee エントリとして記録する (admin 専用)。"""
+        user = db.query(User).filter(User.id == user_id).first()
+        if user is None:
+            raise BillingServiceError(f"User not found: user_id={user_id}")
+
+        refund_amount = amount if amount > Decimal("0") else -amount
+        calc = FeeCalculation(
+            user_id=user_id,
+            calculation_date=date.today(),
+            period_type="refund",
+            aum_snapshot=Decimal("0"),
+            management_fee=Decimal("0"),
+            performance_fee=Decimal("0"),
+            total_fee=-refund_amount,
+            profit_since_hwm=Decimal("0"),
+            high_water_mark=Decimal("0"),
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(calc)
+        db.commit()
+        db.refresh(calc)
+        logger.info(
+            "Refund created for user_id=%d, amount=%s, reason=%s", user_id, refund_amount, reason
+        )
+        return AdminFeeRefundResponse(
+            success=True,
+            user_id=user_id,
+            refund_amount=refund_amount,
+            reason=reason,
+            created_at=calc.created_at,
+        )
+
+    def export_monthly_csv(self, db: Session, month: str) -> str:
+        """指定月の手数料明細を CSV 文字列で返す (admin 専用)。"""
+        entries = self.get_monthly_fee_entries(db, month)
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(
+            [
+                "user_id",
+                "username",
+                "email",
+                "tier",
+                "risk_mode",
+                "calculation_date",
+                "period_type",
+                "aum_snapshot",
+                "management_fee",
+                "performance_fee",
+                "total_fee",
+            ]
+        )
+        for e in entries:
+            writer.writerow(
+                [
+                    e.user_id,
+                    e.username,
+                    e.email,
+                    e.tier,
+                    e.risk_mode or "",
+                    e.calculation_date.isoformat(),
+                    e.period_type,
+                    str(e.aum_snapshot),
+                    str(e.management_fee),
+                    str(e.performance_fee),
+                    str(e.total_fee),
+                ]
+            )
+        return output.getvalue()
 
     def get_active_fee_config(self, db: Session) -> FeeConfig:
         """

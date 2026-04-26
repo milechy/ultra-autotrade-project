@@ -21,7 +21,14 @@ from app.auth.dependencies import require_admin, require_viewer
 from app.auth.models import User, UserRole
 from app.billing.models import FeeCalculation, FeeConfig
 from app.billing.router import router as billing_router
-from app.billing.schemas import BatchResult, FeeSummaryResponse
+from app.billing.schemas import (
+    AdminFeeMonthlyEntry,
+    AdminFeeRefundResponse,
+    AdminFeeUserRow,
+    AdminMonthlyAggregate,
+    BatchResult,
+    FeeSummaryResponse,
+)
 from app.database import get_db
 
 # ---------------------------------------------------------------------------
@@ -267,3 +274,169 @@ class TestBatchDailyEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["processed_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# TestAdminEndpoints (F-12)
+# ---------------------------------------------------------------------------
+
+
+class TestAdminUsersFees:
+    """GET /api/billing/admin/users のテスト。"""
+
+    def test_list_users_fees(self, admin_client: TestClient) -> None:
+        """正常系: 全ユーザー手数料サマリーが返ること。"""
+        rows = [
+            AdminFeeUserRow(
+                user_id=1,
+                username="alice",
+                email="alice@example.com",
+                tier="LOWER",
+                risk_mode="conservative",
+                total_management_fee=Decimal("100.000000"),
+                total_performance_fee=Decimal("50.000000"),
+                total_fee=Decimal("150.000000"),
+                last_calculation_date=date(2026, 4, 1),
+                calculation_count=10,
+            )
+        ]
+        with patch(
+            "app.billing.router._billing_service.get_all_users_fee_overview",
+            return_value=rows,
+        ):
+            response = admin_client.get("/api/billing/admin/users")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["user_id"] == 1
+        assert data[0]["username"] == "alice"
+        assert Decimal(data[0]["total_fee"]) == Decimal("150.000000")
+
+
+class TestAdminMonthlyEntries:
+    """GET /api/billing/admin/monthly-entries のテスト。"""
+
+    def test_list_monthly_entries(self, admin_client: TestClient) -> None:
+        """正常系: 月次明細が返ること。"""
+        entries = [
+            AdminFeeMonthlyEntry(
+                id=1,
+                user_id=1,
+                username="alice",
+                email="alice@example.com",
+                tier="LOWER",
+                risk_mode="conservative",
+                aum_snapshot=Decimal("10000.000000"),
+                management_fee=Decimal("0.136986"),
+                performance_fee=Decimal("0.000000"),
+                total_fee=Decimal("0.136986"),
+                calculation_date=date(2026, 4, 1),
+                period_type="daily",
+            )
+        ]
+        with patch(
+            "app.billing.router._billing_service.get_monthly_fee_entries",
+            return_value=entries,
+        ):
+            response = admin_client.get(
+                "/api/billing/admin/monthly-entries",
+                params={"month": "2026-04"},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["period_type"] == "daily"
+
+    def test_invalid_month_format(self, admin_client: TestClient) -> None:
+        """不正な月フォーマットは 422 を返すこと。"""
+        response = admin_client.get(
+            "/api/billing/admin/monthly-entries",
+            params={"month": "2026/04"},
+        )
+        assert response.status_code == 422
+
+
+class TestAdminMonthlySummary:
+    """GET /api/billing/admin/monthly-summary のテスト。"""
+
+    def test_get_monthly_summary(self, admin_client: TestClient) -> None:
+        """正常系: 月次集計が返ること。"""
+        summary = AdminMonthlyAggregate(
+            month="2026-04",
+            total_management_fee=Decimal("500.000000"),
+            total_performance_fee=Decimal("200.000000"),
+            total_fee=Decimal("700.000000"),
+            user_count=3,
+            entry_count=30,
+        )
+        with patch(
+            "app.billing.router._billing_service.get_monthly_aggregate",
+            return_value=summary,
+        ):
+            response = admin_client.get(
+                "/api/billing/admin/monthly-summary",
+                params={"month": "2026-04"},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["month"] == "2026-04"
+        assert data["user_count"] == 3
+        assert Decimal(data["total_fee"]) == Decimal("700.000000")
+
+
+class TestAdminRefund:
+    """POST /api/billing/admin/{user_id}/refund のテスト。"""
+
+    def test_create_refund(self, admin_client: TestClient) -> None:
+        """正常系: リファンドが作成されること。"""
+        refund_resp = AdminFeeRefundResponse(
+            success=True,
+            user_id=1,
+            refund_amount=Decimal("5000"),
+            reason="手数料過剰徴収のため",
+            created_at=datetime(2026, 4, 1, 0, 0, 0, tzinfo=timezone.utc),
+        )
+        with patch(
+            "app.billing.router._billing_service.create_refund",
+            return_value=refund_resp,
+        ):
+            response = admin_client.post(
+                "/api/billing/admin/1/refund",
+                json={"amount": "5000", "reason": "手数料過剰徴収のため"},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert Decimal(data["refund_amount"]) == Decimal("5000")
+
+    def test_refund_zero_amount_rejected(self, admin_client: TestClient) -> None:
+        """amount=0 は 422 を返すこと。"""
+        response = admin_client.post(
+            "/api/billing/admin/1/refund",
+            json={"amount": "0", "reason": "test"},
+        )
+        assert response.status_code == 422
+
+
+class TestAdminExportCsv:
+    """GET /api/billing/admin/export-csv のテスト。"""
+
+    def test_export_csv(self, admin_client: TestClient) -> None:
+        """正常系: CSV が返ること。"""
+        csv_content = "user_id,username\n1,alice\n"
+        with patch(
+            "app.billing.router._billing_service.export_monthly_csv",
+            return_value=csv_content,
+        ):
+            response = admin_client.get(
+                "/api/billing/admin/export-csv",
+                params={"month": "2026-04"},
+            )
+
+        assert response.status_code == 200
+        assert "text/csv" in response.headers.get("content-type", "")
+        assert "fees_2026-04.csv" in response.headers.get("content-disposition", "")
