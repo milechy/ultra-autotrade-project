@@ -760,12 +760,11 @@ def _process_single_item(
 
             from app.billing.dynamic_fee import calculate_fee_by_market  # noqa: PLC0415
 
-            # TODO(P0 タスク 1214279097935851): current_apy を MarketContext から正しく取得する。
-            # 現状 getattr(ctx, "current_apy", None) は MarketContext に該当属性がないため常に
-            # None を返し、Decimal("4") (4%) フォールバックされる。Aave クライアント連携時に修正予定。
-            _apy_raw = getattr(ctx, "current_apy", None) if ctx else None
+            # MarketContext.aave_supply_apy (fail-open ヘルパー経由で注入) を読む。
+            # Aave 取得失敗時は None → Decimal("4") (4%) フォールバック。
+            _apy_raw = getattr(ctx, "aave_supply_apy", None) if ctx else None
             if _apy_raw is None and isinstance(ctx, dict):
-                _apy_raw = ctx.get("current_apy")
+                _apy_raw = ctx.get("aave_supply_apy")
             current_apy = Decimal(str(_apy_raw)) if _apy_raw is not None else Decimal("4")
 
             # 30日保有での予想利益 = trade_amount × (APY/100) × (30/365)

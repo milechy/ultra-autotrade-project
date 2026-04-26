@@ -20,10 +20,12 @@ from typing import Any, Callable, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai.judgment_log import get_judgment_logger
 from app.ai.models import AIDecision
 from app.ai.schemas import CrossValidationResult, RAGContext, TradeAction
 from app.ai.service import AIService
 from app.auth.models import InvestmentTier, User, normalize_tier
+from app.automation.aave_data_fetcher import fetch_aave_market_data_safe
 from app.data_feeds.context import build_market_context
 from app.database import SessionLocal
 from app.knowledge.schemas import KnowledgeSearchRequest
@@ -251,11 +253,21 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
             logger.warning("RAG context retrieval failed, using empty context: %s", exc)
             rag_ctx = RAGContext(chunks=[], query=_DEFAULT_QUERY, source_count=0)
 
-        # Market context（ニュース・地政学リスク・マクロ）をキャッシュから取得
+        # Market context（ニュース・地政学リスク・マクロ + Aave + cognitive_state）
+        # を組み立てる。Aave 取得は fail-open ヘルパーで、個別失敗は None フォールバック。
+        # cognitive_state は HOLD 連続抑制のため LLM プロンプトに渡す。
         context_degraded = False
         market_ctx: Any
         try:
-            market_ctx = build_market_context()
+            aave_data = fetch_aave_market_data_safe()
+            cognitive_state = get_judgment_logger().get_cognitive_state()
+            market_ctx = build_market_context(
+                aave_utilization_rate=aave_data["utilization_rate"],
+                aave_supply_apy=aave_data["supply_apy"],
+                aave_borrow_apy=aave_data["borrow_apy"],
+                health_factor=aave_data["health_factor"],
+                cognitive_state=cognitive_state,
+            )
         except Exception as exc:
             context_degraded = True
             logger.warning("build_market_context() failed, using degraded context: %s", exc)
