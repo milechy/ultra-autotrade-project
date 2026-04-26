@@ -7,6 +7,17 @@
 
 ## backend/app/main.py
 
+### 変更 #5: F-7 月末バッチ startup hook 追加 (Asana 1214120401388139 / 2026-04-26)
+- **コミット範囲**: feature/f7-monthly-fee-batch-1214120401388139
+- **変更内容**:
+  - `startup_monthly_fee_batch()` startup イベント追加
+  - `app.automation.monthly_fee_batch.monthly_fee_batch_loop` を `asyncio.create_task` で起動
+  - `DISABLE_MONTHLY_FEE_BATCH=1` で無効化可能（既存の DISABLE_* 方針に揃える）
+  - 起動失敗・実行失敗時は `_make_scheduler_error_handler` 経由で Slack `#ultra-auto-project` 通知
+- **理由**: F-7 — 毎月最終日 23:55 JST に手数料計算 (FeeCalculator F-5) を全 active fund_allocation に対して実行し fee_transactions に書き込む必要がある。AI 判定スケジューラーと同じ DISABLE_* 方式・on_error コールバック方式を踏襲。
+- **影響範囲**: 起動シーケンスのみ。`DISABLE_MONTHLY_FEE_BATCH=1` 設定時または FeeConfigV10 未投入時は no-op。既存エンドポイント・スケジューラーへの影響なし。
+- **承認**: feature/f7-monthly-fee-batch-1214120401388139 → main の通常フロー経由
+
 ### 変更 #3: /health エンドポイントに AI モデル設定を追加 (PR #95 / 2026-04-20)
 - **コミット範囲**: `408d3ad` (feature/remove-claude-model-hardcodes)
 - **変更内容**:

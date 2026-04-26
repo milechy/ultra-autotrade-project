@@ -400,19 +400,34 @@ def list_all_users_fees(
 
 @router.post(
     "/finalize-month",
-    summary="月次 finalize (F-7 で本実装、現状スケルトン)",
+    summary="月次 finalize: 月末バッチを手動トリガーする (admin only)",
     dependencies=[Depends(require_admin)],
 )
-def finalize_month(month: date) -> dict[str, Any]:
-    """F-7 (1214120401388139) で本実装予定。本タスクでは 501 を返すスケルトン。"""
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail=(
-            "Not yet implemented. Will be implemented in F-7 "
-            "(Asana 1214120401388139). Requested month: "
-            f"{month.isoformat()}"
-        ),
+def finalize_month(
+    month: date,
+    notify_slack: bool = Query(default=True, description="Slack 通知を送信するか"),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """F-7 (Asana 1214120401388139) 月末バッチの手動トリガー。
+
+    ``app.automation.monthly_fee_batch.run_monthly_fee_batch`` を呼び出して
+    対象月の active fund_allocation を集計し ``fee_transactions`` を作成する。
+    冪等: 既に同月レコードがあるユーザーはスキップする。
+
+    Args:
+        month: 対象月の任意日付 (内部で月初日に正規化)。
+        notify_slack: Slack 通知を送るか (デフォルト True)。
+    """
+    from app.automation.monthly_fee_batch import (  # noqa: PLC0415
+        run_monthly_fee_batch,
     )
+
+    summary = run_monthly_fee_batch(
+        target_month=month,
+        db=db,
+        notify_slack=notify_slack,
+    )
+    return summary.to_log_dict()
 
 
 @router.get(

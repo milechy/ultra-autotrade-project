@@ -621,19 +621,29 @@ class TestAllUsersEndpoint:
 
 
 # ===========================================================================
-# Admin: /finalize-month (501 stub)
+# Admin: /finalize-month (F-7 monthly batch trigger)
 # ===========================================================================
 
 
-class TestFinalizeMonthStub:
-    def test_returns_501_with_f7_reference(self, client: TestClient) -> None:
+class TestFinalizeMonth:
+    """F-7 (Asana 1214120401388139) で 501 → 200 に切り替え済み。"""
+
+    def test_runs_monthly_batch_and_returns_summary(self, client: TestClient, test_db) -> None:
+        _, SessionFactory = test_db
         token = _register_admin(client)
+        with SessionFactory() as db:
+            _seed_active_config(db)
         r = client.post(
-            "/api/v1/fees/finalize-month?month=2026-05-01",
+            "/api/v1/fees/finalize-month?month=2026-05-01&notify_slack=false",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert r.status_code == 501
-        assert "F-7" in r.json()["detail"] or "1214120401388139" in r.json()["detail"]
+        assert r.status_code == 200, r.text
+        body = r.json()
+        # アクティブな fund_allocation がないので processed_count=0
+        assert body["target_month"] == "2026-05-01"
+        assert body["processed_count"] == 0
+        assert body["created_count"] == 0
+        assert body["failed_count"] == 0
 
 
 # ===========================================================================

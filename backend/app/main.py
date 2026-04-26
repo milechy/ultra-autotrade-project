@@ -493,6 +493,37 @@ def create_app() -> FastAPI:
         except BaseException as exc:
             logger.error("Failed to start AI judgment scheduler: %s", exc)
 
+    # --- F-7 monthly fee batch (Asana 1214120401388139) ---
+    @app.on_event("startup")
+    async def startup_monthly_fee_batch() -> None:
+        """毎月最終日 23:55 JST の月末手数料バッチを開始する。デフォルト有効。
+
+        ``DISABLE_MONTHLY_FEE_BATCH=1`` で停止可能 (CLAUDE.md の DISABLE_* 方針)。
+        """
+        import asyncio
+
+        from app.automation.monthly_fee_batch import (  # noqa: PLC0415
+            _is_loop_enabled,
+            monthly_fee_batch_loop,
+        )
+
+        if not _is_loop_enabled():
+            logger.warning(
+                "Monthly fee batch loop is DISABLED "
+                "(DISABLE_MONTHLY_FEE_BATCH=1 or ENABLE_MONTHLY_FEE_BATCH=0)"
+            )
+            return
+
+        try:
+            asyncio.create_task(
+                monthly_fee_batch_loop(
+                    on_error=_make_scheduler_error_handler("月末手数料バッチ"),
+                )
+            )
+            logger.info("Monthly fee batch loop scheduled (every month-end 23:55 JST)")
+        except BaseException as exc:
+            logger.error("Failed to start monthly fee batch loop: %s", exc)
+
     @app.on_event("shutdown")
     async def shutdown_scheduled_tasks() -> None:
         """
