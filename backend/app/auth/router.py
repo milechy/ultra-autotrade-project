@@ -446,6 +446,7 @@ def wallet_connect(
             try:
                 AuthService.update_privy_did(db, user, request.privy_did)
             except Exception:
+                db.rollback()
                 logger.warning(
                     "privy_did update failed (conflict?): wallet=%s...", request.wallet_address[:10]
                 )
