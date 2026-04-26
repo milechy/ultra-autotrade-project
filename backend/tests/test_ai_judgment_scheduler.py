@@ -768,3 +768,118 @@ def test_create_proposals_uses_normalized_tier(db_session):
     assert call_kwargs["tier"] == InvestmentTier.LOWER.value, (
         f"GENERAL は LOWER に正規化されるべきだが {call_kwargs['tier']!r} が渡された"
     )
+
+
+# ---------------------------------------------------------------------------
+# P0 Aave 注入 + cognitive_state 連携 (Asana 1214279097935851)
+# ---------------------------------------------------------------------------
+
+
+def test_run_ai_judgment_job_passes_aave_data(db_session):
+    """fetch_aave_market_data_safe の戻り値が build_market_context に kwargs として渡ること。"""
+    fake_aave = {
+        "utilization_rate": Decimal("0.85"),
+        "supply_apy": Decimal("4.2"),
+        "borrow_apy": Decimal("5.8"),
+        "health_factor": Decimal("2.1"),
+    }
+    mock_result = _make_cross_validation_result(TradeAction.HOLD)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+        patch(
+            "app.automation.ai_judgment_scheduler.fetch_aave_market_data_safe",
+            return_value=fake_aave,
+        ),
+        patch("app.automation.ai_judgment_scheduler.build_market_context") as mock_build,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        run_ai_judgment_job(db=db_session)
+
+    call_kwargs = mock_build.call_args.kwargs
+    assert call_kwargs["aave_utilization_rate"] == Decimal("0.85")
+    assert call_kwargs["aave_supply_apy"] == Decimal("4.2")
+    assert call_kwargs["aave_borrow_apy"] == Decimal("5.8")
+    assert call_kwargs["health_factor"] == Decimal("2.1")
+
+
+def test_run_ai_judgment_job_aave_failure_falls_back_to_none(db_session):
+    """Aave 取得失敗時、全フィールド None で MarketContext が構築され job が継続すること。"""
+    fake_aave = {
+        "utilization_rate": None,
+        "supply_apy": None,
+        "borrow_apy": None,
+        "health_factor": None,
+    }
+    mock_result = _make_cross_validation_result(TradeAction.HOLD)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+        patch(
+            "app.automation.ai_judgment_scheduler.fetch_aave_market_data_safe",
+            return_value=fake_aave,
+        ),
+        patch("app.automation.ai_judgment_scheduler.build_market_context") as mock_build,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        result = run_ai_judgment_job(db=db_session)
+
+    # Job は完走すること (HOLD path 後方互換)
+    assert result["action"] == "HOLD"
+    assert result["decision_id"] is not None
+
+    # 全フィールド None でも build_market_context は呼ばれる
+    call_kwargs = mock_build.call_args.kwargs
+    assert call_kwargs["aave_utilization_rate"] is None
+    assert call_kwargs["aave_supply_apy"] is None
+    assert call_kwargs["aave_borrow_apy"] is None
+    assert call_kwargs["health_factor"] is None
+
+
+def test_run_ai_judgment_job_passes_cognitive_state(db_session):
+    """get_judgment_logger().get_cognitive_state() の戻り値が build_market_context に渡ること。"""
+    from app.ai.judgment_log import CognitiveState  # noqa: PLC0415
+
+    fake_state = CognitiveState(
+        recent_actions=["HOLD", "HOLD", "HOLD"],
+        recent_confidences=[55, 58, 60],
+        last_action="HOLD",
+        last_confidence=60,
+        last_reason="待機継続",
+        consecutive_holds=3,
+        total_judgments=10,
+    )
+    mock_result = _make_cross_validation_result(TradeAction.HOLD)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+        patch(
+            "app.automation.ai_judgment_scheduler.fetch_aave_market_data_safe",
+            return_value={
+                "utilization_rate": None,
+                "supply_apy": None,
+                "borrow_apy": None,
+                "health_factor": None,
+            },
+        ),
+        patch("app.automation.ai_judgment_scheduler.get_judgment_logger") as mock_logger_factory,
+        patch("app.automation.ai_judgment_scheduler.build_market_context") as mock_build,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+        mock_logger_factory.return_value.get_cognitive_state.return_value = fake_state
+
+        run_ai_judgment_job(db=db_session)
+
+    call_kwargs = mock_build.call_args.kwargs
+    passed_state = call_kwargs["cognitive_state"]
+    assert passed_state is fake_state
+    assert passed_state.consecutive_holds == 3
+    assert passed_state.total_judgments == 10
