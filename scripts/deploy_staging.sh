@@ -49,7 +49,7 @@ GREEN_PORT=8021
 NGINX_PORT=8082
 FRONTEND_PORT=3001
 
-UPSTREAM_CONF="${PROJECT_ROOT}/docker/nginx/upstream.conf"
+UPSTREAM_CONF="${PROJECT_ROOT}/docker/nginx/upstream.staging.conf"
 LOCK_FILE="${PROJECT_ROOT}/.deploy-staging.lock"
 
 # ───────────────────────────────────────────────
@@ -139,7 +139,9 @@ read_active_slot() {
   fi
 }
 
-# upstream.conf を書き換え (awk + 一時ファイル + mv、sed -i は禁止)
+# upstream.staging.conf を書き換え (awk + cat >、sed -i / mv は禁止)
+# cat > で in-place 書き換えすることで inode を保持し bind-mount を維持する。
+# nginx 未起動時は docker exec をスキップ (フルデプロイ・リカバリ時のフェイルセーフ)。
 write_upstream_conf() {
   local new_slot="$1"
   local tmp_file
@@ -151,10 +153,19 @@ write_upstream_conf() {
       printf "server backend-%s:8000 max_fails=3 fail_timeout=10s;\n", slot
     }
   ' </dev/null > "${tmp_file}"
-  mv "${tmp_file}" "${UPSTREAM_CONF}"
-  # Docker bind-mount inode fix: mv replaces host inode but nginx container keeps old inode.
-  # Write in-place into container so nginx -s reload sees the new upstream.
-  docker exec -i "${NGINX_CONTAINER}" sh -c 'cat > /etc/nginx/conf.d/upstream.conf' < "${UPSTREAM_CONF}"
+  # cat > preserves inode (mv would break the bind-mount by replacing it)
+  cat "${tmp_file}" > "${UPSTREAM_CONF}"
+  rm -f "${tmp_file}"
+  log "Host file updated: ${UPSTREAM_CONF} → backend-${new_slot}"
+
+  # Sync into container only when nginx is running (skip during full deploy / recovery)
+  if docker ps --filter "name=${NGINX_CONTAINER}" --filter "status=running" \
+       --format "{{.Names}}" 2>/dev/null | grep -q "^${NGINX_CONTAINER}$"; then
+    docker exec -i "${NGINX_CONTAINER}" sh -c 'cat > /etc/nginx/conf.d/upstream.conf' < "${UPSTREAM_CONF}"
+    log "Container file synced: ${NGINX_CONTAINER}"
+  else
+    log "WARN: ${NGINX_CONTAINER} not running — skipping container sync (bind-mount will apply on next start)"
+  fi
 }
 
 active_backend_container() {

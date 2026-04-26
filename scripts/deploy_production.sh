@@ -45,7 +45,7 @@ BLUE_PORT=8010
 GREEN_PORT=8011
 NGINX_PORT=8080
 
-UPSTREAM_CONF="${PROJECT_ROOT}/docker/nginx/upstream.conf"
+UPSTREAM_CONF="${PROJECT_ROOT}/docker/nginx/upstream.production.conf"
 LOCK_FILE="${PROJECT_ROOT}/.deploy-production.lock"
 
 # ───────────────────────────────────────────────
@@ -79,7 +79,7 @@ deploy_production.sh — Ultra AutoTrade production デプロイ
 注意:
   - /opt/ultra-autotrade（または git root）から実行すること
   - .env.production が同ディレクトリに存在していること
-  - Blue/Green 切替には docker/nginx/upstream.conf と nginx コンテナが必要
+  - Blue/Green 切替には docker/nginx/upstream.production.conf と nginx コンテナが必要
 EOF
   exit 0
 }
@@ -135,7 +135,9 @@ read_active_slot() {
   fi
 }
 
-# upstream.conf を書き換え (awk + 一時ファイル + mv、sed -i は禁止)
+# upstream.production.conf を書き換え (awk + cat >、sed -i / mv は禁止)
+# cat > で in-place 書き換えすることで inode を保持し bind-mount を維持する。
+# nginx 未起動時は docker exec をスキップ (フルデプロイ・リカバリ時のフェイルセーフ)。
 write_upstream_conf() {
   local new_slot="$1"  # blue or green
   local tmp_file
@@ -147,10 +149,19 @@ write_upstream_conf() {
       printf "server backend-%s:8000 max_fails=3 fail_timeout=10s;\n", slot
     }
   ' </dev/null > "${tmp_file}"
-  mv "${tmp_file}" "${UPSTREAM_CONF}"
-  # Docker bind-mount inode fix: mv replaces host inode but nginx container keeps old inode.
-  # Write in-place into container so nginx -s reload sees the new upstream.
-  docker exec -i "${NGINX_CONTAINER}" sh -c 'cat > /etc/nginx/conf.d/upstream.conf' < "${UPSTREAM_CONF}"
+  # cat > preserves inode (mv would break the bind-mount by replacing it)
+  cat "${tmp_file}" > "${UPSTREAM_CONF}"
+  rm -f "${tmp_file}"
+  log "Host file updated: ${UPSTREAM_CONF} → backend-${new_slot}"
+
+  # Sync into container only when nginx is running (skip during full deploy / recovery)
+  if docker ps --filter "name=${NGINX_CONTAINER}" --filter "status=running" \
+       --format "{{.Names}}" 2>/dev/null | grep -q "^${NGINX_CONTAINER}$"; then
+    docker exec -i "${NGINX_CONTAINER}" sh -c 'cat > /etc/nginx/conf.d/upstream.conf' < "${UPSTREAM_CONF}"
+    log "Container file synced: ${NGINX_CONTAINER}"
+  else
+    log "WARN: ${NGINX_CONTAINER} not running — skipping container sync (bind-mount will apply on next start)"
+  fi
 }
 
 # 現在 active な backend コンテナ名を返す (DB drift / 401 チェック用)
@@ -221,7 +232,7 @@ deploy_backend_zero_downtime() {
   ${DC} -f "${COMPOSE_FILE}" stop "backend-${active_slot}"
 
   log "✅ Blue/Green 切替完了: active=${inactive_slot}"
-  log "   ロールバック手順: docker/nginx/upstream.conf を 'server backend-${active_slot}:8000 ...' に書き戻し、"
+  log "   ロールバック手順: docker/nginx/upstream.production.conf を 'server backend-${active_slot}:8000 ...' に書き戻し、"
   log "                  ${DC} -f ${COMPOSE_FILE} start backend-${active_slot} → docker exec ${NGINX_CONTAINER} nginx -s reload"
   return 0
 }
@@ -261,7 +272,7 @@ fi
 
 if [[ ! -f "${UPSTREAM_CONF}" ]]; then
   err "${UPSTREAM_CONF} が見つかりません — Blue/Green 構成が壊れている可能性"
-  err "復旧: docker/nginx/upstream.conf を 'server backend-blue:8000 max_fails=3 fail_timeout=10s;' で作成してください"
+  err "復旧: docker/nginx/upstream.production.conf を 'server backend-blue:8000 max_fails=3 fail_timeout=10s;' で作成してください"
   exit 1
 fi
 
