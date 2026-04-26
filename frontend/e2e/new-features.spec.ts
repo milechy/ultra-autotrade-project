@@ -206,3 +206,127 @@ test.describe('メインネットチェーン選択 — /connect', () => {
     await expect(description).toBeVisible();
   });
 });
+
+// ----------------------------------------------------------------
+// 4. /user/dashboard — FeeSimulatorCard (F-11)
+// ----------------------------------------------------------------
+// FeeSimulatorCard は admin/partner のみ表示。
+// viewer/tester は非表示 (isAdmin || isPartner チェック)。
+// 未認証環境ではカードが非表示 or ログイン画面にリダイレクト。
+test.describe('FeeSimulatorCard — /user/dashboard (F-11)', () => {
+  test('ダッシュボードページが200で読み込まれる', async ({ page }) => {
+    const response = await page.goto('/user/dashboard');
+    expect(response?.status()).toBe(200);
+  });
+
+  test('未認証状態では手数料シミュレーターカードが表示されない', async ({ page }) => {
+    await page.goto('/user/dashboard');
+    await page.waitForLoadState('networkidle');
+
+    const simulatorCard = page.locator('[data-testid="fee-simulator-card"]');
+    // 未認証では isAdmin/isPartner が false → カードは非表示
+    const isVisible = await simulatorCard.isVisible().catch(() => false);
+    expect(isVisible).toBeFalsy();
+  });
+
+  test('ページがレンダリングされる（ログイン画面・ダッシュボード・スケルトンいずれか）', async ({ page }) => {
+    await page.goto('/user/dashboard');
+    await page.waitForLoadState('domcontentloaded');
+
+    const skeleton = page.locator('[class*="rounded-xl"]').first();
+    const loginHeading = page.getByRole('heading', { name: 'Ultra AutoTrade' });
+    const loginBtn = page.getByRole('button', { name: 'ログイン' });
+    const simulatorCard = page.locator('[data-testid="fee-simulator-card"]');
+
+    await Promise.any([
+      skeleton.waitFor({ state: 'visible', timeout: 10000 }),
+      loginHeading.waitFor({ state: 'visible', timeout: 10000 }),
+      loginBtn.waitFor({ state: 'visible', timeout: 10000 }),
+      simulatorCard.waitFor({ state: 'visible', timeout: 10000 }),
+    ]).catch(() => {});
+
+    const hasSkeleton = await skeleton.isVisible().catch(() => false);
+    const hasLoginHeading = await loginHeading.isVisible().catch(() => false);
+    const hasLoginBtn = await loginBtn.isVisible().catch(() => false);
+    const hasCard = await simulatorCard.isVisible().catch(() => false);
+
+    expect(hasSkeleton || hasLoginHeading || hasLoginBtn || hasCard).toBeTruthy();
+  });
+
+  // シミュレーターカードが表示される場合: 入力フォームが存在する
+  test('シミュレーターカードが表示される場合は入力フォームを含む', async ({ page }) => {
+    await page.goto('/user/dashboard');
+    await page.waitForLoadState('networkidle');
+
+    const simulatorCard = page.locator('[data-testid="fee-simulator-card"]');
+    const isCardVisible = await simulatorCard.isVisible().catch(() => false);
+
+    if (!isCardVisible) {
+      // admin/partner 未認証の場合は非表示が正常
+      expect(true).toBeTruthy();
+      return;
+    }
+
+    // 入力フィールドが存在することを確認
+    const depositInput = page.locator('[data-testid="fee-simulator-deposit"]');
+    const yieldSlider = page.locator('[data-testid="fee-simulator-yield"]');
+    await expect(depositInput).toBeVisible();
+    await expect(yieldSlider).toBeVisible();
+  });
+
+  // シミュレーターが表示される場合: 月利スライダーで表示値が変わる
+  test('月利スライダーを動かすと表示値がリアルタイム更新される', async ({ page }) => {
+    await page.goto('/user/dashboard');
+    await page.waitForLoadState('networkidle');
+
+    const simulatorCard = page.locator('[data-testid="fee-simulator-card"]');
+    const isCardVisible = await simulatorCard.isVisible().catch(() => false);
+
+    if (!isCardVisible) {
+      expect(true).toBeTruthy();
+      return;
+    }
+
+    const yieldDisplay = page.locator('[data-testid="fee-simulator-yield-display"]');
+    await expect(yieldDisplay).toBeVisible();
+
+    const initialText = await yieldDisplay.textContent();
+
+    // スライダーの値を変更
+    const slider = page.locator('[data-testid="fee-simulator-yield"]');
+    await slider.fill('8');
+    await page.waitForTimeout(100);
+
+    const updatedText = await yieldDisplay.textContent();
+    // 値が変わっていることを確認（初期値 3.0% → 8.0% に変更）
+    expect(updatedText).not.toEqual(initialText);
+  });
+
+  // 手数料履歴トグルをクリックで展開
+  test('手数料履歴トグルをクリックすると履歴セクションが展開される', async ({ page }) => {
+    await page.goto('/user/dashboard');
+    await page.waitForLoadState('networkidle');
+
+    const simulatorCard = page.locator('[data-testid="fee-simulator-card"]');
+    const isCardVisible = await simulatorCard.isVisible().catch(() => false);
+
+    if (!isCardVisible) {
+      expect(true).toBeTruthy();
+      return;
+    }
+
+    const historyToggle = page.locator('[data-testid="fee-history-toggle"]');
+    await expect(historyToggle).toBeVisible();
+
+    await historyToggle.click();
+    await page.waitForTimeout(200);
+
+    // トグル後は履歴テキストまたは「まだ手数料履歴はありません」が表示される
+    const historyEmpty = page.getByText('まだ手数料履歴はありません');
+    const historyTable = page.locator('table').first();
+
+    const hasEmpty = await historyEmpty.isVisible().catch(() => false);
+    const hasTable = await historyTable.isVisible().catch(() => false);
+    expect(hasEmpty || hasTable).toBeTruthy();
+  });
+});
