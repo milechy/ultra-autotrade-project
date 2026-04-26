@@ -665,3 +665,137 @@ class TestLineNotificationsConnected:
             with patch("app.notifications.line_notifier.LINENotifyClient.send") as mock_send:
                 service.record_health_factor(Decimal("1.4"))
                 mock_send.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# F-6: workflow.py の tier 正規化テスト
+# ---------------------------------------------------------------------------
+
+
+class TestWorkflowTierNormalization:
+    """workflow.py:_process_single_item における tier 正規化と current_apy フォールバックの回帰。"""
+
+    def test_workflow_uses_user_tier_not_hardcoded_general(self):
+        """user_id 経由で user.tier を取得し、normalize_tier 経由で計算される (GENERAL ハードコード除去)。
+
+        旧実装は tier="GENERAL" を直接渡していたが、F-6 で user_id → user.tier → normalize_tier
+        の経路に変更。LEGACY_TIER_MAP により GENERAL は LOWER に正規化されるため
+        既存呼び出し (tier=GENERAL) と数値的に同値になる。
+        """
+        from unittest.mock import MagicMock, patch
+
+        from app.auth.models import InvestmentTier, User
+
+        db = MagicMock()
+        # db.get(User, user_id) が tier=UPPER のユーザーを返す
+        db.get.return_value = User(
+            id=42,
+            email="upper@example.com",
+            username="upper",
+            hashed_password="x",
+            tier=InvestmentTier.UPPER.value,
+        )
+
+        ks = MagicMock()
+        ai = MagicMock()
+        ex = MagicMock()
+
+        item = _make_knowledge_item()
+        ks.get_pending.return_value = [item]
+        ks.search.return_value = []
+        ai.judge_with_rag.return_value = _make_cross_validation(TradeAction.BUY, 85)
+
+        with patch("app.billing.dynamic_fee.calculate_fee_by_market") as mock_fee:
+            mock_fee.return_value.should_trade = True
+            mock_fee.return_value.fee_rate = Decimal("0.20")
+            mock_fee.return_value.fee_amount = Decimal("10.00")
+
+            process_pending_knowledge(
+                db,
+                knowledge_service=ks,
+                ai_service=ai,
+                exchange_service=ex,
+                execution_policy="require_approval",
+                user_id=42,
+            )
+
+        assert mock_fee.called
+        call_kwargs = mock_fee.call_args.kwargs
+        assert call_kwargs["tier"] == InvestmentTier.UPPER.value, (
+            f"user.tier=UPPER が渡されるべきだが {call_kwargs['tier']!r} だった"
+        )
+
+    def test_workflow_user_id_none_falls_back_to_lower(self):
+        """user_id=None (legacy / internal token path) は normalize_tier(None) → LOWER フォールバック。"""
+        from unittest.mock import MagicMock, patch
+
+        from app.auth.models import InvestmentTier
+
+        db = MagicMock()
+        ks = MagicMock()
+        ai = MagicMock()
+        ex = MagicMock()
+
+        item = _make_knowledge_item()
+        ks.get_pending.return_value = [item]
+        ks.search.return_value = []
+        ai.judge_with_rag.return_value = _make_cross_validation(TradeAction.BUY, 85)
+
+        with patch("app.billing.dynamic_fee.calculate_fee_by_market") as mock_fee:
+            mock_fee.return_value.should_trade = True
+            mock_fee.return_value.fee_rate = Decimal("0.05")
+            mock_fee.return_value.fee_amount = Decimal("2.00")
+
+            process_pending_knowledge(
+                db,
+                knowledge_service=ks,
+                ai_service=ai,
+                exchange_service=ex,
+                execution_policy="require_approval",
+                # user_id=None (デフォルト)
+            )
+
+        assert mock_fee.called
+        call_kwargs = mock_fee.call_args.kwargs
+        assert call_kwargs["tier"] == InvestmentTier.LOWER.value
+        # db.get は呼ばれない (user_id が None なので user 取得スキップ)
+        db.get.assert_not_called()
+
+    def test_dynamic_fee_apy_fallback_documented(self):
+        """current_apy 取得バグの回帰テスト: MarketContext に current_apy 属性が無い → Decimal("4") フォールバック。
+
+        TODO(P0 タスク 1214279097935851): MarketContext に Aave データを注入後は
+        current_apy が実値で渡されるよう修正される。本テストはその修正時に更新する。
+        """
+        from unittest.mock import MagicMock, patch
+
+        db = MagicMock()
+        ks = MagicMock()
+        ai = MagicMock()
+        ex = MagicMock()
+
+        item = _make_knowledge_item()
+        ks.get_pending.return_value = [item]
+        ks.search.return_value = []
+        ai.judge_with_rag.return_value = _make_cross_validation(TradeAction.BUY, 85)
+
+        with patch("app.billing.dynamic_fee.calculate_fee_by_market") as mock_fee:
+            mock_fee.return_value.should_trade = True
+            mock_fee.return_value.fee_rate = Decimal("0.05")
+            mock_fee.return_value.fee_amount = Decimal("1.00")
+
+            process_pending_knowledge(
+                db,
+                knowledge_service=ks,
+                ai_service=ai,
+                exchange_service=ex,
+                execution_policy="require_approval",
+            )
+
+        assert mock_fee.called
+        call_kwargs = mock_fee.call_args.kwargs
+        # MarketContext に current_apy 属性が無いため、4% フォールバック値が使われる
+        assert call_kwargs["current_apy"] == Decimal("4"), (
+            "MarketContext に current_apy が注入されるよう修正されたら本テストを更新する "
+            "(P0 タスク 1214279097935851)"
+        )

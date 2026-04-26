@@ -263,6 +263,7 @@ def workflow_trigger(
             ai_service=AIService(),
             exchange_service=get_exchange_service(),
             monitoring_service=None,
+            user_id=current_user.id,
         )
         logger.info(
             "Workflow triggered via API",

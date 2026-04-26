@@ -12,6 +12,7 @@ ALTER TABLE users ADD COLUMN last_judgment_at TIMESTAMP WITH TIME ZONE NULL;
 -- F-16 マイグレーションで実施 (docs/46_users_tier_migration_plan.md 参照)。
 """
 
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
@@ -21,6 +22,8 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+
+logger = logging.getLogger(__name__)
 
 
 class UserRole(str, Enum):
@@ -133,6 +136,40 @@ def get_risk_mode_label(value: str | None) -> str:
     except ValueError:
         return RISK_MODE_JP_LABELS[RiskMode.CONSERVATIVE]
     return RISK_MODE_JP_LABELS[mode]
+
+
+def normalize_tier(raw_tier: str | None, *, user_id: int | None = None) -> InvestmentTier:
+    """``users.tier`` の DB 値 (str) を ``InvestmentTier`` enum に正規化する。
+
+    F-6 で導入。``workflow.py`` / ``ai_judgment_scheduler.py`` の trade-time フィー計算
+    経路で、``user.tier`` を ``calculate_fee_by_market`` に渡す前の正規化に使う。
+
+    優先順:
+      1. ``LEGACY_TIER_MAP`` のキー (現状: GENERAL → LOWER) → マップ値を返す
+         (deprecated 値を v10 系列に強制正規化するため、enum 解決より優先)
+      2. ``InvestmentTier`` の有効値 (LOWER/MIDDLE/UPPER) → そのまま enum で返す
+      3. それ以外 (None / 不明値) → WARNING ログ + ``InvestmentTier.LOWER`` フォールバック
+
+    フォールバック時に ``ValueError`` は raise しない (フィー計算は継続、HOLD 転換させない)。
+    F-13 で GENERAL を物理削除後も、本関数の不明値フォールバックパスで安全に吸収できる。
+    """
+    if raw_tier is not None:
+        mapped = LEGACY_TIER_MAP.get(raw_tier)
+        if mapped is not None:
+            return mapped
+        try:
+            return InvestmentTier(raw_tier)
+        except ValueError:
+            pass
+    logger.warning(
+        "tier_normalize_fallback",
+        extra={
+            "user_id": user_id,
+            "received_tier": raw_tier,
+            "fallback_to": InvestmentTier.LOWER.value,
+        },
+    )
+    return InvestmentTier.LOWER
 
 
 class User(Base):

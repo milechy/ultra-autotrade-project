@@ -723,3 +723,48 @@ def test_buy_updates_last_judgment_at(db_session):
 
     db_session.refresh(user)
     assert user.last_judgment_at is not None
+
+
+# ---------------------------------------------------------------------------
+# F-6: tier 正規化のテスト
+# ---------------------------------------------------------------------------
+
+
+def test_create_proposals_uses_normalized_tier(db_session):
+    """``user.tier`` が calculate_fee_by_market に渡される際 normalize_tier 経由になっていること。
+
+    GENERAL ユーザーは LEGACY_TIER_MAP で LOWER に正規化されるため、
+    呼び出し時の tier 引数は "LOWER" になる。
+    """
+    user = User(
+        email="legacy_general@example.com",
+        username="legacy_general",
+        hashed_password="x",
+        is_active=True,
+        execution_policy="require_approval",
+        tier=InvestmentTier.GENERAL.value,
+        last_judgment_at=None,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    mock_result = _make_cross_validation_result(TradeAction.BUY)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+        patch("app.billing.dynamic_fee.calculate_fee_by_market") as mock_fee,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+        mock_fee.return_value.should_trade = True
+        mock_fee.return_value.fee_rate = Decimal("0.05")
+        mock_fee.return_value.fee_amount = Decimal("5.00")
+
+        run_ai_judgment_job(db=db_session)
+
+    assert mock_fee.call_count == 1
+    call_kwargs = mock_fee.call_args.kwargs
+    assert call_kwargs["tier"] == InvestmentTier.LOWER.value, (
+        f"GENERAL は LOWER に正規化されるべきだが {call_kwargs['tier']!r} が渡された"
+    )

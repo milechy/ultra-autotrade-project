@@ -176,7 +176,7 @@
 | 1214120401362419 | F-3 | RiskMode enum (v10) | **既存 risk_mode 列の enum 値はリネーム不可**。日本語ラベル辞書だけ新設。NULL 4人を 'conservative' で埋める | 2026-04-30 |
 | 1214120401381545 | F-4 | FeeConfig seed data | F-1 完了後。リスクモード × tier の手数料率マトリクス投入 | 2026-05-01 |
 | 1214120371502936 | F-5 | fee_calculator.py コア | 新規 `backend/app/fees/calculator.py`。dynamic_fee.py の `calculate_fee_by_market` をベースに統合 | 2026-05-04 |
-| 1214120371503067 | F-6 | AI判断ロジック統合 | workflow.py:757, ai_judgment_scheduler.py:154 の dynamic_fee import を v10 API に差し替え | 2026-05-05 |
+| 1214120371503067 | F-6 | AI判断ロジック統合 | workflow.py:757, ai_judgment_scheduler.py:154 の dynamic_fee import を v10 API に差し替え (注[1]参照) | 2026-05-05 |
 | 1214120401388139 | F-7 | 月末バッチ | 既存 `POST /api/billing/batch/daily` は **廃止**。v10 は月次。`scheduled_tasks.py` に新規ジョブ | 2026-05-06 |
 | 1214120371503131 | F-8 | fees.py API | `/api/billing/*` 4 endpoints と `/api/fees/*` 2 endpoints を `/api/fees/*` 1系統に統合 | 2026-05-07 |
 | 1214120371503003 | F-9 | 経費マークアップ | 固定経費 $0.27/トレード (現状 dynamic_fee デフォルト) を v10 で再評価 | 2026-05-08 |
@@ -187,6 +187,14 @@
 | 1214120353305989 | F-14 | Playwright E2E | F-1〜F-13 完了後。フィー画面 UI / API レグレッション | 2026-05-14 |
 | 1214120401388204 | F-15 | 山本さんレビュー | F-14 完了後。本番デプロイ前承認 | 2026-05-15 |
 | 1214120338926364 | F-16 | v10 本番リリース | F-15 完了後。Hetzner ALTER TABLE → コードデプロイ | 2026-05-18 |
+
+> **注[1]**: F-6 解釈A確定 (2026-04-26 claude.ai判断)。`docs/fee_model_v10_spec.md` §4 未作成のため、F-6 スコープは以下に限定:
+>
+> - `workflow.py` / `ai_judgment_scheduler.py` の tier 正規化 (`normalize_tier()` ヘルパー導入、`auth/models.py`)
+> - `workflow.py` の `tier="GENERAL"` ハードコード除去 (`user_id` 配線で `user.tier` 経由)
+> - `current_apy` バグの TODO 化 (修正は P0 タスク 1214279097935851 で MarketContext に Aave データ注入時に対応)
+>
+> 月次 `FeeCalculator` 統合は **F-7 担当**。Phase 1 中は trade-time の `should_trade` gate を `calculate_fee_by_market` で維持する。
 
 ---
 
