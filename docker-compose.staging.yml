@@ -82,6 +82,8 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: ultra-autotrade-postgres-staging-new
+    env_file:
+      - .env.staging-new
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ultra}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -121,7 +123,9 @@ services:
     env_file:
       - .env.staging-new
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade_staging}
+      # DATABASE_URL は .env.staging-new に直接記述すること。
+      # compose ${} 展開に依存すると --env-file 省略時に空パスワードで env_file 値を上書きする。
+      # (2026-04-26 Lane1インシデント: --env-file なし起動で DATABASE_URL 空PW上書きが発生)
       # Shadow Mode: 実トレード禁止 (Staging専用)
       REBALANCE_SHADOW_MODE: "true"
       AI_SHADOW_MODE: "true"

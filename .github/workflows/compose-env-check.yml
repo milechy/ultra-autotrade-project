@@ -1,0 +1,114 @@
+name: Compose env_file Sanity Check
+
+on:
+  pull_request:
+    paths:
+      - 'docker-compose*.yml'
+      - 'scripts/deploy_*.sh'
+      - '.github/workflows/compose-env-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docker-compose*.yml'
+      - 'scripts/deploy_*.sh'
+
+jobs:
+  compose-env-check:
+    name: Compose env_file check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check staging backend has no DATABASE_URL in environment block
+        run: |
+          echo "=== Checking docker-compose.staging.yml ==="
+          # staging backend の environment: に DATABASE_URL が含まれていないこと
+          # (含まれると --env-file 省略時に空PWで上書きされる 2026-04-26 Lane1インシデント)
+          if python3 - <<'PYEOF'
+          import yaml, sys
+          with open("docker-compose.staging.yml") as f:
+              d = yaml.safe_load(f)
+          backend_env = d.get("services", {}).get("backend", {}).get("environment", {}) or {}
+          if isinstance(backend_env, list):
+              keys = [e.split("=")[0] for e in backend_env]
+          else:
+              keys = list(backend_env.keys())
+          if "DATABASE_URL" in keys:
+              print("❌ FAIL: staging backend environment: に DATABASE_URL が含まれています")
+              print("   --env-file 省略時に空パスワードで env_file 値を上書きします")
+              print("   DATABASE_URL は .env.staging-new に直接記述し environment: から削除してください")
+              sys.exit(1)
+          print("✅ staging backend environment: に DATABASE_URL なし (正常)")
+          PYEOF
+          then
+            echo "Check passed"
+          else
+            exit 1
+          fi
+
+      - name: Check production backend has no DATABASE_URL in environment block
+        run: |
+          echo "=== Checking docker-compose.production.yml ==="
+          python3 - <<'PYEOF'
+          import yaml, sys
+          with open("docker-compose.production.yml") as f:
+              d = yaml.safe_load(f)
+          backend_env = d.get("services", {}).get("backend", {}).get("environment", {}) or {}
+          if isinstance(backend_env, list):
+              keys = [e.split("=")[0] for e in backend_env]
+          else:
+              keys = list(backend_env.keys())
+          if "DATABASE_URL" in keys:
+              print("❌ FAIL: production backend environment: に DATABASE_URL が含まれています")
+              sys.exit(1)
+          print("✅ production backend environment: に DATABASE_URL なし (正常)")
+          PYEOF
+
+      - name: Check backend services have env_file declared
+        run: |
+          python3 - <<'PYEOF'
+          import yaml, sys
+          errors = []
+          for fname, envf in [
+              ("docker-compose.staging.yml",    ".env.staging-new"),
+              ("docker-compose.production.yml", ".env.production"),
+          ]:
+              with open(fname) as f:
+                  d = yaml.safe_load(f)
+              backend = d.get("services", {}).get("backend", {})
+              env_files = backend.get("env_file", [])
+              if isinstance(env_files, str):
+                  env_files = [env_files]
+              if not any(envf in str(ef) for ef in env_files):
+                  errors.append(f"❌ {fname}: backend に env_file: {envf} がありません")
+          if errors:
+              for e in errors:
+                  print(e)
+              sys.exit(1)
+          print("✅ 両 compose ファイルの backend に env_file 宣言あり")
+          PYEOF
+
+      - name: Check deploy scripts pass --env-file to up/build commands
+        run: |
+          echo "=== Checking deploy scripts ==="
+          FAIL=0
+          for script in scripts/deploy_staging.sh scripts/deploy_production.sh; do
+            # up -d コマンドが --env-file を伴っているか確認
+            UP_WITHOUT_ENVFILE=$(grep -nE '^\s+\$\{DC\}.*up -d' "${script}" | grep -v '\-\-env-file' || true)
+            BUILD_WITHOUT_ENVFILE=$(grep -nE '^\s+\$\{DC\}.*build' "${script}" | grep -v '\-\-env-file' || true)
+            if [[ -n "${UP_WITHOUT_ENVFILE}" ]]; then
+              echo "❌ ${script}: --env-file なし up -d コマンド:"
+              echo "${UP_WITHOUT_ENVFILE}"
+              FAIL=1
+            fi
+            if [[ -n "${BUILD_WITHOUT_ENVFILE}" ]]; then
+              echo "❌ ${script}: --env-file なし build コマンド:"
+              echo "${BUILD_WITHOUT_ENVFILE}"
+              FAIL=1
+            fi
+          done
+          if [[ "${FAIL}" -eq 0 ]]; then
+            echo "✅ 全 up/build コマンドに --env-file あり"
+          else
+            exit 1
+          fi

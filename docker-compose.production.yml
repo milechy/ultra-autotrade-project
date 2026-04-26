@@ -80,6 +80,8 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: ultra-autotrade-postgres-production
+    env_file:
+      - .env.production
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ultra}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

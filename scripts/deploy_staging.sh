@@ -89,6 +89,33 @@ resolve_dc() {
   fi
 }
 
+# env_file 適用検証: backend ランタイムの DATABASE_URL PW が env_file の値と一致するか確認
+verify_env_file_applied() {
+  local container="${BACKEND_CONTAINER}"
+  local env_file="${ENV_FILE}"
+  log "=== env_file 適用検証 ==="
+  local expected_pw
+  expected_pw=$(grep "^POSTGRES_PASSWORD=" "${env_file}" | cut -d= -f2- | tr -d '\n')
+  if [[ -z "${expected_pw}" ]]; then
+    expected_pw=$(grep "^DATABASE_URL=" "${env_file}" | grep -oP '(?<=://[^:]+:)[^@]+' | head -1)
+  fi
+  local expected_md5
+  expected_md5=$(echo -n "${expected_pw}" | md5sum | awk '{print $1}')
+
+  local runtime_md5
+  runtime_md5=$(docker exec "${container}" env 2>/dev/null | grep "^DATABASE_URL=" | grep -oP '(?<=://[^:]+:)[^@]+' | tr -d '\n' | md5sum | awk '{print $1}')
+
+  if [[ "${expected_md5}" == "${runtime_md5}" ]]; then
+    log "✅ DATABASE_URL PW md5 一致: ${runtime_md5}"
+  else
+    err "❌ DATABASE_URL PW md5 不一致!"
+    err "   expected (from ${env_file}): ${expected_md5}"
+    err "   runtime  (container env):   ${runtime_md5}"
+    err "   --env-file が正しく渡されていない可能性があります"
+    return 1
+  fi
+}
+
 # ヘルスチェック待ちループ
 wait_healthy() {
   local url="$1"
@@ -212,6 +239,7 @@ elif "${BACKEND_ONLY}"; then
   ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d backend
 
   wait_healthy "http://localhost:8001/health" "backend(staging)" || on_failure
+  verify_env_file_applied || on_failure
 
 else
   log "フルデプロイ開始（Staging環境）"
@@ -245,6 +273,7 @@ else
 
   wait_healthy "http://localhost:8001/health" "backend(staging)"  || on_failure
   wait_healthy "http://localhost:3001"         "frontend(staging)" || on_failure
+  verify_env_file_applied || on_failure
 fi
 
 # ───────────────────────────────────────────────

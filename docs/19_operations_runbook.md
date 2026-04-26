@@ -491,3 +491,69 @@ Grafana などの可観測性ツールでは、Web ダッシュボードと同�
 
 > 注意: Grafana 側の表示は **既存 API の JSON を読み取る構成**とし、  
 > メトリクス定義の追加/変更は行わない（要件変更チャット案件）。
+
+---
+
+## 9. コンテナ再作成時の --env-file 明示ルール（2026-04-26 追加）
+
+### 背景（2026-04-26 Lane1インシデント）
+
+`docker compose up -d backend` を `--env-file` なしで実行したとき、
+`docker-compose.staging.yml` の `backend.environment.DATABASE_URL` に
+`${POSTGRES_PASSWORD}` が展開されず空パスワードになり、
+`env_file:` の正しい DATABASE_URL を上書きする問題が発生。
+30分以上バックエンドが DB 接続不能になりスケジューラーが停止した。
+
+### ルール
+
+#### 1. コンテナ再作成は必ず deploy スクリプト経由で行う
+
+```bash
+# Staging
+./scripts/deploy_staging.sh [--backend-only | --frontend-only | --no-build]
+
+# Production
+./scripts/deploy_production.sh [--backend-only | --frontend-only | --no-build]
+```
+
+#### 2. 手動で docker compose を実行するときは必ず --env-file を渡す
+
+```bash
+# Staging (必須)
+docker compose -f docker-compose.staging.yml -p ultra-autotrade-staging \
+  --env-file .env.staging-new \
+  up -d --no-deps --force-recreate backend
+
+# Production (必須)
+docker compose -f docker-compose.production.yml -p ultra-autotrade-project \
+  --env-file .env.production \
+  up -d --no-deps --force-recreate backend
+```
+
+**`--env-file` 省略は禁止。** `docker compose up -d` だけでは環境変数が展開されない。
+
+#### 3. デプロイ後に DATABASE_URL PW md5 を確認する
+
+```bash
+# staging
+docker exec ultra-autotrade-backend-staging-new env | grep "^DATABASE_URL=" \
+  | grep -oP '(?<=://[^:]+:)[^@]+' | tr -d '\n' | md5sum
+
+# 期待値: .env.staging-new の POSTGRES_PASSWORD と一致する md5
+grep "^POSTGRES_PASSWORD=" .env.staging-new | cut -d= -f2 | tr -d '\n' | md5sum
+```
+
+#### 4. CI ガード（自動）
+
+`docker-compose*.yml` または `scripts/deploy_*.sh` を変更する PR は
+`.github/workflows/compose-env-check.yml` が自動実行され:
+- staging/production backend の `environment:` に `DATABASE_URL` がないこと
+- 全 `up -d` / `build` コマンドに `--env-file` があること
+を検証する。**CI が赤い PR は merge 禁止。**
+
+#### 5. compose ファイルの設計原則
+
+- **DATABASE_URL は `env_file:` に記述し `environment:` には書かない**  
+  （`environment:` が `env_file:` を上書きするため、`${PW}` が空になるリスク）
+- postgres / backend の両サービスに `env_file:` を明示することで、  
+  `--env-file` フラグなしでも最低限の動作を保証する
