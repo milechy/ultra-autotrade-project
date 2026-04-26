@@ -340,6 +340,18 @@
       "required": "An invitation code is required. Please access via the referral link (/r/<code>) provided by your referrer."
     }
   },
+  "RiskModeSelector": {
+    "title": "Risk Mode",
+    "subtitle": "Review and change your strategy and monthly fees",
+    "current": "Current",
+    "locked": "Phase 2",
+    "readOnly": "View only",
+    "subscriptionRate": "Monthly fee",
+    "protocols": "Protocols",
+    "changeSuccess": "Changed to {mode}",
+    "changeError": "Failed to change risk mode",
+    "free": "Free"
+  },
   "CopyTrading": {
     "title": "Copy Trading",
     "subtitle": "Follow professional strategists and auto-copy their trades",

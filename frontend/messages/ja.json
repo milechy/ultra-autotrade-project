@@ -340,6 +340,18 @@
       "required": "招待コードが必要です。紹介者から受け取った招待リンク（/r/<code>）からアクセスしてください"
     }
   },
+  "RiskModeSelector": {
+    "title": "リスクモード選択",
+    "subtitle": "運用戦略と月額手数料を確認・変更",
+    "current": "現在",
+    "locked": "Phase 2",
+    "readOnly": "閲覧のみ",
+    "subscriptionRate": "月額手数料",
+    "protocols": "対応プロトコル",
+    "changeSuccess": "{mode}に変更しました",
+    "changeError": "リスクモードの変更に失敗しました",
+    "free": "無料"
+  },
   "CopyTrading": {
     "title": "コピートレード",
     "subtitle": "プロのストラテジストをフォローして自動コピー",

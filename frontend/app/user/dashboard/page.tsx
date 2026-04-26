@@ -13,8 +13,10 @@ import {
   LatestDecision,
   SafetyScore,
   AiAccuracyCard,
+  RiskModeSelectorCard,
 } from './_components'
 import { useAuthFetch } from '@/hooks/useAuthFetch'
+import { useAuth } from '@/lib/auth'
 
 // Note: PortfolioSummary, SafetyScore, AiAccuracyCard are used by ActiveDashboard only
 
@@ -215,8 +217,18 @@ function RecentOpsCard() {
 }
 
 function ManagedDashboard() {
+  const { isAdmin, isPartner } = useAuth()
+  const canSelectRiskMode = isAdmin || isPartner
+
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
+      {/* リスクモード選択 (admin/partner のみ) */}
+      {canSelectRiskMode && (
+        <section>
+          <RiskModeSelectorCard />
+        </section>
+      )}
+
       {/* 資金割り振り — メインコンテンツ */}
       <section>
         <AllocationCard />
@@ -234,12 +246,22 @@ function ManagedDashboard() {
 
 function ActiveDashboard() {
   const t = useTranslations('Dashboard')
+  const { isAdmin, isPartner } = useAuth()
+  const canSelectRiskMode = isAdmin || isPartner
+
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
-      {/* Risk mode badge */}
+      {/* Risk mode badge (all users) */}
       <div className="flex items-center gap-2">
         <RiskModeBadge />
       </div>
+
+      {/* リスクモード選択カード (admin/partner のみ) */}
+      {canSelectRiskMode && (
+        <section>
+          <RiskModeSelectorCard />
+        </section>
+      )}
 
       <section>
         <PortfolioSummary />

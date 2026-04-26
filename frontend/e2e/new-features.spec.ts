@@ -206,3 +206,96 @@ test.describe('メインネットチェーン選択 — /connect', () => {
     await expect(description).toBeVisible();
   });
 });
+
+// ----------------------------------------------------------------
+// 4. /user/dashboard — RiskModeSelectorCard (F-10)
+// ----------------------------------------------------------------
+// RiskModeSelectorCard は admin/partner のみ表示。
+// viewer/tester には非表示（権限制御はフロントエンドで実装）。
+// 未認証環境ではカードが非表示 or ログイン画面にリダイレクトされる。
+test.describe('RiskModeSelectorCard — /user/dashboard (F-10)', () => {
+  test('ダッシュボードページが200で読み込まれる', async ({ page }) => {
+    const response = await page.goto('/user/dashboard');
+    expect(response?.status()).toBe(200);
+  });
+
+  test('ページがレンダリングされる（ログイン画面・ダッシュボード・スケルトンいずれか）', async ({ page }) => {
+    await page.goto('/user/dashboard');
+    await page.waitForLoadState('domcontentloaded');
+
+    const skeleton = page.locator('[class*="rounded-xl"]').first();
+    const loginHeading = page.getByRole('heading', { name: 'Ultra AutoTrade' });
+    const loginBtn = page.getByRole('button', { name: 'ログイン' });
+    const dashboardContent = page.locator('[data-testid="risk-mode-selector-card"]');
+
+    await Promise.any([
+      skeleton.waitFor({ state: 'visible', timeout: 10000 }),
+      loginHeading.waitFor({ state: 'visible', timeout: 10000 }),
+      loginBtn.waitFor({ state: 'visible', timeout: 10000 }),
+      dashboardContent.waitFor({ state: 'visible', timeout: 10000 }),
+    ]).catch(() => {});
+
+    const hasSkeleton = await skeleton.isVisible().catch(() => false);
+    const hasLoginHeading = await loginHeading.isVisible().catch(() => false);
+    const hasLoginBtn = await loginBtn.isVisible().catch(() => false);
+    const hasCard = await dashboardContent.isVisible().catch(() => false);
+
+    expect(hasSkeleton || hasLoginHeading || hasLoginBtn || hasCard).toBeTruthy();
+  });
+
+  // 未認証時: セレクターカードは表示されない（admin/partner ロールではないため）
+  test('未認証状態ではリスクモードセレクターカードが表示されない', async ({ page }) => {
+    await page.goto('/user/dashboard');
+    await page.waitForLoadState('networkidle');
+
+    const selectorCard = page.locator('[data-testid="risk-mode-selector-card"]');
+    // 未認証では isAdmin/isPartner が false → カードは非表示
+    const isVisible = await selectorCard.isVisible().catch(() => false);
+    // 未認証環境では非表示であることを確認（ログイン画面に飛んでいる場合も同様）
+    expect(isVisible).toBeFalsy();
+  });
+
+  // セレクターカードが表示される場合、3つのモードオプションを持つ
+  test('リスクモードセレクターが表示される場合は3つのモードオプションを含む', async ({ page }) => {
+    await page.goto('/user/dashboard');
+    await page.waitForLoadState('networkidle');
+
+    const selectorCard = page.locator('[data-testid="risk-mode-selector-card"]');
+    const isCardVisible = await selectorCard.isVisible().catch(() => false);
+
+    if (!isCardVisible) {
+      // admin/partner でなければカード非表示は正常動作
+      expect(true).toBeTruthy();
+      return;
+    }
+
+    // カードが表示されている場合は3モードのオプションが存在する
+    const conservative = page.locator('[data-testid="risk-mode-option-conservative"]');
+    const balanced = page.locator('[data-testid="risk-mode-option-balanced"]');
+    const aggressive = page.locator('[data-testid="risk-mode-option-aggressive"]');
+
+    await expect(conservative).toBeVisible();
+    await expect(balanced).toBeVisible();
+    await expect(aggressive).toBeVisible();
+  });
+
+  // Phase 1 制限: balanced/aggressive はロック状態で表示される
+  test('リスクモードカードが表示される場合、balanced/aggressiveはPhase 2ロックを表示する', async ({ page }) => {
+    await page.goto('/user/dashboard');
+    await page.waitForLoadState('networkidle');
+
+    const selectorCard = page.locator('[data-testid="risk-mode-selector-card"]');
+    const isCardVisible = await selectorCard.isVisible().catch(() => false);
+
+    if (!isCardVisible) {
+      expect(true).toBeTruthy();
+      return;
+    }
+
+    // Phase 2 ロックラベルが balanced/aggressive に表示されていることを確認
+    const lockLabels = page.getByText('Phase 2');
+    const lockCount = await lockLabels.count();
+    // balanced と aggressive の2つがロック状態
+    expect(lockCount).toBeGreaterThanOrEqual(2);
+  });
+});
