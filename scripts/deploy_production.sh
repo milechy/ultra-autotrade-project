@@ -148,6 +148,9 @@ write_upstream_conf() {
     }
   ' </dev/null > "${tmp_file}"
   mv "${tmp_file}" "${UPSTREAM_CONF}"
+  # Docker bind-mount inode fix: mv replaces host inode but nginx container keeps old inode.
+  # Write in-place into container so nginx -s reload sees the new upstream.
+  docker exec -i "${NGINX_CONTAINER}" sh -c 'cat > /etc/nginx/conf.d/upstream.conf' < "${UPSTREAM_CONF}"
 }
 
 # 現在 active な backend コンテナ名を返す (DB drift / 401 チェック用)

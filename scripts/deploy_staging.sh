@@ -152,6 +152,9 @@ write_upstream_conf() {
     }
   ' </dev/null > "${tmp_file}"
   mv "${tmp_file}" "${UPSTREAM_CONF}"
+  # Docker bind-mount inode fix: mv replaces host inode but nginx container keeps old inode.
+  # Write in-place into container so nginx -s reload sees the new upstream.
+  docker exec -i "${NGINX_CONTAINER}" sh -c 'cat > /etc/nginx/conf.d/upstream.conf' < "${UPSTREAM_CONF}"
 }
 
 active_backend_container() {
