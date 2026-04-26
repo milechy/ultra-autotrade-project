@@ -21,8 +21,9 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-STAGING_FILE="${PROJECT_ROOT}/.env.staging"
-PRODUCTION_FILE="${PROJECT_ROOT}/.env.production"
+# テスト時のファイルパスオーバーライド (scripts/tests/test_check_env_separation.sh が使用)
+STAGING_FILE="${STAGING_ENV_FILE:-${PROJECT_ROOT}/.env.staging}"
+PRODUCTION_FILE="${PRODUCTION_ENV_FILE:-${PROJECT_ROOT}/.env.production}"
 
 # 両ファイルが揃っていない場合は検証できないのでスキップ（CI で片側のみ存在する場合に配慮）
 if [[ ! -f "${STAGING_FILE}" ]] || [[ ! -f "${PRODUCTION_FILE}" ]]; then
@@ -33,6 +34,38 @@ if [[ ! -f "${STAGING_FILE}" ]] || [[ ! -f "${PRODUCTION_FILE}" ]]; then
 fi
 
 echo "=== 環境分離チェック: .env.staging vs .env.production ==="
+
+# ---------------------------------------------------------------------------
+# Phase 1 例外設定
+# Phase 1 期間中は以下の変数が意図的に staging 値のまま .env.production に存在する。
+# PHASE1_EXCEPTION_EXPIRES_ON を .env.production から読み取り、期限内なら WARN に格下げ。
+# ---------------------------------------------------------------------------
+PHASE1_EXCEPTION_VARS=(
+  "APP_ENV"
+  "BYBIT_SANDBOX"
+  "AAVE_NETWORK"
+  "AAVE_RPC_URL"
+  "EXCHANGE_CLIENT_TYPE"
+  "AAVE_POOL_ADDRESS"
+)
+
+PHASE1_EXPIRES="$(grep -E '^PHASE1_EXCEPTION_EXPIRES_ON=' "${PRODUCTION_FILE}" | head -n 1 | cut -d= -f2)"
+if [[ -z "${PHASE1_EXPIRES}" ]]; then
+  echo "❌ ERROR: PHASE1_EXCEPTION_EXPIRES_ON が .env.production に設定されていません。"
+  echo "   例: PHASE1_EXCEPTION_EXPIRES_ON=2026-09-30"
+  echo "   Phase 1 例外ロジックを正しく動作させるために必須です。"
+  exit 1
+fi
+
+# テスト時の日付オーバーライド (ENV_SEPARATION_TEST_DATE=YYYY-MM-DD で差し替え可能)
+TODAY="${ENV_SEPARATION_TEST_DATE:-$(date +%Y-%m-%d)}"
+if [[ "${TODAY}" > "${PHASE1_EXPIRES}" ]]; then
+  PHASE1_ACTIVE=false
+  echo "ℹ️  Phase 1 例外期間が終了しています (PHASE1_EXCEPTION_EXPIRES_ON=${PHASE1_EXPIRES}, TODAY=${TODAY})"
+else
+  PHASE1_ACTIVE=true
+  echo "ℹ️  Phase 1 例外モード有効 (PHASE1_EXCEPTION_EXPIRES_ON=${PHASE1_EXPIRES}, TODAY=${TODAY})"
+fi
 
 # ---------------------------------------------------------------------------
 # ヘルパー関数
@@ -70,10 +103,32 @@ display_value() {
   fi
 }
 
+# Phase 1 例外変数か判定
+is_phase1_exception_var() {
+  local key="$1"
+  local v
+  for v in "${PHASE1_EXCEPTION_VARS[@]}"; do
+    [[ "${v}" == "${key}" ]] && return 0
+  done
+  return 1
+}
+
+# 違反追加: Phase 1 例外中かつ対象変数ならWARNに格下げ、それ以外はVIOLATIONS
+_add_violation_or_warn() {
+  local key="$1"
+  local message="$2"
+  if [[ "${PHASE1_ACTIVE}" == "true" ]] && is_phase1_exception_var "${key}"; then
+    WARNINGS+=("[Phase1例外 until ${PHASE1_EXPIRES}] ${message}")
+  else
+    VIOLATIONS+=("${message}")
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # 違反収集
 # ---------------------------------------------------------------------------
 VIOLATIONS=()
+WARNINGS=()
 
 # ---------------------------------------------------------------------------
 # 必須差分キー: 以下のいずれか1個でも同値なら違反
@@ -101,8 +156,12 @@ for key in "${REQUIRED_DIFF_KEYS[@]}"; do
   fi
 
   if [[ "${staging_val}" == "${production_val}" ]]; then
-    VIOLATIONS+=("必須差分キー ${key} が同値: staging=$(display_value "${key}" "${staging_val}") / production=$(display_value "${key}" "${production_val}")")
-    echo "  ❌ ${key}: staging=$(display_value "${key}" "${staging_val}") == production=$(display_value "${key}" "${production_val}")"
+    _add_violation_or_warn "${key}" "必須差分キー ${key} が同値: staging=$(display_value "${key}" "${staging_val}") / production=$(display_value "${key}" "${production_val}")"
+    if [[ "${PHASE1_ACTIVE}" == "true" ]] && is_phase1_exception_var "${key}"; then
+      echo "  ⚠️  ${key}: staging==production (Phase1例外: WARN)"
+    else
+      echo "  ❌ ${key}: staging=$(display_value "${key}" "${staging_val}") == production=$(display_value "${key}" "${production_val}")"
+    fi
   else
     echo "  ✅ ${key}: 差分あり"
   fi
@@ -149,22 +208,34 @@ echo ""
 echo "--- 禁止パターンチェック (.env.production) ---"
 
 if grep -qE '^APP_ENV=staging[[:space:]]*$' "${PRODUCTION_FILE}"; then
-  VIOLATIONS+=(".env.production に APP_ENV=staging が含まれています")
-  echo "  ❌ APP_ENV=staging を検出"
+  _add_violation_or_warn "APP_ENV" ".env.production に APP_ENV=staging が含まれています"
+  if [[ "${PHASE1_ACTIVE}" == "true" ]] && is_phase1_exception_var "APP_ENV"; then
+    echo "  ⚠️  APP_ENV=staging を検出 (Phase1例外: WARN)"
+  else
+    echo "  ❌ APP_ENV=staging を検出"
+  fi
 else
   echo "  ✅ APP_ENV=staging なし"
 fi
 
 if grep -qE '^BYBIT_SANDBOX=true[[:space:]]*$' "${PRODUCTION_FILE}"; then
-  VIOLATIONS+=(".env.production に BYBIT_SANDBOX=true が含まれています (本番は false 必須)")
-  echo "  ❌ BYBIT_SANDBOX=true を検出"
+  _add_violation_or_warn "BYBIT_SANDBOX" ".env.production に BYBIT_SANDBOX=true が含まれています (本番は false 必須)"
+  if [[ "${PHASE1_ACTIVE}" == "true" ]] && is_phase1_exception_var "BYBIT_SANDBOX"; then
+    echo "  ⚠️  BYBIT_SANDBOX=true を検出 (Phase1例外: WARN)"
+  else
+    echo "  ❌ BYBIT_SANDBOX=true を検出"
+  fi
 else
   echo "  ✅ BYBIT_SANDBOX=true なし"
 fi
 
 if grep -qiE '^AAVE_NETWORK=.*sepolia.*' "${PRODUCTION_FILE}"; then
-  VIOLATIONS+=(".env.production に AAVE_NETWORK の sepolia 指定が含まれています (本番は mainnet 必須)")
-  echo "  ❌ AAVE_NETWORK=*sepolia* を検出"
+  _add_violation_or_warn "AAVE_NETWORK" ".env.production に AAVE_NETWORK の sepolia 指定が含まれています (本番は mainnet 必須)"
+  if [[ "${PHASE1_ACTIVE}" == "true" ]] && is_phase1_exception_var "AAVE_NETWORK"; then
+    echo "  ⚠️  AAVE_NETWORK=*sepolia* を検出 (Phase1例外: WARN)"
+  else
+    echo "  ❌ AAVE_NETWORK=*sepolia* を検出"
+  fi
 else
   echo "  ✅ AAVE_NETWORK に sepolia 含まず"
 fi
@@ -229,6 +300,14 @@ _validate_ai_model_names "${STAGING_FILE}" "staging"
 # ---------------------------------------------------------------------------
 echo ""
 echo "=== 結果 ==="
+
+if [[ "${#WARNINGS[@]}" -gt 0 ]]; then
+  echo "⚠️  Phase 1 例外 WARN: ${#WARNINGS[@]} 件 (exit 0)"
+  for w in "${WARNINGS[@]}"; do
+    echo "   - ${w}"
+  done
+fi
+
 if [[ "${#VIOLATIONS[@]}" -eq 0 ]]; then
   echo "✅ 環境分離チェック: 全項目通過"
   exit 0
