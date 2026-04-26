@@ -194,6 +194,14 @@ class WalletConnectRequest(BaseModel):
     )
     message: str = Field(..., description="Signed message (must contain timestamp)")
     signature: str = Field(..., description="ECDSA signature (0x...)")
+    privy_did: Optional[str] = Field(None, max_length=255, description="Privy DID (did:privy:...)")
+    # Privy ID Token (JWT) — 提供された場合はサーバー側で署名検証し、
+    # sub claim と privy_did の一致を強制する (Codex Review P1 対応)。
+    privy_id_token: Optional[str] = Field(
+        None,
+        max_length=4096,
+        description="Privy ID token (JWT). 提供時はサーバーで検証し sub == privy_did を確認する。",
+    )
 
 
 class WalletConnectResponse(BaseModel):

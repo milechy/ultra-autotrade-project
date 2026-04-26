@@ -34,6 +34,7 @@ from .models import (
     User,
     UserRole,
 )
+from .privy_verifier import get_privy_verifier
 from .schemas import (
     LoginRequest,
     PasswordChangeRequest,
@@ -429,16 +430,62 @@ def wallet_connect(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # ── Privy ID Token 検証 (Codex Review P1 対応) ──
+    # 後方互換のため、PRIVY_APP_ID 未設定時 (= verifier=None) は privy_did/id_token を
+    # 検証せずに drop する。本番環境では PRIVY_APP_ID + 公開鍵を必ず設定すること。
+    verifier = get_privy_verifier()
+    privy_did_to_store: str | None = None
+    if verifier is None:
+        # 後方互換モード: PRIVY_APP_ID 未設定時は Privy フィールドを silent drop して通常認証へ継続
+        if request.privy_id_token or request.privy_did:
+            logger.warning(
+                "Privy verification disabled (PRIVY_APP_ID not set), "
+                "dropping privy_id_token=%s and privy_did=%s",
+                "<present>" if request.privy_id_token else None,
+                "<present>" if request.privy_did else None,
+            )
+    elif request.privy_id_token:
+        # 検証モード (PRIVY_APP_ID 設定済み): id_token を検証して DID を取得
+        verified_did = verifier.verify_id_token(request.privy_id_token)
+        if request.privy_did and request.privy_did != verified_did:
+            logger.warning(
+                "Privy DID mismatch: request.privy_did=%s..., id_token.sub=%s...",
+                request.privy_did[:20],
+                verified_did[:20],
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Privy DID does not match ID token sub",
+            )
+        privy_did_to_store = verified_did
+    elif request.privy_did:
+        # Privy 検証 ON 環境では未検証 DID を受け付けない
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="privy_did requires privy_id_token for verification",
+        )
+
     # ウォレットアドレスでユーザー検索
     existing_user = AuthService.get_user_by_wallet(db, request.wallet_address)
     is_new_user = existing_user is None
 
     if is_new_user:
-        user = AuthService.create_wallet_user(db, request.wallet_address)
+        user = AuthService.create_wallet_user(
+            db, request.wallet_address, privy_did=privy_did_to_store
+        )
     else:
         if existing_user is None:
             raise RuntimeError("existing_user is None after wallet lookup")
         user = existing_user
+        # 既存ユーザーに privy_did が未保存かつ検証済み DID が手元にあれば後追い保存
+        if privy_did_to_store and not user.privy_did:
+            try:
+                AuthService.update_privy_did(db, user, privy_did_to_store)
+            except Exception:
+                db.rollback()
+                logger.warning(
+                    "privy_did update failed (conflict?): wallet=%s...", request.wallet_address[:10]
+                )
 
     token, expires_in = AuthService.create_access_token(
         user_id=user.id,

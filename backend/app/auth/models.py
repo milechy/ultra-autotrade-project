@@ -10,6 +10,9 @@ ALTER TABLE users ADD COLUMN tier VARCHAR(20) NOT NULL DEFAULT 'LOWER';
 ALTER TABLE users ADD COLUMN last_judgment_at TIMESTAMP WITH TIME ZONE NULL;
 -- 注: F-2 で DEFAULT を 'GENERAL' から 'LOWER' に変更。本番 DB の DEFAULT 切替は
 -- F-16 マイグレーションで実施 (docs/46_users_tier_migration_plan.md 参照)。
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS privy_did VARCHAR(255) NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS ix_users_privy_did ON users (privy_did) WHERE privy_did IS NOT NULL;
 """
 
 import logging
@@ -229,6 +232,9 @@ class User(Base):
     )
     wallet_address: Mapped[Optional[str]] = mapped_column(
         String(42), unique=True, nullable=True, index=True, default=None
+    )
+    privy_did: Mapped[Optional[str]] = mapped_column(
+        String(255), unique=True, nullable=True, index=True, default=None
     )
     invited_by: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True, default=None

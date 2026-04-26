@@ -18,7 +18,9 @@ from typing import Any, Optional
 import bcrypt
 import jwt as pyjwt
 from eth_account.messages import encode_defunct
+from fastapi import HTTPException, status
 from jwt import InvalidTokenError as JWTError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from web3 import Web3
 
@@ -360,7 +362,9 @@ class AuthService:
             return False
 
     @classmethod
-    def create_wallet_user(cls, db: Session, wallet_address: str) -> User:
+    def create_wallet_user(
+        cls, db: Session, wallet_address: str, privy_did: Optional[str] = None
+    ) -> User:
         """
         ウォレットアドレスからユーザーを自動作成する。
 
@@ -368,6 +372,7 @@ class AuthService:
         - risk_mode = conservative
         - terms_accepted_at = None
         - email / username は wallet_ プレフィックス + アドレス先頭8文字（衝突時はランダム4桁追加）
+        - privy_did: Privy固有のDID（任意、後追い更新も可能）
         """
         base_slug = wallet_address[2:10].lower()
         base_email = f"wallet_{base_slug}@wallet.local"
@@ -396,10 +401,38 @@ class AuthService:
             risk_mode="conservative",
             terms_accepted_at=None,
             wallet_address=wallet_address.lower(),
+            privy_did=privy_did,
         )
         db.add(user)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            # privy_did UNIQUE 違反 (= 別ユーザーが同じ DID を保持) や
+            # wallet_address 競合 (並行リクエスト) を 409 Conflict で返す。
+            db.rollback()
+            logger.warning(
+                "Wallet user creation conflict (wallet=%s..., privy_did=%s): %s",
+                wallet_address[:10],
+                (privy_did[:20] + "...") if privy_did else None,
+                exc.orig if hasattr(exc, "orig") else exc,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="DID already in use",
+            ) from exc
         db.refresh(user)
 
         logger.info("Created wallet user: %s (wallet=%s...)", user.email, wallet_address[:10])
         return user
+
+    @classmethod
+    def update_privy_did(cls, db: Session, user: User, privy_did: str) -> None:
+        """既存ユーザーの privy_did を後追い保存する。
+
+        既に同じ privy_did が設定されている場合はスキップ。
+        別ユーザーが同じ privy_did を持つ場合は IntegrityError が発生するため呼び出し元でハンドリングする。
+        """
+        if user.privy_did == privy_did:
+            return
+        user.privy_did = privy_did
+        db.commit()
