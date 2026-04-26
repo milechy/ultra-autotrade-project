@@ -64,6 +64,16 @@
 
 ## backend/requirements.txt
 
+### 変更 #2: PyJWT[crypto] extra 追加（Privy ID Token 検証対応）(PR #155 / 2026-04-27)
+- **コミット範囲**: `c88dfd2` – `41f77d7` (feature/privy-did-storage)
+- **変更内容**: `PyJWT>=2.9.0` → `PyJWT[crypto]>=2.9.0`
+- **理由**: Privy ID Token 検証 (PR #155) に RS256/ES256 アルゴリズムサポートが必要。
+  `PyJWT` 単体では非対称鍵アルゴリズムを扱えず、`cryptography` ライブラリが必要。
+  `[crypto]` extra を追加することで `cryptography` が自動的にインストールされる。
+- **影響範囲**: `cryptography` ライブラリの追加のみ。既存認証ロジックへの影響なし。
+  `pyjwt` は既存コードでも使用しており、API 互換変更（追加のみ）。
+- **承認**: feature/privy-did-storage → main の通常フロー経由（PR #155）
+
 ### 変更 #1: wheel バージョン固定（CVE-2026-24049）
 - **コミット**: `fd2b6a6` (dev ブランチ)
 - **変更内容**: `wheel>=0.46.2` を追加
