@@ -435,12 +435,17 @@ def wallet_connect(
     # 検証せずに drop する。本番環境では PRIVY_APP_ID + 公開鍵を必ず設定すること。
     verifier = get_privy_verifier()
     privy_did_to_store: str | None = None
-    if request.privy_id_token:
-        if verifier is None:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Privy verification not configured on server",
+    if verifier is None:
+        # 後方互換モード: PRIVY_APP_ID 未設定時は Privy フィールドを silent drop して通常認証へ継続
+        if request.privy_id_token or request.privy_did:
+            logger.warning(
+                "Privy verification disabled (PRIVY_APP_ID not set), "
+                "dropping privy_id_token=%s and privy_did=%s",
+                "<present>" if request.privy_id_token else None,
+                "<present>" if request.privy_did else None,
             )
+    elif request.privy_id_token:
+        # 検証モード (PRIVY_APP_ID 設定済み): id_token を検証して DID を取得
         verified_did = verifier.verify_id_token(request.privy_id_token)
         if request.privy_did and request.privy_did != verified_did:
             logger.warning(
@@ -454,15 +459,10 @@ def wallet_connect(
             )
         privy_did_to_store = verified_did
     elif request.privy_did:
-        if verifier is not None:
-            # Privy 検証 ON 環境では未検証 DID を受け付けない
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="privy_did requires privy_id_token for verification",
-            )
-        # 移行期 (PRIVY_APP_ID 未設定) のみ警告ログ + DID を drop
-        logger.warning(
-            "Received privy_did but PRIVY_APP_ID not configured; dropping unverified DID"
+        # Privy 検証 ON 環境では未検証 DID を受け付けない
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="privy_did requires privy_id_token for verification",
         )
 
     # ウォレットアドレスでユーザー検索

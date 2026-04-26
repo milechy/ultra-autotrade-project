@@ -505,3 +505,65 @@ class TestWalletConnect:
         data = response.json()
         assert "access_token" in data
         assert data["is_new_user"] is True
+
+    # ── 後方互換リグレッション修正 (Codex Review P1, GID 1214284845161706) ────
+
+    def test_unconfigured_privy_with_id_token_returns_200(
+        self,
+        client: TestClient,
+        privy_unset_env: None,  # noqa: ARG002
+    ):
+        """PRIVY_APP_ID 未設定 + privy_id_token あり → 200 (silent drop, 後方互換)。"""
+        payload = self._make_valid_request()
+        payload["privy_id_token"] = "ey.fake.token"
+
+        response = client.post("/auth/wallet/connect", json=payload)
+        assert response.status_code == 200
+        assert "access_token" in response.json()
+
+    def test_unconfigured_privy_with_did_only_returns_200(
+        self,
+        client: TestClient,
+        privy_unset_env: None,  # noqa: ARG002
+    ):
+        """PRIVY_APP_ID 未設定 + privy_did あり (id_token なし) → 200 (silent drop, 後方互換)。"""
+        payload = self._make_valid_request()
+        payload["privy_did"] = "did:privy:test-compat"
+
+        response = client.post("/auth/wallet/connect", json=payload)
+        assert response.status_code == 200
+        assert "access_token" in response.json()
+
+    def test_unconfigured_privy_with_both_fields_returns_200(
+        self,
+        client: TestClient,
+        privy_unset_env: None,  # noqa: ARG002
+    ):
+        """PRIVY_APP_ID 未設定 + privy_id_token + privy_did 両方あり → 200 (両方 drop)。"""
+        payload = self._make_valid_request()
+        payload["privy_id_token"] = "ey.fake.token"
+        payload["privy_did"] = "did:privy:test-compat-both"
+
+        response = client.post("/auth/wallet/connect", json=payload)
+        assert response.status_code == 200
+        assert "access_token" in response.json()
+
+    def test_unconfigured_privy_emits_warning_log(
+        self,
+        client: TestClient,
+        privy_unset_env: None,  # noqa: ARG002
+        caplog: pytest.LogCaptureFixture,
+    ):
+        """PRIVY_APP_ID 未設定 + privy_id_token あり → WARN ログ出力 (機密情報を含まない)。"""
+        import logging
+
+        payload = self._make_valid_request()
+        payload["privy_id_token"] = "ey.fake.token"
+
+        with caplog.at_level(logging.WARNING):
+            response = client.post("/auth/wallet/connect", json=payload)
+
+        assert response.status_code == 200
+        assert any("Privy verification disabled" in r.message for r in caplog.records)
+        # 機密情報 (id_token の中身) がログに含まれないことを確認
+        assert not any("ey.fake.token" in r.message for r in caplog.records)
