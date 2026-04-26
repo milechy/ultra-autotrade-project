@@ -360,7 +360,9 @@ class AuthService:
             return False
 
     @classmethod
-    def create_wallet_user(cls, db: Session, wallet_address: str) -> User:
+    def create_wallet_user(
+        cls, db: Session, wallet_address: str, privy_did: Optional[str] = None
+    ) -> User:
         """
         ウォレットアドレスからユーザーを自動作成する。
 
@@ -368,6 +370,7 @@ class AuthService:
         - risk_mode = conservative
         - terms_accepted_at = None
         - email / username は wallet_ プレフィックス + アドレス先頭8文字（衝突時はランダム4桁追加）
+        - privy_did: Privy固有のDID（任意、後追い更新も可能）
         """
         base_slug = wallet_address[2:10].lower()
         base_email = f"wallet_{base_slug}@wallet.local"
@@ -396,6 +399,7 @@ class AuthService:
             risk_mode="conservative",
             terms_accepted_at=None,
             wallet_address=wallet_address.lower(),
+            privy_did=privy_did,
         )
         db.add(user)
         db.commit()
@@ -403,3 +407,15 @@ class AuthService:
 
         logger.info("Created wallet user: %s (wallet=%s...)", user.email, wallet_address[:10])
         return user
+
+    @classmethod
+    def update_privy_did(cls, db: Session, user: User, privy_did: str) -> None:
+        """既存ユーザーの privy_did を後追い保存する。
+
+        既に同じ privy_did が設定されている場合はスキップ。
+        別ユーザーが同じ privy_did を持つ場合は IntegrityError が発生するため呼び出し元でハンドリングする。
+        """
+        if user.privy_did == privy_did:
+            return
+        user.privy_did = privy_did
+        db.commit()

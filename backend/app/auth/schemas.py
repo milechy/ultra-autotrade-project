@@ -194,6 +194,7 @@ class WalletConnectRequest(BaseModel):
     )
     message: str = Field(..., description="Signed message (must contain timestamp)")
     signature: str = Field(..., description="ECDSA signature (0x...)")
+    privy_did: Optional[str] = Field(None, max_length=255, description="Privy DID (did:privy:...)")
 
 
 class WalletConnectResponse(BaseModel):

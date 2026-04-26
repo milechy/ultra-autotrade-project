@@ -27,6 +27,7 @@ os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"
 os.environ["INITIAL_ADMIN_EMAIL"] = "admin@example.com"
 
+from app.auth.models import User
 from app.database import Base, get_db
 from app.main import create_app
 
@@ -191,3 +192,59 @@ class TestWalletConnect:
         data = response.json()
         assert "expires_in" in data
         assert data["expires_in"] > 0
+
+    def test_wallet_connect_new_user_with_privy_did_saves_did(self, client: TestClient, test_db):
+        """新規ユーザー作成時に privy_did が DB に保存されること。"""
+        _, engine = test_db
+        payload = self._make_valid_request()
+        payload["privy_did"] = "did:privy:test123abc"
+
+        response = client.post("/auth/wallet/connect", json=payload)
+        assert response.status_code == 200
+        assert response.json()["is_new_user"] is True
+
+        Session = sessionmaker(bind=engine)
+        with Session() as session:
+            user = (
+                session.query(User)
+                .filter(User.wallet_address == TEST_WALLET_ADDRESS.lower())
+                .first()
+            )
+            assert user is not None
+            assert user.privy_did == "did:privy:test123abc"
+
+    def test_wallet_connect_existing_user_privy_did_backfilled(self, client: TestClient, test_db):
+        """既存ユーザーに privy_did が未設定の場合、後追い保存されること。"""
+        _, engine = test_db
+        # 1回目: privy_did なしで登録
+        payload = self._make_valid_request()
+        first_response = client.post("/auth/wallet/connect", json=payload)
+        assert first_response.status_code == 200
+
+        # 2回目: privy_did 付きで再接続
+        payload["privy_did"] = "did:privy:backfill456"
+        second_response = client.post("/auth/wallet/connect", json=payload)
+        assert second_response.status_code == 200
+        assert second_response.json()["is_new_user"] is False
+
+        Session = sessionmaker(bind=engine)
+        with Session() as session:
+            user = (
+                session.query(User)
+                .filter(User.wallet_address == TEST_WALLET_ADDRESS.lower())
+                .first()
+            )
+            assert user is not None
+            assert user.privy_did == "did:privy:backfill456"
+
+    def test_wallet_connect_without_privy_did_still_works(self, client: TestClient):
+        """privy_did なしのリクエストが従来通り動作すること（後方互換）。"""
+        payload = self._make_valid_request()
+        # privy_did を明示的に含めない
+        assert "privy_did" not in payload
+
+        response = client.post("/auth/wallet/connect", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert data["is_new_user"] is True

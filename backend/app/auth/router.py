@@ -434,11 +434,21 @@ def wallet_connect(
     is_new_user = existing_user is None
 
     if is_new_user:
-        user = AuthService.create_wallet_user(db, request.wallet_address)
+        user = AuthService.create_wallet_user(
+            db, request.wallet_address, privy_did=request.privy_did
+        )
     else:
         if existing_user is None:
             raise RuntimeError("existing_user is None after wallet lookup")
         user = existing_user
+        # 既存ユーザーに privy_did が未保存かつリクエストに含まれる場合は後追い保存
+        if request.privy_did and not user.privy_did:
+            try:
+                AuthService.update_privy_did(db, user, request.privy_did)
+            except Exception:
+                logger.warning(
+                    "privy_did update failed (conflict?): wallet=%s...", request.wallet_address[:10]
+                )
 
     token, expires_in = AuthService.create_access_token(
         user_id=user.id,
