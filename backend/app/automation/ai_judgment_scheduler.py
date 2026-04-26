@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from app.ai.models import AIDecision
 from app.ai.schemas import CrossValidationResult, RAGContext, TradeAction
 from app.ai.service import AIService
-from app.auth.models import InvestmentTier, User
+from app.auth.models import InvestmentTier, User, normalize_tier
 from app.data_feeds.context import build_market_context
 from app.database import SessionLocal
 from app.knowledge.schemas import KnowledgeSearchRequest
@@ -185,7 +185,7 @@ def _create_proposals_for_users(
         )
         market_fee = calculate_fee_by_market(
             trade_amount_usd=_PROPOSAL_AMOUNT_USD,
-            tier=user.tier,
+            tier=normalize_tier(user.tier, user_id=user.id).value,
             current_apy=_default_apy,
             expected_profit_usd=_expected_profit,
             fixed_cost_usd=fixed_cost,

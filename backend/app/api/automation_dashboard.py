@@ -150,6 +150,7 @@ def run_workflow(
         monitoring_service=monitoring_service,
         dry_run=dry_run,
         execution_policy=current_user.execution_policy,
+        user_id=current_user.id,
     )
 
     sanitized_errors = [

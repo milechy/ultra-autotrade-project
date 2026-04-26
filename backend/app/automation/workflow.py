@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.ai.judgment_log import JudgmentRecord, get_judgment_logger
 from app.ai.schemas import AIAnalysisResult, RAGContext, TradeAction
 from app.ai.service import AIService
+from app.auth.models import User, normalize_tier
 from app.automation.monitoring_service import MonitoringService
 from app.automation.schemas import ComponentType, WorkflowRunResult, WorkflowStepError
 from app.automation.shadow_mode_service import ShadowModeService
@@ -362,6 +363,7 @@ def process_pending_knowledge(
     trade_amount_usd: Decimal = Decimal("50"),
     dry_run: bool = False,
     execution_policy: str = "auto_execute",
+    user_id: Optional[int] = None,
 ) -> WorkflowRunResult:
     """Process pending knowledge items through the full pipeline.
 
@@ -556,6 +558,7 @@ def process_pending_knowledge(
                 shadow_mode_service=shadow_mode_service,
                 health_factor=hf,
                 execution_policy=effective_policy,
+                user_id=user_id,
             )
 
             if result.shadow_logged:
@@ -692,6 +695,7 @@ def _process_single_item(
     shadow_mode_service: Optional[ShadowModeService] = None,
     health_factor: Optional[Decimal] = None,
     execution_policy: str = "auto_execute",
+    user_id: Optional[int] = None,
 ) -> _SingleItemResult:
     """Process a single knowledge item through the full pipeline."""
     query = item.title or item.source_url or "analyze market conditions"
@@ -756,7 +760,9 @@ def _process_single_item(
 
             from app.billing.dynamic_fee import calculate_fee_by_market  # noqa: PLC0415
 
-            # APYを市場コンテキストから取得、なければデフォルト4%
+            # TODO(P0 タスク 1214279097935851): current_apy を MarketContext から正しく取得する。
+            # 現状 getattr(ctx, "current_apy", None) は MarketContext に該当属性がないため常に
+            # None を返し、Decimal("4") (4%) フォールバックされる。Aave クライアント連携時に修正予定。
             _apy_raw = getattr(ctx, "current_apy", None) if ctx else None
             if _apy_raw is None and isinstance(ctx, dict):
                 _apy_raw = ctx.get("current_apy")
@@ -768,9 +774,20 @@ def _process_single_item(
             )
             fixed_cost = Decimal(os.getenv("TRADE_FIXED_COST_USD", "0.27"))
 
+            # F-6: tier 正規化 (LEGACY_TIER_MAP 経由 + 不明値 LOWER フォールバック)。
+            # user_id 未指定 (legacy item-driven path) は raw_tier=None で LOWER フォールバック。
+            # 旧実装の tier="GENERAL" ハードコードは LEGACY_TIER_MAP で LOWER に正規化されるため
+            # 数値的な互換性は維持される (GENERAL と LOWER は dynamic_fee マトリクス上で同値)。
+            user_tier_raw: Optional[str] = None
+            if user_id is not None:
+                user = db.get(User, user_id)
+                if user is not None:
+                    user_tier_raw = user.tier
+            tier_value = normalize_tier(user_tier_raw, user_id=user_id).value
+
             market_fee = calculate_fee_by_market(
                 trade_amount_usd=trade_amount_usd,
-                tier="GENERAL",  # ユーザーtier不明の場合は保守的にGENERAL
+                tier=tier_value,
                 current_apy=current_apy,
                 expected_profit_usd=expected_profit,
                 fixed_cost_usd=fixed_cost,
@@ -796,6 +813,7 @@ def _process_single_item(
                 action=action,
                 reason=reason,
                 trade_amount_usd=trade_amount_usd,
+                user_id=user_id if user_id is not None else 0,
                 fee_rate=market_fee.fee_rate,
                 fee_amount=market_fee.fee_amount,
             )
