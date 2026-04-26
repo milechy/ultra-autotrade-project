@@ -240,10 +240,20 @@ monitoring = MonitoringService()  # NG
 新規カラム追加は Hetzner 本番サーバーで手動 `ALTER TABLE` を実行。
 `docs/ops/03_deploy_procedures.md` §DB マイグレーション手順 参照。
 
-### 既知の本番 DB 差分 (2026-04-24 時点)
+### 既知の本番 DB 差分 (2026-04-26 時点)
+
+#### 適用済み
 ```sql
--- 未適用 (本番DBに存在しないカラム)
-ALTER TABLE users ADD COLUMN IF NOT EXISTS tier VARCHAR(20) NOT NULL DEFAULT 'GENERAL';
+-- 適用済み (F-2 完了 2026-04-25)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS tier VARCHAR(20) NOT NULL DEFAULT 'LOWER';
+-- 適用済み (2026-04-24 インシデント対応)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_judgment_at TIMESTAMP WITH TIME ZONE NULL;
--- 影響: /auth/me が 500 → AuthProvider がタイムアウト → partner/admin 画面にアクセス不可
 ```
+
+#### users.tier の状態 (F-2/F-6 完了後)
+- **enum**: `InvestmentTier` — `LOWER` / `MIDDLE` / `UPPER` / `GENERAL` (deprecated, F-13で物理削除予定)
+- **DB DEFAULT**: `'LOWER'` (F-2 で `'GENERAL'` から変更済み)
+- **normalize_tier()**: LEGACY値 (`GENERAL` 等) を `LOWER` に正規化するヘルパー実装済み (F-6 完了 2026-04-26)
+- **既存ユーザー6名**: 現状 `'GENERAL'` のまま (F-16 で `LOWER`/`MIDDLE`/`UPPER` に物理 UPDATE 予定)
+- **判定関数**: `app.users.tier_service.determine_tier_jpy()` — JPY 入金額からティア自動判定
+- **日本語ラベル**: `app.auth.models.TIER_JP_LABELS` — `LOWER`→ローリスク等の表示変換
