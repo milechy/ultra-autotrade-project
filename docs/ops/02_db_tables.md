@@ -41,7 +41,7 @@ docker exec ultra-autotrade-postgres-production \
 | updated_at | DateTime(tz) | NO | 更新日時 |
 | terms_accepted_at | DateTime(tz) | YES | 利用規約承諾日時 |
 | terms_version | String(20) | YES | 承諾バージョン |
-| risk_mode | String(20) | YES | `conservative` / `moderate` / `aggressive` |
+| risk_mode | String(20) | YES | `conservative` / `balanced` / `aggressive` |
 | notification_email | String(255) | YES | 通知先メール |
 | notification_frequency | String(20) | NO | 通知頻度 |
 | max_single_trade_usd | Numeric(20,2) | YES | 1取引上限USD |
