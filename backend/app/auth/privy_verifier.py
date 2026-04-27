@@ -179,6 +179,13 @@ class PrivyVerifier:
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail="Privy JWKS unavailable",
                 ) from exc
+            except ValueError as exc:
+                # json.JSONDecodeError も含む。malformed JSON / 空ボディ等の上流不具合
+                logger.error("Privy JWKS response is not valid JSON (%s): %s", self.jwks_url, exc)
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Privy JWKS upstream returned invalid JSON",
+                ) from exc
         finally:
             if owns_client:
                 client.close()
