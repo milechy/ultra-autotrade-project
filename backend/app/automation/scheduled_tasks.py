@@ -603,6 +603,75 @@ async def latency_monitor_loop(
             await asyncio.sleep(600)
 
 
+async def process_news_loop(
+    *,
+    interval_seconds: int = 300,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """
+    POST /automation/process-news を定期実行するループ。
+
+    INTERNAL_API_TOKEN を X-Internal-Token ヘッダーに付与して内部 API を呼ぶ。
+    BACKEND_BASE_URL が未設定の場合は http://localhost:8000 を使用。
+
+    Args:
+        interval_seconds: 実行間隔（秒）。デフォルト 300 秒（5 分）
+        on_error: エラー発生時のコールバック
+
+    Note:
+        - INTERNAL_API_TOKEN が未設定の場合はスキップしてログ警告のみ
+        - このコルーチンは無限ループで動作する
+        - 停止は asyncio.CancelledError で行う
+        - エラー発生時もループは継続（fail-safe）
+    """
+    import os  # noqa: PLC0415
+
+    logger.info("Starting process_news_loop (interval: %ds)", interval_seconds)
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+
+            token = os.getenv("INTERNAL_API_TOKEN", "")
+            if not token:
+                logger.warning("process_news_loop: INTERNAL_API_TOKEN not set, skipping")
+                continue
+
+            base_url = os.getenv("BACKEND_BASE_URL", "http://localhost:8000")
+            url = f"{base_url}/automation/process-news"
+
+            import httpx  # noqa: PLC0415
+
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    url,
+                    params={"dry_run": "false"},
+                    headers={"X-Internal-Token": token},
+                    timeout=120.0,
+                )
+                resp.raise_for_status()  # 4xx/5xx を HTTPStatusError として伝播
+
+            logger.info(
+                "process_news_loop: POST %s → %d",
+                url,
+                resp.status_code,
+            )
+
+        except asyncio.CancelledError:
+            logger.info("process_news_loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("process_news_loop error: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            await asyncio.sleep(60)
+
+
 async def price_change_monitor_loop(
     *,
     interval_seconds: int = 300,

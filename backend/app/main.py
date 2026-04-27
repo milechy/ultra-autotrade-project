@@ -413,6 +413,11 @@ def create_app() -> FastAPI:
                 mmt_interval = int(os.getenv("MMT_UPDATE_INTERVAL", "1800")) // 60
                 asyncio.create_task(start_mmt_background_task(interval_minutes=mmt_interval))
                 logger.info("MMT data feed started (interval: %ds)", mmt_interval * 60)
+            from app.automation.scheduled_tasks import process_news_loop  # noqa: PLC0415
+
+            pn_interval = int(os.getenv("PROCESS_NEWS_INTERVAL_SECONDS", "300"))
+            asyncio.create_task(process_news_loop(interval_seconds=pn_interval))
+            logger.info("process_news_loop started (interval=%ds)", pn_interval)
         except BaseException as exc:
             logger.error("Failed to start data feed background tasks: %s", exc)
 

@@ -13,6 +13,7 @@ from datetime import datetime, time
 from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
+import httpx
 import pytest
 
 from app.automation.scheduled_tasks import (
@@ -1476,3 +1477,318 @@ class TestStopMethodExceptionBranches:
                 await manager.start_learning()
 
         await manager.stop_learning()
+
+
+# ---------------------------------------------------------------------------
+# process_news_loop — POST /automation/process-news with X-Internal-Token
+# ---------------------------------------------------------------------------
+
+
+class TestProcessNewsLoop:
+    """process_news_loop のテスト。
+
+    - X-Internal-Token ヘッダーを付与して POST すること
+    - INTERNAL_API_TOKEN 未設定時はスキップすること
+    - asyncio.CancelledError を伝播すること
+    - 例外発生時は on_error を呼び 60 秒待機すること
+    """
+
+    @staticmethod
+    def _make_httpx_mock(status_code: int = 200) -> tuple[object, AsyncMock]:
+        """httpx.AsyncClient のモック (class, client_instance) を返す。"""
+        mock_response = MagicMock()
+        mock_response.status_code = status_code
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+
+        cm = AsyncMock()
+        cm.__aenter__ = AsyncMock(return_value=mock_client)
+        cm.__aexit__ = AsyncMock(return_value=None)
+
+        mock_class = MagicMock(return_value=cm)
+        return mock_class, mock_client
+
+    @pytest.mark.asyncio
+    async def test_sends_x_internal_token_header(self) -> None:
+        """X-Internal-Token ヘッダーに INTERNAL_API_TOKEN を付与して POST する。"""
+        from app.automation.scheduled_tasks import process_news_loop
+
+        sleep_count = 0
+
+        async def mock_sleep(seconds: float) -> None:
+            nonlocal sleep_count
+            sleep_count += 1
+            if sleep_count >= 2:
+                raise asyncio.CancelledError()
+
+        mock_class, mock_client = self._make_httpx_mock()
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch.dict("os.environ", {"INTERNAL_API_TOKEN": "test-token-abc"}),
+            patch("httpx.AsyncClient", mock_class),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await process_news_loop(interval_seconds=1)
+
+        mock_client.post.assert_called_once()
+        headers = mock_client.post.call_args.kwargs["headers"]
+        assert headers == {"X-Internal-Token": "test-token-abc"}
+
+    @pytest.mark.asyncio
+    async def test_posts_to_correct_url(self) -> None:
+        """BACKEND_BASE_URL/automation/process-news に POST する。"""
+        from app.automation.scheduled_tasks import process_news_loop
+
+        sleep_count = 0
+
+        async def mock_sleep(seconds: float) -> None:
+            nonlocal sleep_count
+            sleep_count += 1
+            if sleep_count >= 2:
+                raise asyncio.CancelledError()
+
+        mock_class, mock_client = self._make_httpx_mock()
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch.dict(
+                "os.environ",
+                {"INTERNAL_API_TOKEN": "tok", "BACKEND_BASE_URL": "http://backend:8000"},
+            ),
+            patch("httpx.AsyncClient", mock_class),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await process_news_loop(interval_seconds=1)
+
+        posted_url = mock_client.post.call_args.args[0]
+        assert posted_url == "http://backend:8000/automation/process-news"
+
+    @pytest.mark.asyncio
+    async def test_skips_when_token_not_set(self) -> None:
+        """INTERNAL_API_TOKEN が空のとき httpx を呼ばない。"""
+        from app.automation.scheduled_tasks import process_news_loop
+
+        sleep_count = 0
+
+        async def mock_sleep(seconds: float) -> None:
+            nonlocal sleep_count
+            sleep_count += 1
+            if sleep_count >= 2:
+                raise asyncio.CancelledError()
+
+        mock_class, mock_client = self._make_httpx_mock()
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch.dict("os.environ", {"INTERNAL_API_TOKEN": ""}),
+            patch("httpx.AsyncClient", mock_class),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await process_news_loop(interval_seconds=1)
+
+        mock_client.post.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cancelled_error_propagates(self) -> None:
+        """asyncio.CancelledError はループ外に伝播する（再 raise される）。"""
+        from app.automation.scheduled_tasks import process_news_loop
+
+        async def mock_sleep(seconds: float) -> None:
+            raise asyncio.CancelledError()
+
+        with patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep):
+            with pytest.raises(asyncio.CancelledError):
+                await process_news_loop(interval_seconds=1)
+
+    @pytest.mark.asyncio
+    async def test_on_error_callback_called_on_exception(self) -> None:
+        """httpx 例外時に on_error が呼ばれ、60 秒待機してループ継続する。"""
+        from app.automation.scheduled_tasks import process_news_loop
+
+        sleep_calls: list[float] = []
+
+        async def mock_sleep(seconds: float) -> None:
+            sleep_calls.append(seconds)
+            if seconds == 60:
+                raise asyncio.CancelledError()
+
+        on_error_calls: list[Exception] = []
+
+        def on_error(exc: Exception) -> None:
+            on_error_calls.append(exc)
+
+        failing_class = MagicMock(side_effect=RuntimeError("connection refused"))
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch.dict("os.environ", {"INTERNAL_API_TOKEN": "tok"}),
+            patch("httpx.AsyncClient", failing_class),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await process_news_loop(interval_seconds=1, on_error=on_error)
+
+        assert len(on_error_calls) == 1
+        assert isinstance(on_error_calls[0], RuntimeError)
+        assert 60 in sleep_calls
+
+    @pytest.mark.asyncio
+    async def test_on_error_callback_raises_internally(self) -> None:
+        """on_error 自体が例外を投げても 60 秒待機でループを継続する。"""
+        from app.automation.scheduled_tasks import process_news_loop
+
+        sleep_calls: list[float] = []
+
+        async def mock_sleep(seconds: float) -> None:
+            sleep_calls.append(seconds)
+            if seconds == 60:
+                raise asyncio.CancelledError()
+
+        def on_error(exc: Exception) -> None:
+            raise RuntimeError("on_error internal failure")
+
+        failing_class = MagicMock(side_effect=RuntimeError("httpx error"))
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch.dict("os.environ", {"INTERNAL_API_TOKEN": "tok"}),
+            patch("httpx.AsyncClient", failing_class),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await process_news_loop(interval_seconds=1, on_error=on_error)
+
+        assert 60 in sleep_calls
+
+    @pytest.mark.asyncio
+    async def test_process_news_loop_401_triggers_on_error(self) -> None:
+        """401 レスポンス → raise_for_status() で HTTPStatusError → on_error が呼ばれる。"""
+        from app.automation.scheduled_tasks import process_news_loop
+
+        sleep_calls: list[float] = []
+
+        async def mock_sleep(seconds: float) -> None:
+            sleep_calls.append(seconds)
+            if seconds == 60:
+                raise asyncio.CancelledError()
+
+        on_error_calls: list[Exception] = []
+
+        def on_error(exc: Exception) -> None:
+            on_error_calls.append(exc)
+
+        mock_class, mock_client = self._make_httpx_mock(status_code=401)
+        mock_resp = mock_client.post.return_value
+        mock_request = httpx.Request("POST", "http://localhost:8000/automation/process-news")
+        mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "401 Unauthorized", request=mock_request, response=MagicMock()
+        )
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch.dict("os.environ", {"INTERNAL_API_TOKEN": "tok"}),
+            patch("httpx.AsyncClient", mock_class),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await process_news_loop(interval_seconds=1, on_error=on_error)
+
+        assert len(on_error_calls) == 1
+        assert isinstance(on_error_calls[0], httpx.HTTPStatusError)
+        assert 60 in sleep_calls
+
+    @pytest.mark.asyncio
+    async def test_process_news_loop_500_triggers_on_error(self) -> None:
+        """500 レスポンス → raise_for_status() で HTTPStatusError → on_error が呼ばれる。"""
+        from app.automation.scheduled_tasks import process_news_loop
+
+        sleep_calls: list[float] = []
+
+        async def mock_sleep(seconds: float) -> None:
+            sleep_calls.append(seconds)
+            if seconds == 60:
+                raise asyncio.CancelledError()
+
+        on_error_calls: list[Exception] = []
+
+        def on_error(exc: Exception) -> None:
+            on_error_calls.append(exc)
+
+        mock_class, mock_client = self._make_httpx_mock(status_code=500)
+        mock_resp = mock_client.post.return_value
+        mock_request = httpx.Request("POST", "http://localhost:8000/automation/process-news")
+        mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "500 Internal Server Error", request=mock_request, response=MagicMock()
+        )
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch.dict("os.environ", {"INTERNAL_API_TOKEN": "tok"}),
+            patch("httpx.AsyncClient", mock_class),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await process_news_loop(interval_seconds=1, on_error=on_error)
+
+        assert len(on_error_calls) == 1
+        assert isinstance(on_error_calls[0], httpx.HTTPStatusError)
+        assert 60 in sleep_calls
+
+    @pytest.mark.asyncio
+    async def test_process_news_loop_2xx_does_not_trigger_on_error(self) -> None:
+        """200 レスポンス → raise_for_status() は例外を上げず on_error は呼ばれない。"""
+        from app.automation.scheduled_tasks import process_news_loop
+
+        sleep_count = 0
+
+        async def mock_sleep(seconds: float) -> None:
+            nonlocal sleep_count
+            sleep_count += 1
+            if sleep_count >= 2:
+                raise asyncio.CancelledError()
+
+        on_error_calls: list[Exception] = []
+
+        def on_error(exc: Exception) -> None:
+            on_error_calls.append(exc)
+
+        mock_class, mock_client = self._make_httpx_mock(status_code=200)
+        mock_resp = mock_client.post.return_value
+        mock_resp.raise_for_status.return_value = None  # 正常: 例外なし
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch.dict("os.environ", {"INTERNAL_API_TOKEN": "tok"}),
+            patch("httpx.AsyncClient", mock_class),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await process_news_loop(interval_seconds=1, on_error=on_error)
+
+        assert len(on_error_calls) == 0
+
+    @pytest.mark.asyncio
+    async def test_process_news_loop_passes_dry_run_false(self) -> None:
+        """P1: POST に dry_run=false クエリパラメータが付与されること。
+        デフォルト dry_run=True のエンドポイントに対し、本番実行モードを明示する。
+        """
+        from app.automation.scheduled_tasks import process_news_loop
+
+        sleep_count = 0
+
+        async def mock_sleep(seconds: float) -> None:
+            nonlocal sleep_count
+            sleep_count += 1
+            if sleep_count >= 2:
+                raise asyncio.CancelledError()
+
+        mock_class, mock_client = self._make_httpx_mock()
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch.dict("os.environ", {"INTERNAL_API_TOKEN": "test-token"}),
+            patch("httpx.AsyncClient", mock_class),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await process_news_loop(interval_seconds=1)
+
+        mock_client.post.assert_called_once()
+        params = mock_client.post.call_args.kwargs["params"]
+        assert params.get("dry_run") == "false"
