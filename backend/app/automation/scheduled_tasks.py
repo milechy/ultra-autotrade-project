@@ -648,6 +648,7 @@ async def process_news_loop(
                     headers={"X-Internal-Token": token},
                     timeout=120.0,
                 )
+                resp.raise_for_status()  # 4xx/5xx を HTTPStatusError として伝播
 
             logger.info(
                 "process_news_loop: POST %s → %d",
