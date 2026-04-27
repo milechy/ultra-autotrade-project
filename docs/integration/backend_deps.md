@@ -54,6 +54,17 @@
 - **影響範囲**: 新規 router 追加のみ。既存 endpoint への影響なし。`TestCoexistenceWithLegacyEndpoints` (2件) で既存 endpoint の404でないことを保証。
 - **承認**: feature/f8a-fees-api-readonly → main の通常フロー経由（PR #127）
 
+
+### 変更 #5: process_news_loop 起動 (PR #157 / 2026-04-27)
+- **コミット範囲**: `5ea9120` – `ce53ea9` (fix/production-401-unauthorized)
+- **変更内容**:
+  - `from app.automation.scheduled_tasks import process_news_loop` を `startup_data_feeds` 内で動的 import
+  - `asyncio.create_task(process_news_loop(interval_seconds=pn_interval))` で起動
+  - `PROCESS_NEWS_INTERVAL_SECONDS` 環境変数 (デフォルト 300秒 = 5分) で間隔を制御
+- **理由**: production backend で 24h に 189件発生していた `/automation/process-news` 401 Unauthorized エラーを解消するため。ホスト cron (root crontab) の旧呼び出し方式を廃止し、アプリ内スケジューラーから X-Internal-Token ヘッダー付きで `/automation/process-news?dry_run=false` を叩く方式に統一。
+- **影響範囲**: startup シーケンスのみ。`PROCESS_NEWS_INTERVAL_SECONDS` 未設定時は 300秒間隔で動作。既存の `/automation/process-news` エンドポイントは無変更で、内部から HTTP POST で叩く構造。
+- **承認**: fix/production-401-unauthorized → main の通常フロー経由（PR #157）
+
 ## backend/app/database.py
 
 変更なし（現時点）
