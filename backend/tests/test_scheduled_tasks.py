@@ -1763,3 +1763,32 @@ class TestProcessNewsLoop:
                 await process_news_loop(interval_seconds=1, on_error=on_error)
 
         assert len(on_error_calls) == 0
+
+    @pytest.mark.asyncio
+    async def test_process_news_loop_passes_dry_run_false(self) -> None:
+        """P1: POST に dry_run=false クエリパラメータが付与されること。
+        デフォルト dry_run=True のエンドポイントに対し、本番実行モードを明示する。
+        """
+        from app.automation.scheduled_tasks import process_news_loop
+
+        sleep_count = 0
+
+        async def mock_sleep(seconds: float) -> None:
+            nonlocal sleep_count
+            sleep_count += 1
+            if sleep_count >= 2:
+                raise asyncio.CancelledError()
+
+        mock_class, mock_client = self._make_httpx_mock()
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch.dict("os.environ", {"INTERNAL_API_TOKEN": "test-token"}),
+            patch("httpx.AsyncClient", mock_class),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await process_news_loop(interval_seconds=1)
+
+        mock_client.post.assert_called_once()
+        params = mock_client.post.call_args.kwargs["params"]
+        assert params.get("dry_run") == "false"

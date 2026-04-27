@@ -645,6 +645,7 @@ async def process_news_loop(
             async with httpx.AsyncClient() as client:
                 resp = await client.post(
                     url,
+                    params={"dry_run": "false"},
                     headers={"X-Internal-Token": token},
                     timeout=120.0,
                 )
