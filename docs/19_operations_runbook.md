@@ -491,3 +491,165 @@ Grafana などの可観測性ツールでは、Web ダッシュボードと同�
 
 > 注意: Grafana 側の表示は **既存 API の JSON を読み取る構成**とし、  
 > メトリクス定義の追加/変更は行わない（要件変更チャット案件）。
+
+---
+
+## 3. ゼロダウンタイムデプロイ運用 (Blue/Green + nginx)
+
+2026-04-27 導入 (Asana 1214253004741363 / 設計: `docs/research/zero_downtime_deploy.md`)。
+
+`scripts/deploy_production.sh --backend-only` は Blue/Green 切替によるゼロダウンタイムで動作する。
+旧来の `stop → build → up` 方式は廃止。
+
+### 3.1 構成
+
+```
+Internet
+  └─ Cloudflare CDN (WAF/DDoS)
+       └─ Named Tunnel (Dashboard 管理 Ingress)
+            └─ cloudflared (network_mode: host)
+                 ├─ localhost:3000  → frontend (:3000)
+                 └─ localhost:8080  → nginx (:8080)
+                                       └─ upstream backend_active
+                                            ├─ backend-blue:8000   (active or standby)
+                                            └─ backend-green:8000  (standby or active)
+
+ホスト側ポート (Hetzner ローカル):
+  - 8080: nginx (cloudflared 経由で外部公開、:8000 から移行)
+  - 8010: backend-blue (127.0.0.1 のみ、デプロイ検証用)
+  - 8011: backend-green (127.0.0.1 のみ、デプロイ検証用)
+```
+
+切替トリガ: `docker/nginx/upstream.conf` の単一行を書き換えて `nginx -s reload`。  
+nginx reload は POSIX 仕様で既存接続を引き継ぐためゼロダウンタイム。
+
+### 3.2 通常デプロイフロー
+
+```bash
+ssh ultra@<hetzner-ip>
+cd /opt/ultra-autotrade
+git pull origin main
+
+# Blue/Green 切替 (ゼロダウンタイム)
+./scripts/deploy_production.sh --backend-only
+
+# フロントエンド更新時 (frontend のみ、ダウンタイム数秒残存。Phase 7-2 で対処予定)
+./scripts/deploy_production.sh --frontend-only
+
+# 全サービス再構築 (active=blue で再開)
+./scripts/deploy_production.sh
+```
+
+### 3.3 active slot の確認
+
+```bash
+# upstream.conf を直接見る
+cat docker/nginx/upstream.conf
+# → server backend-blue:8000 max_fails=3 fail_timeout=10s;  ← active = blue
+
+# nginx 経由で疎通確認
+curl -sf http://localhost:8080/health | python3 -m json.tool
+# → "deploy_slot": "blue" or "green" (DEPLOY_SLOT 環境変数に基づく)
+
+# nginx-health で nginx 自体の生存確認
+curl -sf http://localhost:8080/nginx-health
+# → nginx ok
+```
+
+### 3.4 緊急ロールバック (Blue/Green)
+
+新コンテナで問題が発生したらすぐに upstream.conf を旧 slot に戻し、`nginx -s reload`。
+旧コンテナは deploy script が `stop` のみで保持しているため即時起動可能。
+
+```bash
+# 1. 現在の active を確認
+ACTIVE=$(grep -oE 'backend-(blue|green)' docker/nginx/upstream.conf | head -1 | sed 's/backend-//')
+[ "${ACTIVE}" = "blue" ] && OLD="green" || OLD="blue"
+echo "Rolling back from ${ACTIVE} → ${OLD}"
+
+# 2. 旧コンテナを起動 (stop されている)
+docker compose -f docker-compose.production.yml --env-file .env.production \
+  start "backend-${OLD}"
+
+# 3. ヘルスチェック (旧 slot の host port)
+[ "${OLD}" = "blue" ] && PORT=8010 || PORT=8011
+curl -sf "http://127.0.0.1:${PORT}/health" || { echo "旧コンテナがヘルスチェックに失敗"; exit 1; }
+
+# 4. upstream.conf を旧 slot に書き換え (awk + 一時ファイル + mv、sed -i 禁止)
+TMP=$(mktemp docker/nginx/upstream.conf.XXXXXX)
+awk -v slot="${OLD}" -v ts="$(date -Iseconds)" 'BEGIN {
+  printf "# Manual rollback at %s\n", ts
+  printf "# Active slot: %s\n", slot
+  printf "server backend-%s:8000 max_fails=3 fail_timeout=10s;\n", slot
+}' </dev/null > "${TMP}"
+mv "${TMP}" docker/nginx/upstream.conf
+
+# 5. nginx reload (ゼロダウンタイム)
+docker exec ultra-autotrade-nginx-production nginx -s reload
+
+# 6. 切替確認
+curl -sf http://localhost:8080/health
+```
+
+詳細: `docs/31_backup_restore_procedures.md §5.4 Blue/Green 緊急ロールバック`。
+
+### 3.5 Cloudflare Tunnel Ingress 切替手順 (初回のみ)
+
+旧構成 (`localhost:8000` → backend) から新構成 (`localhost:8080` → nginx) への移行は
+Cloudflare Dashboard で手動操作する。本タスクの実装と本番デプロイは別タイミング。
+
+**前提**: Hetzner 上で nginx が起動済み (`curl localhost:8080/health` が 200 を返す)。
+
+**手順**:
+
+1. Cloudflare Dashboard → Zero Trust → Networks → Tunnels → 該当 Tunnel を選択
+2. Public Hostnames タブ → `api.ultra-auto-trade.com` を編集
+3. Service URL を `http://localhost:8000` から **`http://localhost:8080`** に変更
+4. Save → 反映待ち (~30秒)
+5. ローカルから疎通確認:
+   ```bash
+   curl -sf https://api.ultra-auto-trade.com/health | python3 -m json.tool
+   # 期待値: {"status": "ok", "scheduler_healthy": true, ...}
+   ```
+6. 失敗時のロールバック: Cloudflare Dashboard で Service URL を `http://localhost:8000` に戻す
+   - ただし `docker-compose.production.yml` の backend-blue の `0.0.0.0:8000` フォールバック行は
+     **デフォルトでコメントアウト**されているため、フォールバックを使う場合は事前に下記を実行:
+     ```bash
+     # docker-compose.production.yml の backend-blue.ports に "8000:8000" を追加 (コメント解除)
+     # その後 backend-blue を再作成
+     docker compose -f docker-compose.production.yml --env-file .env.production \
+       up -d --no-deps --force-recreate backend-blue
+     ```
+
+### 3.6 cloudflared フォールバック有効化手順 (任意・上級)
+
+nginx 障害時に cloudflared を直接 backend-blue に向ける二重ルート設定。
+**通常は不要**。nginx 単一障害点を許容できない場合のみ実施。
+
+1. `docker-compose.production.yml` の `backend-blue.ports` セクションを編集:
+   ```yaml
+       ports:
+         - "127.0.0.1:8010:8000"
+         - "8000:8000"  # ← コメントアウトを外す
+   ```
+2. backend-blue を再作成:
+   ```bash
+   docker compose -f docker-compose.production.yml --env-file .env.production \
+     up -d --no-deps --force-recreate backend-blue
+   ```
+3. Cloudflare Dashboard で `api.ultra-auto-trade.com` の Public Hostname に
+   フォールバックエントリを追加 (Cloudflare の機能制約に依存。設定不可の場合は手動切替手順で代替):
+   - Primary: `http://localhost:8080` (nginx)
+   - Secondary: `http://localhost:8000` (backend-blue 直)
+
+**非対称設計の罠 (要注意)**:
+fallback は backend-blue の `:8000` 直公開のみ。Blue/Green 切替後に active が green の状態で
+nginx 障害が発生すると、cloudflared は古いコード (blue) を返す。長時間の nginx 停止が見込まれる
+場合は、まず active を blue に戻してから fallback に依存すること。
+
+### 3.7 監視ポイント
+
+- `docker logs ultra-autotrade-nginx-production` の `error.log` で 5xx 急増を検知
+- `upstream=` ログフィールド (`/var/log/nginx/access.log`) で active slot の追跡
+- `docker exec ultra-autotrade-nginx-production nginx -t` で設定整合性の事前確認
+- nginx reload 失敗時は deploy script が自動ロールバック (旧 slot に書き戻して再 reload)

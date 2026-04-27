@@ -88,3 +88,7 @@ gate7-*.png
 # Claude Code artifacts
 .playwright-mcp/
 .claude/scheduled_tasks.lock
+
+# Zero-downtime deploy lock files (generated at runtime by deploy_*.sh)
+.deploy-production.lock
+.deploy-staging.lock

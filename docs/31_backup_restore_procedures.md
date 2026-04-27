@@ -109,6 +109,58 @@ cp /opt/ultra-autotrade/backups/env/.env.production.YYYYMMDD \
 # docs/13_security_design.md §10.2 のチェックリストを実施
 ```
 
+### 5.4 Blue/Green 緊急ロールバック (ゼロダウンタイムデプロイ用)
+
+2026-04-27 ゼロダウンタイムデプロイ導入後 (Asana 1214253004741363) 用の
+バックエンドコードロールバック手順。新コンテナで問題発生時に旧コンテナへ即座に切り戻す。
+
+前提: deploy_production.sh は切替後に旧コンテナを `stop` のみで保持しているため、
+30 秒〜数分以内であれば旧コンテナがそのまま起動可能。
+
+```bash
+cd /opt/ultra-autotrade
+
+# 1. 現在 active な slot を判定
+ACTIVE=$(grep -oE 'backend-(blue|green)' docker/nginx/upstream.conf | head -1 | sed 's/backend-//')
+[ "${ACTIVE}" = "blue" ] && OLD="green" || OLD="blue"
+echo "Rolling back from ${ACTIVE} → ${OLD}"
+
+# 2. 旧コンテナを起動 (deploy script が stop で残しているため即座に立つ)
+docker compose -f docker-compose.production.yml --env-file .env.production \
+  start "backend-${OLD}"
+
+# 3. 旧 slot の host port (blue=8010, green=8011) でヘルスチェック
+[ "${OLD}" = "blue" ] && PORT=8010 || PORT=8011
+for i in $(seq 1 20); do
+  curl -sf "http://127.0.0.1:${PORT}/health" >/dev/null && break
+  sleep 1
+done
+
+# 4. upstream.conf を旧 slot に書き換え (awk + 一時ファイル + mv、sed -i 禁止)
+TMP=$(mktemp docker/nginx/upstream.conf.XXXXXX)
+awk -v slot="${OLD}" -v ts="$(date -Iseconds)" 'BEGIN {
+  printf "# Manual rollback at %s\n", ts
+  printf "# Active slot: %s\n", slot
+  printf "server backend-%s:8000 max_fails=3 fail_timeout=10s;\n", slot
+}' </dev/null > "${TMP}"
+mv "${TMP}" docker/nginx/upstream.conf
+
+# 5. nginx reload (ゼロダウンタイム保証)
+docker exec ultra-autotrade-nginx-production nginx -s reload
+
+# 6. 切替確認
+curl -sf http://localhost:8080/health | python3 -m json.tool
+```
+
+**コードロールバックが旧コンテナで足りない場合 (例: 旧コンテナも消失)**:
+
+1. Git で前回タグへロールバック:
+   ```bash
+   git checkout v<previous-tag>
+   ./scripts/deploy_production.sh   # フルデプロイで blue を再構築
+   ```
+2. 設計詳細: `docs/19_operations_runbook.md §3.4 緊急ロールバック (Blue/Green)`
+
 ---
 
 ## 6. リストア後の検証
