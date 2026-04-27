@@ -567,3 +567,166 @@ class TestWalletConnect:
         assert any("Privy verification disabled" in r.message for r in caplog.records)
         # 機密情報 (id_token の中身) がログに含まれないことを確認
         assert not any("ey.fake.token" in r.message for r in caplog.records)
+
+
+# ── Codex Review 3rd round 指摘 (session 019dcc18) 対応テスト ─────────────────
+
+
+class TestErrorHandlingFixes:
+    """P2-1 / P2-2 / P2-3 のエラーハンドリング改善テスト。"""
+
+    # ── P2-1: 既存ユーザー DID backfill 時の IntegrityError → 409 ─────
+
+    def test_existing_user_backfill_did_conflict_returns_409(
+        self,
+        client: TestClient,
+        privy_keypair: Tuple[bytes, bytes],
+        privy_env: None,  # noqa: ARG002
+    ):
+        """既存ユーザーへの DID backfill 中、別ユーザーが既に同じ DID を保持 → 409。
+
+        シナリオ:
+          1. ウォレット B が DID X で登録 (DID X が users.privy_did に保存)
+          2. ウォレット A は DID なしで登録
+          3. ウォレット A が DID X 付きで再接続 → backfill で UNIQUE 違反 → 409
+        """
+        private_pem, _ = privy_keypair
+        did = "did:privy:already-linked-elsewhere"
+        token = _make_id_token(private_pem, sub=did)
+
+        # Step 1: ウォレット B を DID X で登録
+        payload_b = {
+            "wallet_address": TEST_WALLET_ADDRESS_2,
+            "message": "Ultra AutoTrade: backfill conflict #B",
+            "signature": _sign_message("Ultra AutoTrade: backfill conflict #B", TEST_PRIVATE_KEY_2),
+            "privy_did": did,
+            "privy_id_token": token,
+        }
+        resp_b = client.post("/auth/wallet/connect", json=payload_b)
+        assert resp_b.status_code == 200, resp_b.json()
+
+        # Step 2: ウォレット A を DID なしで登録
+        msg_a = "Ultra AutoTrade: backfill conflict #A"
+        payload_a_first = {
+            "wallet_address": TEST_WALLET_ADDRESS,
+            "message": msg_a,
+            "signature": _sign_message(msg_a, TEST_PRIVATE_KEY),
+        }
+        resp_a1 = client.post("/auth/wallet/connect", json=payload_a_first)
+        assert resp_a1.status_code == 200, resp_a1.json()
+        assert resp_a1.json()["is_new_user"] is True
+
+        # Step 3: ウォレット A が DID X 付きで再接続 → backfill 衝突 → 409
+        msg_a2 = "Ultra AutoTrade: backfill conflict #A2"
+        payload_a_second = {
+            "wallet_address": TEST_WALLET_ADDRESS,
+            "message": msg_a2,
+            "signature": _sign_message(msg_a2, TEST_PRIVATE_KEY),
+            "privy_did": did,
+            "privy_id_token": token,
+        }
+        resp_a2 = client.post("/auth/wallet/connect", json=payload_a_second)
+        assert resp_a2.status_code == 409, resp_a2.json()
+        assert "did" in resp_a2.json()["detail"].lower()
+
+    # ── P2-2: JWKS 解析失敗 → 503 ───────────────────────────────────
+
+    def test_fetch_jwks_malformed_json_returns_503(self):
+        """JWKS endpoint が malformed JSON を返すと 503 に変換される (500 漏れ防止)。"""
+        import httpx
+        from fastapi import HTTPException
+
+        from app.auth.privy_verifier import PrivyVerifier
+
+        def handler(_request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, content=b"not json {{{ broken")
+
+        transport = httpx.MockTransport(handler)
+        http_client = httpx.Client(transport=transport)
+        verifier = PrivyVerifier(
+            app_id="test-app",
+            jwks_url="https://privy.example/jwks",
+            http_client=http_client,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            verifier._fetch_jwks()
+        assert exc_info.value.status_code == 503
+        assert "json" in str(exc_info.value.detail).lower()
+
+    def test_fetch_jwks_http_error_still_returns_503(self):
+        """既存の httpx.HTTPError 経路 (5xx 等) も 503 を維持していることの回帰テスト。"""
+        import httpx
+        from fastapi import HTTPException
+
+        from app.auth.privy_verifier import PrivyVerifier
+
+        def handler(_request: httpx.Request) -> httpx.Response:
+            return httpx.Response(500, content=b"upstream down")
+
+        transport = httpx.MockTransport(handler)
+        http_client = httpx.Client(transport=transport)
+        verifier = PrivyVerifier(
+            app_id="test-app",
+            jwks_url="https://privy.example/jwks",
+            http_client=http_client,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            verifier._fetch_jwks()
+        assert exc_info.value.status_code == 503
+
+    # ── P2-3: wallet_address 並行衝突 → 既存ユーザー resolve ─────────
+
+    def test_create_wallet_user_resolves_concurrent_wallet_race(self, test_db):
+        """並行 first-login: 別 transaction が同じ wallet_address で先に user を
+        作成済みの状態で create_wallet_user() を呼ぶと、IntegrityError を吸収して
+        既存ユーザーを返す (409 で誤報告しない)。
+        """
+        from app.auth.service import AuthService
+
+        _, engine = test_db
+        SessionLocal = sessionmaker(bind=engine)
+
+        wallet = TEST_WALLET_ADDRESS.lower()
+
+        # Session A: 先に user を作成・コミット
+        with SessionLocal() as session_a:
+            first = AuthService.create_wallet_user(session_a, wallet)
+            session_a.commit()
+            first_id = first.id
+            first_email = first.email
+
+        # Session B: 同じ wallet で create_wallet_user() を再度呼ぶ。
+        # 内部で wallet_address UNIQUE 違反 (IntegrityError) を検知し、
+        # 既存ユーザーを取得して返すことで race を吸収する。
+        with SessionLocal() as session_b:
+            second = AuthService.create_wallet_user(session_b, wallet)
+            assert second.id == first_id
+            assert second.wallet_address == wallet
+            assert second.email == first_email
+
+    def test_create_wallet_user_privy_did_conflict_still_returns_409(self, test_db):
+        """privy_did UNIQUE 違反は引き続き 409 を返すこと (P2-3 リファクタの回帰防止)。"""
+        from fastapi import HTTPException
+
+        from app.auth.service import AuthService
+
+        _, engine = test_db
+        SessionLocal = sessionmaker(bind=engine)
+
+        did = "did:privy:taken-by-someone-else"
+        wallet1 = TEST_WALLET_ADDRESS.lower()
+        wallet2 = TEST_WALLET_ADDRESS_2.lower()
+
+        # Session 1: 既に DID を保持するユーザーを作成
+        with SessionLocal() as s1:
+            AuthService.create_wallet_user(s1, wallet1, privy_did=did)
+            s1.commit()
+
+        # Session 2: 別 wallet で同じ DID を使って作成 → 409
+        with SessionLocal() as s2:
+            with pytest.raises(HTTPException) as exc_info:
+                AuthService.create_wallet_user(s2, wallet2, privy_did=did)
+            assert exc_info.value.status_code == 409
+            assert "did" in str(exc_info.value.detail).lower()

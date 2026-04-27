@@ -407,23 +407,72 @@ class AuthService:
         try:
             db.commit()
         except IntegrityError as exc:
-            # privy_did UNIQUE 違反 (= 別ユーザーが同じ DID を保持) や
-            # wallet_address 競合 (並行リクエスト) を 409 Conflict で返す。
+            # IntegrityError の原因 (privy_did 衝突 / wallet_address 並行作成) を
+            # constraint 名で判別する。privy_did 衝突 → 409、wallet_address 衝突は
+            # 並行 first-login の可能性が高いので既存ユーザーを取得して返す。
             db.rollback()
+            constraint_name = cls._extract_constraint_name(exc)
             logger.warning(
-                "Wallet user creation conflict (wallet=%s..., privy_did=%s): %s",
+                "Wallet user creation IntegrityError (wallet=%s..., privy_did=%s, "
+                "constraint=%s): %s",
                 wallet_address[:10],
                 (privy_did[:20] + "...") if privy_did else None,
+                constraint_name or "<unknown>",
                 exc.orig if hasattr(exc, "orig") else exc,
             )
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="DID already in use",
-            ) from exc
+
+            if constraint_name and "privy_did" in constraint_name:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="DID already in use",
+                ) from exc
+
+            if constraint_name and "wallet_address" in constraint_name:
+                # 並行 first-login: 別リクエストが先に同じ wallet_address で作成済み。
+                # 既存ユーザーを取得して返すことで race を吸収する。
+                existing = cls.get_user_by_wallet(db, wallet_address)
+                if existing is not None:
+                    logger.info(
+                        "Resolved concurrent wallet creation race: wallet=%s..., user_id=%s",
+                        wallet_address[:10],
+                        existing.id,
+                    )
+                    return existing
+                # 取得できない場合は不整合 → 500
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Concurrent wallet insert race not resolvable",
+                ) from exc
+
+            # 想定外の constraint (email / username 等) は呼び出し元で再 raise。
+            logger.exception(
+                "Unexpected IntegrityError on wallet user creation (constraint=%s)",
+                constraint_name or "<unknown>",
+            )
+            raise
         db.refresh(user)
 
         logger.info("Created wallet user: %s (wallet=%s...)", user.email, wallet_address[:10])
         return user
+
+    @staticmethod
+    def _extract_constraint_name(exc: IntegrityError) -> str:
+        """IntegrityError から違反した constraint 名を抽出する。
+
+        PostgreSQL (psycopg2 / psycopg3) は ``exc.orig.diag.constraint_name`` で
+        constraint 名を提供する。SQLite 等の他ドライバーは diag を持たないため
+        フォールバックとして orig の文字列表現に含まれる constraint 名を文字列
+        マッチで判定する (本関数は呼び出し側で部分一致 ``in`` で使うことを前提)。
+        """
+        orig = getattr(exc, "orig", None)
+        if orig is None:
+            return ""
+        diag = getattr(orig, "diag", None)
+        if diag is not None:
+            constraint = getattr(diag, "constraint_name", None)
+            if isinstance(constraint, str) and constraint:
+                return constraint
+        return str(orig)
 
     @classmethod
     def update_privy_did(cls, db: Session, user: User, privy_did: str) -> None:

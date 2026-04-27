@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -477,15 +478,46 @@ def wallet_connect(
         if existing_user is None:
             raise RuntimeError("existing_user is None after wallet lookup")
         user = existing_user
-        # 既存ユーザーに privy_did が未保存かつ検証済み DID が手元にあれば後追い保存
+        # 既存ユーザーに privy_did が未保存かつ検証済み DID が手元にあれば後追い保存。
+        # IntegrityError (= 別ユーザーが既に同じ DID を保持) は 409、
+        # それ以外の DB エラーは 500 で明示的に返す。silently 握り潰さない。
         if privy_did_to_store and not user.privy_did:
             try:
                 AuthService.update_privy_did(db, user, privy_did_to_store)
-            except Exception:
+            except IntegrityError as exc:
                 db.rollback()
-                logger.warning(
-                    "privy_did update failed (conflict?): wallet=%s...", request.wallet_address[:10]
+                constraint_name = AuthService._extract_constraint_name(exc)
+                if constraint_name and "privy_did" in constraint_name:
+                    logger.warning(
+                        "privy_did backfill conflict (DID already linked to another user): "
+                        "wallet=%s..., did=%s...",
+                        request.wallet_address[:10],
+                        privy_did_to_store[:20],
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Privy DID already linked to another user",
+                    ) from exc
+                logger.exception(
+                    "privy_did backfill failed with unexpected IntegrityError "
+                    "(constraint=%s): wallet=%s...",
+                    constraint_name or "<unknown>",
+                    request.wallet_address[:10],
                 )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="DID backfill failed",
+                ) from exc
+            except Exception as exc:
+                db.rollback()
+                logger.exception(
+                    "privy_did backfill failed: wallet=%s...",
+                    request.wallet_address[:10],
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="DID backfill failed",
+                ) from exc
 
     token, expires_in = AuthService.create_access_token(
         user_id=user.id,
