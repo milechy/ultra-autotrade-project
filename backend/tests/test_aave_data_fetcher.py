@@ -8,6 +8,8 @@ V3 web3 直接呼出 (Pool.getReserveData + ERC20.totalSupply) ベースの実�
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from app.aave.client import AaveClientError
 from app.automation.aave_data_fetcher import (
     _ray_to_apy_pct,
@@ -231,7 +233,7 @@ def test_chain_resolution_uses_client_chain():
     pool contract 作成に使われることを確認する。
     """
 
-    from web3 import Web3
+    Web3 = pytest.importorskip("web3").Web3
 
     from app.aave.chains import CHAIN_REGISTRY
 
