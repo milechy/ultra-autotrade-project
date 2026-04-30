@@ -22,7 +22,7 @@ import logging
 from decimal import Decimal
 from typing import Optional, TypedDict
 
-from app.aave.chains import get_active_chains
+from app.aave.chains import CHAIN_REGISTRY, get_active_chains
 from app.aave.client import AaveClientError, get_default_aave_client
 
 logger = logging.getLogger(__name__)
@@ -152,8 +152,9 @@ def _fetch_reserve_data_via_pool(
     1. Pool.getReserveData(asset) → currentLiquidityRate / currentVariableBorrowRate /
        aTokenAddress / variableDebtTokenAddress
     2. aToken.totalSupply() → totalAToken (= 預入総量)
-    3. variableDebtToken.totalSupply() → totalDebt
-    4. utilization = totalDebt / totalAToken (% 表記)
+    3. variableDebtToken.totalSupply() + stableDebtToken.totalSupply() → totalDebt
+    4. utilization = totalDebt / totalAToken (% 表記, Aave 公式定義: vdebt + sdebt)
+       ※ V3.3 以降 stable debt は deprecated (多くの reserve で 0) だが定義上は含める
     5. APY 換算: ray → APY (%)
 
     例外時は全 None で fail-open。
@@ -172,11 +173,25 @@ def _fetch_reserve_data_via_pool(
         client = get_default_aave_client()
         w3 = client.w3  # type: ignore[attr-defined]
 
-        chains = get_active_chains()
-        if not chains:
-            logger.warning("aave_active_chains_empty")
-            return none_result
-        chain = chains[0]
+        # P1: resolve chain from client's actual settings to avoid mismatch
+        # between the pool the client connects to and get_active_chains()[0]
+        client_settings = getattr(client, "settings", None)
+        _chain_key = getattr(client_settings, "chain_name", None) or getattr(
+            client_settings, "network", None
+        )
+        chain = CHAIN_REGISTRY.get(_chain_key) if _chain_key else None
+        if chain is None:
+            chains = get_active_chains()
+            if not chains:
+                logger.warning("aave_active_chains_empty")
+                return none_result
+            chain = chains[0]
+            if _chain_key:
+                logger.warning(
+                    "aave_chain_registry_miss: key=%s fallback=%s",
+                    _chain_key,
+                    chain.chain_name,
+                )
 
         usdc_addr = chain.tokens.get(asset_symbol)
         if not usdc_addr:
@@ -217,10 +232,21 @@ def _fetch_reserve_data_via_pool(
         )
         vdebt_total = int(vdebt_contract.functions.totalSupply().call())
 
+        # P2: include stable debt per Aave official definition
+        # utilization = (totalVariableDebt + totalStableDebt) / totalAToken
+        # sdebt is deprecated in V3.3+ but defined as 0 for most reserves
+        sdebt_addr = reserve_data[9]  # stableDebtTokenAddress
+        sdebt_contract = w3.eth.contract(
+            address=Web3.to_checksum_address(sdebt_addr),
+            abi=_ERC20_TOTAL_SUPPLY_ABI,
+        )
+        sdebt_total = int(sdebt_contract.functions.totalSupply().call())
+        total_debt = vdebt_total + sdebt_total
+
         if atoken_total <= 0:
             utilization_pct = Decimal(0)
         else:
-            utilization_pct = Decimal(vdebt_total) / Decimal(atoken_total) * Decimal(100)
+            utilization_pct = Decimal(total_debt) / Decimal(atoken_total) * Decimal(100)
 
         return {
             "utilization_rate": utilization_pct,

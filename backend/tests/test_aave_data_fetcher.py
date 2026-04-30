@@ -106,10 +106,12 @@ def test_aave_data_safe_inf_health_factor_returns_none():
     pool_contract = _make_pool_contract(_make_pool_call_result())
     atoken_contract = _make_erc20_contract(1_000_000 * 10**6)
     vdebt_contract = _make_erc20_contract(850_000 * 10**6)
+    sdebt_contract = _make_erc20_contract(0)
     mock_client.w3.eth.contract.side_effect = [
         pool_contract,
         atoken_contract,
         vdebt_contract,
+        sdebt_contract,
     ]
 
     with patch(
@@ -169,10 +171,12 @@ def test_utilization_zero_when_atoken_zero():
     pool_contract = _make_pool_contract(_make_pool_call_result())
     atoken_contract = _make_erc20_contract(0)  # totalSupply = 0
     vdebt_contract = _make_erc20_contract(0)
+    sdebt_contract = _make_erc20_contract(0)
     mock_client.w3.eth.contract.side_effect = [
         pool_contract,
         atoken_contract,
         vdebt_contract,
+        sdebt_contract,
     ]
 
     with patch(
@@ -185,3 +189,102 @@ def test_utilization_zero_when_atoken_zero():
     # APY 自体は ray 値から計算されるので supply/borrow APY は 0 でない
     assert result["supply_apy"] is not None
     assert result["borrow_apy"] is not None
+
+
+def test_utilization_includes_stable_debt():
+    """utilization に stable debt が含まれること (P2: Aave 公式定義)。
+
+    vdebt = 500_000 USDC (50%), sdebt = 350_000 USDC (35%), atoken = 1_000_000 USDC
+    期待 utilization = 85% (旧実装: 50% — バグ)
+    """
+    mock_client = MagicMock()
+    mock_client.get_health_factor.return_value = Decimal("2.0")
+
+    pool_contract = _make_pool_contract(_make_pool_call_result())
+    atoken_contract = _make_erc20_contract(1_000_000 * 10**6)
+    vdebt_contract = _make_erc20_contract(500_000 * 10**6)
+    sdebt_contract = _make_erc20_contract(350_000 * 10**6)  # 35% stable debt
+    mock_client.w3.eth.contract.side_effect = [
+        pool_contract,
+        atoken_contract,
+        vdebt_contract,
+        sdebt_contract,
+    ]
+
+    with patch(
+        "app.automation.aave_data_fetcher.get_default_aave_client",
+        return_value=mock_client,
+    ):
+        result = fetch_aave_market_data_safe()
+
+    assert result["utilization_rate"] is not None
+    assert abs(result["utilization_rate"] - Decimal("85")) < Decimal("0.01"), (
+        f"Expected utilization=85 (vdebt 50% + sdebt 35%), got {result['utilization_rate']}"
+    )
+
+
+def test_chain_resolution_uses_client_chain():
+    """chain が client.settings.chain_name から解決されること (P1 fix)。
+
+    client.settings.chain_name = "arbitrum" で
+    get_active_chains() が base を返す状況でも arbitrum の pool_address が
+    pool contract 作成に使われることを確認する。
+    """
+
+    from web3 import Web3
+
+    from app.aave.chains import CHAIN_REGISTRY
+
+    arbitrum_config = CHAIN_REGISTRY["arbitrum"]
+    base_config = CHAIN_REGISTRY["base"]
+
+    mock_settings = MagicMock()
+    mock_settings.chain_name = "arbitrum"
+    mock_settings.network = "arbitrum"
+
+    mock_client = MagicMock()
+    mock_client.get_health_factor.return_value = Decimal("2.0")
+    mock_client.settings = mock_settings
+
+    pool_contract = _make_pool_contract(_make_pool_call_result())
+    atoken_contract = _make_erc20_contract(1_000_000 * 10**6)
+    vdebt_contract = _make_erc20_contract(500_000 * 10**6)
+    sdebt_contract = _make_erc20_contract(0)
+    mock_client.w3.eth.contract.side_effect = [
+        pool_contract,
+        atoken_contract,
+        vdebt_contract,
+        sdebt_contract,
+    ]
+
+    with (
+        patch(
+            "app.automation.aave_data_fetcher.get_default_aave_client",
+            return_value=mock_client,
+        ),
+        patch(
+            "app.automation.aave_data_fetcher.get_active_chains",
+            return_value=[base_config],
+        ),
+    ):
+        result = fetch_aave_market_data_safe()
+
+    # 最初の contract() 呼出 (pool contract) が arbitrum の pool_address を使っているか確認
+    first_call = mock_client.w3.eth.contract.call_args_list[0]
+    expected_pool_addr = Web3.to_checksum_address(arbitrum_config.pool_address)
+    actual_pool_addr = first_call.kwargs.get("address") or (
+        first_call.args[0] if first_call.args else None
+    )
+    assert actual_pool_addr == expected_pool_addr, (
+        f"Expected arbitrum pool {expected_pool_addr}, got {actual_pool_addr}. "
+        "P1 fix: client.settings.chain_name must override get_active_chains()[0]"
+    )
+
+    # get_active_chains が返した base_config の pool は使われていないことも確認
+    base_pool_addr = Web3.to_checksum_address(base_config.pool_address)
+    assert actual_pool_addr != base_pool_addr, (
+        "base pool address was used instead of arbitrum — P1 fix not working"
+    )
+
+    # 正常に utilization が返ること
+    assert result["utilization_rate"] is not None
