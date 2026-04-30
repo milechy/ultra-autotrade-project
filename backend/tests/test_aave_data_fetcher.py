@@ -288,3 +288,55 @@ def test_chain_resolution_uses_client_chain():
 
     # 正常に utilization が返ること
     assert result["utilization_rate"] is not None
+
+
+def test_zero_address_stable_debt_skipped():
+    """stableDebtTokenAddress が 0x000...000 の場合、contract 呼出をスキップして sdebt=0 とすること。
+
+    Aave V3.3+ の deprecated reserve では stableDebtTokenAddress が zero address になる。
+    zero-code アドレスに totalSupply() を呼ぶと ABI decode 失敗で全フィールド None になるため、
+    zero address は呼出をスキップして 0 debt として扱う (Codex P1 fix)。
+
+    atoken = 1_000_000 USDC, vdebt = 500_000 USDC (50%), sdebt addr = 0x000...000
+    期待 utilization = 50% (sdebt 呼出なし)
+    w3.eth.contract の呼出回数 = 3 (pool / atoken / vdebt のみ)
+    """
+    mock_client = MagicMock()
+    mock_client.get_health_factor.return_value = Decimal("2.0")
+
+    pool_contract = _make_pool_contract(
+        _make_pool_call_result(
+            # stableDebtTokenAddress を zero address に設定 (index 9)
+        )
+    )
+    # _make_pool_call_result の index 9 を zero address に上書き
+    zero_addr = "0x0000000000000000000000000000000000000000"
+    call_result = list(_make_pool_call_result())
+    call_result[9] = zero_addr
+    pool_contract = _make_pool_contract(tuple(call_result))
+
+    atoken_contract = _make_erc20_contract(1_000_000 * 10**6)
+    vdebt_contract = _make_erc20_contract(500_000 * 10**6)
+    # sdebt contract は渡さない — 呼ばれたら StopIteration で検出できる
+    mock_client.w3.eth.contract.side_effect = [
+        pool_contract,
+        atoken_contract,
+        vdebt_contract,
+    ]
+
+    with patch(
+        "app.automation.aave_data_fetcher.get_default_aave_client",
+        return_value=mock_client,
+    ):
+        result = fetch_aave_market_data_safe()
+
+    # sdebt 呼出がなく contract() は 3 回のみ (pool / atoken / vdebt)
+    assert mock_client.w3.eth.contract.call_count == 3, (
+        f"Expected 3 contract() calls (pool/atoken/vdebt), "
+        f"got {mock_client.w3.eth.contract.call_count}"
+    )
+    # utilization = vdebt のみ = 50%
+    assert result["utilization_rate"] is not None
+    assert abs(result["utilization_rate"] - Decimal("50")) < Decimal("0.01"), (
+        f"Expected utilization=50 (vdebt only, sdebt skipped), got {result['utilization_rate']}"
+    )

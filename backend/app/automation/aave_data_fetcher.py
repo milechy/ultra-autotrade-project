@@ -234,13 +234,18 @@ def _fetch_reserve_data_via_pool(
 
         # P2: include stable debt per Aave official definition
         # utilization = (totalVariableDebt + totalStableDebt) / totalAToken
-        # sdebt is deprecated in V3.3+ but defined as 0 for most reserves
+        # sdebt is deprecated in V3.3+ — address is 0x000...000 on most reserves;
+        # calling totalSupply() on a zero-code address causes ABI decode failure,
+        # so skip the call and treat it as 0 debt.
         sdebt_addr = reserve_data[9]  # stableDebtTokenAddress
-        sdebt_contract = w3.eth.contract(
-            address=Web3.to_checksum_address(sdebt_addr),
-            abi=_ERC20_TOTAL_SUPPLY_ABI,
-        )
-        sdebt_total = int(sdebt_contract.functions.totalSupply().call())
+        if int(sdebt_addr, 16) == 0:
+            sdebt_total = 0
+        else:
+            sdebt_contract = w3.eth.contract(
+                address=Web3.to_checksum_address(sdebt_addr),
+                abi=_ERC20_TOTAL_SUPPLY_ABI,
+            )
+            sdebt_total = int(sdebt_contract.functions.totalSupply().call())
         total_debt = vdebt_total + sdebt_total
 
         if atoken_total <= 0:
