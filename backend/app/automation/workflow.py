@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.ai.judgment_log import JudgmentRecord, get_judgment_logger
 from app.ai.schemas import AIAnalysisResult, RAGContext, TradeAction
 from app.ai.service import AIService
+from app.auth.constants import ExecutionPolicy
 from app.auth.models import User, normalize_tier
 from app.automation.monitoring_service import MonitoringService
 from app.automation.schemas import ComponentType, WorkflowRunResult, WorkflowStepError
@@ -542,7 +543,7 @@ def process_pending_knowledge(
     # HF emergency override: always auto_execute if HF < 1.6
     effective_policy = execution_policy
     if hf is not None and hf < Decimal("1.6"):
-        effective_policy = "auto_execute"
+        effective_policy = ExecutionPolicy.AUTO_EXECUTE.value
         logger.info("HF emergency override: execution_policy forced to auto_execute (hf=%s)", hf)
 
     for item in pending:
@@ -754,7 +755,10 @@ def _process_single_item(
 
     order_result: Optional[OrderResult] = None
     if action in (TradeAction.BUY, TradeAction.SELL) and confidence >= 40:
-        if execution_policy in ("require_approval", "proposal_only"):
+        if execution_policy in (
+            ExecutionPolicy.REQUIRE_APPROVAL.value,
+            ExecutionPolicy.PROPOSAL_ONLY.value,
+        ):
             # 動的手数料計算 (B-2)
             import os  # noqa: PLC0415
 

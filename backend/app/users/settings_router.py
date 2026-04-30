@@ -7,6 +7,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.auth.constants import ExecutionPolicy
 from app.auth.dependencies import require_active_user
 from app.auth.models import User, UserRole
 from app.database import get_db
@@ -34,9 +35,9 @@ def update_user_settings(
 ) -> UserSettingsResponse:
     """ユーザー設定を更新する。"""
     _USER_MODE_TO_POLICY = {
-        "managed": "auto_execute",
-        "active": "require_approval",
-        "pro": "proposal_only",
+        "managed": ExecutionPolicy.AUTO_EXECUTE.value,
+        "active": ExecutionPolicy.REQUIRE_APPROVAL.value,
+        "pro": ExecutionPolicy.PROPOSAL_ONLY.value,
     }
 
     if request.notification_frequency is not None:
@@ -77,11 +78,10 @@ def update_user_settings(
         current_user.user_mode = request.user_mode
         current_user.execution_policy = _USER_MODE_TO_POLICY[request.user_mode]
     if request.execution_policy is not None:
-        _VALID_POLICIES = ("auto_execute", "require_approval", "proposal_only")
-        if request.execution_policy not in _VALID_POLICIES:
+        if request.execution_policy not in ExecutionPolicy.values():
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="execution_policy must be one of: auto_execute, require_approval, proposal_only",
+                detail=("execution_policy must be one of: " + ", ".join(ExecutionPolicy.values())),
             )
         current_user.execution_policy = request.execution_policy
     db.add(current_user)

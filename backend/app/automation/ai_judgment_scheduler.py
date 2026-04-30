@@ -24,6 +24,7 @@ from app.ai.judgment_log import get_judgment_logger
 from app.ai.models import AIDecision
 from app.ai.schemas import CrossValidationResult, RAGContext, TradeAction
 from app.ai.service import AIService
+from app.auth.constants import ExecutionPolicy
 from app.auth.models import InvestmentTier, User, normalize_tier
 from app.automation.aave_data_fetcher import fetch_aave_market_data_safe
 from app.data_feeds.context import build_market_context
@@ -158,7 +159,7 @@ def _create_proposals_for_users(
     active_users = db.scalars(
         select(User).where(
             User.is_active == True,  # noqa: E712
-            User.execution_policy == "require_approval",
+            User.execution_policy == ExecutionPolicy.REQUIRE_APPROVAL.value,
         )
     ).all()
 

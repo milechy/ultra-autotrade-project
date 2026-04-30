@@ -13,6 +13,12 @@ ALTER TABLE users ADD COLUMN last_judgment_at TIMESTAMP WITH TIME ZONE NULL;
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS privy_did VARCHAR(255) NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS ix_users_privy_did ON users (privy_did) WHERE privy_did IS NOT NULL;
+
+-- GID 1214176344039867 (P1): execution_policy CHECK + server_default 強化
+-- DB default は a1b2c3d4e5f6 で 'auto_execute' 設定済み。
+-- CheckConstraint と SQLAlchemy 側 server_default を Alembic migration で同期する。
+ALTER TABLE users ADD CONSTRAINT users_execution_policy_check
+    CHECK (execution_policy IN ('auto_execute', 'require_approval', 'proposal_only'));
 """
 
 import logging
@@ -21,9 +27,10 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.auth.constants import ExecutionPolicy
 from app.database import Base
 
 logger = logging.getLogger(__name__)
@@ -191,6 +198,14 @@ class User(Base):
     """
 
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "execution_policy IN ("
+            + ", ".join(f"'{value}'" for value in ExecutionPolicy.values())
+            + ")",
+            name="users_execution_policy_check",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
@@ -228,7 +243,10 @@ class User(Base):
     )
     user_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="managed")
     execution_policy: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="auto_execute"
+        String(20),
+        nullable=False,
+        default=ExecutionPolicy.AUTO_EXECUTE.value,
+        server_default=ExecutionPolicy.AUTO_EXECUTE.value,
     )
     wallet_address: Mapped[Optional[str]] = mapped_column(
         String(42), unique=True, nullable=True, index=True, default=None
