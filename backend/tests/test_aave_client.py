@@ -544,6 +544,78 @@ class TestMakeAaveClient:
             make_aave_client("invalid_type")
 
 
+class TestWeb3AaveClientPoolAddressRequired:
+    """2026-05-01 PR-A: pool_address のデフォルト None 化に対する require テスト。
+
+    silent testnet regression (mainnet 切替後に Sepolia pool に書き込む) を防ぐため、
+    Web3AaveClient.__init__ は pool_address を 引数 or AAVE_POOL_ADDRESS env から
+    必須で要求する。両方欠落していれば AaveClientError を raise する。
+    """
+
+    def test_missing_pool_address_and_env_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """引数 pool_address なし + AAVE_POOL_ADDRESS env なし → AaveClientError。"""
+        monkeypatch.delenv("AAVE_POOL_ADDRESS", raising=False)
+
+        with pytest.raises(AaveClientError, match="AAVE_POOL_ADDRESS"):
+            Web3AaveClient(rpc_url="https://mock-rpc.example.com")
+
+    @patch("app.aave.client.Web3")
+    def test_pool_address_from_env_when_argument_missing(
+        self,
+        mock_web3_cls: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """AAVE_POOL_ADDRESS env 設定 + 引数なし → 正常 instantiate (env 値を採用)。"""
+        env_pool = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5"  # Base Mainnet
+        monkeypatch.setenv("AAVE_POOL_ADDRESS", env_pool)
+
+        captured: dict[str, str] = {}
+
+        def _to_checksum(value: str) -> str:
+            captured["address"] = value
+            return value
+
+        mock_w3 = MagicMock()
+        mock_w3.is_connected.return_value = True
+        mock_web3_cls.return_value = mock_w3
+        mock_web3_cls.HTTPProvider = MagicMock()
+        mock_web3_cls.to_checksum_address = _to_checksum
+
+        client = Web3AaveClient(rpc_url="https://mock-rpc.example.com")
+
+        assert isinstance(client, Web3AaveClient)
+        assert captured["address"] == env_pool
+
+    @patch("app.aave.client.Web3")
+    def test_explicit_pool_address_overrides_env(
+        self,
+        mock_web3_cls: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """引数 pool_address が明示されていれば env より優先される。"""
+        monkeypatch.setenv("AAVE_POOL_ADDRESS", "0xENVADDRESS")
+        explicit = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5"
+
+        captured: dict[str, str] = {}
+
+        def _to_checksum(value: str) -> str:
+            captured["address"] = value
+            return value
+
+        mock_w3 = MagicMock()
+        mock_w3.is_connected.return_value = True
+        mock_web3_cls.return_value = mock_w3
+        mock_web3_cls.HTTPProvider = MagicMock()
+        mock_web3_cls.to_checksum_address = _to_checksum
+
+        Web3AaveClient(
+            rpc_url="https://mock-rpc.example.com",
+            pool_address=explicit,
+        )
+
+        assert captured["address"] == explicit
+
+
 class TestFlashbotsProtect:
     """Flashbots Protect RPC のテスト。"""
 
