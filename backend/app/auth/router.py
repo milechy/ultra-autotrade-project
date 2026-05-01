@@ -468,16 +468,18 @@ def wallet_connect(
 
     # ウォレットアドレスでユーザー検索
     existing_user = AuthService.get_user_by_wallet(db, request.wallet_address)
-    is_new_user = existing_user is None
 
-    if is_new_user:
-        user = AuthService.create_wallet_user(
+    if existing_user is None:
+        # 新規候補: create_wallet_user は並行 race を吸収して
+        # 既存ユーザーを返す可能性があるため、is_new_user は戻り値の
+        # is_newly_created に従う (lookup 時点の None だけで決定しない)。
+        user, is_newly_created = AuthService.create_wallet_user(
             db, request.wallet_address, privy_did=privy_did_to_store
         )
+        is_new_user = is_newly_created
     else:
-        if existing_user is None:
-            raise RuntimeError("existing_user is None after wallet lookup")
         user = existing_user
+        is_new_user = False
         # 既存ユーザーに privy_did が未保存かつ検証済み DID が手元にあれば後追い保存。
         # IntegrityError (= 別ユーザーが既に同じ DID を保持) は 409、
         # それ以外の DB エラーは 500 で明示的に返す。silently 握り潰さない。
