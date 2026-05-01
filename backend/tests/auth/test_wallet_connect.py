@@ -298,6 +298,61 @@ class TestWalletConnect:
         assert "expires_in" in data
         assert data["expires_in"] > 0
 
+    def test_wallet_connect_is_new_user_false_after_race_resolution(
+        self,
+        client: TestClient,
+        test_db,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        """並行 first-login race を吸収した場合、is_new_user は False を返すこと。
+
+        シナリオ: lookup 時点では未存在に見えたが、create 時点で別 transaction
+        が先に同じ wallet_address でユーザーを作成済み → router は
+        create_wallet_user の戻り値 (is_newly_created=False) を信頼すべきで、
+        lookup 結果 (None → True) で誤って True を返してはならない。
+        """
+        from app.auth.service import AuthService
+
+        _, engine = test_db
+        SessionLocal = sessionmaker(bind=engine)
+
+        # 別 transaction が先に同じ wallet で user を作成済み (race の前提)
+        wallet = TEST_WALLET_ADDRESS.lower()
+        with SessionLocal() as setup_session:
+            preexisting, _ = AuthService.create_wallet_user(setup_session, wallet)
+            setup_session.commit()
+            preexisting_id = preexisting.id
+
+        # router の lookup 時のみ None を返し、service の race resolution
+        # (= 2 回目以降の get_user_by_wallet 呼び出し) は本物を返す。
+        original_get_user_by_wallet = AuthService.get_user_by_wallet
+        call_count = {"n": 0}
+
+        def fake_get_user_by_wallet(db, wallet_address):  # type: ignore[no-untyped-def]
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return None
+            return original_get_user_by_wallet(db, wallet_address)
+
+        monkeypatch.setattr(AuthService, "get_user_by_wallet", fake_get_user_by_wallet)
+
+        payload = self._make_valid_request()
+        response = client.post("/auth/wallet/connect", json=payload)
+
+        assert response.status_code == 200, response.json()
+        data = response.json()
+        # race resolution が成立 → 新規作成ではないので is_new_user は False
+        assert data["is_new_user"] is False, (
+            "race resolution した場合は lookup の None ではなく "
+            "create_wallet_user の戻り値 (is_newly_created=False) を反映すべき"
+        )
+
+        # 既存ユーザーの id と一致 (新規 user は作られていない)
+        with SessionLocal() as verify_session:
+            users = verify_session.query(User).filter(User.wallet_address == wallet).all()
+            assert len(users) == 1
+            assert users[0].id == preexisting_id
+
     # ── Privy ID Token 検証 (Codex Review P1) ─────────────────────────
 
     def test_wallet_connect_valid_id_token_with_matching_did_saves_did(
@@ -692,19 +747,22 @@ class TestErrorHandlingFixes:
 
         # Session A: 先に user を作成・コミット
         with SessionLocal() as session_a:
-            first = AuthService.create_wallet_user(session_a, wallet)
+            first, first_is_new = AuthService.create_wallet_user(session_a, wallet)
             session_a.commit()
             first_id = first.id
             first_email = first.email
+            assert first_is_new is True
 
         # Session B: 同じ wallet で create_wallet_user() を再度呼ぶ。
         # 内部で wallet_address UNIQUE 違反 (IntegrityError) を検知し、
         # 既存ユーザーを取得して返すことで race を吸収する。
         with SessionLocal() as session_b:
-            second = AuthService.create_wallet_user(session_b, wallet)
+            second, second_is_new = AuthService.create_wallet_user(session_b, wallet)
             assert second.id == first_id
             assert second.wallet_address == wallet
             assert second.email == first_email
+            # race resolution: 新規作成ではなく既存ユーザー返却なので False
+            assert second_is_new is False
 
     def test_create_wallet_user_privy_did_conflict_still_returns_409(self, test_db):
         """privy_did UNIQUE 違反は引き続き 409 を返すこと (P2-3 リファクタの回帰防止)。"""
@@ -721,8 +779,10 @@ class TestErrorHandlingFixes:
 
         # Session 1: 既に DID を保持するユーザーを作成
         with SessionLocal() as s1:
-            AuthService.create_wallet_user(s1, wallet1, privy_did=did)
+            user_1, is_new_1 = AuthService.create_wallet_user(s1, wallet1, privy_did=did)
             s1.commit()
+            assert is_new_1 is True
+            assert user_1.privy_did == did
 
         # Session 2: 別 wallet で同じ DID を使って作成 → 409
         with SessionLocal() as s2:

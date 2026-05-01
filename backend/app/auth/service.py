@@ -364,7 +364,7 @@ class AuthService:
     @classmethod
     def create_wallet_user(
         cls, db: Session, wallet_address: str, privy_did: Optional[str] = None
-    ) -> User:
+    ) -> tuple[User, bool]:
         """
         ウォレットアドレスからユーザーを自動作成する。
 
@@ -373,6 +373,12 @@ class AuthService:
         - terms_accepted_at = None
         - email / username は wallet_ プレフィックス + アドレス先頭8文字（衝突時はランダム4桁追加）
         - privy_did: Privy固有のDID（任意、後追い更新も可能）
+
+        Returns:
+            (User, is_newly_created) のタプル。
+            - is_newly_created=True: この呼び出しでユーザーを新規作成した
+            - is_newly_created=False: 並行 first-login race を吸収して既存ユーザーを返した
+              (router の is_new_user フラグはこの値を信頼すべき)
         """
         base_slug = wallet_address[2:10].lower()
         base_email = f"wallet_{base_slug}@wallet.local"
@@ -437,7 +443,7 @@ class AuthService:
                         wallet_address[:10],
                         existing.id,
                     )
-                    return existing
+                    return existing, False
                 # 取得できない場合は不整合 → 500
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -453,7 +459,7 @@ class AuthService:
         db.refresh(user)
 
         logger.info("Created wallet user: %s (wallet=%s...)", user.email, wallet_address[:10])
-        return user
+        return user, True
 
     @staticmethod
     def _extract_constraint_name(exc: IntegrityError) -> str:
