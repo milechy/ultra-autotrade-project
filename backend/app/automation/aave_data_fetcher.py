@@ -180,6 +180,9 @@ def _fetch_reserve_data_via_pool(
             client_settings, "network", None
         )
         chain = CHAIN_REGISTRY.get(_chain_key) if _chain_key else None
+        # normalize hyphens to underscores (e.g. "base-sepolia" → "base_sepolia")
+        if chain is None and _chain_key:
+            chain = CHAIN_REGISTRY.get(_chain_key.replace("-", "_"))
         if chain is None:
             chains = get_active_chains()
             if not chains:
