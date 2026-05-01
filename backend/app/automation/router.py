@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.ai.models import AIDecision
 from app.ai.service import AIService
+from app.auth.constants import ExecutionPolicy
 from app.automation.workflow import process_pending_knowledge
 from app.database import get_db
 from app.exchange.router import get_exchange_service
@@ -182,7 +183,7 @@ def run_workflow(
         exchange_service=exchange_service,
         monitoring_service=monitoring,
         dry_run=dry_run,
-        execution_policy="auto_execute",
+        execution_policy=ExecutionPolicy.AUTO_EXECUTE.value,
     )
 
     # Sanitize error messages (no internal details in API response)

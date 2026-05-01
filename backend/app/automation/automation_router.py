@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.ai.service import AIService
+from app.auth.constants import ExecutionPolicy
 from app.auth.dependencies import require_active_user, require_admin, verify_internal_token
 from app.automation.monitoring_service import MonitoringService
 from app.automation.rate_limiter import RateLimiterService, get_rate_limiter
@@ -84,7 +85,7 @@ def process_news(
             exchange_service=get_exchange_service(),
             monitoring_service=monitoring_service,
             dry_run=dry_run,
-            execution_policy="auto_execute",
+            execution_policy=ExecutionPolicy.AUTO_EXECUTE.value,
         )
         monitoring_service.record_news_fetch()
     except Exception as exc:
