@@ -290,6 +290,94 @@ curl -s -X POST "$WEBHOOK" \
   -d '{"text": "❌ [チームメイト名] エラー: [タスク名]\n原因: [エラー内容]"}'
 ```
 
+### 並列開発: Tier 分類 + Agent Teams + Worktree (2026-05-01 確立)
+
+#### コンフリクト多発の真因 (過去ログ分析)
+1. dev/main 同時進行で 12-40 コミット乖離 → 12+ ファイルコンフリクト発生 (3/8, 3/31, 4/1)
+2. 巨大ファイルへの集中編集 (main.py / scheduled_tasks.py / monitoring_service.py / package.json)
+3. delete vs modify 衝突 (stash + upstream delete のミックス)
+
+#### Tier 分類
+
+**Tier S: 同時編集禁止 (1日1PR)**
+- backend/app/main.py
+- backend/requirements.txt / pyproject.toml
+- frontend/package.json / frontend/package-lock.json
+- .github/workflows/ci.yml
+- docker-compose.production.yml / docker-compose.staging.yml
+- nginx/upstream.production.conf / nginx/upstream.staging.conf
+- backend/migrations/versions/*.py (新規追加)
+- backend/app/database.py
+- backend/app/automation/scheduled_tasks.py / monitoring_service.py
+- CLAUDE.md
+
+**Tier A: 同セクション編集のみ衝突**
+- backend/app/schemas/*.py (別ファイルなら並列OK)
+- backend/app/api/routes/*.py (別ファイルなら並列OK)
+- frontend/lib/api/*.ts (関数追加場所により衝突)
+- .env.production / .env.staging-new (同 KEY 編集で衝突)
+
+**Tier B: 並列OK**
+- docs/*.md (別ファイル)
+- backend/tests/*.py (別ファイル)
+- frontend/components/*.tsx (別ファイル)
+- backend/app/protocols/*/*.py (Phase 2 PoC は完全分離)
+- scripts/*.sh (新規ファイル)
+- .claude/agents/*.md (新規ファイル)
+
+#### 並列開発の鉄則 7つ
+
+1. **Hetzner pull only / ローカル merge only** (CLAUDE.md ABSOLUTE)
+2. **Tier S ファイルは 1 日 1 PR まで**
+3. **PR 起票前に必ず `git fetch origin && git rebase origin/main`** (古い base の指数的乖離防止)
+4. **並列レーンは Tier B のみで構成**
+5. **Phase A (Tier B 並列) → main マージ → Phase B (Tier S シリアル)** の段階実行
+6. **stash / 未コミット変更を残さない** (delete vs modify 衝突防止)
+7. **package.json / requirements.txt は誰も触らない週**を作る
+
+#### Agent Teams + Worktree モード (推奨、コンフリクト物理回避)
+
+3+ ファイル並列編集時は Agent Teams worktree モードを使用:
+```
+Create a team with worktree isolation for these tasks:
+
+Teammate 1: feature/branch-a で <タスクA>
+Teammate 2: feature/branch-b で <タスクB>
+Teammate 3: feature/branch-c で <タスクC>
+Each teammate gets its own git worktree.
+```
+
+各 Teammate が独立した worktree で作業 → main マージ時のみコンフリクト可能性。
+
+#### 落とし穴 (2026-02 以降の実運用知見)
+
+- **Agent Teams は file conflict detection なし** — 他 Teammate の変更を**警告なしで上書き**することがある。File ownership を初期プロンプトで**明示**必須。
+- **3-5 Teammate がスイートスポット** — 6+ は coordination overhead 過多。
+- **Tokens 約 7 倍** (plan mode、複数 Teammate) — Sonnet/Haiku を実装係に割り当て、Lead のみ Opus。
+- **session resumption 不安定** — 中断したらタスクリスト (~/.claude/tasks/<team-name>/) を確認して手動再開。
+- **Teammate が message 受け取らないことがある** — tmux 検出失敗等が原因、`tmux ls` で確認。
+
+#### `/batch` コマンド (シンプル並列、coordination 不要時)
+
+Teammate 間のコミュニケーション不要、独立タスクのみなら `/batch` が最適 (worktree 分離自動):
+```
+/batch <タスク1> | <タスク2> | <タスク3>
+```
+
+Agent Teams は teammate が share/challenge する必要があるときに使用。
+
+#### claude.ai 側の責務 (PM/アーキテクト)
+
+並列開発を計画する際、claude.ai は以下を**質問なしで**実行:
+
+1. 各タスクの Tier 判定 (notes の「触るファイル」から自動)
+2. 並列レーン化 (3-5 本のスイートスポット)
+3. CLI 用包括プロンプト 5 本一括生成 (細切れ確認禁止)
+4. Asana タスク notes に並列レーン情報を追記
+5. ユーザーは tmux で 5 ターミナル起動するだけ
+
+「やっていいですか?」の質問は禁止。設計判断のみ claude.ai に残す。
+
 ---
 
 ## 環境定義（2026-04-17 B案リネーム後）
