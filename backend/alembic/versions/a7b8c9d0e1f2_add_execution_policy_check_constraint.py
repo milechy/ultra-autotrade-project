@@ -37,14 +37,23 @@ def upgrade() -> None:
 
     server_default は a1b2c3d4e5f6 で既に 'auto_execute' に設定済み。
     本マイグレーションでは CHECK 制約のみを追加する。
+
+    Sanitize step (Codex P1): 無効値を持つ行を先に修正してから ADD CONSTRAINT する。
+    ADD CONSTRAINT は既存行に対して即座に検証するため、無効値が残っていると失敗する。
+    フォールバック先: 'require_approval' (最も安全な既定値)。
     """
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
+        # 無効な execution_policy を持つ行を有効値に修正してから制約を追加する
+        values_sql = ", ".join(f"'{v}'" for v in VALID_POLICIES)
+        op.execute(
+            f"UPDATE users SET execution_policy = 'require_approval' "
+            f"WHERE execution_policy NOT IN ({values_sql})"
+        )
         # 既存制約があれば一旦削除してから再作成 (idempotent + 値リスト変更にも追随)
         op.execute(
             f"ALTER TABLE users DROP CONSTRAINT IF EXISTS {CONSTRAINT_NAME}",
         )
-        values_sql = ", ".join(f"'{v}'" for v in VALID_POLICIES)
         op.execute(
             f"ALTER TABLE users ADD CONSTRAINT {CONSTRAINT_NAME} "
             f"CHECK (execution_policy IN ({values_sql}))"
