@@ -14,6 +14,11 @@ const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || ''
 // Skip PrivyProvider when App ID is absent — JWT auth remains fully functional.
 const isPrivyConfigured = appId && appId !== 'clplaceholder000000000000000000000'
 
+// 2026-05-01: defaultChain を hardcode (baseSepolia) から env 駆動に変更 (mainnet 切替)
+// NEXT_PUBLIC_DEFAULT_CHAIN_ID は build-time に Docker build.args から焼き込まれる
+const defaultChainId = parseInt(process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID || '8453')
+const defaultChain = defaultChainId === 8453 ? base : baseSepolia
+
 export function PrivyRootClient({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
   if (!isPrivyConfigured) {
@@ -34,8 +39,8 @@ export function PrivyRootClient({ children }: { children: ReactNode }) {
           theme: 'dark',
           accentColor: '#6366f1',
         },
-        supportedChains: [baseSepolia, base],
-        defaultChain: baseSepolia,
+        supportedChains: [base, baseSepolia],
+        defaultChain,
         embeddedWallets: {
           ethereum: { createOnLogin: 'users-without-wallets' },
         },

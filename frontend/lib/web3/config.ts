@@ -18,6 +18,14 @@ export const AAVE_V3_ADDRESSES = {
     PoolDataProvider: '0x69FA688f1Dc47d4B5d8029D5a35FB7a548310654',
     Oracle: '0xb56c2F0B653B2e0b10C9b928C8580Ac5Df02C7C5',
   },
+  // Aave V3 Base Mainnet (chain 8453)
+  // bgd-labs/aave-address-book + PoolAddressesProvider.getPool/Oracle/PoolDataProvider() で
+  // 2026-05-01 にオンチェーン照合済み (mainnet.base.org RPC)
+  base: {
+    Pool: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5',
+    PoolDataProvider: '0x0F43731EB8d45A581f4a36DD74F5f358bc90C73A',
+    Oracle: '0x2Cc0Fc26eD4563A5ce5e8bdcfe1A2878676Ae156',
+  },
 } as const
 
 // 対応トークンアドレス（チェーン別）
@@ -42,6 +50,18 @@ export const TOKEN_ADDRESSES = {
     WETH: '0x4200000000000000000000000000000000000006',
     WBTC: '0x6Bf14CB0A831078629D993FDeBcB182b21A8774C',
     DAI:  '0xc5E420e74Fd98Da91dAC7Bca77f00a6aECde02d4',
+  },
+  // Base Mainnet token addresses (chain 8453)
+  // - Aave V3 Base reserves (オンチェーン取得 2026-05-01): USDC, WETH, cbBTC のみ
+  //   (cbBTC は Aave で WBTC alias 扱い)
+  // - USDT, DAI は Base 上に存在するが Aave Base mainnet には未上場 (deposit/borrow 不可)
+  // - SupportedToken 型 (USDC|USDT|WETH|WBTC|DAI) を満たすため全 5 キー必須
+  base: {
+    USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    USDT: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2',
+    WETH: '0x4200000000000000000000000000000000000006',
+    WBTC: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
+    DAI: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
   },
 } as const
 
@@ -79,12 +99,15 @@ export type AaveChainKey = keyof typeof AAVE_V3_ADDRESSES
 export type SupportedToken = keyof typeof TOKEN_ADDRESSES.arbitrum
 
 export const DEFAULT_CHAIN: SupportedChainKey =
-  (process.env.NEXT_PUBLIC_DEFAULT_CHAIN as SupportedChainKey) || 'base-sepolia'
+  (process.env.NEXT_PUBLIC_DEFAULT_CHAIN as SupportedChainKey) || 'base'
 
 export const MINIMUM_USD_BALANCE = 3000
 
-// Supported chain IDs (Base Sepolia testnet only)
-export const SUPPORTED_CHAIN_IDS = [84532]
+// Supported chain IDs — env-driven (default: Base Mainnet 8453)
+// 2026-05-01: testnet hardcode [84532] から env 駆動に変更 (mainnet 切替対応)
+export const SUPPORTED_CHAIN_IDS = [
+  parseInt(process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID || '8453'),
+]
 
 export function getChainKey(chainId: number): SupportedChainKey | null {
   if (chainId === 84532) return 'base-sepolia'
