@@ -342,3 +342,66 @@ def test_zero_address_stable_debt_skipped():
     assert abs(result["utilization_rate"] - Decimal("50")) < Decimal("0.01"), (
         f"Expected utilization=50 (vdebt only, sdebt skipped), got {result['utilization_rate']}"
     )
+
+
+def test_chain_resolution_normalizes_hyphen_to_underscore():
+    """client.settings.network = "base-sepolia" (ハイフン) でも CHAIN_REGISTRY["base_sepolia"] にヒットすること。
+
+    staging 環境で network="base-sepolia" が返るが CHAIN_REGISTRY のキーは "base_sepolia"
+    (アンダースコア) のため lookup miss → arbitrum フォールバックになっていた。
+    正規化で base_sepolia の pool_address が使われることを確認する。
+    """
+    Web3 = pytest.importorskip("web3").Web3
+
+    from app.aave.chains import CHAIN_REGISTRY
+
+    base_sepolia_config = CHAIN_REGISTRY["base_sepolia"]
+    arbitrum_config = CHAIN_REGISTRY["arbitrum"]
+
+    mock_settings = MagicMock()
+    mock_settings.chain_name = None
+    mock_settings.network = "base-sepolia"  # ハイフン区切り
+
+    mock_client = MagicMock()
+    mock_client.get_health_factor.return_value = Decimal("2.0")
+    mock_client.settings = mock_settings
+
+    pool_contract = _make_pool_contract(_make_pool_call_result())
+    atoken_contract = _make_erc20_contract(1_000_000 * 10**6)
+    vdebt_contract = _make_erc20_contract(500_000 * 10**6)
+    sdebt_contract = _make_erc20_contract(0)
+    mock_client.w3.eth.contract.side_effect = [
+        pool_contract,
+        atoken_contract,
+        vdebt_contract,
+        sdebt_contract,
+    ]
+
+    with (
+        patch(
+            "app.automation.aave_data_fetcher.get_default_aave_client",
+            return_value=mock_client,
+        ),
+        patch(
+            "app.automation.aave_data_fetcher.get_active_chains",
+            return_value=[arbitrum_config],  # フォールバック先は arbitrum
+        ),
+    ):
+        result = fetch_aave_market_data_safe()
+
+    first_call = mock_client.w3.eth.contract.call_args_list[0]
+    expected_pool_addr = Web3.to_checksum_address(base_sepolia_config.pool_address)
+    actual_pool_addr = first_call.kwargs.get("address") or (
+        first_call.args[0] if first_call.args else None
+    )
+    assert actual_pool_addr == expected_pool_addr, (
+        f"Expected base_sepolia pool {expected_pool_addr}, got {actual_pool_addr}. "
+        "hyphen normalization must resolve 'base-sepolia' → CHAIN_REGISTRY['base_sepolia']"
+    )
+
+    arbitrum_pool_addr = Web3.to_checksum_address(arbitrum_config.pool_address)
+    assert actual_pool_addr != arbitrum_pool_addr, (
+        "arbitrum pool was used instead of base_sepolia — hyphen normalization not working"
+    )
+
+    assert result["utilization_rate"] is not None
