@@ -47,8 +47,7 @@ def upgrade() -> None:
         # 無効な execution_policy を持つ行を有効値に修正してから制約を追加する
         values_sql = ", ".join(f"'{v}'" for v in VALID_POLICIES)
         op.execute(
-            f"UPDATE users SET execution_policy = 'require_approval' "
-            f"WHERE execution_policy NOT IN ({values_sql})"
+            f"UPDATE users SET execution_policy = 'require_approval' WHERE execution_policy NOT IN ({values_sql})"  # noqa: S608
         )
         # 既存制約があれば一旦削除してから再作成 (idempotent + 値リスト変更にも追随)
         op.execute(
