@@ -124,6 +124,12 @@ _POOL_ADDRESS_ARBITRUM_SEPOLIA = "0xBfC91D59fdAA134A4ED45f7B584cAf96D7792Eff"
 # Arbitrum Sepolia USDC
 _USDC_ADDRESS_ARBITRUM_SEPOLIA = "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"
 
+# Aave V3 Pool アドレス（Base Mainnet） — chains.py registry の base.pool_address と一致
+_POOL_ADDRESS_BASE_MAINNET = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5"
+
+# Aave V3 Pool アドレス（Base Sepolia） — chains.py registry の base_sepolia.pool_address と一致
+_POOL_ADDRESS_BASE_SEPOLIA = "0x8bAB6d1b75f19e9eD9fCe8b9BD338844fF79aE27"
+
 
 class _NonceTracker:
     """1 フロー内の連続 tx に対してローカルに nonce を管理するトラッカー。
@@ -369,10 +375,13 @@ class Web3AaveClient(AaveClientBase):
     def __init__(
         self,
         rpc_url: Optional[str] = None,
-        pool_address: str = _POOL_ADDRESS_SEPOLIA,
+        pool_address: Optional[str] = None,
         settings: Optional[AaveSettings] = None,
         flashbots_rpc_url: Optional[str] = None,
     ) -> None:
+        # 2026-05-01: pool_address のデフォルトを Sepolia hardcode から None に変更。
+        # 旧デフォルトは mainnet 切替後に silent regression (testnet pool に書き込み) を
+        # 起こすため、env (AAVE_POOL_ADDRESS) または引数の明示を必須化する。
         # web3 はモジュールレベルで参照（テスト時にモックしやすくするため）
         if Web3 is None:
             raise AaveClientError("web3 package is required. Install with: pip install web3")
@@ -392,6 +401,13 @@ class Web3AaveClient(AaveClientBase):
         else:
             if not rpc_url:
                 raise AaveClientError("AAVE_RPC_URL is required for Web3AaveClient")
+            if pool_address is None:
+                pool_address = os.getenv("AAVE_POOL_ADDRESS")
+                if not pool_address:
+                    raise AaveClientError(
+                        "AAVE_POOL_ADDRESS env var or pool_address argument is "
+                        "required for Web3AaveClient"
+                    )
             effective_rpc_url = rpc_url
             effective_pool_address = pool_address
 
@@ -930,8 +946,8 @@ class Web3AaveClient(AaveClientBase):
 def make_aave_client(
     client_type: str,
     rpc_url: Optional[str] = None,
-    pool_address: str = _POOL_ADDRESS_SEPOLIA,
-    network: str = "sepolia",
+    pool_address: Optional[str] = None,
+    network: Optional[str] = None,
     flashbots_rpc_url: Optional[str] = None,
     chain_name: Optional[str] = None,
 ) -> AaveClientBase:
@@ -941,10 +957,16 @@ def make_aave_client(
     Args:
         client_type: "dummy" または "web3"
         rpc_url: web3 の場合は必須
-        pool_address: Aave V3 Pool コントラクトアドレス
-        network: ネットワーク名 ("sepolia", "arbitrum", "arbitrum-sepolia")
+        pool_address: Aave V3 Pool コントラクトアドレス。未指定時は network 経由 or
+            AAVE_POOL_ADDRESS env から解決
+        network: ネットワーク名 ("sepolia", "arbitrum", "arbitrum-sepolia",
+            "base", "base_sepolia")。未指定時は AAVE_NETWORK env を参照
         flashbots_rpc_url: Flashbots Protect RPC URL（MEV対策、オプション）
         chain_name: チェーン名（chains.py のレジストリから設定を解決する、オプション）
+
+    2026-05-01: pool_address / network のデフォルトを Sepolia hardcode から
+    None に変更。silent testnet regression (mainnet 切替後に sepolia に書き込む)
+    の防止が目的。Base Mainnet (chain 8453) を _network_pool に追加。
     """
     if client_type == "dummy":
         return DummyAaveClient()
@@ -962,12 +984,20 @@ def make_aave_client(
             )
         if not rpc_url:
             raise ValueError("AAVE_CLIENT_TYPE=web3 の場合は AAVE_RPC_URL が必須です")
+
+        # network 未指定時は env (AAVE_NETWORK) から解決
+        if network is None:
+            network = os.getenv("AAVE_NETWORK")
+
         _network_pool = {
             "sepolia": _POOL_ADDRESS_SEPOLIA,
             "arbitrum": _POOL_ADDRESS_ARBITRUM,
             "arbitrum-sepolia": _POOL_ADDRESS_ARBITRUM_SEPOLIA,
+            "base": _POOL_ADDRESS_BASE_MAINNET,
+            "base_sepolia": _POOL_ADDRESS_BASE_SEPOLIA,
         }
-        if pool_address == _POOL_ADDRESS_SEPOLIA and network in _network_pool:
+        # pool_address 未指定 + network 既知 → network から解決
+        if pool_address is None and network is not None and network in _network_pool:
             pool_address = _network_pool[network]
         return Web3AaveClient(
             rpc_url=rpc_url,
