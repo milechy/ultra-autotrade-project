@@ -332,6 +332,7 @@ test.describe('tester viewer role — ダッシュボード表示と権限', () 
         // Known: ChunkLoadError / 401 は未認証時の正常動作
         // Known: 500 は CI/staging 環境で backend が未設定の場合に発生（正常）
         // Known: 404 は CI localhost で外部 API エンドポイントが未接続の場合に発生
+        // Known: CORS/cloudflareaccess は localhost から staging URL を呼ぶ際のインフラ起因
         const text = msg.text()
         if (
           !text.includes('401') &&
@@ -343,7 +344,9 @@ test.describe('tester viewer role — ダッシュボード表示と権限', () 
           !text.includes('Failed to fetch') &&
           !text.includes('Failed to load resource') &&
           !text.includes('net::ERR_') &&
-          !text.includes('NEXT_NOT_FOUND')
+          !text.includes('NEXT_NOT_FOUND') &&
+          !text.includes('CORS policy') &&
+          !text.includes('cloudflareaccess.com')
         ) {
           errors.push(text)
         }
@@ -370,7 +373,8 @@ test.describe('tester viewer role — ダッシュボード表示と権限', () 
 
 test.describe('データ鮮度 — AI判定が最新であること', () => {
   test('Step 4: /api/ai/decisions/latest が 200 を返す (バックエンド接続確認)', async ({ page }) => {
-    const baseUrl = process.env.STAGING_URL?.replace(':3001', ':8001') ||
+    const baseUrl = process.env.BACKEND_URL ||
+      process.env.NEXT_PUBLIC_BACKEND_BASE_URL ||
       'https://api.ultra-auto-trade.com'
 
     const response = await page.request.get(`${baseUrl}/ai/decisions/latest`, {
