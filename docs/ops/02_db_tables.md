@@ -332,3 +332,85 @@ docker exec ultra-autotrade-postgres-production \
 
 > **注意**: コンテナ名を必ず `docker ps | grep postgres` で確認してから実行すること。
 > 推測による本番SQL実行は CLAUDE.md で禁止されている。
+
+---
+
+## 本番テストデータ作成禁止ルール
+
+> **制定**: 2026-04-28 / 背景: `fund_allocations` 本番DBクリーンアップインシデント（282 行削除）
+
+### 絶対禁止事項
+
+| 禁止 | 理由 |
+|------|------|
+| 本番DB (`ultra_autotrade`) へのテストデータ INSERT | 実ユーザーデータと混在し、手数料計算・AI判定・レポートが汚染される |
+| 本番DB へのダミーデータ INSERT | 同上。「仮データ」「動作確認用」も含む |
+| 本番コンテナ (`*-production`) での seed スクリプト実行 | production guard なしのスクリプトは即時停止し、実行を取り消す |
+| 動作確認のための本番 `INSERT` / `UPDATE` の直打ち | staging で代替できない理由がない限り禁止 |
+
+### テストデータ作成の正しい手順
+
+**1. staging DB のみで作成する**
+
+```bash
+# staging コンテナに接続（本番コンテナ名と混同しないこと）
+docker ps | grep postgres   # コンテナ名を必ず目視確認
+docker exec ultra-autotrade-postgres-staging \
+  psql -U ultra -d ultra_autotrade_staging \
+  -c "INSERT INTO ..."
+```
+
+**2. シードスクリプトを使う（production guard 必須）**
+
+テスト用シードスクリプトは `scripts/seed_test_data.sh` を使用すること（別 PR にて起票予定）。
+すべてのシードスクリプトには以下の production guard を先頭に記載すること:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# production guard — 本番環境では絶対に実行しない
+if [[ "${APP_ENV:-}" == "production" ]]; then
+  echo "ERROR: seed_test_data.sh は production 環境で実行禁止です。" >&2
+  exit 1
+fi
+
+if docker ps --format '{{.Names}}' | grep -q '\-production'; then
+  echo "ERROR: production コンテナが検出されました。staging コンテナに切り替えてください。" >&2
+  exit 1
+fi
+```
+
+**3. 削除が必要になった場合**
+
+誤って本番に作成してしまった場合は、削除前に必ず claude.ai に報告し承認を得ること。
+削除 SQL は以下の形式で実行し、ログを残す:
+
+```bash
+# 削除前に件数確認
+docker exec ultra-autotrade-postgres-production \
+  psql -U ultra -d ultra_autotrade \
+  -c "SELECT COUNT(*) FROM <table> WHERE <condition>;"
+
+# 確認後に削除（transaction で囲む）
+docker exec ultra-autotrade-postgres-production \
+  psql -U ultra -d ultra_autotrade \
+  -c "BEGIN; DELETE FROM <table> WHERE <condition>; -- 件数確認後 COMMIT または ROLLBACK"
+```
+
+### 過去インシデント記録
+
+#### 2026-04-28: `fund_allocations` 本番DBクリーンアップ
+
+- **概要**: 本番DB `ultra_autotrade` の `fund_allocations` テーブルにダミーデータが混入していた
+- **削除件数**: 282 行
+- **影響**: 手数料計算・ポートフォリオ集計に誤ったデータが反映されていた可能性
+- **根本原因**: staging/production の区別なくシードスクリプトが実行された
+- **対応**: 手動 DELETE で全ダミーデータを削除、本ルールを制定
+
+### チェックリスト（データ投入前に必ず確認）
+
+- [ ] 接続先 DB 名が `ultra_autotrade_staging` であることを確認（`ultra_autotrade` は本番）
+- [ ] `docker ps` でコンテナ名に `-production` が含まれていないことを確認
+- [ ] スクリプトに production guard が記載されていることを確認
+- [ ] データ投入後、staging で正常動作を確認してから本番デプロイを検討
