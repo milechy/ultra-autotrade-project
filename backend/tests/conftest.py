@@ -42,6 +42,11 @@ def _ensure_test_env_vars() -> None:
     os.environ.setdefault("EXCHANGE_CLIENT_TYPE", "dummy")
     os.environ.setdefault("INITIAL_ADMIN_EMAIL", "terms_admin@example.com")
     os.environ.setdefault("LOGIN_RATE_LIMIT", "1000/minute")
+    # 2026-05-01: Web3AaveClient.__init__ で pool_address required 化したため
+    # 既存テスト互換用に Sepolia ダミー値を default で供給する。
+    # 個別テストで env を明示的に空にする / 別値で上書きすることは可能。
+    os.environ.setdefault("AAVE_POOL_ADDRESS", "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951")
+    os.environ.setdefault("AAVE_USDC_ADDRESS", "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8")
 
 
 _ensure_project_root_in_sys_path()
