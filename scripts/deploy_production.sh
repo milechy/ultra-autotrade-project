@@ -299,11 +299,20 @@ if grep -qE '^BYBIT_SANDBOX=true' .env.production; then
   exit 1
 fi
 
-if [[ "${FRONTEND_ONLY}" != "true" ]] && grep -qE '^AAVE_NETWORK=.*sepolia' .env.production; then
-  echo "❌ FAIL: .env.production で AAVE_NETWORK に sepolia 含む (本番は mainnet 必須)"
-  exit 1
-elif [[ "${FRONTEND_ONLY}" == "true" ]] && grep -qE '^AAVE_NETWORK=.*sepolia' .env.production; then
-  echo "⚠️  WARN: AAVE_NETWORK に sepolia が含まれています (フロントエンドのみデプロイのためスキップ)"
+if grep -qE '^AAVE_NETWORK=.*sepolia' .env.production; then
+  if [[ "${FRONTEND_ONLY}" == "true" ]]; then
+    echo "⚠️  WARN: AAVE_NETWORK に sepolia が含まれています (フロントエンドのみデプロイのためスキップ)"
+  elif [[ "${ALLOW_TESTNET:-0}" == "1" ]]; then
+    # Partner 先行検証フェーズ等の意図的な testnet 運用を許容
+    # docs/22_production_release_checklist.md §「ALLOW_TESTNET bypass」参照
+    printf '\033[1;31m⚠️  ALLOW_TESTNET=1: AAVE_NETWORK に sepolia 含むまま production deploy 続行\033[0m\n'
+    printf '\033[1;31m⚠️  この bypass は partner 先行検証フェーズの意図的な testnet 運用専用です\033[0m\n'
+    printf '\033[1;31m⚠️  mainnet 移行後は ALLOW_TESTNET 環境変数を外してください\033[0m\n'
+  else
+    echo "❌ FAIL: .env.production で AAVE_NETWORK に sepolia 含む (本番は mainnet 必須)"
+    echo "    意図的な testnet 運用 (partner 先行検証等) の場合は ALLOW_TESTNET=1 を環境変数で指定してください"
+    exit 1
+  fi
 fi
 
 # Guard 2: 環境分離チェック (バックエンドに関わるキーのみ必須 — フロントエンドのみデプロイ時はスキップ)

@@ -228,6 +228,15 @@ curl https://api.ultra-auto-trade.com/health
 # 期待値: {"status": "ok", "scheduler_healthy": true, "warnings": []}
 ```
 
+### ALLOW_TESTNET bypass（partner 先行検証フェーズ専用）
+
+`scripts/deploy_production.sh` の Guard 1 は `.env.production` で `AAVE_NETWORK=*sepolia*` を検出すると abort する（mainnet 強制）。
+partner 先行検証フェーズ等で意図的に testnet 運用する場合のみ、`ALLOW_TESTNET=1` を環境変数で指定して bypass 可能：
+```bash
+ALLOW_TESTNET=1 bash scripts/deploy_production.sh
+```
+mainnet 移行後は `ALLOW_TESTNET` 環境変数を外して通常運用に戻すこと。Guard 2-4（環境分離・compose 確認・健全性検証）は変更されない。
+
 ---
 
 ## 9. ポストデプロイ確認
