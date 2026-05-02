@@ -86,7 +86,7 @@ docker network inspect ultra-autotrade-project_default | grep -E '(Name|Containe
 
 ```bash
 # alembic migration ファイル一覧
-ls backend/migrations/versions/ | sort
+ls backend/alembic/versions/ | sort
 
 # 本番DBに適用済み migration 一覧
 docker exec ultra-autotrade-postgres-production psql -U ultra -d ultra_autotrade \
@@ -746,7 +746,7 @@ docker exec ultra-autotrade-backend-blue-production env | grep -E "AAVE_NETWORK|
 
 ### 6.4 DB migration 失敗時のロールバック
 
-**alembic 未インストール環境** (CLAUDE.md 教訓): production / staging は alembic コマンドが container 内に存在しない。migration は **手動 SQL 適用方式**。
+**alembic インストール済み** (2026-05-02〜): `alembic>=1.13.0` が `requirements.txt` に追加され、container 内で `alembic upgrade head` が使用可能。migration は alembic 方式が優先。手動 ALTER TABLE が必要な場合は `alembic stamp <revision>` で version を同期すること。
 
 **バックアップから復元 (full restore)**:
 ```bash

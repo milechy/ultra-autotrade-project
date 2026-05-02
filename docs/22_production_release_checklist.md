@@ -105,12 +105,25 @@ Ultra AutoTrade – Production リリース前チェックリスト
 - [ ] `PRIVATE_KEY` が本番ウォレット秘密鍵（staging と完全に異なること）
 - [ ] `SLACK_WEBHOOK_URL` が本番チャネル向け URL
 
-### マイグレーション（手動方式）
-- [x] alembic は未インストール。手動 `ALTER TABLE` 方式で運用 ✅
-- [ ] 新カラム追加が必要な場合はバックアップ取得後に手動実行:
+### マイグレーション（alembic 方式、2026-05-02〜）
+- [x] `alembic>=1.13.0` を `backend/requirements.txt` に追加済み ✅
+- [ ] 新しいマイグレーションファイルを適用する場合:
+  ```bash
+  # staging
+  docker exec -w /app/backend ultra-autotrade-backend-green-staging-new alembic upgrade head
+  # production（デプロイ後に実行）
+  docker exec -w /app/backend ultra-autotrade-backend-blue-production alembic upgrade head
+  ```
+- [ ] 現在の revision 確認:
+  ```bash
+  docker exec -w /app/backend ultra-autotrade-backend-blue-production alembic current
+  ```
+- [ ] 新カラムを手動適用する必要がある場合（alembic upgrade で失敗時フォールバック）:
   ```bash
   docker exec ultra-autotrade-postgres-production psql -U ultra -d ultra_autotrade -c \
     "ALTER TABLE <table> ADD COLUMN IF NOT EXISTS <column> <type>;"
+  # その後 alembic stamp <revision> で version を同期
+  docker exec -w /app/backend ultra-autotrade-backend-blue-production alembic stamp <revision>
   ```
 
 ### ヘルスチェック
@@ -217,11 +230,10 @@ docker compose -f docker-compose.production.yml up -d --no-deps --build backend
 docker compose -f docker-compose.production.yml build --no-cache frontend
 docker compose -f docker-compose.production.yml up -d --no-deps frontend
 
-# 5. DB マイグレーション（手動方式）
-# ⚠️ alembic は使用しない（未インストール、exit code 127 の原因）
-# 新しいカラムが必要な場合は手動で ALTER TABLE を実行:
-# docker exec ultra-autotrade-postgres-production psql -U ultra -d ultra_autotrade -c \
-#   "ALTER TABLE <table> ADD COLUMN IF NOT EXISTS <column> <type>;"
+# 5. DB マイグレーション（alembic 方式、2026-05-02〜）
+docker exec -w /app/backend ultra-autotrade-backend-blue-production alembic upgrade head
+# 確認: alembic current → 最新 revision (head) が表示されること
+docker exec -w /app/backend ultra-autotrade-backend-blue-production alembic current
 
 # 6. ヘルスチェック
 curl https://api.ultra-auto-trade.com/health
