@@ -206,6 +206,7 @@ feature/* (各LLM担当) → dev (Opus統合) → staging (Codex最終レビュ�
 - テスト順序: pytest(自動) → tsc --noEmit(自動) → npm run build(自動) → Playwright E2E(自動) → 孤立コード検出(PR前) → Codex Review(PR前) → Claude in Chrome(UI変更時のみ)
 - 一括検証: ./scripts/verify.sh（1-3を一括実行、コミット前に必須）
 - PR/デプロイ前ゲート: 1-4 必須。5-7 は状況に応じて実施
+- **テストデータ投入**: INSERT/UPDATE/DELETE は staging-new コンテナ + `ultra_autotrade_staging` DB に限定。production DB へのテストデータ投入は禁止（本番DB cleanup インシデント GID 1214121103957100）
 
 ---
 
@@ -791,6 +792,35 @@ docker exec <container> psql -U <user> -d <db> -c "SELECT table_name FROM inform
 ```
 
 この3ステップの結果を確認してから、本番SQL手順を生成する。**推測で本番SQLを書くことは禁止。**
+
+### 2026-05-02追加（テストデータ投入制限 — 本番DB cleanup インシデント GID 1214121103957100 再発防止）
+
+**テストデータの INSERT / UPDATE / DELETE は staging のみ。production DB への投入は禁止。**
+
+#### 対象コンテナ・DB
+- **許可**: `ultra-autotrade-postgres-staging` コンテナ + DB `ultra_autotrade_staging`
+- **禁止**: `ultra-autotrade-postgres-production` コンテナ + DB `ultra_autotrade`（本番）
+
+#### scripts/seed_test_data.sh 等の既存スクリプトルール
+スクリプト先頭で必ず staging コンテナ名チェックを実施すること:
+
+```bash
+# スクリプト先頭に必ず追加
+CONTAINER="${POSTGRES_CONTAINER:-ultra-autotrade-postgres-staging}"
+if [[ "$CONTAINER" != *"staging"* ]]; then
+  echo "ERROR: テストデータ投入は staging コンテナのみ許可。production への投入は禁止。"
+  exit 1
+fi
+```
+
+#### production への INSERT / UPDATE / DELETE 適用: 3段プロンプト必須
+production DB に対してデータ変更 SQL（INSERT / UPDATE / DELETE）を実行する場合、以下の3段確認を必ず経ること:
+
+1. **プロンプト 1**: 「これは production DB への操作である」を明示して確認を取る
+2. **プロンプト 2**: 「バックアップ取得済み」を確認（`pg_dump` 実行 + 出力確認）
+3. **プロンプト 3**: 「実行してよいか」最終確認（明示的な YES 入力のみ続行）
+
+自動スクリプト（Agent Teams / CI）から production DB へのデータ変更操作は **禁止**。手動確認のみ許可。
 
 ### 2026-04-17追加（本番フロントエンド操作ルール）
 
