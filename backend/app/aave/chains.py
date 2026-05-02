@@ -76,10 +76,23 @@ CHAIN_REGISTRY: dict[str, AaveChainConfig] = {
         pool_address="0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         rpc_url_env_var="AAVE_RPC_URL_BASE",
         tokens={
-            "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            # Aave V3 Base 上場 15 銘柄のみ（2025-05時点）
+            # 非上場: WBTC, USDT, DAI は Base Aave V3 に存在しないため除外
             "WETH": "0x4200000000000000000000000000000000000006",
-            # Base では cbBTC を使用。API 一貫性のためキーは "WBTC" とする。
-            "WBTC": "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+            "cbETH": "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22",
+            "USDbC": "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA",
+            "wstETH": "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452",
+            "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "weETH": "0x04C0599Ae5A44757c0af6F9eC3b93da8976c150A",
+            "cbBTC": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+            "ezETH": "0x2416092f143378750bb29b79eD961ab195CcEea5",
+            "GHO": "0x6Bb7a212910682DCFdbd5BCBb3b4A39570B43A8f",
+            "wrsETH": "0xEDfa23602D0EC14714057867A78d01e94176BEA0",
+            "LBTC": "0xecAc9C5F704e954931349Da37F60E39f515c11c1",
+            "EURC": "0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42",
+            "AAVE": "0x18c8a7ec7897177E4529065a7d8b10de7530d81a",
+            "tBTC": "0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b",
+            "syrupUSDC": "0x80ac24aA929eaF5013f6436cdA2a7ba190f5Cc0b",
         },
         flashbots_rpc_env_var=None,
     ),
