@@ -141,6 +141,15 @@ function LoginForm() {
           <p className="mt-6 text-center text-xs text-muted-foreground">
             初期設定が必要な場合は管理者にお問い合わせください。
           </p>
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            <a
+              href="/admin/login"
+              className="underline hover:text-foreground"
+              data-testid="login-admin-link"
+            >
+              管理者の方はこちら
+            </a>
+          </p>
         </CardContent>
       </Card>
     </main>

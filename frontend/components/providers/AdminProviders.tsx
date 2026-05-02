@@ -14,7 +14,7 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated) {
-      router.replace('/login')
+      router.replace('/admin/login')
       return
     }
     if (!isAdmin) {
