@@ -41,7 +41,8 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends \
 
 # builder の wheel をコピーしてインストール（ネットワーク不要）
 COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir --no-index --find-links /wheels /wheels/*.whl \
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir --no-index --find-links /wheels /wheels/*.whl \
     && rm -rf /wheels
 
 # アプリケーションコードをコピー（Cythonコンパイル済み成果物を含む）
