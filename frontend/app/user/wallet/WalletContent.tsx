@@ -14,7 +14,8 @@ export function WalletContent() {
   const { address, isConnected, chain } = useAccount()
   const { data: balance } = useBalance({ address })
   const { disconnect } = useDisconnect()
-  const ALLOWED_CHAIN_IDS = [84532]
+  const defaultChainId = parseInt(process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID || '8453', 10)
+  const ALLOWED_CHAIN_IDS = [defaultChainId]
   const isCorrectChain = chain?.id != null && ALLOWED_CHAIN_IDS.includes(chain.id)
 
   if (!isConnected) {
@@ -26,7 +27,7 @@ export function WalletContent() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <Step num={1} text="MetaMask または WalletConnect 対応ウォレットを準備" />
-            <Step num={2} text="Base Sepolia ネットワークを追加・切り替え" />
+            <Step num={2} text="Base メインネットを追加・切り替え" />
             <Step num={3} text="下のボタンからウォレットを接続" />
           </CardContent>
         </Card>
@@ -68,7 +69,7 @@ export function WalletContent() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>ネットワークが違います</AlertTitle>
           <AlertDescription>
-            Base Sepolia ネットワークに切り替えてください。現在: {chain?.name ?? '不明'}
+            Base メインネットに切り替えてください。現在: {chain?.name ?? '不明'}
           </AlertDescription>
         </Alert>
       )}

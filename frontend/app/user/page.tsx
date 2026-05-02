@@ -14,7 +14,7 @@ const steps = [
     number: 1,
     icon: Wallet,
     title: 'ウォレットを接続',
-    description: 'MetaMask / WalletConnect 対応ウォレットをBase Sepoliaネットワークに接続',
+    description: 'MetaMask / WalletConnect 対応ウォレットをBase メインネットに接続',
   },
   {
     number: 2,
@@ -60,7 +60,7 @@ export default function LandingPage() {
               Aave V3
             </Badge>
             <Badge variant="outline" className="text-indigo-400 border-indigo-400/50">
-              Base Sepolia
+              Base メインネット
             </Badge>
           </div>
         </div>
