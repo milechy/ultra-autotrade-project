@@ -352,6 +352,15 @@ PR マージ前に、既存機能が壊れていないことを担保する。
    > **Playwright実行方法:**
    > - 本番URL対象（デフォルト）: `cd frontend && npx playwright test`
    > - ローカル開発サーバー対象: `npm run dev` を起動後、`STAGING_URL=http://localhost:3000 npx playwright test`
+   > - staging URL対象（CF Accessトークン必須）:
+   >   ```bash
+   >   STAGING_URL=https://app-staging.ultra-auto-trade.com \
+   >   CF_ACCESS_CLIENT_ID=<service-token-id> \
+   >   CF_ACCESS_CLIENT_SECRET=<service-token-secret> \
+   >   npx playwright test
+   >   ```
+   >   CF Accessトークンの発行: Cloudflare Dashboard > Access > Service Auth > Service Tokens
+   >   バックエンドもCF Access配下の場合は `NEXT_PUBLIC_BACKEND_BASE_URL=https://api-staging.ultra-auto-trade.com` も指定
    > - 77.42.46.155 直IPはproduction.ymlで127.0.0.1バインド済みのため接続拒否される（正常動作）
 
 5. **孤立コード検出（手動トリガー）** — PR作成前。安全装置・リスク管理の配線漏れ検出。大量タスク一括完了後は必須
