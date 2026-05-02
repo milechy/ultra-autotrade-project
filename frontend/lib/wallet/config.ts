@@ -6,8 +6,8 @@ import { injected } from 'wagmi/connectors'
 
 export const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ''
 
-// Default chain is Base Sepolia (testnet). Override via NEXT_PUBLIC_DEFAULT_CHAIN_ID.
-const defaultChainId = parseInt(process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID || '84532') // Base Sepolia
+// Default chain is Base メインネット (8453). Override via NEXT_PUBLIC_DEFAULT_CHAIN_ID. 84532 = Base Sepolia.
+const defaultChainId = parseInt(process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID || '8453')
 
 const allChains = [baseSepolia, base, arbitrum, optimism, mainnet] as const
 

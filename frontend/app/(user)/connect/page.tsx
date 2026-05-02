@@ -17,11 +17,13 @@ type UserMode = 'managed' | 'active' | 'pro'
 
 const USER_MODE_STORAGE_KEY = 'ultra_user_mode'
 
-// Base Sepolia (testnet only)
-const SUPPORTED_CHAIN_IDS = [84532]
+// Default chain id is env-driven (2026-05-01: mainnet switch). 8453 = Base Mainnet, 84532 = Base Sepolia.
+const DEFAULT_CHAIN_ID = parseInt(process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID || '8453', 10)
+const SUPPORTED_CHAIN_IDS = [DEFAULT_CHAIN_ID]
 
 const CHAIN_DISPLAY_NAMES: Record<number, string> = {
   84532: 'Base Sepolia',
+  8453: 'Base メインネット',
 }
 
 function getNetworkDisplayName(chainId: number | null): string {
@@ -218,16 +220,16 @@ export default function ConnectPage() {
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="h-5 w-5 text-yellow-400 shrink-0 mt-0.5" />
                       <p className="text-sm text-yellow-300">
-                        Base Sepoliaに切り替えてください
+                        {CHAIN_DISPLAY_NAMES[DEFAULT_CHAIN_ID] ?? `Chain ${DEFAULT_CHAIN_ID}`}に切り替えてください
                       </p>
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
                       className="w-full border-blue-600 text-blue-400 hover:bg-blue-950/40"
-                      onClick={() => wallet?.switchChain(84532)}
+                      onClick={() => wallet?.switchChain(DEFAULT_CHAIN_ID)}
                     >
-                      Base Sepolia (テスト用) に切り替える
+                      {CHAIN_DISPLAY_NAMES[DEFAULT_CHAIN_ID] ?? `Chain ${DEFAULT_CHAIN_ID}`} に切り替える
                     </Button>
                   </div>
                 )}
