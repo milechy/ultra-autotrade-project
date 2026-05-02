@@ -1,6 +1,32 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_NO_FLICKER": "1",
+    "MCP_CONNECTION_NONBLOCKING": "true",
+    "ENABLE_PROMPT_CACHING_1H": "1"
+  },
   "permissions": {
     "allow": [
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(echo:*)",
+      "Bash(jq:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(git fetch:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker images:*)",
+      "Bash(docker inspect:*)",
+      "Bash(curl -s:*)",
       "Bash(grep -l \"class\\\\|def\\\\|router\\\\|Router\" /Users/hkobayashi/projects/ultra-autotrade/backend/app/automation/*.py)",
       "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[0][''text''][:15000]\\)\")",
       "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); text=data[0][''text'']; print\\(text[15000:30000]\\)\")",
