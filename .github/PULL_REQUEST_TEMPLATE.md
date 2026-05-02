@@ -40,3 +40,23 @@
 - 要件変更が含まれていないこと
 - フェーズ範囲外の作業をしていないこと
 - 仕様書（.md）が最新と一致していること
+
+---
+
+## チェーン設定関連 (チェーン関連の PR のみ)
+
+本 PR は **チェーン (mainnet/testnet) の切替** または **chain ID 設定** を含みますか?
+
+- [ ] いいえ (チェーン設定の変更なし)
+- [ ] はい — 以下のチェックを実施
+
+チェーン関連 PR の場合は以下を確認:
+- [ ] `grep -rn "Sepolia" frontend/` の出力をすべて確認・修正済み
+- [ ] `.env.production` の `NEXT_PUBLIC_*` チェーン設定を本番値に更新済み
+- [ ] `frontend/components/PrivyProvider.tsx` の chain config 確認済み
+- [ ] post-deploy `curl <production URL> | grep -i "sepolia"` で出力ゼロ確認済み
+- [ ] ブラウザで実機ランディング目視確認済み (スクリーンショット添付)
+
+参照:
+- docs/43_mainnet_wallet_switch_guide.md §2.5 (frontend 表示テキスト確認)
+- 2026-05-02 インシデント: Asana GID 1214462619161978
