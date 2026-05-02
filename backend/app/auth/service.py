@@ -210,7 +210,7 @@ class AuthService:
             return None
         if not user.is_active:
             return None
-        if not cls.verify_password(password, user.hashed_password):
+        if not user.hashed_password or not cls.verify_password(password, user.hashed_password):
             return None
         return user
 

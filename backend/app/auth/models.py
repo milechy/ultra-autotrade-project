@@ -19,6 +19,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS ix_users_privy_did ON users (privy_did) WHERE 
 -- CheckConstraint と SQLAlchemy 側 server_default を Alembic migration で同期する。
 ALTER TABLE users ADD CONSTRAINT users_execution_policy_check
     CHECK (execution_policy IN ('auto_execute', 'require_approval', 'proposal_only'));
+
+-- GID 1214176336328111: auth method check + hashed_password nullable 化
+-- Privy-only ユーザーを将来サポートするため hashed_password を nullable に変更。
+-- hashed_password IS NOT NULL OR privy_did IS NOT NULL の CHECK constraint で
+-- 「どちらも NULL」な幽霊ユーザーを DB レベルで防ぐ。
+ALTER TABLE users ALTER COLUMN hashed_password DROP NOT NULL;
+ALTER TABLE users ADD CONSTRAINT users_auth_method_check
+    CHECK (hashed_password IS NOT NULL OR privy_did IS NOT NULL);
 """
 
 import logging
@@ -205,12 +213,16 @@ class User(Base):
             + ")",
             name="users_execution_policy_check",
         ),
+        CheckConstraint(
+            "hashed_password IS NOT NULL OR privy_did IS NOT NULL",
+            name="users_auth_method_check",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    hashed_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default=UserRole.VIEWER.value)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
