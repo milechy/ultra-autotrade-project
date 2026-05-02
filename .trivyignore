@@ -10,12 +10,3 @@ GHSA-h25m-26qc-wcjf
 # Next.js 14→15 upgrade tracked as Asana 1214129072009759 (due 2026-05-31)
 # Temporary suppression until upgrade is completed
 GHSA-q4gf-8mx6-v5v3
-
-# pip 24.0 MEDIUM/LOW CVEs in python:3.11-slim base image
-# Root cause: trivy-action uses limit-severities-for-sarif=false (default), so
-# SARIF output includes all severities and exit-code=1 triggers on ANY result.
-# These are MEDIUM/LOW severity and do not affect the running application.
-# Proper fix: upgrade pip in Dockerfile runtime stage OR set
-# limit-severities-for-sarif: true in ci.yml (tracked separately).
-CVE-2025-8869
-CVE-2026-1703
