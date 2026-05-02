@@ -19,6 +19,36 @@ fail() {
   exit 1
 }
 
+# ── Gate 0: Chain Config Consistency ─────────
+
+step "[0/7] Chain Config Consistency"
+if [ -f "$PROJECT_ROOT/.env.production" ]; then
+  CHAIN_ID=$(grep "^NEXT_PUBLIC_DEFAULT_CHAIN_ID=" "$PROJECT_ROOT/.env.production" 2>/dev/null | cut -d= -f2)
+  if [ "$CHAIN_ID" = "8453" ]; then
+    if grep -rn "Sepolia" \
+        "$PROJECT_ROOT/frontend/app/" \
+        "$PROJECT_ROOT/frontend/components/" \
+        "$PROJECT_ROOT/frontend/lib/" \
+        2>/dev/null \
+        | grep -v "__mocks__\|\.spec\.\|\.test\." > /tmp/sepolia_check.log 2>&1; then
+      echo "ERROR: Chain is mainnet (8453) but 'Sepolia' is hard-coded in frontend:"
+      cat /tmp/sepolia_check.log
+      echo ""
+      echo "Fix: Update the above files to use 'メインネット' or 'Mainnet'"
+      rm -f /tmp/sepolia_check.log
+      exit 1
+    fi
+    rm -f /tmp/sepolia_check.log
+    echo "✅ Gate 0 pass: No Sepolia hardcode in mainnet config"
+  elif [ "$CHAIN_ID" = "84532" ]; then
+    echo "ℹ Gate 0 skipped: Chain is Sepolia testnet (84532)"
+  else
+    echo "⚠ Gate 0 skipped: NEXT_PUBLIC_DEFAULT_CHAIN_ID not 8453 or 84532, value: '$CHAIN_ID'"
+  fi
+else
+  echo "⚠ Gate 0 skipped: .env.production not found (CI environment)"
+fi
+
 # ── Backend ──────────────────────────────────
 
 step "[1/7] ruff check"

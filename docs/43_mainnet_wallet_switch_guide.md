@@ -224,6 +224,43 @@ curl -sf https://api.ultra-auto-trade.com/aave/status | python3 -m json.tool
 
 ---
 
+## 2.5 frontend 表示テキスト確認 (NEW — 2026-05-02 インシデント対策)
+
+> 2026-05-02 に `frontend/app/page.tsx` の "Base Sepolia" ハードコード残存が検出されなかったことに起因。
+> 技術設定 (env/RPC) のチェックに加え、**ユーザー目に触れる表示テキスト**も必ずチェックすること。
+
+### 2.5.1 コードベース grep チェック (デプロイ前必須)
+
+```bash
+grep -rn "Sepolia" frontend/app/ frontend/components/ frontend/lib/ \
+  | grep -v "__mocks__\|\.spec\.\|\.test\."
+
+grep -rn "テストネット\|testnet" frontend/app/ frontend/components/ \
+  | grep -v "__mocks__\|\.spec\."
+```
+
+期待: 出力ゼロ (mainnet 切替後)
+発見された場合: mainnet 表記に修正してから deploy すること
+
+### 2.5.2 post-deploy curl チェック (deploy 直後必須)
+
+```bash
+curl -s https://app.ultra-auto-trade.com 2>&1 | grep -iE "sepolia|テストネット"
+# 期待: 出力ゼロ
+
+curl -s https://app.ultra-auto-trade.com 2>&1 | grep -iE "メインネット|mainnet"
+# 期待: 複数箇所でヒット
+```
+
+### 2.5.3 ブラウザ目視確認 (deploy 直後推奨)
+
+以下を実機ブラウザで確認:
+- ランディング (/) の「対応プロトコル・チェーン」セクション → "Base メインネット" 表示
+- FAQ の「対応ウォレット」「対応チェーン・プロトコル」項目を展開し Sepolia 表記がないこと
+- スクリーンショットを `docs/images/mainnet_switch/` に保存し PR に添付
+
+---
+
 ## 5. 切替後監視 (24h)
 
 | 確認項目 | 方法 | 頻度 |
