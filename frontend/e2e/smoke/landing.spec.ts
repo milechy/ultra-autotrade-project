@@ -17,13 +17,13 @@ test.describe('U-01 ランディングページ (/)', () => {
     await expect(hero).toBeVisible();
   });
 
-  test('CTAボタン「ウォレットを接続する」が表示される', async ({ page }) => {
-    const cta = page.getByRole('link', { name: 'ウォレットを接続する' }).first();
+  test('CTAボタン「ウォレットで始める」が表示される', async ({ page }) => {
+    const cta = page.getByRole('link', { name: 'ウォレットで始める' }).first();
     await expect(cta).toBeVisible();
   });
 
   test('CTAボタンクリックで /connect に遷移する', async ({ page }) => {
-    const cta = page.getByRole('link', { name: 'ウォレットを接続する' }).first();
+    const cta = page.getByRole('link', { name: 'ウォレットで始める' }).first();
     await cta.click();
     await page.waitForURL('**/connect');
     expect(page.url()).toContain('/connect');

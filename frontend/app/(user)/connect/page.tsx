@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { ethers } from 'ethers'
-import { Wallet, CheckCircle, AlertTriangle, ArrowRight } from 'lucide-react'
+import { Wallet, CheckCircle, AlertTriangle, ArrowRight, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/lib/auth'
@@ -88,10 +88,16 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 
 export default function ConnectPage() {
   const router = useRouter()
-  const { loginWithWallet } = useAuth()
+  const { loginWithWallet, isAuthenticated, user } = useAuth()
   const { login, authenticated } = usePrivy()
   const { wallets } = useWallets()
   const { checkMinimum, minimumUSD } = useMinimumBalance()
+
+  // tester_onboarding 途中ユーザー: メール/PW で /register 完了済 (JWT あり) かつ
+  // wallet 未接続 (Privy authenticated=false) の場合、ガイダンスを表示する。
+  // 管理者は /register が引き続き正規動線なので除外。
+  const showResumeFromEmailGuidance =
+    isAuthenticated && !authenticated && user?.role !== 'admin'
 
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [riskAccepted, setRiskAccepted] = useState(false)
@@ -173,6 +179,27 @@ export default function ConnectPage() {
             ウォレットまたはメールアドレスで接続してください
           </p>
         </div>
+
+        {/* tester_onboarding 途中ユーザー向けガイダンス */}
+        {showResumeFromEmailGuidance && (
+          <div
+            data-testid="resume-from-email-banner"
+            className="mb-6 rounded-lg border border-blue-700 bg-blue-950/40 px-4 py-3 text-sm"
+          >
+            <div className="flex items-start gap-2">
+              <Info className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <p className="font-semibold text-blue-200">
+                  メール登録は完了しています
+                </p>
+                <p className="text-blue-100/80 text-xs leading-relaxed">
+                  運用を開始するには、続けてウォレットを接続してください。
+                  接続後にダッシュボードへ遷移します。
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-4">
 

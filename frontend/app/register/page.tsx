@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Wallet } from "lucide-react";
 
 interface InvitationResponse {
   valid: boolean;
@@ -94,11 +94,34 @@ function RegisterForm() {
     (Boolean(urlCode) && codeStatus === "invalid");
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-muted/40 p-4">
+      {/* Deprecation banner: 一般ユーザーは /connect (Privy) に誘導、管理者専用 */}
+      <div
+        role="status"
+        aria-label="メール登録は管理者専用です"
+        data-testid="register-deprecation-banner"
+        className="w-full max-w-sm mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+      >
+        <p className="font-semibold flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" />
+          メール登録は管理者専用です
+        </p>
+        <p className="mt-1 text-xs">
+          一般ユーザーの方は<a href="/connect" className="font-semibold underline underline-offset-2 mx-1">ウォレット接続</a>で開始してください。
+        </p>
+        <a
+          href="/connect"
+          className="mt-2 inline-flex items-center gap-1.5 rounded border border-amber-400 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 dark:bg-amber-900 dark:text-amber-50 dark:hover:bg-amber-800"
+          data-testid="register-banner-connect-link"
+        >
+          <Wallet className="h-3.5 w-3.5" />
+          ウォレットで始める
+        </a>
+      </div>
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Ultra AutoTrade</CardTitle>
-          <CardDescription>アカウント登録</CardDescription>
+          <CardDescription>アカウント登録（管理者用）</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

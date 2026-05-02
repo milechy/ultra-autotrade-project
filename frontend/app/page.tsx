@@ -96,8 +96,11 @@ export default function LandingPage() {
               size="lg"
               className="bg-blue-500 hover:bg-blue-600 text-white text-base px-8 py-6 h-auto"
             >
-              <Link href="/connect">ウォレットを接続する</Link>
+              <Link href="/connect">ウォレットで始める</Link>
             </Button>
+            <p className="mt-4 text-xs text-gray-500">
+              メールアドレス不要。ウォレットを接続するだけで開始できます。
+            </p>
           </div>
         </div>
       </section>
@@ -234,7 +237,7 @@ export default function LandingPage() {
             size="lg"
             className="bg-blue-500 hover:bg-blue-600 text-white text-base px-8 py-6 h-auto"
           >
-            <Link href="/connect">ウォレットを接続する</Link>
+            <Link href="/connect">ウォレットで始める</Link>
           </Button>
         </div>
       </section>

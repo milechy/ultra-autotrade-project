@@ -53,14 +53,14 @@ async function clickConnectAndWait(page: import('@playwright/test').Page) {
 test.describe('[Landing] CTAボタン', () => {
   test('ヒーローセクションにCTAボタンが表示される', async ({ page }) => {
     await page.goto('/')
-    // The hero section link button text
-    const cta = page.getByRole('link', { name: 'ウォレットを接続する' }).first()
+    // The hero section link button text (B案改: ウォレットファーストCTA)
+    const cta = page.getByRole('link', { name: 'ウォレットで始める' }).first()
     await expect(cta).toBeVisible()
   })
 
   test('CTAボタンをクリックすると /connect に遷移する', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('link', { name: 'ウォレットを接続する' }).first().click()
+    await page.getByRole('link', { name: 'ウォレットで始める' }).first().click()
     await expect(page).toHaveURL(/\/connect/)
     await expect(page.getByRole('heading', { name: 'ウォレットを接続' })).toBeVisible()
   })
@@ -317,7 +317,7 @@ test.describe('[Mobile 375px] 基本フロー', () => {
 
   test('ランディングページのCTAボタンがモバイルで表示される', async ({ page }) => {
     await page.goto('/')
-    const cta = page.getByRole('link', { name: 'ウォレットを接続する' }).first()
+    const cta = page.getByRole('link', { name: 'ウォレットで始める' }).first()
     await expect(cta).toBeVisible()
   })
 
