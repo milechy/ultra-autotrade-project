@@ -47,22 +47,20 @@ async function clickConnectAndWait(page: import('@playwright/test').Page) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// 1. Landing page
+// 1. /connect エントリポイント (旧 Landing page)
+// / は未認証ユーザーを /login にリダイレクトするゲートになったため、
+// ウォレット接続のエントリポイントは /connect を直接テストする。
 // ──────────────────────────────────────────────────────────────────────────────
 
-test.describe('[Landing] CTAボタン', () => {
-  test('ヒーローセクションにCTAボタンが表示される', async ({ page }) => {
-    await page.goto('/')
-    // The hero section link button text
-    const cta = page.getByRole('link', { name: 'ウォレットを接続する' }).first()
-    await expect(cta).toBeVisible()
-  })
-
-  test('CTAボタンをクリックすると /connect に遷移する', async ({ page }) => {
-    await page.goto('/')
-    await page.getByRole('link', { name: 'ウォレットを接続する' }).first().click()
-    await expect(page).toHaveURL(/\/connect/)
-    await expect(page.getByRole('heading', { name: 'ウォレットを接続' })).toBeVisible()
+// /connect エントリポイント確認 (旧 Landing page CTA テスト)
+// / は未認証ユーザーを /login にリダイレクトするゲートになったため、
+// ウォレット接続の入口として /connect を直接テストする。
+// ボタン表示の詳細確認は既存の [Connect] 初期状態 describe に委譲。
+test.describe('[Connect] エントリポイント確認', () => {
+  test('/connect にアクセスするとウォレット接続ページが表示される', async ({ page }) => {
+    await page.goto('/connect')
+    // 見出しは Privy 初期化前から静的にレンダリングされる
+    await expect(page.getByRole('heading', { name: 'ウォレットを接続' })).toBeVisible({ timeout: 15000 })
   })
 })
 
@@ -315,10 +313,9 @@ test.describe.skip('[Connect] 規約同意セクション', () => {
 test.describe('[Mobile 375px] 基本フロー', () => {
   test.use({ viewport: { width: 375, height: 812 } })
 
-  test('ランディングページのCTAボタンがモバイルで表示される', async ({ page }) => {
-    await page.goto('/')
-    const cta = page.getByRole('link', { name: 'ウォレットを接続する' }).first()
-    await expect(cta).toBeVisible()
+  test('/connect にウォレット接続ページが表示される', async ({ page }) => {
+    await page.goto('/connect')
+    await expect(page.getByRole('heading', { name: 'ウォレットを接続' })).toBeVisible({ timeout: 15000 })
   })
 
   test('/connect の3ステップインジケーターがモバイルで表示される', async ({
