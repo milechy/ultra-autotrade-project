@@ -42,11 +42,11 @@ test.describe('レスポンシブテスト', () => {
     await expect(nav).toBeHidden();
   });
 
-  test('ランディングページ: モバイル（375px）でヒーローが表示される', async ({ page }) => {
+  test('ルートページ: モバイル（375px）で /login にリダイレクトされる', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/');
-    const hero = page.locator('h1').filter({ hasText: 'AIが導く' });
-    await expect(hero).toBeVisible();
-    await page.screenshot({ path: 'e2e/screenshots/landing-375.png' });
+    await page.waitForURL('**/login', { timeout: 8000 });
+    await page.screenshot({ path: 'e2e/screenshots/login-375.png' });
+    expect(page.url()).toContain('/login');
   });
 });
