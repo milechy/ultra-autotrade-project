@@ -656,6 +656,25 @@ docker exec <frontend> grep -r "http://77" /app/.next/static/chunks/ | wc -l
 ### 2026-04-03追加（デプロイ・運用）
 
 - **`scripts/deploy_production.sh` を必ず使う。**（2026-04-17 B案リネーム: 旧 `deploy_staging.sh`）手打ちデプロイは孤立コンテナ（Conflict）、`--env-file` 忘れ（`NEXT_PUBLIC_*` 未焼き込み）、ビルドスキップ（古いイメージ起動）の3問題を毎回引き起こす。`deploy_production.sh` は `down --remove-orphans` → `docker rm -f` → `build --no-cache` → `up -d` → ヘルスチェック → Slack通知まで全自動。`--frontend-only` / `--backend-only` / `--no-build` オプションあり
+
+#### Lesson Learned: 2026-05-03 手打ちdeploy違反インシデント（claude.ai生成プロンプト起因）
+
+**事象**: PR #191 デプロイで `docker compose -p ultra-autotrade-project -f docker-compose.production.yml build --no-cache frontend` を**手打ち実行**し、`--env-file .env.production` が抜けて `NEXT_PUBLIC_PRIVY_APP_ID` が空展開でビルドされた。本番ウォレット接続ボタンが完全死亡し、本番テスター（山本さん）が詰まり、復旧に追加 4-5 時間を要した。
+
+**真因**: claude.ai が生成したデプロイプロンプトに `docker compose ... build` 直接コマンドが含まれていた。CLAUDE.md に「`deploy_production.sh` 必須」と上記で明記されていたが、claude.ai 側でルール参照漏れ。`compose config` で確認すると `--env-file` なしでは `${NEXT_PUBLIC_PRIVY_APP_ID:-}` が空展開、ありでは正しい値が解決される、と機械的に再現できた。
+
+**再発防止（絶対遵守）**:
+1. **本番 frontend 再ビルドは `./scripts/deploy_production.sh --frontend-only` のみ。** 手打ち `docker compose ... build` を含むプロンプトを生成・実行しない／受け取った場合は拒否して `deploy_production.sh` への置き換えを要求
+2. デプロイ後は必ず焼き込み確認（値が JS バンドルに入っているか grep で検証）:
+   ```bash
+   PRIVY_VAL=$(grep '^NEXT_PUBLIC_PRIVY_APP_ID=' /opt/ultra-autotrade/.env.production | cut -d= -f2-)
+   docker exec ultra-autotrade-frontend-production sh -c \
+     "grep -lE '$PRIVY_VAL' /app/.next/static/chunks/*.js | wc -l"
+   # 0件なら焼き込み失敗 → 即ロールバック
+   ```
+3. 焼き込み確認パス後も Gate 4 実機検証（Claude in Chrome / Playwright で Privy モーダル発火確認）必須
+4. `--env-file` を付け忘れる手打ちが疑われる場合は `docker compose -p ultra-autotrade-project --env-file .env.production -f docker-compose.production.yml config` で `${NEXT_PUBLIC_*}` の解決値を事前確認できる
+
 - **`docker compose build --no-cache` だけでは不十分な場合がある。** `--no-cache` はレイヤーキャッシュをスキップするが、**古いイメージ自体は残る**。COMPOSE_PROJECT_NAMEや--env-fileが不一致だと別名のイメージが使われ続ける。`deploy_production.sh` ではビルド前に `docker rmi -f` でイメージを完全削除してから再ビルドするため、この問題は自動的に回避される。手動で修正する場合は: `docker images | grep frontend | awk '{print $3}' | xargs -r docker rmi -f && docker compose build --no-cache frontend`
 - **`docker system prune -af` の後は全コンテナリビルドが必須。** イメージが削除されるため `up -d` しても起動しない。prune後は必ず `deploy_production.sh`（フルビルド）を実行
 - **テストアカウント（@ultra-autotrade.com系）は DB ボリューム再作成で消える可能性がある。** 消えた場合は `bcrypt` でハッシュ生成 → `INSERT INTO users` で再作成。Registration API が無効化されている場合がある（`INITIAL_ADMIN_EMAIL` 未設定）
