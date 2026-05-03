@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { ethers } from 'ethers'
-import { Wallet, CheckCircle, AlertTriangle, ArrowRight } from 'lucide-react'
+import { Wallet, CheckCircle, AlertTriangle, ArrowRight, Network } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/lib/auth'
@@ -167,6 +167,14 @@ export default function ConnectPage() {
 
         {/* Step Indicator */}
         <StepIndicator currentStep={currentStep} />
+
+        {/* Network Badge — env-driven, e.g. "Base メインネット (Chain 8453)" */}
+        <div className="text-center mb-3">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-950/40 border border-blue-800 text-xs text-blue-300">
+            <Network className="w-3 h-3" />
+            {CHAIN_DISPLAY_NAMES[DEFAULT_CHAIN_ID] ?? `Chain ${DEFAULT_CHAIN_ID}`} (Chain {DEFAULT_CHAIN_ID})
+          </span>
+        </div>
 
         {/* Header */}
         <div className="text-center mb-8">
