@@ -65,6 +65,16 @@
 - **影響範囲**: startup シーケンスのみ。`PROCESS_NEWS_INTERVAL_SECONDS` 未設定時は 300秒間隔で動作。既存の `/automation/process-news` エンドポイントは無変更で、内部から HTTP POST で叩く構造。
 - **承認**: fix/production-401-unauthorized → main の通常フロー経由（PR #157）
 
+### 変更 #6: RAS Phase 1 referral_router 登録 (PR #194 / 2026-05-08)
+- **コミット範囲**: `72148ce` (feature/ras-l2-backend-api)
+- **変更内容**:
+  - `from app.referral.router import router as referral_router` を追加
+  - `app.include_router(referral_router)` を register_routers() に 1 行追加
+  - 計 2 行追加のみ
+- **理由**: F-17 + RAS Phase 1 (Asana 1214629980953220) — 紹介機能 (Referral Attribution System Phase 1) の API 群 (POST /referral/code / GET /referral/list / GET /referral/users/{id}/transactions) を FastAPI app に登録。partner ロールが自身の紹介コードを発行・紹介済みユーザー一覧と取引履歴 (deposit/withdraw/borrow/repay のみ、wallet/tx_hash 非開示) を閲覧する Phase 1 機能。
+- **影響範囲**: 新規 router 追加のみ。既存 endpoint への影響なし。tests/test_referral_router.py で既存 endpoint の404でないことを保証。
+- **承認**: feature/ras-l2-backend-api → main の通常フロー経由（PR #194）
+
 ## backend/app/database.py
 
 変更なし（現時点）
