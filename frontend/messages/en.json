@@ -314,6 +314,32 @@
       "aggressive": "Aggressively pursuing high returns"
     }
   },
+  "referral": {
+    "code": {
+      "title": "Referral Link",
+      "copy": "Copy",
+      "copied": "Copied!"
+    },
+    "list": {
+      "empty": "No referred users yet",
+      "users": "Referred Users"
+    },
+    "transaction": {
+      "type": {
+        "deposit": "Deposit",
+        "withdraw": "Withdraw",
+        "borrow": "Borrow",
+        "repay": "Repay"
+      }
+    }
+  },
+  "register": {
+    "referralCode": {
+      "applied": "Referral code applied",
+      "consent": "I consent to the referrer viewing my transaction history (type/amount/date, excluding wallet info)",
+      "required": "An invitation code is required. Please access via the referral link (/r/<code>) provided by your referrer."
+    }
+  },
   "CopyTrading": {
     "title": "Copy Trading",
     "subtitle": "Follow professional strategists and auto-copy their trades",

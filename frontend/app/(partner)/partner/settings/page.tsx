@@ -25,6 +25,7 @@ import { PasswordChangeCard } from '@/app/(user)/settings/_components/PasswordCh
 import { getStoredToken } from '@/lib/auth'
 import { putJson, getJson } from '@/lib/api/http'
 import { WalletConnectCard } from '@/components/partner/WalletConnectCard'
+import { ReferralTab } from '@/components/partner/ReferralTab'
 
 // ---- Profile Card (email + username) ----------------------------------------
 
@@ -275,6 +276,7 @@ export default function PartnerSettingsPage() {
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
       <h1 className="text-2xl font-bold">設定</h1>
       <WalletConnectCard />
+      <ReferralTab />
       <ExecutionModeCard />
       <ProfileCard />
       <PasswordChangeCard />
