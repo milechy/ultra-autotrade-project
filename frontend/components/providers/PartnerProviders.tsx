@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '@/lib/auth'
 import AppShell from '@/components/layout/AppShell'
 import { AutomationStatusProvider } from '@/components/user/UserProviders'
 import { EmergencyStopFloat } from '@/components/shared/EmergencyStopFloat'
+import { Toaster } from 'sonner'
 
 function PartnerGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isPartner, isLoading } = useAuth()
@@ -40,6 +41,7 @@ export function PartnerProviders({ children }: { children: React.ReactNode }) {
         <AutomationStatusProvider>
           <AppShell>{children}</AppShell>
           <EmergencyStopFloat />
+          <Toaster position="top-center" richColors />
         </AutomationStatusProvider>
       </PartnerGuard>
     </AuthProvider>
