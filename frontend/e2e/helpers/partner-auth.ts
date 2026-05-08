@@ -11,7 +11,7 @@ import path from 'path'
 
 export const PARTNER_MOCK_USER = {
   id: 15,
-  email: 'partner-e2e@ultra-autotrade.com',
+  email: 'e2e-user@ultra-autotrade.com',
   username: 'e2e-user',
   role: 'partner',
   is_active: true,
