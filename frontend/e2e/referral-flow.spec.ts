@@ -160,11 +160,10 @@ test.describe('[RAS] partner referral flow', () => {
     // email mask が表示されること
     await expect(page.getByText('te**@example.com')).toBeVisible({ timeout: 10_000 })
 
-    // ロール表示 (viewer / テスター 等)
-    const hasRole =
-      (await page.getByText('viewer').isVisible({ timeout: 3_000 }).catch(() => false)) ||
-      (await page.getByText('テスター').isVisible({ timeout: 1_000 }).catch(() => false))
-    expect(hasRole).toBeTruthy()
+    // 「取引履歴」リンクが表示されること (Lane3: ロール列なし、詳細リンク列のみ)
+    await expect(page.getByRole('link', { name: '取引履歴' }).first()).toBeVisible({
+      timeout: 5_000,
+    })
 
     await saveScreenshot(page, 'tc3-referral-list')
   })
@@ -191,9 +190,15 @@ test.describe('[RAS] partner referral flow', () => {
     await page.goto('/partner/referral')
     await page.waitForLoadState('domcontentloaded')
 
-    // 紹介ユーザーが表示されたら最初のユーザーをクリックして取引履歴を展開
+    // 紹介ユーザー一覧が表示されたら「取引履歴」リンクをクリックして詳細ページへ遷移
+    // (Lane3: インライン展開ではなく /partner/referral/{id} への画面遷移)
     await expect(page.getByText('te**@example.com')).toBeVisible({ timeout: 10_000 })
-    await page.getByText('te**@example.com').click()
+    const detailLink = page.getByRole('link', { name: '取引履歴' }).first()
+    await expect(detailLink).toBeVisible({ timeout: 5_000 })
+    await detailLink.click()
+
+    await page.waitForLoadState('domcontentloaded')
+    expect(page.url()).toContain('/partner/referral/')
 
     // 取引タイプ「入金」が表示されること
     await expect(page.getByText('入金')).toBeVisible({ timeout: 8_000 })
@@ -219,7 +224,6 @@ test.describe('[RAS] partner referral flow', () => {
         ),
       )
       if (containers.length === 0) {
-        // コンテナが特定できない場合は body 全体で確認
         return document.body.innerHTML.includes('tx_hash')
       }
       return containers.some((c) => c.textContent?.toLowerCase().includes('wallet'))
@@ -366,23 +370,18 @@ test.describe('[RAS] referral registration', () => {
 
     await page.getByLabel('パスワード').fill('Test1234!!')
 
-    // consent チェックなしで送信
+    // consent 未チェック → submit ボタンは disabled (Lane3 実装: disabled={!consent})
+    // disabled ボタンへの click() はタイムアウトするため、disabled アサーションで代替
     const submitBtn = page
       .getByRole('button', { name: /登録|アカウントを作成/ })
       .first()
-    await submitBtn.click()
+    await expect(submitBtn).toBeDisabled({ timeout: 5_000 })
 
-    await page.waitForTimeout(2_000)
+    // フォームは送信されていないこと
+    expect(requestMade).toBe(false)
 
-    if (requestMade) {
-      // 送信された場合: 422 エラーメッセージが表示されること
-      const errorEl = page.locator('[role="alert"], .text-destructive').first()
-      const errorText = await errorEl.textContent().catch(() => '')
-      expect((errorText ?? '').length).toBeGreaterThan(0)
-    } else {
-      // クライアント側バリデーションでブロックされた場合: ページに留まっていること
-      expect(page.url()).toContain('/auth/register')
-    }
+    // ページが /auth/register に留まっていること
+    expect(page.url()).toContain('/auth/register')
 
     await saveScreenshot(page, 'tc7-consent-validation-error')
   })

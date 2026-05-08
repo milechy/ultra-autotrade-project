@@ -39,17 +39,27 @@ async function saveScreenshot(page: Page, name: string): Promise<void> {
   })
 }
 
-/** DOM のテキストノードを列挙して英語単語 pattern にマッチするものを返す。*/
+/** DOM のテキストノードを列挙して英語単語 pattern にマッチするものを返す。
+ *  script / style / noscript 内のテキストは除外する（Next.js RSC/__next_f 誤検出防止）。
+ */
 async function findEnglishTextNodes(
   page: Page,
   pattern: RegExp,
 ): Promise<string[]> {
   return page.evaluate((patternSource: string) => {
     const re = new RegExp(patternSource, 'i')
+    const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT'])
     const walker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,
-      null,
+      {
+        acceptNode(node) {
+          const tag = node.parentElement?.tagName ?? ''
+          return SKIP_TAGS.has(tag)
+            ? NodeFilter.FILTER_REJECT
+            : NodeFilter.FILTER_ACCEPT
+        },
+      },
     )
     const matches: string[] = []
     let node: Node | null
