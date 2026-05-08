@@ -196,10 +196,13 @@ test.describe('[RAS] partner referral flow', () => {
     await expect(page.getByText('te**@example.com')).toBeVisible({ timeout: 10_000 })
     const detailLink = page.getByRole('link', { name: '取引履歴' }).first()
     await expect(detailLink).toBeVisible({ timeout: 5_000 })
-    await detailLink.click()
-
-    await page.waitForLoadState('domcontentloaded')
-    expect(page.url()).toContain('/partner/referral/')
+    // Next.js client-side navigation のため waitForURL で遷移完了を確実に待つ
+    // (waitForLoadState だけでは domcontentloaded が再 fire せず race condition になる)
+    await Promise.all([
+      page.waitForURL(/\/partner\/referral\/\d+/, { timeout: 10_000 }),
+      detailLink.click(),
+    ])
+    expect(page.url()).toMatch(/\/partner\/referral\/\d+/)
 
     // 取引タイプ「入金」が表示されること
     await expect(page.getByText('入金')).toBeVisible({ timeout: 8_000 })
