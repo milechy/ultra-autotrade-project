@@ -112,7 +112,8 @@ test.describe('[RAS] partner referral flow', () => {
 
     expect(page.url()).toContain('/partner/referral')
 
-    await expect(page.getByText('AB12CD34')).toBeVisible({ timeout: 10_000 })
+    // exact: true でコードスパン（"AB12CD34"）のみに絞る（URL スパンとの strict 違反回避）
+    await expect(page.getByText('AB12CD34', { exact: true })).toBeVisible({ timeout: 10_000 })
 
     await saveScreenshot(page, 'tc1-referral-code-display')
   })
@@ -136,7 +137,7 @@ test.describe('[RAS] partner referral flow', () => {
     await page.goto('/partner/referral')
     await page.waitForLoadState('domcontentloaded')
 
-    await expect(page.getByText('AB12CD34')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('AB12CD34', { exact: true })).toBeVisible({ timeout: 10_000 })
 
     const copyBtn = page.getByRole('button', { name: /コピー/ }).first()
     await expect(copyBtn).toBeVisible({ timeout: 5_000 })
