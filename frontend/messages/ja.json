@@ -314,6 +314,32 @@
       "aggressive": "高リターンを重視して積極的に運用します"
     }
   },
+  "referral": {
+    "code": {
+      "title": "招待リンク",
+      "copy": "コピー",
+      "copied": "コピーしました"
+    },
+    "list": {
+      "empty": "紹介したユーザーはいません",
+      "users": "紹介済みユーザー"
+    },
+    "transaction": {
+      "type": {
+        "deposit": "入金",
+        "withdraw": "出金",
+        "borrow": "借入",
+        "repay": "返済"
+      }
+    }
+  },
+  "register": {
+    "referralCode": {
+      "applied": "招待コード適用済",
+      "consent": "紹介者があなたの取引履歴（種別/金額/日時、ウォレット情報を除く）を閲覧することに同意します",
+      "required": "招待コードが必要です。紹介者から受け取った招待リンク（/r/<code>）からアクセスしてください"
+    }
+  },
   "CopyTrading": {
     "title": "コピートレード",
     "subtitle": "プロのストラテジストをフォローして自動コピー",
