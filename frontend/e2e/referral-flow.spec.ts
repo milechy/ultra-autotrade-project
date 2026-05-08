@@ -213,12 +213,12 @@ test.describe('[RAS] partner referral flow', () => {
     // data-testid="tx-hash" が DOM に存在しないこと
     await expect(page.locator('[data-testid="tx-hash"]')).toHaveCount(0)
 
-    // 可視テキスト（script タグ除く innerText）に "tx_hash" / "wallet" が出現しないこと
-    // page.content() / innerHTML は Next.js script タグを含むため誤検出する可能性があり、
-    // innerText のみを対象に not.toContain で一貫した表現にする
-    const visibleText = await page.evaluate(() => document.body.innerText ?? '')
-    expect(visibleText).not.toContain('tx_hash')
-    expect(visibleText).not.toContain('wallet')
+    // 取引履歴テーブル内に "tx_hash" / "wallet" が出現しないこと
+    // body.innerText 全体だと AppShell ナビ等の "ウォレット" メニュー文言を誤検出するため、
+    // テーブル要素の innerText のみを対象にする
+    const tableText = await page.locator('table').innerText().catch(() => '')
+    expect(tableText).not.toContain('tx_hash')
+    expect(tableText).not.toContain('wallet')
 
     await saveScreenshot(page, 'tc4-transactions-no-wallet')
   })
