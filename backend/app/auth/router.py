@@ -41,6 +41,7 @@ from .schemas import (
     PasswordChangeRequest,
     RegisterRequest,
     RegisterResponse,
+    RegisterWithReferralRequest,
     RiskModeUpdateRequest,
     TermsAcceptRequest,
     TermsStatusResponse,
@@ -76,7 +77,7 @@ def register(
     Register a user.
 
     - With invitation_code: register as viewer via partner invitation.
-    - Without invitation_code: initial admin registration (first user only).
+    - Without code: initial admin registration (first user only).
     """
     if request.invitation_code:
         from app.invitations import service as invitation_service  # noqa: PLC0415
@@ -143,6 +144,78 @@ def register(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
+
+@router.post(
+    "/register-with-referral",
+    response_model=RegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Referral-based user registration (invitation-only signup)",
+)
+def register_with_referral(
+    request: RegisterWithReferralRequest,
+    db: Session = Depends(get_db),
+) -> RegisterResponse:
+    """
+    Register a new user via partner referral code.
+
+    Validation order (per spec):
+    1. referral_code format (8-char alphanumeric) — Pydantic 422
+    2. referral_code DB lookup — 404
+    3. referred_consent == true — 422
+    4. email duplicate — 409
+    5. create user (role=viewer fixed)
+    6. set referrer_id + referred_consent_at
+    7. issue JWT → 201
+    """
+    # Step 2: DB lookup
+    referrer = db.query(User).filter(User.referral_code == request.referral_code).first()
+    if referrer is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="referral code not found",
+        )
+
+    # Step 3: consent check
+    if not request.referred_consent:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="referral consent required",
+        )
+
+    # Step 4: email duplicate
+    if AuthService.get_user_by_email(db, request.email):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="email already registered",
+        )
+
+    # Step 5: create user (role=viewer, fixed)
+    try:
+        user = AuthService.create_user(db, request, role=UserRole.VIEWER.value)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    # Step 6: set referral fields
+    user.referrer_id = referrer.id
+    user.referred_consent_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(user)
+
+    logger.info(
+        "User registered via referral: %s (referrer_id=%d, code=%s)",
+        user.email,
+        referrer.id,
+        request.referral_code,
+    )
+
+    # Step 7: JWT
+    token, expires_in = AuthService.create_access_token(user.id, user.email, user.role)
+    return RegisterResponse(
+        **UserResponse.model_validate(user).model_dump(),
+        access_token=token,
+        expires_in=expires_in,
+    )
 
 
 @router.post(
