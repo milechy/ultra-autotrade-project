@@ -248,7 +248,7 @@ def test_get_referral_list_returns_referred_users_with_masked_email(
     assert "email" not in rows[0]
 
 
-# ── 4. POST /auth/register (referral_code + consent=true) → 201 + referrer_id ─
+# ── 4. POST /auth/register-with-referral (referral_code + consent=true) → 201 ─
 
 
 def test_register_with_referral_code_sets_referrer_and_consent(
@@ -265,7 +265,7 @@ def test_register_with_referral_code_sets_referrer_and_consent(
     )
 
     r = client.post(
-        "/auth/register",
+        "/auth/register-with-referral",
         json={
             "email": "newuser@example.com",
             "username": "newuser",
@@ -290,7 +290,7 @@ def test_register_with_referral_code_sets_referrer_and_consent(
         db.close()
 
 
-# ── 5. POST /auth/register (consent=false) → 422 ────────────────────────────
+# ── 5. POST /auth/register-with-referral (consent=false) → 422 ──────────────
 
 
 def test_register_without_consent_returns_422(client: TestClient, test_db: SessionFactory) -> None:
@@ -305,7 +305,7 @@ def test_register_without_consent_returns_422(client: TestClient, test_db: Sessi
     )
 
     r = client.post(
-        "/auth/register",
+        "/auth/register-with-referral",
         json={
             "email": "noconsent@example.com",
             "username": "noconsent",
@@ -315,16 +315,16 @@ def test_register_without_consent_returns_422(client: TestClient, test_db: Sessi
         },
     )
     assert r.status_code == 422
-    assert "紹介プログラム同意" in r.json()["detail"]
+    assert "referral consent required" in r.json()["detail"]
 
 
-# ── 6. POST /auth/register (referral_code='DEADBEEF') → 404 ─────────────────
+# ── 6. POST /auth/register-with-referral (referral_code='DEADBEEF') → 404 ───
 
 
 def test_register_with_invalid_referral_code_returns_404(client: TestClient) -> None:
     _register_initial_admin(client)
     r = client.post(
-        "/auth/register",
+        "/auth/register-with-referral",
         json={
             "email": "deadbeef@example.com",
             "username": "deadbeef",
@@ -334,7 +334,7 @@ def test_register_with_invalid_referral_code_returns_404(client: TestClient) -> 
         },
     )
     assert r.status_code == 404
-    assert r.json()["detail"] == "無効な紹介コード"
+    assert r.json()["detail"] == "referral code not found"
 
 
 # ── 7. GET /referral/users/{id}/transactions → wallet/tx_hash 含まない ──────

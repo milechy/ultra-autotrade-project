@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from web3 import Web3
 
 from .models import User, UserRole
-from .schemas import RegisterRequest, UserCreateRequest
+from .schemas import RegisterRequest, RegisterWithReferralRequest, UserCreateRequest
 
 logger = logging.getLogger(__name__)
 
@@ -218,7 +218,7 @@ class AuthService:
     def create_user(
         cls,
         db: Session,
-        request: RegisterRequest | UserCreateRequest,
+        request: RegisterRequest | RegisterWithReferralRequest | UserCreateRequest,
         role: str = UserRole.VIEWER.value,
     ) -> User:
         """

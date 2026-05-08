@@ -1,8 +1,8 @@
 # 15_rollback_procedures.md
 Ultra AutoTrade – ロールバック手順
 
-最終更新: 2026-04-19  
-主要変更: OctoBot削除、F-17a反映、Phase 1例外期間対応、OR ロジック emergency stop
+最終更新: 2026-05-08  
+主要変更: OctoBot削除、F-17a反映、Phase 1例外期間対応、OR ロジック emergency stop、F-17/RAS freeze期間追記
 
 ---
 
@@ -10,6 +10,7 @@ Ultra AutoTrade – ロールバック手順
 
 | 日付 | 変更内容 |
 |------|---------|
+| 2026-05-08 | **🔒 本番凍結期間通知追記**: F-17 (PR #193 / commit abaecdc) が main にマージ済。本番デプロイは RAS Phase 1 と一括（期限 2026-05-15）。凍結期間中は緊急 hotfix のみ許可、通常機能デプロイ禁止。dev/staging マージは通常通り。Lane 5 並列開発運用。 |
 | 2026-04-19 | 全面改訂。OctoBot廃止対応、F-17aカスタムリミッター追加、OR logic emergency stop反映、Phase 1例外期間の注意事項追加、デプロイフロー刷新（deploy_production.sh基準） |
 | 2026-01（旧版） | 初版。Notion→AI→OctoBot→Aaveフロー前提 |
 

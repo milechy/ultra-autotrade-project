@@ -6,6 +6,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import AppShell from '@/components/layout/AppShell'
+import { Toaster } from 'sonner'
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isAdmin, isPartner, isLoading } = useAuth()
@@ -35,7 +36,10 @@ export function AdminProviders({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <AdminGuard>
-        <AppShell>{children}</AppShell>
+        <AppShell>
+          {children}
+          <Toaster position="top-center" richColors />
+        </AppShell>
       </AdminGuard>
     </AuthProvider>
   )
