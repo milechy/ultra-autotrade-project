@@ -27,26 +27,18 @@ from app.auth.models import InvestmentTier as InvestmentTier  # noqa: E402, F401
 
 
 class RegisterRequest(BaseModel):
-    """初回管理者登録リクエスト（招待コードがある場合は招待登録）。
-
-    RAS Lane 2: referral_code / referred_consent を追加。
-    referral_code 指定時は紹介経由登録となり referrer_id / referred_consent_at が記録される。
-    """
+    """初回管理者登録または招待コード登録リクエスト。"""
 
     email: EmailStr
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=8, max_length=100)
     invitation_code: Optional[str] = None
-    referral_code: Optional[str] = None
-    referred_consent: bool = False
 
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str) -> str:
-        # アンダースコアとハイフンを除去した後、英数字のみかチェック
         if not v.replace("_", "").replace("-", "").isalnum():
             raise ValueError("Username must be alphanumeric (with _ or - allowed)")
-        # 先頭は英数字のみ許可（_や-で始まることを禁止）
         if not v[0].isalnum():
             raise ValueError("Username must start with a letter or number")
         return v.lower()
@@ -57,6 +49,39 @@ class RegisterRequest(BaseModel):
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
         return v
+
+
+class RegisterWithReferralRequest(BaseModel):
+    """紹介コード経由ユーザー登録リクエスト (RAS Lane 2.1)。"""
+
+    email: EmailStr
+    username: str = Field(min_length=3, max_length=50)
+    password: str = Field(min_length=8, max_length=100)
+    referral_code: str
+    referred_consent: bool
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        if not v.replace("_", "").replace("-", "").isalnum():
+            raise ValueError("Username must be alphanumeric (with _ or - allowed)")
+        if not v[0].isalnum():
+            raise ValueError("Username must start with a letter or number")
+        return v.lower()
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+    @field_validator("referral_code")
+    @classmethod
+    def validate_referral_code_format(cls, v: str) -> str:
+        if len(v) != 8 or not v.isalnum():
+            raise ValueError("invalid referral code format")
+        return v.upper()
 
 
 class LoginRequest(BaseModel):
