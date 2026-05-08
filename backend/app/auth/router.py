@@ -75,9 +75,44 @@ def register(
     """
     Register a user.
 
+    - With referral_code (RAS Lane 2): register as viewer via partner referral.
     - With invitation_code: register as viewer via partner invitation.
-    - Without invitation_code: initial admin registration (first user only).
+    - Without either: initial admin registration (first user only).
     """
+    # ── RAS Lane 2: referral_code path ────────────────────────────────────
+    if request.referral_code:
+        if not request.referred_consent:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="紹介プログラム同意が必要です",
+            )
+        referrer = db.query(User).filter(User.referral_code == request.referral_code).first()
+        if referrer is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="無効な紹介コード",
+            )
+        try:
+            user = AuthService.create_user(db, request, role=UserRole.VIEWER.value)
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        user.referrer_id = referrer.id
+        user.referred_consent_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(user)
+        logger.info(
+            "User registered via referral: %s (referrer_id=%d, code=%s)",
+            user.email,
+            referrer.id,
+            request.referral_code,
+        )
+        token, expires_in = AuthService.create_access_token(user.id, user.email, user.role)
+        return RegisterResponse(
+            **UserResponse.model_validate(user).model_dump(),
+            access_token=token,
+            expires_in=expires_in,
+        )
+
     if request.invitation_code:
         from app.invitations import service as invitation_service  # noqa: PLC0415
 

@@ -27,12 +27,18 @@ from app.auth.models import InvestmentTier as InvestmentTier  # noqa: E402, F401
 
 
 class RegisterRequest(BaseModel):
-    """初回管理者登録リクエスト（招待コードがある場合は招待登録）。"""
+    """初回管理者登録リクエスト（招待コードがある場合は招待登録）。
+
+    RAS Lane 2: referral_code / referred_consent を追加。
+    referral_code 指定時は紹介経由登録となり referrer_id / referred_consent_at が記録される。
+    """
 
     email: EmailStr
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=8, max_length=100)
     invitation_code: Optional[str] = None
+    referral_code: Optional[str] = None
+    referred_consent: bool = False
 
     @field_validator("username")
     @classmethod

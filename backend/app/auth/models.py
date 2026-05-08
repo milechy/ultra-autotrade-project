@@ -19,6 +19,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS ix_users_privy_did ON users (privy_did) WHERE 
 -- CheckConstraint と SQLAlchemy 側 server_default を Alembic migration で同期する。
 ALTER TABLE users ADD CONSTRAINT users_execution_policy_check
     CHECK (execution_policy IN ('auto_execute', 'require_approval', 'proposal_only'));
+
+-- RAS (Referral / Partner Affiliate System) Lane 1 schema. Lane 1 が DB schema 本体を
+-- 所有するが、Lane 2 (本ファイル) でも型解決のため同一定義を先行追加している。
+-- Lane 1 マージ時は同一定義のため conflict 解消は trivial。
+ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(16) NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS ix_users_referral_code ON users (referral_code) WHERE referral_code IS NOT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS referrer_id INTEGER NULL REFERENCES users(id);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_consent_at TIMESTAMP WITH TIME ZONE NULL;
 """
 
 import logging
@@ -261,6 +269,16 @@ class User(Base):
         String(20), nullable=False, default=InvestmentTier.LOWER.value
     )
     last_judgment_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    # RAS Lane 1 schema (Lane 2 先行定義 / 同一定義のため Lane 1 merge 時 conflict は trivial)
+    referral_code: Mapped[Optional[str]] = mapped_column(
+        String(16), unique=True, nullable=True, index=True, default=None
+    )
+    referrer_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True, default=None
+    )
+    referred_consent_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
 
