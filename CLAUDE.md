@@ -888,6 +888,18 @@ docker compose -f docker-compose.staging.yml --env-file .env.staging-new \
    - [ ] 外形 `/health` が production と staging で 200 を返すか
    - [ ] Cloudflare Dashboard 設定変更が必要な場合、PR description に明記したか
 
+6. **CF Access で保護した API サブドメインへのクロスオリジン fetch は必ず `credentials: 'include'` が必要。**
+   CF Access はブラウザセッションで `CF_Authorization` Cookie を使う。SPA (staging.ultra-auto-trade.com)
+   から CF Access 保護下の API (api-staging.ultra-auto-trade.com) に cross-origin fetch する場合、
+   `credentials: 'include'` がないと Cookie が送信されず毎回 302 ループになる (2026-05-09 UAT pre-check で発覚)。
+
+   **設計ルール:**
+   - CF Access Application に API サブドメインを追加する場合、対応する SPA の fetch オプションも同時に変更する (PR に両方含める)
+   - `frontend/lib/api/*.ts` の全 fetch 呼び出しには原則 `credentials: 'include'` を設定する
+   - CF Access Service Token (`CF-Access-Client-Id` / `CF-Access-Client-Secret` ヘッダー) は CI/curl 向け。ブラウザ SPA では Cookie + `credentials: 'include'` が正しいアプローチ
+   - staging で SPA + API を同一 CF Access Application に含める場合は、Cookie のクロスドメイン送信をブラウザで事前確認してから UAT に進む
+   - 参照: `docs/postmortems/2026-05-09_staging_api_502.md` §CF Access SPA cross-origin Cookie 問題
+
 **Dashboard 管理設定の事故パターン (3 回目):**
 
 | 日付 | 事象 | 共通点 |
