@@ -122,6 +122,7 @@ services:
 
   backend-blue:
     container_name: ultra-autotrade-backend-blue-staging-new
+    image: ghcr.io/milechy/ultra-autotrade-backend:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -162,6 +163,7 @@ services:
 
   backend-green:
     container_name: ultra-autotrade-backend-green-staging-new
+    image: ghcr.io/milechy/ultra-autotrade-backend:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -227,6 +229,7 @@ services:
 
   frontend:
     container_name: ultra-autotrade-frontend-staging-new
+    image: ghcr.io/milechy/ultra-autotrade-frontend-staging:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile

@@ -1,9 +1,10 @@
 name: Deploy to Staging
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["Build and Push to GHCR"]
+    types: [completed]
+    branches: [main]
 
 concurrency:
   group: staging-deployment
@@ -13,6 +14,7 @@ jobs:
   deploy:
     name: Deploy to Hetzner Staging
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Deploy via SSH
@@ -27,5 +29,5 @@ jobs:
             cd /opt/ultra-autotrade
             git fetch origin
             git reset --hard origin/main
-            ./scripts/deploy_staging.sh
+            ./scripts/deploy_staging.sh --backend-only
             echo "✅ Staging deployment completed"

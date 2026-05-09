@@ -194,8 +194,13 @@ deploy_backend_zero_downtime() {
   log "Blue/Green 切替開始 (staging): active=${active_slot} → new=${inactive_slot}(:${inactive_port})"
 
   if ! "${NO_BUILD}"; then
-    log "backend-${inactive_slot} をビルド中..."
-    ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build "backend-${inactive_slot}"
+    log "GHCR から backend イメージを pull (ローカルビルド省略)..."
+    if ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" pull "backend-${inactive_slot}" 2>/dev/null; then
+      log "✅ GHCR pull 成功"
+    else
+      log "WARN: GHCR pull 失敗 — ローカルビルドにフォールバック..."
+      ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build "backend-${inactive_slot}"
+    fi
   fi
 
   log "backend-${inactive_slot} を起動..."
@@ -287,6 +292,14 @@ DC=$(resolve_dc)
 log "docker compose コマンド: ${DC}"
 log "現在の active slot: $(read_active_slot)"
 
+# GHCR 認証 (GHCR_PAT が .env.staging-new に設定されている場合)
+if [[ -n "${GHCR_PAT:-}" ]]; then
+  log "GHCR 認証中 (ghcr.io/milechy)..."
+  echo "${GHCR_PAT}" | docker login ghcr.io -u "${GHCR_USER:-milechy}" --password-stdin 2>/dev/null \
+    && log "✅ GHCR 認証成功" \
+    || log "WARN: GHCR 認証失敗 — ローカルビルドにフォールバックします"
+fi
+
 # ───────────────────────────────────────────────
 # 共通ステップ
 # ───────────────────────────────────────────────
@@ -315,17 +328,22 @@ if "${FRONTEND_ONLY}"; then
   docker rm -f "${FRONTEND_CONTAINER}" 2>/dev/null || true
 
   if ! "${NO_BUILD}"; then
-    log "古いフロントエンドイメージを完全削除..."
-    docker images --format "{{.Repository}} {{.ID}}" \
-      | grep -E "frontend.*staging-new|ultra-autotrade-staging.*front" \
-      | awk '{print $2}' \
-      | xargs -r docker rmi -f 2>/dev/null || true
+    log "GHCR から frontend イメージを pull (ローカルビルド省略)..."
+    if ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" pull frontend 2>/dev/null; then
+      log "✅ GHCR pull 成功"
+    else
+      log "WARN: GHCR pull 失敗 — ローカルビルドにフォールバック..."
+      log "古いフロントエンドイメージを完全削除..."
+      docker images --format "{{.Repository}} {{.ID}}" \
+        | grep -E "frontend.*staging-new|ultra-autotrade-staging.*front|ultra-autotrade-frontend-staging" \
+        | awk '{print $2}' \
+        | xargs -r docker rmi -f 2>/dev/null || true
 
-    log "frontend をビルド中..."
-    ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build --no-cache frontend
+      ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build --no-cache frontend
 
-    log "古いビルドキャッシュを削除（1時間以上前のエントリ）..."
-    docker builder prune --filter until=1h -f 2>/dev/null || true
+      log "古いビルドキャッシュを削除（1時間以上前のエントリ）..."
+      docker builder prune --filter until=1h -f 2>/dev/null || true
+    fi
   fi
 
   ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d frontend
@@ -358,18 +376,24 @@ else
   docker volume prune -f 2>/dev/null || true
 
   if ! "${NO_BUILD}"; then
-    log "古いフロントエンドイメージを完全削除..."
-    docker images --format "{{.Repository}} {{.ID}}" \
-      | grep -E "frontend.*staging-new|ultra-autotrade-staging.*front" \
-      | awk '{print $2}' \
-      | xargs -r docker rmi -f 2>/dev/null || true
+    log "GHCR からイメージを pull (ローカルビルド省略)..."
+    if ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" pull frontend backend-blue backend-green 2>/dev/null; then
+      log "✅ GHCR pull 成功 (frontend + backend-blue + backend-green)"
+    else
+      log "WARN: GHCR pull 失敗 — ローカルビルドにフォールバック..."
+      log "古いフロントエンドイメージを完全削除..."
+      docker images --format "{{.Repository}} {{.ID}}" \
+        | grep -E "frontend.*staging-new|ultra-autotrade-staging.*front|ultra-autotrade-frontend-staging" \
+        | awk '{print $2}' \
+        | xargs -r docker rmi -f 2>/dev/null || true
 
-    log "frontend / backend-blue / backend-green をビルド中..."
-    ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build --no-cache frontend
-    ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build backend-blue backend-green
+      log "frontend / backend-blue / backend-green をビルド中..."
+      ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build --no-cache frontend
+      ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build backend-blue backend-green
 
-    log "古いビルドキャッシュを削除（1時間以上前のエントリ）..."
-    docker builder prune --filter until=1h -f 2>/dev/null || true
+      log "古いビルドキャッシュを削除（1時間以上前のエントリ）..."
+      docker builder prune --filter until=1h -f 2>/dev/null || true
+    fi
   fi
 
   log "全サービスを起動 (staging: postgres → backend-blue → nginx → frontend)"
