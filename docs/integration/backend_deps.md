@@ -75,6 +75,26 @@
 - **影響範囲**: 新規 router 追加のみ。既存 endpoint への影響なし。tests/test_referral_router.py で既存 endpoint の404でないことを保証。
 - **承認**: feature/ras-l2-backend-api → main の通常フロー経由（PR #194）
 
+### 変更 #7: RAS Phase 1 cleanup — invitations_router 無効化 + referral prefix 修正 (PR #201 / 2026-05-09)
+- **コミット範囲**: `e3210c8` (hotfix/ras-partner-referral-cleanup)
+- **変更内容**:
+  - `from app.invitations.router import router as invitations_router` をコメントアウト
+  - `app.include_router(invitations_router)` をコメントアウト（Phase 2 物理削除予定）
+  - `referral_router` の APIRouter prefix を `/referral` → `/partner/referral` に修正
+    (PR #194 変更 #6 で mount 時の prefix 設定漏れを補完)
+- **理由**: hkobayashi 判断 (A) 置換 / 2026-05-09 UAT pre-check 中に発覚した以下の問題を一括修正:
+  1. `POST /referral/code` (backend) と `POST /partner/referral/code` (仕様) の prefix 不一致
+  2. 旧 `/api/invitations` と新 `/partner/referral` の二重化 → invitations を Phase 2 まで disabled
+  3. partner ナビゲーションに紹介プログラムリンクが未追加 (AppShell.tsx で追加)
+  RAS Phase 1 教訓: PR description に API path 一覧を必須記載 (CLAUDE.md ルール 11 追加予定)
+- **影響範囲**:
+  - `/api/invitations/*` エンドポイントが全て 404 になる (既存 Wave 2 招待フローは無効化)
+  - `POST /referral/code` → `POST /partner/referral/code` (既存の frontend も同時更新)
+  - `register/page.tsx` が `/api/invitations/{code}` を呼ぶ旧登録フローは Phase 2 で移行予定
+  - `frontend/app/register/page.tsx` の挙動変化: 旧招待コード登録 → 404 (UAT 影響なし / 旧フローは非推奨)
+- **承認**: hkobayashi 判断 (A) 置換 / hotfix/ras-partner-referral-cleanup → main (PR #201)
+- **ロールバック**: `git revert e3210c8` → invitations_router を再有効化 + prefix を `/referral` に戻す
+
 ## backend/app/database.py
 
 変更なし（現時点）
