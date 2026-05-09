@@ -864,6 +864,57 @@ docker compose -f docker-compose.staging.yml --env-file .env.staging-new \
 
 **過去インシデント（2026-04-17 Phase C）:** `docker-compose.staging.yml` を本番コンテナに誤適用 → 本番502（5分）。正しい compose ファイル指定で12秒で復旧。
 
+### 2026-05-09追加（Cloudflare Tunnel ingress 追従漏れによる staging 502 — RCA: docs/postmortems/2026-05-09_staging_api_502.md）
+
+**症状:** Blue/Green nginx 化（df0faf6, 2026-04-27）で staging backend を 8001 直接 bind から `nginx:127.0.0.1:8082` 経由に変更したが、Cloudflare Tunnel ingress（`api-staging.ultra-auto-trade.com`）が dashboard 上で `localhost:8001` のまま残り、約 12 日間 502 が放置された。production 側は 5/01 (a7008f5/PR #163) で同型バグが発覚済みだったが、staging への水平展開が漏れていた。検出は 5/9 09:42 JST、UAT pre-check 実行を試みた瞬間 (Cloudflare Ray ID `9f8caa253993e360`)。production 影響なし。
+
+**鉄則 (絶対):**
+
+1. **Cloudflare Dashboard 等 dashboard 系設定の変更は必ず「インフラ変更チェックリスト」を経由する。**
+   `docs/16_infra_deployment_guide.md` (or 新規 `docs/<番号>_infra_change_checklist.md`) に定義する「インフラ変更チェックリスト」を経由しないかぎり Dashboard 直接変更は禁止。Dashboard 直接変更を恒常運用しない (Phase 3b PR-A で token → config.yml 移行と合わせて完了)。`docker-compose.production.yml` / `docker-compose.staging.yml` の `ports:` 行や nginx port を変更する PR は、PR description のテストプランに「インフラ変更チェックリスト実行済」を明記する。
+
+2. **cloudflared は token 方式 (dashboard 管理) を避け、`config.yml` 方式に移行する。**
+   `--token` 方式では ingress がリポジトリ外で管理されるため、git diff / コードレビューで port mismatch を検知できない (CLAUDE.md L546 既知制約の延長)。Phase 3b PR-A で production / staging を独立 cloudflared + 独立 `config.yml` に分離する。
+
+3. **deploy 後の外形 healthcheck を必須化する (Gate 8)。**
+   `staging-deploy.yml` / `deploy_production.sh` 両方に `curl -fsS https://api{,-staging}.ultra-auto-trade.com/health` を deploy 直後に実行し、失敗したら Slack #ultra-auto-project に通知 + 自動ロールバック判断。内部 `127.0.0.1:8082/health` の確認だけでは「外形経路（cloudflared → nginx → backend）」は検証できない。
+
+4. **production と同型のインフラインシデントが起きたら、PR description に「staging への水平展開状況」を必須記述する。** PR #163 (a7008f5) では production だけ後方互換 binding で塞いだが staging は塞がず放置 → 同じバグを 1 週間後に踏み直した。同型バグの再発防止には「他の環境にも同型リスクがないか」を PR テストプランに明示するルールが必要。
+
+5. **インフラ変更前チェックリスト (`docs/16` 拡張 or 新規 docs) の必須項目:**
+   - [ ] backend / frontend / nginx / cloudflared / postgres の port が変わるか
+   - [ ] その port を参照する箇所 (cloudflared ingress, NEXT_PUBLIC_*, healthcheck script, docs, CLAUDE.md) が全て同期されているか
+   - [ ] production / staging の両方で確認したか
+   - [ ] 外形 `/health` が production と staging で 200 を返すか
+   - [ ] Cloudflare Dashboard 設定変更が必要な場合、PR description に明記したか
+
+**Dashboard 管理設定の事故パターン (3 回目):**
+
+| 日付 | 事象 | 共通点 |
+|---|---|---|
+| 2026-04-02 | cloudflared token 方式移行時に ingress が Cloudflare Dashboard 管理に切替 | Dashboard 設定とコードが非連動 |
+| 2026-04-03 | NEXT_PUBLIC_BACKEND_BASE_URL 古い trycloudflare URL 残存 → Mixed Content | URL 設定がコードと乖離 |
+| 2026-05-01 | production cloudflared が `localhost:8000` のまま Blue/Green 切替 → 502 (PR #163) | nginx port 変更 vs Dashboard ingress 非連動 |
+| 2026-05-09 | staging cloudflared が `localhost:8001` のまま Blue/Green 切替 → 502 (本件、12 日遅延) | 同上、PR #163 教訓の水平展開漏れ |
+
+**確認コマンド (デプロイ直後):**
+
+```bash
+# production
+curl -fsS -o /dev/null -w "%{http_code}\n" https://api.ultra-auto-trade.com/health
+
+# staging (CF Access Service Token 必須)
+curl -fsS -o /dev/null -w "%{http_code}\n" \
+  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+  https://api-staging.ultra-auto-trade.com/health
+```
+
+200 以外なら即 Slack 通知 + Phase 1 (read-only) で原因切り分け。
+
+**Gate 8 (新規) を本 CLAUDE.md `## Testing` セクションのテスト順序に追加**:
+> テスト順序: pytest(自動) → tsc --noEmit(自動) → npm run build(自動) → Playwright E2E(自動) → 孤立コード検出(PR前) → Codex Review(PR前) → Claude in Chrome(UI変更時のみ) → **post-deploy-healthcheck (deploy後 自動) ★ Gate 8**
+
 ---
 
 ## 参照ファイル
@@ -879,6 +930,7 @@ docker compose -f docker-compose.staging.yml --env-file .env.staging-new \
 | docs/ops/01_api_endpoints.md | 全APIエンドポイント一覧（パス・認証・curl例） | curl を書く前・エンドポイントを推測しそうなとき |
 | docs/ops/02_db_tables.md | 全DBテーブル定義（カラム・型・NULL可否） | ALTER TABLE を書く前・DBスキーマを推測しそうなとき |
 | docs/ops/03_deploy_procedures.md | デプロイ手順・コンテナ名・ボリューム・障害対応 | デプロイ前・Docker環境を推測しそうなとき |
+| docs/postmortems/2026-05-09_staging_api_502.md | staging cloudflared ingress port mismatch 12日遅延検出 RCA | port変更PR・cloudflared変更時 |
 
 ---
 
