@@ -194,6 +194,7 @@ class TestInvitationService:
 # ────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.skip(reason="invitations_router は PR #201 で disabled (Phase 2 物理削除予定)")
 class TestInvitationAPI:
     """招待コード API のテスト。"""
 
@@ -267,6 +268,7 @@ class TestInvitationAPI:
 # ────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.skip(reason="invitations_router は PR #201 で disabled (Phase 2 物理削除予定)")
 class TestRegistrationWithInvitation:
     """招待コード付き登録フローのテスト。"""
 
