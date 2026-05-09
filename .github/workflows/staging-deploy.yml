@@ -46,3 +46,26 @@ jobs:
           DEPLOY_SCRIPT
 
           echo "Deploy completed successfully"
+
+      - name: Gate 8 — Post-deploy healthcheck (staging)
+        # RCA: docs/postmortems/2026-05-09_staging_api_502.md
+        # internal mode のみ (external は Phase 3b PR-A 完了後に有効化)
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER || 'root' }}
+          HEALTHCHECK_MODE: ${{ vars.HEALTHCHECK_MODE || 'internal' }}
+        run: |
+          if [ -z "$SSH_PRIVATE_KEY" ] || [ -z "$HETZNER_HOST" ]; then
+            echo "::warning::SSH credentials not configured. Skipping Gate 8 healthcheck."
+            exit 0
+          fi
+
+          # SLACK_WEBHOOK_URL を .env.production から取得 (Hetzner 側で既存)
+          ssh -i ~/.ssh/deploy_key "${HETZNER_USER}@${HETZNER_HOST}" \
+              "cd /opt/ultra-autotrade && \
+               SLACK_WEBHOOK_URL=\"\$(grep '^SLACK_WEBHOOK_URL=' .env.production | cut -d= -f2-)\" \
+               HEALTHCHECK_MODE='${HEALTHCHECK_MODE}' \
+               ./scripts/post_deploy_healthcheck.sh --env=staging"
+
+          echo "Gate 8 healthcheck passed"

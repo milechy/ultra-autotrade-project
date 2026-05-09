@@ -26,3 +26,20 @@ jobs:
             cd ~/ultra-autotrade
             ./deploy.sh staging
             echo "✅ Staging deployment completed"
+
+      - name: Gate 8 — Post-deploy healthcheck (staging)
+        # RCA: docs/postmortems/2026-05-09_staging_api_502.md
+        # internal mode のみ (external は Phase 3b PR-A 完了後に vars.HEALTHCHECK_MODE=both で有効化)
+        uses: appleboy/ssh-action@v1
+        env:
+          HEALTHCHECK_MODE: ${{ vars.HEALTHCHECK_MODE || 'internal' }}
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          envs: HEALTHCHECK_MODE
+          script: |
+            cd ~/ultra-autotrade
+            export SLACK_WEBHOOK_URL=$(grep '^SLACK_WEBHOOK_URL=' .env.production | cut -d= -f2-)
+            ./scripts/post_deploy_healthcheck.sh --env=staging
+            echo "✅ Gate 8 healthcheck passed"
