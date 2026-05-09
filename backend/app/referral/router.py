@@ -4,9 +4,9 @@
 """RAS Lane 2 ルーター。
 
 partner-only エンドポイント (admin / user は 403):
-  - POST /referral/code                            紹介コード取得 (未発行なら発行)
-  - GET  /referral/list                            配下ユーザー一覧
-  - GET  /referral/users/{user_id}/transactions    配下ユーザーの取引履歴
+  - POST /partner/referral/code                            紹介コード取得 (未発行なら発行)
+  - GET  /partner/referral/list                            配下ユーザー一覧
+  - GET  /partner/referral/users/{user_id}/transactions    配下ユーザーの取引履歴
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from .schemas import (
     ReferredUserResponse,
 )
 
-router = APIRouter(prefix="/referral", tags=["referral"])
+router = APIRouter(prefix="/partner/referral", tags=["referral"])
 
 
 def require_partner_only(

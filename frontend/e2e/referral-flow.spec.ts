@@ -68,7 +68,7 @@ async function saveScreenshot(page: Page, name: string): Promise<void> {
 
 /** POST /referral/code をモック (partner 紹介コード取得/生成) */
 async function mockReferralCode(page: Page): Promise<void> {
-  await page.route('**/referral/code', async (route) => {
+  await page.route('**/partner/referral/code', async (route) => {
     if (route.request().method() === 'POST') {
       await route.fulfill({
         status: 200,
@@ -83,7 +83,7 @@ async function mockReferralCode(page: Page): Promise<void> {
 
 /** GET /referral/list をモック */
 async function mockReferralList(page: Page): Promise<void> {
-  await page.route('**/referral/list', async (route) => {
+  await page.route('**/partner/referral/list', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({
         status: 200,
@@ -176,7 +176,7 @@ test.describe('[RAS] partner referral flow', () => {
     await mockReferralCode(page)
     await mockReferralList(page)
 
-    await page.route('**/referral/users/*/transactions', async (route) => {
+    await page.route('**/partner/referral/users/*/transactions', async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
