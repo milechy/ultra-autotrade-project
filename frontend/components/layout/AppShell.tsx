@@ -22,6 +22,7 @@ const adminNavLinks = [
 
 const partnerNavLinks: Array<{ href: string; label: string; highlight?: boolean }> = [
   { href: "/partner/dashboard", label: "ダッシュボード" },
+  { href: "/partner/referral", label: "紹介プログラム" },
   { href: "/partner/users", label: "テスター管理" },
   { href: "/partner/proposals", label: "AI提案" },
   { href: "/partner/notifications", label: "通知ログ" },

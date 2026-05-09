@@ -3,7 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState, useMemo, useEffect } from 'react'
-import { Users, Search, UserPlus } from 'lucide-react'
+import { Users, Search } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -16,7 +16,6 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth'
 import { apiFetch } from '@/lib/api/client'
 import type { UserResponse } from '@/lib/api/auth'
-import { InviteModal } from './_components/InviteModal'
 import { UserDetailModal } from './_components/UserDetailModal'
 import { UserEditModal } from './_components/UserEditModal'
 
@@ -53,8 +52,6 @@ export default function PartnerUsersPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [selectedUser, setSelectedUser] = useState<UserResponse | null>(null)
   const [editingUser, setEditingUser] = useState<UserResponse | null>(null)
-  const [showInviteModal, setShowInviteModal] = useState(false)
-
   useEffect(() => {
     if (!token) return
     setLoading(true)
@@ -122,14 +119,6 @@ export default function PartnerUsersPage() {
           </div>
         </div>
 
-        <Button
-          size="sm"
-          onClick={() => setShowInviteModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5"
-        >
-          <UserPlus className="h-4 w-4" />
-          ユーザーを招待
-        </Button>
       </div>
 
       {/* ── Filters ──────────────────────────────────────────────────────── */}
@@ -178,11 +167,6 @@ export default function PartnerUsersPage() {
       </p>
 
       {/* ── Modals ───────────────────────────────────────────────────────── */}
-      <InviteModal
-        open={showInviteModal}
-        onClose={() => setShowInviteModal(false)}
-      />
-
       <UserDetailModal
         user={selectedUser}
         token={token}

@@ -133,7 +133,7 @@ def test_post_referral_code_partner_returns_200_with_8char(
         UserRole.PARTNER.value,
     )
     token = _login(client, "partner-a@example.com", "partnerpass1!")
-    r = client.post("/referral/code", headers={"Authorization": f"Bearer {token}"})
+    r = client.post("/partner/referral/code", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200, r.text
     body = r.json()
     assert len(body["referral_code"]) == 8
@@ -154,8 +154,8 @@ def test_post_referral_code_returns_same_code_on_repeat(
         UserRole.PARTNER.value,
     )
     token = _login(client, "partner-b@example.com", "partnerpass2!")
-    r1 = client.post("/referral/code", headers={"Authorization": f"Bearer {token}"})
-    r2 = client.post("/referral/code", headers={"Authorization": f"Bearer {token}"})
+    r1 = client.post("/partner/referral/code", headers={"Authorization": f"Bearer {token}"})
+    r2 = client.post("/partner/referral/code", headers={"Authorization": f"Bearer {token}"})
     assert r1.status_code == 200
     assert r2.status_code == 200
     assert r1.json()["referral_code"] == r2.json()["referral_code"]
@@ -174,19 +174,19 @@ def test_post_referral_code_viewer_returns_403(client: TestClient, test_db: Sess
         UserRole.VIEWER.value,
     )
     token = _login(client, "viewer-a@example.com", "viewerpass1!")
-    r = client.post("/referral/code", headers={"Authorization": f"Bearer {token}"})
+    r = client.post("/partner/referral/code", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 403
 
 
 def test_post_referral_code_admin_returns_403(client: TestClient) -> None:
     """admin は紹介プログラム対象外なので 403 (partner-only)。"""
     admin_token = _register_initial_admin(client)
-    r = client.post("/referral/code", headers={"Authorization": f"Bearer {admin_token}"})
+    r = client.post("/partner/referral/code", headers={"Authorization": f"Bearer {admin_token}"})
     assert r.status_code == 403
 
 
 def test_post_referral_code_unauthenticated_returns_401(client: TestClient) -> None:
-    r = client.post("/referral/code")
+    r = client.post("/partner/referral/code")
     assert r.status_code == 401
 
 
@@ -203,7 +203,7 @@ def test_get_referral_list_empty(client: TestClient, test_db: SessionFactory) ->
         UserRole.PARTNER.value,
     )
     token = _login(client, "partner-c@example.com", "partnerpass3!")
-    r = client.get("/referral/list", headers={"Authorization": f"Bearer {token}"})
+    r = client.get("/partner/referral/list", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     assert r.json() == []
 
@@ -238,7 +238,7 @@ def test_get_referral_list_returns_referred_users_with_masked_email(
         db.close()
 
     token = _login(client, "partner-d@example.com", "partnerpass4!")
-    r = client.get("/referral/list", headers={"Authorization": f"Bearer {token}"})
+    r = client.get("/partner/referral/list", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     rows = r.json()
     assert len(rows) == 1
@@ -402,7 +402,7 @@ def test_transactions_endpoint_excludes_wallet_and_tx_hash(
 
     token = _login(client, "partner-g@example.com", "partnerpass7!")
     r = client.get(
-        f"/referral/users/{viewer_id}/transactions",
+        f"/partner/referral/users/{viewer_id}/transactions",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert r.status_code == 200
@@ -461,7 +461,7 @@ def test_transactions_endpoint_403_for_other_partners_referred_user(
     # partner_i (別 partner) のトークンで取得しようとする → 403
     token_i = _login(client, "partner-i@example.com", "partnerpass9!")
     r = client.get(
-        f"/referral/users/{viewer_id}/transactions",
+        f"/partner/referral/users/{viewer_id}/transactions",
         headers={"Authorization": f"Bearer {token_i}"},
     )
     assert r.status_code == 403

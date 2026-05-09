@@ -75,6 +75,30 @@
 - **影響範囲**: 新規 router 追加のみ。既存 endpoint への影響なし。tests/test_referral_router.py で既存 endpoint の404でないことを保証。
 - **承認**: feature/ras-l2-backend-api → main の通常フロー経由（PR #194）
 
+### 変更 #7: RAS Phase 1 cleanup — invitations_router 無効化 + referral prefix 修正 (PR #201 / 2026-05-09)
+- **コミット範囲**: `e3210c8` + `95d51f3` (hotfix/ras-partner-referral-cleanup)
+- **変更内容**:
+  - `from app.invitations.router import router as invitations_router` をコメントアウト
+  - `app.include_router(invitations_router)` をコメントアウト（Phase 2 物理削除予定）
+  - 変更は計 2 行コメントアウト + ruff I001 自動修正のみ。新規ロジック追加なし
+- **理由**: hkobayashi 判断 (A) 置換 (Asana 1214653767574265 / RAS F-17) /
+  2026-05-09 UAT pre-check 中に発覚した以下の問題を一括修正:
+  1. `APIRouter(prefix="/referral")` vs 仕様 `/partner/referral` の不一致
+     — `referral/router.py` 側で prefix 変更 (main.py の include_router 行は変更なし)
+  2. 旧 `/api/invitations` (Wave 2、16文字コード + 期限) と新 `/partner/referral` (RAS Phase 1、8文字) の二重化解消
+  3. AppShell.tsx partner nav に「紹介プログラム」リンク未追加 → UI 側で追加
+- **影響範囲**:
+  - `/api/invitations/*` エンドポイントが全て 404 になる (Wave 2 招待フロー無効化)
+  - `frontend/app/register/page.tsx` の旧招待コード登録フロー → 404 (非推奨フロー、UAT 影響なし)
+  - production deploy 予定: **2026-05-15 Phase E** (staging 検証後)
+  - staging には `ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(16) NULL` 適用済み前提
+- **承認**: hkobayashi 判断 (A) 置換 / hotfix/ras-partner-referral-cleanup → main (PR #201)
+- **関連**: Asana RAS Phase 1 GID 1214639261103650 / PR-H Asana GID 1214653767574265
+- **ロールバック**:
+  1. `git revert e3210c8` → invitations_router を再有効化、referral prefix を `/referral` に戻す
+  2. staging: `docker compose -f docker-compose.staging.yml restart backend-blue`
+  3. production (Phase E 後): `docker compose -f docker-compose.production.yml restart backend-blue`
+
 ## backend/app/database.py
 
 変更なし（現時点）

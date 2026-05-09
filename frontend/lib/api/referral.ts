@@ -40,19 +40,19 @@ export interface RegisterWithReferralResponse {
 }
 
 export function postReferralCode(token: string): Promise<ReferralCodeResponse> {
-  return postJson<ReferralCodeResponse>('/referral/code', {}, {
+  return postJson<ReferralCodeResponse>('/partner/referral/code', {}, {
     headers: { Authorization: `Bearer ${token}` },
   })
 }
 
 export function getReferralList(token: string): Promise<ReferredUser[]> {
-  return getJson<ReferredUser[]>('/referral/list', {
+  return getJson<ReferredUser[]>('/partner/referral/list', {
     headers: { Authorization: `Bearer ${token}` },
   })
 }
 
 export function getReferralTransactions(token: string, userId: number): Promise<ReferralTransaction[]> {
-  return getJson<ReferralTransaction[]>(`/referral/users/${userId}/transactions`, {
+  return getJson<ReferralTransaction[]>(`/partner/referral/users/${userId}/transactions`, {
     headers: { Authorization: `Bearer ${token}` },
   })
 }
