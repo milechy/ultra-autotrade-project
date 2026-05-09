@@ -22,7 +22,10 @@ jobs:
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
           script: |
+            set -euo pipefail
             echo "🚀 Starting staging deployment..."
-            cd ~/ultra-autotrade
-            ./deploy.sh staging
+            cd /opt/ultra-autotrade
+            git fetch origin
+            git reset --hard origin/main
+            ./scripts/deploy_staging.sh
             echo "✅ Staging deployment completed"
