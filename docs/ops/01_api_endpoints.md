@@ -39,6 +39,7 @@
 | GET | `/auth/risk-mode` | 🔑 | リスクモード取得 |
 | PUT | `/auth/risk-mode` | 🔑 | リスクモード更新 |
 | POST | `/auth/wallet/connect` | 🔑 | WalletConnect認証 |
+| POST | `/auth/wallet/link` | 🔑 | 認証済みユーザーへのウォレット紐付け (200/401/409/422/404, F-17 L1) |
 | POST | `/auth/line` | 🔓 | LINE LIFF認証 → JWT返却 |
 
 ---
