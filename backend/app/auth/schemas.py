@@ -245,3 +245,23 @@ class WalletConnectResponse(BaseModel):
     needs_terms_acceptance: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class WalletLinkRequest(BaseModel):
+    """認証済みユーザーへのウォレット紐付けリクエスト (POST /auth/wallet/link)。"""
+
+    address: str = Field(
+        ..., min_length=42, max_length=42, description="EVM wallet address (0x...)"
+    )
+    signature: str = Field(..., description="ECDSA signature (0x...)")
+    message: str = Field(..., description="Signed message (must contain timestamp)")
+
+
+class WalletLinkResponse(BaseModel):
+    """ウォレット紐付けレスポンス。"""
+
+    user_id: int
+    wallet_address: str
+    linked_at: str  # ISO8601 文字列
+
+    model_config = ConfigDict(from_attributes=True)

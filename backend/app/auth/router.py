@@ -49,6 +49,8 @@ from .schemas import (
     UserResponse,
     WalletConnectRequest,
     WalletConnectResponse,
+    WalletLinkRequest,
+    WalletLinkResponse,
 )
 from .service import AuthService
 
@@ -614,6 +616,86 @@ def wallet_connect(
         expires_in=expires_in,
         is_new_user=is_new_user,
         needs_terms_acceptance=needs_terms_acceptance,
+    )
+
+
+@router.post(
+    "/wallet/link",
+    response_model=WalletLinkResponse,
+    summary="認証済みユーザーにウォレットを紐付け (F-17 L1)",
+)
+def wallet_link(
+    request: WalletLinkRequest,
+    user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> WalletLinkResponse:
+    """
+    JWT で認証済みのユーザーに EVM ウォレットアドレスを紐付ける。
+
+    レスポンス:
+    - 200: 紐付け成功
+    - 401: 未認証 (require_active_user が返す)
+    - 422: 署名検証失敗
+    - 409: 別ユーザーが同じ wallet_address をすでにリンク済み
+    - 404: privy_did 不一致 (JWT ユーザーと wallet ユーザーが別人)
+    """
+    # 422: 署名検証
+    if not AuthService.verify_wallet_signature(request.address, request.message, request.signature):
+        logger.warning(
+            "Wallet link signature verification failed: user_id=%d address=%s...",
+            user.id,
+            request.address[:10],
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="signature verification failed",
+        )
+
+    address_lower = request.address.lower()
+
+    # 既存リンクチェック
+    existing = AuthService.get_user_by_wallet(db, address_lower)
+    if existing is not None and existing.id != user.id:
+        # 404: 両ユーザーに privy_did が設定済みかつ不一致 → 別人扱い
+        if user.privy_did and existing.privy_did and user.privy_did != existing.privy_did:
+            logger.warning(
+                "Wallet link DID mismatch: jwt_user=%d existing_user=%d address=%s...",
+                user.id,
+                existing.id,
+                address_lower[:10],
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="JWT user does not match wallet user (privy_did mismatch)",
+            )
+        # 409: それ以外はウォレット重複
+        logger.warning(
+            "Wallet link conflict: jwt_user=%d existing_user=%d address=%s...",
+            user.id,
+            existing.id,
+            address_lower[:10],
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="wallet already linked to another account",
+        )
+
+    # 200: 紐付け
+    user.wallet_address = address_lower
+    db.commit()
+    db.refresh(user)
+
+    linked_at = (user.updated_at or datetime.now(timezone.utc)).isoformat()
+    logger.info(
+        "Wallet linked: user_id=%d wallet=%s...%s",
+        user.id,
+        address_lower[:10],
+        address_lower[-4:],
+    )
+    return WalletLinkResponse(
+        user_id=user.id,
+        wallet_address=address_lower,
+        linked_at=linked_at,
     )
 
 
