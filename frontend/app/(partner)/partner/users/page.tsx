@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState, useMemo, useEffect } from 'react'
+import Link from 'next/link'
 import { Users, Search } from 'lucide-react'
 import {
   Table,
@@ -119,6 +120,11 @@ export default function PartnerUsersPage() {
           </div>
         </div>
 
+        <Link href="/partner/referral">
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white text-sm">
+            紹介プログラムへ
+          </Button>
+        </Link>
       </div>
 
       {/* ── Filters ──────────────────────────────────────────────────────── */}
@@ -281,7 +287,7 @@ function EmptyState({ hasFilter }: { hasFilter: boolean }) {
         <>
           <p className="text-gray-400 font-medium">登録ユーザーがいません</p>
           <p className="text-gray-600 text-sm mt-1">
-            「ユーザーを招待」ボタンから招待コードを発行できます
+            「紹介プログラムへ」から紹介リンクを発行できます
           </p>
         </>
       )}
