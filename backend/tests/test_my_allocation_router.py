@@ -24,6 +24,7 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-my-allocation")
 from app.aave.client import AccountData  # noqa: E402
 from app.auth.router import router as auth_router  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
+from app.partner.allocation_models import FundAllocation  # noqa: E402
 from app.partner.allocation_router import router as allocation_router  # noqa: E402
 from app.portfolio.models import PortfolioSnapshot  # noqa: E402
 from app.users.router import router as users_router  # noqa: E402
@@ -165,14 +166,19 @@ class TestGetMyAllocation:
         self,
         client: TestClient,
         tokens: dict[str, str],
+        test_db: tuple[SessionFactory, object],
     ) -> None:
         """Aave 接続成功時は is_live=True + PnL がリアルタイム計算される。"""
-        r = client.post(
-            "/api/partner/allocations",
-            json={"tester_name": "my-alloc-tester", "allocated_amount_usd": "1000.00"},
-            headers={"Authorization": f"Bearer {tokens['partner']}"},
-        )
-        assert r.status_code == 201
+        session_factory, _ = test_db
+        with session_factory() as db:
+            db.add(
+                FundAllocation(
+                    partner_id=int(tokens["partner_id"]),
+                    tester_name="my-alloc-tester",
+                    allocated_amount_usd=Decimal("1000.00"),
+                )
+            )
+            db.commit()
 
         mock_client = MagicMock()
         mock_client.get_account_data.return_value = _DUMMY_ACCOUNT_DATA
@@ -205,14 +211,16 @@ class TestGetMyAllocation:
         """Aave 接続失敗時は PortfolioSnapshot にフォールバックし is_live=False になる。"""
         session_factory, _ = test_db
 
-        r = client.post(
-            "/api/partner/allocations",
-            json={"tester_name": "my-alloc-tester", "allocated_amount_usd": "1000.00"},
-            headers={"Authorization": f"Bearer {tokens['partner']}"},
-        )
-        assert r.status_code == 201
-
         partner_id = int(tokens["partner_id"])
+        with session_factory() as db:
+            db.add(
+                FundAllocation(
+                    partner_id=partner_id,
+                    tester_name="my-alloc-tester",
+                    allocated_amount_usd=Decimal("1000.00"),
+                )
+            )
+            db.commit()
         with session_factory() as db:
             snapshot = PortfolioSnapshot(
                 user_id=partner_id,
@@ -242,14 +250,19 @@ class TestGetMyAllocation:
         self,
         client: TestClient,
         tokens: dict[str, str],
+        test_db: tuple[SessionFactory, object],
     ) -> None:
         """Aave 失敗 + Snapshot なし → pnl/current_value は null、is_live=False。"""
-        r = client.post(
-            "/api/partner/allocations",
-            json={"tester_name": "my-alloc-tester", "allocated_amount_usd": "1000.00"},
-            headers={"Authorization": f"Bearer {tokens['partner']}"},
-        )
-        assert r.status_code == 201
+        session_factory, _ = test_db
+        with session_factory() as db:
+            db.add(
+                FundAllocation(
+                    partner_id=int(tokens["partner_id"]),
+                    tester_name="my-alloc-tester",
+                    allocated_amount_usd=Decimal("1000.00"),
+                )
+            )
+            db.commit()
 
         with patch("app.partner.allocation_service.get_default_aave_client") as mock_aave:
             mock_aave.return_value.get_account_data.side_effect = Exception("no aave")

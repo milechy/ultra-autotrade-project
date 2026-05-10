@@ -171,7 +171,7 @@ export default function PartnerDashboardPage() {
       {/* Allocation Table + Chart */}
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <AllocationTable performanceMap={performanceMap} tierMap={tierMap} onRefresh={loadAllocations} />
+          <AllocationTable performanceMap={performanceMap} tierMap={tierMap} />
         </div>
 
         <Card>
