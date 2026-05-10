@@ -30,6 +30,7 @@ const partnerNavItems = [
   { href: '/partner/dashboard', label: 'ダッシュボード' },
   { href: '/user/approve', label: '取引承認' },
   { href: '/partner/users', label: 'テスター管理' },
+  { href: '/partner/referral', label: '紹介プログラム' },
   { href: '/partner/proposals', label: 'AI提案' },
   { href: '/partner/settings', label: '設定' },
 ]
