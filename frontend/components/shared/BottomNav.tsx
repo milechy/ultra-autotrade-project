@@ -4,7 +4,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, CheckCircle, Brain, Settings, HelpCircle, Users, ClipboardList } from 'lucide-react'
+import { Home, CheckCircle, Brain, Settings, HelpCircle, Users, ClipboardList, Gift } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
 
@@ -21,6 +21,7 @@ const partnerNavItems = [
   { href: '/partner/dashboard', label: 'ホーム', icon: Home },
   { href: '/user/approve', label: '承認', icon: CheckCircle },
   { href: '/partner/users', label: 'テスター', icon: Users },
+  { href: '/partner/referral', label: '紹介', icon: Gift },
   { href: '/partner/proposals', label: 'AI提案', icon: ClipboardList },
   { href: '/partner/settings', label: '設定', icon: Settings },
 ]
