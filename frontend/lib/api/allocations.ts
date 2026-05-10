@@ -2,7 +2,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 // frontend/lib/api/allocations.ts
 
-import { getJson, postJson, putJson, deleteJson } from './http'
+import { getJson } from './http'
 
 // ---- Types ----
 
@@ -38,18 +38,6 @@ export interface PerformanceResponse {
   testers: TesterPerformance[]
 }
 
-export interface CreateAllocationData {
-  tester_name: string
-  allocated_amount_usd: number
-  notes?: string
-}
-
-export interface UpdateAllocationData {
-  tester_name?: string
-  allocated_amount_usd?: number
-  notes?: string
-}
-
 // ---- Helpers ----
 
 function authHeaders(token: string): HeadersInit {
@@ -60,31 +48,6 @@ function authHeaders(token: string): HeadersInit {
 
 export async function fetchAllocations(token: string): Promise<Allocation[]> {
   return getJson<Allocation[]>('/api/partner/allocations', {
-    headers: authHeaders(token),
-  })
-}
-
-export async function createAllocation(
-  token: string,
-  data: CreateAllocationData
-): Promise<Allocation> {
-  return postJson<Allocation>('/api/partner/allocations', data, {
-    headers: authHeaders(token),
-  })
-}
-
-export async function updateAllocation(
-  token: string,
-  id: number,
-  data: UpdateAllocationData
-): Promise<Allocation> {
-  return putJson<Allocation>(`/api/partner/allocations/${id}`, data, {
-    headers: authHeaders(token),
-  })
-}
-
-export async function deleteAllocation(token: string, id: number): Promise<void> {
-  return deleteJson<void>(`/api/partner/allocations/${id}`, {
     headers: authHeaders(token),
   })
 }

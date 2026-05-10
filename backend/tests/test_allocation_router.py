@@ -2,7 +2,8 @@
 """
 資金割り振り API ルーターの統合テスト。
 
-正常系 CRUD + 異常系（403, 404, 422）+ ロールベースアクセス制御。
+POST/PUT/DELETE は 410 Gone（廃止）。
+GET /allocations と GET /performance はロールチェック含め正常動作を確認。
 """
 
 import os
@@ -153,18 +154,6 @@ def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _create_alloc(
-    client: TestClient, token: str, tester: str = "Alice", amount: str = "1000"
-) -> dict:
-    r = client.post(
-        "/api/partner/allocations",
-        json={"tester_name": tester, "allocated_amount_usd": amount},
-        headers=_auth(token),
-    )
-    assert r.status_code == 201, r.text
-    return r.json()
-
-
 # ---------------------------------------------------------------------------
 # ロールアクセス制御テスト
 # ---------------------------------------------------------------------------
@@ -188,6 +177,7 @@ class TestRoleAccess:
         assert r.status_code == 401 or r.status_code == 403
 
     def test_viewer_cannot_create(self, client: TestClient, setup_users: dict) -> None:
+        # require_partner 依存が 403 を返す（410 到達前に弾かれる）
         r = client.post(
             "/api/partner/allocations",
             json={"tester_name": "Alice", "allocated_amount_usd": "1000"},
@@ -201,7 +191,7 @@ class TestRoleAccess:
 
 
 # ---------------------------------------------------------------------------
-# CRUD 正常系
+# GET /allocations
 # ---------------------------------------------------------------------------
 
 
@@ -211,145 +201,62 @@ class TestListAllocations:
         assert r.status_code == 200
         assert r.json() == []
 
-    def test_returns_created_allocation(self, client: TestClient, setup_users: dict) -> None:
-        _create_alloc(client, setup_users["partner"])
-        r = client.get("/api/partner/allocations", headers=_auth(setup_users["partner"]))
-        assert r.status_code == 200
-        data = r.json()
-        assert len(data) == 1
-        assert data[0]["tester_name"] == "Alice"
-        assert data[0]["status"] == "active"
 
-    def test_status_filter_withdrawn(self, client: TestClient, setup_users: dict) -> None:
-        alloc = _create_alloc(client, setup_users["partner"])
-        # withdrawn に更新
-        client.put(
-            f"/api/partner/allocations/{alloc['id']}",
-            json={"status": "withdrawn"},
-            headers=_auth(setup_users["partner"]),
-        )
-        # active フィルタでは空
-        r_active = client.get(
-            "/api/partner/allocations?status=active", headers=_auth(setup_users["partner"])
-        )
-        assert r_active.json() == []
-        # withdrawn フィルタでは 1 件
-        r_withdrawn = client.get(
-            "/api/partner/allocations?status=withdrawn", headers=_auth(setup_users["partner"])
-        )
-        assert len(r_withdrawn.json()) == 1
+# ---------------------------------------------------------------------------
+# POST/PUT/DELETE → 410 Gone（廃止）
+# ---------------------------------------------------------------------------
 
 
 class TestCreateAllocation:
-    def test_create_success(self, client: TestClient, setup_users: dict) -> None:
+    def test_partner_gets_410(self, client: TestClient, setup_users: dict) -> None:
         r = client.post(
             "/api/partner/allocations",
-            json={"tester_name": "Bob", "allocated_amount_usd": "2500.50", "notes": "batch-1"},
+            json={"tester_name": "Bob", "allocated_amount_usd": "2500"},
             headers=_auth(setup_users["partner"]),
         )
-        assert r.status_code == 201
-        data = r.json()
-        assert data["tester_name"] == "Bob"
-        assert Decimal(data["allocated_amount_usd"]) == Decimal("2500.50")
-        assert data["notes"] == "batch-1"
-        assert data["status"] == "active"
+        assert r.status_code == 410
 
-    def test_create_negative_amount_422(self, client: TestClient, setup_users: dict) -> None:
+    def test_admin_gets_410(self, client: TestClient, setup_users: dict) -> None:
         r = client.post(
             "/api/partner/allocations",
-            json={"tester_name": "Bad", "allocated_amount_usd": "-100"},
-            headers=_auth(setup_users["partner"]),
+            json={"tester_name": "Alice", "allocated_amount_usd": "1000"},
+            headers=_auth(setup_users["admin"]),
         )
-        assert r.status_code == 422
-
-    def test_create_zero_amount_422(self, client: TestClient, setup_users: dict) -> None:
-        r = client.post(
-            "/api/partner/allocations",
-            json={"tester_name": "Zero", "allocated_amount_usd": "0"},
-            headers=_auth(setup_users["partner"]),
-        )
-        assert r.status_code == 422
-
-    def test_create_empty_tester_name_422(self, client: TestClient, setup_users: dict) -> None:
-        r = client.post(
-            "/api/partner/allocations",
-            json={"tester_name": "  ", "allocated_amount_usd": "100"},
-            headers=_auth(setup_users["partner"]),
-        )
-        assert r.status_code == 422
+        assert r.status_code == 410
 
 
 class TestUpdateAllocation:
-    def test_update_success(self, client: TestClient, setup_users: dict) -> None:
-        alloc = _create_alloc(client, setup_users["partner"])
+    def test_partner_gets_410(self, client: TestClient, setup_users: dict) -> None:
         r = client.put(
-            f"/api/partner/allocations/{alloc['id']}",
-            json={"tester_name": "AliceUpdated", "allocated_amount_usd": "1500"},
+            "/api/partner/allocations/1",
+            json={"tester_name": "Updated"},
             headers=_auth(setup_users["partner"]),
         )
-        assert r.status_code == 200
-        data = r.json()
-        assert data["tester_name"] == "AliceUpdated"
-        assert Decimal(data["allocated_amount_usd"]) == Decimal("1500")
+        assert r.status_code == 410
 
-    def test_update_not_found_404(self, client: TestClient, setup_users: dict) -> None:
+    def test_admin_gets_410(self, client: TestClient, setup_users: dict) -> None:
         r = client.put(
-            "/api/partner/allocations/99999",
-            json={"tester_name": "Ghost"},
-            headers=_auth(setup_users["partner"]),
+            "/api/partner/allocations/1",
+            json={"tester_name": "Updated"},
+            headers=_auth(setup_users["admin"]),
         )
-        assert r.status_code == 404
-
-    def test_update_another_partners_record_404(
-        self, client: TestClient, setup_users: dict
-    ) -> None:
-        # admin が作成した割り振り（admin は別 partner_id）を partner が更新しようとする
-        admin_alloc = _create_alloc(client, setup_users["admin"], tester="AdminTester")
-        r = client.put(
-            f"/api/partner/allocations/{admin_alloc['id']}",
-            json={"tester_name": "Stolen"},
-            headers=_auth(setup_users["partner"]),
-        )
-        assert r.status_code == 404
-
-    def test_update_invalid_status_422(self, client: TestClient, setup_users: dict) -> None:
-        alloc = _create_alloc(client, setup_users["partner"])
-        r = client.put(
-            f"/api/partner/allocations/{alloc['id']}",
-            json={"status": "invalid_status"},
-            headers=_auth(setup_users["partner"]),
-        )
-        assert r.status_code == 422
+        assert r.status_code == 410
 
 
 class TestDeleteAllocation:
-    def test_delete_success(self, client: TestClient, setup_users: dict) -> None:
-        alloc = _create_alloc(client, setup_users["partner"])
+    def test_partner_gets_410(self, client: TestClient, setup_users: dict) -> None:
         r = client.delete(
-            f"/api/partner/allocations/{alloc['id']}",
+            "/api/partner/allocations/1",
             headers=_auth(setup_users["partner"]),
         )
-        assert r.status_code == 204
-        # 削除後は空
-        r_list = client.get("/api/partner/allocations", headers=_auth(setup_users["partner"]))
-        assert r_list.json() == []
+        assert r.status_code == 410
 
-    def test_delete_not_found_404(self, client: TestClient, setup_users: dict) -> None:
+    def test_admin_gets_410(self, client: TestClient, setup_users: dict) -> None:
         r = client.delete(
-            "/api/partner/allocations/99999",
-            headers=_auth(setup_users["partner"]),
+            "/api/partner/allocations/1",
+            headers=_auth(setup_users["admin"]),
         )
-        assert r.status_code == 404
-
-    def test_delete_another_partners_record_404(
-        self, client: TestClient, setup_users: dict
-    ) -> None:
-        admin_alloc = _create_alloc(client, setup_users["admin"], tester="AdminTester")
-        r = client.delete(
-            f"/api/partner/allocations/{admin_alloc['id']}",
-            headers=_auth(setup_users["partner"]),
-        )
-        assert r.status_code == 404
+        assert r.status_code == 410
 
 
 # ---------------------------------------------------------------------------
@@ -370,23 +277,6 @@ class TestGetPerformance:
         data = r.json()
         assert data["testers"] == []
         assert Decimal(data["total_allocated_usd"]) == Decimal("0")
-
-    def test_performance_with_allocations(self, client: TestClient, setup_users: dict) -> None:
-        _create_alloc(client, setup_users["partner"], tester="Alice", amount="500")
-        _create_alloc(client, setup_users["partner"], tester="Bob", amount="500")
-
-        with patch("app.partner.allocation_service.get_default_aave_client") as mock_factory:
-            mock_client = MagicMock()
-            mock_client.get_account_data.return_value = _DUMMY_ACCOUNT_DATA
-            mock_factory.return_value = mock_client
-
-            r = client.get("/api/partner/performance", headers=_auth(setup_users["partner"]))
-
-        assert r.status_code == 200
-        data = r.json()
-        assert len(data["testers"]) == 2
-        assert Decimal(data["total_supply_usd"]) == Decimal("10000")
-        assert Decimal(data["health_factor"]) == Decimal("2.5")
 
     def test_performance_partner_role(self, client: TestClient, setup_users: dict) -> None:
         with patch("app.partner.allocation_service.get_default_aave_client") as mock_factory:
