@@ -90,7 +90,7 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 
 export default function ConnectPage() {
   const router = useRouter()
-  const { loginWithWallet } = useAuth()
+  const { loginWithWallet, user } = useAuth()
   const { login, authenticated } = usePrivy()
   const { wallets } = useWallets()
   const { checkMinimum, minimumUSD } = useMinimumBalance()
@@ -153,7 +153,8 @@ export default function ConnectPage() {
       } catch (modeErr) {
         console.error('Failed to sync user mode:', modeErr)
       }
-      router.push('/user/dashboard')
+      const destination = user?.role === 'partner' ? '/partner/dashboard' : '/user/dashboard'
+      router.replace(destination)
     } catch {
       setAuthError('認証に失敗しました。もう一度お試しください。')
     } finally {
