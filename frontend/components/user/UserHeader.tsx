@@ -117,7 +117,7 @@ export function UserHeader() {
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
-            {isAdmin && address && (
+            {(isAdmin || isPartner) && address && (
               <>
                 <Badge variant="outline" className="font-mono text-xs hidden sm:flex">
                   {`${address.slice(0, 6)}...${address.slice(-4)}`}
