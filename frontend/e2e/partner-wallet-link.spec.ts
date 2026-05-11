@@ -77,6 +77,8 @@ function readPartnerAuth(): { token: string; expiresAt: number } | undefined {
 /**
  * partner JWT を localStorage に注入 + /auth/me をモック。
  * PartnerGuard が /login にリダイレクトしないための最小セットアップ。
+ * contract test (TC1-TC4) は /auth/wallet/link レスポンス制御が目的のため
+ * /auth/me はモックのまま維持する (CF Access 保護下の staging-new で安定実行するため)。
  */
 async function setupPartnerAuth(page: Page): Promise<void> {
   const auth = readPartnerAuth()
@@ -259,5 +261,36 @@ test.describe('[F-17] partner wallet link flow', () => {
     await expect(page.getByRole('button', { name: 'ウォレット接続' })).toBeVisible()
 
     await saveScreenshot(page, 'tc4-wallet-422-sig-fail')
+  })
+})
+
+// ─── Lane G: 実 backend 疎通確認 ─────────────────────────────────────────────
+// mock なし。partner JWT で実 staging-new backend を叩く。
+// PR #207 稼働確認 (endpoint 存在 + 422 返却) に特化。
+
+test.describe('[F-17 Lane G] /auth/wallet/link 実 backend 疎通', () => {
+  test('TC-G2: POST /auth/wallet/link 無効署名 → 422 (PR #207 staging-new 稼働確認)', async ({
+    request,
+  }) => {
+    const auth = readPartnerAuth()
+    test.skip(!auth, 'partner.json なし — E2E_PARTNER_EMAIL / PASSWORD を設定して再実行')
+
+    const backendUrl =
+      process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? 'https://api.ultra-auto-trade.com'
+
+    const resp = await request.post(`${backendUrl}/auth/wallet/link`, {
+      headers: {
+        Authorization: `Bearer ${auth!.token}`,
+        'Content-Type': 'application/json',
+      },
+      data: {
+        address: '0xABCD1234567890ABcD1234567890aBcD12345678',
+        signature: '0xe2e_test_invalid_signature_lane_g',
+        message: 'sign this: e2e test 2026-01-01T00:00:00Z',
+      },
+    })
+
+    // 404 なら endpoint 未デプロイ、422 なら署名検証まで到達 (正常動作)
+    expect(resp.status()).toBe(422)
   })
 })
