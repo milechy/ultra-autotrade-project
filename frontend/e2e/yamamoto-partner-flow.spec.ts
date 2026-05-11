@@ -684,3 +684,78 @@ test.describe('TC8: AuthProvider getMe() タイムアウト (2026-04-24 P1-NEW)'
     await expect(banner).toHaveCount(0)
   })
 })
+
+// ─── Wallet badge TC (F-17/2 / Lane C) ────────────────────────────────────
+//
+// UserHeader.tsx の Wallet badge 条件を isAdmin → isAdmin || isPartner に変更した
+// 回帰テスト。badge は wagmi の address (実ウォレット接続) を要するため、
+// E2E 環境 (wallet 未接続) では badge は常に非表示となる。
+// 以下は「接続なし = badge 非表示」の regression TC。
+// wallet 接続後の badge 表示確認は Lane G (Privy E2E 統合) に委任。
+
+test.describe('Wallet badge 条件変更 — isAdmin || isPartner (Lane C)', () => {
+  async function setupMockAuth(
+    page: Page,
+    role: 'admin' | 'partner' | 'viewer',
+  ): Promise<void> {
+    await page.addInitScript((args) => {
+      localStorage.setItem(args.tokenKey, args.token)
+      localStorage.setItem(args.expiresKey, String(args.expires))
+    }, {
+      tokenKey: 'ultra_auth_token',
+      token: 'mock-badge-test-token',
+      expiresKey: 'ultra_auth_expires',
+      expires: Date.now() + 24 * 60 * 60 * 1000,
+    })
+
+    await page.route('**/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 99,
+          email: `${role}-badge@ultra-autotrade.com`,
+          username: `${role}-badge-test`,
+          role,
+          is_active: true,
+          created_at: '2026-01-01T00:00:00+00:00',
+          updated_at: '2026-01-01T00:00:00+00:00',
+          tier: 'GENERAL',
+          risk_mode: 'conservative',
+          risk_mode_label: 'ローリスク',
+        }),
+      })
+    })
+  }
+
+  test('partner ロール / wallet 未接続 → badge 非表示', async ({ page }) => {
+    await setupMockAuth(page, 'partner')
+    await page.goto('/user/approve')
+    // wallet address badge は 0x から始まる短縮アドレスを表示する
+    await expect(
+      page.locator('header').getByText(/^0x[0-9a-fA-F]{4}\.\.\./)
+    ).toHaveCount(0)
+  })
+
+  test('admin ロール / wallet 未接続 → badge 非表示 (regression)', async ({ page }) => {
+    await setupMockAuth(page, 'admin')
+    await page.goto('/user/dashboard')
+    await expect(
+      page.locator('header').getByText(/^0x[0-9a-fA-F]{4}\.\.\./)
+    ).toHaveCount(0)
+  })
+
+  test('viewer ロール / wallet 未接続 → badge 非表示 (regression)', async ({ page }) => {
+    await setupMockAuth(page, 'viewer')
+    await page.goto('/user/dashboard')
+    await expect(
+      page.locator('header').getByText(/^0x[0-9a-fA-F]{4}\.\.\./)
+    ).toHaveCount(0)
+  })
+
+  // wallet 接続済み partner の badge 表示は Privy E2E 統合が必要 → Lane G に委任
+  // GID 1214691705320525 / バグ-F-17 教訓 (mock E2E pass → 実環境 fail 防止) 参照
+  test.skip('partner ロール / wallet 接続済み → badge 表示 [Lane G: Privy 統合後]', async () => {
+    // TODO(Lane G): Privy test token で wallet 接続 → UserHeader badge 表示確認
+  })
+})
