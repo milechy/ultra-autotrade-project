@@ -345,6 +345,9 @@ else
   log "フルデプロイ開始（Staging環境）"
   log "初回起動時は active slot=blue で立ち上げ、以降は --backend-only で切替"
 
+  log "📦 Pre-deploy backup (staging-new)..."
+  ENVIRONMENT=staging-new bash "${SCRIPT_DIR}/backup_db.sh" || log "⚠️ Backup failed, continuing deploy..."
+
   log "upstream.conf を blue に初期化..."
   write_upstream_conf "blue"
 
