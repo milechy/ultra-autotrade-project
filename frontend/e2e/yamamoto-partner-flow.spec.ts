@@ -759,3 +759,129 @@ test.describe('Wallet badge 条件変更 — isAdmin || isPartner (Lane C)', () 
     // TODO(Lane G): Privy test token で wallet 接続 → UserHeader badge 表示確認
   })
 })
+
+// ─── Lane G: 実ログイン TC3/TC4 ───────────────────────────────────────────────
+// mock なし。E2E_PARTNER_EMAIL / PASSWORD で real auth。
+// PR #209 (BottomNav 紹介リンク) / PR #210 (Wallet badge 条件) 実ログイン確認。
+//
+// CF Access 回避: staging-new frontend は NEXT_PUBLIC_BACKEND_BASE_URL が
+//   https://api-staging.ultra-auto-trade.com (CF Access 保護) に焼き込まれているため、
+//   page.route で内部 backend に relay する。これは mock ではなく実 backend への中継。
+//   内部 URL: process.env.E2E_INTERNAL_BACKEND_URL (default: http://localhost:8082)
+
+const INTERNAL_BACKEND = process.env.E2E_INTERNAL_BACKEND_URL ?? 'http://localhost:8082'
+
+/** staging-new の CF Access 保護 API を内部 backend に relay する。
+ *  route.fetch() は body/json 競合で失敗するため Node fetch で代替。 */
+async function setupCfAccessRelay(page: Page, token: string): Promise<void> {
+  await page.route('**/api-staging.ultra-auto-trade.com/**', async (route) => {
+    const originalUrl = route.request().url()
+    const internalUrl = originalUrl.replace(
+      /https?:\/\/api-staging\.ultra-auto-trade\.com/,
+      INTERNAL_BACKEND,
+    )
+    const method = route.request().method()
+    const postData = route.request().postData()
+    try {
+      const res = await fetch(internalUrl, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        ...(postData ? { body: postData } : {}),
+      })
+      const body = await res.text()
+      await route.fulfill({
+        status: res.status,
+        contentType: res.headers.get('content-type') ?? 'application/json',
+        body,
+      })
+    } catch (e) {
+      // relay 失敗時はデバッグ用にログ出力し continue
+      console.error('[relay] failed:', internalUrl, e)
+      await route.continue()
+    }
+  })
+}
+
+test.describe('Lane G: 実ログイン — BottomNav / Wallet badge 確認', () => {
+  test.skip(!HAS_CREDENTIALS, 'E2E_PARTNER_EMAIL / E2E_PARTNER_PASSWORD 未設定')
+
+  async function setupLaneGAuth(page: Page): Promise<void> {
+    const authPath = path.join('e2e', '.auth', 'partner.json')
+    if (!fs.existsSync(authPath)) throw new Error('partner.json not found')
+    const { token, expiresAt } = JSON.parse(fs.readFileSync(authPath, 'utf-8')) as {
+      token: string; expiresAt: number
+    }
+    const safeExpires = Math.max(expiresAt, Date.now() + 24 * 60 * 60 * 1000)
+
+    // relay を先に登録 (loginAsPartner のモックと競合しないよう独立)
+    await setupCfAccessRelay(page, token)
+
+    // JWT 注入
+    await page.addInitScript(
+      (args) => {
+        localStorage.setItem(args.tokenKey, args.t)
+        localStorage.setItem(args.expiresKey, String(args.e))
+      },
+      { tokenKey: 'ultra_auth_token', expiresKey: 'ultra_auth_expires', t: token, e: safeExpires },
+    )
+  }
+
+  // TC3: partner 実ログイン → UserHeader wallet badge 非表示 (wallet 未接続)
+  test('TC-G3: partner 実ログイン → UserHeader wallet badge は wallet 未接続時に非表示 (PR #210)', async ({
+    page,
+  }) => {
+    await setupLaneGAuth(page)
+    await page.goto('/partner/dashboard')
+    await page.waitForLoadState('domcontentloaded')
+
+    // partner dashboard に到達していること (/login でも /user でもない)
+    expect(page.url()).toContain('/partner/dashboard')
+
+    // wallet badge: 0x... 形式のアドレスは表示されない (wallet 未接続)
+    await expect(
+      page.locator('header').getByText(/^0x[0-9a-fA-F]{4}\.\.\./)
+    ).toHaveCount(0)
+
+    await page.screenshot({
+      path: 'e2e/screenshots/lane-g/tc-g3-wallet-badge-partner-real-login.png',
+      fullPage: false,
+    })
+  })
+
+  // TC4: partner 実ログイン → BottomNav「紹介プログラム」リンク表示 + /partner/referral 遷移
+  // BottomNav は md:hidden (モバイルのみ) のため 375px ビューポートで確認
+  test('TC-G4: partner 実ログイン → AppShell ハンバーガーメニュー 紹介プログラム → /partner/referral 200 (PR #209)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 667 })
+    await setupLaneGAuth(page)
+    await page.goto('/partner/dashboard')
+    await page.waitForLoadState('domcontentloaded')
+
+    expect(page.url()).toContain('/partner/dashboard')
+
+    // AppShell モバイル: ハンバーガーボタンをクリックしてメニューを開く
+    const hamburger = page.getByRole('button', { name: 'メニュー' })
+    await expect(hamburger).toBeVisible({ timeout: 8_000 })
+    await hamburger.click()
+
+    // ドロップダウン内の「紹介プログラム」リンクをクリック
+    const referralLink = page.getByRole('link', { name: '紹介プログラム' })
+    await expect(referralLink).toBeVisible({ timeout: 5_000 })
+    await referralLink.click()
+
+    // /partner/referral に遷移し 404 にならないこと
+    await page.waitForURL(/\/partner\/referral/, { timeout: 8_000 })
+    expect(page.url()).toContain('/partner/referral')
+
+    await expect(page.locator('main')).toBeVisible({ timeout: 8_000 })
+
+    await page.screenshot({
+      path: 'e2e/screenshots/lane-g/tc-g4-referral-nav.png',
+      fullPage: false,
+    })
+  })
+})
