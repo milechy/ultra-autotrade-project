@@ -8,22 +8,35 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.ai.models import AIDecision
 from app.auth.models import User
 from app.portfolio.models import PortfolioHistory, PortfolioSnapshot
 
-from .schemas import MonthlyStatsResponse, PartnerStatsResponse, UserStatsResponse
+from .schemas import (
+    JudgmentSummaryItem,
+    MonthlyStatsResponse,
+    PartnerStatsResponse,
+    ReferralUserDetailResponse,
+    ReferralUserItem,
+    UserStatsResponse,
+)
 
 
 def _get_partner_user_ids(db: Session, partner_id: int) -> list[int]:
-    """users.invited_by からパートナーに紐づくユーザー ID を取得する。
-
-    マルチユース招待コード対応: Invitation.invited_user_id（1件のみ）ではなく
-    users.invited_by（ユーザーごとに記録）を参照する。
-    """
-    users = db.query(User.id).filter(User.invited_by == partner_id).all()
+    """users.referrer_id からパートナーに紐づくユーザー ID を取得する (RAS B モデル)。"""
+    users = db.query(User.id).filter(User.referrer_id == partner_id).all()
     return [u.id for u in users]
+
+
+def _mask_email(email: str) -> str:
+    """``y***@example.com`` 形式へマスクする。"""
+    if "@" not in email:
+        return email[:1] + "***"
+    local, domain = email.split("@", 1)
+    return (f"{local[0]}***@{domain}") if local else f"***@{domain}"
 
 
 def get_partner_stats(db: Session, partner_id: int) -> PartnerStatsResponse:
@@ -34,10 +47,18 @@ def get_partner_stats(db: Session, partner_id: int) -> PartnerStatsResponse:
     - yesterday_aum: 前日の最新スナップショット合計
     - month_return_pct: 当月の月次 portfolio_history から算出
     - yesterday_return_pct: 前日の日次 portfolio_history から算出
-    - user_count: 招待ユーザー数
+    - user_count: 被紹介ユーザー数 (referrer_id)
+    - total_pnl: 当月の pnl_usd 合計
+    - active_user_count: is_active=True の被紹介ユーザー数
     """
     user_ids = _get_partner_user_ids(db, partner_id)
     user_count = len(user_ids)
+
+    active_user_count: int = (
+        db.query(func.count(User.id))
+        .filter(User.referrer_id == partner_id, User.is_active.is_(True))
+        .scalar()
+    ) or 0
 
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -72,6 +93,7 @@ def get_partner_stats(db: Session, partner_id: int) -> PartnerStatsResponse:
 
     yesterday_return_pct: Optional[Decimal] = None
     month_return_pct: Optional[Decimal] = None
+    total_pnl: Optional[Decimal] = None
 
     if user_ids:
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -109,13 +131,16 @@ def get_partner_stats(db: Session, partner_id: int) -> PartnerStatsResponse:
         if monthly_records:
             total_open = Decimal("0")
             total_close = Decimal("0")
+            pnl_sum = Decimal("0")
             for r in monthly_records:
                 total_open += Decimal(str(r.open_value_usd))
                 total_close += Decimal(str(r.close_value_usd))
+                pnl_sum += Decimal(str(r.pnl_usd))
             if total_open > Decimal("0"):
                 month_return_pct = (
                     (total_close - total_open) / total_open * Decimal("100")
                 ).quantize(Decimal("0.0001"))
+            total_pnl = pnl_sum
 
     return PartnerStatsResponse(
         total_aum=total_aum,
@@ -123,6 +148,8 @@ def get_partner_stats(db: Session, partner_id: int) -> PartnerStatsResponse:
         month_return_pct=month_return_pct,
         yesterday_return_pct=yesterday_return_pct,
         user_count=user_count,
+        total_pnl=total_pnl,
+        active_user_count=active_user_count,
     )
 
 
@@ -130,13 +157,12 @@ def get_user_stats(db: Session, partner_id: int, user_id: int) -> UserStatsRespo
     """
     特定ユーザーの運用実績を返す。
 
-    招待テーブルで partner_id との紐づきを確認する。
+    referrer_id で partner_id との紐づきを確認する。
     紐づきがない場合は ValueError を送出する。
     """
-    # users.invited_by でパートナーとの紐づきを確認（マルチユース招待コード対応）
-    target_user = db.query(User).filter(User.id == user_id, User.invited_by == partner_id).first()
+    target_user = db.query(User).filter(User.id == user_id, User.referrer_id == partner_id).first()
     if target_user is None:
-        raise ValueError(f"User {user_id} is not invited by partner {partner_id}")
+        raise ValueError(f"User {user_id} is not referred by partner {partner_id}")
 
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -259,3 +285,129 @@ def get_monthly_stats(db: Session, partner_id: int) -> list[MonthlyStatsResponse
         )
 
     return result
+
+
+def list_referral_users(db: Session, partner_id: int) -> list[ReferralUserItem]:
+    """
+    被紹介者一覧を N+1 なしで返す (3 クエリ)。
+
+    Q1: referrer_id からユーザー一覧
+    Q2: 各ユーザーの最新スナップショット (subquery)
+    Q3: 当月の月次 portfolio_history から利回り計算
+    """
+    users = (
+        db.query(User).filter(User.referrer_id == partner_id).order_by(User.created_at.desc()).all()
+    )
+    if not users:
+        return []
+
+    user_ids = [u.id for u in users]
+
+    max_snap_sq = (
+        db.query(
+            PortfolioSnapshot.user_id,
+            func.max(PortfolioSnapshot.recorded_at).label("max_ts"),
+        )
+        .filter(PortfolioSnapshot.user_id.in_(user_ids))
+        .group_by(PortfolioSnapshot.user_id)
+        .subquery()
+    )
+    snaps = (
+        db.query(PortfolioSnapshot)
+        .join(
+            max_snap_sq,
+            (PortfolioSnapshot.user_id == max_snap_sq.c.user_id)
+            & (PortfolioSnapshot.recorded_at == max_snap_sq.c.max_ts),
+        )
+        .all()
+    )
+    snap_map: dict[int, Decimal] = {s.user_id: Decimal(str(s.total_value_usd)) for s in snaps}
+
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    monthly_recs = (
+        db.query(PortfolioHistory)
+        .filter(
+            PortfolioHistory.user_id.in_(user_ids),
+            PortfolioHistory.period_type == "monthly",
+            PortfolioHistory.period_start >= month_start,
+        )
+        .all()
+    )
+    month_ret_map: dict[int, Optional[Decimal]] = {}
+    for rec in monthly_recs:
+        open_val = Decimal(str(rec.open_value_usd))
+        if open_val > Decimal("0"):
+            close_val = Decimal(str(rec.close_value_usd))
+            pct = (close_val - open_val) / open_val * Decimal("100")
+            month_ret_map[rec.user_id] = pct.quantize(Decimal("0.0001"))
+
+    return [
+        ReferralUserItem(
+            user_id=u.id,
+            email_masked=_mask_email(u.email),
+            total_aum=snap_map.get(u.id, Decimal("0")),
+            month_return_pct=month_ret_map.get(u.id),
+            is_active=u.is_active,
+            last_judgment_at=u.last_judgment_at,
+        )
+        for u in users
+    ]
+
+
+def get_referral_user_detail(
+    db: Session, partner_id: int, user_id: int
+) -> ReferralUserDetailResponse:
+    """
+    被紹介者の詳細を返す。
+
+    - referrer_id で partner_id との紐づきを確認
+    - 月別運用実績 (portfolio_history monthly)
+    - AI 判定履歴要約 (ai_decisions 直近 10 件)
+    """
+    user = db.query(User).filter(User.id == user_id, User.referrer_id == partner_id).first()
+    if user is None:
+        raise ValueError(f"User {user_id} is not referred by partner {partner_id}")
+
+    monthly_records = (
+        db.query(PortfolioHistory)
+        .filter(
+            PortfolioHistory.user_id == user_id,
+            PortfolioHistory.period_type == "monthly",
+        )
+        .order_by(PortfolioHistory.period_start.asc())
+        .all()
+    )
+    monthly_performance = [
+        MonthlyStatsResponse(
+            month=r.period_start.strftime("%Y-%m"),
+            start_value=Decimal(str(r.open_value_usd)),
+            end_value=Decimal(str(r.close_value_usd)),
+            return_pct=Decimal(str(r.pnl_pct)),
+            user_count=1,
+        )
+        for r in monthly_records
+    ]
+
+    decisions = (
+        db.query(AIDecision)
+        .filter(AIDecision.user_id == user_id)
+        .order_by(AIDecision.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    judgment_summary = [
+        JudgmentSummaryItem(
+            action=d.action,
+            confidence=d.confidence,
+            created_at=d.created_at,
+        )
+        for d in decisions
+    ]
+
+    return ReferralUserDetailResponse(
+        user_id=user_id,
+        email_masked=_mask_email(user.email),
+        monthly_performance=monthly_performance,
+        judgment_summary=judgment_summary,
+    )

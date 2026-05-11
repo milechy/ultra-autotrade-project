@@ -116,12 +116,12 @@ def _create_viewer(
     assert r.status_code == 201, r.text
     user_id = int(r.json()["id"])
 
-    # users.invited_by に partner_id を設定して紐づきを記録する
+    # users.referrer_id に partner_id を設定して紐づきを記録する (RAS B モデル)
     db = session_factory()
     try:
         user = db.query(User).filter(User.id == user_id).first()
         if user is not None:
-            user.invited_by = partner_id
+            user.referrer_id = partner_id
             db.commit()
     finally:
         db.close()

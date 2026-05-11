@@ -17,6 +17,8 @@ class PartnerStatsResponse(BaseModel):
     month_return_pct: Optional[Decimal]
     yesterday_return_pct: Optional[Decimal]
     user_count: int
+    total_pnl: Optional[Decimal] = None
+    active_user_count: int = 0
 
 
 class UserStatsResponse(BaseModel):
@@ -37,6 +39,36 @@ class MonthlyStatsResponse(BaseModel):
     end_value: Decimal
     return_pct: Decimal
     user_count: int
+
+
+class ReferralUserItem(BaseModel):
+    """被紹介者一覧アイテム (referrer_id モデル)。wallet_address / tx_hash は含まない。"""
+
+    user_id: int
+    email_masked: str
+    total_aum: Decimal
+    month_return_pct: Optional[Decimal]
+    is_active: bool
+    last_judgment_at: Optional[datetime]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class JudgmentSummaryItem(BaseModel):
+    """AI 判定履歴要約アイテム。"""
+
+    action: str
+    confidence: int
+    created_at: datetime
+
+
+class ReferralUserDetailResponse(BaseModel):
+    """被紹介者詳細レスポンス (referrer_id モデル)。wallet_address / tx_hash は含まない。"""
+
+    user_id: int
+    email_masked: str
+    monthly_performance: list[MonthlyStatsResponse]
+    judgment_summary: list[JudgmentSummaryItem]
 
 
 class NotificationLogItem(BaseModel):
