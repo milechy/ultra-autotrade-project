@@ -34,6 +34,7 @@
 import { test, expect, Page } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
+import { setupConnectedWagmiWallet } from './fixtures/privy'
 
 // ─── 設定 ──────────────────────────────────────────────────────────────────
 
@@ -753,10 +754,23 @@ test.describe('Wallet badge 条件変更 — isAdmin || isPartner (Lane C)', () 
     ).toHaveCount(0)
   })
 
-  // wallet 接続済み partner の badge 表示は Privy E2E 統合が必要 → Lane G に委任
-  // GID 1214691705320525 / バグ-F-17 教訓 (mock E2E pass → 実環境 fail 防止) 参照
-  test.skip('partner ロール / wallet 接続済み → badge 表示 [Lane G: Privy 統合後]', async () => {
-    // TODO(Lane G): Privy test token で wallet 接続 → UserHeader badge 表示確認
+  // F-17/8: viem 由来の固定アドレスを window.ethereum + wagmi storage で注入し、
+  // UserHeader が WalletAddressMask (フォーマット 0x123456...abcd) を描画することを確認。
+  // GID 1214691705320525 / バグ-F-17 教訓 (mock E2E pass → 実環境 fail 防止) 参照。
+  test('partner ロール / wallet 接続済み → UserHeader badge 表示 (F-17/8)', async ({
+    page,
+  }) => {
+    await setupMockAuth(page, 'partner')
+    const { address } = await setupConnectedWagmiWallet(page, { chainId: 8453 })
+
+    await page.goto('/user/dashboard')
+    await page.waitForLoadState('domcontentloaded')
+
+    // WalletAddressMask: `${address.slice(0,6)}...${address.slice(-4)}`
+    const masked = `${address.slice(0, 6)}...${address.slice(-4)}`
+    await expect(page.locator('header').getByText(masked)).toBeVisible({
+      timeout: 8_000,
+    })
   })
 })
 

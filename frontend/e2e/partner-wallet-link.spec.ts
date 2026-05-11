@@ -21,6 +21,7 @@
 import { test, expect, Page } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
+import { signWalletLinkPayload, getTestAccount } from './fixtures/privy'
 
 // ─── 定数 ─────────────────────────────────────────────────────────────────────
 
@@ -292,5 +293,59 @@ test.describe('[F-17 Lane G] /auth/wallet/link 実 backend 疎通', () => {
 
     // 404 なら endpoint 未デプロイ、422 なら署名検証まで到達 (正常動作)
     expect(resp.status()).toBe(422)
+  })
+})
+
+// ─── F-17/8: 実 viem 署名で /auth/wallet/link 200 path ─────────────────────
+// Lane G TC-G2 (無効署名 → 422) の続編。viem の EIP-191 personal_sign で
+// 復元可能な署名を生成し、200 + DB users.wallet_address 反映まで実環境で検証する。
+// idempotent: 同一 JWT user × 同一 wallet なので再リンク = 200 (副作用なし)。
+
+test.describe('[F-17/8] /auth/wallet/link 200 — real viem signature', () => {
+  test('TC-G5: viem 署名 → 200 + GET /auth/me.wallet_address 反映', async ({
+    request,
+  }) => {
+    const auth = readPartnerAuth()
+    test.skip(!auth, 'partner.json なし — E2E_PARTNER_EMAIL / PASSWORD を設定して再実行')
+
+    const backendUrl =
+      process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? 'https://api.ultra-auto-trade.com'
+
+    const payload = await signWalletLinkPayload()
+    const expectedAddress = getTestAccount().address.toLowerCase()
+
+    // 1. POST /auth/wallet/link → 200
+    const linkResp = await request.post(`${backendUrl}/auth/wallet/link`, {
+      headers: {
+        Authorization: `Bearer ${auth!.token}`,
+        'Content-Type': 'application/json',
+      },
+      data: payload,
+    })
+
+    // 409 (別 user に既にリンク済) は staging-new の汚染を示す。明示メッセージで失敗。
+    if (linkResp.status() === 409) {
+      throw new Error(
+        `409: ${expectedAddress} が partner test user 以外にリンク済。` +
+          'staging-new で UPDATE users SET wallet_address=NULL WHERE id != <partner_id> を実行のこと。',
+      )
+    }
+    expect(linkResp.status(), `link response: ${await linkResp.text()}`).toBe(200)
+
+    const linkBody = (await linkResp.json()) as {
+      user_id: number
+      wallet_address: string
+      linked_at: string
+    }
+    expect(linkBody.wallet_address).toBe(expectedAddress)
+    expect(linkBody.linked_at).toMatch(/T.*\d/)
+
+    // 2. GET /auth/me → wallet_address が反映されている
+    const meResp = await request.get(`${backendUrl}/auth/me`, {
+      headers: { Authorization: `Bearer ${auth!.token}` },
+    })
+    expect(meResp.status()).toBe(200)
+    const meBody = (await meResp.json()) as { wallet_address?: string | null }
+    expect(meBody.wallet_address).toBe(expectedAddress)
   })
 })
