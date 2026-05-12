@@ -156,7 +156,11 @@ test.describe('[F-17] partner wallet link flow', () => {
   })
 
   // ── TC2: 200 → 接続済 UI ────────────────────────────────────────────────────
-  test('TC2: POST /auth/wallet/link 200 → 接続済 UI + アドレス + ネットワーク表示', async ({
+  // SKIP: 2026-05-12 hotfix で WalletConnectCard が空の POST から
+  // Privy modal → 実署名 → POST {address,signature,message} へ変更された。
+  // page.route() 直前のボタンクリックだけでは POST が発火しなくなったため、本ケースは
+  // wallet-connect-link.spec.ts の Privy-aware ケースに移譲。
+  test.skip('TC2: POST /auth/wallet/link 200 → 接続済 UI + アドレス + ネットワーク表示', async ({
     page,
   }) => {
     await setupPartnerAuth(page)
@@ -193,7 +197,9 @@ test.describe('[F-17] partner wallet link flow', () => {
   })
 
   // ── TC3: 409 → toast エラー ─────────────────────────────────────────────────
-  test('TC3: POST /auth/wallet/link 409 → toast "このウォレットは別アカウントで登録済みです"', async ({
+  // SKIP: 2026-05-12 hotfix で実署名フローに変更。TC2 と同じ理由で route mock 単独
+  // ではテストできない。エラー toast 表示は wallet-connect-link.spec.ts で再現。
+  test.skip('TC3: POST /auth/wallet/link 409 → toast "このウォレットは別アカウントで登録済みです"', async ({
     page,
   }) => {
     await setupPartnerAuth(page)
@@ -229,7 +235,8 @@ test.describe('[F-17] partner wallet link flow', () => {
   })
 
   // ── TC4: 422 → toast エラー ─────────────────────────────────────────────────
-  test('TC4: POST /auth/wallet/link 422 → toast "署名検証に失敗しました"', async ({
+  // SKIP: 2026-05-12 hotfix で実署名フローに変更。
+  test.skip('TC4: POST /auth/wallet/link 422 → toast "署名検証に失敗しました"', async ({
     page,
   }) => {
     await setupPartnerAuth(page)
