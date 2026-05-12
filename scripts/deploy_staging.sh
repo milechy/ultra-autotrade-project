@@ -344,31 +344,53 @@ if "${FRONTEND_ONLY}"; then
 
   # ─── post-deploy: nginx 経由 /health 疎通テスト ───
   # 内部ヘルスチェックだけでは nginx → backend 経路の障害 (upstream IP 固着) を検出できない。
-  # staging は CF Access 必須なので外形 curl は省略し、nginx 直接 /health を 5 回連続 200 で確認。
-  log "post-deploy: nginx 経由 /health で疎通を確認..."
+  # staging は CF Access の認可ヘッダが curl 側で取れないケースがあるため、nginx 内部
+  # `127.0.0.1:${NGINX_PORT}/health` を**安定して**通っているか 5 連続 200 で確認する。
+  # 最大 30 回 (約 90s) で 5 連続 200 を達成できなければ nginx -s reload を試行。
+  log "post-deploy: nginx 経由 /health で疎通を 5 連続 200 で確認..."
+  STAGING_HEALTH_URL="http://127.0.0.1:${NGINX_PORT}/health"
+  POST_DEPLOY_OK=false
+  CONSECUTIVE_200=0
   POST_DEPLOY_CODE=""
-  for i in 1 2 3 4 5; do
-    POST_DEPLOY_CODE=$(curl -sf -o /dev/null -m 5 -w "%{http_code}" "http://127.0.0.1:${NGINX_PORT}/health" || echo "000")
+  for i in $(seq 1 30); do
+    POST_DEPLOY_CODE=$(curl -sf -o /dev/null -m 5 -w "%{http_code}" "${STAGING_HEALTH_URL}" || echo "000")
     if [[ "${POST_DEPLOY_CODE}" == "200" ]]; then
-      log "  nginx /health [${i}/5] = 200"
-      break
+      CONSECUTIVE_200=$((CONSECUTIVE_200 + 1))
+      log "  nginx /health [attempt ${i}] = 200 (consecutive ${CONSECUTIVE_200}/5)"
+      if [[ "${CONSECUTIVE_200}" -ge 5 ]]; then
+        POST_DEPLOY_OK=true
+        break
+      fi
+    else
+      log "  nginx /health [attempt ${i}] = ${POST_DEPLOY_CODE} (consecutive reset 0/5)"
+      CONSECUTIVE_200=0
     fi
-    log "  nginx /health [${i}/5] = ${POST_DEPLOY_CODE} (retry in 3s)"
     sleep 3
   done
 
-  if [[ "${POST_DEPLOY_CODE}" != "200" ]]; then
-    err "nginx /health = ${POST_DEPLOY_CODE} (upstream IP 固着の可能性)"
+  if ! "${POST_DEPLOY_OK}"; then
+    err "nginx /health の 5 連続 200 が 30 回試行 (約 90s) で達成できず。最終 status = ${POST_DEPLOY_CODE}"
     log "nginx -s reload で upstream の動的解決を強制..."
     if docker exec "${NGINX_CONTAINER}" nginx -s reload 2>&1; then
-      sleep 3
-      FINAL_CODE=$(curl -sf -o /dev/null -m 5 -w "%{http_code}" "http://127.0.0.1:${NGINX_PORT}/health" || echo "000")
-      log "nginx reload 後 /health = ${FINAL_CODE}"
-      if [[ "${FINAL_CODE}" == "200" ]]; then
+      sleep 5
+      CONSECUTIVE_200=0
+      FINAL_CODE=""
+      for j in $(seq 1 10); do
+        FINAL_CODE=$(curl -sf -o /dev/null -m 5 -w "%{http_code}" "${STAGING_HEALTH_URL}" || echo "000")
+        if [[ "${FINAL_CODE}" == "200" ]]; then
+          CONSECUTIVE_200=$((CONSECUTIVE_200 + 1))
+          [[ "${CONSECUTIVE_200}" -ge 5 ]] && break
+        else
+          CONSECUTIVE_200=0
+        fi
+        sleep 2
+      done
+      log "nginx reload 後 /health 最終 status = ${FINAL_CODE}, consecutive 200 = ${CONSECUTIVE_200}/5"
+      if [[ "${CONSECUTIVE_200}" -ge 5 ]]; then
         slack_notify "⚠️ [deploy_staging.sh] post-deploy nginx reload で 502 自動復旧"
         log "⚠️ nginx reload で復旧しました"
       else
-        err "nginx reload 後も 502 残留 (${FINAL_CODE}). on_failure に遷移"
+        err "nginx reload 後も 5 連続 200 達成できず (最終 ${FINAL_CODE}). on_failure に遷移"
         on_failure
       fi
     else
@@ -376,7 +398,7 @@ if "${FRONTEND_ONLY}"; then
       on_failure
     fi
   else
-    log "✅ nginx /health = 200 連続確認 OK"
+    log "✅ nginx /health = 5 連続 200 確認 OK"
   fi
 
 elif "${BACKEND_ONLY}"; then

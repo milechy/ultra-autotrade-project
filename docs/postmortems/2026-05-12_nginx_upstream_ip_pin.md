@@ -61,14 +61,17 @@ nginx 内 getent backend-blue = 172.19.0.5   ← Docker DNS は正解を返し�
 nginx upstream cache         = 172.19.0.6   ← 起動時 1 回解決した古い IP に固着
 ```
 
-### 環境証拠
+### 環境証拠 (pre-fix snapshot — 本 PR で全て修正済)
 
-| 項目 | 値 | 説明 |
+下表は本 PR (`fix/nginx-upstream-ip-pin-20260512`) **適用前**の状態を示す。
+本 PR マージ後はいずれも fixed (詳細は「対策」セクション参照)。
+
+| 項目 | pre-fix の値 | 説明 |
 |---|---|---|
 | nginx.conf `resolver` 出現回数 | 0 | 致命的 |
 | upstream.production.conf | `server backend-blue:8000 max_fails=3 fail_timeout=10s;` | hostname 直書き、起動時 1 回解決 |
 | deploy_production.sh L384 | `up -d frontend` (no flags) | CLAUDE.md L1009 違反 |
-| promtail target | `/var/log/*log` のみ | nginx container log 取り込みなし |
+| promtail target | `/var/log/*log` のみ | nginx container log 取り込みなし (本 PR では未対応、別タスク) |
 
 ### Phase 1 復旧確認
 
@@ -109,7 +112,10 @@ nginx upstream cache         = 172.19.0.6   ← 起動時 1 回解決した古�
 
 **効果**: backend container 再生成で IP が変動しても、nginx が TTL 5s で DNS を再解決するため**自動復旧**。`docker restart nginx` 手動対応が不要に。
 
-**トレードオフ**: `upstream` block の `keepalive 32` プールは失われる (変数 proxy_pass と両立しない)。本サービスの QPS は低く、TCP セッション再確立コストは無視できる。passive health check (`proxy_next_upstream`) は維持。
+**トレードオフ**:
+- `upstream` block の `keepalive 32` プールは失われる (変数 proxy_pass と両立しない)。本サービスの QPS は低く、TCP セッション再確立コストは無視できる。
+- `proxy_next_upstream` は維持しているが、**upstream group の peer failover ではなく同一 `$backend` に対する単純リトライ**として動作する点を運用上明示する必要がある (NGINX OSS の `upstream` block 撤去に伴う必然的挙動差)。Blue/Green 切替時の peer failover は `write_upstream_conf` + `nginx -s reload` で行う仕組みは従来どおり機能する。
+- `max_fails` / `fail_timeout` は upstream block 専用のディレクティブのため変数 proxy_pass では無効化される。backend 単一インスタンス故障の検知は `proxy_next_upstream` の retry + Slack 通知 (post-deploy gate) でカバー。
 
 ### Option 2: deploy script の防御層
 
@@ -141,9 +147,10 @@ nginx を撤去して cloudflared → backend 直接 ingress に変更する案�
 4. nginx error.log の `upstream` が新 IP に切り替わっていることを確認
 
 ### Playwright E2E
-`frontend/e2e/nginx-upstream-recovery.spec.ts` (新規):
-- staging-new の `https://api-staging.ultra-auto-trade.com/health` を 10 回連続で叩く
-- いずれも 200 であること、`urt` (upstream_response_time) が 5s 以下であること
+`frontend/e2e/nginx-upstream-recovery.spec.ts` (新規、smoke test):
+- 指定の `HEALTH_URL` (デフォルト production) を 5 回連続で叩いて全て 200 を要求する
+- 1 回目のレスポンス body に `status` / `scheduler_healthy` フィールドが含まれることを確認 (nginx 固定レスポンスでなく backend FastAPI が実際に応答していることの担保)
+- chaos test (backend recreate での自動復旧) は Playwright spec では実施せず、deploy_staging.sh 経由の手動 chaos 検証 (本 PR の DoD で staging-new で実施済) に委ねる。Playwright は CI で定期的に「経路が通っているか」を見張る smoke 役割
 
 ## 再発防止
 

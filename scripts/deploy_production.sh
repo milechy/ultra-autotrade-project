@@ -412,33 +412,55 @@ if "${FRONTEND_ONLY}"; then
   # ─── post-deploy: Cloudflare 経由 /health 疎通テスト (Gate 8) ───
   # 2026-05-12 教訓: 内部 localhost:3000 ヘルスチェックだけでは
   # nginx → backend 経路の障害 (upstream IP 固着) を検出できない。
-  # Cloudflare → cloudflared → nginx → backend の外形パスを 5 回連続 200 で確認。
-  # 失敗時は nginx -s reload で upstream を再解決し、それでも復旧しなければ on_failure。
-  log "post-deploy: Cloudflare 経由 /health で外形疎通を確認..."
+  # Cloudflare → cloudflared → nginx → backend の外形パスが**安定して**通っているか
+  # 確認するため、5 回**連続**で 200 を要求する。途中で 502 等が出たらカウンタをリセット。
+  # 最大 30 回 (約 90s) で 5 連続 200 を達成できなければ nginx -s reload を試行。
+  log "post-deploy: Cloudflare 経由 /health で外形疎通を 5 連続 200 で確認..."
   EXTERNAL_HEALTH_URL="https://api.ultra-auto-trade.com/health"
+  POST_DEPLOY_OK=false
+  CONSECUTIVE_200=0
   POST_DEPLOY_CODE=""
-  for i in 1 2 3 4 5; do
+  for i in $(seq 1 30); do
     POST_DEPLOY_CODE=$(curl -sf -o /dev/null -m 5 -w "%{http_code}" "${EXTERNAL_HEALTH_URL}" || echo "000")
     if [[ "${POST_DEPLOY_CODE}" == "200" ]]; then
-      log "  外形 /health [${i}/5] = 200"
-      break
+      CONSECUTIVE_200=$((CONSECUTIVE_200 + 1))
+      log "  外形 /health [attempt ${i}] = 200 (consecutive ${CONSECUTIVE_200}/5)"
+      if [[ "${CONSECUTIVE_200}" -ge 5 ]]; then
+        POST_DEPLOY_OK=true
+        break
+      fi
+    else
+      log "  外形 /health [attempt ${i}] = ${POST_DEPLOY_CODE} (consecutive reset 0/5)"
+      CONSECUTIVE_200=0
     fi
-    log "  外形 /health [${i}/5] = ${POST_DEPLOY_CODE} (retry in 3s)"
     sleep 3
   done
 
-  if [[ "${POST_DEPLOY_CODE}" != "200" ]]; then
-    err "外形 /health = ${POST_DEPLOY_CODE} (nginx upstream IP 固着の可能性)"
+  if ! "${POST_DEPLOY_OK}"; then
+    err "外形 /health の 5 連続 200 が 30 回試行 (約 90s) で達成できず。最終 status = ${POST_DEPLOY_CODE}"
+    err "  (nginx upstream IP 固着・cloudflared 伝播遅延・backend 起動失敗のいずれか)"
     log "nginx -s reload で upstream の動的解決を強制..."
     if docker exec "${NGINX_CONTAINER}" nginx -s reload 2>&1; then
-      sleep 3
-      FINAL_CODE=$(curl -sf -o /dev/null -m 5 -w "%{http_code}" "${EXTERNAL_HEALTH_URL}" || echo "000")
-      log "nginx reload 後 /health = ${FINAL_CODE}"
-      if [[ "${FINAL_CODE}" == "200" ]]; then
+      sleep 5
+      # reload 後も 5 連続 200 を要求
+      CONSECUTIVE_200=0
+      FINAL_CODE=""
+      for j in $(seq 1 10); do
+        FINAL_CODE=$(curl -sf -o /dev/null -m 5 -w "%{http_code}" "${EXTERNAL_HEALTH_URL}" || echo "000")
+        if [[ "${FINAL_CODE}" == "200" ]]; then
+          CONSECUTIVE_200=$((CONSECUTIVE_200 + 1))
+          [[ "${CONSECUTIVE_200}" -ge 5 ]] && break
+        else
+          CONSECUTIVE_200=0
+        fi
+        sleep 2
+      done
+      log "nginx reload 後 /health 最終 status = ${FINAL_CODE}, consecutive 200 = ${CONSECUTIVE_200}/5"
+      if [[ "${CONSECUTIVE_200}" -ge 5 ]]; then
         slack_notify "⚠️ [deploy_production.sh] post-deploy nginx reload で 502 自動復旧 (frontend-only deploy 直後)\\n要調査: nginx の resolver 設定が機能しているか、または backend container が想定外に recreate されていないか"
         log "⚠️ nginx reload で復旧しました (要 RCA)"
       else
-        err "nginx reload 後も 502 残留 (${FINAL_CODE}). on_failure に遷移"
+        err "nginx reload 後も 5 連続 200 達成できず (最終 ${FINAL_CODE}). on_failure に遷移"
         on_failure
       fi
     else
@@ -446,7 +468,7 @@ if "${FRONTEND_ONLY}"; then
       on_failure
     fi
   else
-    log "✅ 外形 /health = 200 連続確認 OK (Gate 8)"
+    log "✅ 外形 /health = 5 連続 200 確認 OK (Gate 8)"
   fi
 
 elif "${BACKEND_ONLY}"; then
