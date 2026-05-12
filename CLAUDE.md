@@ -927,6 +927,73 @@ curl -fsS -o /dev/null -w "%{http_code}\n" \
 **Gate 8 (新規) を本 CLAUDE.md `## Testing` セクションのテスト順序に追加**:
 > テスト順序: pytest(自動) → tsc --noEmit(自動) → npm run build(自動) → Playwright E2E(自動) → 孤立コード検出(PR前) → Codex Review(PR前) → Claude in Chrome(UI変更時のみ) → **post-deploy-healthcheck (deploy後 自動) ★ Gate 8**
 
+### 2026-05-12追加（nginx upstream IP 固着 → frontend-only deploy 直後 502）
+
+**症状:** 12:00 production で `./scripts/deploy_production.sh --frontend-only` 実行直後から、
+Cloudflare 経由 `https://api.ultra-auto-trade.com/health` = 502。backend container 自体は健全
+(`localhost:8010` 直撃 = 200)。15:23 `docker restart ultra-autotrade-nginx-production` で復旧
+(3 時間 23 分継続)。同日 15:25 staging-new でも同型 502 を発見し、nginx error.log で
+**古い IP (172.19.0.6) への "Host is unreachable" 生証拠**を取得 (backend 実 IP は 172.19.0.5)。
+
+**真因:** `docker/nginx/nginx.conf` に **`resolver` ディレクティブ未設定**で、
+upstream を `server backend-blue:8000` の hostname 直書きにしていた。nginx は起動時に
+Docker embedded DNS (127.0.0.11) で 1 回だけ解決し、ワーカーメモリに永続キャッシュする。
+backend container が recreate されて新 IP を取得すると、nginx は古い IP に proxy_pass し続け、
+`docker restart nginx` 以外復旧手段なし。
+
+**トリガー:** `deploy_production.sh --frontend-only` 経路 (L367-384) が
+`--no-deps --force-recreate` フラグなしで `docker compose up -d frontend` を実行。
+compose の依存再評価で backend が recreate された (CLAUDE.md「本番フロントエンド操作ルール」
+L1009 違反)。
+
+**鉄則 (絶対):**
+
+1. **nginx の upstream に hostname を直書きする場合は必ず `resolver` を併設する。**
+   `docker/nginx/nginx.conf` で `resolver 127.0.0.11 valid=5s ipv6=off;` を宣言し、
+   `proxy_pass http://$backend;` の変数経由で動的解決させる。`upstream` block + hostname
+   直書きは hostname を起動時 1 回しか解決しないため**禁止**。
+   現行構成: `upstream.{production,staging}.conf` は `set $backend backend-blue:8000;`
+   の単一行で、`nginx.conf` の `location /` で include される。
+
+2. **`deploy_{production,staging}.sh --frontend-only` 経路は `--no-deps --force-recreate` 必須。**
+   `docker compose up -d frontend` 単独実行は禁止。本ルール違反が今回のトリガーになった。
+
+3. **post-deploy で外形 `/health` を必ず確認する (Gate 8 拡張)。**
+   `--frontend-only` の場合でも、production は `https://api.ultra-auto-trade.com/health`
+   (staging は `http://127.0.0.1:8082/health`) を 5 回連続 200 で確認し、失敗時は
+   `nginx -s reload` を自動実行 + Slack 通知 (`#ultra-auto-project`)。
+   `deploy_{production,staging}.sh` に組み込み済 (本セクションと対の修正)。
+
+4. **nginx コンテナのログは Loki に取り込む** (要追加実装、別 Asana タスク)。
+   現在 promtail は `/var/log/*log` のみ scrape し、nginx コンテナ内 `/dev/stderr` を
+   docker logs 経由でしか保持していないため、`docker restart nginx` で過去ログが完全消失する。
+   今回の本番側 RCA で error.log を取得できなかった構造的弱点。
+
+**Dashboard 管理設定の事故パターン (4 回目、L588 表に追加):**
+
+| 日付 | 事象 | 共通点 |
+|---|---|---|
+| 2026-05-12 | nginx upstream IP 固着で frontend-only deploy 直後 502 | resolver 未設定 + `--no-deps` 不在の二重バグ |
+
+**確認コマンド (deploy 直後・nginx 関連変更時):**
+
+```bash
+# nginx の resolver 設定確認 (1 以上必須)
+docker exec ultra-autotrade-nginx-production nginx -T 2>&1 | grep -c "^[[:space:]]*resolver"
+# upstream.conf が変数形式になっているか
+docker exec ultra-autotrade-nginx-production cat /etc/nginx/conf.d/upstream.conf
+# → "set $backend backend-blue:8000;" (新形式) or "server backend-blue:8000 ...;" (旧形式、要修正)
+# 外形 /health 5 回連続
+for i in 1 2 3 4 5; do
+  curl -sf -o /dev/null -w "[%{http_code}] " https://api.ultra-auto-trade.com/health
+  sleep 2
+done; echo
+```
+
+5 回全て 200 でなければ即 Slack 通知 + Phase 1 (read-only) で原因切り分け。
+
+**参照:** `docs/postmortems/2026-05-12_nginx_upstream_ip_pin.md`
+
 ---
 
 ## 参照ファイル
@@ -943,6 +1010,7 @@ curl -fsS -o /dev/null -w "%{http_code}\n" \
 | docs/ops/02_db_tables.md | 全DBテーブル定義（カラム・型・NULL可否） | ALTER TABLE を書く前・DBスキーマを推測しそうなとき |
 | docs/ops/03_deploy_procedures.md | デプロイ手順・コンテナ名・ボリューム・障害対応 | デプロイ前・Docker環境を推測しそうなとき |
 | docs/postmortems/2026-05-09_staging_api_502.md | staging cloudflared ingress port mismatch 12日遅延検出 RCA | port変更PR・cloudflared変更時 |
+| docs/postmortems/2026-05-12_nginx_upstream_ip_pin.md | nginx upstream IP 固着 (resolver 未設定 + `--no-deps` 不在) RCA | nginx config・deploy script変更時 |
 
 ---
 
