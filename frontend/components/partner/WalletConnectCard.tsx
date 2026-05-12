@@ -87,19 +87,49 @@ export function WalletConnectCard() {
       }
 
       const address = wallet.address
+      if (!address || !address.startsWith('0x')) {
+        toast.error('ウォレットアドレスが取得できませんでした')
+        return
+      }
+
       const timestamp = new Date().toISOString()
       const message = `Link wallet to Ultra AutoTrade\nAddress: ${address}\nTimestamp: ${timestamp}`
 
-      const eip1193 = await wallet.getEthereumProvider()
-      const ethProvider = new ethers.BrowserProvider(
-        eip1193 as unknown as ethers.Eip1193Provider,
-      )
-      const signer = await ethProvider.getSigner()
-      const signature = await signer.signMessage(message)
+      let eip1193: unknown
+      try {
+        eip1193 = await wallet.getEthereumProvider()
+      } catch {
+        toast.error('ウォレットプロバイダーの取得に失敗しました')
+        return
+      }
+
+      let signature: string
+      try {
+        const ethProvider = new ethers.BrowserProvider(
+          eip1193 as ethers.Eip1193Provider,
+        )
+        const signer = await ethProvider.getSigner()
+        signature = await signer.signMessage(message)
+      } catch {
+        toast.error('署名がキャンセルされました')
+        return
+      }
+      if (!signature || !signature.startsWith('0x')) {
+        toast.error('署名の取得に失敗しました')
+        return
+      }
+
+      // Defence-in-depth: never POST an empty/partial body. If any field is
+      // missing here, abort loudly rather than serialise undefined → {}.
+      const payload = { address, signature, message }
+      if (!payload.address || !payload.signature || !payload.message) {
+        toast.error('リクエスト内容に不足があります')
+        return
+      }
 
       const res = await postJson<BackendWalletLinkResponse>(
         '/auth/wallet/link',
-        { address, signature, message },
+        payload,
         { headers: { Authorization: `Bearer ${token}` } },
       )
       setLinked({
