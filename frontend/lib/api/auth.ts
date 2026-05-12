@@ -33,6 +33,9 @@ export interface UserResponse {
   created_at: string;
   updated_at: string;
   invited_by?: number | null;
+  tier?: "LOWER" | "MIDDLE" | "UPPER" | "GENERAL";
+  risk_mode?: "conservative" | "balanced" | "aggressive";
+  risk_mode_label?: string;
 }
 
 export interface PasswordChangeRequest {

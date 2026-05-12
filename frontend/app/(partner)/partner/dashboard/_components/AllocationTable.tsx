@@ -32,18 +32,34 @@ function fmtUsd(v: number): string {
   }).format(v)
 }
 
+// Tier ラベル辞書 (backend TIER_JP_LABELS と整合 — app/auth/models.py)
+// GENERAL は v9 互換 (LOWER と同義、F-13 で削除予定)
+const TIER_LABELS: Record<string, string> = {
+  LOWER: '一般',
+  MIDDLE: 'ミドル',
+  UPPER: 'アッパー',
+  GENERAL: '一般',
+}
+
+function tierBadgeClass(tier: string): string {
+  if (tier === 'UPPER') {
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+  }
+  if (tier === 'MIDDLE') {
+    return 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
+  }
+  return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+}
+
 function TierBadge({ tier }: { tier?: string }) {
   if (!tier) return <span className="text-muted-foreground text-xs">—</span>
-  const isUpper = tier === 'UPPER'
+  const label = TIER_LABELS[tier] ?? tier
   return (
     <span
-      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-        isUpper
-          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-      }`}
+      data-testid={`tier-badge-${tier}`}
+      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${tierBadgeClass(tier)}`}
     >
-      {isUpper ? 'アッパー' : '一般'}
+      {label}
     </span>
   )
 }
