@@ -33,23 +33,17 @@ const HEALTH_URL =
 const CF_ACCESS_CLIENT_ID = process.env.CF_ACCESS_CLIENT_ID
 const CF_ACCESS_CLIENT_SECRET = process.env.CF_ACCESS_CLIENT_SECRET
 
-const isStaging = HEALTH_URL.includes('api-staging.')
-
 test.describe('nginx upstream リカバリ (2026-05-12 P0)', () => {
-  test.skip(
-    isStaging && (!CF_ACCESS_CLIENT_ID || !CF_ACCESS_CLIENT_SECRET),
-    'staging API には CF Access Service Token が必要',
-  )
+  // CF Access Service Token が指定された場合のみヘッダを付与 (staging で必要なケースに備える)。
+  // /health 自体は CF Access 保護外でも 200 を返す現行構成のため、トークン未指定でも実行可能。
+  const extraHeaders: Record<string, string> = {}
+  if (CF_ACCESS_CLIENT_ID && CF_ACCESS_CLIENT_SECRET) {
+    extraHeaders['CF-Access-Client-Id'] = CF_ACCESS_CLIENT_ID
+    extraHeaders['CF-Access-Client-Secret'] = CF_ACCESS_CLIENT_SECRET
+  }
 
   test(`/health 5 回連続 200 (${HEALTH_URL})`, async () => {
-    const ctx = await pwRequest.newContext({
-      extraHTTPHeaders: isStaging
-        ? {
-            'CF-Access-Client-Id': CF_ACCESS_CLIENT_ID ?? '',
-            'CF-Access-Client-Secret': CF_ACCESS_CLIENT_SECRET ?? '',
-          }
-        : {},
-    })
+    const ctx = await pwRequest.newContext({ extraHTTPHeaders: extraHeaders })
 
     const results: number[] = []
     for (let i = 0; i < 5; i += 1) {
@@ -70,14 +64,7 @@ test.describe('nginx upstream リカバリ (2026-05-12 P0)', () => {
   })
 
   test(`/health body に scheduler_healthy / status フィールドが返る`, async () => {
-    const ctx = await pwRequest.newContext({
-      extraHTTPHeaders: isStaging
-        ? {
-            'CF-Access-Client-Id': CF_ACCESS_CLIENT_ID ?? '',
-            'CF-Access-Client-Secret': CF_ACCESS_CLIENT_SECRET ?? '',
-          }
-        : {},
-    })
+    const ctx = await pwRequest.newContext({ extraHTTPHeaders: extraHeaders })
 
     const res = await ctx.get(HEALTH_URL, { timeout: 8_000 })
     expect(res.status()).toBe(200)
