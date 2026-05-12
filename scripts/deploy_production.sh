@@ -411,8 +411,8 @@ else
   log "フルデプロイ開始"
   log "初回起動時は active slot=blue で立ち上げ、以降は --backend-only で切替"
 
-  log "📦 Pre-deploy backup..."
-  bash "${SCRIPT_DIR}/backup_db.sh" || log "⚠️ Backup failed, continuing deploy..."
+  log "📦 Pre-deploy backup (production)..."
+  ENVIRONMENT=production bash "${SCRIPT_DIR}/backup_db.sh" || log "⚠️ Backup failed, continuing deploy..."
 
   # 既知のフルデプロイは active=blue で再開する。upstream.conf を blue に揃える。
   log "upstream.conf を blue に初期化..."
