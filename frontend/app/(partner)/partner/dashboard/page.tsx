@@ -16,7 +16,7 @@ import {
   type Allocation,
   type TesterPerformance,
 } from '@/lib/api/allocations'
-import { getStoredToken } from '@/lib/auth'
+import { getStoredToken, useAuth } from '@/lib/auth'
 import PerformanceSummaryKPI from './_components/PerformanceSummaryKPI'
 import AllocationTable from './_components/AllocationTable'
 import type { MonthlyData } from './_components/MonthlyChartRecharts'
@@ -90,18 +90,44 @@ function returnTrend(v: number | undefined): 'up' | 'down' | 'flat' {
   return v > 0 ? 'up' : 'down'
 }
 
+// Tier ラベル辞書 (backend TIER_JP_LABELS と整合 — app/auth/models.py)
+// GENERAL は v9 互換 (LOWER と同義、F-13 で削除予定)
+const TIER_LABELS: Record<string, string> = {
+  LOWER: '一般',
+  MIDDLE: 'ミドル',
+  UPPER: 'アッパー',
+  GENERAL: '一般',
+}
+
+function tierBadgeClass(tier: string): string {
+  if (tier === 'UPPER') {
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+  }
+  if (tier === 'MIDDLE') {
+    return 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
+  }
+  return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+}
+
+function tierCardClass(tier: string): string {
+  if (tier === 'UPPER') {
+    return 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20'
+  }
+  if (tier === 'MIDDLE') {
+    return 'border-violet-200 bg-violet-50 dark:border-violet-800 dark:bg-violet-950/20'
+  }
+  return 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20'
+}
+
 function TierBadge({ tier }: { tier?: string }) {
   if (!tier) return <span className="text-muted-foreground text-xs">—</span>
-  const isUpper = tier === 'UPPER'
+  const label = TIER_LABELS[tier] ?? tier
   return (
     <span
-      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-        isUpper
-          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-      }`}
+      data-testid={`tier-badge-${tier}`}
+      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${tierBadgeClass(tier)}`}
     >
-      {isUpper ? 'アッパー' : '一般'}
+      {label}
     </span>
   )
 }
@@ -109,6 +135,10 @@ function TierBadge({ tier }: { tier?: string }) {
 // ---- Page ----
 
 export default function PartnerDashboardPage() {
+  const { user: currentUser } = useAuth()
+  // GENERAL は LOWER 同義 (v9 互換)
+  const currentTier = currentUser?.tier === 'GENERAL' ? 'LOWER' : currentUser?.tier
+
   const { data: stats, loading: statsLoading } = useAuthFetch<PartnerStats>('/api/partner/stats', { refreshInterval: 300000 })
   const { data: usersRaw, loading: usersLoading } = useAuthFetch<UsersResponse | PartnerUser[]>('/users', { refreshInterval: 300000 })
   const { data: monthly, loading: monthlyLoading } = useAuthFetch<MonthlyData[]>('/api/partner/monthly', { refreshInterval: 300000 })
@@ -239,25 +269,36 @@ export default function PartnerDashboardPage() {
               <Skeleton className="h-24 rounded-lg" />
             ) : feeSchedule ? (
               <div className="space-y-3">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {feeSchedule.schedule.map((item) => (
-                    <div
-                      key={item.tier}
-                      className={`rounded-lg border p-4 ${
-                        item.tier === 'UPPER'
-                          ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20'
-                          : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <TierBadge tier={item.tier} />
-                        <span className="text-sm font-medium">{item.description}</span>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {feeSchedule.schedule.map((item) => {
+                    const isCurrent = item.tier === currentTier
+                    return (
+                      <div
+                        key={item.tier}
+                        data-testid={`fee-card-${item.tier}`}
+                        data-current={isCurrent ? 'true' : 'false'}
+                        className={`rounded-lg border p-4 transition-shadow ${tierCardClass(item.tier)} ${
+                          isCurrent ? 'ring-2 ring-offset-2 ring-primary shadow-md' : 'opacity-80'
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <TierBadge tier={item.tier} />
+                          {isCurrent && (
+                            <span
+                              data-testid="current-tier-label"
+                              className="text-[10px] font-semibold uppercase tracking-wider text-primary"
+                            >
+                              あなたのティア
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-1">{item.description}</p>
+                        <p className="text-2xl font-bold">
+                          {item.min_rate_pct}〜{item.max_rate_pct}%
+                        </p>
                       </div>
-                      <p className="text-2xl font-bold">
-                        {item.min_rate_pct}〜{item.max_rate_pct}%
-                      </p>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
                 <p className="text-xs text-muted-foreground">{feeSchedule.note}</p>
               </div>
