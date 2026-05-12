@@ -4,11 +4,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, DollarSign, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { KPICard } from '@/components/shared/KPICard'
 import { getStoredToken } from '@/lib/auth'
 import { getReferralTransactions, type ReferralTransaction } from '@/lib/api/referral'
+import { getPartnerUserStats, type PartnerUserStats } from '@/lib/api/partner'
 
 const TYPE_LABELS: Record<string, string> = {
   deposit: '入金',
@@ -22,6 +24,25 @@ function formatType(type: string): string {
   return TYPE_LABELS[type] ?? type
 }
 
+function fmtUsd(v: string | null | undefined): string {
+  if (v == null) return '—'
+  const n = Number(v)
+  return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n)
+}
+
+function fmtPct(v: string | null | undefined): string {
+  if (v == null) return '—'
+  return Number(v).toFixed(2)
+}
+
+function returnTrend(v: string | null | undefined): 'up' | 'down' | 'flat' {
+  if (v == null) return 'flat'
+  const n = Number(v)
+  if (n > 0) return 'up'
+  if (n < 0) return 'down'
+  return 'flat'
+}
+
 export default function ReferralUserDetailPage() {
   const params = useParams()
   const userId = Number(params.id)
@@ -29,6 +50,8 @@ export default function ReferralUserDetailPage() {
 
   const [transactions, setTransactions] = useState<ReferralTransaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<PartnerUserStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
 
   const load = useCallback(async () => {
     if (!token || !userId) return
@@ -43,9 +66,28 @@ export default function ReferralUserDetailPage() {
     }
   }, [token, userId])
 
+  const loadStats = useCallback(async () => {
+    if (!token || !userId) return
+    setStatsLoading(true)
+    try {
+      const data = await getPartnerUserStats(token, userId)
+      setStats(data)
+    } catch {
+      setStats(null)
+    } finally {
+      setStatsLoading(false)
+    }
+  }, [token, userId])
+
   useEffect(() => {
     void load()
-  }, [load])
+    void loadStats()
+    const id = setInterval(() => {
+      void load()
+      void loadStats()
+    }, 30000)
+    return () => clearInterval(id)
+  }, [load, loadStats])
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
@@ -59,7 +101,37 @@ export default function ReferralUserDetailPage() {
         </Link>
       </div>
 
-      <h1 className="text-2xl font-bold">取引履歴</h1>
+      <h1 className="text-2xl font-bold">運用状況詳細</h1>
+
+      {/* KPI section */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {statsLoading ? (
+          Array.from({ length: 2 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
+          ))
+        ) : (
+          <>
+            <KPICard
+              label="今日の運用総額"
+              value={fmtUsd(stats?.today_amount)}
+              prefix="$"
+              icon={DollarSign}
+            />
+            <KPICard
+              label="今月の利回り"
+              value={fmtPct(stats?.month_return_pct)}
+              suffix="%"
+              trend={returnTrend(stats?.month_return_pct)}
+              trendValue={
+                stats?.month_return_pct != null
+                  ? `${fmtPct(stats.month_return_pct)}%`
+                  : undefined
+              }
+              icon={TrendingUp}
+            />
+          </>
+        )}
+      </section>
 
       <Card>
         <CardHeader className="pb-3">

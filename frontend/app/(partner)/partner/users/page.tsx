@@ -4,7 +4,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
-import { Users, Search } from 'lucide-react'
+import { Users, Search, ExternalLink } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -205,7 +205,7 @@ function UsersTable({
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-900 border-gray-800 hover:bg-gray-900">
-            {['名前', 'メール', 'ロール', 'ステータス', '登録日', '最終更新'].map((h) => (
+            {['名前', 'メール', 'ロール', 'ステータス', '登録日', '最終更新', ''].map((h) => (
               <TableHead
                 key={h}
                 className="text-gray-400 font-medium text-xs uppercase tracking-wider"
@@ -247,6 +247,15 @@ function UsersTable({
               </TableCell>
               <TableCell className="text-gray-400 text-xs py-3">
                 {formatDate(user.updated_at)}
+              </TableCell>
+              <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
+                <Link
+                  href={`/partner/users/${user.id}`}
+                  className="inline-flex items-center gap-1 text-xs text-blue-400 hover:underline"
+                >
+                  詳細
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
               </TableCell>
             </TableRow>
           ))}
