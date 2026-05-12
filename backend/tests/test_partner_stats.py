@@ -116,12 +116,13 @@ def _create_viewer(
     assert r.status_code == 201, r.text
     user_id = int(r.json()["id"])
 
-    # users.invited_by に partner_id を設定して紐づきを記録する
+    # invited_by (get_testers 用) と referrer_id (新 partner/users 用) 両方を設定する
     db = session_factory()
     try:
         user = db.query(User).filter(User.id == user_id).first()
         if user is not None:
             user.invited_by = partner_id
+            user.referrer_id = partner_id
             db.commit()
     finally:
         db.close()

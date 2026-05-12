@@ -25,6 +25,8 @@ from .schemas import (
     NotificationLogItem,
     NotificationLogPage,
     PartnerStatsResponse,
+    ReferralUserDetailResponse,
+    ReferralUserItem,
     TesterItem,
     UserStatsResponse,
 )
@@ -62,6 +64,39 @@ def get_partner_stats(
 ) -> PartnerStatsResponse:
     """パートナーが招待したユーザー全体の AUM・利回りを返す。"""
     return service.get_partner_stats(db, current_user.id)
+
+
+@router.get(
+    "/users",
+    response_model=list[ReferralUserItem],
+    summary="被紹介者一覧 (referrer_id モデル)",
+)
+def get_referral_users(
+    current_user: User = Depends(require_partner),
+    db: Session = Depends(get_db),
+) -> list[ReferralUserItem]:
+    """referrer_id 経由で登録された被紹介者一覧を返す。wallet_address / tx_hash は含まない。"""
+    return service.list_referral_users(db, current_user.id)
+
+
+@router.get(
+    "/users/{user_id}",
+    response_model=ReferralUserDetailResponse,
+    summary="被紹介者詳細 (referrer_id モデル)",
+)
+def get_referral_user_detail(
+    user_id: int,
+    current_user: User = Depends(require_partner),
+    db: Session = Depends(get_db),
+) -> ReferralUserDetailResponse:
+    """被紹介者の月別運用実績と AI 判定履歴要約を返す。wallet_address / tx_hash は含まない。"""
+    try:
+        return service.get_referral_user_detail(db, current_user.id, user_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get(
