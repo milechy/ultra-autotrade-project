@@ -6,6 +6,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { AuthProvider, useAuth } from '@/lib/auth'
 import { Toaster } from 'sonner'
 import { fetchAutomationStatus } from '@/lib/api/automation'
+import { PrivyRootClient } from '@/lib/wallet/PrivyRootClient'
 import type { AutomationStatus } from '@/lib/types'
 
 type SystemStatus = 'NORMAL' | 'PAUSED' | 'HARD_STOP'
@@ -66,11 +67,13 @@ export function AutomationStatusProvider({ children }: { children: React.ReactNo
 
 export function UserProviders({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <AutomationStatusProvider>
-        {children}
-        <Toaster position="top-center" richColors />
-      </AutomationStatusProvider>
-    </AuthProvider>
+    <PrivyRootClient>
+      <AuthProvider>
+        <AutomationStatusProvider>
+          {children}
+          <Toaster position="top-center" richColors />
+        </AutomationStatusProvider>
+      </AuthProvider>
+    </PrivyRootClient>
   )
 }
