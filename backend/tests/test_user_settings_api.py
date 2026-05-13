@@ -187,3 +187,27 @@ class TestUserSettingsAPI:
         r = client.get("/api/user/settings", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         assert "execution_policy" in r.json()
+
+    def test_get_me_includes_execution_policy(self, client: TestClient) -> None:
+        """GET /auth/me レスポンスに execution_policy が含まれること。"""
+        token = register_and_login(client)
+        r = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        data = r.json()
+        assert "execution_policy" in data
+        assert data["execution_policy"] == "auto_execute"
+
+    def test_get_me_execution_policy_reflects_update(self, client: TestClient) -> None:
+        """/api/user/settings で execution_policy を更新後、/auth/me に反映されること。"""
+        token = register_and_login(client)
+        # require_approval に更新
+        put_r = client.put(
+            "/api/user/settings",
+            json={"execution_policy": "require_approval"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert put_r.status_code == 200
+        # /auth/me で確認
+        me_r = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert me_r.status_code == 200
+        assert me_r.json()["execution_policy"] == "require_approval"

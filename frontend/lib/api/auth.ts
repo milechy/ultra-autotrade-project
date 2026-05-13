@@ -36,6 +36,7 @@ export interface UserResponse {
   tier?: "LOWER" | "MIDDLE" | "UPPER" | "GENERAL";
   risk_mode?: "conservative" | "balanced" | "aggressive";
   risk_mode_label?: string;
+  execution_policy?: "auto_execute" | "require_approval" | "proposal_only";
 }
 
 export interface PasswordChangeRequest {

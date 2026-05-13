@@ -35,7 +35,6 @@ def _make_mock_multi_chain_service() -> MagicMock:
     mock_service = MagicMock()
 
     def _execute_rebalance(chain_name, action, amount, asset_symbol, dry_run):
-
         action_val = action.value if hasattr(action, "value") else str(action)
         if action_val == "HOLD":
             op = AaveOperationType.NOOP
