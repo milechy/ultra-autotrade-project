@@ -218,6 +218,26 @@ def _create_proposals_for_users(
         user.last_judgment_at = now
         count += 1
 
+        # ai_proposal_notification: best-effort（失敗しても Proposal 作成は継続）
+        try:
+            from app.notifications.factory import get_notification_service  # noqa: PLC0415
+            from app.notifications.templates import ai_proposal_notification  # noqa: PLC0415
+
+            _payload = ai_proposal_notification(
+                operation=operation,
+                asset=_PROPOSAL_ASSET,
+                amount=_PROPOSAL_AMOUNT,
+                confidence=result.final_confidence,
+            )
+            _payload.notification_message.user_id = user.id
+            get_notification_service().send(_payload.notification_message)
+        except Exception as _notif_exc:  # noqa: BLE001
+            logger.warning(
+                "ai_proposal_notification failed for user %d (skipping): %s",
+                user.id,
+                _notif_exc,
+            )
+
     return count
 
 
