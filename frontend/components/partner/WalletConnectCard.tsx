@@ -2,18 +2,49 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { CheckCircle, Wallet, Network } from 'lucide-react'
+import { usePrivy, useWallets } from '@privy-io/react-auth'
+import { ethers } from 'ethers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { getStoredToken } from '@/lib/auth'
 import { postJson } from '@/lib/api/http'
 import type { HttpError } from '@/lib/api/http'
 
-interface WalletLinkResponse {
+// 8453 = Base Mainnet, 84532 = Base Sepolia. build-time 埋め込み。
+const DEFAULT_CHAIN_ID = parseInt(
+  process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID || '8453',
+  10,
+)
+
+const CHAIN_DISPLAY_NAMES: Record<number, string> = {
+  84532: 'Base Sepolia',
+  8453: 'Base メインネット',
+}
+
+function getNetworkDisplayName(chainId: number): string {
+  return CHAIN_DISPLAY_NAMES[chainId] ?? `Chain ${chainId}`
+}
+
+// Privy returns chainId as "eip155:84532" or "84532".
+function parsePrivyChainId(chainIdStr: string | undefined): number | null {
+  if (!chainIdStr) return null
+  const str = chainIdStr.includes(':') ? chainIdStr.split(':')[1] : chainIdStr
+  const num = parseInt(str, 10)
+  return isNaN(num) ? null : num
+}
+
+interface BackendWalletLinkResponse {
+  user_id: number
   wallet_address: string
-  network?: string
+  linked_at: string
+}
+
+interface LinkedState {
+  wallet_address: string
+  network: string
 }
 
 function truncateAddress(addr: string): string {
@@ -23,35 +54,127 @@ function truncateAddress(addr: string): string {
 
 export function WalletConnectCard() {
   const token = getStoredToken()
-  const [linked, setLinked] = useState<WalletLinkResponse | null>(null)
-  const [isLinking, setIsLinking] = useState(false)
+  const { login, authenticated } = usePrivy()
+  const { wallets } = useWallets()
+  const wallet = wallets[0] ?? null
 
-  const handleConnect = async () => {
+  const [linked, setLinked] = useState<LinkedState | null>(null)
+  const [isLinking, setIsLinking] = useState(false)
+  // Whether the user clicked "Connect wallet" and is waiting for Privy → sign → link.
+  const pendingLinkRef = useRef(false)
+
+  const linkWallet = useCallback(async () => {
     if (!token) {
       toast.error('認証されていません')
       return
     }
+    if (!wallet) {
+      // shouldn't happen because caller guards on wallet presence
+      return
+    }
     setIsLinking(true)
     try {
-      const res = await postJson<WalletLinkResponse>(
+      const currentChainId = parsePrivyChainId(wallet.chainId)
+      if (currentChainId !== DEFAULT_CHAIN_ID) {
+        try {
+          await wallet.switchChain(DEFAULT_CHAIN_ID)
+        } catch {
+          toast.error(
+            `${getNetworkDisplayName(DEFAULT_CHAIN_ID)} への切替に失敗しました`,
+          )
+          return
+        }
+      }
+
+      const address = wallet.address
+      if (!address || !address.startsWith('0x')) {
+        toast.error('ウォレットアドレスが取得できませんでした')
+        return
+      }
+
+      const timestamp = new Date().toISOString()
+      const message = `Link wallet to Ultra AutoTrade\nAddress: ${address}\nTimestamp: ${timestamp}`
+
+      let eip1193: unknown
+      try {
+        eip1193 = await wallet.getEthereumProvider()
+      } catch {
+        toast.error('ウォレットプロバイダーの取得に失敗しました')
+        return
+      }
+
+      let signature: string
+      try {
+        const ethProvider = new ethers.BrowserProvider(
+          eip1193 as ethers.Eip1193Provider,
+        )
+        const signer = await ethProvider.getSigner()
+        signature = await signer.signMessage(message)
+      } catch {
+        toast.error('署名がキャンセルされました')
+        return
+      }
+      if (!signature || !signature.startsWith('0x')) {
+        toast.error('署名の取得に失敗しました')
+        return
+      }
+
+      // Defence-in-depth: never POST an empty/partial body. If any field is
+      // missing here, abort loudly rather than serialise undefined → {}.
+      const payload = { address, signature, message }
+      if (!payload.address || !payload.signature || !payload.message) {
+        toast.error('リクエスト内容に不足があります')
+        return
+      }
+
+      const res = await postJson<BackendWalletLinkResponse>(
         '/auth/wallet/link',
-        {},
+        payload,
         { headers: { Authorization: `Bearer ${token}` } },
       )
-      setLinked(res)
+      setLinked({
+        wallet_address: res.wallet_address,
+        network: getNetworkDisplayName(DEFAULT_CHAIN_ID),
+      })
     } catch (err: unknown) {
       const status = (err as HttpError)?.status
       if (status === 409) {
         toast.error('このウォレットは別アカウントで登録済みです')
       } else if (status === 422) {
         toast.error('署名検証に失敗しました')
+      } else if (status === 401) {
+        toast.error('認証セッションが切れました。再ログインしてください')
       } else {
         toast.error('ウォレットの接続に失敗しました')
       }
     } finally {
       setIsLinking(false)
+      pendingLinkRef.current = false
     }
-  }
+  }, [token, wallet])
+
+  // If user clicked the button before Privy wallet was ready, resume once wallet appears.
+  useEffect(() => {
+    if (!pendingLinkRef.current) return
+    if (!authenticated) return
+    if (!wallet) return
+    if (isLinking) return
+    void linkWallet()
+  }, [authenticated, wallet, isLinking, linkWallet])
+
+  const handleConnect = useCallback(() => {
+    if (!token) {
+      toast.error('認証されていません')
+      return
+    }
+    if (!authenticated || !wallet) {
+      // Privy modal をまず開く。useEffect が wallets[0] 出現後に linkWallet() を呼ぶ。
+      pendingLinkRef.current = true
+      login()
+      return
+    }
+    void linkWallet()
+  }, [token, authenticated, wallet, login, linkWallet])
 
   return (
     <Card>
@@ -68,18 +191,16 @@ export function WalletConnectCard() {
                 {truncateAddress(linked.wallet_address)}
               </span>
             </div>
-            {linked.network && (
-              <div className="flex items-center gap-1.5">
-                <Network className="h-3 w-3 text-blue-400" />
-                <span className="text-xs text-blue-400">{linked.network}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-1.5">
+              <Network className="h-3 w-3 text-blue-400" />
+              <span className="text-xs text-blue-400">{linked.network}</span>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">ウォレット未接続</p>
             <Button
-              onClick={() => { void handleConnect() }}
+              onClick={handleConnect}
               disabled={isLinking}
               size="sm"
             >
