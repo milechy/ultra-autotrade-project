@@ -1121,3 +1121,237 @@ done; echo
 - [ ] deploy_production.sh は Hetzner 上で実行（ローカルMacではない）
 - [ ] --frontend-only はバックエンドAPIに変更なしの場合のみ
 - [ ] DB変更がある場合は Hetzner で事前に CREATE TABLE / ALTER TABLE 実行
+
+---
+
+## 2026-05-13追加（5/12 終日 UAT ブロッカー 教訓 20 策 — RCA: docs/postmortems/2026-05-12_uat_blocker_full_day_failure.md）
+
+### セクション 1: 朝プロトコル拡張 (策 1-2)
+
+**策 1: production 業務動作サニティチェック（朝プロトコル冒頭に必須）**
+
+`scheduler_healthy: true` の確認だけでは AI 判定が業務として動いているかを確認できない。
+毎朝以下 SQL を実行して業務 KPI を確認すること:
+
+```sql
+-- AI 判定 24h 件数
+SELECT COUNT(*) FROM ai_decisions WHERE created_at > NOW() - INTERVAL '24 hours';
+-- 提案 24h 件数
+SELECT COUNT(*), MAX(created_at) FROM proposals WHERE created_at > NOW() - INTERVAL '24 hours';
+-- バックエンドエラー件数 (docker logs で確認)
+-- docker logs --tail=200 ultra-autotrade-backend-production 2>&1 | grep -c "ERROR"
+-- knowledge_sources スキーマ確認
+SELECT COUNT(*) FROM knowledge_sources WHERE status = 'pending';
+```
+
+**策 2: Gate 8 標準 SQL — 業務動作 KPI を朝プロトコルに組み込む**
+
+`/health` の `scheduler_healthy: true` + 上記 SQL 確認を合わせて「業務動作 Gate 8」とする。
+Gate 8 が通らない場合は当日の AI 判定結果は信頼できないと判断し、原因調査を優先する。
+
+### セクション 2: 判定癖修正 (策 3-5)
+
+**策 3: エラー判定 3 軸ルール（即「既知/先送り」禁止）**
+
+エラーを「既知」「先送り」と判断するには以下 3 軸を全て確認すること:
+1. **影響範囲**: 山本さんの操作フローに影響が出ているか
+2. **発生頻度**: 過去 24h で何件発生しているか (ゼロなら既知判断を慎重に)
+3. **修正コスト**: 30 分以内に対応できるか
+
+1 軸でも確認できていない状態で「既知/先送り」と判断することを禁止する。
+
+**策 4: `scheduler_healthy=true` の意味の明文化**
+
+`/health` レスポンスの `scheduler_healthy: true` は「スケジューラープロセスが生存している」
+ことのみを示す。以下は**保証しない**:
+- AI 判定が実際に実行されて BUY/SELL 提案が生成されていること
+- 通知関数が呼ばれていること
+- 業務ループが正常に完了していること
+
+業務動作の確認には策 1 の SQL を使う。
+
+**策 5: 影響度低判定チェックリスト（4 項目全 YES のみ「影響度低」と判定可）**
+
+以下 4 項目が全て YES の場合のみ「影響度低」と判断可:
+- [ ] 山本さんの操作フローに直接関係しないか
+- [ ] 本番 API が正常に 200 を返しているか
+- [ ] 24h エラーログが増加していないか
+- [ ] 業務 KPI (提案/判定件数) が前日比で大きく下がっていないか
+
+1 項目でも NO なら「影響度高」として即対応する。
+
+### セクション 3: コマンド精度 (策 6-7)
+
+**策 6: curl HTTP method を必ず明示する**
+
+`curl -sI URL` は HEAD リクエストを送る。POST エンドポイントに `-sI` を使うと 405 が返り、
+「エンドポイントが壊れている」と誤認する。
+
+```bash
+# 誤: HEAD リクエストになる → POST エンドポイントで 405
+curl -sI https://api.ultra-auto-trade.com/health
+
+# 正: GET で確認
+curl -sf https://api.ultra-auto-trade.com/health
+# 正: POST で確認
+curl -sf -X POST -H 'Content-Type: application/json' \
+  -d '{"key":"value"}' https://api.ultra-auto-trade.com/endpoint
+```
+
+**策 7: SSH heredoc 内の SQL に INTERVAL を使う場合は heredoc 必須**
+
+```bash
+# 誤: single quote 内で $() が展開されず意図しない SQL になる
+ssh ultra@77.42.46.155 'psql -U ultra -d ultra_autotrade -c "SELECT COUNT(*) FROM ai_decisions WHERE created_at > NOW() - INTERVAL '"'"'24 hours'"'"'"'
+
+# 正: heredoc で SQL を渡す
+ssh ultra@77.42.46.155 <<'ENDSSH'
+psql -U ultra -d ultra_autotrade -c "SELECT COUNT(*) FROM ai_decisions WHERE created_at > NOW() - INTERVAL '24 hours'"
+ENDSSH
+```
+
+### セクション 4: テーブル・コード調査精度 (策 8-11)
+
+**策 8: DB テーブル名から機能を推測しない**
+
+- `ai_feedbacks` テーブル ≠ AI 判定本体（フィードバック履歴）
+- `ai_decisions` テーブル = AI 判定実体（BUY/SELL/HOLD 決定）
+- `proposals` テーブル = 承認待ち提案（ai_decisions の後段）
+
+テーブル名だけで機能を推測せず、`docs/ops/02_db_tables.md` でスキーマを確認する。
+
+**策 9: テストユーザー dry run 前に credentials アクセス事前 hash 確認**
+
+テストユーザーでのログイン操作前に、対象ユーザーの password hash が DB に存在することを確認する:
+
+```sql
+SELECT id, email, hashed_password IS NOT NULL AS has_pwd, role
+FROM users WHERE email = 'test@example.com';
+```
+
+hash が NULL のままテストするとログインが永遠に失敗し、「バグ」と誤認する。
+
+**策 10: 朝起動時に ops_01/05 正本を通読**
+
+毎朝作業開始前に以下を通読する:
+- `docs/ops/01_api_endpoints.md` — 最新エンドポイント一覧
+- `docs/ops/05_monitoring_runbook.md` (または最新 ops ドキュメント) — 監視・アラート手順
+
+curl を書く前・ALTER TABLE を書く前に、まず ops ドキュメントを確認する習慣を徹底する。
+
+**策 11: CLI 委譲ルール拡張（コード調査・grep も Claude Code に委譲）**
+
+claude.ai セッションでコード調査・grep・ファイル探索が必要な場合、claude.ai が直接推測せず
+Claude Code CLI に委譲する。claude.ai の「推測」が実装と乖離してインシデントを招く主要因。
+
+委譲すべき操作:
+- `grep -r "function_name" backend/` — 関数の参照箇所
+- `cat backend/app/XXX/service.py` — 実装の確認
+- `git log --oneline` — 最近の変更履歴
+
+### セクション 5: production deploy + nginx (策 12-14)
+
+**策 12: deploy 後は Cloudflare 経由 /health を Gate 5 として必須確認**
+
+`deploy_production.sh` の内部 `127.0.0.1:8010/health` 確認だけでは不十分。
+必ず Cloudflare 経由の外形 URL で確認する:
+
+```bash
+# 5 回連続 200 を確認 (Gate 8 外形確認)
+for i in 1 2 3 4 5; do
+  curl -sf -o /dev/null -w "[%{http_code}] " https://api.ultra-auto-trade.com/health
+  sleep 2
+done; echo
+```
+
+5 回全て 200 でなければ即 Slack 通知 + nginx reload を試みる。
+
+**策 13: deploy script の「OK」出力を信用しない**
+
+`deploy_production.sh` が「✅ deploy 完了」を出力しても、内部の healthcheck が
+`127.0.0.1` ループバック経由のため、Cloudflare → nginx → backend の外形経路は
+検証していない。策 12 の外形 curl を必ず追加実行する。
+
+**策 14: nginx 502 が出たら frontend-only deploy とペアで疑う**
+
+nginx 502 発生時の最初の確認:
+1. 直近に `--frontend-only` deploy を実施したか
+2. `docker ps` で backend container の `CREATED` 時刻が変わっているか (recreate の証拠)
+3. `docker exec nginx nginx -T 2>&1 | grep resolver` で resolver 設定を確認
+
+resolver 未設定かつ backend recreate 後なら、`docker restart nginx` で即時復旧できる。
+恒久対策は `resolver 127.0.0.11 valid=5s;` 設定 + `proxy_pass http://$backend;` 変数化。
+
+### セクション 6: 表示データ実体確認 (策 15-17)
+
+**策 15: dummy/seed データの識別方法**
+
+本番データとダミーデータを区別する 3 指標:
+1. **時刻分散性**: 全レコードが同日同時刻 → seed データの可能性が高い
+2. **ユーザー差異性**: 全レコードが同一ユーザー → seed データの可能性が高い
+3. **24h 生成有無**: `WHERE created_at > NOW() - INTERVAL '24 hours'` で 0 件 → AI が動いていないか seed のみ
+
+**策 16: production 表示データの実体は SQL で確認**
+
+フロントエンドの表示値を見て「データが入っている」と判断しない。
+フロントエンドはキャッシュや seed データを表示することがある。
+必ず production DB に直接 SQL で確認する:
+
+```bash
+docker exec ultra-autotrade-postgres-production \
+  psql -U ultra -d ultra_autotrade -c \
+  "SELECT COUNT(*), MAX(created_at) FROM ai_decisions WHERE created_at > NOW() - INTERVAL '24 hours';"
+```
+
+**策 17: 孤立コード再発防止 — CI 週次 detect_orphan_functions.sh**
+
+孤立コードは「大きなリファクタ時」だけでなく並列開発後も発生する。
+以下を実施する:
+- 毎週月曜の CI で `scripts/detect_orphan_functions.sh`（または同等の grep スクリプト）を自動実行
+- `backend/app/notifications/service.py` の全 public 関数を特に重点チェック
+- 孤立が検出された場合は P1 として当日中に配線修正または削除
+
+### セクション 7: PR と実機の乖離 (策 18-20)
+
+**策 18: wallet flow / 認証 flow / DB 書き込み伴う action は viem 実署名 E2E 必須**
+
+component 単独 commit + route-mock テストでは「実際に signature が生成され、backend に
+送られ、DB に書き込まれる」フローを検証できない。
+
+以下のフローは必ず viem 実署名 E2E テストを追加すること:
+- `POST /auth/wallet/link` — nonce 取得 → viem signMessage → POST の 3 ステップ
+- `POST /auth/login` — email/password → JWT 取得 → ダッシュボードへのリダイレクト
+- `POST /aave/rebalance` — health factor 確認 → deposit/withdraw
+
+**策 19: Codex APPROVED + Playwright pass でも実機 (実ブラウザ) 確認は必須**
+
+Playwright の動作環境 (ヘッドレス Chrome、拡張なし、自動 Content-Type 付与) と
+実ユーザーの動作環境 (拡張入り Chrome、手動操作、browser の fetch 挙動) は異なる。
+
+特に以下は実機確認を必須とする:
+- `fetch()` の `Content-Type` / `body` が正しく設定されているか
+- wallet 拡張 (MetaMask 等) の popup が正しく発火するか
+- CF Access の Cookie が正しく送られているか (`credentials: 'include'` の有無)
+
+**策 20: frontend container restart は image rebuild ではない**
+
+```bash
+# 誤: イメージが古いまま旧コードが起動する
+docker compose up -d --force-recreate frontend
+
+# 正: 必ず build してから recreate する
+docker compose -f docker-compose.production.yml --env-file .env.production \
+  build --no-cache frontend
+
+# ビルド完了の確認: image hash が変化したか確認
+docker images --format "{{.Repository}}:{{.Tag}} {{.ID}}" | grep frontend
+
+# その後 recreate
+docker compose -f docker-compose.production.yml --env-file .env.production \
+  up -d --no-deps --force-recreate frontend
+```
+
+`--force-recreate` はコンテナの再生成のみ。イメージの再ビルドは `build --no-cache` が必要。
+image hash が変化していなければ rebuild されていないため、旧コードが動き続ける。
+
+**参照**: `docs/postmortems/2026-05-12_uat_blocker_full_day_failure.md`
