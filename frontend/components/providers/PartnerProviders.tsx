@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '@/lib/auth'
 import AppShell from '@/components/layout/AppShell'
 import { AutomationStatusProvider } from '@/components/user/UserProviders'
 import { EmergencyStopFloat } from '@/components/shared/EmergencyStopFloat'
+import { PrivyRootClient } from '@/lib/wallet/PrivyRootClient'
 import { Toaster } from 'sonner'
 
 function PartnerGuard({ children }: { children: React.ReactNode }) {
@@ -36,14 +37,16 @@ function PartnerGuard({ children }: { children: React.ReactNode }) {
 
 export function PartnerProviders({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <PartnerGuard>
-        <AutomationStatusProvider>
-          <AppShell>{children}</AppShell>
-          <EmergencyStopFloat />
-          <Toaster position="top-center" richColors />
-        </AutomationStatusProvider>
-      </PartnerGuard>
-    </AuthProvider>
+    <PrivyRootClient>
+      <AuthProvider>
+        <PartnerGuard>
+          <AutomationStatusProvider>
+            <AppShell>{children}</AppShell>
+            <EmergencyStopFloat />
+            <Toaster position="top-center" richColors />
+          </AutomationStatusProvider>
+        </PartnerGuard>
+      </AuthProvider>
+    </PrivyRootClient>
   )
 }
