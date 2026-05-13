@@ -668,20 +668,22 @@ def _create_proposal_from_judgment(
         action.value,
         expires_at,
     )
-    # LINE notification for proposal created (best-effort)
+    # ai_proposal_notification: best-effort（失敗しても Proposal 作成は継続）
+    # 旧 LINE Notify (LINE_NOTIFY_TOKEN) 経路を get_notification_service() に統一
     try:
-        import os  # noqa: PLC0415
+        from app.notifications.factory import get_notification_service  # noqa: PLC0415
+        from app.notifications.templates import ai_proposal_notification  # noqa: PLC0415
 
-        from app.notifications.line_notifier import notify_proposal_created  # noqa: PLC0415
-
-        if os.getenv("LINE_NOTIFY_TOKEN"):
-            notify_proposal_created(
-                operation=action.value,
-                asset="USDC",
-                amount=float(trade_amount_usd),
-            )
-    except Exception as _line_exc:
-        logger.debug("notify_proposal_created failed (skipping): %s", _line_exc)
+        _payload = ai_proposal_notification(
+            operation=action.value,
+            asset="USDC",
+            amount=trade_amount_usd,
+            confidence=50,
+        )
+        _payload.notification_message.user_id = user_id if user_id else None
+        get_notification_service().send(_payload.notification_message)
+    except Exception as _notif_exc:  # noqa: BLE001
+        logger.debug("ai_proposal_notification failed (skipping): %s", _notif_exc)
 
 
 def _process_single_item(
