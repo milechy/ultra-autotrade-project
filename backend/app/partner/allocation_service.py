@@ -369,6 +369,8 @@ def get_performance(
         account_data = aave_client.get_account_data(wallet_addr)
         total_supply = Decimal(str(account_data.total_collateral_usd))
         raw_hf = Decimal(str(account_data.health_factor))
+        if total_supply == 0:
+            raw_hf = _HF_INFINITY_DISPLAY
     except Exception:
         logger.exception("[allocation_service] Aave get_account_data failed; using zeros")
         total_supply = Decimal("0")

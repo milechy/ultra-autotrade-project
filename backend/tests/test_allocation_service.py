@@ -355,6 +355,28 @@ class TestGetPerformance:
         assert summary.total_supply_usd == Decimal("0")
         assert summary.testers[0].current_value_usd == Decimal("0")
 
+    def test_aave_success_zero_supply_forces_hf_infinity(self, db: Session) -> None:
+        """Aave 成功 + total_supply=0 → raw_hf を _HF_INFINITY_DISPLAY に強制 (edge case)."""
+        partner = _make_partner(db)
+        _make_allocation(db, partner.id, "Alice", Decimal("100"))
+
+        edge_data = AccountData(
+            total_collateral_usd=Decimal("0"),
+            total_debt_usd=Decimal("0"),
+            available_borrows_usd=Decimal("0"),
+            health_factor=Decimal("1.5"),
+        )
+
+        with patch("app.partner.allocation_service.get_default_aave_client") as mock_factory:
+            mock_client = MagicMock()
+            mock_client.get_account_data.return_value = edge_data
+            mock_factory.return_value = mock_client
+
+            summary = get_performance(db, partner)
+
+        assert summary.total_supply_usd == Decimal("0")
+        assert summary.health_factor == _HF_INFINITY_DISPLAY
+
 
 # ---------------------------------------------------------------------------
 # エッジケース: 未カバー行を対象とした追加テスト
