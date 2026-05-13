@@ -2,7 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,7 +23,7 @@ import { useAuth } from '@/lib/auth'
 import { updateUser } from '@/lib/api/users'
 import { PasswordChangeCard } from '@/app/(user)/settings/_components/PasswordChangeCard'
 import { getStoredToken } from '@/lib/auth'
-import { putJson, getJson } from '@/lib/api/http'
+import { putJson } from '@/lib/api/http'
 import { WalletConnectCard } from '@/components/partner/WalletConnectCard'
 import { ReferralTab } from '@/components/partner/ReferralTab'
 
@@ -136,7 +136,26 @@ function ProfileCard() {
 
 // ---- Execution Mode Card ----------------------------------------------------
 
-type UserMode = 'managed' | 'active'
+type ExecutionPolicyValue = 'auto_execute' | 'require_approval' | 'proposal_only'
+
+const EXECUTION_POLICY_LABELS: Record<ExecutionPolicyValue, string> = {
+  auto_execute: '自動実行',
+  require_approval: '手動承認',
+  proposal_only: '提案のみ',
+}
+
+const EXECUTION_POLICY_DESCRIPTIONS: Record<ExecutionPolicyValue, string> = {
+  auto_execute: 'AIの判定を自動で実行（承認不要）',
+  require_approval: 'AIの提案をレビューしてから承認',
+  proposal_only: '提案の表示のみ（実行しない）',
+}
+
+const EXECUTION_POLICY_DIALOG: Record<ExecutionPolicyValue, string> = {
+  auto_execute:
+    '自動実行に切り替えると、AIの判定が自動的に実行されます。安全装置（HF<1.6自動停止、取引上限10%、日次上限30%）は引き続き有効です。よろしいですか？',
+  require_approval: '手動承認に切り替えますか？以降のAI提案は承認が必要になります。',
+  proposal_only: '提案のみモードに切り替えますか？AIの提案を確認できますが実行はされません。',
+}
 
 interface UserSettingsData {
   user_mode: string
@@ -144,55 +163,43 @@ interface UserSettingsData {
 }
 
 function ExecutionModeCard() {
+  const { user } = useAuth()
   const token = getStoredToken()
-  const [currentMode, setCurrentMode] = useState<UserMode | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [currentPolicy, setCurrentPolicy] = useState<ExecutionPolicyValue | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [pendingMode, setPendingMode] = useState<UserMode | null>(null)
+  const [pendingPolicy, setPendingPolicy] = useState<ExecutionPolicyValue | null>(null)
 
-  const loadSettings = useCallback(async () => {
-    if (!token) return
-    try {
-      const data = await getJson<UserSettingsData>('/api/user/settings', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      setCurrentMode(data.user_mode === 'managed' ? 'managed' : 'active')
-    } catch {
-      toast.error('設定の取得に失敗しました')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [token])
-
+  // useAuth().user.execution_policy をベースに初期値を設定
   useEffect(() => {
-    void loadSettings()
-  }, [loadSettings])
+    const policy = user?.execution_policy
+    if (policy && policy in EXECUTION_POLICY_LABELS) {
+      setCurrentPolicy(policy as ExecutionPolicyValue)
+    } else {
+      setCurrentPolicy('auto_execute')
+    }
+  }, [user?.execution_policy])
 
   const handleConfirm = async () => {
-    if (!token || !pendingMode) return
+    if (!token || !pendingPolicy) return
     setIsSaving(true)
     try {
       const data = await putJson<UserSettingsData>('/api/user/settings', {
-        user_mode: pendingMode,
+        execution_policy: pendingPolicy,
       }, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      setCurrentMode(data.user_mode === 'managed' ? 'managed' : 'active')
-      toast.success(pendingMode === 'managed' ? '自動実行モードに切り替えました' : '手動承認モードに切り替えました')
+      const updated = data.execution_policy as ExecutionPolicyValue
+      setCurrentPolicy(updated in EXECUTION_POLICY_LABELS ? updated : 'auto_execute')
+      toast.success(`${EXECUTION_POLICY_LABELS[pendingPolicy]}モードに切り替えました`)
     } catch {
       toast.error('設定の更新に失敗しました')
     } finally {
       setIsSaving(false)
-      setPendingMode(null)
+      setPendingPolicy(null)
     }
   }
 
-  const modeLabel = (mode: UserMode) =>
-    mode === 'managed' ? '自動実行' : '手動承認'
-
-  const dialogDescription = pendingMode === 'managed'
-    ? '自動実行に切り替えると、AIの判定が自動的に実行されます。安全装置（HF<1.6自動停止、取引上限10%、日次上限30%）は引き続き有効です。よろしいですか？'
-    : '手動承認に切り替えますか？以降のAI提案は承認が必要になります。'
+  const allPolicies: ExecutionPolicyValue[] = ['require_approval', 'auto_execute', 'proposal_only']
 
   return (
     <Card>
@@ -200,48 +207,46 @@ function ExecutionModeCard() {
         <CardTitle className="text-base">運用モード</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isLoading ? (
+        {currentPolicy === null ? (
           <p className="text-sm text-muted-foreground">読み込み中...</p>
         ) : (
           <>
             <div className="mb-2 text-sm text-muted-foreground">
               現在のモード:{' '}
               <span className="font-semibold text-foreground">
-                {currentMode ? modeLabel(currentMode) : '—'}
+                {EXECUTION_POLICY_LABELS[currentPolicy]}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              {(['active', 'managed'] as UserMode[]).map((mode) => (
-                <AlertDialog key={mode} onOpenChange={(open) => { if (!open) setPendingMode(null) }}>
+            <div className="grid grid-cols-3 gap-3">
+              {allPolicies.map((policy) => (
+                <AlertDialog key={policy} onOpenChange={(open) => { if (!open) setPendingPolicy(null) }}>
                   <AlertDialogTrigger asChild>
                     <button
-                      onClick={() => setPendingMode(mode)}
-                      disabled={currentMode === mode || isSaving}
+                      onClick={() => setPendingPolicy(policy)}
+                      disabled={currentPolicy === policy || isSaving}
                       className={[
                         'rounded-xl border-2 p-4 text-left transition-colors',
-                        currentMode === mode
+                        currentPolicy === policy
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
                           : 'border-border hover:border-blue-400',
                         'disabled:cursor-not-allowed disabled:opacity-60',
                       ].join(' ')}
                     >
-                      <div className="font-semibold text-sm">{modeLabel(mode)}</div>
+                      <div className="font-semibold text-sm">{EXECUTION_POLICY_LABELS[policy]}</div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        {mode === 'managed'
-                          ? 'AIの判定を自動で実行（承認不要）'
-                          : 'AIの提案をレビューしてから承認'}
+                        {EXECUTION_POLICY_DESCRIPTIONS[policy]}
                       </div>
                     </button>
                   </AlertDialogTrigger>
-                  {pendingMode === mode && (
+                  {pendingPolicy === policy && (
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>
-                          {modeLabel(mode)}モードに切り替えますか？
+                          {EXECUTION_POLICY_LABELS[policy]}モードに切り替えますか？
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                          {dialogDescription}
+                          {EXECUTION_POLICY_DIALOG[policy]}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

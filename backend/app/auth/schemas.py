@@ -114,6 +114,7 @@ class UserResponse(BaseModel):
     risk_mode: Optional[str] = "conservative"
     invited_by: Optional[int] = None
     tier: InvestmentTier = InvestmentTier.LOWER
+    execution_policy: str = "auto_execute"
 
     model_config = ConfigDict(from_attributes=True)
 
