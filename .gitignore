@@ -92,3 +92,24 @@ gate7-*.png
 # Zero-downtime deploy lock files (generated at runtime by deploy_*.sh)
 .deploy-production.lock
 .deploy-staging.lock
+
+# 5/13 終業整理(2026-05-13)
+.claude/settings.local.json.bak.*
+.claude/morning-snapshot/
+.claude/worktrees/
+frontend/.auth/
+phase5-*-mobile.png
+phase5-*-desktop.png
+prod-*-mobile*.png
+prod-*-desktop*.png
+prod-privy-*.png
+prod-connect-*.png
+prod-login-*.png
+step1-*.png
+step2-*.png
+step3-*.png
+step6-*.png
+frontend/e2e/screenshots/uat-pre-check-*/
+frontend/e2e/screenshots/login-375.png
+frontend/e2e/screenshots/login-mobile.png
+frontend/e2e/uat-pre-check-*.spec.ts.bak*
