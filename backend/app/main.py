@@ -433,41 +433,100 @@ def create_app() -> FastAPI:
         Controlled by environment variables:
             ENABLE_DAILY_REPORTS=1: enable daily reports
             ENABLE_WEEKLY_REPORTS=1: enable weekly reports
+            DISABLE_BACKGROUND_MONITORING=1: disable all 7 operational loops
+
+        7 operational loops (always-on unless DISABLE_BACKGROUND_MONITORING=1):
+            proposal_timeout / rebalance_check / price_monitor / health_check /
+            latency_monitor / rss_fetch / dca
         """
+        from app.automation.scheduled_tasks import get_scheduled_task_manager  # noqa: PLC0415
+        from app.notifications.config import get_notification_settings  # noqa: PLC0415
+
         enable_daily = os.getenv("ENABLE_DAILY_REPORTS", "0") == "1"
         enable_weekly = os.getenv("ENABLE_WEEKLY_REPORTS", "0") == "1"
 
+        settings = get_notification_settings()
+        scheduled_manager = get_scheduled_task_manager()
+
+        # --- Optional report tasks ---
         if not enable_daily and not enable_weekly:
             logger.info(
                 "Scheduled reports disabled "
                 "(set ENABLE_DAILY_REPORTS=1 or ENABLE_WEEKLY_REPORTS=1 to enable)"
             )
+        else:
+            try:
+                if enable_daily:
+                    await scheduled_manager.start_daily_reports(
+                        channel=settings.default_channel,
+                        on_error=_make_scheduler_error_handler("日次レポートスケジューラー"),
+                    )
+                    logger.info("Daily reports scheduled successfully")
+
+                if enable_weekly:
+                    await scheduled_manager.start_weekly_reports(
+                        channel=settings.default_channel,
+                        on_error=_make_scheduler_error_handler("週次レポートスケジューラー"),
+                    )
+                    logger.info("Weekly reports scheduled successfully")
+            except BaseException as exc:
+                logger.error("Failed to start report tasks: %s", exc)
+
+        # --- 7 operational loops (always-on, fail-safe each) ---
+        if not _is_background_monitoring_enabled():
+            logger.info("Operational loops disabled (DISABLE_BACKGROUND_MONITORING=1)")
             return
 
-        try:
-            from app.automation.scheduled_tasks import get_scheduled_task_manager
-            from app.notifications.config import get_notification_settings
-
-            settings = get_notification_settings()
-            scheduled_manager = get_scheduled_task_manager()
-
-            if enable_daily:
-                await scheduled_manager.start_daily_reports(
-                    channel=settings.default_channel,
-                    on_error=_make_scheduler_error_handler("日次レポートスケジューラー"),
-                )
-                logger.info("Daily reports scheduled successfully")
-
-            if enable_weekly:
-                await scheduled_manager.start_weekly_reports(
-                    channel=settings.default_channel,
-                    on_error=_make_scheduler_error_handler("週次レポートスケジューラー"),
-                )
-                logger.info("Weekly reports scheduled successfully")
-
-        except BaseException as exc:
-            logger.error("Failed to start scheduled tasks: %s", exc)
-            # Scheduled task startup failure does not block app startup (fail-safe)
+        _loops: list[tuple[str, object]] = [
+            (
+                "proposal_timeout",
+                scheduled_manager.start_proposal_timeout(
+                    on_error=_make_scheduler_error_handler("proposal_timeout_loop"),
+                ),
+            ),
+            (
+                "rebalance_check",
+                scheduled_manager.start_rebalance_check(
+                    on_error=_make_scheduler_error_handler("rebalance_check_loop"),
+                ),
+            ),
+            (
+                "price_monitor",
+                scheduled_manager.start_price_monitor(
+                    on_error=_make_scheduler_error_handler("price_monitor_loop"),
+                ),
+            ),
+            (
+                "health_check",
+                scheduled_manager.start_health_check(
+                    on_error=_make_scheduler_error_handler("health_check_loop"),
+                ),
+            ),
+            (
+                "latency_monitor",
+                scheduled_manager.start_latency_monitor(
+                    on_error=_make_scheduler_error_handler("latency_monitor_loop"),
+                ),
+            ),
+            (
+                "rss_fetch",
+                scheduled_manager.start_rss_fetch(
+                    on_error=_make_scheduler_error_handler("rss_fetch_loop"),
+                ),
+            ),
+            (
+                "dca",
+                scheduled_manager.start_dca(
+                    on_error=_make_scheduler_error_handler("dca_loop"),
+                ),
+            ),
+        ]
+        for name, coro in _loops:
+            try:
+                await coro  # type: ignore[misc]
+                logger.info("Operational loop started: %s", name)
+            except BaseException as exc:
+                logger.error("Failed to start loop %s: %s", name, exc)
 
     @app.on_event("startup")
     async def startup_ai_judgment_scheduler() -> None:
@@ -511,9 +570,8 @@ def create_app() -> FastAPI:
 
             scheduled_manager = get_scheduled_task_manager()
 
-            if scheduled_manager.is_daily_running or scheduled_manager.is_weekly_running:
-                await scheduled_manager.stop_all()
-                logger.info("Scheduled tasks stopped")
+            await scheduled_manager.stop_all()
+            logger.info("Scheduled tasks stopped")
 
         except Exception as exc:
             logger.error("Error during scheduled tasks shutdown: %s", exc)
