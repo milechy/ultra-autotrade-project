@@ -753,7 +753,7 @@ def test_create_proposals_uses_normalized_tier(db_session):
     with (
         patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
         patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
-        patch("app.billing.dynamic_fee.calculate_fee_by_market") as mock_fee,
+        patch("app.fees.trade_gate.calculate_fee_by_market") as mock_fee,
     ):
         MockAIService.return_value.judge_with_rag.return_value = mock_result
         MockKnowledgeService.return_value.search.return_value = []

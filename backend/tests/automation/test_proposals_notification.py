@@ -89,7 +89,7 @@ class TestCreateProposalsForUsersNotification:
 
         with (
             patch(
-                "app.billing.dynamic_fee.calculate_fee_by_market",
+                "app.fees.trade_gate.calculate_fee_by_market",
                 return_value=_make_fee(should_trade),
             ),
             patch("app.notifications.factory.get_notification_service") as mock_get_svc,
@@ -136,7 +136,7 @@ class TestCreateProposalsForUsersNotification:
 
         with (
             patch(
-                "app.billing.dynamic_fee.calculate_fee_by_market",
+                "app.fees.trade_gate.calculate_fee_by_market",
                 return_value=_make_fee(should_trade=True),
             ),
             patch(

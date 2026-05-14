@@ -764,7 +764,7 @@ def _process_single_item(
             # 動的手数料計算 (B-2)
             import os  # noqa: PLC0415
 
-            from app.billing.dynamic_fee import calculate_fee_by_market  # noqa: PLC0415
+            from app.fees.trade_gate import calculate_fee_by_market  # noqa: PLC0415
 
             # MarketContext.aave_supply_apy (fail-open ヘルパー経由で注入) を読む。
             # Aave 取得失敗時は None → Decimal("4") (4%) フォールバック。

@@ -705,7 +705,7 @@ class TestWorkflowTierNormalization:
         ks.search.return_value = []
         ai.judge_with_rag.return_value = _make_cross_validation(TradeAction.BUY, 85)
 
-        with patch("app.billing.dynamic_fee.calculate_fee_by_market") as mock_fee:
+        with patch("app.fees.trade_gate.calculate_fee_by_market") as mock_fee:
             mock_fee.return_value.should_trade = True
             mock_fee.return_value.fee_rate = Decimal("0.20")
             mock_fee.return_value.fee_amount = Decimal("10.00")
@@ -741,7 +741,7 @@ class TestWorkflowTierNormalization:
         ks.search.return_value = []
         ai.judge_with_rag.return_value = _make_cross_validation(TradeAction.BUY, 85)
 
-        with patch("app.billing.dynamic_fee.calculate_fee_by_market") as mock_fee:
+        with patch("app.fees.trade_gate.calculate_fee_by_market") as mock_fee:
             mock_fee.return_value.should_trade = True
             mock_fee.return_value.fee_rate = Decimal("0.05")
             mock_fee.return_value.fee_amount = Decimal("2.00")
@@ -779,7 +779,7 @@ class TestWorkflowTierNormalization:
         ks.search.return_value = []
         ai.judge_with_rag.return_value = _make_cross_validation(TradeAction.BUY, 85)
 
-        with patch("app.billing.dynamic_fee.calculate_fee_by_market") as mock_fee:
+        with patch("app.fees.trade_gate.calculate_fee_by_market") as mock_fee:
             mock_fee.return_value.should_trade = True
             mock_fee.return_value.fee_rate = Decimal("0.05")
             mock_fee.return_value.fee_amount = Decimal("1.00")
@@ -824,7 +824,7 @@ class TestWorkflowTierNormalization:
 
         with (
             patch("app.automation.workflow.build_market_context", return_value=injected_ctx),
-            patch("app.billing.dynamic_fee.calculate_fee_by_market") as mock_fee,
+            patch("app.fees.trade_gate.calculate_fee_by_market") as mock_fee,
         ):
             mock_fee.return_value.should_trade = True
             mock_fee.return_value.fee_rate = Decimal("0.10")

@@ -60,13 +60,8 @@ def test_db() -> Generator[tuple, None, None]:
     os.close(fd)
     engine = create_engine(f"sqlite:///{path}", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)
-    # 旧 app.billing.models.FeeConfig が Base.metadata で fee_configs を作成済み。
-    # 同名で v10 版 (FeeConfigV10、別 metadata) を作るため、旧版を drop してから再作成する。
-    Base.metadata.tables["fee_configs"].drop(bind=engine)
-    if "fee_calculations" in Base.metadata.tables:
-        Base.metadata.tables["fee_calculations"].drop(bind=engine)
-    if "high_water_marks" in Base.metadata.tables:
-        Base.metadata.tables["high_water_marks"].drop(bind=engine)
+    # v9 billing モデル (FeeConfig/fee_calculations/high_water_marks) は F-13 で物理削除済み。
+    # Base.metadata に fee_configs 重複なし → V10Base をそのまま create_all する。
     FeeConfigV10.__table__.create(bind=engine)  # type: ignore[attr-defined]
     FeeTransaction.__table__.create(bind=engine)  # type: ignore[attr-defined]
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -701,14 +696,14 @@ class TestUataIncomeEndpoint:
 # ===========================================================================
 
 
-class TestCoexistenceWithLegacyEndpoints:
-    """F-8a 投入後も既存 endpoint が登録されていることを 404 でないことで確認。"""
+class TestLegacyEndpointsRemoved:
+    """F-13 で旧 billing エンドポイントが削除されたことを確認 (404 になること)。"""
 
-    def test_legacy_billing_config_route_registered(self, client: TestClient) -> None:
-        # auth なしで叩いても 401 / 422 が返る (404 ではない = ルート存在)
+    def test_legacy_billing_config_route_removed(self, client: TestClient) -> None:
         r = client.get("/api/billing/config")
-        assert r.status_code != 404, "/api/billing/config route was removed!"
+        assert r.status_code == 404, "/api/billing/config route should be removed by F-13!"
 
-    def test_legacy_fees_calculate_route_registered(self, client: TestClient) -> None:
+    def test_aave_fees_calculate_still_registered(self, client: TestClient) -> None:
+        # aave/fee_router.py は F-8b 廃止予定だが F-13 スコープ外 → 404 でないこと
         r = client.get("/api/fees/calculate?aum_usd=1000")
-        assert r.status_code != 404, "/api/fees/calculate route was removed!"
+        assert r.status_code != 404, "/api/fees/calculate (aave) should still be registered!"

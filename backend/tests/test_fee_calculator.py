@@ -23,8 +23,8 @@ import pytest
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-fee-calculator")
 
 from app.auth.models import InvestmentTier, RiskMode  # noqa: E402
-from app.billing.dynamic_fee import calculate_fee_by_market  # noqa: E402
 from app.fees import FeeCalculationInput, FeeCalculationResult, FeeCalculator  # noqa: E402
+from app.fees.trade_gate import _MARKET_FEE_CAPS, calculate_fee_by_market  # noqa: E402
 from tests.helpers.fee_config_factory import make_v10_default_config  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -449,9 +449,7 @@ class TestRegressionVsDynamicFee:
         assert result.should_trade is True
 
     def test_f5_and_dynamic_fee_use_same_tier_strings(self) -> None:
-        """F-5 出力の tier 文字列が dynamic_fee の有効 tier に含まれること。"""
-        from app.billing.dynamic_fee import _MARKET_FEE_CAPS  # noqa: PLC0415
-
+        """F-5 出力の tier 文字列が trade_gate の有効 tier に含まれること。"""
         calculator = FeeCalculator(make_v10_default_config())
         for tier in (InvestmentTier.LOWER, InvestmentTier.MIDDLE, InvestmentTier.UPPER):
             result: FeeCalculationResult = calculator.calculate_monthly(

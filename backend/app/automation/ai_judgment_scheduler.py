@@ -165,7 +165,7 @@ def _create_proposals_for_users(
 
     import os  # noqa: PLC0415
 
-    from app.billing.dynamic_fee import calculate_fee_by_market  # noqa: PLC0415
+    from app.fees.trade_gate import calculate_fee_by_market  # noqa: PLC0415
 
     fixed_cost = Decimal(os.getenv("TRADE_FIXED_COST_USD", "0.27"))
 

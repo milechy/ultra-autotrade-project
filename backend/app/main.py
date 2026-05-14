@@ -45,7 +45,6 @@ from app.auth.router import router as auth_router
 from app.auth.service import AuthService
 from app.automation.automation_router import router as automation_router
 from app.automation.howl_review import start_howl_background_task
-from app.billing.router import router as billing_router
 from app.bots.router import router as octobot_router
 from app.data_feeds.finance_feed import start_finance_background_task
 from app.data_feeds.geopolitical import start_geo_risk_background_task
@@ -230,9 +229,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(data_feeds_router)  # External data feeds (Phase 2)
     app.include_router(reports_router, prefix="/api/reports")  # Monthly reports
-    app.include_router(billing_router)
-    # F-8a: Fee Model v10 API (/api/v1/fees/*)。既存 billing/fee_router は併存維持 (F-8b で廃止予定)。
-    app.include_router(fees_v10_router, prefix="/api/v1")
+    app.include_router(fees_v10_router, prefix="/api/v1")  # Fee Model v10 API (/api/v1/fees/*)
     app.include_router(ai_decisions_router)  # AI Decisions API
     app.include_router(ai_feedback_router)  # AI Feedback API (Layer 4)
     app.include_router(transactions_router)  # Transactions API
