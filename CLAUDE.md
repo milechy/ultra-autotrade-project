@@ -555,13 +555,31 @@ deferred tools、MCPサーバー（Asana/Slack）、カスタムエージェン�
 
 ## Skills & Hooks
 
-### スキル（.claude/skills/）
-- single-function-edit.md — 1回1関数ルール
-- pre-commit-diff.md — コミット前diff確認
+### スキル（`.claude/skills/<name>/SKILL.md` 形式のみ。旧 `*.md` 直置きは 2026-05-14 廃止）
 
-### フック
-- pre-large-edit.sh (PreToolUse) — 50行超の変更を警告
-- post-commit-diff.sh (PostToolUse) — コミット時にdiff表示
+| スキル名 | 自動発火条件 | 手動呼び出し | 役割 |
+|---|---|---|---|
+| `defi-aave-review` | `backend/app/aave/` 変更時、HF / Decimal / approve+supply / rebalance 変更時 | `/defi-aave-review` | Aave V3 コードレビュー |
+| `defi-security-audit` | Aikido / Snyk 結果評価、外部監査準備、脆弱性対応、依存更新時 | `/defi-security-audit` | セキュリティ監査チェックリスト |
+| `defi-transparency-report` | パートナー向けバージョン更新報告、コスト試算、機能説明資料作成時 | `/defi-transparency-report` | パートナー向け報告書生成 |
+| `health` | Claude が誤動作 / ルール無視 / hooks・MCP の監査が必要なとき | `/health` | Claude Code 設定健全性監査（6層フレームワーク） |
+| `ultra-deploy` | `deploy_production.sh` / `deploy_staging.sh` 呼出時、デプロイ計画時 | `/ultra-deploy` | 本番 / staging デプロイ（手打ち build 禁止徹底） |
+| `ops-doc-loader` | curl / ALTER TABLE / INSERT・UPDATE・DELETE SQL / deploy script 呼出直前 | `/ops-doc-loader` | `docs/ops/01-03` 強制先読み（2026-04-24 推測インシデント対策） |
+
+**ルール:**
+- 旧 `.claude/skills/*.md` 直置き形式は廃止。新規スキルは必ず `.claude/skills/<name>/SKILL.md` ディレクトリ形式で作成
+- frontmatter には必ず `name` と `description` を含める
+- `description` は自動発火させたい trigger 条件を具体的に書く（例: "MUST use X. Y is FORBIDDEN."）
+- CLAUDE.md 内の参照は見出し名形式で書き、行番号は使わない（CLAUDE.md 編集による参照腐敗を防ぐ）
+
+### フック（`.claude/hooks/`）
+- `pre-large-edit.sh` (PreToolUse) — 50 行超の変更を警告
+- `post-commit-diff.sh` (PostToolUse) — コミット時に diff 表示
+- `pre-tool-guard.sh` (PreToolUse) — Lane 越境 + `.env.production` 並列書込の物理ブロック
+- `guard-env-files.sh` (PreToolUse) — 旧 env ファイル / production_operation_checklist.md の物理ブロック（R1 / R2 / R3）
+- `slack_notify.py` (Notification / Stop) — Slack 完了通知
+- `slack_permission.py` (PreToolUse) — Slack パーミッションリクエスト
+- `post-lane-notify.sh` / `send-lane-completion.sh` — Agent Teams Lane 完了通知
 
 ---
 
