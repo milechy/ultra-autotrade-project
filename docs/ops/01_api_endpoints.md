@@ -22,6 +22,7 @@
 | Method | Path | 認証 | 説明 |
 |--------|------|------|------|
 | GET | `/health` | 🔓 | アプリ生死確認。`scheduler_healthy`, `warnings` フィールドに注意 |
+| GET | `/health/detail` | 🔑 admin | 4軸多層ヘルス (scheduler/quota/cross_judgment/safety) + warnings + 5min キャッシュ。F-17a 期限切れ・OpenAI/Perplexity quota・cross-judgment 停止を観測可能化 (5/14 DoD #6) |
 
 ---
 

@@ -55,6 +55,7 @@ from app.database import init_db
 from app.dca.router import router as dca_router
 from app.error_handlers import register_error_handlers
 from app.exchange.router import router as exchange_router
+from app.health.detail_router import router as health_detail_router
 from app.hooks.router import router as hooks_router
 
 # from app.invitations.router import router as invitations_router  # Phase 2 物理削除予定
@@ -244,6 +245,7 @@ def create_app() -> FastAPI:
     app.include_router(pendle_router)  # Pendle Finance (Phase 2)
     app.include_router(protocol_health_router)  # Protocol Health Monitor (Phase 2)
     app.include_router(referral_router)  # RAS Lane 2 (Referral / Partner Affiliate System)
+    app.include_router(health_detail_router)  # /health/detail (admin, 5/14 DoD #6)
 
     # Register global error handlers (production safety)
     register_error_handlers(app)
@@ -524,6 +526,25 @@ def create_app() -> FastAPI:
                 logger.info("Operational loop started: %s", name)
             except BaseException as exc:
                 logger.error("Failed to start loop %s: %s", name, exc)
+
+    @app.on_event("startup")
+    async def startup_health_probes() -> None:
+        """Start background probes for /health/detail (OpenAI / Perplexity / Aave safety)."""
+        import asyncio  # noqa: PLC0415
+
+        try:
+            from app.health.probes import (  # noqa: PLC0415
+                aave_safety_probe_loop,
+                openai_probe_loop,
+                perplexity_probe_loop,
+            )
+
+            asyncio.create_task(openai_probe_loop())
+            asyncio.create_task(perplexity_probe_loop())
+            asyncio.create_task(aave_safety_probe_loop())
+            logger.info("Health detail probe loops started (openai/perplexity/aave-safety)")
+        except BaseException as exc:
+            logger.error("Failed to start health detail probe loops: %s", exc)
 
     @app.on_event("startup")
     async def startup_ai_judgment_scheduler() -> None:
