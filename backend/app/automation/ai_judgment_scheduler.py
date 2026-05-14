@@ -70,6 +70,7 @@ def save_ai_decision(
     result: CrossValidationResult,
     query: str,
     user_id: Optional[int] = None,
+    rag_context: Optional[RAGContext] = None,
 ) -> AIDecision:
     """CrossValidationResult を ai_decisions テーブルに保存して返す。
 
@@ -78,6 +79,7 @@ def save_ai_decision(
         result: AI クロスバリデーション結果。
         query: 判定に使ったクエリ文字列。
         user_id: 紐づけるユーザー ID（None = システム判定）。
+        rag_context: 判定に使った RAG コンテキスト。None の場合は保存しない。
 
     Returns:
         保存済みの AIDecision インスタンス。
@@ -95,7 +97,7 @@ def save_ai_decision(
         secondary_action=result.secondary.action.value if result.secondary else None,
         secondary_confidence=result.secondary.confidence if result.secondary else None,
         agreed=result.agreed,
-        rag_context_json=None,
+        rag_context_json=rag_context.model_dump() if rag_context else None,
     )
     db.add(decision)
     db.flush()  # id を確定させる
@@ -310,7 +312,7 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
         )
 
         # DB 保存
-        decision = save_ai_decision(db, result, _DEFAULT_QUERY)
+        decision = save_ai_decision(db, result, _DEFAULT_QUERY, rag_context=rag_ctx)
 
         # BUY / SELL 時は Proposal 作成
         proposals_created = 0

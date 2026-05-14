@@ -118,6 +118,29 @@ def test_save_ai_decision_creates_record(db_session):
     assert decision.agreed is True
 
 
+def test_save_ai_decision_with_rag_context_persists(db_session):
+    """save_ai_decision が rag_context を rag_context_json に保存すること。"""
+    from app.ai.schemas import RAGContext  # noqa: PLC0415
+
+    result = _make_cross_validation_result(TradeAction.HOLD)
+    rag_ctx = RAGContext(chunks=["chunk A", "chunk B"], query="btc", source_count=2)
+    decision = save_ai_decision(db_session, result, "test query", rag_context=rag_ctx)
+    db_session.commit()
+
+    assert decision.rag_context_json is not None
+    assert decision.rag_context_json["chunks"] == ["chunk A", "chunk B"]
+    assert decision.rag_context_json["source_count"] == 2
+
+
+def test_save_ai_decision_without_rag_context_saves_null(db_session):
+    """save_ai_decision が rag_context=None の場合 rag_context_json=None を保存すること。"""
+    result = _make_cross_validation_result(TradeAction.HOLD)
+    decision = save_ai_decision(db_session, result, "test query")
+    db_session.commit()
+
+    assert decision.rag_context_json is None
+
+
 # ---------------------------------------------------------------------------
 # run_ai_judgment_job のテスト
 # ---------------------------------------------------------------------------

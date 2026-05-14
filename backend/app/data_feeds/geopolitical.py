@@ -83,8 +83,8 @@ def get_cached_geo_risk() -> GeoRiskResult:
 GDELT_GKG_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 
 _GDELT_MAX_RETRIES = 3
-_GDELT_BASE_BACKOFF_SECONDS = 30
-_GDELT_BUDGET_SECONDS = 20
+_GDELT_BASE_BACKOFF_SECONDS = 5  # was 30: exceeded budget on first retry (30 > 20)
+_GDELT_BUDGET_SECONDS = 60
 
 
 async def fetch_gdelt_events(client: httpx.AsyncClient) -> GDELTEvent:
