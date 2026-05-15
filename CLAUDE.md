@@ -291,14 +291,102 @@ curl -s -X POST "$WEBHOOK" \
   -d '{"text": "❌ [チームメイト名] エラー: [タスク名]\n原因: [エラー内容]"}'
 ```
 
-### 並列開発: Tier 分類 + Agent Teams + Worktree (2026-05-01 確立)
+### 並列開発フロー v4 (2026-05-15 確立 / v3 全面置換)
 
-#### コンフリクト多発の真因 (過去ログ分析)
-1. dev/main 同時進行で 12-40 コミット乖離 → 12+ ファイルコンフリクト発生 (3/8, 3/31, 4/1)
-2. 巨大ファイルへの集中編集 (main.py / scheduled_tasks.py / monitoring_service.py / package.json)
-3. delete vs modify 衝突 (stash + upstream delete のミックス)
+#### v4 改訂の経緯
 
-#### Tier 分類
+v3 (2026-05-01 確立) で 3-5 Lane 並列が「Tier B + worktree + tmux + Agent Teams」で運用可能になった。
+しかし 5/15 の Phase A 起動で以下の系統的問題が露呈:
+
+1. **claude.ai プロジェクトファイルを正本扱いした推測連鎖** (古いdocs を実体と誤認 → Lane プロンプト全部やり直し)
+2. **CLI レポートの「保守的判定」を文脈確認せず鵜呑み** (Lane A-3 中断レポート過剰反応で 4 Lane 全停止指示)
+3. **Phase 計画立案時の現環境制約軸の事前列挙不足** (production 凍結期限 / 山本さん UAT 状況 / Opus 障害可能性 等)
+4. **Lane プロンプト発行前の「実 endpoint パス CLI 確認」抜け** (推測パスで Lane プロンプト発行)
+5. **Opus 障害時の Sonnet 退避ルートが言語化されていなかった** (Opus 4.6/4.7 elevated error rate で 3 Lane 停止)
+
+v4 はこれらの根本対策を CLAUDE.md §0 / §6 / §14 と接続して制度化する。
+
+---
+
+#### v4 コア原則 (v3 の鉄則 7 つに 3 つ追加 + 強化)
+
+##### v3 から継承する鉄則 7 つ (変更なし)
+
+1. **Hetzner pull only / ローカル merge only** (CLAUDE.md ABSOLUTE)
+2. **Tier S ファイルは 1 日 1 PR まで**
+3. **PR 起票前に必ず `git fetch origin && git rebase origin/main`** (古い base の指数的乖離防止)
+4. **並列レーンは Tier B のみで構成**
+5. **Phase A (Tier B 並列) → main マージ → Phase B (Tier S シリアル)** の段階実行
+6. **stash / 未コミット変更を残さない** (delete vs modify 衝突防止)
+7. **package.json / requirements.txt は誰も触らない週**を作る
+
+##### v4 で追加する鉄則 8-10
+
+**8. 正本確認は CLI 経由 cat 必須 (claude.ai プロジェクトファイル古い前提)**
+
+朝プロトコルで「正本確認」を行う際、claude.ai プロジェクトファイルは memory 同等扱い (古い可能性あり)。
+必ず CLI で以下を流して結果を貼り戻してから Phase 計画立案を開始する:
+
+```bash
+# 朝プロトコル正本確認テンプレート (read-only / 15分)
+cd ~/projects/ultra-autotrade
+
+# 直近 docs 変更コミット (claude.ai プロジェクトファイル sync 後の変更可視化)
+git log --since="2026-04-15" --oneline -- docs/ | head -30
+
+# 主要 docs の最終更新コミット
+for f in docs/14_test_strategy.md docs/22_production_release_checklist.md \
+         docs/42_production_e2e_runbook.md docs/13_security_design.md \
+         docs/15_rollback_procedures.md CLAUDE.md; do
+  echo "=== $f ==="
+  git log -1 --format="%h %ci %s" -- "$f"
+done
+
+# 直近 postmortem の有無
+ls docs/postmortems/ 2>/dev/null | tail -10
+
+# CLAUDE.md 教訓セクション最新分
+grep -nE "^### 教訓|^#### Lesson Learned|^## 20[0-9]{2}-[0-9]{2}-[0-9]{2}" CLAUDE.md | tail -20
+```
+
+CLI 結果を claude.ai に貼り戻してから Phase 計画開始。**プロジェクトファイル内検索だけで Phase 計画を立てることを禁止**。
+
+**9. Lane プロンプト発行前に「実 endpoint」「実 import path」CLI 確認必須**
+
+Lane プロンプトに endpoint パス / import path / クラス名を書く前に、必ず CLI で実コード grep:
+
+```bash
+# Lane プロンプト発行前テンプレート (該当 module ごと)
+grep -rn "@router\." backend/app/<対象module>/  # 実 endpoint
+grep -rn "class <ClassName>" backend/app/       # 実 import path
+grep -rn "<module>.*include_router\|<module_router>" backend/app/main.py  # main登録
+git log -1 --format="%h %ci %s" -- backend/app/<対象module>/  # 最終更新時期
+```
+
+claude.ai プロジェクトファイルの記述から推測で書かない。
+
+**10. Opus 障害時の Sonnet 退避ルート確立**
+
+Opus 4.6/4.7 elevated error rate / outage 時に **Phase 全停止しない**。
+以下を Sonnet 4.6 で進める:
+
+| 作業カテゴリ | Sonnet 採用可否 |
+|---|---|
+| read-only 調査 (真因確定 / 影響範囲評価) | ✅ |
+| .claude/agents/ + .claude/skills/ 作成 | ✅ |
+| docs / Asana 整理 / postmortem 起草 | ✅ |
+| pytest / E2E 追加のみの PR | ✅ |
+| 既存実装の Lane プロンプト Phase 1-2 (コード把握 + test 設計) | ✅ |
+| Lane プロンプト Phase 5 PR 作成 (Gate 4 一部保留可) | ✅ |
+| Tier S 直列 / 大規模リファクタ / セキュリティ系本体修正 | ❌ Opus 復旧待ち |
+| 安全装置系の配線変更 (workflow.py / scheduled_tasks.py) | ❌ Opus 復旧待ち |
+| 本体修正の最終実装 | ❌ Opus 復旧待ち |
+
+Sonnet で Phase 1-2 + テスト書き起こし + PR (Gate 4 保留版) まで進めれば、Opus 復旧後 15-30 分で完走できる状態を作れる。
+
+---
+
+#### Tier 分類 (v3 から変更なし)
 
 **Tier S: 同時編集禁止 (1日1PR)**
 - backend/app/main.py
@@ -306,10 +394,10 @@ curl -s -X POST "$WEBHOOK" \
 - frontend/package.json / frontend/package-lock.json
 - .github/workflows/ci.yml
 - docker-compose.production.yml / docker-compose.staging.yml
-- nginx/upstream.production.conf / nginx/upstream.staging.conf
+- nginx/upstream.{production,staging}.conf
 - backend/migrations/versions/*.py (新規追加)
 - backend/app/database.py
-- backend/app/automation/scheduled_tasks.py / monitoring_service.py
+- backend/app/automation/scheduled_tasks.py / monitoring_service.py / workflow.py
 - CLAUDE.md
 
 **Tier A: 同セクション編集のみ衝突**
@@ -324,17 +412,114 @@ curl -s -X POST "$WEBHOOK" \
 - frontend/components/*.tsx (別ファイル)
 - backend/app/protocols/*/*.py (Phase 2 PoC は完全分離)
 - scripts/*.sh (新規ファイル)
-- .claude/agents/*.md (新規ファイル)
+- .claude/agents/*.md / .claude/skills/*.md / .claude/hooks/*.sh (新規ファイル)
 
-#### 並列開発の鉄則 7つ
+---
 
-1. **Hetzner pull only / ローカル merge only** (CLAUDE.md ABSOLUTE)
-2. **Tier S ファイルは 1 日 1 PR まで**
-3. **PR 起票前に必ず `git fetch origin && git rebase origin/main`** (古い base の指数的乖離防止)
-4. **並列レーンは Tier B のみで構成**
-5. **Phase A (Tier B 並列) → main マージ → Phase B (Tier S シリアル)** の段階実行
-6. **stash / 未コミット変更を残さない** (delete vs modify 衝突防止)
-7. **package.json / requirements.txt は誰も触らない週**を作る
+#### Phase 計画立案 必須セクション (v4 新設)
+
+新 Phase 計画立案時、claude.ai は以下 5 軸を CLI で事前確認 + Phase 計画書に明記:
+
+| 制約軸 | 確認内容 | 確認ソース CLI |
+|---|---|---|
+| 凍結期限 | 当日 production 反映可否 | `cat docs/15_rollback_procedures.md \| grep -iE "凍結\|期限\|RAS"` |
+| 山本さん状況 | production UAT 進行段階 (wallet/SUPPLY/proposals) | `docker exec postgres psql -c "SELECT ... FROM users WHERE id=11"` |
+| API 障害 | Opus / Sonnet 可用性 | status.claude.com スクショ + 状態判定 |
+| 期限タスク | docs/45-48 Fee 移行 / F-シリーズ / その他 due 近接 | Asana search_tasks_preview で due 7日以内 |
+| 残務 | 過去 postmortem の P1 未済 | `ls docs/postmortems/ && grep -l "P1" docs/postmortems/*.md` |
+
+5 軸すべて確認後に Phase 計画を Asana ハブとして起票。
+**5 軸抜けで Phase 計画を立てた場合、その Phase は推測ベースとして扱い、起動前に再立案する**。
+
+---
+
+#### Lane プロンプト DoD 強化版 (v4 必須テンプレ)
+
+各 Lane プロンプトの DoD は以下 6 セクション必須:
+
+**A. 機能完了 (Lane 個別)**
+- Lane 元 DoD 項目
+
+**B. Gate 全通過 (CLAUDE.md §5 + §test_strategy 準拠)**
+- Gate 1-3: verify.sh 全 pass
+- Gate 4: Playwright E2E 新規 spec staging baseURL 全 pass
+- Gate 5: 孤立コード検出 (大きなリファクタ + DeFi 安全系変更時必須)
+- Gate 6: Codex Review (Aave/セキュリティ変更時は adversarial review 追加)
+- Gate 7: Claude in Chrome (UI 変更 Lane / staging で CF Access ブロック時は Playwright mobile 代替明記)
+
+**C. 教訓記録 (CLAUDE.md §0「新規教訓・ルールは正本に追記」遵守)**
+- 詰まった箇所 / 推測失敗 / 環境分離違反 / memory 仮定起因失敗 を CLAUDE.md「教訓-YYYY-MM-DD」セクションに追記
+- 該当なしの場合も「特記なし」と明示 (silent skip 禁止)
+- §6 / §12 / §13 / §14 違反は太字で記録
+
+**D. Asana 連携**
+- PR description に該当 Asana GID + Closes 記述
+- Lane 完了時 notes に PR link + Gate 結果 + 教訓サマリ
+- PR main マージ後 close
+
+**E. Slack JSON 通知 (.claude/hooks/send-lane-completion.sh / lane-json.md スキーマ)**
+```json
+{
+  "lane": "X-N",
+  "phase": "Phase X",
+  "status": "completed | partial_complete | blocked | failed",
+  "tier": "S | B",
+  "root_cause": "(blocked/failed 時のみ)",
+  "lessons_learned_count": N,
+  "gate_results": {
+    "1-3_verify": "pass | fail",
+    "4_e2e": "X/Y pass | deferred_to_<reason>",
+    "5_dead_code": "pass | n/a",
+    "6_codex": "approved | minor | major",
+    "7_chrome": "pass | n/a | skipped_<reason>"
+  },
+  "pr_url": "...",
+  "next_action": "..."
+}
+```
+
+**F. claude.ai 引継ぎ**
+- PR URL / Gate 1-7 個別判定 / 教訓記録 CLAUDE.md 追記行 / staging 実機検証実値 / 次 Lane への blocker
+
+---
+
+#### CLI レポート受領時の判断プロトコル (v4 新設)
+
+CLI から以下のような保守的判定 / 制約レポートが来た場合、claude.ai は**鵜呑みにせず文脈確認**してから採用判断:
+
+- 「中止推奨」「全停止」「制約あり」「Lane 不可能」等の保守的判定
+- 「Tier 超過」「設計欠陥」「事前計画乖離」等の構造判定
+
+必須確認 4 軸:
+
+| 確認軸 | 質問 |
+|---|---|
+| 観測軸 | 制約は curl 側か frontend 側か agent 側か backend 側か |
+| 環境軸 | production / staging-new / staging旧 のどれの話か |
+| 時間軸 | 今日発生 / 既解消 / 未解消 / 過去のもの |
+| 影響軸 | 当該 Lane だけ / Phase 全体 / プロジェクト全体 |
+
+4 軸確認後に判断:
+- 全 Lane 影響かつ未解消 → 全停止指示
+- 当該 Lane のみ → 当該 Lane 修正 + 他 Lane 継続
+- 環境違いの話 → 当該 Lane 注意点として記録のみで継続
+- 既解消の話 → 継続
+
+**4 軸確認なしの「全停止」「全撤回」指示を出してはならない**。
+
+---
+
+#### Phase 終了処理 (v4 新設 / 各 Phase 末尾必須)
+
+Phase 全 Lane 完了後、claude.ai セッションで以下を 1-2 時間で実行:
+
+1. **教訓集約**: 各 Lane が CLAUDE.md「教訓-YYYY-MM-DD」に追記したものを横断レビュー → Phase 全体レベルの教訓抽出 → 「教訓-YYYY-MM-DD Phase X 総括」セクション新設
+2. **Postmortem (重大インシデント時)**: docs/postmortems/YYYY-MM-DD_*.md 作成
+3. **ルール改訂判断**: Phase 教訓から新規 hook / agent / skill / ルール追加が必要か判断 → 必要なら CLAUDE.md 該当セクション更新 + claude.ai プロジェクト指示文改訂起案
+4. **次 Phase 起動ハブ Asana 起票**: 5 軸事前確認 + Lane 構成 + DoD 強化版 全包含
+5. **山本さん共有 (必要時)**: §10 文面禁止 / 小林さん本人で送信
+
+---
 
 #### Agent Teams + Worktree モード (推奨、コンフリクト物理回避)
 
@@ -350,8 +535,7 @@ Each teammate gets its own git worktree.
 
 各 Teammate が独立した worktree で作業 → main マージ時のみコンフリクト可能性。
 
-#### 落とし穴 (2026-02 以降の実運用知見)
-
+落とし穴 (2026-02 以降の実運用知見):
 - **Agent Teams は file conflict detection なし** — 他 Teammate の変更を**警告なしで上書き**することがある。File ownership を初期プロンプトで**明示**必須。
 - **3-5 Teammate がスイートスポット** — 6+ は coordination overhead 過多。
 - **Tokens 約 7 倍** (plan mode、複数 Teammate) — Sonnet/Haiku を実装係に割り当て、Lead のみ Opus。
@@ -367,17 +551,48 @@ Teammate 間のコミュニケーション不要、独立タスクのみなら `
 
 Agent Teams は teammate が share/challenge する必要があるときに使用。
 
-#### claude.ai 側の責務 (PM/アーキテクト)
+---
 
-並列開発を計画する際、claude.ai は以下を**質問なしで**実行:
+#### tmux 5 ペイン起動コマンド (v4 標準化)
 
-1. 各タスクの Tier 判定 (notes の「触るファイル」から自動)
-2. 並列レーン化 (3-5 本のスイートスポット)
-3. CLI 用包括プロンプト 5 本一括生成 (細切れ確認禁止)
-4. Asana タスク notes に並列レーン情報を追記
-5. ユーザーは tmux で 5 ターミナル起動するだけ
+```bash
+cd ~/projects/ultra-autotrade
+tmux new-session -d -s phase-<X>
+tmux split-window -h -t phase-<X>
+tmux split-window -v -t phase-<X>:0.0
+tmux split-window -v -t phase-<X>:0.1
+tmux split-window -h -t phase-<X>:0.3
+tmux attach -t phase-<X>
 
-「やっていいですか?」の質問は禁止。設計判断のみ claude.ai に残す。
+# 各ペインで claude-uata (UATa の sic.nozawa@gmail.com 切替 alias)
+# Lane X-1 (Tier S) → 左上 / Opus 4.7
+# Lane X-2 (Tier B) → 左中 / Opus 4.7 or Sonnet 4.6
+# Lane X-3 (Tier B) → 左下 / Opus 4.7 or Sonnet 4.6
+# Lane X-4 (Tier B) → 右上 / Sonnet 4.6
+# Lane X-5 (Tier B) → 右下 / Sonnet 4.6
+
+# 復帰
+tmux attach -t phase-<X>
+# Ctrl+b → d でデタッチ
+```
+
+---
+
+#### claude.ai 側の責務 (PM/アーキテクト / v4 強化版)
+
+並列開発計画時、claude.ai は質問なしで以下を実行:
+
+1. **5 軸事前確認** (Phase 計画立案前 / CLI 経由必須)
+2. **各タスクの Tier 判定** (notes の「触るファイル」から自動)
+3. **並列レーン化** (3-5 本のスイートスポット / Opus と Sonnet 配分判断)
+4. **CLI 用包括プロンプト 5 本一括生成** (細切れ確認禁止)
+5. **Asana タスク notes に並列レーン情報追記**
+6. **CLI レポート受領時の 4 軸確認** (鵜呑み禁止)
+7. **Phase 終了処理 (教訓集約 + postmortem + 次 Phase ハブ起票)**
+
+ユーザーは tmux で 5 ペイン起動するだけ。
+「やっていいですか?」の細切れ確認は禁止 (5/15 で実証された浪費パターン)。
+設計判断と 4 軸確認のみ claude.ai に残す。
 
 ---
 
@@ -1420,3 +1635,45 @@ docker compose -f docker-compose.production.yml --env-file .env.production \
 image hash が変化していなければ rebuild されていないため、旧コードが動き続ける。
 
 **参照**: `docs/postmortems/2026-05-12_uat_blocker_full_day_failure.md`
+
+---
+
+## 2026-05-15追加（Phase A PoC staging endpoint 未実装パターン教訓）
+
+### 教訓-2026-05-15: PoC 段階の schemas-only 定義と staging 実機検証の関係
+
+**事象**: Lane A-4 (AI Optimizer staging E2E) で、`OptimizerRequest` / `OptimizerResponse` が
+`app/ai/optimizer/schemas.py` に定義されているにも関わらず、対応する router が存在せず
+`/api/optimizer/recommend` エンドポイントが staging に存在しない状態でタスクが完了指定されそうになった。
+また `app/protocols/risk/router.py` の `/api/protocols/health` は main.py に登録済みだが、
+`DummyClient` を使用しているため staging で `500: DummyClient cannot be used in staging environment` が返る。
+
+**真因**: Phase 2 PoC では「schemas 先行定義 → router は実装フェーズで追加」という開発順序を取る。
+CLAUDE.md の「Phase 4: staging 実機検証」フローに「PoC 段階でエンドポイントが未実装の場合の代替」が明記されていなかった。
+
+**再発防止ルール**:
+
+1. **staging 実機検証の前にエンドポイント存在確認を必須化**
+   ```bash
+   # curl の前に必ずエンドポイント存在を確認
+   ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 \
+     "curl -sf http://localhost:8082/openapi.json | python3 -c \"import sys,json; paths=json.load(sys.stdin)['paths']; print('\\n'.join(paths.keys()))\"" \
+     | grep -E "optimizer|recommend"
+   # 0件なら → PoC仕様 → pytest E2E で代替、その旨を DoD に明記
+   ```
+
+2. **PoC 段階の schemas-only 定義は「孤立コード検出」対象**
+   router が存在しない `OptimizerRequest` / `OptimizerResponse` は P1 孤立として記録する。
+   Lane 完了時の孤立コード検出でこれらを捕捉し、`[P1: router 実装待ち]` とラベリングして別タスク化する。
+
+3. **DummyClient を使うプロトコルの staging 実機検証は skip 明示**
+   `DummyClient` / `DummyLidoClient` / `DummyPendleClient` を使用するエンドポイントは
+   staging で必ず 500 になる。pytest mock E2E で代替し、
+   DoD に `Gate 4: staging スキップ (DummyClient - PoC仕様)` と明記すること。
+
+4. **孤立クラスの P0/P1 分類基準**
+   | 分類 | 対象 | 対応期限 |
+   |---|---|---|
+   | P0 | 安全装置・緊急停止・避難系 (AutoEvacuator, CompoundRiskAssessor 等) | 当日中 |
+   | P1 | API スキーマ・router 待ち定義 (OptimizerRequest 等) | 次スプリント |
+   | P2 | ユーティリティ・将来機能 | バックログ |

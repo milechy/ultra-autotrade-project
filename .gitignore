@@ -113,3 +113,7 @@ frontend/e2e/screenshots/uat-pre-check-*/
 frontend/e2e/screenshots/login-375.png
 frontend/e2e/screenshots/login-mobile.png
 frontend/e2e/uat-pre-check-*.spec.ts.bak*
+
+# Phase A screenshots (5/15)
+frontend/e2e/screenshots/uat-pre-check/
+frontend/e2e/screenshots/yamamoto-partner/
