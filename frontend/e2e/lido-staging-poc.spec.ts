@@ -132,11 +132,15 @@ test.describe('[Phase A-2] Lido PoC — staging 実機検証', () => {
   // Sanity check (常時実行可能 — Gate 4 保留関係なし)
   // -----------------------------------------------------------------------
   test('[sanity] staging backend が応答すること', async ({ request }) => {
-    const res = await request.get(`${STAGING_API}/health`)
-    // staging backend が起動していれば 200、停止なら skip
-    if (res.status() === 0) {
+    // Playwright は接続不可時に例外を throw するため try-catch で処理
+    let status: number
+    try {
+      const res = await request.get(`${STAGING_API}/health`)
+      status = res.status()
+    } catch {
       test.skip(true, 'staging backend 到達不可 — SSH / CF Access 設定を確認')
+      return
     }
-    expect(res.status()).toBeLessThan(500)
+    expect(status).toBeLessThan(500)
   })
 })
