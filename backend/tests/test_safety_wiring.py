@@ -11,7 +11,6 @@ import pytest
 
 from app.protocols.risk.schemas import (
     CompoundRiskAssessment,
-    MaturityAlert,
     PegStatus,
     ProtocolHealth,
     RiskLevel,
