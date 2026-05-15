@@ -159,5 +159,18 @@
       "/Users/hkobayashi/.claude/projects/-Users-hkobayashi-projects-ultra-autotrade",
       "/Users/hkobayashi/projects/ultra-autotrade/.claude"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/pre-tool-guard.sh"
+          }
+        ]
+      }
+    ]
   }
 }
