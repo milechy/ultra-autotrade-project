@@ -432,7 +432,7 @@ def get_lido_client(config: LidoConfig) -> AbstractLidoClient:
     import os  # noqa: PLC0415
 
     app_env = os.getenv("APP_ENV", "development")
-    if app_env in ("staging", "production") and config.sandbox:
+    if app_env == "production" and config.sandbox:
         logger.error("DummyClient is forbidden in %s environment", app_env)
         raise RuntimeError(f"DummyClient cannot be used in {app_env} environment")
     if config.sandbox:

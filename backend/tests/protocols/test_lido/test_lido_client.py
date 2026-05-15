@@ -99,12 +99,12 @@ class TestGetLidoClient:
         with pytest.raises(RuntimeError, match="DummyClient cannot be used in production"):
             get_lido_client(config)
 
-    def test_staging_env_with_sandbox_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """APP_ENV=staging + sandbox=True でエラーが発生すること。"""
+    def test_staging_env_with_sandbox_allowed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Phase 1 期間中、APP_ENV=staging + sandbox=True は DummyClient を返すこと（docs/13 §1.4）。"""
         monkeypatch.setenv("APP_ENV", "staging")
         config = LidoConfig(sandbox=True)
-        with pytest.raises(RuntimeError, match="DummyClient cannot be used in staging"):
-            get_lido_client(config)
+        client = get_lido_client(config)
+        assert isinstance(client, DummyLidoClient)
 
     def test_development_env_with_sandbox_allowed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """APP_ENV=development + sandbox=True は正常動作すること。"""
