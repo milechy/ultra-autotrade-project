@@ -29,7 +29,9 @@ def _make_protocol_health(risk_level: RiskLevel = RiskLevel.LOW) -> ProtocolHeal
     )
 
 
-def _make_assessment(should_evacuate: bool, risk_level: RiskLevel = RiskLevel.LOW) -> CompoundRiskAssessment:
+def _make_assessment(
+    should_evacuate: bool, risk_level: RiskLevel = RiskLevel.LOW
+) -> CompoundRiskAssessment:
     peg = PegStatus(
         current_ratio=Decimal("0.9998"),
         deviation_pct=Decimal("0.02"),
@@ -151,7 +153,9 @@ async def test_scheduled_task_manager_start_stop_compound_risk() -> None:
     manager = ScheduledTaskManager()
     assert not manager.is_compound_risk_running
 
-    with patch("app.automation.scheduled_tasks.compound_risk_monitor_loop", new_callable=AsyncMock) as mock_loop:
+    with patch(
+        "app.automation.scheduled_tasks.compound_risk_monitor_loop", new_callable=AsyncMock
+    ) as mock_loop:
         mock_loop.return_value = None
         await manager.start_compound_risk_monitor(interval_seconds=600)
         assert manager.is_compound_risk_running
@@ -253,7 +257,10 @@ def test_workflow_fail_open_on_compound_risk_exception() -> None:
 
     mock_ks.get_pending.return_value = []
 
-    with patch("app.protocols.risk.compound_risk.CompoundRiskAssessor", side_effect=RuntimeError("test error")):
+    with patch(
+        "app.protocols.risk.compound_risk.CompoundRiskAssessor",
+        side_effect=RuntimeError("test error"),
+    ):
         result = process_pending_knowledge(
             mock_db,
             knowledge_service=mock_ks,
