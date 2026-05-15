@@ -150,7 +150,7 @@ function AaveCard({ data }: { data: AaveHealth }) {
       <StatRow label="供給APY" value={`${data.supply_apy.toFixed(2)}%`} />
       <StatRow label="利用率" value={`${data.utilization_rate.toFixed(1)}%`} />
       <StatRow
-        label="Pause"
+        label="一時停止"
         value={
           <span
             className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${
@@ -159,12 +159,12 @@ function AaveCard({ data }: { data: AaveHealth }) {
                 : 'border-green-500/30 bg-green-500/20 text-green-400'
             }`}
           >
-            {data.is_paused ? 'Paused' : '正常'}
+            {data.is_paused ? '停止中' : '正常'}
           </span>
         }
       />
       <StatRow
-        label="Freeze"
+        label="凍結"
         value={
           <span
             className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${
@@ -173,7 +173,7 @@ function AaveCard({ data }: { data: AaveHealth }) {
                 : 'border-green-500/30 bg-green-500/20 text-green-400'
             }`}
           >
-            {data.is_frozen ? 'Frozen' : '正常'}
+            {data.is_frozen ? '凍結中' : '正常'}
           </span>
         }
       />
