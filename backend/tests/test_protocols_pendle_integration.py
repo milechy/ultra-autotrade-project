@@ -251,20 +251,25 @@ class TestProtocolHealthPendleEndpoint:
 
 
 # ---------------------------------------------------------------------------
-# 7. staging 環境 DummyClient 禁止ガード
+# 7. 環境別 DummyClient 許可ガード (Phase 1: staging 許可 / production 禁止)
 # ---------------------------------------------------------------------------
 
 
-class TestStagingGuard:
-    def test_staging_env_with_sandbox_returns_5xx(
+class TestEnvGuard:
+    def test_staging_env_with_sandbox_returns_200(
         self, pendle_app: FastAPI, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """APP_ENV=staging + PENDLE_SANDBOX=true は 5xx を返す。
-
-        TestClient を raise_server_exceptions=False で生成して
-        RuntimeError が HTTP 500 にマップされることを確認する。
-        """
+        """Phase 1 期間中、APP_ENV=staging + PENDLE_SANDBOX=true は DummyClient で 200 を返す（docs/13 §1.4）。"""
         monkeypatch.setenv("APP_ENV", "staging")
+        staging_client = TestClient(pendle_app, raise_server_exceptions=False)
+        resp = staging_client.get("/api/protocols/pendle/markets")
+        assert resp.status_code == 200
+
+    def test_production_env_with_sandbox_returns_5xx(
+        self, pendle_app: FastAPI, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """APP_ENV=production + PENDLE_SANDBOX=true は 5xx を返す。"""
+        monkeypatch.setenv("APP_ENV", "production")
         staging_client = TestClient(pendle_app, raise_server_exceptions=False)
         resp = staging_client.get("/api/protocols/pendle/markets")
         assert resp.status_code in (500, 503)
