@@ -185,7 +185,7 @@ function StrategyCard({ strategy }: { strategy: StrategyData }) {
       {isPhase2 && (
         <div className="absolute inset-0 flex items-center justify-center rounded-lg">
           <div className="rounded-full border border-zinc-700 bg-zinc-800/90 px-4 py-2 backdrop-blur-sm">
-            <span className="text-sm font-semibold text-zinc-300">Coming Soon</span>
+            <span className="text-sm font-semibold text-zinc-300">近日公開</span>
           </div>
         </div>
       )}
