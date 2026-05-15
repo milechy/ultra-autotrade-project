@@ -41,6 +41,9 @@ WEEKLY_REPORT_DAY = 0  # Monday (0 = Monday, 6 = Sunday)
 # RSS フェッチ間隔（秒）
 RSS_FETCH_INTERVAL_SECONDS = 1800  # 30 分
 
+# 複合リスク監視間隔（秒）
+COMPOUND_RISK_INTERVAL_SECONDS = 600  # 10 分
+
 # DCA 頻度→秒数マッピング
 DCA_FREQUENCY_SECONDS = {
     "hourly": 3600,
@@ -793,6 +796,80 @@ async def learning_loop(
             await asyncio.sleep(600)
 
 
+async def compound_risk_monitor_loop(
+    *,
+    interval_seconds: int = COMPOUND_RISK_INTERVAL_SECONDS,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """複合リスク評価（CompoundRiskAssessor）と自動避難計画（AutoEvacuator）の定期実行ループ。
+
+    10 分ごとに全プロトコルの複合リスクを評価し、
+    should_evacuate が True の場合は避難計画を dry_run で作成・ログ出力する。
+
+    Args:
+        interval_seconds: チェック間隔（秒）。デフォルト 600 秒（10 分）
+        on_error: エラー発生時のコールバック
+
+    Note:
+        - このコルーチンは無限ループで動作する
+        - 停止は asyncio.CancelledError で行う
+        - エラー発生時もループは継続（fail-open）
+    """
+    from app.protocols.risk.auto_evacuate import AutoEvacuator  # noqa: PLC0415
+    from app.protocols.risk.compound_risk import CompoundRiskAssessor  # noqa: PLC0415
+
+    logger.info(
+        "Starting compound risk monitor loop (interval: %ds)",
+        interval_seconds,
+    )
+
+    assessor = CompoundRiskAssessor()
+    evacuator = AutoEvacuator()
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+
+            logger.info("compound_risk_monitor_loop: 複合リスク評価開始")
+            assessment = await assessor.assess()
+            logger.info(
+                "compound_risk_monitor_loop: overall_risk=%s, score=%s, should_evacuate=%s",
+                assessment.overall_risk.value,
+                assessment.risk_score,
+                assessment.should_evacuate,
+            )
+
+            if assessment.should_evacuate:
+                logger.warning(
+                    "compound_risk_monitor_loop: 避難条件成立 — 避難計画を作成します (reason=%s)",
+                    assessment.evacuation_reason,
+                )
+                plan = await evacuator.create_evacuation_plan(assessment)
+                if plan is not None:
+                    result = await evacuator.execute_evacuation(plan, dry_run=True)
+                    logger.warning(
+                        "compound_risk_monitor_loop: 避難計画 dry_run 完了 "
+                        "(steps=%d/%d, priority=%s)",
+                        result.steps_completed,
+                        result.steps_total,
+                        plan.priority,
+                    )
+
+        except asyncio.CancelledError:
+            logger.info("compound_risk_monitor_loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in compound risk monitor loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            await asyncio.sleep(600)
+
+
 class ScheduledTaskManager:
     """
     スケジュールタスクのライフサイクル管理。
@@ -814,6 +891,7 @@ class ScheduledTaskManager:
         self._latency_monitor_task: Optional[asyncio.Task[None]] = None
         self._proposal_timeout_task: Optional[asyncio.Task[None]] = None
         self._learning_task: Optional[asyncio.Task[None]] = None
+        self._compound_risk_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -864,6 +942,11 @@ class ScheduledTaskManager:
     def is_learning_running(self) -> bool:
         """AI学習サイクルタスクが動作中かどうか。"""
         return self._learning_task is not None and not self._learning_task.done()
+
+    @property
+    def is_compound_risk_running(self) -> bool:
+        """複合リスク監視タスクが動作中かどうか。"""
+        return self._compound_risk_task is not None and not self._compound_risk_task.done()
 
     async def start_daily_reports(
         self,
@@ -1465,6 +1548,65 @@ class ScheduledTaskManager:
         self._learning_task = None
         logger.info("AI learning task stopped")
 
+    async def start_compound_risk_monitor(
+        self,
+        *,
+        interval_seconds: int = COMPOUND_RISK_INTERVAL_SECONDS,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """複合リスク監視タスクを開始する。
+
+        Args:
+            interval_seconds: チェック間隔（秒）
+            on_error: エラー時コールバック
+
+        Raises:
+            RuntimeError: 既に開始されている場合
+        """
+        if self.is_compound_risk_running:
+            raise RuntimeError("Compound risk monitor already running")
+
+        logger.info("Starting compound risk monitor task")
+
+        self._compound_risk_task = asyncio.create_task(
+            compound_risk_monitor_loop(
+                interval_seconds=interval_seconds,
+                on_error=on_error,
+            )
+        )
+
+        logger.info("Compound risk monitor task started")
+
+    async def stop_compound_risk_monitor(self, timeout: float = 5.0) -> None:
+        """複合リスク監視タスクを停止する。
+
+        Args:
+            timeout: キャンセル待機のタイムアウト秒数
+        """
+        if not self.is_compound_risk_running:
+            logger.debug("Compound risk monitor not running - nothing to stop")
+            return
+
+        logger.info("Stopping compound risk monitor task")
+
+        assert self._compound_risk_task is not None  # noqa: S101
+        self._compound_risk_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._compound_risk_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Compound risk monitor task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Compound risk monitor task did not stop within %.1fs timeout",
+                timeout,
+            )
+        except Exception as exc:
+            logger.error("Error while stopping compound risk monitor task: %s", exc)
+
+        self._compound_risk_task = None
+        logger.info("Compound risk monitor task stopped")
+
     async def stop_all(self, timeout: float = 5.0) -> None:
         """
         全てのスケジュールタスクを停止する。
@@ -1485,6 +1627,7 @@ class ScheduledTaskManager:
             self.stop_latency_monitor(timeout=timeout),
             self.stop_proposal_timeout(timeout=timeout),
             self.stop_learning(timeout=timeout),
+            self.stop_compound_risk_monitor(timeout=timeout),
             return_exceptions=True,
         )
 

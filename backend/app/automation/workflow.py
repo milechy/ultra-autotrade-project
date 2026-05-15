@@ -533,6 +533,43 @@ def process_pending_knowledge(
             status="completed",
         )
 
+    # CompoundRiskAssessor: マルチプロトコル複合リスクチェック（AI 判断前）
+    try:
+        import asyncio as _asyncio  # noqa: PLC0415
+        import concurrent.futures  # noqa: PLC0415
+
+        from app.protocols.risk.compound_risk import CompoundRiskAssessor  # noqa: PLC0415
+
+        _assessor = CompoundRiskAssessor()
+        # sync から async assess() を呼ぶ: ThreadPoolExecutor で独立ループを生成
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _pool:
+            _risk = _pool.submit(_asyncio.run, _assessor.assess()).result(timeout=10)
+
+        logger.info(
+            "CompoundRiskAssessor: overall_risk=%s, score=%s, should_evacuate=%s",
+            _risk.overall_risk.value,
+            _risk.risk_score,
+            _risk.should_evacuate,
+        )
+
+        if _risk.should_evacuate:
+            logger.warning(
+                "CompoundRiskAssessor: 避難条件成立 — 全アイテムを HOLD します (reason=%s)",
+                _risk.evacuation_reason,
+            )
+            for item in pending:
+                try:
+                    knowledge_service.update_status(db, item.id, KnowledgeItemStatus.SKIPPED)
+                except Exception:
+                    logger.warning("Failed to update status for item %d", item.id)
+            return WorkflowRunResult(
+                fetched_count=len(pending),
+                hold_count=len(pending),
+                status="completed",
+            )
+    except Exception as _cra_exc:
+        logger.warning("CompoundRiskAssessor check failed (fail-open, continuing): %s", _cra_exc)
+
     errors: List[WorkflowStepError] = []
     traded_count = 0
     hold_count = 0
