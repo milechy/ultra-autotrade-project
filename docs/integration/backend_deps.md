@@ -75,6 +75,20 @@
 - **影響範囲**: 新規 router 追加のみ。既存 endpoint への影響なし。tests/test_referral_router.py で既存 endpoint の404でないことを保証。
 - **承認**: feature/ras-l2-backend-api → main の通常フロー経由（PR #194）
 
+### 変更 #8: P0-2 Safety wiring — compound_risk_monitor startup 登録 (PR #240 / 2026-05-15)
+- **コミット範囲**: `d6a4ed3` (feat/safety-wiring)
+- **変更内容**:
+  - `startup_scheduled_tasks` の `_loops` リストに `compound_risk_monitor` エントリを 1 件追加
+  - `scheduled_manager.start_compound_risk_monitor(on_error=...)` を呼び出す tuple を追加（他の operational loops と完全に同一パターン）
+  - 計 6 行追加のみ。既存 loop・エンドポイント・ロジックへの変更なし
+- **理由**: P0-2 (Asana 1214822153727471) — 孤立コード状態だった `AutoEvacuator` / `CompoundRiskAssessor` の配線。
+  `workflow.py` の AI 判断前に `CompoundRiskAssessor` pre-check を追加し、
+  `scheduled_tasks.py` に `compound_risk_monitor_loop`（10分間隔でマルチプロトコル複合リスク評価 + AutoEvacuator dry_run）を追加。
+  `main.py` への変更は startup_scheduled_tasks の `_loops` に同ループの登録を追加するのみ（既存 `SchedulerWatchdog` / `health_check` / `dca` と同パターン）。
+- **影響範囲**: startup/shutdown シーケンスのみ。既存エンドポイント・ロジックへの影響なし。
+  `compound_risk_monitor_loop` は 10 分ごとに dry_run=True で実行するため本番資産操作は発生しない。
+- **承認**: claude.ai 判断 (2026-05-15 Pane 2 完了報告経由) / feat/safety-wiring → main (PR #240)
+
 ### 変更 #7: RAS Phase 1 cleanup — invitations_router 無効化 + referral prefix 修正 (PR #201 / 2026-05-09)
 - **コミット範囲**: `e3210c8` + `95d51f3` (hotfix/ras-partner-referral-cleanup)
 - **変更内容**:

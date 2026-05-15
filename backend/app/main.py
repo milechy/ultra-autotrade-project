@@ -519,6 +519,12 @@ def create_app() -> FastAPI:
                     on_error=_make_scheduler_error_handler("dca_loop"),
                 ),
             ),
+            (
+                "compound_risk_monitor",
+                scheduled_manager.start_compound_risk_monitor(
+                    on_error=_make_scheduler_error_handler("compound_risk_monitor_loop"),
+                ),
+            ),
         ]
         for name, coro in _loops:
             try:
