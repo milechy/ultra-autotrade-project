@@ -124,7 +124,8 @@ test.describe('[Phase A-2] Lido PoC — staging 実機検証', () => {
 
     const data = await res.json()
     expect(data).toHaveProperty('protocol')
-    expect(data).toHaveProperty('status')
+    expect(data).toHaveProperty('is_operational')
+    expect(data).toHaveProperty('risk_level')
     expect(data.protocol).toBe('lido')
   })
 
