@@ -96,10 +96,12 @@ check_l1() {
   fi
 
   # 内部 /health (backend-blue)
+  # curl -w "%{http_code}" は失敗時も "000" を stdout に書くため || echo は不要
   local local_code
   local_code="$(curl -sf -o /dev/null -w "%{http_code}" \
     --connect-timeout "$TIMEOUT" --max-time "$TIMEOUT" \
-    "$BACKEND_BLUE_URL/health" 2>/dev/null || echo "000")"
+    "$BACKEND_BLUE_URL/health" 2>/dev/null || true)"
+  local_code="${local_code:-000}"
   if [[ "$local_code" != "200" ]]; then
     status="FAIL"
     details="${details:+$details; }local /health HTTP $local_code"
@@ -109,7 +111,8 @@ check_l1() {
   local pub_code
   pub_code="$(curl -sf -o /dev/null -w "%{http_code}" \
     --connect-timeout "$TIMEOUT" --max-time "$TIMEOUT" \
-    "$BACKEND_PUBLIC_URL/health" 2>/dev/null || echo "000")"
+    "$BACKEND_PUBLIC_URL/health" 2>/dev/null || true)"
+  pub_code="${pub_code:-000}"
   if [[ "$pub_code" != "200" ]]; then
     status="FAIL"
     details="${details:+$details; }public /health HTTP $pub_code"
