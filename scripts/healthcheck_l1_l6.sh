@@ -12,7 +12,7 @@
 #   DRY_RUN=true ./scripts/healthcheck_l1_l6.sh  # Slack送信をスキップしてJSONを表示
 #
 # cron登録例 (Hetzner /opt/ultra-autotrade/scripts/ に配置後):
-#   */5 * * * * /opt/ultra-autotrade/scripts/healthcheck_l1_l6.sh >> /var/log/ultra-autotrade/healthcheck.log 2>&1
+#   */5 * * * * /opt/ultra-autotrade/scripts/healthcheck_l1_l6.sh >> /opt/ultra-autotrade/logs/healthcheck_l1_l6.log 2>&1
 
 set -uo pipefail
 
@@ -21,7 +21,7 @@ set -uo pipefail
 # ============================================================
 ENV_FILE="${ENV_FILE:-/opt/ultra-autotrade/.env.production}"
 PASS_STAMP_FILE="${PASS_STAMP_FILE:-/tmp/.last_healthcheck_pass}"
-LOG_DIR="${LOG_DIR:-/var/log/ultra-autotrade}"
+LOG_DIR="${LOG_DIR:-/opt/ultra-autotrade/logs}"
 TIMEOUT="${TIMEOUT:-10}"
 DRY_RUN="${DRY_RUN:-false}"
 
