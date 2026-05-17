@@ -28,8 +28,9 @@ DRY_RUN="${DRY_RUN:-false}"
 POSTGRES_CONTAINER="ultra-autotrade-postgres-production"
 DB_USER="ultra"
 DB_NAME="ultra_autotrade"
-BACKEND_BLUE_URL="http://127.0.0.1:8010"
-BACKEND_PUBLIC_URL="https://api.ultra-auto-trade.com"
+# 環境変数オーバーライド可能 (テスト・違反シミュレーション用)
+BACKEND_BLUE_URL="${BACKEND_BLUE_URL:-http://127.0.0.1:8010}"
+BACKEND_PUBLIC_URL="${BACKEND_PUBLIC_URL:-https://api.ultra-auto-trade.com}"
 
 # 期待する常時起動コンテナ (7台)
 REQUIRED_CONTAINERS=(
