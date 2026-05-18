@@ -150,11 +150,23 @@ async def fetch_finance_data(client: httpx.AsyncClient) -> FinanceFeedResult:
             if stablecoin_risk not in _VALID_STABLECOIN_RISKS:
                 stablecoin_risk = "low"
 
+            # key_indicators may be list[str] or list[dict] depending on Perplexity API version.
+            # Coerce dicts to "name: value" strings to avoid pydantic ValidationError.
+            raw_indicators: list[object] = parsed.get("key_indicators", [])[:5]
+            key_indicators: list[str] = [
+                (
+                    ": ".join(filter(None, [str(item.get("name", "")), str(item.get("value", ""))]))
+                    if isinstance(item, dict)
+                    else str(item)
+                )
+                for item in raw_indicators
+            ]
+
             return FinanceFeedResult(
-                macro_summary=parsed.get("macro_summary", content[:400]),
+                macro_summary=str(parsed.get("macro_summary", content[:400])),
                 fed_stance=fed_stance,
                 stablecoin_risk=stablecoin_risk,
-                key_indicators=parsed.get("key_indicators", [])[:5],
+                key_indicators=key_indicators,
                 sources_count=len(citations),
                 updated_at=datetime.now(timezone.utc),
             )

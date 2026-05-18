@@ -57,8 +57,11 @@ async def rebalance_check_loop(
                 from app.aave.service import AaveService
                 from app.aave.state_manager import get_default_state_manager
                 from app.automation.state import get_monitoring_service
-                from app.notifications.composite import (  # type: ignore[import-not-found]
-                    CompositeNotificationService,
+                from app.notifications.factory import get_notification_service
+                from app.notifications.schemas import (
+                    NotificationChannel,
+                    NotificationMessage,
+                    NotificationSeverity,
                 )
 
                 service = RebalanceService(
@@ -99,15 +102,22 @@ async def rebalance_check_loop(
                 )
 
                 # Slack通知
-                notification_service = CompositeNotificationService()
-                message = (
+                notification_service = get_notification_service()
+                body = (
                     f"*[Rebalance Check]* リバランスが必要です。\n"
                     f"最大乖離: {float(max_deviation):.2%}\n"
                     f"Proposal ID: `{proposal.proposal_id}`\n"
                     f"操作数: {len(proposal.operations)}\n"
                     f"※ Shadow Mode: 自動実行はしません。手動で確認してください。"
                 )
-                notification_service.notify(message)
+                notification_service.send(
+                    NotificationMessage(
+                        channel=NotificationChannel.SLACK,
+                        severity=NotificationSeverity.WARNING,
+                        title="[Rebalance Check] リバランスが必要です",
+                        body=body,
+                    )
+                )
 
             await asyncio.to_thread(_run_check)
             logger.info("Rebalance check job completed")
