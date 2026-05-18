@@ -3,6 +3,19 @@
 > 生成: 2026-04-24 / `backend/app/` 実コードから抽出（推測なし）
 > FastAPI (Python 3.11)、SQLAlchemy、PostgreSQL 16
 
+> **注 (2026-05-18 監査)**: 本ドキュメントは 2026-04-24 生成。以下のモジュールが
+> `backend/app/` に追加されているが本ドキュメントは未追従。司令塔参照時は実コードを優先する。
+> 本格的な doc 再生成は別 follow-up タスクとする。
+> - `fees/` — Fee Model v10（F-1〜F-16）
+> - `referral/` — 紹介コード機能
+> - `reports/` — independent module（旧 `api/automation_reports` とは別）
+> - `protocols/` — Phase 2 PoC（BaseProtocolClient）
+> - `utils/` — masking 等の共通ユーティリティ
+>
+> （2026-05-18 監査の Pre-check 補足: 当初 `health/`（detail_router + probes.py）と
+> `shared/` も追従対象候補に挙がったが、`backend/app/` に**実在しないことを CLI 確認した
+> ため除外**。実装にない機能をドキュメントが案内する事故[2026-04-21 教訓]の再発防止。）
+
 ---
 
 ## 1. main.py ルーター登録順序
