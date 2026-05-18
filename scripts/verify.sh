@@ -23,7 +23,7 @@ fail() {
 
 step "[0/7] Chain Config Consistency"
 if [ -f "$PROJECT_ROOT/.env.production" ]; then
-  CHAIN_ID=$(grep "^NEXT_PUBLIC_DEFAULT_CHAIN_ID=" "$PROJECT_ROOT/.env.production" 2>/dev/null | cut -d= -f2)
+  CHAIN_ID=$(grep "^NEXT_PUBLIC_DEFAULT_CHAIN_ID=" "$PROJECT_ROOT/.env.production" 2>/dev/null | cut -d= -f2 || true)
   if [ "$CHAIN_ID" = "8453" ]; then
     if grep -rn "Sepolia" \
         "$PROJECT_ROOT/frontend/app/" \
