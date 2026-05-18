@@ -703,6 +703,53 @@ tmux / 複数ターミナルタブ運用を置換する。
 
 ---
 
+## 開発環境 v3 (2026-05-18〜)
+
+> 2026-05-18 に **開発専用 VPS** を追加し、3 層運用（dev / staging / production）へ移行。
+> dev は本番 Hetzner VPS とは**物理的に別ホスト**。staging と production は本番 Hetzner VPS
+> (77.42.46.155) 上に compose stack を分離して同居する（従来通り）。
+> 詳細手順は `docs/20_development_vps_setup.md` を参照。
+
+### 3 層運用 — ホスト / 作業ディレクトリ
+
+| 層 | ホスト | IP | OS user | 作業ディレクトリ | 用途 |
+|----|--------|----|---------|------------------|------|
+| **dev** | `uata-dev-01`（開発専用 VPS、新規） | `77.42.79.75` | `uata` | `/opt/ultra-autotrade/main`（main worktree）+ `/opt/ultra-autotrade-worktrees/<branch>` | Claude Code CLI による実装・並列レーン開発。実資金・実トレードなし |
+| **staging** | 本番 Hetzner VPS | `77.42.46.155` | `ultra` | `/opt/ultra-autotrade`（staging compose stack） | Shadow Mode 専用（Base Sepolia）、port 3001/8001/5433 |
+| **production** | 本番 Hetzner VPS | `77.42.46.155` | `ultra` | `/opt/ultra-autotrade`（production compose stack） | 実資金・実トレード（Base Mainnet）、port 3000/8000/5432 |
+
+- dev VPS への接続: ローカル Mac から `ssh uata-dev`（Mac `~/.ssh/config` に alias 定義済 →
+  `uata@77.42.79.75` / 鍵 `~/.ssh/hetzner_uata_dev`）。**dev VPS 側の `~/.ssh/config` には
+  VPS 向け alias は未定義**（`github-uata` のみ）。dev VPS 上では推測の別名を使わない。
+- 本番 VPS への接続: `ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155`（staging / production 共通ホスト）
+
+### 役割分担（開発体制 v2 を 3 層に展開）
+
+| 主体 | 稼働場所 | 責務 |
+|------|----------|------|
+| **claude.ai** | ブラウザ | PM / アーキテクト / Asana 管理 / Phase 計画 / 4 軸確認（コード実装はしない） |
+| **Claude Code CLI** | dev VPS (`uata@77.42.79.75`) | 実装・テスト・並列レーン（worktree 分離）・PR 作成 |
+| **Mac（ローカル）** | 開発者端末 | GitHub への push 起点 / ローカル merge / レビュー。本番 VPS は **pull only**（CLAUDE.md ABSOLUTE） |
+
+- 正規フロー: dev VPS で実装 → PR → ローカル Mac で merge → GitHub push → 本番 Hetzner で `git pull origin main` → `deploy_production.sh`
+- 本番 Hetzner 上で直接 `git merge` / `git commit` / エディタ編集をしない（「本番デプロイフロー」セクション準拠）
+
+### Phase 6 環境構築コンポーネント（dev VPS / 2026-05-18 時点）
+
+> **状態は構築中。** 別 Claude Code セッションが `/opt/ultra-autotrade/main` で Phase 6
+> 環境構築（swap / venv / npm install）を並行実行中。本ドキュメント監査時点（2026-05-18）の
+> 観測値は以下（仮説ではなく `free -h` / ディレクトリ実在確認による実測）:
+
+| コンポーネント | 監査時点の状態 | 確認方法 |
+|----------------|----------------|----------|
+| Python venv (`backend/.venv`) | ✅ 構築済み | `ls -d /opt/ultra-autotrade/main/backend/.venv` |
+| Frontend `node_modules` | ✅ 構築済み | `ls /opt/ultra-autotrade/main/frontend/node_modules` |
+| swap | ⏳ **未反映（`free -h` で Swap 0B）** | `swapon --show` / `free -h` |
+
+- swap は別セッション完了後に有効化される見込み。完了確認まで「Phase 6 完了」と断定しない。
+
+---
+
 ## Claude Code 最新機能活用ガイド（2026年4月 v2.1.89〜v2.1.92）
 
 ### 1. カスタムサブエージェント + @メンション呼び出し

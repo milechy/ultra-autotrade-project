@@ -4,6 +4,29 @@ Ultra AutoTrade – Production 環境設定ガイド（2026-04-17 B案リネー�
 本ドキュメントは、Ultra AutoTrade の **production（本番）環境** で使用する  
 `.env.production` の設定項目と運用ポリシーを整理したものです。
 
+---
+
+## 0. 開発VPSとの区別 (2026-05-18追加)
+
+2026-05-18 に開発専用 VPS を追加（3 層運用）。**本番 VPS と開発 VPS は物理的に別ホスト**。
+本ドキュメントが対象とするのは **本番 VPS（`77.42.46.155`）のみ**。IP / ホストの混同を防ぐ:
+
+| 項目 | 開発 VPS | 本番 / staging VPS（本ドキュメント対象） |
+|------|----------|------------------------------------------|
+| IP | `77.42.79.75` | `77.42.46.155` |
+| ホスト名 | `uata-dev-01` | Hetzner 本番 VPS |
+| OS user | `uata` | `ultra` |
+| ssh | `ssh uata@77.42.79.75` | `ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155` |
+| 資金 | なし（実トレードなし） | **実資金・実トレード（誤操作 = 資金リスク）** |
+| `.env` | （開発用、本番キー禁止） | `.env.production` / `.env.staging`（物理的に別キー） |
+| 用途 | Claude Code CLI 実装・並列レーン | production（実トレード）+ staging（Shadow Mode） |
+
+> ⚠️ `77.42.79.75`（開発）と `77.42.46.155`（本番）を取り違えると、開発操作を本番に
+> 適用する重大インシデントになる。curl / ssh / deploy を打つ前に必ず IP を目視確認すること。
+> 開発 VPS のセットアップは `docs/20_development_vps_setup.md` を参照。
+
+---
+
 ### Production環境の定義（2026-04-17以降）
 - **URL**: app.ultra-auto-trade.com / api.ultra-auto-trade.com
 - **compose**: `docker-compose.production.yml`（旧 `docker-compose.staging.yml` を正式化）

@@ -113,3 +113,32 @@ project root/
 │       └── ultra-autotrade-backend.service # systemd 用バックエンドサービス定義（テンプレート）
 │
 └── README.md                       # プロジェクト概要・セットアップ手順
+
+---
+
+## 開発VPS構成 (2026-05-18追加)
+
+2026-05-18 に開発専用 VPS（`uata-dev-01` / `77.42.79.75` / OS user `uata`）を追加。
+リポジトリは git worktree で複数ブランチを物理分離して並列開発する。
+
+```
+/opt/
+├── ultra-autotrade/
+│   └── main/                           # main worktree（branch: main）
+│       ├── backend/
+│       │   └── .venv/                  # Python venv（Phase 6 構築済み）
+│       ├── frontend/
+│       │   └── node_modules/           # npm install 済み（Phase 6 構築済み）
+│       └── ...                         # 上記「ディレクトリ構成」と同一ツリー
+│
+└── ultra-autotrade-worktrees/
+    ├── dev/                            # worktree（branch: dev — Opus 統合用）
+    └── docs-dev-vps/                   # worktree（branch: docs/dev-vps-environment-20260518）
+        └── ...                         # 各 worktree は独立ツリー（Tier B 並列レーン物理分離）
+```
+
+- `git worktree list` で全 worktree とブランチ・SHA を確認できる
+- 並列レーンは各 worktree で完結させ、他 worktree のファイルは編集しない（コンフリクト回避）
+- 本番 / staging は別ホスト（Hetzner VPS `77.42.46.155`）。混同防止は
+  `docs/21_production_environment_config.md` §0 を参照
+- セットアップ手順の詳細は `docs/20_development_vps_setup.md` を参照
