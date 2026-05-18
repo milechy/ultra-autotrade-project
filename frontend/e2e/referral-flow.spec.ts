@@ -326,8 +326,9 @@ test.describe('[RAS] referral registration', () => {
     // POST /auth/register-with-referral に referred_consent=true が送られていること
     await page.waitForTimeout(2_000)
     expect(capturedBody).not.toBeNull()
-    expect(capturedBody?.referred_consent).toBe(true)
-    expect(capturedBody?.referral_code).toBe('ABC123')
+    const body = capturedBody as unknown as Record<string, unknown>
+    expect(body['referred_consent']).toBe(true)
+    expect(body['referral_code']).toBe('ABC123')
 
     await saveScreenshot(page, 'tc6-register-with-referral-success')
   })

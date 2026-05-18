@@ -20,7 +20,7 @@ const STAGING_URL = 'https://staging.ultra-auto-trade.com'
 // Cloudflare Dashboard → Access → Service Auth → Service Tokens で発行
 const CF_CLIENT_ID = process.env.CF_ACCESS_CLIENT_ID ?? ''
 const CF_CLIENT_SECRET = process.env.CF_ACCESS_CLIENT_SECRET ?? ''
-const CF_HEADERS =
+const CF_HEADERS: Record<string, string> =
   CF_CLIENT_ID && CF_CLIENT_SECRET
     ? { 'CF-Access-Client-Id': CF_CLIENT_ID, 'CF-Access-Client-Secret': CF_CLIENT_SECRET }
     : {}
