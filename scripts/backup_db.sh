@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # backup_db.sh — PostgreSQL 日次バックアップ (production / staging-new 切替)
+# 自己検証機能: バックアップ後にファイルサイズ + gzip 整合性を検証。
+#               失敗時は Slack #ultra-auto-project に通知して exit 1。
+#               (RC-4 Asana GID 1214882070742107)
 #
 # Usage:
 #   ENVIRONMENT=production    bash scripts/backup_db.sh
@@ -48,8 +51,32 @@ esac
 DB_USER="${POSTGRES_USER:-ultra}"
 BACKUP_DIR="${BACKUP_DIR:-/opt/ultra-autotrade/db_backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-7}"
+MIN_SIZE_BYTES="${MIN_SIZE_BYTES:-10240}"   # 10 KB 未満は異常とみなす
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_FILE="${BACKUP_DIR}/${ENVIRONMENT}_ultra_autotrade_${TIMESTAMP}.sql.gz"
+
+# ── Slack 通知ヘルパー ─────────────────────────────
+_slack_send() {
+  local text="$1"
+  local webhook
+  webhook="$(grep '^SLACK_WEBHOOK_URL=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)"
+  if [ -n "${webhook}" ]; then
+    curl -sf -X POST "${webhook}" \
+      -H "Content-Type: application/json" \
+      -d "{\"text\": \"${text}\"}" || true
+  fi
+}
+
+# ── 失敗通知 + クリーンアップ ──────────────────────
+_notify_failure() {
+  local reason="$1"
+  echo "❌ [${ENVIRONMENT}] Backup FAILED: ${reason}" >&2
+  _slack_send "❌ [${ENVIRONMENT}] backup_db.sh FAILED: ${reason}"
+  rm -f "${BACKUP_FILE}" 2>/dev/null || true
+}
+
+# ERR トラップ: pg_dump 失敗等の予期しないエラーも Slack 通知する
+trap '_notify_failure "unexpected error at line ${LINENO} (exit $?)"' ERR
 
 # ── バックアップ実行 ──────────────────────────────
 mkdir -p "$BACKUP_DIR"
@@ -57,19 +84,29 @@ mkdir -p "$BACKUP_DIR"
 echo "[${TIMESTAMP}] [${ENVIRONMENT}] Starting PostgreSQL backup (container: ${CONTAINER_NAME}, db: ${DB_NAME})..."
 docker exec "$CONTAINER_NAME" pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_FILE"
 
+# ── 自己検証 1: ファイルサイズ ───────────────────
 FILESIZE="$(stat -f%z "$BACKUP_FILE" 2>/dev/null || stat -c%s "$BACKUP_FILE" 2>/dev/null || echo 0)"
-echo "✅ [${ENVIRONMENT}] Backup created: ${BACKUP_FILE} ($(( FILESIZE / 1024 )) KB)"
+if [ "${FILESIZE}" -lt "${MIN_SIZE_BYTES}" ]; then
+  _notify_failure "file too small: ${FILESIZE} bytes (minimum: ${MIN_SIZE_BYTES})"
+  exit 1
+fi
+
+# ── 自己検証 2: gzip 整合性 ──────────────────────
+if ! gzip -t "${BACKUP_FILE}" 2>/dev/null; then
+  _notify_failure "gzip integrity check failed (corrupted archive)"
+  exit 1
+fi
+
+# 検証完了後は ERR トラップを解除（クリーンアップ失敗で誤通知しない）
+trap - ERR
+
+echo "✅ [${ENVIRONMENT}] Backup verified: ${BACKUP_FILE} ($(( FILESIZE / 1024 )) KB, gzip OK)"
 
 # ── 古いバックアップ削除 (同じ ENVIRONMENT のものだけ) ──
 find "$BACKUP_DIR" -maxdepth 1 -name "${ENVIRONMENT}_ultra_autotrade_*.sql.gz" -mtime +"${RETENTION_DAYS}" -delete
 echo "🗑️ [${ENVIRONMENT}] Old backups cleaned (retention: ${RETENTION_DAYS} days)"
 
-# ── Slack通知（WEBHOOK設定時のみ）────────────────
-WEBHOOK="$(grep '^SLACK_WEBHOOK_URL=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)"
-if [ -n "${WEBHOOK}" ]; then
-  curl -sf -X POST "${WEBHOOK}" \
-    -H "Content-Type: application/json" \
-    -d "{\"text\": \"🗄️ [${ENVIRONMENT}] DB backup completed: $(basename "${BACKUP_FILE}") ($(( FILESIZE / 1024 )) KB)\"}" || true
-fi
+# ── Slack 成功通知（WEBHOOK設定時のみ）───────────
+_slack_send "🗄️ [${ENVIRONMENT}] DB backup completed: $(basename "${BACKUP_FILE}") ($(( FILESIZE / 1024 )) KB)"
 
 echo "[${TIMESTAMP}] [${ENVIRONMENT}] Backup finished."
