@@ -1274,6 +1274,80 @@ done; echo
 
 **参照:** `docs/postmortems/2026-05-12_nginx_upstream_ip_pin.md`
 
+### 2026-05-17追加 (P0: postgres 2,448回クラッシュ + バックアップ全滅 RCA)
+
+**事象概要:**
+- 2026-05-15 08:18 〜 2026-05-17 11:55 (約2日間) postgres-production が SIGKILL (exit 137) で
+  2,448回 restart loop。AI判定スケジューラが 5/16 08:25 以降 18.2h 停止
+- 同期間に backup_db.sh が空 gzip (20バイト) を量産。5/14 18:00 以降の有効バックアップなし
+- Slack Watchdog は 5/16 09:08 から 3分おきに警告を出し続けていたが、対応が打たれず
+- 原因は Loki Docker logging driver の半死状態 (TCP受付するが処理しない)
+- 全コンテナの logging.driver: loki が SPOF として機能した
+
+**Logging driver は SPOF になりうる:**
+- docker-compose で logging.driver を network 依存型 (loki/fluentd/syslog) に設定すると、
+  ログ収集系の故障が全コンテナを巻き込む
+- 本番DB等の stateful service は json-file driver を使い、
+  ログ集約は pull 型 (promtail tail /var/lib/docker/containers/) で行う
+- 教訓: 2026-05-15 08:18 Loki 半死 → postgres 2,448回 SIGKILL (10秒寿命) で 18.2h AI判定停止。
+  Loki が応答しないが TCP は受け付ける半死状態が最悪
+
+**HTTP 200 ≠ 健全:**
+- /health 200 OK だが scheduler_healthy: false / scheduler_last_error あり / warnings あり の
+  ケースを見落とした
+- response body 全フィールド (scheduler_healthy, last_judgment, warnings, scheduler_last_error)
+  を監視対象にする
+
+**ログ件数 0 は致命的シグナル:**
+- 2,448回 restart で1行もログが出ないのは normal ではない
+- RestartCount > 10 + ログ件数 0 → 別系統 (容器外、systemd/dmesg/journalctl) で alert
+
+**バックアップは「取れている」を証明する仕組み:**
+- backup スクリプトの exit code だけでは不十分
+- サイズチェック (>1KB) + 週次復元テスト + 失敗時 Slack 通知の三点セット
+- backup_db.sh の動的コンテナ名解決 (ハードコード禁止)。例:
+  `docker ps --filter "name=postgres-production" --filter "status=running" --format "{{.Names}}" | head -1`
+
+**警告疲労 (Alert fatigue) は対応者不在と同じ:**
+- 3分おきに警告が来ても誰も見ないなら、警告は単なるノイズ
+- エスカレーション (5回連続で別チャネル / 10回連続で電話) 必須
+- 1人プロジェクトは Twilio API 等で電話通知
+
+**「動いていることになっている」を疑う:**
+- Loki / backup / Watchdog / Slack / Docker healthcheck の5つが
+  「動いている建前」で実際は機能していなかった
+- 月1回 Chaos test (staging で Loki/postgres/backend を意図的に殺す)
+- 「Status 200」「Up XX hours」は健全の証明ではない
+
+**claude.ai は正本確認を忘れる前提で仕組み化:**
+- 鉄則8 (CLI cat 必須) を明文化しても、急ぐ場面で必ず飛ばす
+- 朝プロトコル §9 冒頭で /mnt/project/ docs を CLI cat して claude.ai セッションに
+  貼り付けてから初めて作業開始 (貼られていない場合 §9 進行禁止)
+- 2026-05-17 セッションで claude.ai が 3回連続で鉄則8違反、本指示文 v4 §9 に Step 0 強制化を追記
+
+**復旧時の正本docsスキーマ実態 (推測禁止、CLI \\d で確定):**
+- users: execution_policy (require_approval ではない), tier (tier_id ではない), wallet_address
+- proposals: operation (action ではない), status, expires_at, error_message
+- transactions: tx_hash, is_dry_run, status
+- portfolio_snapshots: recorded_at (snapshot_at ではない), total_value_usd, health_factor
+- ai_decisions: created_at, final_action, final_confidence
+
+**Docker compose ps の空応答 ≠ サービス未定義:**
+- `docker compose ps postgres` が空応答 → 「postgres compose 内未定義」と推測した claude.ai 違反
+- 実際は project 名不一致または status=running なしのいずれか
+- production_operation_checklist.md ゲート2 (`docker compose ls / docker ps / docker inspect`) を
+  必ず先に流して、推測ではなく実態確認する
+
+**Tier S 操作の sed -i 禁止 (compose YAML編集も含む):**
+- 31_backup_restore_procedures.md L139-146 の awk + 一時ファイル + mv パターン厳守
+- inode 保持 (bind-mount 対応) と memory 由来の運用ルール
+
+**参考ドキュメント:**
+- docs/postmortems/2026-05-17_loki_postgres_cascade.md (Lane B-4 で作成)
+- docs/postmortems/2026-05-17_backup_silent_failure.md (Lane S-2 で作成)
+- CLAUDE.md 並列開発フロー v4.1 鉄則8 (CLI cat 必須)
+- 本指示文 v4 §9 朝プロトコル Step 0 強制化 (Lane B-6 で追記)
+
 ---
 
 ## 朝プロトコル §9
