@@ -1,0 +1,34 @@
+# 環境ファイル — Docker build context に secrets を含めない
+# .env.staging は 2026-04-17 以降 .env.staging-new が正式
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Git / CI — build context 削減
+.git/
+.github/
+.gitignore
+
+# Python キャッシュ
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+backend/.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# フロントエンド成果物 (backend context: . では不要)
+frontend/node_modules/
+frontend/.next/
+frontend/playwright-report/
+frontend/test-results/
+
+# ログ / バックアップ
+*.log
+db_backups/
