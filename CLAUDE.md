@@ -889,6 +889,28 @@ deferred tools、MCPサーバー（Asana/Slack）、カスタムエージェン�
 - `slack_notify.py` (Notification / Stop) — Slack 完了通知
 - `slack_permission.py` (PreToolUse) — Slack パーミッションリクエスト
 - `post-lane-notify.sh` / `send-lane-completion.sh` — Agent Teams Lane 完了通知
+- `update-heartbeat.sh` (PostToolUse) — `/tmp/uata-heartbeat` を更新 (stuck-detector 監視用)
+
+### 並列 tool call は最大 2 本まで（24h 自走 / Agent Teams 必須ルール）
+
+**背景:** Claude Code GitHub issues #43866, #44068, #39830, #46767 で報告されている
+`[Tool result missing due to internal error]` バグは、**3本以上の並列 tool call** で
+発生頻度が高い。24h 自走中に stuck すると人間が「続けて」と指示するまで停止する。
+
+**ルール:**
+- 並列 tool call は **最大 2 本**まで。3 本以上は順次実行 or 2 本ずつのバッチに分ける
+- 独立性が高い調査でも 2 本 → 結果確認 → 2 本の順で実行
+- `uata-stuck-detector.sh` が `/tmp/uata-heartbeat` の更新を 5 分間隔で監視し、
+  30 分間更新なし → Slack `#ultra-auto-project` に `STUCK-DETECTED` 通知
+
+**24h 自走起動手順:**
+```bash
+# stuck detector を起動してから claude を起動する
+cd /opt/ultra-autotrade/main
+./scripts/uata-stuck-detector.sh start
+# → "stuck-detector 起動 (PID=XXXX, log=/tmp/uata-stuck-detector.log)"
+claude --resume   # または新規セッション起動
+```
 
 ---
 
