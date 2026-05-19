@@ -138,6 +138,8 @@ services:
       REBALANCE_SHADOW_MODE: "true"
       AI_SHADOW_MODE: "true"
       DEPLOY_SLOT: "blue"
+    mem_limit: ${BACKEND_MEM_LIMIT:-768m}
+    memswap_limit: ${BACKEND_MEM_LIMIT:-768m}
     ports:
       # 内部検証用 (deploy script が /health を直接ポーリング)。外部公開なし。
       - "127.0.0.1:8020:8000"
@@ -178,6 +180,8 @@ services:
       REBALANCE_SHADOW_MODE: "true"
       AI_SHADOW_MODE: "true"
       DEPLOY_SLOT: "green"
+    mem_limit: ${BACKEND_MEM_LIMIT:-768m}
+    memswap_limit: ${BACKEND_MEM_LIMIT:-768m}
     ports:
       - "127.0.0.1:8021:8000"
     volumes:
