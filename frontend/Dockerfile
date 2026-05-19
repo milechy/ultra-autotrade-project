@@ -50,6 +50,13 @@ ENV NEXT_PUBLIC_PRIVY_APP_ID=${NEXT_PUBLIC_PRIVY_APP_ID}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# NODE_OPTIONS: Next.js build の OOM 対策 (CLAUDE.md §2026-05-19 GID 1214828243363427)
+# docker-compose.staging.yml build.args で NODE_BUILD_MAX_OLD_SPACE_SIZE をオーバーライド可能。
+# 実際のピークメモリは staging で `docker stats` → `npm run build` 実行後に確認すること。
+# 推測での値変更は禁止 (実ビルドログでピーク確認後に設定)。
+ARG NODE_BUILD_MAX_OLD_SPACE_SIZE=4096
+ENV NODE_OPTIONS="--max-old-space-size=${NODE_BUILD_MAX_OLD_SPACE_SIZE}"
+
 # Ensure standalone output is enabled
 RUN if ! grep -q "output.*standalone" next.config.* 2>/dev/null; then \
   echo "/** @type {import('next').NextConfig} */" > next.config.mjs.bak && \
