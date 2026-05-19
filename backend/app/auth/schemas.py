@@ -41,7 +41,9 @@ class RegisterRequest(BaseModel):
         if not v.strip():
             raise ValueError("ユーザー名は空白のみにできません")
         if not (v[0].isalpha() or v[0].isdigit()):
-            raise ValueError("ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)")
+            raise ValueError(
+                "ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)"
+            )
         if not re.match(r"^[\w\s\-]+$", v):
             raise ValueError("ユーザー名には文字・数字・スペース・_・- のみ使用できます")
         return v.lower()
@@ -69,7 +71,9 @@ class RegisterWithReferralRequest(BaseModel):
         if not v.strip():
             raise ValueError("ユーザー名は空白のみにできません")
         if not (v[0].isalpha() or v[0].isdigit()):
-            raise ValueError("ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)")
+            raise ValueError(
+                "ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)"
+            )
         if not re.match(r"^[\w\s\-]+$", v):
             raise ValueError("ユーザー名には文字・数字・スペース・_・- のみ使用できます")
         return v.lower()
@@ -177,7 +181,9 @@ class UserCreateRequest(BaseModel):
         if not v.strip():
             raise ValueError("ユーザー名は空白のみにできません")
         if not (v[0].isalpha() or v[0].isdigit()):
-            raise ValueError("ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)")
+            raise ValueError(
+                "ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)"
+            )
         if not re.match(r"^[\w\s\-]+$", v):
             raise ValueError("ユーザー名には文字・数字・スペース・_・- のみ使用できます")
         return v.lower()
@@ -200,7 +206,9 @@ class UserUpdateRequest(BaseModel):
         if not v.strip():
             raise ValueError("ユーザー名は空白のみにできません")
         if not (v[0].isalpha() or v[0].isdigit()):
-            raise ValueError("ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)")
+            raise ValueError(
+                "ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)"
+            )
         if not re.match(r"^[\w\s\-]+$", v):
             raise ValueError("ユーザー名には文字・数字・スペース・_・- のみ使用できます")
         return v.lower()
