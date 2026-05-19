@@ -460,7 +460,7 @@ test.describe('TC-I: KPI 接続確認 (/api/partner/stats)', () => {
     expect(responseStatus).toBe(200)
 
     // PartnerStatsResponse スキーマ検証
-    const body = capturedResponse as Record<string, unknown>
+    const body = capturedResponse as unknown as Record<string, unknown>
     expect(body).toHaveProperty('total_aum')
     expect(body).toHaveProperty('yesterday_aum')
     expect(body).toHaveProperty('user_count')
