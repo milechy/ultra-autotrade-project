@@ -66,7 +66,9 @@ def test_run_check_uses_get_notification_service() -> None:
         patch("app.aave.service.AaveService", return_value=MagicMock()),
         patch("app.aave.state_manager.get_default_state_manager", return_value=MagicMock()),
         patch("app.automation.state.get_monitoring_service", return_value=MagicMock()),
-        patch("app.notifications.factory.get_notification_service", return_value=MagicMock()) as mock_get_notif,
+        patch(
+            "app.notifications.factory.get_notification_service", return_value=MagicMock()
+        ) as mock_get_notif,
     ):
         # Inline _run_check logic by importing and triggering via module internals
         # We verify that get_notification_service is importable from the factory module
