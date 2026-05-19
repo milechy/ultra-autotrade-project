@@ -346,6 +346,27 @@ if [[ "${COMPOSE_FILE}" != *production.yml* ]] && [[ -z "${FORCE_OVERRIDE:-}" ]]
   exit 1
 fi
 
+# Guard 4: DB schema gap check (exit 1 aborts deploy, exit 2 is warning only)
+if [[ "${FRONTEND_ONLY}" != "true" ]]; then
+  echo "[deploy] Checking DB schema gaps..."
+  set +e
+  bash "${SCRIPT_DIR}/check_db_migration_gap.sh"
+  _gap_exit=$?
+  set -e
+  if [[ "${_gap_exit}" -eq 1 ]]; then
+    echo "FAIL: DB schema gap detected -- run ALTER TABLE statements then redeploy"
+    echo "   To skip: SKIP_DB_GAP_CHECK=1 ./scripts/deploy_production.sh"
+    if [[ -z "${SKIP_DB_GAP_CHECK:-}" ]]; then
+      exit 1
+    fi
+    echo "WARN: SKIP_DB_GAP_CHECK=1 set -- continuing despite schema gap"
+  elif [[ "${_gap_exit}" -eq 2 ]]; then
+    echo "WARN: DB gap check skipped (DB unreachable or config error)"
+  else
+    echo "DB schema: no gaps detected"
+  fi
+fi
+
 echo "✅ All production deploy guards passed"
 # === End of guardrails ===
 

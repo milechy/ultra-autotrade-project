@@ -653,3 +653,65 @@ nginx 障害が発生すると、cloudflared は古いコード (blue) を返す
 - `upstream=` ログフィールド (`/var/log/nginx/access.log`) で active slot の追跡
 - `docker exec ultra-autotrade-nginx-production nginx -t` で設定整合性の事前確認
 - nginx reload 失敗時は deploy script が自動ロールバック (旧 slot に書き戻して再 reload)
+
+---
+
+## 4. DB schema gap detection (check_db_migration_gap.sh)
+
+### 4.1 Overview
+
+`scripts/check_db_migration_gap.sh` compares SQLAlchemy model definitions against the
+actual DB schema, detecting columns/tables present in models but missing from the DB.
+
+It is integrated as Guard 4 in `deploy_production.sh` and will abort the deploy if gaps
+are found.
+
+### 4.2 Usage
+
+```bash
+# Check against production DB (uses .env.production)
+./scripts/check_db_migration_gap.sh
+
+# Check against staging DB (uses .env.staging-new)
+./scripts/check_db_migration_gap.sh --env staging
+
+# Provide DATABASE_URL directly
+DATABASE_URL=postgresql://ultra:pass@localhost:5432/ultra_autotrade \
+  ./scripts/check_db_migration_gap.sh
+```
+
+### 4.3 Exit codes
+
+| code | Meaning | deploy_production.sh behavior |
+|------|---------|-------------------------------|
+| 0 | No gaps | Deploy continues |
+| 1 | Gaps found | Deploy aborted (set SKIP_DB_GAP_CHECK=1 to override) |
+| 2 | Config error / DB unreachable | Warning only, deploy continues |
+
+### 4.4 Resolving detected gaps
+
+Example output:
+```
+MISSING COLUMN: proposals.fee_amount
+   --> ALTER TABLE proposals ADD COLUMN IF NOT EXISTS fee_amount NUMERIC NOT NULL DEFAULT '0';
+```
+
+Resolution steps:
+```bash
+# Connect to postgres container on Hetzner
+docker exec -it ultra-autotrade-postgres-production \
+  psql -U ultra -d ultra_autotrade
+
+# Run the suggested ALTER TABLE statement
+ALTER TABLE proposals ADD COLUMN IF NOT EXISTS fee_amount NUMERIC NOT NULL DEFAULT '0';
+\q
+
+# Re-run check to confirm exit 0
+./scripts/check_db_migration_gap.sh
+```
+
+### 4.5 Emergency skip (not recommended)
+
+```bash
+SKIP_DB_GAP_CHECK=1 ./scripts/deploy_production.sh
+```
