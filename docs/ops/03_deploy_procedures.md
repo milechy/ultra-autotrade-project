@@ -99,6 +99,11 @@ git pull origin main
 > git diff main --name-only | grep "^frontend/lib/api/" # ありならフルデプロイ
 > ```
 
+> **`--frontend-only` のイメージ管理 (2026-05-13 RCA)**
+> ビルド先行方式（ビルド成功後にコンテナ入れ替え）を採用。
+> 旧順序（stop → rmi → build）だとビルド失敗時にイメージもコンテナも消えて起動不可になる。
+> ビルドが失敗した場合は ERR トラップが発火し、旧コンテナを維持したまま終了する。
+
 ---
 
 ## .env.production の必須チェック項目
