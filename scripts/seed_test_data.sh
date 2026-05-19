@@ -30,12 +30,23 @@ fi
 DB_NAME="$(echo "$DB_URL" | sed -E 's|.*/([^/?]+)(\?.*)?$|\1|')"
 
 # ────────────────────────────────────────────────
-# 2. 本番 DB ガード
+# 2. 本番 DB ガード (CLAUDE.md 2026-05-02 ルール準拠)
 # ────────────────────────────────────────────────
+# 2-a. DB 名チェック
 if [[ "$DB_NAME" != "ultra_autotrade_staging" ]]; then
-  echo "❌ ERROR: This script is for staging only."
+  echo "❌ ERROR: テストデータ投入は staging DB のみ許可。production への投入は禁止。"
   echo "   Expected DB: ultra_autotrade_staging"
   echo "   Got DB:      $DB_NAME"
+  exit 1
+fi
+
+# 2-b. コンテナ名チェック (POSTGRES_CONTAINER が設定されている場合)
+#      docker exec 経由で psql を実行する場合は POSTGRES_CONTAINER を設定すること。
+CONTAINER="${POSTGRES_CONTAINER:-}"
+if [[ -n "$CONTAINER" && "$CONTAINER" != *"staging"* ]]; then
+  echo "❌ ERROR: テストデータ投入は staging コンテナのみ許可。production への投入は禁止。"
+  echo "   Expected container: *staging*"
+  echo "   Got container:      $CONTAINER"
   exit 1
 fi
 
