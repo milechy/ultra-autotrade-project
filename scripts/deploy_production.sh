@@ -548,6 +548,18 @@ if ! "${FRONTEND_ONLY}"; then
   else
     log "scheduler_healthy=${SCHED_HEALTHY} ✓"
   fi
+
+  # scheduler_last_error チェック (KeyError 等の runtime エラーを検知)
+  # 2026-05-19 インシデント: v4 prompt deploy 後 KeyError が 14 分見逃された再発防止
+  SCHED_LAST_ERROR=$(echo "${HEALTH_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('scheduler_last_error') or '')" 2>/dev/null || echo "")
+  if [ -n "${SCHED_LAST_ERROR}" ]; then
+    log "⚠️  WARNING: scheduler_last_error 検出 — 最後の判定実行でエラーが発生しています"
+    log "   エラー内容: ${SCHED_LAST_ERROR}"
+    log "   → AI_PROMPT_VERSION 等の設定を確認してください"
+    log "   → 必要に応じて前バージョンにロールバックしてください"
+  else
+    log "scheduler_last_error=なし ✓"
+  fi
 fi
 
 # ───────────────────────────────────────────────

@@ -457,9 +457,31 @@ fi
 # Shadow Mode確認（デプロイ後）
 # ───────────────────────────────────────────────
 if ! "${FRONTEND_ONLY}"; then
-  log "Shadow Mode最終確認..."
+  log "Shadow Mode最終確認 + スケジューラー状態チェック..."
   HEALTH_JSON=$(curl -sf --max-time 5 "http://127.0.0.1:${NGINX_PORT}/health" 2>/dev/null || echo '{}')
   log "health: ${HEALTH_JSON}"
+
+  # scheduler_healthy チェック
+  SCHED_HEALTHY=$(echo "${HEALTH_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('scheduler_healthy','unknown'))" 2>/dev/null || echo "unknown")
+  if [ "${SCHED_HEALTHY}" = "False" ] || [ "${SCHED_HEALTHY}" = "false" ]; then
+    log "⚠️  WARNING: scheduler_healthy=false — スケジューラーが overdue 状態です"
+  elif [ "${SCHED_HEALTHY}" = "unknown" ]; then
+    log "⚠️  WARNING: /health からスケジューラー状態を取得できませんでした"
+  else
+    log "scheduler_healthy=${SCHED_HEALTHY} ✓"
+  fi
+
+  # scheduler_last_error チェック (KeyError 等の runtime エラーを検知)
+  # 2026-05-19 インシデント: v4 prompt deploy 後 KeyError が 14 分見逃された再発防止
+  SCHED_LAST_ERROR=$(echo "${HEALTH_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('scheduler_last_error') or '')" 2>/dev/null || echo "")
+  if [ -n "${SCHED_LAST_ERROR}" ]; then
+    log "⚠️  WARNING: scheduler_last_error 検出 — 最後の判定実行でエラーが発生しています"
+    log "   エラー内容: ${SCHED_LAST_ERROR}"
+    log "   → AI_PROMPT_VERSION 等の設定を確認してください"
+    log "   → 必要に応じて前バージョンにロールバックしてください"
+  else
+    log "scheduler_last_error=なし ✓"
+  fi
 fi
 
 # ───────────────────────────────────────────────
