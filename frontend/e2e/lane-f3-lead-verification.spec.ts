@@ -358,8 +358,8 @@ test.describe('TC-G: /api/invitations 廃止 + InviteModal partner 非表示', (
   }) => {
     await setupPartnerAuth(page)
 
-    // /users API をモックしてテーブルを表示させる
-    await page.route('**/users', async (route) => {
+    // `**/users` は /partner/users navigation も intercept するため API ドメイン固定 (TC-K-1 と同様)
+    await page.route('**/api.ultra-auto-trade.com/users', async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
@@ -488,8 +488,8 @@ test.describe('TC-J: /partner/users 一覧 + 詳細モーダル', () => {
   }) => {
     await setupPartnerAuth(page)
 
-    // /users をモック
-    await page.route('**/users', async (route) => {
+    // `**/users` は /partner/users navigation も intercept するため API ドメイン固定 (TC-K-1 と同様)
+    await page.route('**/api.ultra-auto-trade.com/users', async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
