@@ -94,12 +94,17 @@ check_cmd() {
   fi
 
   # R5: production への直接書込(production_operation_checklist.md 違反)
+  # 誤発火対策 (2026-05-19 GID 1214761976014146):
+  #   `2>&1 ./build.sh --env-file .env.production` のような ">" + 任意文字 + .env.production を
+  #   誤検知しないよう、各パターンを厳密化。
+  #   - redirect: `>[[:space:]]*\.env\.production` (> の直後が .env.production のみ BLOCK)
+  #   - tee: tee の直後引数が .env.production の場合のみ BLOCK
   if [[ "$cmd" =~ ssh.*ultra@77\.42\.46\.155 ]] \
      && [[ "$cmd" =~ \.env\.production ]] \
      && { [[ "$cmd" =~ sed[[:space:]]+-i ]] \
-          || [[ "$cmd" =~ (awk|tee).*\.env\.production ]] \
-          || [[ "$cmd" =~ \>[[:space:]]*.*\.env\.production ]] \
-          || [[ "$cmd" =~ cp.*\.env\.production ]]; }; then
+          || [[ "$cmd" =~ tee[[:space:]]+\.env\.production ]] \
+          || [[ "$cmd" =~ \>[[:space:]]+[^[:space:]]*\.env\.production ]] \
+          || [[ "$cmd" =~ cp[[:space:]].*[[:space:]]\.env\.production ]]; }; then
     if ! is_bypassed "R5"; then
       log_block "R5" \
         "ssh production への .env.production 直接書込 (production_operation_checklist.md ゲート 3 違反)" \
@@ -124,7 +129,13 @@ self_test() {
     "BLOCK|R4|docker compose -f docker-compose.production.yml up -d --force-recreate"
     "PASS||docker compose -f docker-compose.production.yml up -d --force-recreate --no-deps backend-blue"
     'BLOCK|R5|ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155 "sed -i s/old/new/ /opt/ultra-autotrade/.env.production"'
+    'BLOCK|R5|ssh -i ~/.ssh/hetzner ultra@77.42.46.155 "awk > /opt/ultra-autotrade/.env.production"'
+    'BLOCK|R5|ssh ultra@77.42.46.155 "tee .env.production"'
+    'BLOCK|R5|ssh ultra@77.42.46.155 "cp /tmp/new.env .env.production"'
     'PASS||ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155 "cat /opt/ultra-autotrade/.env.production | grep API_KEY"'
+    'PASS||ssh ultra@77.42.46.155 "bash deploy.sh 2>&1 --env-file .env.production"'
+    'PASS||ssh ultra@77.42.46.155 "docker compose --env-file .env.production build 2>&1 | tee /tmp/build.log"'
+    'PASS||ssh ultra@77.42.46.155 "cat .env.production"'
     "PASS||ls -la /opt/ultra-autotrade/"
     "BYPASS_R1|PASS|cat /opt/ultra-autotrade/.env.staging"
   )
