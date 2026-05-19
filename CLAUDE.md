@@ -2065,3 +2065,32 @@ docker inspect <container> --format '{{.HostConfig.LogConfig.Type}}'
   書かれていない進捗は失われる**。
 - 重要な setup 変更（settings.json / secrets / hooks）は **session 起動前に
   完了**させ、起動後に再起動を要する変更を残さない。
+
+---
+
+## 2026-05-19追加（Next.js bundle 反映確認の盲点 — Asana GID 1214828247132605）
+
+### 教訓: `static/chunks/` のみの grep は不十分
+
+**事象**: `grep -l 'LOWER' /app/.next/static/chunks/*.js` が 0 件 → 「frontend 未反映」と誤判定。
+実際は Next.js が SSR ページファイル (`/app/.next/server/`) にも出力するため、
+`static/chunks/` のみでは検出できないケースがある。
+
+**誤判定の影響**:
+- 「アップデートにダウンタイムあり」と誤った判断につながる危険性
+- 不要なフルビルド実行を誘発する
+
+### 正しい確認コマンド
+
+```bash
+# Next.js build 反映確認は /app/.next/ 全体を再帰検索する
+docker exec ultra-autotrade-frontend-production sh -c \
+  "grep -rn '<検索文字列>' /app/.next/ 2>/dev/null | head -10"
+
+# 存在確認のみなら -l で高速化
+docker exec ultra-autotrade-frontend-production sh -c \
+  "grep -rl '<検索文字列>' /app/.next/ 2>/dev/null | head -5"
+```
+
+**禁止**: `static/chunks/` のみ、`/app/.next/static/` のみの限定検索。
+`/app/.next/server/` を含む全体を必ず検索すること。
