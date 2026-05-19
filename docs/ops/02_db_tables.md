@@ -52,6 +52,9 @@ docker exec ultra-autotrade-postgres-production \
 | invited_by | Integer FK(users.id) | YES | 招待者ID |
 | tier | String(20) | NO | 投資ティア |
 | last_judgment_at | DateTime(tz) | YES | 最後のAI判定日時 |
+| referral_code | String(16) UNIQUE | YES | 紹介コード (8文字英数字) |
+| referrer_id | Integer FK(users.id) | YES | 紹介者 users.id |
+| referred_consent_at | DateTime(tz) | YES | 紹介プログラム同意日時 |
 
 **INDEX**: `email`, `username`
 
