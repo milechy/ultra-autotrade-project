@@ -171,6 +171,17 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/update-heartbeat.sh"
+          }
+        ]
+      }
     ]
   }
 }

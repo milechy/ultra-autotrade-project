@@ -16,7 +16,6 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-finance-feed-key")
 
 from app.data_feeds.finance_feed import FinanceFeedResult, fetch_finance_data  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Unit tests: FinanceFeedResult construction
 # ---------------------------------------------------------------------------
