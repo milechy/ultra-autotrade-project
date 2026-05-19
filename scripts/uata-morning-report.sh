@@ -89,12 +89,17 @@ fi
 # ─── 6. 山本さん UAT 状況 (R3: 正ロール=ultra。heredoc で $$ 安全化) ───
 
 YAMAMOTO_STATUS=$(ssh "${SSH_OPTS[@]}" ultra@77.42.46.155 bash -s <<'ENDSSH' 2>/dev/null
-docker exec ultra-autotrade-postgres-production \
-  psql -U ultra -d ultra_autotrade -t -A -F'|' -c \
-  "SELECT
-     (SELECT COUNT(*) FROM proposals    WHERE user_id=11 AND status='pending'),
-     (SELECT COUNT(*) FROM transactions WHERE user_id=11),
-     (SELECT MAX(created_at) FROM proposals WHERE user_id=11);"
+PG_CONTAINER=$(docker ps --filter 'name=postgres-production' --filter 'status=running' --format '{{.Names}}' | head -1)
+if [ -z "$PG_CONTAINER" ]; then
+  echo "(postgres-production コンテナが見つかりません)"
+else
+  docker exec "$PG_CONTAINER" \
+    psql -U ultra -d ultra_autotrade -t -A -F'|' -c \
+    "SELECT
+       (SELECT COUNT(*) FROM proposals    WHERE user_id=11 AND status='pending'),
+       (SELECT COUNT(*) FROM transactions WHERE user_id=11),
+       (SELECT MAX(created_at) FROM proposals WHERE user_id=11);"
+fi
 ENDSSH
 )
 [ -z "$YAMAMOTO_STATUS" ] && YAMAMOTO_STATUS="(取得失敗)"
