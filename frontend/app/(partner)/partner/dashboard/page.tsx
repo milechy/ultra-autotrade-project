@@ -142,7 +142,7 @@ export default function PartnerDashboardPage() {
   const { data: stats, loading: statsLoading } = useAuthFetch<PartnerStats>('/api/partner/stats', { refreshInterval: 300000 })
   const { data: usersRaw, loading: usersLoading } = useAuthFetch<UsersResponse | PartnerUser[]>('/users', { refreshInterval: 300000 })
   const { data: monthly, loading: monthlyLoading } = useAuthFetch<MonthlyData[]>('/api/partner/monthly', { refreshInterval: 300000 })
-  const { data: accuracy, loading: accuracyLoading } = useAuthFetch<AiAccuracy>('/ai/accuracy', { refreshInterval: 300000 })
+  const { data: accuracy, loading: accuracyLoading } = useAuthFetch<AiAccuracy>('/api/ai/accuracy', { refreshInterval: 300000 })
   const { data: feeSchedule, loading: feeLoading } = useAuthFetch<FeeSchedule>('/users/fee-schedule', { refreshInterval: 0 })
 
   const [allocations, setAllocations] = useState<Allocation[]>([])
