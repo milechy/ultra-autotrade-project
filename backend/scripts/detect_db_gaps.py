@@ -92,7 +92,7 @@ def main() -> int:
                     arg = getattr(col.default, "arg", None)
                     if arg is not None and not callable(arg):
                         default_clause = f" DEFAULT '{arg}'"
-                except Exception:
+                except Exception:  # noqa: S110
                     pass
             print(f"\nMISSING COLUMN: {table_name}.{col_name}")
             print(
