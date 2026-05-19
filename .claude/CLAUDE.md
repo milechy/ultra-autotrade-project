@@ -14,11 +14,14 @@ hostname && pwd && echo "branch: $(git branch --show-current 2>/dev/null || echo
 
 ### ホスト判定
 
-| hostname / IP | 環境 | 許可 | 禁止 |
-|---|---|---|---|
-| `uata-dev-01` / `77.42.79.75` | **dev VPS** | git commit / push / merge / Claude Code 実行 | 本番 DB 直接操作 |
-| `77.42.46.155` | **production VPS** | git pull / docker compose up / deploy_production.sh | git commit / git merge / nano 直接編集 |
-| Mac (`hostname` = 個人 Mac) | **ローカル** | 全開発作業 / Agent View 起動 | 本番 VPS 直接接続（3段プロトコル経由のみ） |
+| hostname / IP | 環境 | git repo root | 許可 | 禁止 |
+|---|---|---|---|---|
+| `uata-dev-01` / `77.42.79.75` | **dev VPS** | `/opt/ultra-autotrade/main/` | git commit / push / merge / Claude Code 実行 | 本番 DB 直接操作 |
+| `77.42.46.155` | **production VPS** | `/opt/ultra-autotrade/` ※`main/`なし | git pull / docker compose up / deploy_production.sh | git commit / git merge / nano 直接編集 |
+| Mac (`hostname` = 個人 Mac) | **ローカル** | — | 全開発作業 / Agent View 起動 | 本番 VPS 直接接続（3段プロトコル経由のみ） |
+
+> **パス構造差**: dev VPS は worktree 構造で `main/` サブディレクトリが存在する。本番 VPS は repo root が直接 `/opt/ultra-autotrade/`。
+> SSH 後は必ず `pwd && ls` で確認してから操作すること。`/opt/ultra-autotrade/main/` を本番 VPS で使うと `No such file or directory`。
 
 ### production VPS での禁止操作 (ABSOLUTE)
 

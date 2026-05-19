@@ -350,6 +350,11 @@ v4 はこれらの根本対策を CLAUDE.md §0 / §6 / §14 と接続して制�
 朝プロトコルで「正本確認」を行う際、claude.ai プロジェクトファイルは memory 同等扱い (古い可能性あり)。
 必ず CLI で以下を流して結果を貼り戻してから Phase 計画立案を開始する:
 
+> **鉄則8 チェック項目に追加 (2026-05-20)**:  
+> 本番 VPS 向け手順書・Lane プロンプトを書く前に **VPS パス構造を確認する**。  
+> dev VPS は `/opt/ultra-autotrade/main/` が repo root。本番 VPS は `/opt/ultra-autotrade/` が repo root（`main/` サブディレクトリなし）。  
+> SSH ログイン後に `pwd && ls` を実行してから手順を進める。推測で `/main/` を含む絶対パスを書かない。
+
 ```bash
 # 朝プロトコル正本確認テンプレート (read-only / 15分)
 cd ~/projects/ultra-autotrade
@@ -740,6 +745,17 @@ tmux / 複数ターミナルタブ運用を置換する。
 | **dev** | `uata-dev-01`（開発専用 VPS、新規） | `77.42.79.75` | `uata` | `/opt/ultra-autotrade/main`（main worktree）+ `/opt/ultra-autotrade-worktrees/<branch>` | Claude Code CLI による実装・並列レーン開発。実資金・実トレードなし |
 | **staging** | 本番 Hetzner VPS | `77.42.46.155` | `ultra` | `/opt/ultra-autotrade`（staging compose stack） | Shadow Mode 専用（Base Sepolia）、port 3001/8001/5433 |
 | **production** | 本番 Hetzner VPS | `77.42.46.155` | `ultra` | `/opt/ultra-autotrade`（production compose stack） | 実資金・実トレード（Base Mainnet）、port 3000/8000/5432 |
+
+> **[CRITICAL] パス構造差 — 推測禁止**
+>
+> | VPS | git repo root | `backend/` の絶対パス |
+> |---|---|---|
+> | **dev VPS** (`uata-dev-01`) | `/opt/ultra-autotrade/main/` | `/opt/ultra-autotrade/main/backend/` |
+> | **本番 VPS** (`77.42.46.155`) | `/opt/ultra-autotrade/` | `/opt/ultra-autotrade/backend/` |
+>
+> dev VPS の `/main/` サブディレクトリは git worktree 構造に由来する。本番 VPS には `main/` サブディレクトリは**存在しない**。
+> 手順書・Lane プロンプト・curl パスに `/opt/ultra-autotrade/main/` を書いた場合、本番 VPS で `No such file or directory` になる。
+> SSH ログイン直後に必ず `pwd && ls` で確認してから操作を開始すること。
 
 - dev VPS への接続: ローカル Mac から `ssh uata-dev`（Mac `~/.ssh/config` に alias 定義済 →
   `uata@77.42.79.75` / 鍵 `~/.ssh/hetzner_uata_dev`）。**dev VPS 側の `~/.ssh/config` には

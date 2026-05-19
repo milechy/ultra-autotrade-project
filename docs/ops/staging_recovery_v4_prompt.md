@@ -33,6 +33,9 @@ ssh hetzner
 
 ## Step 2: 最新コード取得 + 修正確認
 
+> **パス注意**: 本番 VPS では `/opt/ultra-autotrade/` が git repo root（`main/` サブディレクトリなし）。
+> dev VPS の `/opt/ultra-autotrade/main/` とは構造が異なる。
+
 ```bash
 cd /opt/ultra-autotrade
 
@@ -40,7 +43,7 @@ cd /opt/ultra-autotrade
 git pull origin main
 
 # 確認: service.py が version in ("v3", "v4") になっていること
-grep 'version in' main/backend/app/ai/service.py
+grep 'version in' backend/app/ai/service.py
 # → if version in ("v3", "v4"):  が表示されれば OK
 ```
 
@@ -49,7 +52,7 @@ grep 'version in' main/backend/app/ai/service.py
 ## Step 2.5: staging stack 現状確認
 
 ```bash
-cd /opt/ultra-autotrade/main
+cd /opt/ultra-autotrade
 
 # 起動中コンテナ一覧
 docker compose -f docker-compose.staging.yml ps
@@ -90,7 +93,7 @@ docker exec ultra-autotrade-backend-staging-new env | grep AI_PROMPT_VERSION
 ### Step 3: staging env を v3 に設定
 
 ```bash
-cd /opt/ultra-autotrade/main
+cd /opt/ultra-autotrade
 
 # 現在値確認
 grep 'AI_PROMPT_VERSION' .env.staging-new
@@ -110,7 +113,7 @@ grep 'AI_PROMPT_VERSION' .env.staging-new
 ### Step 4: backend 再ビルド & 起動
 
 ```bash
-cd /opt/ultra-autotrade/main
+cd /opt/ultra-autotrade
 
 docker compose -f docker-compose.staging.yml --env-file .env.staging-new \
   build --no-cache backend
@@ -166,7 +169,7 @@ staging URL (`https://staging.ultra-auto-trade.com`) でブラウザから確認
 ### Step 6: AI_PROMPT_VERSION を v4 に変更
 
 ```bash
-cd /opt/ultra-autotrade/main
+cd /opt/ultra-autotrade
 
 # v4 に変更
 awk '{gsub(/AI_PROMPT_VERSION=.*/, "AI_PROMPT_VERSION=v4"); print}' \
@@ -253,7 +256,7 @@ docker compose -f docker-compose.staging.yml ps postgres
 staging で `prompt_version = v4` + BUY/SELL 確認後:
 
 ```bash
-cd /opt/ultra-autotrade/main
+cd /opt/ultra-autotrade
 
 # 1. 本番 env に v4 を設定
 awk '{gsub(/AI_PROMPT_VERSION=.*/, "AI_PROMPT_VERSION=v4"); print}' \
