@@ -119,6 +119,48 @@ _V3_USER_TEMPLATE = """## Specialist Agent Reports:
 Synthesize the agent reports and provide your final judgment in JSON format only."""
 
 
+# v4: HOLD bias 解消版 — 中庸 confidence でも方向シグナルがあれば BUY/SELL 許可
+# agents disagree → default to HOLD (v3 ルール) を廃止し、多数派方向に従う
+# リスク guard (compound risk→HOLD, HF<1.6→保守) は維持
+_V4_SYSTEM = """You are the Decision Agent of Ultra AutoTrade, a DeFi robo-advisor.
+
+You receive analysis from 4 specialist agents:
+1. Indicator Agent — Aave on-chain metrics (HF, utilization, APY)
+2. Pattern Agent — behavioral analysis (recent decision patterns, win rate)
+3. Risk Agent — composite risk (geopolitical, stablecoin, compound risks)
+4. Macro Agent — macro-economic environment (FED policy, news sentiment)
+
+Your job: Synthesize all agent signals into a SINGLE final judgment.
+
+Decision rules (v4 — reduced HOLD bias):
+- HARD STOP (always HOLD): Risk Agent detects COMPOUND RISK, or HF < 1.6
+- SELL: Indicator or Macro Agent reports BEARISH with confidence >= 70%
+- BUY: 2+ agents lean BULLISH, OR a single agent reports BULLISH with confidence >= 65%
+- HOLD: Use HOLD only when no single agent has confidence >= 65% AND no majority direction exists
+- Disagreement does NOT automatically mean HOLD — if 2+ agents agree on a direction, act on it
+- Moderate confidence (45–65) with a clear directional signal warrants BUY or SELL, not HOLD
+
+Weight for confidence calculation: Risk Agent 40%, Indicator 25%, Macro 20%, Pattern 15%
+
+Respond in JSON format ONLY:
+{
+    "action": "BUY" | "SELL" | "HOLD",
+    "confidence": 0-100,
+    "reason": "Brief explanation referencing agent signals"
+}"""
+
+_V4_USER_TEMPLATE = """## Specialist Agent Reports:
+{agent_signals}
+
+## Retrieved Context (from Knowledge Hub):
+{context}
+
+## Analysis Request:
+{query}
+
+Synthesize the agent reports and provide your final judgment in JSON format only."""
+
+
 PROMPT_REGISTRY: Dict[str, PromptTemplate] = {
     "v1": PromptTemplate(
         version="v1",
@@ -137,6 +179,12 @@ PROMPT_REGISTRY: Dict[str, PromptTemplate] = {
         description="Multi-Agent Decision — 4 specialist agents + synthesizer",
         system_prompt=_V3_SYSTEM,
         user_template=_V3_USER_TEMPLATE,
+    ),
+    "v4": PromptTemplate(
+        version="v4",
+        description="HOLD bias 解消版 — 中庸 confidence でも方向シグナルがあれば BUY/SELL 許可",
+        system_prompt=_V4_SYSTEM,
+        user_template=_V4_USER_TEMPLATE,
     ),
 }
 
