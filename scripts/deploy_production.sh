@@ -372,18 +372,21 @@ if "${FRONTEND_ONLY}"; then
   # ─── フロントエンドのみ ───────────────────────
   log "フロントエンドのみデプロイ"
 
+  if ! "${NO_BUILD}"; then
+    log "frontend をビルド中（コンテナ停止前にビルド先行）..."
+    # ビルドを先行させる。旧順序（stop → rmi → build）だとビルド失敗時に
+    # コンテナもイメージも消えて起動不可になる。
+    # 2026-05-13 RCA: GID 1214762107679590
+    ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build --no-cache frontend
+  fi
+
+  log "旧 frontend コンテナを停止・削除..."
   ${DC} -f "${COMPOSE_FILE}" stop frontend
   docker rm -f "${FRONTEND_CONTAINER}" 2>/dev/null || true
 
   if ! "${NO_BUILD}"; then
-    log "古いフロントエンドイメージを完全削除..."
-    docker images --format "{{.Repository}} {{.ID}}" \
-      | grep -E "frontend|ultra-autotrade.*front" \
-      | awk '{print $2}' \
-      | xargs -r docker rmi -f 2>/dev/null || true
-
-    log "frontend をビルド中..."
-    ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build --no-cache frontend
+    log "dangling（タグなし）イメージを削除..."
+    docker image prune -f 2>/dev/null || true
 
     log "古いビルドキャッシュを削除（1時間以上前のエントリ）..."
     docker builder prune --filter until=1h -f 2>/dev/null || true
