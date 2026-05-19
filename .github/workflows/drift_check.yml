@@ -1,0 +1,64 @@
+name: Environment Drift Check
+
+on:
+  schedule:
+    # 毎日 02:00 JST (= 17:00 UTC 前日)
+    - cron: '0 17 * * *'
+  workflow_dispatch:
+    inputs:
+      slack_notify:
+        description: 'Slack 通知を送る (差異・警告時)'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  drift-check:
+    name: 環境間 drift 検知
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: drift check 実行
+        id: drift
+        run: |
+          bash scripts/env_drift_check.sh 2>&1 | tee /tmp/drift_output.txt
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+
+      - name: 結果をジョブサマリに出力
+        run: |
+          echo "## 環境間 drift チェック結果" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/drift_output.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Slack 通知 (drift または警告あり)
+        if: >
+          (steps.drift.outputs.exit_code != '0' ||
+           contains(steps.drift.outputs.drift_output, '⚠️')) &&
+          (github.event_name == 'schedule' ||
+           (github.event_name == 'workflow_dispatch' && inputs.slack_notify == 'true'))
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          DRIFT_OUTPUT=$(cat /tmp/drift_output.txt)
+          SUMMARY=$(echo "${DRIFT_OUTPUT}" | tail -20)
+          STATUS=$([ "${{ steps.drift.outputs.exit_code }}" = "0" ] && echo "⚠️ 警告あり" || echo "❌ DRIFT 検出")
+
+          curl -s -X POST "${SLACK_WEBHOOK_URL}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg status "${STATUS}" \
+              --arg summary "${SUMMARY}" \
+              --arg run_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+              '{
+                "text": ("*[env_drift_check] " + $status + "*\n```\n" + $summary + "\n```\n\n参照: docs/51_horizontal_propagation_checklist.md\n詳細: " + $run_url)
+              }'
+            )"
+
+      - name: drift 検出時はジョブ失敗にする
+        if: steps.drift.outputs.exit_code != '0'
+        run: exit 1
