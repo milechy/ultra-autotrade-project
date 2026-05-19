@@ -102,12 +102,13 @@ function AaveHistoryTab() {
       params.set('offset', String(newOffset))
       if (operationFilter) params.set('operation', operationFilter)
       const res = await apiFetch<AaveTransactionListResponse>(`/api/transactions?${params.toString()}`)
+      const safeItems = Array.isArray(res?.items) ? res.items : []
       if (newOffset === 0) {
-        setTransactions(res.items)
+        setTransactions(safeItems)
       } else {
-        setTransactions(prev => [...prev, ...res.items])
+        setTransactions(prev => [...prev, ...safeItems])
       }
-      setTotal(res.total)
+      setTotal(res?.total ?? 0)
       setOffset(newOffset)
     } catch {
       setError(t('fetchError'))
@@ -281,7 +282,7 @@ function HistoryTable({ records }: { records: TradeRecord[] }) {
           </tr>
         </thead>
         <tbody className="divide-y">
-          {records.map(r => (
+          {records.filter((r): r is TradeRecord => r != null).map(r => (
             <tr key={r.id} className="hover:bg-muted/30 transition-colors">
               <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
                 {r.created_at
@@ -350,8 +351,8 @@ function HistoryPage() {
         `/exchange/history?${params.toString()}`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
-      setRecords(data.items)
-      setTotal(data.total)
+      setRecords(Array.isArray(data?.items) ? data.items : [])
+      setTotal(data?.total ?? 0)
     } catch {
       // endpoint may not exist yet — show empty state
       setRecords([])
