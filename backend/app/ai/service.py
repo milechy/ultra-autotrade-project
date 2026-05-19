@@ -304,8 +304,8 @@ class AIService:
         if market_context is not None:
             agent_ctx = run_all_agents(market_context)
 
-        # Build user content — v3 injects agent_signals into the template itself
-        if version == "v3":
+        # Build user content — v3/v4 inject agent_signals into the template itself
+        if version in ("v3", "v4"):
             agent_signals_text = (
                 agent_ctx.to_decision_prompt()
                 if agent_ctx is not None
