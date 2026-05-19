@@ -135,6 +135,29 @@ Docker ビルド・CI が失敗する。`npm install` は `package.json` ベー�
 - `grep -E "ignoreBuildErrors|ignoreDuringBuilds" frontend/next.config.js` でOOMワークアラウンド確認
 - Playwright E2E: デフォルトは本番URL直打ち。ローカルテスト時は `STAGING_URL=http://localhost:3000` + `npm run dev` 必須。77.42.46.155直IPは127.0.0.1バインドにより接続拒否される（正常）
 
+### Next.js App Router route group と URL の対応 (E2E spec 必須確認)
+
+**route group `(xxx)` はディレクトリ名が URL に含まれない。** E2E で `page.goto()` する URL は
+実ファイルパスではなくブラウザからアクセスできる URL に合わせること。
+
+| ファイルパス | URL | よくある誤り |
+|---|---|---|
+| `app/(admin)/protocols/page.tsx` | `/protocols` | ❌ `/admin/protocols` |
+| `app/(user)/strategies/page.tsx` | `/strategies` | ❌ `/user/strategies` |
+| `app/(partner)/partner/dashboard/page.tsx` | `/partner/dashboard` | ✅ (subfolder `partner/` が入る) |
+| `app/user/approve/page.tsx` (通常フォルダ) | `/user/approve` | ✅ (route group でない) |
+
+**確認方法:** E2E spec に URL を書く前に、必ず `AppShell.tsx` / `BottomNav.tsx` 等のナビリンクで
+使われている `href` 値を grep して確認すること:
+
+```bash
+grep -r "href=" frontend/src/components/ | grep -E "protocols|strategies" | head -10
+```
+
+**背景:** 2026-05-19 PR #307 で `pendle-staging-poc.spec.ts` / `phase2-admin-protocols.spec.ts` /
+`phase2-iphone-mobile.spec.ts` の 3 ファイルに `/admin/protocols` / `/user/strategies` という
+誤 URL が混入。`< 500` チェックのため 404 でもテストが通過し、長期間気づかれなかった。
+
 ---
 
 ## Key API Endpoints
