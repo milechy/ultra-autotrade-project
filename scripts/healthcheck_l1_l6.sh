@@ -137,7 +137,9 @@ check_l1() {
   printf '{"status":"%s","details":"%s"}' "${status}" "${details}"
 }
 
-# L2: スケジューラ — scheduler_healthy + last_judgment 経過時間 < 60min
+# L2: スケジューラ — scheduler_healthy + last_judgment 経過時間 < 270min
+#     (AI 判定は約4時間=240min 間隔のため、60min 閾値だと正常運用でも常時 FAIL に
+#      なる。docs/launch_decision_criteria_v2.md 準拠で 270min = 240 + 30 buffer)
 check_l2() {
   local status="PASS"
   local scheduler_healthy="unknown"
@@ -174,7 +176,7 @@ check_l2() {
       "import datetime; t=datetime.datetime.fromisoformat('${last_judgment}'.replace('Z','+00:00')); \
        now=datetime.datetime.now(datetime.timezone.utc); \
        print(int((now-t).total_seconds()/60))" 2>/dev/null || echo "-1")
-    if [[ "${last_judgment_age_min}" -gt 60 && "${last_judgment_age_min}" != "-1" ]]; then
+    if [[ "${last_judgment_age_min}" -gt 270 && "${last_judgment_age_min}" != "-1" ]]; then
       status="FAIL"
     fi
   fi
