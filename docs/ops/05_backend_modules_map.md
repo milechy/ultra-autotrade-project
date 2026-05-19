@@ -197,12 +197,12 @@
 **主要スキーマ:** `ProtocolHealth`  
 **注意:** `CompoundRiskAssessor` / `AutoEvacuator` は安全装置系 (P0 孤立コード対象)。
 
-### ai/optimizer (ルーター未登録 — PoC schemas-only)
+### ai/optimizer (`/api/ai/optimizer` — main.py 登録待ち)
 **役割:** AI Optimizer — プロトコル間の配分最適化・戦略スコアリング・ENB (Expected Net Benefit) 計算  
 **主要クラス:** `PortfolioAllocator`, `StrategyScorer`, `NetBenefitCalculator`, `StrategyComparator`  
-**状態:** schemas + ロジック実装済みだが `app/main.py` に router 未登録 (PoC段階)  
+**状態:** `router.py` 実装済み (PR #282 / 2026-05-19)。`app/main.py` への登録は Phase B (Tier S) で実施予定  
 **主要スキーマ:** `OptimizerRequest`, `OptimizerResponse` (`schemas.py`)  
-**孤立状態:** P1 (router実装待ち) — `docs/ops/05_backend_modules_map.md` §5 参照
+**エンドポイント:** `POST /api/ai/optimizer/recommend` (main.py 登録後に有効化)
 
 ### fees (app/fees/)
 **役割:** Fee Model v10 純粋計算エンジン (router なし / `api/v1/fees` router から呼ばれる)  
