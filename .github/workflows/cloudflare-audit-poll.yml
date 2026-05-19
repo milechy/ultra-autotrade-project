@@ -1,0 +1,63 @@
+name: Cloudflare Audit Log Polling
+
+on:
+  schedule:
+    # 10 分間隔: GitHub Actions の最小粒度は 5 分
+    # 注意: cron は UTC。JST = UTC+9
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (Slack 通知なし)'
+        required: false
+        default: 'false'
+        type: boolean
+
+# 並列実行禁止 (10分タイムアウト内に前のジョブが終わらない場合はスキップ)
+concurrency:
+  group: cloudflare-audit-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    name: CF Audit Log polling
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 最終確認タイムスタンプを cache から復元
+        uses: actions/cache@v4
+        with:
+          path: /tmp/cloudflare_audit_last_seen.txt
+          key: cf-audit-last-seen-${{ github.run_number }}
+          restore-keys: |
+            cf-audit-last-seen-
+
+      - name: polling 実行
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          STATE_FILE: /tmp/cloudflare_audit_last_seen.txt
+        run: |
+          DRY_RUN_FLAG=""
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+
+          # CF_API_TOKEN が未設定の場合はスキップ（秘密情報が登録されていない PR ブランチ等）
+          if [[ -z "${CF_API_TOKEN}" ]]; then
+            echo "CF_API_TOKEN が未設定のためスキップ (Secrets 未登録環境)"
+            exit 0
+          fi
+
+          bash scripts/cloudflare_audit_log_polling.sh ${DRY_RUN_FLAG}
+
+      - name: タイムスタンプを cache に保存
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/cloudflare_audit_last_seen.txt
+          key: cf-audit-last-seen-${{ github.run_number }}
