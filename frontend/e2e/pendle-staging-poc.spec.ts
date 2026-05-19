@@ -7,8 +7,8 @@
 //       フロントエンド表示 + バックエンド API 疎通を E2E 確認する。
 //
 // シナリオ:
-//   A: /admin/protocols — Pendle プロトコルカード表示確認
-//   B: /user/strategies — Pendle PT 戦略カード表示確認
+//   A: /protocols — Pendle プロトコルカード表示確認
+//   B: /strategies — Pendle PT 戦略カード表示確認
 //   C: GET /api/protocols/pendle/markets — 200 + PendleMarketInfo 構造検証
 //   D: GET /api/protocols/health/pendle — is_operational + risk_level 検証
 //   E: POST /api/protocols/pendle/mint dry_run=true — MINT_PT レスポンス検証
@@ -84,22 +84,23 @@ test.describe('[Phase A-3] Pendle PoC staging E2E', () => {
     })(),
   })
 
-  // ── A: /admin/protocols — Pendle プロトコルカード ─────────────────────────
+  // ── A: /protocols — Pendle プロトコルカード ─────────────────────────────────
+  // 注: (admin) は Next.js route group のため URL には含まれない → /protocols
 
-  test.describe('A: /admin/protocols — Pendle プロトコルカード', () => {
+  test.describe('A: /protocols — Pendle プロトコルカード', () => {
     test('A-1: ページが 200 で読み込まれる', async ({ page }) => {
       await setupAdminAuth(page)
-      const resp = await page.goto(`${STAGING_URL}/admin/protocols`, {
+      const resp = await page.goto(`${STAGING_URL}/protocols`, {
         waitUntil: 'domcontentloaded',
         timeout: 15_000,
       })
-      // 認証リダイレクト (302→/login) または 200 を許容
-      expect([200, 302, null].includes(resp?.status() ?? null)).toBeTruthy()
+      // 認証リダイレクト (302/307→/login) または 200 を許容
+      expect([200, 301, 302, 307, 308, null].includes(resp?.status() ?? null)).toBeTruthy()
     })
 
     test('A-2: Pendle セクションが表示される (mock data)', async ({ page }) => {
       await setupAdminAuth(page)
-      await page.goto(`${STAGING_URL}/admin/protocols`, { waitUntil: 'domcontentloaded' })
+      await page.goto(`${STAGING_URL}/protocols`, { waitUntil: 'domcontentloaded' })
 
       // ページが正常レンダリングまたはログインページを表示していること
       const pendleCard = page.getByText('Pendle').first()
@@ -121,7 +122,7 @@ test.describe('[Phase A-3] Pendle PoC staging E2E', () => {
 
     test('A-3: Pendle プロトコルカードに PT / YT レートが含まれる (mock data)', async ({ page }) => {
       await setupAdminAuth(page)
-      await page.goto(`${STAGING_URL}/admin/protocols`, { waitUntil: 'domcontentloaded' })
+      await page.goto(`${STAGING_URL}/protocols`, { waitUntil: 'domcontentloaded' })
 
       // ログイン画面にリダイレクトされた場合はスキップ
       const isLoginPage = await page.getByRole('button', { name: 'ログイン' }).isVisible().catch(() => false)
@@ -137,21 +138,23 @@ test.describe('[Phase A-3] Pendle PoC staging E2E', () => {
     })
   })
 
-  // ── B: /user/strategies — Pendle 戦略カード ────────────────────────────────
+  // ── B: /strategies — Pendle 戦略カード ─────────────────────────────────────
+  // 注: (user) は Next.js route group のため URL には含まれない → /strategies
 
-  test.describe('B: /user/strategies — Pendle 戦略カード', () => {
+  test.describe('B: /strategies — Pendle 戦略カード', () => {
     test('B-1: ページが読み込まれる', async ({ page }) => {
       await setupPartnerAuth(page)
-      const resp = await page.goto(`${STAGING_URL}/user/strategies`, {
+      const resp = await page.goto(`${STAGING_URL}/strategies`, {
         waitUntil: 'domcontentloaded',
         timeout: 15_000,
       })
-      expect([200, 302, null].includes(resp?.status() ?? null)).toBeTruthy()
+      // 認証リダイレクト (302/307→/login) または 200 を許容
+      expect([200, 301, 302, 307, 308, null].includes(resp?.status() ?? null)).toBeTruthy()
     })
 
     test('B-2: Pendle PT 戦略カードが表示される', async ({ page }) => {
       await setupPartnerAuth(page)
-      await page.goto(`${STAGING_URL}/user/strategies`, { waitUntil: 'domcontentloaded' })
+      await page.goto(`${STAGING_URL}/strategies`, { waitUntil: 'domcontentloaded' })
 
       // 「Pendle」「PT」「固定利回り」等のいずれかが存在すること
       const bodyText = await page.locator('body').textContent().catch(() => '') ?? ''
@@ -163,7 +166,7 @@ test.describe('[Phase A-3] Pendle PoC staging E2E', () => {
 
     test('B-3: 戦略リストに APY 表示がある', async ({ page }) => {
       await setupPartnerAuth(page)
-      await page.goto(`${STAGING_URL}/user/strategies`, { waitUntil: 'domcontentloaded' })
+      await page.goto(`${STAGING_URL}/strategies`, { waitUntil: 'domcontentloaded' })
 
       const bodyText = await page.locator('body').textContent().catch(() => '') ?? ''
 
