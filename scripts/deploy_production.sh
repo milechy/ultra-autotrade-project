@@ -276,6 +276,14 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
+# .env ファイルのパーミッション検証 (600 必須 / 2026-05-19 セキュリティガード追加)
+_ENV_PERM=$(stat -c '%a' "${ENV_FILE}" 2>/dev/null || stat -f '%OLp' "${ENV_FILE}" 2>/dev/null || echo "unknown")
+if [[ "${_ENV_PERM}" != "600" ]]; then
+  err "${ENV_FILE} のパーミッションが ${_ENV_PERM} です。600 でなければデプロイを中止します。"
+  err "修正: chmod 600 ${ENV_FILE}"
+  exit 1
+fi
+
 if [[ ! -f "${UPSTREAM_CONF}" ]]; then
   err "${UPSTREAM_CONF} が見つかりません — Blue/Green 構成が壊れている可能性"
   err "復旧: docker/nginx/upstream.production.conf を 'set \$backend backend-blue:8000;' で作成してください"

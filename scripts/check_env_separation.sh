@@ -125,6 +125,22 @@ _add_violation_or_warn() {
 }
 
 # ---------------------------------------------------------------------------
+# .env ファイルのパーミッション検証 (600 必須)
+# ---------------------------------------------------------------------------
+_check_env_permission() {
+  local env_file="$1"
+  local label="$2"
+  if [[ ! -f "${env_file}" ]]; then return; fi
+  local perm
+  perm=$(stat -c '%a' "${env_file}" 2>/dev/null || stat -f '%OLp' "${env_file}" 2>/dev/null || echo "unknown")
+  if [[ "${perm}" != "600" ]]; then
+    echo "⚠️  ${label} のパーミッションが ${perm} です (推奨: 600)。'chmod 600 ${env_file}' で修正してください。"
+  fi
+}
+_check_env_permission "${PRODUCTION_FILE}" ".env.production"
+_check_env_permission "${STAGING_FILE}" ".env.staging"
+
+# ---------------------------------------------------------------------------
 # 違反収集
 # ---------------------------------------------------------------------------
 VIOLATIONS=()
