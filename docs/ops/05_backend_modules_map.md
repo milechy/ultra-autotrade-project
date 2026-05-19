@@ -1,20 +1,8 @@
 # Ultra AutoTrade — バックエンドモジュールマップ
 
-> 生成: 2026-04-24 / `backend/app/` 実コードから抽出（推測なし）
+> 生成: 2026-04-24 / 更新: 2026-05-19（Phase 2 以降追加分を反映）
+> `backend/app/` 実コードから抽出（推測なし）
 > FastAPI (Python 3.11)、SQLAlchemy、PostgreSQL 16
-
-> **注 (2026-05-18 監査)**: 本ドキュメントは 2026-04-24 生成。以下のモジュールが
-> `backend/app/` に追加されているが本ドキュメントは未追従。司令塔参照時は実コードを優先する。
-> 本格的な doc 再生成は別 follow-up タスクとする。
-> - `fees/` — Fee Model v10（F-1〜F-16）
-> - `referral/` — 紹介コード機能
-> - `reports/` — independent module（旧 `api/automation_reports` とは別）
-> - `protocols/` — Phase 2 PoC（BaseProtocolClient）
-> - `utils/` — masking 等の共通ユーティリティ
->
-> （2026-05-18 監査の Pre-check 補足: 当初 `health/`（detail_router + probes.py）と
-> `shared/` も追従対象候補に挙がったが、`backend/app/` に**実在しないことを CLI 確認した
-> ため除外**。実装にない機能をドキュメントが案内する事故[2026-04-21 教訓]の再発防止。）
 
 ---
 
@@ -25,26 +13,27 @@
 | # | モジュール | prefix | tags | 備考 |
 |---|-----------|--------|------|------|
 | 1 | auth | `/auth` | auth | Phase12 |
-| 2 | invitations | `/api/invitations` | — | Wave 2 |
-| 3 | partner | `/api/partner` | partner | Wave 2 |
-| 4 | allocation | `/api/partner` | partner-allocations | 資金割り振り |
-| 5 | users | `/users` | users | Phase12 |
-| 6 | ai | `/api/ai` | — | Phase2 |
-| 7 | octobot (bots) | — | — | Phase3 |
-| 8 | aave | `/api/aave` | — | Phase4 |
-| 9 | rebalance | `/api` | — | Aave Rebalance (Stream-T) |
-| 10 | knowledge | `/knowledge` | — | PoC Pivot Step 2 |
-| 11 | dca | `/dca` | — | DCA Bot |
-| 12 | exchange | `/exchange` | — | PoC Pivot Step 3 |
-| 13 | rss | `/rss` | — | RSS 自動取得 |
-| 14 | webhook | `/webhook` | — | Webhook 受信 |
-| 15 | hooks | `/api/hooks` | — | Slack 承認ゲート |
-| 16 | automation | — | — | ワークフロー |
-| 17 | transparency | — | — | Wave 2 |
-| 18 | fee | — | — | 手数料計算 CSV |
-| 19 | automation_dashboard | `/api/automation` | — | 自動化ダッシュボード |
-| 20 | data_feeds | `/api/data-feeds` | — | Phase 2 外部データ |
-| 21 | reports | `/api/reports` | — | 月次レポート |
+| ~~2~~ | ~~invitations~~ | ~~`/api/invitations`~~ | — | **コメントアウト済** (Phase 2 物理削除予定 → `/partner/referral` に置換) |
+| 2 | partner | `/api/partner` | partner | Wave 2 |
+| 3 | allocation | `/api/partner` | partner-allocations | 資金割り振り |
+| 4 | users | `/users` | users | Phase12 |
+| 5 | ai | `/api/ai` | — | Phase2 |
+| 6 | octobot (bots) | — | — | Phase3 |
+| 7 | aave | `/api/aave` | — | Phase4 |
+| 8 | rebalance | `/api` | — | Aave Rebalance (Stream-T) |
+| 9 | knowledge | `/knowledge` | — | PoC Pivot Step 2 |
+| 10 | dca | `/dca` | — | DCA Bot |
+| 11 | exchange | `/exchange` | — | PoC Pivot Step 3 |
+| 12 | rss | `/rss` | — | RSS 自動取得 |
+| 13 | webhook | `/webhook` | — | Webhook 受信 |
+| 14 | hooks | `/api/hooks` | — | Slack 承認ゲート |
+| 15 | automation | — | — | ワークフロー |
+| 16 | transparency | — | — | Wave 2 |
+| 17 | fee (aave) | — | — | 手数料計算 CSV (aave/fee_router) |
+| 18 | automation_dashboard | `/api/automation` | — | 自動化ダッシュボード |
+| 19 | data_feeds | `/api/data-feeds` | — | Phase 2 外部データ |
+| 20 | reports | `/api/reports` | — | 月次レポート |
+| 21 | fees_v10 | `/api/v1/fees` | fees-v10 | **Fee Model v10 API (F-1〜F-16)** |
 | 22 | billing | `/api/billing` | — | 請求 |
 | 23 | ai_decisions | — | — | AI判定 API |
 | 24 | ai_feedback | — | — | AI フィードバック (Layer 4) |
@@ -56,12 +45,15 @@
 | 30 | alias | — | — | `/api/safety-score` 等エイリアス |
 | 31 | notification | `/notifications` | — | PWA 通知 |
 | 32 | notification_api | `/api/notifications` | — | PWA 通知エイリアス |
-| 33 | lido | — | — | Lido Finance (Phase 2) |
-| 34 | pendle | — | — | Pendle Finance (Phase 2) |
-| 35 | protocol_health | — | — | プロトコルヘルスモニター (Phase 2) |
+| 33 | lido | `/api/protocols/lido` | lido | **Lido Finance (Phase 2)** |
+| 34 | pendle | `/api/protocols/pendle` | pendle | **Pendle Finance (Phase 2)** |
+| 35 | protocol_health | `/api/protocols/health` | protocol-health | **プロトコルヘルスモニター (Phase 2)** |
+| 36 | referral | `/partner/referral` | referral | **紹介コード / Partner Affiliate (RAS Lane 2)** |
+| 37 | health_detail | — | — | **`/health/detail` (admin, 2026-05-14)** |
 
 特殊エンドポイント (inline):
 - `GET /health` — スケジューラー・DB・接続状態を返す
+- `GET /health/detail` — 詳細ヘルスチェック (admin 認証必須、`health/detail_router.py`)
 
 ---
 
@@ -179,6 +171,78 @@
 
 ---
 
+## 2b. Phase 2 以降追加モジュール（2026-05-19 反映）
+
+### protocols/lido `/api/protocols/lido`
+**役割:** Lido Finance V2 — ETH ステーキング・stETH 取得・引き出し・APR 確認  
+**主要クラス:** `LidoClient` (DummyClient / Web3 切替)  
+**エンドポイント数:** 4 (GET×2, POST×2)  
+**エンドポイント:** `GET /status`, `GET /apr`, `POST /stake`, `POST /withdraw`  
+**主要スキーマ:** `LidoStatus`, `LidoStakeResponse`, `LidoWithdrawResponse`, `LidoAprResponse`  
+**注意:** PoC段階。DummyClient使用中のため staging で `500: DummyClient cannot be used in staging` になる場合あり。
+
+### protocols/pendle `/api/protocols/pendle`
+**役割:** Pendle Finance — YT/PT マーケット・mint・redeem・戦略比較  
+**主要クラス:** `PendleClient` (DummyClient / Web3 切替)  
+**エンドポイント数:** 5 (GET×3, POST×2)  
+**エンドポイント:** `GET /markets`, `GET /market/{address}`, `GET /strategies`, `POST /mint`, `POST /redeem`  
+**主要スキーマ:** `PendleMarketInfo`, `PendleMintResponse`, `PendleRedeemResponse`, `StrategyComparison`  
+**注意:** PoC段階。DummyClient使用中。
+
+### protocols/risk `/api/protocols/health`
+**役割:** プロトコルヘルスモニター — Aave / Lido / Pendle 全体の健全性確認  
+**主要クラス:** `ProtocolMonitor`, `PegMonitor`, `CompoundRiskAssessor`, `AutoEvacuator`  
+**エンドポイント数:** 4 (GET×4)  
+**エンドポイント:** `GET /api/protocols/health`, `GET /api/protocols/health/aave`, `GET /api/protocols/health/lido`, `GET /api/protocols/health/pendle`  
+**主要スキーマ:** `ProtocolHealth`  
+**注意:** `CompoundRiskAssessor` / `AutoEvacuator` は安全装置系 (P0 孤立コード対象)。
+
+### ai/optimizer (ルーター未登録 — PoC schemas-only)
+**役割:** AI Optimizer — プロトコル間の配分最適化・戦略スコアリング・ENB (Expected Net Benefit) 計算  
+**主要クラス:** `PortfolioAllocator`, `StrategyScorer`, `NetBenefitCalculator`, `StrategyComparator`  
+**状態:** schemas + ロジック実装済みだが `app/main.py` に router 未登録 (PoC段階)  
+**主要スキーマ:** `OptimizerRequest`, `OptimizerResponse` (`schemas.py`)  
+**孤立状態:** P1 (router実装待ち) — `docs/ops/05_backend_modules_map.md` §5 参照
+
+### fees (app/fees/)
+**役割:** Fee Model v10 純粋計算エンジン (router なし / `api/v1/fees` router から呼ばれる)  
+**主要クラス:** `FeeCalculator`, `TradeGate`  
+**注意:** DB / 外部 API 依存なし。純粋関数として実装。エンドポイントは `api/v1/fees` 経由。
+
+### api/v1/fees `/api/v1/fees`
+**役割:** Fee Model v10 REST API — 手数料設定取得・計算・請求プレビュー・管理  
+**エンドポイント数:** 8 (GET×6, POST×2)  
+**主要スキーマ:** `FeeConfigResponse`, `FeeCalculationRequest`, `FeeBillingPreview`  
+**依存:** `fees/calculator.py`, `auth.service`
+
+### referral `/partner/referral`
+**役割:** Partner Affiliate System (RAS Lane 2) — 紹介コード発行・使用・報酬追跡  
+**エンドポイント数:** 3 (GET×2, POST×1)  
+**主要スキーマ:** `ReferralCodeCreate`, `ReferralCodeResponse`, `ReferralUsageResponse`  
+**注:** 旧 `invitations` router を置換。invitations router は main.py でコメントアウト済み。
+
+### reports `/api/reports`
+**役割:** 月次レポート生成 (独立モジュール。旧 `api/automation_dashboard` とは別)  
+**エンドポイント数:** 1 (GET×1)  
+**エンドポイント:** `GET /api/reports/monthly`  
+**依存:** `billing.service`, `transactions.service`
+
+### health `/health/detail`
+**役割:** 詳細ヘルスチェック — DB 接続・スケジューラー状態・各サービス ping を詳細報告  
+**主要クラス:** `HealthDetailResponse` (schemas.py)  
+**エンドポイント数:** 1 (GET×1)  
+**エンドポイント:** `GET /health/detail` (admin 認証必須)  
+**依存:** `automation.monitoring_service`, `database`
+
+### utils (ライブラリ — ルーター非登録)
+**役割:** 共通ユーティリティ  
+**主要ファイル:**  
+- `masking.py` — トークン・秘密鍵のマスク (先頭6字+末尾4字)  
+- `cache.py` — インメモリキャッシュユーティリティ  
+**注意:** ルーター非登録。各モジュールから `from app.utils.masking import mask_secret` 等でインポートして使用。
+
+---
+
 ## 3. モジュール間依存関係
 
 ### workflow.py が呼ぶサービス
@@ -192,6 +256,26 @@ automation/workflow.py
 ├── knowledge.service.KnowledgeService
 ├── notion.service.NotionService  (レガシー)
 └── notifications.service  (遅延インポート: 承認時)
+```
+
+### AI Optimizer の依存 (Phase 2 / PoC)
+```
+ai/optimizer/
+├── allocator.py (PortfolioAllocator)
+│   └── protocols/risk/compound_risk.py (CompoundRiskAssessor) ← 動的リスクスコア取得
+├── comparator.py (StrategyComparator)
+├── net_benefit.py (NetBenefitCalculator)
+└── strategy_scorer.py (StrategyScorer)
+```
+
+### protocols/risk の安全装置依存
+```
+protocols/risk/
+├── auto_evacuate.py (AutoEvacuator) ← P0: aave/service に配線確認必要
+├── compound_risk.py (CompoundRiskAssessor) ← ai/optimizer が参照
+├── peg_monitor.py (PegMonitor) ← stETH/PT peg 監視
+├── maturity_manager.py (MaturityManager) ← Pendle YT 満期管理
+└── protocol_monitor.py (ProtocolMonitor) ← router から呼ばれる
 ```
 
 ### proposals/router.py の依存
@@ -234,6 +318,13 @@ users/router.py
 | hooks | 2 | 0 | 0 | 2 | 0 |
 | automation | 4 | 0 | 0 | 4 | 0 |
 | rss | 2 | 0 | 0 | 2 | 0 |
+| protocols/lido | 4 | 0 | 0 | 4 | 0 |
+| protocols/pendle | 5 | 0 | 0 | 5 | 0 |
+| protocols/health | 4 | 0 | 0 | 4 | 0 |
+| referral | 3 | 0 | 2 | 1 | 0 |
+| reports | 1 | 1 | 0 | 0 | 0 |
+| fees_v10 | 8 | 4 | 0 | 4 | 0 |
+| health/detail | 1 | 1 | 0 | 0 | 0 |
 
 ---
 
