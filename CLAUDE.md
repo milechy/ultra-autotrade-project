@@ -2088,3 +2088,35 @@ docker inspect <container> --format '{{.HostConfig.LogConfig.Type}}'
   書かれていない進捗は失われる**。
 - 重要な setup 変更（settings.json / secrets / hooks）は **session 起動前に
   完了**させ、起動後に再起動を要する変更を残さない。
+
+---
+
+## 2026-05-19追加（Next.js bundle 反映確認の盲点 — Asana GID 1214828247132605）
+
+**`static/chunks/` のみの grep では Next.js の SSR 出力を見逃す。**
+
+2026-05-15 Pane 4 調査で発見:
+- `grep -l 'LOWER' /app/.next/static/chunks/*.js` が 0 件 → 「frontend 未反映」と誤判定
+- 実際は Next.js が SSR ページファイル (`/app/.next/server/`) にも出力していた
+
+**正しい確認コマンド（`/app/.next/` 全体を再帰検索）**:
+```bash
+docker exec ultra-autotrade-frontend-production sh -c \
+  "grep -rn '<検索文字列>' /app/.next/ 2>/dev/null | head -10"
+```
+
+**禁止**: `static/chunks/` のみ、`/app/.next/static/` のみの限定検索。
+**理由**: この誤判定を信じていたら、山本さんへ「ダウンタイムアリ」の誤 DM を送り、F-16 を不要にフルビルドで実行していた。
+
+---
+
+## 2026-05-19追加（AI v4 prompt KeyError: 'agent_signals' — 本番 14 分停止 RCA）
+
+**service.py の `_build_prompt_content()` で v3 のみ `agent_signals` を渡す条件分岐が v4 を考慮していなかった。**
+
+発生: 2026-05-19 16:28-16:42 JST に本番で `AI_PROMPT_VERSION=v4` を試用。
+`_V4_USER_TEMPLATE` は `{agent_signals}` を含むが `else` ブランチ（v1/v2 向け）で処理されるため KeyError 発生。
+14 分のスケジューラー停止 → v3 ロールバック。PR #302 で修正済み（`version in ("v3", "v4")`）。
+
+**新しい prompt version を追加する際は `_build_prompt_content()` の条件分岐を必ず確認する。**
+`{agent_signals}` を template に含む version は `if version in (...)` に必ず追加すること。
