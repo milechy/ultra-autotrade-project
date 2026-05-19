@@ -75,6 +75,13 @@
 
 ## backend/requirements.txt
 
+### 変更 #3: alembic>=1.13.0 追加（alembic CLI + alembic_version stamp 同期）(PR #181 / 2026-05-02)
+- **コミット範囲**: `chore/alembic-version-sync`
+- **変更内容**: `alembic>=1.13.0` を Authentication & Database セクションに追加
+- **理由**: Alembic CLI インストールと `alembic_version` stamp の同期。マイグレーション管理の整備。
+- **影響範囲**: alembic パッケージの追加のみ。既存アプリケーションロジックへの影響なし。
+- **承認**: chore/alembic-version-sync → main の通常フロー経由（PR #181）
+
 ### 変更 #2: PyJWT[crypto] extra 追加（Privy ID Token 検証対応）(PR #155 / 2026-04-27)
 - **コミット範囲**: `c88dfd2` – `41f77d7` (feature/privy-did-storage)
 - **変更内容**: `PyJWT>=2.9.0` → `PyJWT[crypto]>=2.9.0`
