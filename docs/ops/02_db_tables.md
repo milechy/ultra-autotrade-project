@@ -348,19 +348,25 @@ docker exec ultra-autotrade-postgres-production \
 
 ### `fee_transactions` (billing/v10_models.py)
 
+> Fee Model v10 (F-1〜F-16) の月次手数料計算結果。1ユーザー×1ヶ月で1レコード。
+
 | カラム | 型 | NULL | 説明 |
 |--------|-----|------|------|
-| id | Integer PK | NO | 自動採番 |
+| id | BigInteger PK | NO | 自動採番 |
 | user_id | Integer FK(users.id) | NO | ユーザーID |
-| fee_type | VARCHAR(50) | NO | 手数料種別 (performance / management 等) |
-| amount_usd | Numeric(20,6) | NO | 手数料金額 (USD) |
-| basis_amount_usd | Numeric(20,6) | YES | 計算基礎額 |
-| rate | Numeric(10,6) | YES | 手数料率 |
-| status | VARCHAR(20) | NO | `pending` / `settled` / `cancelled` |
-| period_start | DateTime(tz) | YES | 計算対象期間開始 |
-| period_end | DateTime(tz) | YES | 計算対象期間終了 |
-| settled_at | DateTime(tz) | YES | 確定日時 |
-| notes | Text | YES | メモ |
+| calculation_month | Date | NO | 計算月 (月初日) |
+| tier | VARCHAR(16) | NO | `LOWER` / `MIDDLE` / `UPPER` |
+| risk_mode | VARCHAR(16) | NO | `conservative` / `balanced` / `aggressive` |
+| deposit_amount_jpy | Numeric(18,2) | NO | 運用元本 (JPY) |
+| gross_profit_jpy | Numeric(18,2) | NO | 総利益 (JPY) |
+| expense_jpy | Numeric(18,2) | NO | 費用 (JPY) |
+| net_profit_jpy | Numeric(18,2) | NO | 純利益 (JPY) |
+| fee_rate_applied | Numeric(6,4) | NO | 適用手数料率 |
+| fee_amount_jpy | Numeric(18,2) | NO | 手数料金額 (JPY) |
+| subscription_rate_applied | Numeric(6,4) | NO | 月額サブスク率 |
+| subscription_amount_jpy | Numeric(18,2) | NO | 月額サブスク金額 (JPY) |
+| user_takehome_jpy | Numeric(18,2) | NO | ユーザー手取り (JPY) |
+| finalized_at | DateTime(tz) | YES | 確定日時 (NULL=再計算可能) |
 | created_at | DateTime(tz) | NO | 作成日時 |
 | updated_at | DateTime(tz) | NO | 更新日時 |
 
