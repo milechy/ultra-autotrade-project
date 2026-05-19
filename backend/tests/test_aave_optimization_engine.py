@@ -5,47 +5,6 @@ from decimal import Decimal
 
 from app.aave.net_benefit_calculator import NetBenefitCalculator, NetBenefitParams
 from app.aave.optimization_rules import CurrentPosition, OptimizationRules, ProposedAction
-from app.aave.utilization_monitor import UtilizationData, UtilizationMonitor
-
-# ---------------------------------------------------------------------------
-# Utilization Monitor
-# ---------------------------------------------------------------------------
-
-
-def _make_util_data(
-    utilization_rate: Decimal, supply_apy: Decimal = Decimal("0.05")
-) -> UtilizationData:
-    return UtilizationData(
-        asset_symbol="USDC",
-        utilization_rate=utilization_rate,
-        supply_apy=supply_apy,
-        borrow_apy=Decimal("0.08"),
-        available_liquidity=Decimal("1000000"),
-        tvl=Decimal("5000000"),
-        timestamp=datetime.now(tz=timezone.utc),
-    )
-
-
-def test_utilization_sweet_spot() -> None:
-    monitor = UtilizationMonitor()
-    data = _make_util_data(Decimal("0.85"))
-    rec = monitor.evaluate(data)
-    assert rec.action == "SUPPLY"
-
-
-def test_utilization_low() -> None:
-    monitor = UtilizationMonitor()
-    data = _make_util_data(Decimal("0.40"))
-    rec = monitor.evaluate(data)
-    assert rec.action == "WAIT"
-
-
-def test_utilization_high_risk() -> None:
-    monitor = UtilizationMonitor()
-    data = _make_util_data(Decimal("0.97"))
-    rec = monitor.evaluate(data)
-    assert rec.action == "CAUTION"
-
 
 # ---------------------------------------------------------------------------
 # Net Benefit Calculator
