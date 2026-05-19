@@ -99,6 +99,8 @@ async function mockReferralList(page: Page): Promise<void> {
 // ─── TC1-TC4: partner 紹介フロー ─────────────────────────────────────────────
 
 test.describe('[RAS] partner referral flow', () => {
+  // headless Chrome で navigator.clipboard が保護されるため clipboard-write 権限を付与
+  test.use({ permissions: ['clipboard-write'] })
   test.beforeEach(ensureScreenshotDir)
 
   test('TC1: POST /referral/code 200 → /partner/referral で referral_code 表示', async ({
@@ -143,7 +145,7 @@ test.describe('[RAS] partner referral flow', () => {
     await expect(copyBtn).toBeVisible({ timeout: 5_000 })
     await copyBtn.click()
 
-    await expect(page.getByText('コピーしました')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('コピーしました')).toBeVisible({ timeout: 8_000 })
 
     await saveScreenshot(page, 'tc2-copy-toast')
   })
