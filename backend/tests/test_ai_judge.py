@@ -506,6 +506,45 @@ class TestPromptVersioning:
         assert "Disagreement" in tmpl.system_prompt
         assert "does NOT automatically mean HOLD" in tmpl.system_prompt
 
+    def test_build_prompt_content_v4_receives_agent_signals(self):
+        """v4 prompt の _build_prompt_content が agent_signals を受け取る回帰テスト。
+        2026-05-19: service.py の条件分岐が v3 専用だったため KeyError が発生した。
+        """
+        from unittest.mock import patch
+
+        from app.ai.schemas import RAGContext
+        from app.ai.service import AIService
+
+        service = AIService()
+        rag_context = RAGContext(chunks=["test chunk"], query="btc")
+
+        with patch("app.ai.service.run_all_agents", return_value=None):
+            # KeyError が出なければ修正が有効
+            system_prompt, user_content = service._build_rag_prompt(
+                query="BTC analysis",
+                rag_context=rag_context,
+                version="v4",
+            )
+        assert "{agent_signals}" not in user_content  # 未解決の変数が残っていないこと
+
+    def test_build_prompt_content_v3_receives_agent_signals(self):
+        """v3 prompt の _build_prompt_content が agent_signals を受け取ることの確認テスト。"""
+        from unittest.mock import patch
+
+        from app.ai.schemas import RAGContext
+        from app.ai.service import AIService
+
+        service = AIService()
+        rag_context = RAGContext(chunks=["test chunk"], query="btc")
+
+        with patch("app.ai.service.run_all_agents", return_value=None):
+            system_prompt, user_content = service._build_rag_prompt(
+                query="BTC analysis",
+                rag_context=rag_context,
+                version="v3",
+            )
+        assert "{agent_signals}" not in user_content
+
     def test_list_versions(self):
         from app.ai.prompts import list_versions
 
