@@ -1931,3 +1931,37 @@ CLAUDE.md の「Phase 4: staging 実機検証」フローに「PoC 段階でエ�
    | P0 | 安全装置・緊急停止・避難系 (AutoEvacuator, CompoundRiskAssessor 等) | 当日中 |
    | P1 | API スキーマ・router 待ち定義 (OptimizerRequest 等) | 次スプリント |
    | P2 | ユーティリティ・将来機能 | バックログ |
+
+---
+
+## 2026-05-17追加（docker compose restart ≠ recreate — Lane S-1 実機証明）
+
+**docker compose restart ≠ recreate (2026-05-17 実機証明):**
+- `docker compose restart <service>` は既存コンテナの停止+起動のみ。compose.yml の HostConfig（logging driver・network・port・env_file 等）変更は**適用されない**
+- `docker compose up -d --force-recreate --no-deps <service>` を使うとコンテナが新規作成され HostConfig も付け替わる
+- compose.yml 変更後は必ず `up -d --force-recreate --no-deps` を使う。`restart` だけで「適用したつもり」のミスは production_operation_checklist.md ゲート2 に明記済み
+- 検証方法: `docker inspect <container> --format '{{.Created}}'` でコンテナ作成時刻を確認、compose.yml 変更時刻より新しいことを確認
+
+**経緯**: Lane S-1 (2026-05-17) で logging driver を loki → json-file に変更した compose.yml を `docker compose restart` したところ、古い loki driver のままだった。`up -d --force-recreate --no-deps` で初めて適用された。関連 PR: #243 (Lane B-5 教訓-2026-05-17)
+
+### docker compose 変更後 推奨コマンドテンプレ
+
+| 変更内容 | 推奨コマンド | NG（compose変更が未適用になる）|
+|---|---|---|
+| logging driver 変更 | `docker compose up -d --force-recreate --no-deps <svc>` | `docker compose restart <svc>` |
+| network 変更 | `docker compose up -d --force-recreate --no-deps <svc>` | `docker compose restart <svc>` |
+| port 変更 | `docker compose up -d --force-recreate --no-deps <svc>` | `docker compose restart <svc>` |
+| env_file 変更 | `docker compose up -d --force-recreate --no-deps <svc>` | `docker compose restart <svc>` |
+| image 変更 | `docker compose pull <svc> && docker compose up -d --no-deps <svc>` | `docker compose restart <svc>` |
+| コード変更のみ（HostConfig変更なし）| `docker compose restart <svc>` 可 | N/A |
+
+```bash
+# compose.yml 変更後の標準手順
+docker compose up -d --force-recreate --no-deps <service>
+
+# 適用確認: コンテナ作成時刻が compose.yml の変更時刻より新しいことを確認
+docker inspect <container> --format '{{.Created}}'
+
+# logging driver 適用確認
+docker inspect <container> --format '{{.HostConfig.LogConfig.Type}}'
+```
