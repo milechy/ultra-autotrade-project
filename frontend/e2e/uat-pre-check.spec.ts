@@ -181,7 +181,7 @@ test.describe.serial('[UAT Pre-check] F-17 + RAS Phase 1 / staging 実環境 8 �
       // メール / パスワード / username 入力
       const emailInput = page.getByLabel(/メールアドレス|email/i).first()
       const passwordInput = page.getByLabel(/パスワード|password/i).first()
-      const usernameInput = page.getByLabel(/ユーザー名|username/i).first()
+      const usernameInput = page.getByLabel(/表示名|ユーザー名|username/i).first()
       await emailInput.fill(TEST_NEW_USER_EMAIL)
       await passwordInput.fill('UATPreCheck!2026')
       await usernameInput.fill(`uat-pc-${TS}`)

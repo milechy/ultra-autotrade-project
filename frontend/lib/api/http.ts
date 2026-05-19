@@ -34,7 +34,7 @@ export async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     const msg =
       typeof body === "object" && body && "detail" in (body as any)
-        ? String((body as any).detail)
+        ? extractDetail((body as any).detail)
         : `HTTP ${res.status}`;
     throw { status: res.status, message: msg, detail: body } as HttpError;
   }
@@ -66,7 +66,7 @@ export async function postJson<T>(
   if (!res.ok) {
     const msg =
       typeof body === "object" && body && "detail" in (body as any)
-        ? String((body as any).detail)
+        ? extractDetail((body as any).detail)
         : `HTTP ${res.status}`;
     throw { status: res.status, message: msg, detail: body } as HttpError;
   }
@@ -98,7 +98,7 @@ export async function putJson<T>(
   if (!res.ok) {
     const msg =
       typeof body === "object" && body && "detail" in (body as any)
-        ? String((body as any).detail)
+        ? extractDetail((body as any).detail)
         : `HTTP ${res.status}`;
     throw { status: res.status, message: msg, detail: body } as HttpError;
   }
@@ -121,7 +121,7 @@ export async function deleteJson<T>(path: string, init?: RequestInit): Promise<T
   if (!res.ok) {
     const msg =
       typeof body === "object" && body && "detail" in (body as any)
-        ? String((body as any).detail)
+        ? extractDetail((body as any).detail)
         : `HTTP ${res.status}`;
     throw { status: res.status, message: msg, detail: body } as HttpError;
   }
@@ -134,4 +134,17 @@ function safeJsonParse(text: string): unknown {
   } catch {
     return text;
   }
+}
+
+// FastAPI 422 の detail は配列 [{loc, msg, type}] になる。
+// String(array) は "[object Object]" になるので msg を抽出して結合する。
+function extractDetail(detail: unknown): string {
+  if (Array.isArray(detail)) {
+    return detail
+      .map((e: unknown) =>
+        e && typeof e === "object" && "msg" in e ? String((e as { msg: unknown }).msg) : String(e)
+      )
+      .join(", ");
+  }
+  return String(detail);
 }

@@ -5,6 +5,7 @@
 認証関連の Pydantic スキーマ。
 """
 
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Optional
@@ -37,10 +38,14 @@ class RegisterRequest(BaseModel):
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str) -> str:
-        if not v.replace("_", "").replace("-", "").isalnum():
-            raise ValueError("Username must be alphanumeric (with _ or - allowed)")
-        if not v[0].isalnum():
-            raise ValueError("Username must start with a letter or number")
+        if not v.strip():
+            raise ValueError("ユーザー名は空白のみにできません")
+        if not (v[0].isalpha() or v[0].isdigit()):
+            raise ValueError(
+                "ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)"
+            )
+        if not re.match(r"^[\w\s\-]+$", v):
+            raise ValueError("ユーザー名には文字・数字・スペース・_・- のみ使用できます")
         return v.lower()
 
     @field_validator("password")
@@ -63,10 +68,14 @@ class RegisterWithReferralRequest(BaseModel):
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str) -> str:
-        if not v.replace("_", "").replace("-", "").isalnum():
-            raise ValueError("Username must be alphanumeric (with _ or - allowed)")
-        if not v[0].isalnum():
-            raise ValueError("Username must start with a letter or number")
+        if not v.strip():
+            raise ValueError("ユーザー名は空白のみにできません")
+        if not (v[0].isalpha() or v[0].isdigit()):
+            raise ValueError(
+                "ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)"
+            )
+        if not re.match(r"^[\w\s\-]+$", v):
+            raise ValueError("ユーザー名には文字・数字・スペース・_・- のみ使用できます")
         return v.lower()
 
     @field_validator("password")
@@ -169,12 +178,14 @@ class UserCreateRequest(BaseModel):
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str) -> str:
-        # アンダースコアとハイフンを除去した後、英数字のみかチェック
-        if not v.replace("_", "").replace("-", "").isalnum():
-            raise ValueError("Username must be alphanumeric (with _ or - allowed)")
-        # 先頭は英数字のみ許可（_や-で始まることを禁止）
-        if not v[0].isalnum():
-            raise ValueError("Username must start with a letter or number")
+        if not v.strip():
+            raise ValueError("ユーザー名は空白のみにできません")
+        if not (v[0].isalpha() or v[0].isdigit()):
+            raise ValueError(
+                "ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)"
+            )
+        if not re.match(r"^[\w\s\-]+$", v):
+            raise ValueError("ユーザー名には文字・数字・スペース・_・- のみ使用できます")
         return v.lower()
 
 
@@ -192,12 +203,14 @@ class UserUpdateRequest(BaseModel):
     def validate_username(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return None
-        # アンダースコアとハイフンを除去した後、英数字のみかチェック
-        if not v.replace("_", "").replace("-", "").isalnum():
-            raise ValueError("Username must be alphanumeric (with _ or - allowed)")
-        # 先頭は英数字のみ許可（_や-で始まることを禁止）
-        if not v[0].isalnum():
-            raise ValueError("Username must start with a letter or number")
+        if not v.strip():
+            raise ValueError("ユーザー名は空白のみにできません")
+        if not (v[0].isalpha() or v[0].isdigit()):
+            raise ValueError(
+                "ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)"
+            )
+        if not re.match(r"^[\w\s\-]+$", v):
+            raise ValueError("ユーザー名には文字・数字・スペース・_・- のみ使用できます")
         return v.lower()
 
 
