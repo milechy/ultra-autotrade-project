@@ -33,12 +33,12 @@ ENVIRONMENT="${ENVIRONMENT:-production}"
 
 case "$ENVIRONMENT" in
   production)
-    CONTAINER_NAME="ultra-autotrade-postgres-production"
+    CONTAINER_FILTER="postgres-production"
     ENV_FILE="${PROJECT_ROOT}/.env.production"
     DB_NAME="ultra_autotrade"
     ;;
   staging-new)
-    CONTAINER_NAME="ultra-autotrade-postgres-staging-new"
+    CONTAINER_FILTER="postgres-staging"
     ENV_FILE="${PROJECT_ROOT}/.env.staging-new"
     DB_NAME="ultra_autotrade_staging"
     ;;
@@ -77,6 +77,17 @@ _notify_failure() {
 
 # ERR トラップ: pg_dump 失敗等の予期しないエラーも Slack 通知する
 trap '_notify_failure "unexpected error at line ${LINENO} (exit $?)"' ERR
+
+# ── コンテナ名の動的取得 (ハードコード禁止 / RC-4) ──
+CONTAINER_NAME="$(docker ps --filter "name=${CONTAINER_FILTER}" --filter "status=running" \
+  --format "{{.Names}}" | head -1)"
+if [ -z "${CONTAINER_NAME}" ]; then
+  # ERR トラップを外してから手動で通知 (トラップのネストを避ける)
+  trap - ERR
+  echo "ERROR: [${ENVIRONMENT}] postgres コンテナが起動していません (filter: ${CONTAINER_FILTER})" >&2
+  _slack_send "❌ [${ENVIRONMENT}] backup_db.sh: postgres コンテナ未起動 (filter: ${CONTAINER_FILTER})"
+  exit 1
+fi
 
 # ── バックアップ実行 ──────────────────────────────
 mkdir -p "$BACKUP_DIR"
