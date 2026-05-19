@@ -35,7 +35,7 @@ function AccuracyValue({ value, label }: { value: number | null; label: string }
 }
 
 export function AiAccuracyCard() {
-  const { data, loading, error } = useAuthFetch<AiAccuracyResponse>('/ai/accuracy')
+  const { data, loading, error } = useAuthFetch<AiAccuracyResponse>('/api/ai/accuracy')
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-4">
