@@ -41,6 +41,7 @@
 | PUT | `/auth/risk-mode` | 🔑 | リスクモード更新 |
 | POST | `/auth/wallet/connect` | 🔑 | WalletConnect認証 |
 | POST | `/auth/wallet/link` | 🔑 | 認証済みユーザーへのウォレット紐付け (200/401/409/422/404, F-17 L1) |
+| POST | `/auth/register-with-referral` | 🔓 | 紹介コード経由ユーザー登録 (201/409/422/404)。`referral_code` + `referred_consent=true` 必須 |
 | POST | `/auth/line` | 🔓 | LINE LIFF認証 → JWT返却 |
 
 ---
@@ -227,6 +228,16 @@ Fee Model v10 read-only 中心 + simulate。F-1〜F-5 (FeeConfigV10 / FeeTransac
 | PUT | `/api/partner/allocations/{allocation_id}` | 🤝 | 配分更新 |
 | DELETE | `/api/partner/allocations/{allocation_id}` | 🤝 | 配分削除 |
 | GET | `/api/partner/performance` | 🤝 | パフォーマンス |
+| GET | `/api/partner/users` | 🤝 | 管理テスター一覧 (詳細リンク用) |
+| GET | `/api/partner/users/{user_id}` | 🤝 | ユーザー詳細 (KPI: 今日の運用総額・利回り) |
+
+### Partner Referral `/partner/referral`
+
+| Method | Path | 認証 | 説明 |
+|--------|------|------|------|
+| POST | `/partner/referral/code` | 🤝 | 紹介コード取得 (未発行なら発行、8文字英数字) |
+| GET | `/partner/referral/list` | 🤝 | 配下の紹介済みユーザー一覧 (email masked) |
+| GET | `/partner/referral/users/{user_id}/transactions` | 🤝 | 配下ユーザーの取引履歴 (wallet/tx_hash 非含) |
 
 ---
 
@@ -349,7 +360,7 @@ Fee Model v10 read-only 中心 + simulate。F-1〜F-5 (FeeConfigV10 / FeeTransac
 
 ### AI Optimizer `/api/ai/optimizer`
 
-> ⚠️ **注意**: `router.py` 実装済みだが `main.py` への登録は Phase B (Tier S) で実施予定。staging では未稼働。
+> **PR #287 (2026-05-19 merge)** で `main.py` への登録完了。production/staging で稼働中。
 
 | Method | Path | 認証 | 説明 |
 |--------|------|------|------|
