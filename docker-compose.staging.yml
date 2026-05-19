@@ -246,6 +246,10 @@ services:
         NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
         NEXT_PUBLIC_LIFF_ID: ${NEXT_PUBLIC_LIFF_ID:-}
         NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}
+        # Next.js ビルド OOM 対策 (CLAUDE.md §2026-05-19 GID 1214828243363427)
+        # staging-new は 7.6GB RAM / swap なし → 4096MB が安全下限。
+        # 実ビルドログでピーク確認後に値を調整すること。
+        NODE_BUILD_MAX_OLD_SPACE_SIZE: ${NODE_BUILD_MAX_OLD_SPACE_SIZE:-4096}
     environment:
       NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api-staging.ultra-auto-trade.com}
       # SSR は Docker ネットワーク内の nginx (内部ポート 8080) 経由で backend に到達する。
