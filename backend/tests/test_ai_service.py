@@ -117,3 +117,47 @@ def test_build_rag_prompt_v3_without_market_context():
     assert isinstance(user_content, str)
     assert "No agent signals available" in user_content
     assert "test chunk" in user_content
+
+
+def test_build_rag_prompt_v4_without_market_context():
+    """v4 テンプレートで market_context が None の場合に KeyError が起きないこと。
+
+    PR #302 不完全修正のリグレッション防止: _V4_USER_TEMPLATE は {agent_signals} を
+    含むが service.py の分岐が version == "v3" のみだと v4 で KeyError が発生する。
+    """
+    service = AIService()
+    rag_context = RAGContext(chunks=["test chunk"], query="test query", source_count=1)
+
+    system_prompt, user_content = service._build_rag_prompt(
+        query="test query",
+        rag_context=rag_context,
+        version="v4",
+        market_context=None,
+    )
+    assert isinstance(system_prompt, str)
+    assert isinstance(user_content, str)
+    assert "No agent signals available" in user_content
+    assert "test chunk" in user_content
+
+
+def test_build_rag_prompt_v4_with_market_context():
+    """v4 テンプレートで market_context がある場合に agent_signals が展開されること。"""
+    from decimal import Decimal
+
+    from app.data_feeds.context import MarketContext
+
+    service = AIService()
+    rag_context = RAGContext(chunks=["btc context"], query="buy or sell?", source_count=1)
+    market_ctx = MarketContext(health_factor=Decimal("1.9"), aave_utilization_rate=Decimal("65.0"))
+
+    system_prompt, user_content = service._build_rag_prompt(
+        query="buy or sell?",
+        rag_context=rag_context,
+        version="v4",
+        market_context=market_ctx,
+    )
+    assert isinstance(system_prompt, str)
+    assert isinstance(user_content, str)
+    assert "btc context" in user_content
+    # agent_signals プレースホルダーが未展開のまま残っていないこと
+    assert "{agent_signals}" not in user_content
