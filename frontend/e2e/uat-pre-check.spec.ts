@@ -25,7 +25,13 @@ const CF_HEADERS =
     ? { 'CF-Access-Client-Id': CF_CLIENT_ID, 'CF-Access-Client-Secret': CF_CLIENT_SECRET }
     : {}
 
-const PARTNER_JWT = fs.readFileSync('/tmp/staging_partner_jwt.txt', 'utf-8').trim()
+// staging 実環境専用スペック。CI / 非 staging では JWT ファイルが無いため、
+// トップレベル readFileSync で全 E2E Smoke job をクラッシュさせない
+// (import 時に落ちると Playwright 収集が失敗し全 spec が FAILURE になる baseline 問題)。
+const JWT_PATH = '/tmp/staging_partner_jwt.txt'
+const PARTNER_JWT = fs.existsSync(JWT_PATH)
+  ? fs.readFileSync(JWT_PATH, 'utf-8').trim()
+  : ''
 const SCREENSHOT_DIR = path.join('e2e', 'screenshots', 'uat-pre-check')
 if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: true })
 
@@ -55,6 +61,13 @@ async function injectAuth(page: Page) {
 }
 
 test.describe.serial('[UAT Pre-check] F-17 + RAS Phase 1 / staging 実環境 8 シナリオ A-H', () => {
+  // PARTNER_JWT 未配置 (CI / 非 staging) では全シナリオを skip。
+  // このスペックは staging 実環境専用 (実 frontend + 実 backend + 実 DB)。
+  test.skip(
+    !PARTNER_JWT,
+    'PARTNER_JWT 未配置のため skip (staging 実環境専用スペック / CI baseline)',
+  )
+
   test.use({
     extraHTTPHeaders: CF_HEADERS,
     storageState: '.auth/cf-access.json',
