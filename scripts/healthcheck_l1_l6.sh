@@ -13,6 +13,13 @@
 #   DB_NAME                postgres DB 名 (default: ultra_autotrade)
 #   DRY_RUN                true の場合 Slack 通知をスキップして JSON を stdout に出力
 #   FAIL_SIMULATE_L1       true の場合 L1 を強制 FAIL (テスト用)
+#
+# Twilio 電話エスカレーション (5連続FAIL時):
+#   TWILIO_ACCOUNT_SID     Twilio Account SID
+#   TWILIO_AUTH_TOKEN      Twilio Auth Token
+#   TWILIO_FROM_NUMBER     発信元電話番号 (+81XXXXXXXXXX 形式)
+#   TWILIO_TO_NUMBER       着信先電話番号 (+81XXXXXXXXXX 形式)
+#   TWILIO_CALL_RATE_LIMIT_MIN  電話発信の最小間隔 (分, default: 30)
 
 set -uo pipefail
 
@@ -31,10 +38,19 @@ DRY_RUN="${DRY_RUN:-false}"
 FAIL_SIMULATE_L1="${FAIL_SIMULATE_L1:-false}"
 CURL_TIMEOUT=10
 
+# Twilio 電話エスカレーション設定
+TWILIO_ACCOUNT_SID="${TWILIO_ACCOUNT_SID:-}"
+TWILIO_AUTH_TOKEN="${TWILIO_AUTH_TOKEN:-}"
+TWILIO_FROM_NUMBER="${TWILIO_FROM_NUMBER:-}"
+TWILIO_TO_NUMBER="${TWILIO_TO_NUMBER:-}"
+TWILIO_CALL_RATE_LIMIT_MIN="${TWILIO_CALL_RATE_LIMIT_MIN:-30}"
+TWILIO_CONSECUTIVE_FAIL_THRESHOLD=5
+
 # PASS 通知の連投防止 (1時間に1回)
 LAST_PASS_FILE="${TMPDIR:-/tmp}/.last_healthcheck_pass"
 LAST_FAIL_FILE="${TMPDIR:-/tmp}/.last_healthcheck_fail"
 FAIL_COUNT_FILE="${TMPDIR:-/tmp}/.healthcheck_fail_count"
+TWILIO_LAST_CALL_FILE="${TMPDIR:-/tmp}/.healthcheck_twilio_last_call"
 PASS_COOLDOWN_SEC=3600  # 1時間
 
 # ログ
@@ -335,6 +351,66 @@ increment_fail_count() {
   echo "${count}"
 }
 
+# Twilio 電話エスカレーション (5連続FAIL時のみ、L6単独FAILは対象外)
+# レート制限: TWILIO_CALL_RATE_LIMIT_MIN 分に1回まで
+call_twilio_phone() {
+  local fail_count="$1"
+  local failed_layers="${2:-L1-L5}"
+
+  if [[ "${DRY_RUN}" == "true" ]]; then
+    echo "[DRY_RUN] Twilio call would fire: fail_count=${fail_count}, layers=${failed_layers}"
+    return 0
+  fi
+
+  if [[ -z "${TWILIO_ACCOUNT_SID}" || -z "${TWILIO_AUTH_TOKEN}" \
+     || -z "${TWILIO_FROM_NUMBER}" || -z "${TWILIO_TO_NUMBER}" ]]; then
+    log "WARN: Twilio credentials not set — phone escalation skipped"
+    return 0
+  fi
+
+  # レート制限チェック
+  local now; now=$(date +%s)
+  if [[ -f "${TWILIO_LAST_CALL_FILE}" ]]; then
+    local last_call; last_call=$(cat "${TWILIO_LAST_CALL_FILE}" 2>/dev/null || echo "0")
+    local elapsed=$(( now - last_call ))
+    local threshold=$(( TWILIO_CALL_RATE_LIMIT_MIN * 60 ))
+    if [[ "${elapsed}" -lt "${threshold}" ]]; then
+      log "Twilio 電話スキップ (レート制限: ${elapsed}s < ${threshold}s)"
+      return 0
+    fi
+  fi
+
+  local twiml
+  twiml="<Response><Say language=\"ja-JP\" voice=\"Polly.Mizuki\">こちらはウルトラオートトレードの緊急通知です。本番環境のヘルスチェックが${fail_count}回連続で失敗しました。障害レイヤーは${failed_layers}です。緊急対応が必要です。このメッセージは自動送信です。</Say><Pause length=\"2\"/><Say language=\"ja-JP\" voice=\"Polly.Mizuki\">繰り返します。本番環境のヘルスチェックが${fail_count}回連続で失敗しました。緊急対応が必要です。</Say></Response>"
+
+  log "Twilio 電話発信: ${TWILIO_TO_NUMBER} (連続FAIL ${fail_count}回)"
+
+  local response
+  response=$(curl -s --max-time 30 -X POST \
+    "https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json" \
+    -u "${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}" \
+    --data-urlencode "To=${TWILIO_TO_NUMBER}" \
+    --data-urlencode "From=${TWILIO_FROM_NUMBER}" \
+    --data-urlencode "Twiml=${twiml}" 2>&1)
+
+  local call_sid
+  call_sid=$(echo "${response}" | python3 -c \
+    "import sys, json; d=json.load(sys.stdin); print(d.get('sid',''))" 2>/dev/null || echo "")
+
+  if [[ -n "${call_sid}" && "${call_sid}" != "" ]]; then
+    log "Twilio 電話発信成功: CallSid=${call_sid}"
+    date +%s > "${TWILIO_LAST_CALL_FILE}" 2>/dev/null || true
+    return 0
+  else
+    local error_msg
+    error_msg=$(echo "${response}" | python3 -c \
+      "import sys, json; d=json.load(sys.stdin); print(d.get('message','unknown error'))" 2>/dev/null \
+      || echo "${response}")
+    log "ERROR: Twilio 電話発信失敗: ${error_msg}" >&2
+    return 1
+  fi
+}
+
 # =============================================================================
 # メイン
 # =============================================================================
@@ -442,6 +518,20 @@ print(json.dumps(payload))
     fail_count=$(increment_fail_count)
     log "FAIL 通知送信 (連続 ${fail_count} 回目)"
     send_slack "${slack_json}"
+
+    # 5連続FAIL → Twilio 電話エスカレーション
+    # L6 単独 FAIL は対象外 (overall_status が FAIL になるのは L1-L5 の FAIL のみ)
+    if [[ "${fail_count}" -ge "${TWILIO_CONSECUTIVE_FAIL_THRESHOLD}" ]]; then
+      local failed_layers=""
+      [[ "${l1_status}" == "FAIL" ]] && failed_layers="${failed_layers}L1 "
+      [[ "${l2_status}" == "FAIL" ]] && failed_layers="${failed_layers}L2 "
+      [[ "${l3_status}" == "FAIL" ]] && failed_layers="${failed_layers}L3 "
+      [[ "${l4_status}" == "FAIL" ]] && failed_layers="${failed_layers}L4 "
+      [[ "${l5_status}" == "FAIL" ]] && failed_layers="${failed_layers}L5 "
+      failed_layers="${failed_layers:-L1-L5}"
+      log "5連続FAIL到達 (${fail_count}回) — Twilio 電話エスカレーション発動: ${failed_layers}"
+      call_twilio_phone "${fail_count}" "${failed_layers}"
+    fi
   fi
 
   # DRY_RUN でない場合のみ stdout に出力 (DRY_RUN は send_slack 内で出力済み)
