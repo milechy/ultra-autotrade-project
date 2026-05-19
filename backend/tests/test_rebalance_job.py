@@ -189,7 +189,6 @@ class TestRebalanceCheckLoopExecution:
         mock_service.simulate.return_value = mock_proposal
 
         mock_notifier = MagicMock()
-        _mock_cns_class.return_value = mock_notifier
 
         with (
             patch("asyncio.sleep", side_effect=mock_sleep),
@@ -201,12 +200,19 @@ class TestRebalanceCheckLoopExecution:
             patch("app.aave.service.AaveService"),
             patch("app.aave.state_manager.get_default_state_manager"),
             patch("app.automation.state.get_monitoring_service"),
+            patch(
+                "app.notifications.factory.get_notification_service",
+                return_value=mock_notifier,
+            ),
         ):
             with pytest.raises(asyncio.CancelledError):
                 await rebalance_check_loop()
 
         mock_service.simulate.assert_called_once()
-        mock_notifier.notify.assert_called_once()
+        # rebalance_job は get_notification_service().send(NotificationMessage(...))
+        # を呼ぶ。旧テストは存在しない .notify() を assert していたため baseline FAIL
+        # していた (2026-05-19 修正)。
+        mock_notifier.send.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_run_check_needs_rebalance_false(self) -> None:
