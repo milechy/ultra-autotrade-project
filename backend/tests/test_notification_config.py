@@ -50,8 +50,17 @@ class TestParseNotificationChannel:
     def test_parse_invalid_returns_default(self):
         """無効な値の場合はデフォルト値を返すことを確認"""
         assert _parse_notification_channel("INVALID") == NotificationChannel.INTERNAL_LOG
-        assert _parse_notification_channel("sms") == NotificationChannel.INTERNAL_LOG
         assert _parse_notification_channel("webhook") == NotificationChannel.INTERNAL_LOG
+
+    def test_parse_sms_returns_sms(self):
+        """sms チャンネルが正しくパースされることを確認（Twilio SMS 追加）"""
+        assert _parse_notification_channel("sms") == NotificationChannel.SMS
+        assert _parse_notification_channel("SMS") == NotificationChannel.SMS
+
+    def test_parse_phone_returns_phone(self):
+        """phone チャンネルが正しくパースされることを確認（Twilio 音声 追加）"""
+        assert _parse_notification_channel("phone") == NotificationChannel.PHONE
+        assert _parse_notification_channel("PHONE") == NotificationChannel.PHONE
 
 
 class TestNotificationSettings:

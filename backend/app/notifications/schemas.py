@@ -35,15 +35,19 @@ class NotificationChannel(str, Enum):
     通知の論理的なチャンネル種別。
 
     - INTERNAL_LOG: アプリ内部ログ（Phase5 デフォルト）
-    - LINE: 将来の LINE 通知
-    - SLACK: 将来の Slack 通知
-    - EMAIL: 将来の Email 通知
+    - LINE: LINE 通知
+    - SLACK: Slack 通知
+    - EMAIL: Email 通知
+    - PHONE: Twilio 音声電話（EMERGENCY エスカレーション）
+    - SMS: Twilio SMS（オンコール時間外または音声失敗時フォールバック）
     """
 
     INTERNAL_LOG = "internal_log"
     LINE = "line"
     SLACK = "slack"
     EMAIL = "email"
+    PHONE = "phone"
+    SMS = "sms"
 
 
 class NotificationSeverity(str, Enum):
