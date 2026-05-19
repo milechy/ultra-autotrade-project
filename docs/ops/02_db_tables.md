@@ -311,6 +311,59 @@ docker exec ultra-autotrade-postgres-production \
 | hwm_value | Numeric | NO | HWM値 |
 | updated_at | DateTime(tz) | NO | 更新日時 |
 
+### `ai_feedbacks` (ai/feedback_models.py)
+
+| カラム | 型 | NULL | 説明 |
+|--------|-----|------|------|
+| id | Integer PK | NO | 自動採番 |
+| ai_decision_id | Integer (FK非強制) | NO | `ai_decisions.id` 参照 |
+| is_correct | Boolean | YES | 判定が正解だったか |
+| actual_outcome | VARCHAR(20) | NO | `profit` / `loss` / `neutral` / `unknown` |
+| pnl_usd | Numeric(20,6) | YES | 実績損益 (USD) |
+| expected_apy | Numeric(10,4) | YES | 予測APY |
+| actual_apy | Numeric(10,4) | YES | 実績APY |
+| improvement_suggestion | Text | YES | 改善提案 (最大2000文字) |
+| feedback_source | VARCHAR(20) | NO | `manual` / `auto_howl` / `auto_outcome` |
+| recorded_at | DateTime(tz) | NO | 記録日時 |
+| recorded_by | VARCHAR(100) | YES | 記録者 |
+| created_at | DateTime(tz) | NO | 作成日時 |
+
+### `fund_allocations` (partner/allocation_models.py)
+
+| カラム | 型 | NULL | 説明 |
+|--------|-----|------|------|
+| id | Integer PK | NO | 自動採番 |
+| partner_id | Integer FK(users.id) | NO | 割り振り元パートナー |
+| tester_name | VARCHAR(100) | NO | テスター識別名 (表示用) |
+| tester_user_id | Integer FK(users.id) | YES | テスター users.id (Phase 1.5 追加) |
+| allocated_amount_usd | Numeric(20,6) | NO | 割り振り金額 (USD, Decimal) |
+| status | VARCHAR(20) | NO | `active` / `withdrawn` |
+| allocated_at | DateTime(tz) | NO | 割り振り開始日時 |
+| withdrawn_at | DateTime(tz) | YES | 引き出し完了日時 |
+| notes | Text | YES | メモ |
+| created_at | DateTime(tz) | NO | 作成日時 |
+| updated_at | DateTime(tz) | NO | 更新日時 |
+
+> ⚠️ `fund_allocations` は本番DBクリーンアップインシデント (2026-04-28) の対象テーブル。テストデータ投入禁止。
+
+### `fee_transactions` (billing/v10_models.py)
+
+| カラム | 型 | NULL | 説明 |
+|--------|-----|------|------|
+| id | Integer PK | NO | 自動採番 |
+| user_id | Integer FK(users.id) | NO | ユーザーID |
+| fee_type | VARCHAR(50) | NO | 手数料種別 (performance / management 等) |
+| amount_usd | Numeric(20,6) | NO | 手数料金額 (USD) |
+| basis_amount_usd | Numeric(20,6) | YES | 計算基礎額 |
+| rate | Numeric(10,6) | YES | 手数料率 |
+| status | VARCHAR(20) | NO | `pending` / `settled` / `cancelled` |
+| period_start | DateTime(tz) | YES | 計算対象期間開始 |
+| period_end | DateTime(tz) | YES | 計算対象期間終了 |
+| settled_at | DateTime(tz) | YES | 確定日時 |
+| notes | Text | YES | メモ |
+| created_at | DateTime(tz) | NO | 作成日時 |
+| updated_at | DateTime(tz) | NO | 更新日時 |
+
 ---
 
 ## マイグレーション方針
