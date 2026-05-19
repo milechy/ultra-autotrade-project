@@ -50,10 +50,12 @@ esac
 
 DB_USER="${POSTGRES_USER:-ultra}"
 BACKUP_DIR="${BACKUP_DIR:-/opt/ultra-autotrade/db_backups}"
-RETENTION_DAYS="${RETENTION_DAYS:-7}"
-MIN_SIZE_BYTES="${MIN_SIZE_BYTES:-10240}"   # 10 KB 未満は異常とみなす
+RETENTION_DAYS="${RETENTION_DAYS:-28}"     # 直近 4 週分を保持
+MONTHLY_RETENTION_MONTHS="${MONTHLY_RETENTION_MONTHS:-6}"  # 月次アーカイブ 6 ヶ月
+MIN_SIZE_BYTES="${MIN_SIZE_BYTES:-10240}"  # 10 KB 未満は異常とみなす
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_FILE="${BACKUP_DIR}/${ENVIRONMENT}_ultra_autotrade_${TIMESTAMP}.sql.gz"
+MONTHLY_DIR="${BACKUP_DIR}/monthly"
 
 # ── Slack 通知ヘルパー ─────────────────────────────
 _slack_send() {
@@ -90,7 +92,7 @@ if [ -z "${CONTAINER_NAME}" ]; then
 fi
 
 # ── バックアップ実行 ──────────────────────────────
-mkdir -p "$BACKUP_DIR"
+mkdir -p "$BACKUP_DIR" "$MONTHLY_DIR"
 
 echo "[${TIMESTAMP}] [${ENVIRONMENT}] Starting PostgreSQL backup (container: ${CONTAINER_NAME}, db: ${DB_NAME})..."
 docker exec "$CONTAINER_NAME" pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_FILE"
@@ -113,9 +115,30 @@ trap - ERR
 
 echo "✅ [${ENVIRONMENT}] Backup verified: ${BACKUP_FILE} ($(( FILESIZE / 1024 )) KB, gzip OK)"
 
-# ── 古いバックアップ削除 (同じ ENVIRONMENT のものだけ) ──
+# ── 月次アーカイブ: 月の最初のバックアップを monthly/ にコピー ──
+CURRENT_MONTH="$(date +%Y%m)"
+MONTHLY_FILE="${MONTHLY_DIR}/${ENVIRONMENT}_monthly_${CURRENT_MONTH}.sql.gz"
+if [ ! -f "${MONTHLY_FILE}" ]; then
+  cp "${BACKUP_FILE}" "${MONTHLY_FILE}"
+  echo "📦 [${ENVIRONMENT}] Monthly archive saved: ${MONTHLY_FILE}"
+fi
+
+# ── 古いバックアップ削除 (直近 RETENTION_DAYS 日分を保持) ──
 find "$BACKUP_DIR" -maxdepth 1 -name "${ENVIRONMENT}_ultra_autotrade_*.sql.gz" -mtime +"${RETENTION_DAYS}" -delete
 echo "🗑️ [${ENVIRONMENT}] Old backups cleaned (retention: ${RETENTION_DAYS} days)"
+
+# ── 古い月次アーカイブ削除 (MONTHLY_RETENTION_MONTHS ヶ月以前を削除) ──
+MONTHLY_CUTOFF="$(date -d "${MONTHLY_RETENTION_MONTHS} months ago" +%Y%m 2>/dev/null \
+  || date -v-${MONTHLY_RETENTION_MONTHS}m +%Y%m 2>/dev/null \
+  || echo "000000")"
+for f in "${MONTHLY_DIR}/${ENVIRONMENT}_monthly_"*.sql.gz; do
+  [ -f "$f" ] || continue
+  file_month="$(basename "$f" | grep -oE '[0-9]{6}' | head -1)"
+  if [ -n "${file_month}" ] && [ "${file_month}" \< "${MONTHLY_CUTOFF}" ]; then
+    rm -f "$f"
+    echo "🗑️ [${ENVIRONMENT}] Old monthly archive deleted: $(basename "$f")"
+  fi
+done
 
 # ── Slack 成功通知（WEBHOOK設定時のみ）───────────
 _slack_send "🗄️ [${ENVIRONMENT}] DB backup completed: $(basename "${BACKUP_FILE}") ($(( FILESIZE / 1024 )) KB)"

@@ -181,9 +181,93 @@ grep "Docker cleanup started" /opt/ultra-autotrade/logs/docker_cleanup.log
 
 3. ディスクが完全に埋まった場合は手動でスペースを確保してから再実行
 
+---
+
+## PostgreSQL 週次バックアップ
+
+### 概要
+
+| 項目 | 方針 |
+|---|---|
+| 実行スクリプト | `scripts/backup_db.sh` |
+| 実行頻度 | 週次（毎週日曜 03:00 JST）|
+| 保存先 | `/opt/ultra-autotrade/db_backups/` |
+| 月次アーカイブ | `/opt/ultra-autotrade/db_backups/monthly/` |
+| 保持期間（週次） | 直近 28 日（4 週分） |
+| 保持期間（月次） | 6 ヶ月 |
+| 検証 | ファイルサイズ 10KB 以上 + gzip 整合性チェック |
+| Slack 通知 | 成功/失敗とも `#ultra-auto-project` |
+
+### cron 登録手順（Hetzner ultra ユーザー / 初回のみ）
+
+```bash
+# Hetzner VPS にログイン (production VPS: ultra@77.42.46.155)
+ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155
+
+# crontab 編集
+crontab -e
+
+# 以下の行を追加 (毎週日曜 03:00 JST)
+0 3 * * 0 ENVIRONMENT=production /opt/ultra-autotrade/scripts/backup_db.sh >> /opt/ultra-autotrade/logs/backup_db.log 2>&1
+
+# 確認
+crontab -l | grep backup_db
+```
+
+### ログディレクトリ確認
+
+```bash
+# ログディレクトリが存在しない場合は作成
+mkdir -p /opt/ultra-autotrade/logs
+
+# バックアップ先ディレクトリ確認
+ls -lh /opt/ultra-autotrade/db_backups/ 2>/dev/null || echo "ディレクトリなし (初回実行で自動作成)"
+```
+
+### 手動実行テスト
+
+```bash
+# production VPS で手動実行
+ENVIRONMENT=production /opt/ultra-autotrade/scripts/backup_db.sh
+
+# 成功確認
+ls -lh /opt/ultra-autotrade/db_backups/production_*.sql.gz | tail -5
+ls -lh /opt/ultra-autotrade/db_backups/monthly/ 2>/dev/null
+```
+
+### トラブルシューティング
+
+#### バックアップが空 (20 bytes) の場合
+
+2026-05-17 インシデント: backup_db.sh が空 gzip を量産 → ハードコードされたコンテナ名が実際と不一致だった。
+
+現行スクリプトは動的コンテナ名解決のため再発しないが、確認手順:
+
+```bash
+# postgres コンテナが起動中か確認
+docker ps --filter "name=postgres-production" --filter "status=running"
+
+# バックアップファイルサイズ確認
+stat -c%s /opt/ultra-autotrade/db_backups/production_*.sql.gz | sort -n | tail -5
+# 10240 (10KB) 未満なら異常 → Slack 通知が届いているはず
+```
+
+#### 月次アーカイブが作成されない
+
+月初（1日）以降の初回実行時に自動作成される。手動で作成する場合:
+
+```bash
+CURRENT_MONTH=$(date +%Y%m)
+cp /opt/ultra-autotrade/db_backups/production_$(ls /opt/ultra-autotrade/db_backups/production_*.sql.gz | sort | tail -1 | xargs basename) \
+   /opt/ultra-autotrade/db_backups/monthly/production_monthly_${CURRENT_MONTH}.sql.gz
+```
+
+---
+
 ## 関連ドキュメント
 
 - `docs/19_operations_runbook.md` — 全体的な運用手順
 - `docs/16_infra_deployment_guide.md` — インフラ・デプロイガイド
-- `scripts/backup_db.sh` — 日次 DB バックアップ（同様の cron 運用パターン）
+- `scripts/backup_db.sh` — 週次 DB バックアップ（4 週保持 + 月次 6 ヶ月アーカイブ）
 - `scripts/deploy_production.sh` — `slack_notify()` の参照元実装
+- `docs/postmortems/2026-05-17_backup_silent_failure.md` — バックアップ無音失敗 RCA
