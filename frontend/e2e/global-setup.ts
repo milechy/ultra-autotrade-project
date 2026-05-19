@@ -20,9 +20,17 @@ export default async function globalSetup(): Promise<void> {
   const backendUrl =
     process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? 'https://api.ultra-auto-trade.com'
 
+  const cfHeaders: Record<string, string> =
+    process.env.CF_ACCESS_CLIENT_ID && process.env.CF_ACCESS_CLIENT_SECRET
+      ? {
+          'CF-Access-Client-Id': process.env.CF_ACCESS_CLIENT_ID,
+          'CF-Access-Client-Secret': process.env.CF_ACCESS_CLIENT_SECRET,
+        }
+      : {}
+
   const res = await fetch(`${backendUrl}/auth/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...cfHeaders },
     body: JSON.stringify({ email, password }),
   })
 

@@ -1,6 +1,14 @@
 // Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 import { defineConfig, devices } from '@playwright/test'
 
+const cfAccessHeaders: Record<string, string> =
+  process.env.CF_ACCESS_CLIENT_ID && process.env.CF_ACCESS_CLIENT_SECRET
+    ? {
+        'CF-Access-Client-Id': process.env.CF_ACCESS_CLIENT_ID,
+        'CF-Access-Client-Secret': process.env.CF_ACCESS_CLIENT_SECRET,
+      }
+    : {}
+
 export default defineConfig({
   globalSetup: require.resolve('./e2e/global-setup'),
   testDir: './e2e',
@@ -15,6 +23,7 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'off',
+    extraHTTPHeaders: cfAccessHeaders,
   },
   projects: [
     {
