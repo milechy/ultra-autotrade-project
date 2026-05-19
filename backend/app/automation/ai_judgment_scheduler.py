@@ -62,7 +62,7 @@ _DEFAULT_QUERY = "DeFi market analysis"
 _PROPOSAL_ASSET = "USDC"
 _PROPOSAL_AMOUNT = Decimal("1000")
 _PROPOSAL_AMOUNT_USD = Decimal("1000.00")
-_PROPOSAL_EXPIRES_HOURS = 24
+_PROPOSAL_EXPIRES_HOURS = 72
 
 
 def save_ai_decision(
