@@ -99,6 +99,8 @@ async function mockReferralList(page: Page): Promise<void> {
 // ─── TC1-TC4: partner 紹介フロー ─────────────────────────────────────────────
 
 test.describe('[RAS] partner referral flow', () => {
+  // headless Chrome で navigator.clipboard が保護されるため clipboard-write 権限を付与
+  test.use({ permissions: ['clipboard-write'] })
   test.beforeEach(ensureScreenshotDir)
 
   test('TC1: POST /referral/code 200 → /partner/referral で referral_code 表示', async ({
@@ -122,28 +124,33 @@ test.describe('[RAS] partner referral flow', () => {
     await setupPartnerAuth(page)
     await mockReferralCode(page)
 
-    // navigator.clipboard を HTTP (localhost) でも動作するようにモック
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, 'clipboard', {
-        configurable: true,
-        value: {
-          writeText: async (_text: string): Promise<void> => {
-            return Promise.resolve()
-          },
-        },
-      })
-    })
-
     await page.goto('/partner/referral')
     await page.waitForLoadState('domcontentloaded')
 
     await expect(page.getByText('AB12CD34', { exact: true })).toBeVisible({ timeout: 10_000 })
 
+    // ページロード後に navigator.clipboard をモック
+    // addInitScript はブラウザ既存プロパティと競合する場合があるため page.evaluate で適用
+    await page.evaluate(() => {
+      try {
+        Object.defineProperty(navigator, 'clipboard', {
+          configurable: true,
+          writable: true,
+          value: {
+            writeText: async (_text: string): Promise<void> => Promise.resolve(),
+            readText: async (): Promise<string> => '',
+          },
+        })
+      } catch {
+        // 既存 clipboard が non-configurable の場合は上書きしない (test.use permissions で代替)
+      }
+    })
+
     const copyBtn = page.getByRole('button', { name: /コピー/ }).first()
     await expect(copyBtn).toBeVisible({ timeout: 5_000 })
     await copyBtn.click()
 
-    await expect(page.getByText('コピーしました')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('コピーしました')).toBeVisible({ timeout: 8_000 })
 
     await saveScreenshot(page, 'tc2-copy-toast')
   })

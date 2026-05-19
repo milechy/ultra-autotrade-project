@@ -129,7 +129,6 @@ async function setupPartnerMocks(page: Page): Promise<void> {
     ['**/api/partner/performance', { total_allocated_usd: 0, total_supply_usd: 0, health_factor: null, testers: [] }],
     ['**/ai/accuracy', { total_decisions: 0, correct_count: 0, accuracy_pct: 0, last_30d_accuracy_pct: 0 }],
     ['**/users/fee-schedule', { schedule: [], note: '' }],
-    ['**/users', []],
     ['**/partner/referral/code', { referral_code: 'TEST123', share_url: 'https://example.com/r/TEST123' }],
     ['**/partner/referral/list', []],
   ]
@@ -146,6 +145,19 @@ async function setupPartnerMocks(page: Page): Promise<void> {
       }
     })
   }
+
+  // /users は document ナビゲーション (/partner/users) を除外して API のみモック
+  await page.route('**/users', async (route) => {
+    if (route.request().resourceType() === 'document') {
+      await route.continue()
+      return
+    }
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    } else {
+      await route.continue()
+    }
+  })
 }
 
 // ── TC-F2-1: /partner/users/1 KPI カード表示 ──────────────────────────────────
@@ -242,8 +254,15 @@ test.describe('TC-F2-3: /partner/referral/[id] 運用状況 KPI', () => {
 
 test.describe('TC-F2-4: /partner/users 一覧の詳細リンク', () => {
   test('テーブルに「詳細」リンクが含まれる（ユーザーありのとき）', async ({ page }) => {
-    // /users を 1 ユーザーで返す
+    await setupPartnerMocks(page)
+
+    // setupPartnerMocks の /users モック（空配列）を 1 ユーザーで上書き (last-wins)
+    // resourceType チェックでページナビゲーションを除外
     await page.route('**/users', async (route) => {
+      if (route.request().resourceType() === 'document') {
+        await route.continue()
+        return
+      }
       if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
@@ -265,8 +284,6 @@ test.describe('TC-F2-4: /partner/users 一覧の詳細リンク', () => {
       }
     })
 
-    await setupPartnerMocks(page)
-    // Override /users mock to the specific one above (page.route last-wins)
     await page.goto('/partner/users')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(1500)

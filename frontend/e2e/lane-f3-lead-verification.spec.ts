@@ -358,8 +358,12 @@ test.describe('TC-G: /api/invitations 廃止 + InviteModal partner 非表示', (
   }) => {
     await setupPartnerAuth(page)
 
-    // /users API をモックしてテーブルを表示させる
+    // document ナビゲーション (/partner/users) は除外して fetch/xhr (API) のみモック
     await page.route('**/users', async (route) => {
+      if (route.request().resourceType() === 'document') {
+        await route.continue()
+        return
+      }
       if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
@@ -488,8 +492,12 @@ test.describe('TC-J: /partner/users 一覧 + 詳細モーダル', () => {
   }) => {
     await setupPartnerAuth(page)
 
-    // /users をモック
+    // document ナビゲーション (/partner/users) は除外して fetch/xhr (API) のみモック
     await page.route('**/users', async (route) => {
+      if (route.request().resourceType() === 'document') {
+        await route.continue()
+        return
+      }
       if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
@@ -552,10 +560,13 @@ test.describe('TC-K: tx_hash / wallet_address 非含確認 (法務)', () => {
   }) => {
     await setupPartnerAuth(page)
 
-    // `**/users` は https://app.ultra-auto-trade.com/partner/users の navigation も
-    // intercept するため、API ドメイン固定パターンに変更 (navigation URL と衝突防止)。
-    // 旧パターンでは domcontentloaded が 30s 待機になり test timeout が発生していた。
-    await page.route('**/api.ultra-auto-trade.com/users', async (route) => {
+    // document ナビゲーション (/partner/users) は除外して fetch/xhr (API) のみモック
+    // resourceType() チェックにより CI (localhost) / staging 双方で正しく機能する
+    await page.route('**/users', async (route) => {
+      if (route.request().resourceType() === 'document') {
+        await route.continue()
+        return
+      }
       if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
