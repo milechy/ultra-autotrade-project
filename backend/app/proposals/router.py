@@ -400,7 +400,7 @@ def create_proposal(
     db: Session = Depends(get_db),
 ) -> ProposalResponse:
     """提案を作成する（内部呼び出し用）。"""
-    expires_at = request.expires_at or (datetime.now(timezone.utc) + timedelta(hours=24))
+    expires_at = request.expires_at or (datetime.now(timezone.utc) + timedelta(hours=72))
     proposal = Proposal(
         user_id=request.user_id,
         ai_decision_id=request.ai_decision_id,
