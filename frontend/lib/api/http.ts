@@ -23,6 +23,7 @@ export async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
   const url = base ? `${base}${path}` : path;
 
   const res = await fetch(url, {
+    credentials: "include",
     ...init,
     method: "GET",
     headers: { "Accept": "application/json", ...init?.headers },
@@ -50,6 +51,7 @@ export async function postJson<T>(
   const url = base ? `${base}${path}` : path;
 
   const res = await fetch(url, {
+    credentials: "include",
     ...init,
     method: "POST",
     headers: {
@@ -82,6 +84,7 @@ export async function putJson<T>(
   const url = base ? `${base}${path}` : path;
 
   const res = await fetch(url, {
+    credentials: "include",
     ...init,
     method: "PUT",
     headers: {
@@ -110,6 +113,7 @@ export async function deleteJson<T>(path: string, init?: RequestInit): Promise<T
   const url = base ? `${base}${path}` : path;
 
   const res = await fetch(url, {
+    credentials: "include",
     ...init,
     method: "DELETE",
     headers: { "Accept": "application/json", ...init?.headers },
