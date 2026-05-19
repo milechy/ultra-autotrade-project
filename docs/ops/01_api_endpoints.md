@@ -347,6 +347,21 @@ Fee Model v10 read-only 中心 + simulate。F-1〜F-5 (FeeConfigV10 / FeeTransac
 | GET | `/api/protocols/health/lido` | 🔑 | Lido ヘルス |
 | GET | `/api/protocols/health/pendle` | 🔑 | Pendle ヘルス |
 
+### AI Optimizer `/api/ai/optimizer`
+
+> ⚠️ **注意**: `router.py` 実装済みだが `main.py` への登録は Phase B (Tier S) で実施予定。staging では未稼働。
+
+| Method | Path | 認証 | 説明 |
+|--------|------|------|------|
+| POST | `/api/ai/optimizer/recommend` | 🔑 | 戦略比較 + ポートフォリオ配分推奨。`investment_usd`, `risk_mode`, `holding_days` を受け取り最適配分を返す |
+
+**リクエスト例:**
+```bash
+curl -sf -X POST -H "Authorization: $TOKEN" -H "Content-Type: application/json" \
+  -d '{"investment_usd": "10000", "risk_mode": "conservative", "holding_days": 30}' \
+  "${BASE}/api/ai/optimizer/recommend" | jq
+```
+
 ---
 
 ## DCA `/dca`
