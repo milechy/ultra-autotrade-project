@@ -89,6 +89,10 @@ class TestCreateProposalsForUsersNotification:
 
         with (
             patch(
+                "app.automation.ai_judgment_scheduler._resolve_proposal_amount",
+                return_value=Decimal("500"),
+            ),
+            patch(
                 "app.fees.trade_gate.calculate_fee_by_market",
                 return_value=_make_fee(should_trade),
             ),
@@ -135,6 +139,10 @@ class TestCreateProposalsForUsersNotification:
         mock_db.scalars.return_value.all.return_value = [user]
 
         with (
+            patch(
+                "app.automation.ai_judgment_scheduler._resolve_proposal_amount",
+                return_value=Decimal("500"),
+            ),
             patch(
                 "app.fees.trade_gate.calculate_fee_by_market",
                 return_value=_make_fee(should_trade=True),
