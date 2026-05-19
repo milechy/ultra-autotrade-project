@@ -58,43 +58,43 @@ export interface AgentsData {
 }
 
 export async function fetchGeoRisk(token: string): Promise<GeoRiskData> {
-  const res = await fetch(`${API_BASE}/api/data-feeds/geo-risk`, { headers: authHeaders(token) });
+  const res = await fetch(`${API_BASE}/api/data-feeds/geo-risk`, { credentials: "include", headers: authHeaders(token) });
   if (!res.ok) throw new Error(`geo-risk: ${res.status}`);
   return res.json();
 }
 
 export async function fetchNews(token: string): Promise<NewsFeedData> {
-  const res = await fetch(`${API_BASE}/api/data-feeds/news`, { headers: authHeaders(token) });
+  const res = await fetch(`${API_BASE}/api/data-feeds/news`, { credentials: "include", headers: authHeaders(token) });
   if (!res.ok) throw new Error(`news: ${res.status}`);
   return res.json();
 }
 
 export async function fetchFinance(token: string): Promise<FinanceFeedData> {
-  const res = await fetch(`${API_BASE}/api/data-feeds/finance`, { headers: authHeaders(token) });
+  const res = await fetch(`${API_BASE}/api/data-feeds/finance`, { credentials: "include", headers: authHeaders(token) });
   if (!res.ok) throw new Error(`finance: ${res.status}`);
   return res.json();
 }
 
 export async function fetchAgents(token: string): Promise<AgentsData> {
-  const res = await fetch(`${API_BASE}/api/data-feeds/agents`, { headers: authHeaders(token) });
+  const res = await fetch(`${API_BASE}/api/data-feeds/agents`, { credentials: "include", headers: authHeaders(token) });
   if (!res.ok) throw new Error(`agents: ${res.status}`);
   return res.json();
 }
 
 export async function refreshGeoRisk(token: string): Promise<GeoRiskData> {
-  const res = await fetch(`${API_BASE}/api/data-feeds/geo-risk/refresh`, { method: "POST", headers: authHeaders(token) });
+  const res = await fetch(`${API_BASE}/api/data-feeds/geo-risk/refresh`, { method: "POST", credentials: "include", headers: authHeaders(token) });
   if (!res.ok) throw new Error(`geo-risk refresh: ${res.status}`);
   return res.json();
 }
 
 export async function refreshNews(token: string): Promise<NewsFeedData> {
-  const res = await fetch(`${API_BASE}/api/data-feeds/news/refresh`, { method: "POST", headers: authHeaders(token) });
+  const res = await fetch(`${API_BASE}/api/data-feeds/news/refresh`, { method: "POST", credentials: "include", headers: authHeaders(token) });
   if (!res.ok) throw new Error(`news refresh: ${res.status}`);
   return res.json();
 }
 
 export async function refreshFinance(token: string): Promise<FinanceFeedData> {
-  const res = await fetch(`${API_BASE}/api/data-feeds/finance/refresh`, { method: "POST", headers: authHeaders(token) });
+  const res = await fetch(`${API_BASE}/api/data-feeds/finance/refresh`, { method: "POST", credentials: "include", headers: authHeaders(token) });
   if (!res.ok) throw new Error(`finance refresh: ${res.status}`);
   return res.json();
 }
