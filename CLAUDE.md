@@ -1965,3 +1965,54 @@ docker inspect <container> --format '{{.Created}}'
 # logging driver 適用確認
 docker inspect <container> --format '{{.HostConfig.LogConfig.Type}}'
 ```
+
+---
+
+## 2026-05-19追加（24h 自走起動準備の教訓）
+
+> 24h 自走起動の準備フェーズで Bypass Permissions が不発し承認要求で実質停止、
+> 設定修正のため session 再起動した経緯から確立。起動前チェックリストは
+> `docs/ops/uata_24h_autonomous_startup_checklist.md`（8 項目）を参照。
+
+### 1. Bypass Permissions の正しい有効化手順
+
+- `.claude/settings.json` の **`permissions.defaultMode = "bypassPermissions"`** に
+  ネストする。**root 直下に `defaultMode` を書いても効かない**。
+- 公式 doc 推奨の確実な方法は CLI フラグ **`claude --dangerously-skip-permissions`**。
+- `defaultMode` が settings.json から反映されない bug が GitHub issue
+  **#29026 / #34923 / #12604** で継続報告中。settings.json 方式が不発のときは
+  CLI フラグにフォールバックする。
+- 公式 valid values: `default` / `acceptEdits` / `plan` / `dontAsk` / `bypassPermissions`。
+- Bypass Permissions の警告画面で Yes は**新規セッション起動扱い**。進行中の
+  session は `/resume` で復帰可能だが、**auto-memory に書かれていない進捗は失われる**。
+  重要な setup 変更は session 起動前に完了させること。
+
+### 2. dev VPS と Mac の secrets 分離原則
+
+- Slack webhook / Pushover env / `scripts/uata-pushover-notify.sh` は
+  **Mac 側のみに存在することが多い**。dev VPS で使うには以下 4 手順:
+  1. `scp` で dev VPS の `~/.claude-uata/secrets/` 配下へ配置
+  2. `chmod 600` で権限を絞る
+  3. `~/.bashrc` に `source` 行を追加（起動時自動 load）
+  4. 動作確認（`gh auth status` / webhook curl / `uata-pushover-notify.sh test`）
+- **既存設定を前提にしない**。毎回 dev VPS 上で `grep` 確認してから使う。
+- 標準配置: `~/.claude-uata/secrets/{github.env,slack.env,pushover.env}`（mode 600）。
+
+### 3. 24h 自走起動前チェックリスト（8 項目 / 詳細は docs/ops）
+
+1. Bypass Permissions が settings.json に正しくネスト or CLI フラグ起動
+2. GitHub PAT（`github.env`, scope `repo`/`workflow`）が env load 済
+3. Slack webhook（`slack.env`）配置・到達可能
+4. Pushover（`pushover.env` + `uata-pushover-notify.sh`）配置・`test` 送信 OK
+5. stuck-detector 起動済（`ps` で PID 確認 + `touch /tmp/uata-heartbeat` でリセット）
+6. 正本確認（鉄則8）完了・結果をセッションに貼付
+7. 安全境界をセッション冒頭に明示（本番 deploy 禁止 / HUMAN-REVIEW-REQUIRED 範囲 / 並列 2 本上限）
+8. Phase 分解・DoD・auto-memory 逐次記録方針が確定
+
+### 4. Claude Code session 再起動時のリスク
+
+- Bypass Permissions 警告画面の Yes は**新規セッション起動扱い**になる。
+- 進行中の session は `/resume` で復帰可能。ただし **auto-memory（MEMORY.md）に
+  書かれていない進捗は失われる**。
+- 重要な setup 変更（settings.json / secrets / hooks）は **session 起動前に
+  完了**させ、起動後に再起動を要する変更を残さない。
