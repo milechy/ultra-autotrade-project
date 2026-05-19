@@ -11,6 +11,7 @@ import {
 import type { Transaction, OperationType } from './_components'
 import { apiFetch } from '@/lib/api/client'
 import { Skeleton } from '@/components/ui/skeleton'
+import AuthGuard from '@/components/AuthGuard'
 
 // ---------------------------------------------------------------------------
 // API response types
@@ -71,7 +72,7 @@ function mapToTransaction(item: TransactionAPIResponse): Transaction {
 
 const LIMIT = 20
 
-export default function HistoryPage() {
+function HistoryPageContent() {
   const [activeType, setActiveType] = useState<OperationType>('ALL')
   // Initialize to 30-day range to match DateRangeFilter's default visual state
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | 'all'>(() => {
@@ -218,5 +219,14 @@ export default function HistoryPage() {
         )}
       </div>
     </div>
+  )
+}
+
+
+export default function HistoryPage() {
+  return (
+    <AuthGuard>
+      <HistoryPageContent />
+    </AuthGuard>
   )
 }
