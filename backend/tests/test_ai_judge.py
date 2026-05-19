@@ -485,12 +485,34 @@ class TestPromptVersioning:
         tmpl = get_prompt_template("v99")
         assert tmpl.version == "v1"
 
+    def test_get_prompt_template_v4(self):
+        from app.ai.prompts import get_prompt_template
+
+        tmpl = get_prompt_template("v4")
+        assert tmpl.version == "v4"
+        assert "HOLD bias" in tmpl.description
+        assert "COMPOUND RISK" in tmpl.system_prompt
+        assert "HF < 1.6" in tmpl.system_prompt
+        assert "Disagreement" in tmpl.system_prompt
+        assert "{agent_signals}" in tmpl.user_template
+        assert "{context}" in tmpl.user_template
+        assert "{query}" in tmpl.user_template
+
+    def test_v4_no_absolute_hold_bias(self):
+        from app.ai.prompts import get_prompt_template
+
+        tmpl = get_prompt_template("v4")
+        assert "迷ったら HOLD" not in tmpl.system_prompt
+        assert "Disagreement" in tmpl.system_prompt
+        assert "does NOT automatically mean HOLD" in tmpl.system_prompt
+
     def test_list_versions(self):
         from app.ai.prompts import list_versions
 
         versions = list_versions()
         assert "v1" in versions
         assert "v2" in versions
+        assert "v4" in versions
 
     def test_prompt_version_default_in_llm_decision(self):
         from app.ai.schemas import LLMDecision, LLMProvider, TradeAction
