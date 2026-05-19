@@ -25,12 +25,13 @@ step "[0/7] Chain Config Consistency"
 if [ -f "$PROJECT_ROOT/.env.production" ]; then
   CHAIN_ID=$(grep "^NEXT_PUBLIC_DEFAULT_CHAIN_ID=" "$PROJECT_ROOT/.env.production" 2>/dev/null | cut -d= -f2 || true)
   if [ "$CHAIN_ID" = "8453" ]; then
-    if grep -rn "Sepolia" \
+    grep -rn "Sepolia" \
         "$PROJECT_ROOT/frontend/app/" \
         "$PROJECT_ROOT/frontend/components/" \
         "$PROJECT_ROOT/frontend/lib/" \
         2>/dev/null \
-        | grep -v "__mocks__\|\.spec\.\|\.test\." > /tmp/sepolia_check.log 2>&1; then
+        | grep -v "__mocks__\|\.spec\.\|\.test\." > /tmp/sepolia_check.log 2>&1 || true
+    if [ -s /tmp/sepolia_check.log ]; then
       echo "ERROR: Chain is mainnet (8453) but 'Sepolia' is hard-coded in frontend:"
       cat /tmp/sepolia_check.log
       echo ""
