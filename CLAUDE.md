@@ -230,6 +230,7 @@ feature/* (各LLM担当) → dev (Opus統合) → staging (Codex最終レビュ�
 - 一括検証: ./scripts/verify.sh（1-3を一括実行、コミット前に必須）
 - PR/デプロイ前ゲート: 1-4 必須。5-7 は状況に応じて実施
 - **テストデータ投入**: INSERT/UPDATE/DELETE は staging-new コンテナ + `ultra_autotrade_staging` DB に限定。production DB へのテストデータ投入は禁止（本番DB cleanup インシデント GID 1214121103957100）
+- **staging admin user**: staging 復旧後は必ず `scripts/seed_staging_admin.sh` を実行して admin user を投入する。staging DB は volume 再作成で user データが消えるため、毎回 seed が必要。直接 SQL 禁止 — 必ずこのスクリプト経由。`ADMIN_EMAIL=hkobayashi@mooores.com`（production と同じ email、パスワードは staging 専用）
 
 ---
 
