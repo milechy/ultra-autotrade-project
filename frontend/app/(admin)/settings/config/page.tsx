@@ -12,6 +12,7 @@ import {
   RiskEngineSection,
   NotificationSection,
   APIKeySection,
+  FeeConfigCard,
 } from '../_components'
 import type {
   AISettings,
@@ -91,6 +92,9 @@ function SettingsContent() {
 
         {/* Section 5: APIキー管理 */}
         <APIKeySection apiKeys={apiKeys} onRotate={handleRotate} />
+
+        {/* Section 6: 手数料設定 (F-12) — GET /api/v1/fees/config 参照のみ */}
+        <FeeConfigCard />
       </div>
     </>
   )
