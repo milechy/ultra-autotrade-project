@@ -28,8 +28,8 @@ ADMIN_ROLE="admin"
 
 # ── postgres コンテナ動的検出 ─────────────────────────────────────────────────
 if [[ -z "${POSTGRES_CONTAINER:-}" ]]; then
-  POSTGRES_CONTAINER=$(docker ps --filter "name=postgres.*staging" --filter "status=running" \
-    --format "{{.Names}}" | head -1 || true)
+  POSTGRES_CONTAINER=$(docker ps --filter "status=running" --format "{{.Names}}" 2>/dev/null \
+    | grep postgres | grep staging | head -1 || true)
 fi
 CONTAINER="${POSTGRES_CONTAINER:-}"
 if [[ -z "${CONTAINER}" ]]; then
@@ -39,21 +39,21 @@ fi
 
 # ── backend コンテナ動的検出 (nginx upstream.conf の active 側を参照) ──────────
 if [[ -z "${BACKEND_CONTAINER:-}" ]]; then
-  NGINX_C=$(docker ps --filter "name=nginx.*staging" --filter "status=running" \
-    --format "{{.Names}}" | head -1 || true)
+  NGINX_C=$(docker ps --filter "status=running" --format "{{.Names}}" 2>/dev/null \
+    | grep nginx | grep staging | head -1 || true)
   ACTIVE_ALIAS=""
   if [[ -n "${NGINX_C}" ]]; then
     ACTIVE_ALIAS=$(docker exec "${NGINX_C}" cat /etc/nginx/conf.d/upstream.conf 2>/dev/null \
       | grep -oP 'backend-\w+' | head -1 || true)
   fi
   if [[ -n "${ACTIVE_ALIAS}" ]]; then
-    BACKEND_CONTAINER=$(docker ps --filter "name=${ACTIVE_ALIAS}.*staging" \
-      --filter "status=running" --format "{{.Names}}" | head -1 || true)
+    BACKEND_CONTAINER=$(docker ps --filter "status=running" --format "{{.Names}}" 2>/dev/null \
+      | grep "${ACTIVE_ALIAS}" | grep staging | head -1 || true)
   fi
   # フォールバック: nginx が取れなければ任意の running staging backend
   if [[ -z "${BACKEND_CONTAINER:-}" ]]; then
-    BACKEND_CONTAINER=$(docker ps --filter "name=backend.*staging" \
-      --filter "status=running" --format "{{.Names}}" | head -1 || true)
+    BACKEND_CONTAINER=$(docker ps --filter "status=running" --format "{{.Names}}" 2>/dev/null \
+      | grep backend | grep staging | head -1 || true)
   fi
 fi
 if [[ -z "${BACKEND_CONTAINER:-}" ]]; then
