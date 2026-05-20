@@ -1,9 +1,66 @@
-# CLAUDE.md 分割提案 v1
+# CLAUDE.md 分割提案 v2
 
 **作成:** 2026-05-20 (night-mode 事前準備 / claude-code-cli)
-**更新:** 2026-05-20 v1 (night-mode Lane 8)
-**レビュー予定:** 2026-05-21 06:00 JST (claude.ai)
-**実行予定:** 2026-05-21 (残り 2 PR: Step 3 → Step 4)
+**更新:** 2026-05-20 v2 (night-mode タスク #12 — 5/20 教訓 3点追加)
+**レビュー予定:** 2026-05-21 06:30 JST (claude.ai)
+**実行予定:** 2026-05-21 06:30 レビュー → 承認後 Tier S 枠で実行
+
+---
+
+## v2 追加内容 (2026-05-20 教訓から)
+
+### A. Lane への 1ブロック包括依頼テンプレ (core.md に追加)
+
+分割後 `CLAUDE.md` のどこに入れるか: **§9 朝プロトコルの直後** (Step 0 の延長として)
+
+```
+【Lane 依頼標準テンプレ】
+環境: staging-new / production (どちらか明示)
+現象: (1行で)
+依頼: 以下を1ブロックで返す
+  1. 実機 dump (docker ps / logs / DB query 等)
+  2. 真因 (推測ではなく実データから)
+  3. 修正案 (最小/標準/根本 の3択)
+制約: 本番 DB write / deploy は HUMAN-REVIEW-REQUIRED で停止
+```
+
+**背景:** 2026-05-20 に claude.ai が docker コマンドを 25往復中継し、§25 違反を6回犯した。Lane に「1ブロック依頼」すれば 1往復で済む。
+
+### B. 朝プロトコル違反パターン (lessons.md に追加 / 2026-05-20セクション)
+
+分割後のどこに入れるか: `CLAUDE.lessons.md` の **2026-05-20 セクション**として追加。
+
+| # | 違反パターン | 正しい行動 |
+|---|---|---|
+| P1 | docker コマンドを 2行以上中継する | 2行目で停止 → Lane に1ブロック依頼 |
+| P2 | コンテナ名を断定して SQL 発行 | `docker ps` で実名確認後に発行 |
+| P3 | staging 消滅アラートで即復旧コマンドを出す | 先に Lane に診断依頼 |
+| P4 | v4/schema 変更後の SQL を docs 未確認で発行 | `docs/ops/02_db_tables.md` を先読み |
+| P5 | `docker restart` で env 変更が反映されると思い込む | CLAUDE.md「docker restart ≠ recreate」を参照 |
+
+### C. docker 罠 7項目リンク (ops.md に追加)
+
+分割後のどこに入れるか: `CLAUDE.ops.md` または `docs/ops/docker_command_cheatsheet.md` への参照として追加。
+
+> 詳細: `docs/ops/docker_command_cheatsheet.md` (2026-05-20 作成)
+
+7項目の概要:
+1. `--env-file` 必須
+2. `restart ≠ recreate`
+3. `--remove-orphans` 別 stack 巻き込みリスク
+4. `--filter name=` は OR 動作
+5. backend 再起動標準手順
+6. Blue/Green active 動的確認
+7. `builder prune` vs `system prune`
+
+### D. 配置先まとめ (v2 決定事項)
+
+| 追加コンテンツ | 配置先 |
+|---|---|
+| Lane 1ブロック依頼テンプレ | `CLAUDE.md` core — §9 朝プロトコル直後 |
+| 朝プロ違反パターン 5件 | `CLAUDE.lessons.md` — 2026-05-20 セクション |
+| docker 罠 7項目リンク | `CLAUDE.ops.md` — Docker 運用セクション |
+| docker_command_cheatsheet.md | `docs/ops/` (新規 — 本 PR 外で作成済み) |
 
 ---
 
