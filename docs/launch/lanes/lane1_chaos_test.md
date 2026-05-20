@@ -117,7 +117,7 @@ fi
 # 結果を docs/launch/chaos_test_results/2026-MM-DD_run_N.md に記録
 ```
 
-**3 日連続実行は cron 化せず、各日 22:00 に手動 (Lane で `claude --bg`) で kick**。理由: chaos test の最中に他 Lane が staging を触ると干渉する。
+**3 日連続実行は cron 化せず、各日 22:00 に手動で Agent View (`claude agents` 起動 → 該当 Lane 行を選択 → `/bg` で背景投入) で kick**。理由: chaos test の最中に他 Lane が staging を触ると干渉する。
 
 ### Step 4: pytest chaos suite (60 min)
 
