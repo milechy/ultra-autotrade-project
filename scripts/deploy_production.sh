@@ -524,8 +524,8 @@ else
   log "upstream.conf を blue に初期化..."
   write_upstream_conf "blue"
 
-  log "孤立コンテナを含めて停止・削除"
-  ${DC} -f "${COMPOSE_FILE}" down --remove-orphans
+  log "本番コンテナを停止・削除 (--remove-orphans 禁止: staging-new 道連れ防止)"
+  ${DC} -f "${COMPOSE_FILE}" down
 
   # 本番コンテナ (*-production) と移行前の旧 *-staging 残留のみ強制削除。
   # *-staging-new (真の staging 環境) は保護対象なので除外する。
