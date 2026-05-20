@@ -24,7 +24,7 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-fee-calculator")
 
 from app.auth.models import InvestmentTier, RiskMode  # noqa: E402
 from app.fees import FeeCalculationInput, FeeCalculationResult, FeeCalculator  # noqa: E402
-from app.fees.trade_gate import _MARKET_FEE_CAPS, calculate_fee_by_market  # noqa: E402
+from app.fees.trade_gate import calculate_fee_by_market  # noqa: E402
 from tests.helpers.fee_config_factory import make_v10_default_config  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -417,15 +417,11 @@ class TestDecimalPrecision:
 # ---------------------------------------------------------------------------
 
 
-class TestRegressionVsDynamicFee:
-    """既存 ``dynamic_fee.calculate_fee_by_market`` が F-5 追加後も無回帰で動作する。
+class TestTradeGate:
+    """§4 トレードゲート: 予想利益 > 経費 のみを判定。手数料は月次バッチで計算。"""
 
-    dynamic_fee は per-trade USD ベースで概念的に F-5 (月次 JPY) と異なるため、
-    数値一致ではなく "互いに干渉しない" ことを保証する。
-    """
-
-    def test_dynamic_fee_general_still_returns_should_trade_true(self) -> None:
-        # 既存 _MARKET_FEE_MATRIX["GENERAL"]["BEAR"] = (0.03, 0.05)
+    def test_gate_passes_when_profit_exceeds_cost(self) -> None:
+        # net_profit = 100 - 0.27 = 99.73 > 0 → should_trade=True
         result = calculate_fee_by_market(
             trade_amount_usd=Decimal("10000"),
             tier="GENERAL",
@@ -434,30 +430,61 @@ class TestRegressionVsDynamicFee:
             fixed_cost_usd=Decimal("0.27"),
         )
         assert result.should_trade is True
-        # net_profit = 100 - 0.27 = 99.73 > 0
-        assert result.fee_rate >= Decimal("0.03")
-        assert result.fee_rate <= Decimal("0.05")
+        # per-trade fee は常に 0 (月次バッチで計算)
+        assert result.fee_rate == Decimal("0")
+        assert result.fee_amount == Decimal("0")
 
-    def test_dynamic_fee_lower_after_f2(self) -> None:
-        # F-2 で LOWER が GENERAL の alias として _TIER_FEE_RANGES に追加された
+    def test_gate_blocks_when_profit_equals_cost(self) -> None:
+        # net_profit = 0.27 - 0.27 = 0 → should_trade=False
         result = calculate_fee_by_market(
             trade_amount_usd=Decimal("10000"),
             tier="LOWER",
             current_apy=Decimal("2"),
-            expected_profit_usd=Decimal("100"),
+            expected_profit_usd=Decimal("0.27"),
+            fixed_cost_usd=Decimal("0.27"),
         )
-        assert result.should_trade is True
+        assert result.should_trade is False
 
-    def test_f5_and_dynamic_fee_use_same_tier_strings(self) -> None:
-        """F-5 出力の tier 文字列が trade_gate の有効 tier に含まれること。"""
+    def test_gate_blocks_when_profit_below_cost(self) -> None:
+        # net_profit = 0.10 - 0.27 = -0.17 ≤ 0 → should_trade=False
+        result = calculate_fee_by_market(
+            trade_amount_usd=Decimal("100"),
+            tier="LOWER",
+            current_apy=Decimal("2"),
+            expected_profit_usd=Decimal("0.10"),
+            fixed_cost_usd=Decimal("0.27"),
+        )
+        assert result.should_trade is False
+
+    def test_all_tiers_return_zero_fee(self) -> None:
+        """tier に関わらず per-trade fee は 0 (月次バッチで計算)。"""
+        for tier in ("LOWER", "MIDDLE", "UPPER", "GENERAL"):
+            result = calculate_fee_by_market(
+                trade_amount_usd=Decimal("10000"),
+                tier=tier,
+                current_apy=Decimal("5"),
+                expected_profit_usd=Decimal("100"),
+            )
+            assert result.fee_rate == Decimal("0"), f"tier={tier} で fee_rate != 0"
+            assert result.fee_amount == Decimal("0"), f"tier={tier} で fee_amount != 0"
+
+    def test_f5_and_trade_gate_coexist(self) -> None:
+        """F-5 月次計算と §4 トレードゲートが独立して動作すること。"""
         calculator = FeeCalculator(make_v10_default_config())
         for tier in (InvestmentTier.LOWER, InvestmentTier.MIDDLE, InvestmentTier.UPPER):
-            result: FeeCalculationResult = calculator.calculate_monthly(
+            monthly_result: FeeCalculationResult = calculator.calculate_monthly(
                 _make_input(deposit=Decimal("100000"), gross=Decimal("1000"), tier=tier)
             )
-            assert result.tier in _MARKET_FEE_CAPS, (
-                f"F-5 tier output {result.tier!r} not in dynamic_fee matrix"
+            gate_result = calculate_fee_by_market(
+                trade_amount_usd=Decimal("10000"),
+                tier=monthly_result.tier,
+                current_apy=Decimal("5"),
+                expected_profit_usd=Decimal("100"),
             )
+            # 月次計算は tier 別手数料を計算する
+            assert monthly_result.fee_rate_applied > Decimal("0")
+            # per-trade ゲートは手数料 0 を返す
+            assert gate_result.fee_rate == Decimal("0")
 
 
 # ---------------------------------------------------------------------------
