@@ -50,16 +50,18 @@ FILES_JSON=$(to_jsonnum "$FILES_COUNT")
 # WEBHOOK 取得
 if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
   WEBHOOK="$SLACK_WEBHOOK_URL"
+elif [[ -f "${HOME}/.claude-uata/secrets/slack.env" ]]; then
+  WEBHOOK=$(grep "^SLACK_WEBHOOK_URL=" "${HOME}/.claude-uata/secrets/slack.env" | head -1 | cut -d= -f2-)
 elif GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) && [[ -f "${GIT_ROOT}/.env.production" ]]; then
   WEBHOOK=$(grep "^SLACK_WEBHOOK_URL=" "${GIT_ROOT}/.env.production" | head -1 | cut -d= -f2-)
-else
+elif [[ -f "${HOME}/.ssh/hetzner_staging" ]]; then
   WEBHOOK=$(ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155 \
-    'grep SLACK_WEBHOOK_URL /opt/ultra-autotrade/.env.production | head -1 | cut -d= -f2-')
+    'grep SLACK_WEBHOOK_URL /opt/ultra-autotrade/.env.production | head -1 | cut -d= -f2-' 2>/dev/null || true)
 fi
 
 if [[ -z "${WEBHOOK:-}" ]]; then
-  echo "[send-lane-completion] ERROR: SLACK_WEBHOOK_URL が取得できませんでした" >&2
-  exit 1
+  echo "[send-lane-completion] WARN: SLACK_WEBHOOK_URL 未取得 — Slack 通知をスキップ" >&2
+  exit 0
 fi
 
 # status に応じた絵文字
