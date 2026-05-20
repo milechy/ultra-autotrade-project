@@ -43,7 +43,7 @@ function PositionCard({ pos }: { pos: Position }) {
             <AssetIcon symbol={pos.symbol} size="md" />
             <div>
               <p className="text-sm font-semibold text-white">{pos.symbol}</p>
-              <p className="text-xs text-zinc-500">Supply APR {pos.supplyApr.toFixed(2)}%</p>
+              <p className="text-xs text-zinc-500">Supply APR {Number(pos.supplyApr).toFixed(2)}%</p>
             </div>
           </div>
           <div className="text-right flex-1 px-3">

@@ -130,6 +130,7 @@ if [[ -n "${EXISTING_ID}" ]]; then
     "UPDATE users
      SET hashed_password = '${HASHED}',
          role            = '${ADMIN_ROLE}',
+         tier            = 'GENERAL',
          is_active       = true,
          updated_at      = NOW()
      WHERE email = '${ADMIN_EMAIL}';"
@@ -138,8 +139,8 @@ else
   echo "[seed_staging_admin] ユーザー未存在 — INSERT します"
   # users テーブルの NOT NULL 必須カラムのみ指定。他はDB default に委ねる。
   docker exec "${CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" -c \
-    "INSERT INTO users (email, hashed_password, role, is_active, created_at, updated_at)
-     VALUES ('${ADMIN_EMAIL}', '${HASHED}', '${ADMIN_ROLE}', true, NOW(), NOW());" \
+    "INSERT INTO users (email, hashed_password, role, tier, is_active, created_at, updated_at)
+     VALUES ('${ADMIN_EMAIL}', '${HASHED}', '${ADMIN_ROLE}', 'GENERAL', true, NOW(), NOW());" \
   || {
     echo ""
     echo "ERROR: INSERT 失敗。NOT NULL エラーの場合は上記 schema を確認し、" >&2

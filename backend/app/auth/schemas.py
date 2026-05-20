@@ -25,6 +25,7 @@ class UserRole(str, Enum):
 # InvestmentTier は app.auth.models で定義 (v10 3 層 + GENERAL 過渡期互換)。
 # F-2 までは本ファイルでも重複定義していたが、単一情報源 (auth/models.py) に統合した。
 from app.auth.models import InvestmentTier as InvestmentTier  # noqa: E402, F401
+from app.auth.models import normalize_tier  # noqa: E402
 
 
 class RegisterRequest(BaseModel):
@@ -126,6 +127,13 @@ class UserResponse(BaseModel):
     execution_policy: str = "auto_execute"
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("tier", mode="before")
+    @classmethod
+    def normalize_tier_value(cls, v: object) -> InvestmentTier:
+        """DB に残存する 'standard' 等の不明値を normalize_tier で LOWER に正規化する。"""
+        raw = str(v) if v is not None else None
+        return normalize_tier(raw)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

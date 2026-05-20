@@ -727,8 +727,8 @@ tmux / 複数ターミナルタブ運用を置換する。
 | **staging** | staging/api-staging.ultra-auto-trade.com（Phase 4設定予定）| `docker-compose.staging.yml` | `.env.staging` | `scripts/deploy_staging.sh` |
 
 - **コンテナ名**: production は `*-production` suffix（2026-04-24 container_name 衝突インシデント後にリネーム済み）
-- **staging**: Shadow Mode専用（`AI_SHADOW_MODE=true` / `REBALANCE_SHADOW_MODE=true`）、Base Sepolia、port 3001/8001/5433
-- **production**: 実資金・実トレード、Base Mainnet、port 3000/8000/5432
+- **staging**: Shadow Mode専用（`AI_SHADOW_MODE=true` / `REBALANCE_SHADOW_MODE=true`）、Base Sepolia、port 3001/8082(nginx経由)/5433（注: 旧8001は廃止。`curl http://127.0.0.1:8082/health` で確認）
+- **production**: 実資金・実トレード、Base Mainnet、port 3000/8010(nginx経由)/5432
 
 ---
 
@@ -744,7 +744,7 @@ tmux / 複数ターミナルタブ運用を置換する。
 | 層 | ホスト | IP | OS user | 作業ディレクトリ | 用途 |
 |----|--------|----|---------|------------------|------|
 | **dev** | `uata-dev-01`（開発専用 VPS、新規） | `77.42.79.75` | `uata` | `/opt/ultra-autotrade/main`（main worktree）+ `/opt/ultra-autotrade-worktrees/<branch>` | Claude Code CLI による実装・並列レーン開発。実資金・実トレードなし |
-| **staging** | 本番 Hetzner VPS | `77.42.46.155` | `ultra` | `/opt/ultra-autotrade`（staging compose stack） | Shadow Mode 専用（Base Sepolia）、port 3001/8001/5433 |
+| **staging** | 本番 Hetzner VPS | `77.42.46.155` | `ultra` | `/opt/ultra-autotrade`（staging compose stack） | Shadow Mode 専用（Base Sepolia）、port 3001/8082(nginx)/5433（旧8001廃止） |
 | **production** | 本番 Hetzner VPS | `77.42.46.155` | `ultra` | `/opt/ultra-autotrade`（production compose stack） | 実資金・実トレード（Base Mainnet）、port 3000/8000/5432 |
 
 > **[CRITICAL] パス構造差 — 推測禁止**

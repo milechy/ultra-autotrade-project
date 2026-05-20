@@ -26,7 +26,7 @@ function AccuracyValue({ value, label }: { value: number | null; label: string }
           <span className="text-zinc-500">—</span>
         ) : (
           <span className={value < 0 ? 'text-red-500' : 'text-white'}>
-            {value.toFixed(1)}%
+            {Number(value).toFixed(1)}%
           </span>
         )}
       </p>
