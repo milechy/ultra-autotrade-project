@@ -1,8 +1,9 @@
-# CLAUDE.md 分割提案 v0
+# CLAUDE.md 分割提案 v1
 
 **作成:** 2026-05-20 (night-mode 事前準備 / claude-code-cli)
+**更新:** 2026-05-20 v1 (night-mode Lane 8)
 **レビュー予定:** 2026-05-21 06:00 JST (claude.ai)
-**実行予定:** 2026-05-21 06:00-09:00 (Tier S 1本枠)
+**実行予定:** 2026-05-21 (残り 2 PR: Step 3 → Step 4)
 
 ---
 
@@ -10,7 +11,8 @@
 
 | 項目 | 値 |
 |---|---|
-| 現在のサイズ | 122,369 bytes / 2,150 lines / 80,834 chars |
+| 分割前サイズ | 122,369 bytes / 2,162 lines (PR #329 merge 前) |
+| 現在のサイズ (PR #329 適用済) | **119,906 bytes / 2,103 lines** |
 | 問題 | コンテキスト注入コストが高い / 教訓が毎月増える / 検索性が低い |
 | 目標 | core を 40KB 以下に / 教訓は別ファイルに分離 |
 
@@ -189,32 +191,42 @@ CLAUDE.ops.md        ← 詳細運用ガイド (API一覧/Testing/LLM運用等)
 
 ### ① 重複セクション (即削除対象)
 
-| セクション | 重複箇所 | 処置 |
-|---|---|---|
-| `## Claude Code Agent View 運用 (2026-05-12 追加)` | L628-674 と L675-721 で完全同一 | L628-674 を **削除** |
+| セクション | 重複箇所 | 処置 | 状態 |
+|---|---|---|---|
+| `## Claude Code Agent View 運用 (2026-05-12 追加)` | 旧 L628-674 と L675-721 で完全同一 | 旧 L628-674 を **削除** | **✅ 完了 (PR #329, 2026-05-20 merged)** |
 
 ### ② 統合推奨セクション
 
 | 現状 | 問題 | 提案 |
 |---|---|---|
-| L50-72 `## Definition of Done (DoD)` と L119-126 `## [CRITICAL] Definition of Done (DoD)` | ほぼ同内容で2箇所存在 | [CRITICAL] 版に統合し旧版削除 |
+| 旧 L50-72 `## Definition of Done (DoD)` と `## [CRITICAL] Definition of Done (DoD)` | ほぼ同内容で2箇所存在 | [CRITICAL] 版に統合し旧版削除 |
 
-### ③ Agent Teams 運用ルール (L300-627, 10,087 chars) の扱い
+### ③ Agent Teams 運用ルール (10,087 chars) の扱い
 
 この 1 セクションが core 全体の ~30% を占める。
-中に含まれる:
-- v4 鉄則 10本 (行数が多いが参照頻度高)
-- Tier 分類表 (常時必要)
-- Phase 計画必須 5軸 (常時必要)
-- Lane DoD 6 セクション (常時必要)
-- tmux 5ペイン起動コマンド (運用時参照)
-- CLI レポート受領プロトコル (常時必要)
-- Phase 終了処理 (常時必要)
+中に含まれる要素と参照頻度:
 
-**提案 A (現状維持):** core に丸ごと残す。50KB target を超えるが v4 鉄則は日常参照必須。
-**提案 B (抽出):** 鉄則10本 + Tier分類表のみ core に残し、詳細 (tmux/Phase計画/Lane DoD) を ops.md に。
+| 含まれる要素 | 参照頻度 | 備考 |
+|---|---|---|
+| v4 鉄則 10本 | **毎 Lane 起動時** | Lane プロンプト作成前に必ず確認 |
+| Tier 分類表 (S/A/B) | **毎 Lane 起動時** | どのファイルを触るか判断に必須 |
+| Phase 計画必須 5軸 | **毎 Phase 立案時** | 省略すると v4 鉄則違反 |
+| Lane DoD 6 セクション | **毎 Lane DoD 確認時** | Gate 1-7 の運用判断基準 |
+| CLI レポート受領プロトコル | **毎 Lane 報告受信時** | 4 軸確認なし全停止禁止 |
+| Phase 終了処理 | **各 Phase 末尾** | 教訓集約・次 Phase ハブ起票 |
+| tmux 5ペイン起動コマンド | 並列起動時 (頻度中) | Agent View 移行後は参照頻度低下傾向 |
 
-→ **推奨: 提案 A**。CLAUDE.lessons.md の分離だけで 40KB 削減になるため、core の 10,087 chars はそのまま残す方が安全。
+**コスト比較:**
+- **毎回 Read**: Lane プロンプト発行のたびに `Read CLAUDE.md` → inject コスト 119KB 毎回
+- **inject 済み (core 維持)**: 起動時 1 回 inject で Lane プロンプト発行中は参照無料
+
+**提案 A (現状維持 = 推奨):** core に丸ごと残す。inject コスト効率が高く、参照漏れリスクがない。CLAUDE.lessons.md の分離だけで △40KB 削減になるため、10,087 chars の追加コストは許容範囲。
+**提案 B (抽出):** 鉄則10本 + Tier分類表のみ core に残し、詳細 (tmux/Phase計画/Lane DoD) を `docs/ops/04_multiLLM_and_tooling.md` へ。Lane DoD 6セクションが ops に行くと、Lane 作成者が Read を忘れた場合に DoD 省略リスクが発生する。
+
+→ **推奨: 提案 A (core 維持)**
+- 根拠: v4 鉄則 10 本すべてが「毎 Lane プロンプト作成時」に参照される。inject 済みなら Read コスト不要。
+- CLAUDE.lessons.md 分離で inject bytes が 119KB → **~55KB** (△54%) になるため、Agent Teams セクション維持でもコスト目標を達成できる。
+- リスク: 提案 B を選ぶと Lane DoD 6セクションが ops.md に移動し、Lane 作成者が Read を忘れた場合に DoD 省略 (Gate 1-7 スキップ) リスクが発生する。安全装置として core 維持が優る。
 
 ---
 
