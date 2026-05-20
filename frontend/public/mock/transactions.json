@@ -1,0 +1,115 @@
+{
+  "items": [
+    {
+      "id": 1, "user_id": 2, "wallet_address": "0x742d35Cc6634C0532925a3b8D4C9C3A5f1bE8E4",
+      "operation": "SUPPLY", "asset": "USDC", "amount": "50000", "amount_usd": "50000.00",
+      "tx_hash": "0x3a7f8c2d1e9b4f6a0c5d8e2b1a3f7c9d0e8b5a2f1c4d7e0a3b6f9c2d5e8b1a4",
+      "chain": "base", "status": "SUCCESS", "ai_decision_id": 101,
+      "gas_used": "152340", "gas_price_gwei": "0.045", "is_dry_run": false,
+      "realized_pnl_usd": "156.20",
+      "created_at": "2026-05-19T09:14:22Z", "updated_at": "2026-05-19T09:14:45Z"
+    },
+    {
+      "id": 2, "user_id": 3, "wallet_address": "0x8A3F9E1C4B7D2F5A0E3C6B9D2F5A8E1C4B7D2F5",
+      "operation": "SUPPLY", "asset": "USDC", "amount": "10000", "amount_usd": "10000.00",
+      "tx_hash": "0x1b4e7a0d3f6c9b2e5a8d1f4c7b0e3a6d9f2c5b8e1a4d7f0c3b6e9a2d5f8c1b4",
+      "chain": "base", "status": "SUCCESS", "ai_decision_id": 101,
+      "gas_used": "151820", "gas_price_gwei": "0.045", "is_dry_run": false,
+      "realized_pnl_usd": "31.24",
+      "created_at": "2026-05-19T09:17:05Z", "updated_at": "2026-05-19T09:17:28Z"
+    },
+    {
+      "id": 3, "user_id": 4, "wallet_address": "0xF5A2E8C1B4D7F0C3B6E9A2D5F8C1B4E7A0D3F6",
+      "operation": "SUPPLY", "asset": "USDC", "amount": "5000", "amount_usd": "5000.00",
+      "tx_hash": "0x9c2f5a8b1e4d7f0c3b6e9a2d5f8c1b4e7a0d3f6c9b2e5a8d1f4c7b0e3a6d9f2",
+      "chain": "base", "status": "SUCCESS", "ai_decision_id": 102,
+      "gas_used": "151650", "gas_price_gwei": "0.044", "is_dry_run": false,
+      "realized_pnl_usd": "22.60",
+      "created_at": "2026-05-18T14:32:18Z", "updated_at": "2026-05-18T14:32:41Z"
+    },
+    {
+      "id": 4, "user_id": 2, "wallet_address": "0x742d35Cc6634C0532925a3b8D4C9C3A5f1bE8E4",
+      "operation": "WITHDRAW", "asset": "USDC", "amount": "20000", "amount_usd": "20000.00",
+      "tx_hash": "0x5e8b1a4d7f0c3b6e9a2d5f8c1b4e7a0d3f6c9b2e5a8d1f4c7b0e3a6d9f2c5b8",
+      "chain": "base", "status": "SUCCESS", "ai_decision_id": 103,
+      "gas_used": "132100", "gas_price_gwei": "0.046", "is_dry_run": false,
+      "realized_pnl_usd": "312.50",
+      "created_at": "2026-05-17T11:02:45Z", "updated_at": "2026-05-17T11:03:08Z"
+    },
+    {
+      "id": 5, "user_id": 3, "wallet_address": "0x8A3F9E1C4B7D2F5A0E3C6B9D2F5A8E1C4B7D2F5",
+      "operation": "SUPPLY", "asset": "USDC", "amount": "10000", "amount_usd": "10000.00",
+      "tx_hash": "0x2d5f8c1b4e7a0d3f6c9b2e5a8d1f4c7b0e3a6d9f2c5b8e1a4d7f0c3b6e9a2d5",
+      "chain": "base", "status": "SUCCESS", "ai_decision_id": 104,
+      "gas_used": "151800", "gas_price_gwei": "0.043", "is_dry_run": false,
+      "realized_pnl_usd": "38.90",
+      "created_at": "2026-05-16T08:22:33Z", "updated_at": "2026-05-16T08:22:56Z"
+    },
+    {
+      "id": 6, "user_id": 4, "wallet_address": "0xF5A2E8C1B4D7F0C3B6E9A2D5F8C1B4E7A0D3F6",
+      "operation": "SUPPLY", "asset": "USDC", "amount": "5000", "amount_usd": "5000.00",
+      "tx_hash": "0x8e1a4d7f0c3b6e9a2d5f8c1b4e7a0d3f6c9b2e5a8d1f4c7b0e3a6d9f2c5b8e1",
+      "chain": "base", "status": "SUCCESS", "ai_decision_id": 104,
+      "gas_used": "151620", "gas_price_gwei": "0.043", "is_dry_run": false,
+      "realized_pnl_usd": "19.45",
+      "created_at": "2026-05-16T08:27:11Z", "updated_at": "2026-05-16T08:27:34Z"
+    },
+    {
+      "id": 7, "user_id": 5, "wallet_address": "0xC1B4E7A0D3F6C9B2E5A8D1F4C7B0E3A6D9F2C5",
+      "operation": "SUPPLY", "asset": "USDC", "amount": "1000", "amount_usd": "1000.00",
+      "tx_hash": "0x4f7c0b3e6a9d2f5c8b1e4a7d0f3c6b9e2a5d8f1c4b7e0a3d6f9c2b5e8a1d4f7",
+      "chain": "base", "status": "SUCCESS", "ai_decision_id": 105,
+      "gas_used": "151580", "gas_price_gwei": "0.044", "is_dry_run": false,
+      "realized_pnl_usd": "4.12",
+      "created_at": "2026-05-15T16:02:09Z", "updated_at": "2026-05-15T16:02:32Z"
+    },
+    {
+      "id": 8, "user_id": 2, "wallet_address": "0x742d35Cc6634C0532925a3b8D4C9C3A5f1bE8E4",
+      "operation": "SUPPLY", "asset": "USDC", "amount": "50000", "amount_usd": "50000.00",
+      "tx_hash": "0x7a0d3f6c9b2e5a8d1f4c7b0e3a6d9f2c5b8e1a4d7f0c3b6e9a2d5f8c1b4e7a0",
+      "chain": "base", "status": "SUCCESS", "ai_decision_id": 106,
+      "gas_used": "152210", "gas_price_gwei": "0.045", "is_dry_run": false,
+      "realized_pnl_usd": "198.60",
+      "created_at": "2026-05-14T10:17:44Z", "updated_at": "2026-05-14T10:18:07Z"
+    },
+    {
+      "id": 9, "user_id": 3, "wallet_address": "0x8A3F9E1C4B7D2F5A0E3C6B9D2F5A8E1C4B7D2F5",
+      "operation": "WITHDRAW", "asset": "USDC", "amount": "5000", "amount_usd": "5000.00",
+      "tx_hash": "0x6b9e2a5d8f1c4b7e0a3d6f9c2b5e8a1d4f7c0b3e6a9d2f5c8b1e4a7d0f3c6b9",
+      "chain": "base", "status": "SUCCESS", "ai_decision_id": 107,
+      "gas_used": "131980", "gas_price_gwei": "0.045", "is_dry_run": false,
+      "realized_pnl_usd": "78.30",
+      "created_at": "2026-05-13T13:42:22Z", "updated_at": "2026-05-13T13:42:45Z"
+    },
+    {
+      "id": 10, "user_id": 4, "wallet_address": "0xF5A2E8C1B4D7F0C3B6E9A2D5F8C1B4E7A0D3F6",
+      "operation": "SUPPLY", "asset": "USDC", "amount": "5000", "amount_usd": "5000.00",
+      "tx_hash": "0x0c3b6e9a2d5f8c1b4e7a0d3f6c9b2e5a8d1f4c7b0e3a6d9f2c5b8e1a4d7f0c3",
+      "chain": "base", "status": "SUCCESS", "ai_decision_id": 108,
+      "gas_used": "151700", "gas_price_gwei": "0.043", "is_dry_run": false,
+      "realized_pnl_usd": "24.80",
+      "created_at": "2026-05-12T09:32:15Z", "updated_at": "2026-05-12T09:32:38Z"
+    },
+    {
+      "id": 11, "user_id": 5, "wallet_address": "0xC1B4E7A0D3F6C9B2E5A8D1F4C7B0E3A6D9F2C5",
+      "operation": "SUPPLY", "asset": "USDC", "amount": "1000", "amount_usd": "1000.00",
+      "tx_hash": "0xd5f8c1b4e7a0d3f6c9b2e5a8d1f4c7b0e3a6d9f2c5b8e1a4d7f0c3b6e9a2d5f8",
+      "chain": "base", "status": "SUCCESS", "ai_decision_id": 109,
+      "gas_used": "151540", "gas_price_gwei": "0.044", "is_dry_run": false,
+      "realized_pnl_usd": "5.88",
+      "created_at": "2026-05-11T15:22:44Z", "updated_at": "2026-05-11T15:23:07Z"
+    },
+    {
+      "id": 12, "user_id": 2, "wallet_address": "0x742d35Cc6634C0532925a3b8D4C9C3A5f1bE8E4",
+      "operation": "SUPPLY", "asset": "USDC", "amount": "50000", "amount_usd": "50000.00",
+      "tx_hash": "0xa8d1f4c7b0e3a6d9f2c5b8e1a4d7f0c3b6e9a2d5f8c1b4e7a0d3f6c9b2e5a8d1",
+      "chain": "base", "status": "SUCCESS", "ai_decision_id": 110,
+      "gas_used": "152380", "gas_price_gwei": "0.045", "is_dry_run": false,
+      "realized_pnl_usd": "218.40",
+      "created_at": "2026-05-10T08:02:33Z", "updated_at": "2026-05-10T08:02:56Z"
+    }
+  ],
+  "total": 12,
+  "limit": 30,
+  "offset": 0
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "id": 1, "email": "admin@ultra-auto-trade.com", "role": "admin",
+    "wallet_address": "0xA1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2",
+    "tier": "UPPER", "risk_mode": "balanced", "is_active": true,
+    "execution_policy": "require_approval",
+    "allocated_amount_usd": null, "created_at": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": 2, "email": "yamamoto@ultra-auto-trade.com", "role": "tester",
+    "wallet_address": "0x742d35Cc6634C0532925a3b8D4C9C3A5f1bE8E4",
+    "tier": "UPPER", "risk_mode": "aggressive", "is_active": true,
+    "execution_policy": "require_approval",
+    "allocated_amount_usd": 50000, "created_at": "2026-04-01T09:00:00Z"
+  },
+  {
+    "id": 3, "email": "tanaka@ultra-auto-trade.com", "role": "tester",
+    "wallet_address": "0x8A3F9E1C4B7D2F5A0E3C6B9D2F5A8E1C4B7D2F5",
+    "tier": "MIDDLE", "risk_mode": "balanced", "is_active": true,
+    "execution_policy": "require_approval",
+    "allocated_amount_usd": 10000, "created_at": "2026-04-15T10:00:00Z"
+  },
+  {
+    "id": 4, "email": "suzuki@ultra-auto-trade.com", "role": "partner",
+    "wallet_address": "0xF5A2E8C1B4D7F0C3B6E9A2D5F8C1B4E7A0D3F6",
+    "tier": "LOWER", "risk_mode": "conservative", "is_active": true,
+    "execution_policy": "require_approval",
+    "allocated_amount_usd": 5000, "created_at": "2026-05-01T09:00:00Z"
+  },
+  {
+    "id": 5, "email": "nakamura@ultra-auto-trade.com", "role": "tester",
+    "wallet_address": "0xC1B4E7A0D3F6C9B2E5A8D1F4C7B0E3A6D9F2C5",
+    "tier": "LOWER", "risk_mode": "conservative", "is_active": true,
+    "execution_policy": "require_approval",
+    "allocated_amount_usd": 1000, "created_at": "2026-05-10T09:00:00Z"
+  }
+]
