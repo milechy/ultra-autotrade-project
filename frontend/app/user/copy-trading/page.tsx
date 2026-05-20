@@ -2,7 +2,6 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
-export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
 import { TrendingUp, RefreshCw } from 'lucide-react'
