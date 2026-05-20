@@ -10,8 +10,8 @@
 #   ADMIN_EMAIL=other@example.com ADMIN_PASSWORD=xxx ./scripts/seed_staging_admin.sh
 #
 # 環境変数:
-#   POSTGRES_CONTAINER  (default: ultra-autotrade-postgres-staging-new)
-#   BACKEND_CONTAINER   (default: ultra-autotrade-backend-blue-staging-new)
+#   POSTGRES_CONTAINER  (default: 自動検出 — staging postgres コンテナ)
+#   BACKEND_CONTAINER   (default: 自動検出 — nginx upstream の active 側 backend)
 #   DB_USER             (default: ultra)
 #   DB_NAME             (default: ultra_autotrade_staging)
 #   ADMIN_EMAIL         (default: hkobayashi@mooores.com)
@@ -21,12 +21,45 @@
 
 set -euo pipefail
 
-CONTAINER="${POSTGRES_CONTAINER:-ultra-autotrade-postgres-staging-new}"
-BACKEND_CONTAINER="${BACKEND_CONTAINER:-ultra-autotrade-backend-blue-staging-new}"
 DB_USER="${DB_USER:-ultra}"
 DB_NAME="${DB_NAME:-ultra_autotrade_staging}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-hkobayashi@mooores.com}"
 ADMIN_ROLE="admin"
+
+# ── postgres コンテナ動的検出 ─────────────────────────────────────────────────
+if [[ -z "${POSTGRES_CONTAINER:-}" ]]; then
+  POSTGRES_CONTAINER=$(docker ps --filter "name=postgres.*staging" --filter "status=running" \
+    --format "{{.Names}}" | head -1 || true)
+fi
+CONTAINER="${POSTGRES_CONTAINER:-}"
+if [[ -z "${CONTAINER}" ]]; then
+  echo "ERROR: staging postgres コンテナが見つかりません。docker ps | grep postgres を確認してください。" >&2
+  exit 1
+fi
+
+# ── backend コンテナ動的検出 (nginx upstream.conf の active 側を参照) ──────────
+if [[ -z "${BACKEND_CONTAINER:-}" ]]; then
+  NGINX_C=$(docker ps --filter "name=nginx.*staging" --filter "status=running" \
+    --format "{{.Names}}" | head -1 || true)
+  ACTIVE_ALIAS=""
+  if [[ -n "${NGINX_C}" ]]; then
+    ACTIVE_ALIAS=$(docker exec "${NGINX_C}" cat /etc/nginx/conf.d/upstream.conf 2>/dev/null \
+      | grep -oP 'backend-\w+' | head -1 || true)
+  fi
+  if [[ -n "${ACTIVE_ALIAS}" ]]; then
+    BACKEND_CONTAINER=$(docker ps --filter "name=${ACTIVE_ALIAS}.*staging" \
+      --filter "status=running" --format "{{.Names}}" | head -1 || true)
+  fi
+  # フォールバック: nginx が取れなければ任意の running staging backend
+  if [[ -z "${BACKEND_CONTAINER:-}" ]]; then
+    BACKEND_CONTAINER=$(docker ps --filter "name=backend.*staging" \
+      --filter "status=running" --format "{{.Names}}" | head -1 || true)
+  fi
+fi
+if [[ -z "${BACKEND_CONTAINER:-}" ]]; then
+  echo "ERROR: staging backend コンテナが見つかりません。docker ps | grep backend を確認してください。" >&2
+  exit 1
+fi
 
 # ── Safety: staging コンテナのみ許可 ─────────────────────────────────────────
 if [[ "${CONTAINER}" != *"staging"* ]]; then
@@ -34,9 +67,10 @@ if [[ "${CONTAINER}" != *"staging"* ]]; then
   exit 1
 fi
 
-echo "[seed_staging_admin] 対象コンテナ : ${CONTAINER}"
-echo "[seed_staging_admin] DB             : ${DB_NAME}"
-echo "[seed_staging_admin] Admin email    : ${ADMIN_EMAIL}"
+echo "[seed_staging_admin] postgres コンテナ: ${CONTAINER}"
+echo "[seed_staging_admin] backend コンテナ : ${BACKEND_CONTAINER} (nginx active 側)"
+echo "[seed_staging_admin] DB               : ${DB_NAME}"
+echo "[seed_staging_admin] Admin email      : ${ADMIN_EMAIL}"
 
 # ── パスワード取得 ────────────────────────────────────────────────────────────
 if [[ -z "${ADMIN_PASSWORD:-}" ]]; then
@@ -50,17 +84,27 @@ if [[ ${#ADMIN_PASSWORD} -lt 8 ]]; then
   exit 1
 fi
 
-# ── bcrypt hash 生成 (backend container の Python 環境を利用) ─────────────────
+# ── bcrypt hash 生成 (env var 経由で渡す / passlib → bcrypt の順でフォールバック) ──
 echo "[seed_staging_admin] bcrypt hash 生成中..."
-HASHED=$(docker exec "${BACKEND_CONTAINER}" \
+HASHED=$(docker exec -e "SEED_PWD=${ADMIN_PASSWORD}" "${BACKEND_CONTAINER}" \
   python3 -c "
-import bcrypt, sys
-pwd = sys.argv[1].encode('utf-8')
-print(bcrypt.hashpw(pwd, bcrypt.gensalt(rounds=12)).decode())
-" "${ADMIN_PASSWORD}" 2>/dev/null || true)
+import os, sys
+pwd = os.environ['SEED_PWD']
+try:
+    from passlib.context import CryptContext
+    ctx = CryptContext(schemes=['bcrypt'], deprecated='auto')
+    print(ctx.hash(pwd))
+except Exception as e1:
+    try:
+        import bcrypt
+        print(bcrypt.hashpw(pwd.encode('utf-8'), bcrypt.gensalt(12)).decode())
+    except Exception as e2:
+        print(f'FAIL passlib={e1} bcrypt={e2}', file=sys.stderr)
+        sys.exit(1)
+" 2>&1 || true)
 
-if [[ -z "${HASHED}" ]]; then
-  echo "ERROR: bcrypt hash 生成失敗。backend container を確認: ${BACKEND_CONTAINER}" >&2
+if [[ "${HASHED:0:4}" != '$2b$' ]] && [[ "${HASHED:0:4}" != '$2a$' ]]; then
+  echo "ERROR: bcrypt hash 生成失敗。実際のエラー: ${HASHED}" >&2
   exit 1
 fi
 echo "[seed_staging_admin] bcrypt hash 生成完了"
