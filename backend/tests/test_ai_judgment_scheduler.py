@@ -542,7 +542,9 @@ def test_run_job_degraded_context_has_required_keys(db_session):
 
 def test_buy_creates_proposal_only_for_require_approval_users(db_session):
     """BUY 判定時、execution_policy='require_approval' のユーザーのみ Proposal が作成されること。"""
-    approval_user = _add_active_user(db_session, "approval@example.com", execution_policy="require_approval")
+    approval_user = _add_active_user(
+        db_session, "approval@example.com", execution_policy="require_approval"
+    )
     _add_active_user(db_session, "auto@example.com", execution_policy="auto_execute")
     _add_active_user(db_session, "proposal@example.com", execution_policy="proposal_only")
     _add_fund_allocation(db_session, approval_user)
