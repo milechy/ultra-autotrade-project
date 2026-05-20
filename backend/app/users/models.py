@@ -1,6 +1,28 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/app/users/models.py
-"""ユーザー設定モデル定義。"""
+"""ユーザー設定モデル定義。
+
+本モジュールは main.py から `from app.users.models import UserSettings  # noqa: F401`
+でインポートされ、Base.metadata.create_all() 時にテーブルが自動作成される。
+Alembic 不使用プロジェクトのため、下記 SQL は手動実行が必要なバックアップとして保持する。
+
+手動 CREATE TABLE SQL (新規環境・DB 再構築時):
+    CREATE TABLE IF NOT EXISTS user_settings (
+        id              SERIAL PRIMARY KEY,
+        user_id         INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        notification_email      VARCHAR(255),
+        notification_frequency  VARCHAR(20)  NOT NULL DEFAULT 'important',
+        max_single_trade_usd    NUMERIC(20,2),
+        max_daily_trade_usd     NUMERIC(20,2),
+        risk_mode       VARCHAR(20)  NOT NULL DEFAULT 'conservative',
+        dark_mode       BOOLEAN      NOT NULL DEFAULT TRUE,
+        language        VARCHAR(10)  NOT NULL DEFAULT 'ja',
+        two_factor_enabled BOOLEAN  NOT NULL DEFAULT FALSE,
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS ix_user_settings_user_id ON user_settings (user_id);
+"""
 
 from datetime import datetime, timezone
 from decimal import Decimal

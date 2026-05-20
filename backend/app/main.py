@@ -78,6 +78,9 @@ from app.reports.router import router as reports_router
 from app.rss.router import router as rss_router
 from app.transactions.router import admin_router as admin_transactions_router
 from app.transactions.router import router as transactions_router
+from app.users.models import (
+    UserSettings,  # noqa: F401 — ensure table registered with Base.metadata
+)
 from app.users.router import router as users_router
 from app.users.settings_router import router as user_settings_router
 from app.webhook.router import router as webhook_router
