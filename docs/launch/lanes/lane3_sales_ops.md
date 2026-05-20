@@ -11,6 +11,29 @@
 | owner | Claude Code CLI bg lane (sonnet 4.6) |
 | 関連 roadmap | `docs/launch/roadmap_to_launch.md` §3 Lane 3 + handoff §既知ブロッカー「営業チーム運用 docs」 |
 
+## 🚀 営業デモ環境 (2026-05-21 完成)
+
+**URL**: **https://demo.ultra-auto-trade.com** (Cloudflare Pages、Custom domain 設定済)
+
+ログイン不要、URL を開けば自動的に partner 視点で全画面閲覧可能。営業先への展開は本日から可能。
+
+**詳細**: `docs/sales/demo_url_guide.md` (営業向けガイド: 5 + パートナー専用 5 画面のトーク例、FAQ、案内テンプレ)
+
+**営業展開時の制約 (必ず把握)**:
+
+- ログイン不要、URL を開けばパートナー視点で全画面閲覧可能 (デモ用 partner ユーザーで自動ログイン状態)
+- 日本語のみ (国際化 en は無効)
+- 招待リンク `/r/<code>` は静的画面のため機能しない (代替: `/auth/register?ref=xxx` 直叩き)
+- リアルタイム更新なし (mock データの静的表示、再読み込みで値は変わらない)
+- データは全て架空 (sample data、本番実データは一切含まれない)
+- 本番への影響なし (デモ操作は本番 backend / DB に届かない)
+
+**関連 PR / commit**:
+- PR #326 (`demo/frontend-mock`): MOCK_MODE 基盤実装
+- PR #335 (`demo/frontend-static`): Cloudflare Pages static export 対応
+- commit `0e33c34`: useAuth bypass (login 不要化)
+- commit `db5d03f`: partner 5 画面のデータ表示 + テスター管理 white screen 解消
+
 ## /goal
 
 **Ultra AutoTrade のローンチ後を見据えた営業チーム運用 SOP と顧客対応フローを `docs/sales/` 配下に整備する。** ローンチ時点で営業チーム (現状: 小林さん + 想定パートナー営業) が困らないオペレーション基盤を作る。**機能仕様書ではなく、運用 SOP** (誰が・いつ・何を・どう操作するか) に scope を絞る。
