@@ -3,6 +3,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import Link from 'next/link'
 import {
   StatsCards,
   TransactionFilters,
@@ -160,9 +161,17 @@ function HistoryPageContent() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-xl font-bold text-zinc-100">取引履歴</h1>
-          <p className="text-sm text-zinc-400 mt-0.5">Aave操作の全履歴を確認できます</p>
+        <div className="flex items-end justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-zinc-100">取引履歴</h1>
+            <p className="text-sm text-zinc-400 mt-0.5">Aave操作の全履歴を確認できます</p>
+          </div>
+          <Link
+            href="/fees"
+            className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
+          >
+            手数料明細を見る →
+          </Link>
         </div>
 
         {/* Stats */}
