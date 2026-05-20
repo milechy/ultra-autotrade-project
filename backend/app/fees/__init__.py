@@ -10,9 +10,8 @@
 - ``FeeCalculationInput``    : 入力 dataclass (frozen, Decimal)
 - ``FeeCalculationResult``   : 出力 dataclass (frozen, Decimal)
 - ``JPY_QUANTIZE``           : 円未満切り捨て用 Decimal 単位
-- ``MarketFeeResult``        : トレード時点手数料ゲート計算結果
-- ``calculate_fee_by_market``: トレード時点の手数料率 + should_trade ゲート
-- ``MarketCondition``        : 市場状況 (BEAR/STABLE/BULL)
+- ``MarketFeeResult``        : トレードゲート判定結果 (§4)
+- ``calculate_fee_by_market``: §4 トレードゲート (予想利益 > 経費チェック)
 """
 
 from .calculator import (
@@ -22,7 +21,6 @@ from .calculator import (
     FeeCalculator,
 )
 from .trade_gate import (
-    MarketCondition,
     MarketFeeResult,
     calculate_fee_by_market,
 )
@@ -32,7 +30,6 @@ __all__ = [
     "FeeCalculationInput",
     "FeeCalculationResult",
     "FeeCalculator",
-    "MarketCondition",
     "MarketFeeResult",
     "calculate_fee_by_market",
 ]
