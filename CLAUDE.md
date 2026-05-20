@@ -2148,3 +2148,15 @@ docker exec ultra-autotrade-frontend-production sh -c \
 
 **新しい prompt version を追加する際は `_build_prompt_content()` の条件分岐を必ず確認する。**
 `{agent_signals}` を template に含む version は `if version in (...)` に必ず追加すること。
+
+---
+
+## Launch Progress (2026-05-20〜)
+
+正規ロードマップ: `docs/launch/roadmap_to_launch.md` (v1.0-skeleton)。5条件・6/3 シナリオ・実機データ再計算は本ロードマップで管理。CLAUDE.md §17 (5条件条文化) は本ロードマップ本文確定後に別 PR で追記する。
+
+**現状 (2026-05-20)**:
+- 想定ローンチ日 (claude.ai 提案 v1): 2026-06-03 (最早シナリオ、Tier B 4本並列構成)
+- 並列レーン: chaos test script / approval_rate 計測 / 営業チーム運用 docs / 森先生 DM 草案 (詳細指示書は本日 16:00 までに別途起票)
+- 起算ブロッカー: P0-X2 山本さん UAT INSERT が 4日 overdue (条件4 UAT 14日観測の起点遅延)
+- HOLD bias v4: 2026-05-19 PR #302 merge 済 (memory 「staging 反映待ち」は陳腐化、要更新)
