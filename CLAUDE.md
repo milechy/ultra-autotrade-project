@@ -9,6 +9,13 @@ Based on:
 > **2026-05-21 refactor (本 file の構成)**: `CLAUDE.md` は core のみを保持し、教訓は `CLAUDE.lessons.md`、ops 詳細は `docs/ops/` 配下に分離されている。
 > SessionStart Hook (`.claude/hooks/load-claude-lessons.sh`) が `CLAUDE.lessons.md` を auto-Read する。
 > 経緯: `docs/internal/claude_md_split_proposal.md` v2、TODO 1-10 の決定事項は本 PR description 参照。
+>
+> **「v4 指示文」と「CLAUDE.md」の関係**: 本 repo は 2 文書体制で運用。
+> - **CLAUDE.md** (本ファイル) — Claude Code CLI / dev VPS 向けの正本。リポジトリに commit。
+> - **v4 指示文** (claude.ai プロジェクト指示文、`/mnt/project/` 配下、browser 側) — claude.ai (PM/アーキテクト) 向けの正本。
+> 文中の `§9 朝プロトコル` のように prefix 無しの §-number は **本 CLAUDE.md 内**を指す。
+> `v4 指示文 §0 / §3 / §5 / §6 / §10 / §12 / §13 / §14` のように prefix 付きは **claude.ai 側指示文**を指す。
+> 両者は意図的に分離 (二重管理回避) し、相互参照のみ行う。
 
 ---
 
@@ -207,7 +214,7 @@ v3 (2026-05-01 確立) で 3-5 Lane 並列が「Tier B + worktree + tmux + Agent
 4. **Lane プロンプト発行前の「実 endpoint パス CLI 確認」抜け** (推測パスで Lane プロンプト発行)
 5. **Opus 障害時の Sonnet 退避ルートが言語化されていなかった** (Opus 4.6/4.7 elevated error rate で 3 Lane 停止)
 
-v4 はこれらの根本対策を CLAUDE.md §0 / §6 / §14 と接続して制度化する。
+v4 はこれらの根本対策を **v4 指示文 §0 / §6 / §14** (claude.ai プロジェクト指示文、`/mnt/project/` 配下) と接続して制度化する。
 
 ---
 
@@ -348,17 +355,17 @@ Sonnet で Phase 1-2 + テスト書き起こし + PR (Gate 4 保留版) まで�
 **A. 機能完了 (Lane 個別)**
 - Lane 元 DoD 項目
 
-**B. Gate 全通過 (CLAUDE.md §5 + §test_strategy 準拠)**
+**B. Gate 全通過 (v4 指示文 §5 + `docs/14_test_strategy.md` 準拠)**
 - Gate 1-3: verify.sh 全 pass
 - Gate 4: Playwright E2E 新規 spec staging baseURL 全 pass
 - Gate 5: 孤立コード検出 (大きなリファクタ + DeFi 安全系変更時必須)
 - Gate 6: Codex Review (Aave/セキュリティ変更時は adversarial review 追加)
 - Gate 7: Claude in Chrome (UI 変更 Lane / staging で CF Access ブロック時は Playwright mobile 代替明記)
 
-**C. 教訓記録 (CLAUDE.md §0「新規教訓・ルールは正本に追記」遵守)**
+**C. 教訓記録 (v4 指示文 §0「新規教訓・ルールは正本に追記」遵守)**
 - 詰まった箇所 / 推測失敗 / 環境分離違反 / memory 仮定起因失敗 を `CLAUDE.lessons.md`「YYYY-MM-DD」セクションに追記
 - 該当なしの場合も「特記なし」と明示 (silent skip 禁止)
-- §6 / §12 / §13 / §14 違反は太字で記録
+- v4 指示文 §6 / §12 / §13 / §14 違反は太字で記録
 
 **D. Asana 連携**
 - PR description に該当 Asana GID + Closes 記述
@@ -425,7 +432,7 @@ Phase 全 Lane 完了後、claude.ai セッションで以下を 1-2 時間で�
 2. **Postmortem (重大インシデント時)**: docs/postmortems/YYYY-MM-DD_*.md 作成
 3. **ルール改訂判断**: Phase 教訓から新規 hook / agent / skill / ルール追加が必要か判断 → 必要なら `CLAUDE.md` 該当セクション更新 + claude.ai プロジェクト指示文改訂起案
 4. **次 Phase 起動ハブ Asana 起票**: 5 軸事前確認 + Lane 構成 + DoD 強化版 全包含
-5. **山本さん共有 (必要時)**: §10 文面禁止 / 小林さん本人で送信
+5. **山本さん共有 (必要時)**: v4 指示文 §10 文面禁止 / 小林さん本人で送信
 
 ---
 
@@ -690,7 +697,7 @@ claude plugin list 2>&1 | head -10
 claude.ai が Step 0 をスキップして §9 を実行した場合、それは **鉄則8違反**。
 - 1回目: 本人 (claude.ai) が指摘を受けて Step 0 やり直し
 - 2回目以降: hkobayashi から claude.ai への信頼コスト発生、claude.ai は設計判断資格を失う
-- 本指示文 v4 §3 「メモリルール3件以上参照 / 適用判定」と並んで運用される
+- v4 指示文 §3 「メモリルール3件以上参照 / 適用判定」と並んで運用される
 - Step 0 未完のまま §9 を進めた事実は、§9 進行禁止ルールへの直接違反として記録される
 
 ### 経緯
