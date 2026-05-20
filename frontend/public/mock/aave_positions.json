@@ -1,0 +1,49 @@
+{
+  "health_factor": 2.05,
+  "total_collateral_usd": "67278.60",
+  "total_debt_usd": "32817.36",
+  "available_borrow_usd": "21000.00",
+  "net_apy": "2.84",
+  "positions": [
+    {
+      "user_id": 2,
+      "wallet_address": "0x742d35Cc6634C0532925a3b8D4C9C3A5f1bE8E4",
+      "asset": "USDC",
+      "supply_amount": "45000.00",
+      "supply_apy": "4.20",
+      "borrow_amount": "22000.00",
+      "borrow_apy": "5.80",
+      "health_factor": 2.08,
+      "net_apy": "2.52"
+    },
+    {
+      "user_id": 3,
+      "wallet_address": "0x8A3F9E1C4B7D2F5A0E3C6B9D2F5A8E1C4B7D2F5",
+      "asset": "USDC",
+      "supply_amount": "15312.80",
+      "supply_apy": "4.20",
+      "borrow_amount": "8200.00",
+      "borrow_apy": "5.80",
+      "health_factor": 1.95,
+      "net_apy": "2.65"
+    },
+    {
+      "user_id": 4,
+      "wallet_address": "0xF5A2E8C1B4D7F0C3B6E9A2D5F8C1B4E7A0D3F6",
+      "asset": "USDC",
+      "supply_amount": "5965.80",
+      "supply_apy": "4.20",
+      "borrow_amount": "2617.36",
+      "borrow_apy": "5.80",
+      "health_factor": 1.90,
+      "net_apy": "2.71"
+    }
+  ],
+  "market_data": {
+    "usdc_supply_apy": "4.20",
+    "usdc_borrow_apy": "5.80",
+    "usdc_utilization_rate": "72.4",
+    "total_market_supply_usd": "2450000000",
+    "chain": "base"
+  }
+}

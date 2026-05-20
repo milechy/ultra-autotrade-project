@@ -1,0 +1,31 @@
+{
+  "total_allocated_usd": 65000,
+  "total_supply_usd": 67278.60,
+  "health_factor": 2.05,
+  "testers": [
+    {
+      "tester_name": "山本 太郎",
+      "user_id": 2,
+      "allocated_amount_usd": 50000,
+      "current_value_usd": 51823.50,
+      "pnl_usd": 1823.50,
+      "pnl_percentage": 3.647
+    },
+    {
+      "tester_name": "田中 花子",
+      "user_id": 3,
+      "allocated_amount_usd": 10000,
+      "current_value_usd": 10312.80,
+      "pnl_usd": 312.80,
+      "pnl_percentage": 3.128
+    },
+    {
+      "tester_name": "鈴木 次郎",
+      "user_id": 4,
+      "allocated_amount_usd": 5000,
+      "current_value_usd": 5142.30,
+      "pnl_usd": 142.30,
+      "pnl_percentage": 2.846
+    }
+  ]
+}

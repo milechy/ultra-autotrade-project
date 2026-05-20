@@ -18,7 +18,48 @@ function getBaseUrl(): string {
   return base.replace(/\/$/, "");
 }
 
+// MOCK_MODE: path prefix → mock JSON file mapping
+const MOCK_PATH_MAP: Array<[string | RegExp, string]> = [
+  ["/api/proposals/admin/stats", "/mock/proposal_stats.json"],
+  ["/api/proposals/admin/all", "/mock/proposals.json"],
+  ["/api/proposals", "/mock/proposals.json"],
+  ["/api/partner/performance", "/mock/performance.json"],
+  ["/api/partner/allocations", "/mock/fund_allocations.json"],
+  ["/api/admin/transactions", "/mock/transactions.json"],
+  ["/api/ai/decisions", "/mock/ai_decisions.json"],
+  ["/api/admin/users", "/mock/users.json"],
+  ["/api/users", "/mock/users.json"],
+  ["/api/aave", "/mock/aave_positions.json"],
+  ["/health", "/mock/stats.json"],
+  ["/api/health", "/mock/stats.json"],
+];
+
+function getMockFile(path: string): string | null {
+  for (const [pattern, file] of MOCK_PATH_MAP) {
+    if (typeof pattern === "string" ? path.startsWith(pattern) : pattern.test(path)) {
+      return file;
+    }
+  }
+  return null;
+}
+
+async function mockFetch<T>(path: string): Promise<T> {
+  const mockFile = getMockFile(path);
+  if (!mockFile) {
+    // Return empty/null for unmapped paths in mock mode
+    return null as T;
+  }
+  const res = await fetch(mockFile, { cache: "no-store" });
+  if (!res.ok) throw { status: res.status, message: `Mock file not found: ${mockFile}` } as HttpError;
+  return res.json() as Promise<T>;
+}
+
+function isMockMode(): boolean {
+  return process.env.NEXT_PUBLIC_MOCK_MODE === "true";
+}
+
 export async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
+  if (isMockMode()) return mockFetch<T>(path);
   const base = getBaseUrl();
   const url = base ? `${base}${path}` : path;
 
@@ -47,6 +88,7 @@ export async function postJson<T>(
   data: unknown,
   init?: RequestInit
 ): Promise<T> {
+  if (isMockMode()) return mockFetch<T>(path);
   const base = getBaseUrl();
   const url = base ? `${base}${path}` : path;
 
@@ -80,6 +122,7 @@ export async function putJson<T>(
   data: unknown,
   init?: RequestInit
 ): Promise<T> {
+  if (isMockMode()) return mockFetch<T>(path);
   const base = getBaseUrl();
   const url = base ? `${base}${path}` : path;
 
@@ -109,6 +152,7 @@ export async function putJson<T>(
 }
 
 export async function deleteJson<T>(path: string, init?: RequestInit): Promise<T> {
+  if (isMockMode()) return mockFetch<T>(path);
   const base = getBaseUrl();
   const url = base ? `${base}${path}` : path;
 

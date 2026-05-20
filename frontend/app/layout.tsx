@@ -3,6 +3,7 @@
 import type { Metadata, Viewport } from 'next'
 import '../styles/globals.css'
 import { PWAProvider, InstallBanner, UpdatePrompt } from '@/components/pwa'
+import { DemoBanner } from '@/components/DemoBanner'
 
 export const metadata: Metadata = {
   title: 'Ultra AutoTrade',
@@ -48,6 +49,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
       </head>
       <body className="bg-background text-foreground antialiased">
+        <DemoBanner />
         <PWAProvider>
           {children}
           <InstallBanner />

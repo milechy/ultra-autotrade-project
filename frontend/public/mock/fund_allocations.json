@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "tester_name": "山本 太郎",
+    "allocated_amount_usd": 50000,
+    "current_value_usd": 51823.50,
+    "pnl_usd": 1823.50,
+    "pnl_percentage": 3.647,
+    "allocated_at": "2026-04-01T09:00:00Z",
+    "notes": "UPPERティア / 積極運用"
+  },
+  {
+    "id": 2,
+    "tester_name": "田中 花子",
+    "allocated_amount_usd": 10000,
+    "current_value_usd": 10312.80,
+    "pnl_usd": 312.80,
+    "pnl_percentage": 3.128,
+    "allocated_at": "2026-04-15T10:00:00Z",
+    "notes": "MIDDLEティア / バランス運用"
+  },
+  {
+    "id": 3,
+    "tester_name": "鈴木 次郎",
+    "allocated_amount_usd": 5000,
+    "current_value_usd": 5142.30,
+    "pnl_usd": 142.30,
+    "pnl_percentage": 2.846,
+    "allocated_at": "2026-05-01T09:00:00Z",
+    "notes": "LOWERティア / 保守運用"
+  }
+]
