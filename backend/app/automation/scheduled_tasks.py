@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
@@ -37,6 +38,7 @@ DEFAULT_TIMEZONE = ZoneInfo("Asia/Tokyo")
 DAILY_REPORT_TIME = time(0, 30)  # 00:30 JST
 WEEKLY_REPORT_TIME = time(1, 0)  # 01:00 JST
 WEEKLY_REPORT_DAY = 0  # Monday (0 = Monday, 6 = Sunday)
+MONTHLY_FEE_BATCH_TIME = time(9, 0)  # 毎月1日 09:00 JST
 
 # RSS フェッチ間隔（秒）
 RSS_FETCH_INTERVAL_SECONDS = 1800  # 30 分
@@ -103,6 +105,138 @@ def _calculate_seconds_until(
 
     # 最小 60 秒（重複実行防止）
     return max(seconds, 60.0)
+
+
+def _calculate_seconds_until_month_first(
+    tz: ZoneInfo = DEFAULT_TIMEZONE,
+    now: Optional[datetime] = None,
+) -> float:
+    """次回「月初 09:00 JST」までの秒数を返す。
+
+    今月1日 09:00 JST がまだ来ていなければそれを目標とし、
+    過ぎていれば翌月1日 09:00 JST を目標とする。
+    """
+    if now is None:
+        now = datetime.now(tz)
+    elif now.tzinfo is None:
+        now = now.replace(tzinfo=tz)
+    else:
+        now = now.astimezone(tz)
+
+    this_month_first = datetime(
+        now.year,
+        now.month,
+        1,
+        MONTHLY_FEE_BATCH_TIME.hour,
+        MONTHLY_FEE_BATCH_TIME.minute,
+        tzinfo=tz,
+    )
+
+    if now < this_month_first:
+        target = this_month_first
+    elif now.month == 12:
+        target = datetime(
+            now.year + 1,
+            1,
+            1,
+            MONTHLY_FEE_BATCH_TIME.hour,
+            MONTHLY_FEE_BATCH_TIME.minute,
+            tzinfo=tz,
+        )
+    else:
+        target = datetime(
+            now.year,
+            now.month + 1,
+            1,
+            MONTHLY_FEE_BATCH_TIME.hour,
+            MONTHLY_FEE_BATCH_TIME.minute,
+            tzinfo=tz,
+        )
+
+    return max((target - now).total_seconds(), 60.0)
+
+
+def _prev_month_start(d: date) -> date:
+    """指定日の前月月初を返す。"""
+    if d.month == 1:
+        return date(d.year - 1, 12, 1)
+    return date(d.year, d.month - 1, 1)
+
+
+def _monthly_fee_batch_sync(calculation_month: date, usd_jpy_rate: Decimal) -> None:
+    """月次手数料バッチの同期実行 (asyncio.to_thread から呼ばれる)。"""
+    from sqlalchemy import select as _select  # noqa: PLC0415
+
+    from app.api.v1.fees import finalize_month_core  # noqa: PLC0415
+    from app.billing.v10_models import FeeConfigV10  # noqa: PLC0415
+
+    with SessionLocal() as db:
+        config = db.scalar(
+            _select(FeeConfigV10)
+            .where(FeeConfigV10.is_active.is_(True))
+            .order_by(FeeConfigV10.effective_from.desc())
+            .limit(1)
+        )
+        if config is None:
+            logger.error(
+                "monthly_fee_batch: active fee_config not found, skipping month=%s",
+                calculation_month,
+            )
+            return
+        result = finalize_month_core(db, config, calculation_month, usd_jpy_rate)
+        logger.info(
+            "monthly_fee_batch done: month=%s processed=%d skipped_no_snap=%d"
+            " skipped_finalized=%d total_fee=%s",
+            calculation_month,
+            result.users_processed,
+            result.users_skipped_no_snapshot,
+            result.users_skipped_already_finalized,
+            result.total_fee_jpy,
+        )
+
+
+async def monthly_fee_batch_loop(
+    *,
+    usd_jpy_rate: Decimal = Decimal("150"),
+    tz: ZoneInfo = DEFAULT_TIMEZONE,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """月次手数料バッチ: 毎月1日 09:00 JST に前月分の fee_transactions を計算・登録する。
+
+    ENABLE_MONTHLY_FEE_BATCH=1 で main.py から起動される。
+    usd_jpy_rate は USD_TO_JPY_RATE 環境変数（デフォルト 150）を使う。
+    """
+    logger.info(
+        "Starting monthly fee batch loop (schedule: 1st of month %s JST)", MONTHLY_FEE_BATCH_TIME
+    )
+
+    while True:
+        try:
+            wait_seconds = _calculate_seconds_until_month_first(tz=tz)
+            logger.debug("Waiting %.1f seconds until next monthly fee batch", wait_seconds)
+            await asyncio.sleep(wait_seconds)
+
+            now_jst = datetime.now(tz)
+            target_month = _prev_month_start(now_jst.date())
+
+            logger.info("Running monthly fee batch for month=%s", target_month)
+            await asyncio.to_thread(_monthly_fee_batch_sync, target_month, usd_jpy_rate)
+            logger.info("Monthly fee batch completed for month=%s", target_month)
+
+            await asyncio.sleep(3600)  # 重複実行防止
+
+        except asyncio.CancelledError:
+            logger.info("Monthly fee batch loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in monthly fee batch loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+            await asyncio.sleep(3600)
 
 
 async def daily_report_loop(
@@ -892,6 +1026,7 @@ class ScheduledTaskManager:
         self._proposal_timeout_task: Optional[asyncio.Task[None]] = None
         self._learning_task: Optional[asyncio.Task[None]] = None
         self._compound_risk_task: Optional[asyncio.Task[None]] = None
+        self._monthly_fee_batch_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -947,6 +1082,49 @@ class ScheduledTaskManager:
     def is_compound_risk_running(self) -> bool:
         """複合リスク監視タスクが動作中かどうか。"""
         return self._compound_risk_task is not None and not self._compound_risk_task.done()
+
+    @property
+    def is_monthly_fee_batch_running(self) -> bool:
+        """月次手数料バッチタスクが動作中かどうか。"""
+        return self._monthly_fee_batch_task is not None and not self._monthly_fee_batch_task.done()
+
+    async def start_monthly_fee_batch(
+        self,
+        *,
+        usd_jpy_rate: Decimal = Decimal("150"),
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """月次手数料バッチタスクを開始する。"""
+        if self.is_monthly_fee_batch_running:
+            raise RuntimeError("Monthly fee batch already running")
+
+        logger.info("Starting monthly fee batch task (rate=%s)", usd_jpy_rate)
+        self._monthly_fee_batch_task = asyncio.create_task(
+            monthly_fee_batch_loop(usd_jpy_rate=usd_jpy_rate, on_error=on_error)
+        )
+        logger.info("Monthly fee batch task started")
+
+    async def stop_monthly_fee_batch(self, timeout: float = 5.0) -> None:
+        """月次手数料バッチタスクを停止する。"""
+        if not self.is_monthly_fee_batch_running:
+            logger.debug("Monthly fee batch not running - nothing to stop")
+            return
+
+        logger.info("Stopping monthly fee batch task")
+        assert self._monthly_fee_batch_task is not None  # noqa: S101
+        self._monthly_fee_batch_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._monthly_fee_batch_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Monthly fee batch task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning("Monthly fee batch task did not stop within %.1fs timeout", timeout)
+        except Exception as exc:
+            logger.error("Error while stopping monthly fee batch task: %s", exc)
+
+        self._monthly_fee_batch_task = None
+        logger.info("Monthly fee batch task stopped")
 
     async def start_daily_reports(
         self,
@@ -1628,6 +1806,7 @@ class ScheduledTaskManager:
             self.stop_proposal_timeout(timeout=timeout),
             self.stop_learning(timeout=timeout),
             self.stop_compound_risk_monitor(timeout=timeout),
+            self.stop_monthly_fee_batch(timeout=timeout),
             return_exceptions=True,
         )
 
