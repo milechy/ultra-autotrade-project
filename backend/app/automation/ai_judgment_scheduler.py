@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Callable, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.ai.judgment_log import get_judgment_logger
@@ -60,9 +60,72 @@ def get_scheduler_status() -> "dict[str, Any]":
 
 _DEFAULT_QUERY = "DeFi market analysis"
 _PROPOSAL_ASSET = "USDC"
-_PROPOSAL_AMOUNT = Decimal("1000")
-_PROPOSAL_AMOUNT_USD = Decimal("1000.00")
 _PROPOSAL_EXPIRES_HOURS = 72
+
+# 提案金額: fund_allocations.allocated_amount_usd × _PROPOSAL_RATIO で動的計算。
+# fund_allocations が未設定のユーザーへの提案は Decimal("0") → skip (安全側)。
+# 環境変数で上書き可能。
+_PROPOSAL_RATIO = Decimal(os.getenv("PROPOSAL_AMOUNT_RATIO", "0.10"))  # 10%
+_PROPOSAL_AMOUNT_MIN_USD = Decimal(os.getenv("PROPOSAL_AMOUNT_MIN_USD", "50"))
+_PROPOSAL_AMOUNT_MAX_USD = Decimal(os.getenv("PROPOSAL_AMOUNT_MAX_USD", "2000"))
+
+
+def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
+    """ユーザーの fund_allocations 合計 × _PROPOSAL_RATIO を提案金額として返す。
+
+    active な fund_allocations が存在しない場合は Decimal("0") を返し、
+    Slack 通知 (best-effort) を送る。$0 は下流の explicit check でスキップされる。
+
+    新テスター追加後に fund_allocations INSERT を忘れると Slack 警告が飛ぶ設計。
+    """
+    from app.partner.allocation_models import FundAllocation  # noqa: PLC0415
+
+    raw = (
+        db.query(func.sum(FundAllocation.allocated_amount_usd))
+        .filter(
+            FundAllocation.tester_user_id == user_id,
+            FundAllocation.status == "active",
+        )
+        .scalar()
+    )
+    allocated = Decimal(str(raw)) if raw else Decimal("0")
+    if allocated <= Decimal("0"):
+        logger.warning(
+            "fund_allocations empty for user_id=%d — proposal skipped. "
+            "ACTION REQUIRED: INSERT INTO fund_allocations (tester_user_id=%d, status='active').",
+            user_id,
+            user_id,
+        )
+        _notify_missing_allocation(user_id)
+        return Decimal("0")
+    amount = (allocated * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
+    return max(_PROPOSAL_AMOUNT_MIN_USD, min(amount, _PROPOSAL_AMOUNT_MAX_USD))
+
+
+def _notify_missing_allocation(user_id: int) -> None:
+    """fund_allocations 未設定ユーザーを Slack 通知する (best-effort)。"""
+    try:
+        from app.notifications.factory import get_notification_service  # noqa: PLC0415
+        from app.notifications.schemas import (  # noqa: PLC0415
+            NotificationChannel,
+            NotificationMessage,
+            NotificationSeverity,
+        )
+
+        msg = NotificationMessage(
+            user_id=None,
+            channel=NotificationChannel.SLACK,
+            severity=NotificationSeverity.WARNING,
+            title="⚠️ fund_allocations 未設定",
+            body=(
+                f"user_id={user_id} に active な fund_allocations がありません。\n"
+                "ACTION REQUIRED: production DB に INSERT してください。\n"
+                "提案生成をスキップしました。"
+            ),
+        )
+        get_notification_service().send(msg)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("_notify_missing_allocation failed for user_id=%d: %s", user_id, exc)
 
 
 def save_ai_decision(
@@ -182,14 +245,20 @@ def _create_proposals_for_users(
             )
             continue
 
+        # fund_allocations から per-user 提案金額を動的計算 (Decimal("0") = skip)
+        proposal_amount_usd = _resolve_proposal_amount(db, user.id)
+        if proposal_amount_usd <= Decimal("0"):
+            # _resolve_proposal_amount 内で警告・Slack 通知済み
+            continue
+
         # 動的手数料計算: デフォルトAPY 4%（安定期）を使用
         # 30日保有での予想利益 = amount × (APY/100) × (30/365)
         _default_apy = Decimal("4")
         _expected_profit = (
-            _PROPOSAL_AMOUNT_USD * _default_apy / Decimal("100") * Decimal("30") / Decimal("365")
+            proposal_amount_usd * _default_apy / Decimal("100") * Decimal("30") / Decimal("365")
         )
         market_fee = calculate_fee_by_market(
-            trade_amount_usd=_PROPOSAL_AMOUNT_USD,
+            trade_amount_usd=proposal_amount_usd,
             tier=normalize_tier(user.tier, user_id=user.id).value,
             current_apy=_default_apy,
             expected_profit_usd=_expected_profit,
@@ -209,8 +278,8 @@ def _create_proposals_for_users(
             ai_decision_id=decision.id,
             operation=operation,
             asset=_PROPOSAL_ASSET,
-            amount=_PROPOSAL_AMOUNT,
-            amount_usd=_PROPOSAL_AMOUNT_USD,
+            amount=proposal_amount_usd,
+            amount_usd=proposal_amount_usd,
             reason=reason,
             expires_at=expires_at,
             fee_rate=market_fee.fee_rate,
@@ -228,7 +297,7 @@ def _create_proposals_for_users(
             _payload = ai_proposal_notification(
                 operation=operation,
                 asset=_PROPOSAL_ASSET,
-                amount=_PROPOSAL_AMOUNT,
+                amount=proposal_amount_usd,
                 confidence=result.final_confidence,
             )
             _payload.notification_message.user_id = user.id

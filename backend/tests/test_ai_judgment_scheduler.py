@@ -32,6 +32,7 @@ from app.automation.ai_judgment_scheduler import (  # noqa: E402
     save_ai_decision,
 )
 from app.database import Base  # noqa: E402
+from app.partner.allocation_models import FundAllocation  # noqa: E402
 from app.proposals.models import Proposal  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -96,6 +97,28 @@ def _add_active_user(
     session.add(user)
     session.flush()
     return user
+
+
+def _add_fund_allocation(
+    session,
+    user: User,
+    allocated_usd: Decimal = Decimal("10000"),
+    partner_id: "int | None" = None,
+) -> FundAllocation:
+    """テストユーザー用の fund_allocations を追加するヘルパー。
+    allocated_usd=$10,000, ratio=10% → proposal_amount=$1,000 (既存アサーションと一致)。
+    """
+    pid = partner_id if partner_id is not None else user.id
+    alloc = FundAllocation(
+        partner_id=pid,
+        tester_name=f"test-{user.email}",
+        tester_user_id=user.id,
+        allocated_amount_usd=allocated_usd,
+        status="active",
+    )
+    session.add(alloc)
+    session.flush()
+    return alloc
 
 
 # ---------------------------------------------------------------------------
@@ -193,8 +216,10 @@ def test_run_job_hold_no_proposals(db_session):
 
 def test_run_job_buy_creates_proposals(db_session):
     """BUY 判定のとき、アクティブユーザー数分の Proposal が作成されること。"""
-    _add_active_user(db_session, "user1@example.com")
-    _add_active_user(db_session, "user2@example.com")
+    u1 = _add_active_user(db_session, "user1@example.com")
+    u2 = _add_active_user(db_session, "user2@example.com")
+    _add_fund_allocation(db_session, u1)
+    _add_fund_allocation(db_session, u2)
     db_session.commit()
 
     mock_result = _make_cross_validation_result(TradeAction.BUY)
@@ -241,7 +266,8 @@ def test_run_job_saves_to_ai_decisions(db_session):
 
 def test_run_job_sell_creates_withdraw_proposals(db_session):
     """SELL 判定のとき、operation='WITHDRAW' の Proposal が作成されること。"""
-    _add_active_user(db_session, "seller@example.com")
+    seller = _add_active_user(db_session, "seller@example.com")
+    _add_fund_allocation(db_session, seller)
     db_session.commit()
 
     mock_result = _make_cross_validation_result(TradeAction.SELL)
@@ -516,9 +542,12 @@ def test_run_job_degraded_context_has_required_keys(db_session):
 
 def test_buy_creates_proposal_only_for_require_approval_users(db_session):
     """BUY 判定時、execution_policy='require_approval' のユーザーのみ Proposal が作成されること。"""
-    _add_active_user(db_session, "approval@example.com", execution_policy="require_approval")
+    approval_user = _add_active_user(
+        db_session, "approval@example.com", execution_policy="require_approval"
+    )
     _add_active_user(db_session, "auto@example.com", execution_policy="auto_execute")
     _add_active_user(db_session, "proposal@example.com", execution_policy="proposal_only")
+    _add_fund_allocation(db_session, approval_user)
     db_session.commit()
 
     mock_result = _make_cross_validation_result(TradeAction.BUY)
@@ -703,6 +732,8 @@ def test_buy_includes_upper_user_within_general_interval(db_session):
         last_judgment_at=past_4h,
     )
     db_session.add(user)
+    db_session.flush()
+    _add_fund_allocation(db_session, user)
     db_session.commit()
 
     mock_result = _make_cross_validation_result(TradeAction.BUY)
@@ -731,6 +762,8 @@ def test_buy_updates_last_judgment_at(db_session):
         last_judgment_at=None,
     )
     db_session.add(user)
+    db_session.flush()
+    _add_fund_allocation(db_session, user)
     db_session.commit()
 
     mock_result = _make_cross_validation_result(TradeAction.BUY)
@@ -769,6 +802,8 @@ def test_create_proposals_uses_normalized_tier(db_session):
         last_judgment_at=None,
     )
     db_session.add(user)
+    db_session.flush()
+    _add_fund_allocation(db_session, user)
     db_session.commit()
 
     mock_result = _make_cross_validation_result(TradeAction.BUY)

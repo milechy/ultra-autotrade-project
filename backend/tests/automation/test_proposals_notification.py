@@ -20,7 +20,12 @@ from unittest.mock import MagicMock, patch
 from app.ai.schemas import CrossValidationResult, LLMDecision, LLMProvider, TradeAction
 from app.auth.constants import ExecutionPolicy
 from app.auth.models import InvestmentTier
-from app.automation.ai_judgment_scheduler import _create_proposals_for_users
+from app.automation.ai_judgment_scheduler import (
+    _PROPOSAL_AMOUNT_MAX_USD,
+    _PROPOSAL_AMOUNT_MIN_USD,
+    _PROPOSAL_RATIO,
+    _create_proposals_for_users,
+)
 from app.automation.workflow import _create_proposal_from_judgment
 from app.notifications.schemas import NotificationMessage
 
@@ -89,6 +94,10 @@ class TestCreateProposalsForUsersNotification:
 
         with (
             patch(
+                "app.automation.ai_judgment_scheduler._resolve_proposal_amount",
+                return_value=Decimal("460"),
+            ),
+            patch(
                 "app.fees.trade_gate.calculate_fee_by_market",
                 return_value=_make_fee(should_trade),
             ),
@@ -135,6 +144,10 @@ class TestCreateProposalsForUsersNotification:
         mock_db.scalars.return_value.all.return_value = [user]
 
         with (
+            patch(
+                "app.automation.ai_judgment_scheduler._resolve_proposal_amount",
+                return_value=Decimal("460"),
+            ),
             patch(
                 "app.fees.trade_gate.calculate_fee_by_market",
                 return_value=_make_fee(should_trade=True),
@@ -229,3 +242,51 @@ class TestCreateProposalFromJudgmentNotification:
                 user_id=5,
             )
         mock_legacy.assert_not_called()
+
+
+class TestDynamicProposalAmount:
+    """_create_proposals_for_users uses _resolve_proposal_amount per user."""
+
+    def _run_with_resolved_amount(self, resolved_amount: Decimal) -> "Decimal | None":
+        """Runs with mocked _resolve_proposal_amount, returns amount used in Proposal.add()."""
+        user = _make_user(user_id=5)
+        decision = _make_decision()
+        result = _make_cross_result(TradeAction.BUY)
+
+        mock_db = MagicMock()
+        mock_db.scalars.return_value.all.return_value = [user]
+
+        added_proposals: list[Any] = []
+        mock_db.add.side_effect = lambda obj: added_proposals.append(obj)
+
+        with (
+            patch(
+                "app.automation.ai_judgment_scheduler._resolve_proposal_amount",
+                return_value=resolved_amount,
+            ),
+            patch(
+                "app.fees.trade_gate.calculate_fee_by_market",
+                return_value=_make_fee(should_trade=True),
+            ),
+            patch("app.notifications.factory.get_notification_service"),
+        ):
+            _create_proposals_for_users(mock_db, decision, result)
+
+        return added_proposals[0].amount_usd if added_proposals else None
+
+    def test_uses_resolved_amount_in_proposal(self) -> None:
+        """Proposal.amount_usd equals the value returned by _resolve_proposal_amount."""
+        used = self._run_with_resolved_amount(Decimal("460"))
+        assert used == Decimal("460")
+
+    def test_skips_proposal_when_resolved_amount_is_zero(self) -> None:
+        """When _resolve_proposal_amount returns 0, no Proposal is created."""
+        used = self._run_with_resolved_amount(Decimal("0"))
+        assert used is None
+
+    def test_ratio_and_clamp_logic(self) -> None:
+        """_PROPOSAL_RATIO × allocation, clamped to [MIN, MAX]."""
+        allocation = Decimal("4600")
+        raw = (allocation * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
+        expected = max(_PROPOSAL_AMOUNT_MIN_USD, min(raw, _PROPOSAL_AMOUNT_MAX_USD))
+        assert expected == Decimal("460.00")
