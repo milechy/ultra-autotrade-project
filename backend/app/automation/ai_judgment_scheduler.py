@@ -161,6 +161,7 @@ def save_ai_decision(
         secondary_confidence=result.secondary.confidence if result.secondary else None,
         agreed=result.agreed,
         rag_context_json=rag_context.model_dump() if rag_context else None,
+        prompt_version=result.primary.prompt_version,
     )
     db.add(decision)
     db.flush()  # id を確定させる

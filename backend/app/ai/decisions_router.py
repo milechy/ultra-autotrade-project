@@ -112,6 +112,7 @@ def create_decision(
         secondary_confidence=request.secondary_confidence,
         agreed=request.agreed,
         rag_context_json=request.rag_context_json,
+        prompt_version=request.prompt_version,
     )
     db.add(decision)
     db.commit()

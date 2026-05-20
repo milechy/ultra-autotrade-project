@@ -30,6 +30,8 @@ class AIDecision(Base):
     secondary_confidence: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     agreed: Mapped[bool] = mapped_column(Boolean, default=False)
     rag_context_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    # ALTER TABLE ai_decisions ADD COLUMN IF NOT EXISTS prompt_version VARCHAR(10) DEFAULT 'v1';
+    prompt_version: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, default="v1")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

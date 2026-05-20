@@ -22,6 +22,7 @@ class AIDecisionCreate(BaseModel):
     secondary_confidence: Optional[int] = None
     agreed: bool = False
     rag_context_json: Optional[Any] = None
+    prompt_version: Optional[str] = "v1"
 
 
 class AIDecisionResponse(BaseModel):
@@ -41,6 +42,7 @@ class AIDecisionResponse(BaseModel):
     secondary_confidence: Optional[int]
     agreed: bool
     rag_context_json: Optional[Any]
+    prompt_version: Optional[str]
     created_at: datetime
 
 
