@@ -3,6 +3,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Lock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,12 +25,37 @@ interface RiskSettingsCardProps {
   onMaxSingleTradeUsdChange: (value: number) => void
   maxDailyTradeUsd: number
   onMaxDailyTradeUsdChange: (value: number) => void
+  allowedModes?: RiskMode[]
 }
 
-const riskOptions: { mode: RiskMode; label: string; emoji: string; description: string; toastDescription: string }[] = [
-  { mode: 'conservative', label: '保守的', emoji: '🛡️', description: '安全重視、低リスク', toastDescription: 'ステーブルコインのみで安全に運用します' },
-  { mode: 'balanced', label: 'バランス', emoji: '⚖️', description: '標準設定', toastDescription: '安定性と収益のバランスを取って運用します' },
-  { mode: 'aggressive', label: '積極的', emoji: '🚀', description: '高リターン、高リスク', toastDescription: '高リターンを重視して積極的に運用します' },
+const riskOptions: {
+  mode: RiskMode
+  label: string
+  emoji: string
+  description: string
+  toastDescription: string
+}[] = [
+  {
+    mode: 'conservative',
+    label: '保守的',
+    emoji: '🛡️',
+    description: '安全重視、低リスク',
+    toastDescription: 'ステーブルコインのみで安全に運用します',
+  },
+  {
+    mode: 'balanced',
+    label: 'バランス',
+    emoji: '⚖️',
+    description: '標準設定',
+    toastDescription: '安定性と収益のバランスを取って運用します',
+  },
+  {
+    mode: 'aggressive',
+    label: '積極的',
+    emoji: '🚀',
+    description: '高リターン、高リスク',
+    toastDescription: '高リターンを重視して積極的に運用します',
+  },
 ]
 
 const modeActiveClass: Record<RiskMode, string> = {
@@ -45,11 +71,12 @@ export function RiskSettingsCard({
   onMaxSingleTradeUsdChange,
   maxDailyTradeUsd,
   onMaxDailyTradeUsdChange,
+  allowedModes = ['conservative'],
 }: RiskSettingsCardProps) {
   const [saving, setSaving] = useState(false)
 
   const handleRiskModeChange = async (mode: RiskMode) => {
-    if (saving || mode === riskMode) return
+    if (saving || mode === riskMode || !allowedModes.includes(mode)) return
     setSaving(true)
     try {
       await apiPut<RiskModeResponse>('/auth/risk-mode', { mode })
@@ -77,28 +104,54 @@ export function RiskSettingsCard({
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {riskOptions.map((opt) => {
               const isActive = riskMode === opt.mode
+              const isAllowed = allowedModes.includes(opt.mode)
+              const isDisabled = saving || !isAllowed
+
               return (
                 <button
                   key={opt.mode}
                   onClick={() => { void handleRiskModeChange(opt.mode) }}
-                  disabled={saving}
+                  disabled={isDisabled}
                   className={cn(
-                    'text-left rounded-lg border-2 p-3 transition-all disabled:opacity-60',
-                    isActive
+                    'text-left rounded-lg border-2 p-3 transition-all',
+                    isAllowed
+                      ? 'disabled:opacity-60'
+                      : 'cursor-not-allowed opacity-50',
+                    isActive && isAllowed
                       ? modeActiveClass[opt.mode]
-                      : 'border-zinc-700 bg-zinc-800/40 hover:border-zinc-600'
+                      : isAllowed
+                        ? 'border-zinc-700 bg-zinc-800/40 hover:border-zinc-600'
+                        : 'border-zinc-800 bg-zinc-900/40',
                   )}
                 >
                   <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-base">{opt.emoji}</span>
-                    <span className="text-sm font-semibold text-zinc-100">{opt.label}</span>
-                    {isActive && (
+                    {isAllowed ? (
+                      <span className="text-base">{opt.emoji}</span>
+                    ) : (
+                      <Lock className="w-4 h-4 text-zinc-600" />
+                    )}
+                    <span
+                      className={cn(
+                        'text-sm font-semibold',
+                        isAllowed ? 'text-zinc-100' : 'text-zinc-600',
+                      )}
+                    >
+                      {opt.label}
+                    </span>
+                    {isActive && isAllowed && (
                       <span className="ml-auto text-xs px-1.5 py-0.5 rounded bg-zinc-700 text-zinc-300">
                         現在
                       </span>
                     )}
+                    {!isAllowed && (
+                      <span className="ml-auto text-xs px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-600">
+                        Phase 2
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-zinc-400">{opt.description}</p>
+                  <p className={cn('text-xs', isAllowed ? 'text-zinc-400' : 'text-zinc-700')}>
+                    {isAllowed ? opt.description : 'Phase 2 で解禁予定'}
+                  </p>
                 </button>
               )
             })}

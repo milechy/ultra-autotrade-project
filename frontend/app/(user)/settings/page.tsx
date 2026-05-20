@@ -23,6 +23,11 @@ type RiskMode = 'conservative' | 'balanced' | 'aggressive'
 type NotificationFrequency = 'all' | 'important' | 'emergency'
 type Language = 'ja' | 'en'
 
+interface RiskModeOption {
+  mode: RiskMode
+  allowed_in_phase_1: boolean
+}
+
 interface UserSettingsResponse {
   notification_email?: string
   notification_frequency?: NotificationFrequency
@@ -59,6 +64,7 @@ export default function SettingsPage() {
   const { address, chainId, disconnect } = useWallet()
   const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS)
   const [isStopped, setIsStopped] = useState(false)
+  const [allowedModes, setAllowedModes] = useState<RiskMode[]>(['conservative'])
 
   // U-07: Load risk mode from GET /auth/risk-mode
   useEffect(() => {
@@ -66,6 +72,19 @@ export default function SettingsPage() {
     apiFetch<{ mode: RiskMode }>('/auth/risk-mode')
       .then((data) => setSettings((prev) => ({ ...prev, riskMode: data.mode })))
       .catch(() => {/* keep default on error */})
+  }, [token])
+
+  // F-10: Load allowed risk modes from GET /auth/risk-modes
+  useEffect(() => {
+    if (!token) return
+    apiFetch<{ modes: RiskModeOption[] }>('/auth/risk-modes')
+      .then((data) => {
+        const allowed = data.modes
+          .filter((m) => m.allowed_in_phase_1)
+          .map((m) => m.mode)
+        if (allowed.length > 0) setAllowedModes(allowed)
+      })
+      .catch(() => {/* keep default conservative */})
   }, [token])
 
   // Load user settings from GET /api/user/settings
@@ -155,6 +174,7 @@ export default function SettingsPage() {
           onMaxSingleTradeUsdChange={(value) => set('maxSingleTradeUsd', value)}
           maxDailyTradeUsd={settings.maxDailyTradeUsd}
           onMaxDailyTradeUsdChange={(value) => set('maxDailyTradeUsd', value)}
+          allowedModes={allowedModes}
         />
 
         {/* 3. 通知設定 — synced with PUT /api/user/settings */}
