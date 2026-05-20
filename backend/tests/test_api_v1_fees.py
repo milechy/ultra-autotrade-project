@@ -643,6 +643,34 @@ def _add_portfolio_snapshot(
         db.commit()
 
 
+def _add_transaction(
+    SessionFactory,
+    *,
+    user_id: int,
+    created_at: datetime,
+    status: str = "completed",
+    is_dry_run: bool = False,
+    operation: str = "deposit",
+    amount_usd: Decimal = Decimal("100"),
+) -> None:
+    from app.transactions.models import Transaction  # noqa: PLC0415
+
+    with SessionFactory() as db:
+        txn = Transaction(
+            user_id=user_id,
+            operation=operation,
+            asset="USDC",
+            amount=amount_usd,
+            amount_usd=amount_usd,
+            chain="polygon",
+            status=status,
+            is_dry_run=is_dry_run,
+            created_at=created_at,
+        )
+        db.add(txn)
+        db.commit()
+
+
 class TestFinalizeMonth:
     """F-7: POST /api/v1/fees/finalize-month の正常系・境界テスト。"""
 
@@ -737,6 +765,55 @@ class TestFinalizeMonth:
                 select(func.count(FeeTransaction.id)).where(FeeTransaction.user_id == user_id)
             )
             assert count == 0  # dry_run なので DB 未書込
+
+    def test_expense_jpy_calculated_from_completed_trades(
+        self, client: TestClient, test_db
+    ) -> None:
+        """F-9: 完了トレード件数 × TRADE_FIXED_COST_USD × usd_jpy_rate が expense_jpy に反映される。"""
+        override_get_db, SessionFactory = test_db
+        with SessionFactory() as db:
+            _seed_active_config(db)
+        token = _register_admin(client)
+        user_id = _create_user(SessionFactory, email="exp@example.com", username="exp_u")
+
+        month_dt = datetime(2026, 5, 15, tzinfo=timezone.utc)
+        _add_portfolio_snapshot(
+            SessionFactory,
+            user_id=user_id,
+            recorded_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+            total_supply_usd=Decimal("10000"),
+        )
+        _add_portfolio_snapshot(
+            SessionFactory,
+            user_id=user_id,
+            recorded_at=datetime(2026, 5, 31, tzinfo=timezone.utc),
+            total_supply_usd=Decimal("10200"),
+        )
+        # 完了トレード 2 件
+        _add_transaction(SessionFactory, user_id=user_id, created_at=month_dt)
+        _add_transaction(SessionFactory, user_id=user_id, created_at=month_dt)
+        # 除外: dry_run / pending / 別月
+        _add_transaction(SessionFactory, user_id=user_id, created_at=month_dt, is_dry_run=True)
+        _add_transaction(SessionFactory, user_id=user_id, created_at=month_dt, status="pending")
+        _add_transaction(
+            SessionFactory,
+            user_id=user_id,
+            created_at=datetime(2026, 4, 30, tzinfo=timezone.utc),
+        )
+
+        os.environ["TRADE_FIXED_COST_USD"] = "0.27"
+        r = client.post(
+            "/api/v1/fees/finalize-month?month=2026-05-01&usd_jpy_rate=150",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["users_processed"] == 1
+
+        with SessionFactory() as db:
+            tx = db.scalar(select(FeeTransaction).where(FeeTransaction.user_id == user_id))
+            assert tx is not None
+            # 2 trades × $0.27 × 150 = 81 JPY (ROUND_DOWN)
+            assert tx.expense_jpy == Decimal("81")
 
     def test_already_finalized_is_skipped(self, client: TestClient, test_db) -> None:
         override_get_db, SessionFactory = test_db

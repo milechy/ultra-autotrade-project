@@ -32,6 +32,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
@@ -46,6 +47,7 @@ from app.billing.v10_models import FeeConfigV10, FeeTransaction
 from app.database import get_db
 from app.fees import FeeCalculationInput, FeeCalculator
 from app.portfolio.models import PortfolioSnapshot
+from app.transactions.models import Transaction
 
 logger = logging.getLogger(__name__)
 
@@ -238,7 +240,7 @@ def finalize_month_core(
     各ユーザーの portfolio_snapshots から月次損益を算出し、
     FeeCalculator で手数料を計算して fee_transactions に書き込む。
     dry_run=True の場合は計算のみ行い DB 書込はしない。
-    expense_jpy は F-9 で実費マークアップを実装するまで 0 とする。
+    expense_jpy は当月の完了トレード件数 × TRADE_FIXED_COST_USD × usd_jpy_rate で算出 (F-9)。
     """
     next_month = _next_month_start(month_start)
     dt_from = datetime(month_start.year, month_start.month, 1, tzinfo=timezone.utc)
@@ -299,12 +301,27 @@ def finalize_month_core(
             user_created_date is not None and month_start <= user_created_date < next_month
         )
 
+        fixed_cost_usd = Decimal(os.getenv("TRADE_FIXED_COST_USD", "0.27"))
+        trade_count = (
+            db.scalar(
+                select(func.count(Transaction.id)).where(
+                    Transaction.user_id == user.id,
+                    Transaction.status == "completed",
+                    Transaction.is_dry_run.is_(False),
+                    Transaction.created_at >= dt_from,
+                    Transaction.created_at < dt_to,
+                )
+            )
+            or 0
+        )
+        expense_jpy = (fixed_cost_usd * trade_count * usd_jpy_rate).quantize(Decimal("1"))
+
         payload = FeeCalculationInput(
             user_id=user.id,
             calculation_month=month_start,
             deposit_jpy=deposit_jpy,
             gross_profit_jpy=gross_profit_jpy,
-            expense_jpy=Decimal("0"),  # F-9 で実費マークアップ実装予定
+            expense_jpy=expense_jpy,
             user_tier=user_tier,
             user_risk_mode=user_risk_mode,
             affiliate_id=user.invited_by,
@@ -605,7 +622,7 @@ def finalize_month(
     - month: 対象月の月初日 (例: 2026-05-01)
     - usd_jpy_rate: 計算に使う USD/JPY レート (省略時 150)
     - dry_run: True の場合は DB 書込なしで結果のみ返す
-    - expense_jpy は F-9 実装まで 0 として計算する
+    - expense_jpy: 当月の完了トレード件数 × TRADE_FIXED_COST_USD × usd_jpy_rate (F-9)
     """
     return finalize_month_core(db, config, month.replace(day=1), usd_jpy_rate, dry_run=dry_run)
 
