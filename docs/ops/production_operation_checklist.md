@@ -140,10 +140,39 @@ docker logs <cloudflared-container> 2>&1 | tail -20
 
 ---
 
+## ゲート 8: ディスク使用率確認
+
+```bash
+# 本番 VPS で実行
+df -h /
+# → 80% 超: scripts/periodic_docker_cleanup.sh を実行
+# → 90% 超: 即時手動対応 (healthcheck L7 が CRITICAL → Slack アラート発報)
+
+# Docker 内訳確認
+docker system df
+
+# journal 使用量確認
+du -sh /var/log/journal/ 2>/dev/null
+
+# 積極クリーンアップ実行 (80% 超時)
+/opt/ultra-autotrade/scripts/periodic_docker_cleanup.sh
+# → docker builder prune -a -f + docker image prune -f + journalctl --vacuum-size=1G + Slack 通知
+```
+
+**月次監査チェックリスト** (毎月 1 回 / 小林さん専権):
+- [ ] `df -h /` で使用率確認 (80% 超なら即 periodic_docker_cleanup.sh 実行)
+- [ ] `docker system df` で builder cache / image 内訳確認
+- [ ] `du -sh /var/log/journal/` で journal 使用量確認
+- [ ] `scripts/periodic_docker_cleanup.sh` を手動実行 (月次定期実施)
+- [ ] crontab -l で `periodic_docker_cleanup.sh` が登録されているか確認
+
+---
+
 ## 緊急時参照
 
 | 事象 | 対応 |
 |------|------|
+| ディスク 90% 超 (L7 CRITICAL) | `scripts/periodic_docker_cleanup.sh` 手動実行 |
 | postgres SIGKILL / exit 137 | `docs/postmortems/2026-05-17_loki_postgres_cascade.md` |
 | バックアップ空ファイル | `docs/postmortems/2026-05-17_backup_silent_failure.md` |
 | nginx 502 (upstream IP 固着) | `docs/postmortems/2026-05-12_nginx_upstream_ip_pin.md` |
@@ -153,4 +182,4 @@ docker logs <cloudflared-container> 2>&1 | tail -20
 
 ---
 
-*GID 1214888902535109 / 2026-05-19*
+*GID 1214888902535109 / 2026-05-20*

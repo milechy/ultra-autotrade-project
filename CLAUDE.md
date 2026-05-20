@@ -1589,10 +1589,21 @@ claude.ai が Step 0 をスキップして §9 を実行した場合、それは
 
 ## Docker クリーンアップ運用
 
-- 週次自動実行: `scripts/docker_cleanup.sh`（毎週日曜 03:00 JST、Hetzner cron 登録）
-- 使用コマンド: `docker builder prune -f` + `docker image prune -f`
+- **通常週次**: `scripts/docker_cleanup.sh`（dangling のみ / `builder prune -f` + `image prune -f`）
+- **積極週次**: `scripts/periodic_docker_cleanup.sh`（ALL builder cache / `-a` フラグ + journal vacuum 1G）
+  - cron 登録例: `0 3 * * 0 /opt/ultra-autotrade/scripts/periodic_docker_cleanup.sh`
 - **禁止**: `docker system prune -af`（使用中イメージ削除リスク、CLAUDE.md 明記）
-- 閾値: WARN 70% / CRITICAL 85%（Slack `#ultra-auto-project` 通知）
+- 閾値: periodic スクリプト WARN=80% / CRITICAL=90%（Slack `#ultra-auto-project` 通知）
+- **L7 ディスクチェック**: `healthcheck_l1_l6.sh` に組み込み済み（WARN=80%, CRITICAL=90% → overall FAIL）
+- **月次ディスク監査** (小林さん専権、毎月手動):
+  ```bash
+  # 本番 VPS で実行
+  df -h /
+  du -sh /var/lib/docker/
+  du -sh /var/log/journal/ 2>/dev/null
+  docker system df
+  ```
+  80% 超 → `periodic_docker_cleanup.sh` 手動実行。90% 超 → 即時手動対応必須。
 - 詳細: `docs/35_docker_maintenance_runbook.md`
 
 ---

@@ -38,6 +38,10 @@ DRY_RUN="${DRY_RUN:-false}"
 FAIL_SIMULATE_L1="${FAIL_SIMULATE_L1:-false}"
 CURL_TIMEOUT=10
 
+# L7: ディスク使用率閾値
+DISK_WARN_THRESHOLD="${DISK_WARN_THRESHOLD:-80}"
+DISK_CRITICAL_THRESHOLD="${DISK_CRITICAL_THRESHOLD:-90}"
+
 # Twilio 電話エスカレーション設定
 TWILIO_ACCOUNT_SID="${TWILIO_ACCOUNT_SID:-}"
 TWILIO_AUTH_TOKEN="${TWILIO_AUTH_TOKEN:-}"
@@ -303,6 +307,30 @@ check_l6() {
 }
 
 # =============================================================================
+# L7: ディスク使用率チェック (WARN=80%, CRITICAL=90%)
+# =============================================================================
+check_disk() {
+  local status="PASS"
+  local disk_pct=0
+  local disk_used_gb="0"
+  local disk_avail_gb="0"
+
+  disk_pct=$(df / | tail -1 | awk '{gsub(/%/,""); print $5}' 2>/dev/null || echo "0")
+  disk_used_gb=$(df -BG / | tail -1 | awk '{gsub(/G/,""); print $3}' 2>/dev/null || echo "0")
+  disk_avail_gb=$(df -BG / | tail -1 | awk '{gsub(/G/,""); print $4}' 2>/dev/null || echo "0")
+
+  if (( disk_pct >= DISK_CRITICAL_THRESHOLD )); then
+    status="CRITICAL"
+  elif (( disk_pct >= DISK_WARN_THRESHOLD )); then
+    status="WARN"
+  fi
+
+  printf '{"status":"%s","disk_usage_pct":%s,"disk_used_gb":"%s","disk_avail_gb":"%s","warn_threshold":%s,"critical_threshold":%s}' \
+    "${status}" "${disk_pct}" "${disk_used_gb}" "${disk_avail_gb}" \
+    "${DISK_WARN_THRESHOLD}" "${DISK_CRITICAL_THRESHOLD}"
+}
+
+# =============================================================================
 # Slack 通知
 # =============================================================================
 send_slack() {
@@ -450,7 +478,11 @@ main() {
   local l6_json; l6_json=$(check_l6)
   local l6_status; l6_status=$(echo "${l6_json}" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])" 2>/dev/null || echo "WARN")
 
-  # 全体判定 (L6 WARN は FAIL ではない)
+  log "L7: ディスクチェック"
+  local l7_json; l7_json=$(check_disk)
+  local l7_status; l7_status=$(echo "${l7_json}" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])" 2>/dev/null || echo "WARN")
+
+  # 全体判定 (L6 WARN は FAIL ではない / L7 CRITICAL → FAIL / L7 WARN は FAIL ではない)
   local overall_status="PASS"
   for s in "${l1_status}" "${l2_status}" "${l3_status}" "${l4_status}" "${l5_status}"; do
     if [[ "${s}" == "FAIL" ]]; then
@@ -458,8 +490,11 @@ main() {
       break
     fi
   done
+  if [[ "${l7_status}" == "CRITICAL" ]]; then
+    overall_status="FAIL"
+  fi
 
-  log "結果: L1=${l1_status} L2=${l2_status} L3=${l3_status} L4=${l4_status} L5=${l5_status} L6=${l6_status} → ${overall_status}"
+  log "結果: L1=${l1_status} L2=${l2_status} L3=${l3_status} L4=${l4_status} L5=${l5_status} L6=${l6_status} L7=${l7_status} → ${overall_status}"
 
   # Slack 通知 JSON 組み立て
   local slack_json
@@ -476,6 +511,7 @@ l3 = json.loads('''${l3_json}''')
 l4 = json.loads('''${l4_json}''')
 l5 = json.loads('''${l5_json}''')
 l6 = json.loads('''${l6_json}''')
+l7 = json.loads('''${l7_json}''')
 
 icon = '✅' if overall == 'PASS' else '🚨'
 results = {
@@ -489,6 +525,7 @@ results = {
     'L4': l4,
     'L5': l5,
     'L6': l6,
+    'L7_disk': l7,
   },
   'next_check': next_check
 }
@@ -530,6 +567,7 @@ print(json.dumps(payload))
       [[ "${l3_status}" == "FAIL" ]] && failed_layers="${failed_layers}L3 "
       [[ "${l4_status}" == "FAIL" ]] && failed_layers="${failed_layers}L4 "
       [[ "${l5_status}" == "FAIL" ]] && failed_layers="${failed_layers}L5 "
+      [[ "${l7_status}" == "CRITICAL" ]] && failed_layers="${failed_layers}L7(disk) "
       failed_layers="${failed_layers:-L1-L5}"
       log "5連続FAIL到達 (${fail_count}回) — Twilio 電話エスカレーション発動: ${failed_layers}"
       call_twilio_phone "${fail_count}" "${failed_layers}"
