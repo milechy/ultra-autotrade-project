@@ -32,9 +32,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -46,6 +45,7 @@ from app.auth.models import InvestmentTier, RiskMode, User
 from app.billing.v10_models import FeeConfigV10, FeeTransaction
 from app.database import get_db
 from app.fees import FeeCalculationInput, FeeCalculator
+from app.portfolio.models import PortfolioSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +176,20 @@ class UataIncomeResponse(BaseModel):
     uata_income_total: str  # subscription + fee + yield_excess - affiliate
 
 
+class FinalizeMonthResponse(BaseModel):
+    """月次 finalize バッチの実行結果サマリ (F-7)。"""
+
+    calculation_month: date
+    usd_jpy_rate: str
+    dry_run: bool
+    users_processed: int
+    users_skipped_no_snapshot: int
+    users_skipped_already_finalized: int
+    total_fee_jpy: str
+    total_subscription_jpy: str
+    total_user_takehome_jpy: str
+
+
 # ===========================================================================
 # Helpers
 # ===========================================================================
@@ -203,6 +217,174 @@ def _decimal_str(value: Decimal | int | float | None) -> str:
     if value is None:
         return "0"
     return str(value if isinstance(value, Decimal) else Decimal(str(value)))
+
+
+def _next_month_start(d: date) -> date:
+    if d.month == 12:
+        return date(d.year + 1, 1, 1)
+    return date(d.year, d.month + 1, 1)
+
+
+def finalize_month_core(
+    db: Session,
+    config: FeeConfigV10,
+    month_start: date,
+    usd_jpy_rate: Decimal,
+    *,
+    dry_run: bool = False,
+) -> FinalizeMonthResponse:
+    """月次手数料バッチのコアロジック (API endpoint / 定期実行タスク 共通)。
+
+    各ユーザーの portfolio_snapshots から月次損益を算出し、
+    FeeCalculator で手数料を計算して fee_transactions に書き込む。
+    dry_run=True の場合は計算のみ行い DB 書込はしない。
+    expense_jpy は F-9 で実費マークアップを実装するまで 0 とする。
+    """
+    next_month = _next_month_start(month_start)
+    dt_from = datetime(month_start.year, month_start.month, 1, tzinfo=timezone.utc)
+    dt_to = datetime(next_month.year, next_month.month, 1, tzinfo=timezone.utc)
+
+    calculator = FeeCalculator(config)
+    active_users = db.execute(select(User).where(User.is_active.is_(True))).scalars().all()
+
+    processed = 0
+    skipped_no_snapshot = 0
+    skipped_finalized = 0
+    total_fee = Decimal("0")
+    total_sub = Decimal("0")
+    total_takehome = Decimal("0")
+
+    for user in active_users:
+        first_snap = db.scalar(
+            select(PortfolioSnapshot)
+            .where(PortfolioSnapshot.user_id == user.id)
+            .where(PortfolioSnapshot.recorded_at >= dt_from)
+            .where(PortfolioSnapshot.recorded_at < dt_to)
+            .order_by(PortfolioSnapshot.recorded_at.asc())
+            .limit(1)
+        )
+        if first_snap is None:
+            skipped_no_snapshot += 1
+            continue
+
+        last_snap = db.scalar(
+            select(PortfolioSnapshot)
+            .where(PortfolioSnapshot.user_id == user.id)
+            .where(PortfolioSnapshot.recorded_at >= dt_from)
+            .where(PortfolioSnapshot.recorded_at < dt_to)
+            .order_by(PortfolioSnapshot.recorded_at.desc())
+            .limit(1)
+        )
+        assert last_snap is not None  # noqa: S101
+
+        existing = db.scalar(
+            select(FeeTransaction)
+            .where(FeeTransaction.user_id == user.id)
+            .where(FeeTransaction.calculation_month == month_start)
+        )
+        if existing is not None and existing.finalized_at is not None:
+            skipped_finalized += 1
+            continue
+
+        deposit_jpy = (last_snap.total_supply_usd * usd_jpy_rate).quantize(Decimal("1"))
+        gross_profit_jpy = (
+            (last_snap.total_supply_usd - first_snap.total_supply_usd) * usd_jpy_rate
+        ).quantize(Decimal("1"))
+
+        user_tier = InvestmentTier(user.tier) if user.tier else InvestmentTier.LOWER
+        user_risk_mode = RiskMode(user.risk_mode) if user.risk_mode else RiskMode.CONSERVATIVE
+
+        user_created_date = user.created_at.date() if user.created_at else None
+        is_first_month = (
+            user_created_date is not None and month_start <= user_created_date < next_month
+        )
+
+        payload = FeeCalculationInput(
+            user_id=user.id,
+            calculation_month=month_start,
+            deposit_jpy=deposit_jpy,
+            gross_profit_jpy=gross_profit_jpy,
+            expense_jpy=Decimal("0"),  # F-9 で実費マークアップ実装予定
+            user_tier=user_tier,
+            user_risk_mode=user_risk_mode,
+            affiliate_id=user.invited_by,
+            is_first_month=is_first_month,
+        )
+
+        result = calculator.calculate_monthly(payload)
+
+        if not dry_run:
+            if existing is None:
+                db.add(
+                    FeeTransaction(
+                        user_id=result.user_id,
+                        calculation_month=result.calculation_month,
+                        tier=result.tier,
+                        risk_mode=result.risk_mode,
+                        deposit_amount_jpy=result.deposit_jpy,
+                        gross_profit_jpy=result.gross_profit_jpy,
+                        expense_jpy=result.expense_jpy,
+                        net_profit_jpy=result.net_profit_jpy,
+                        fee_rate_applied=result.fee_rate_applied,
+                        fee_amount_jpy=result.fee_amount_jpy,
+                        subscription_rate_applied=result.subscription_rate_applied,
+                        subscription_amount_jpy=result.subscription_amount_jpy,
+                        subscription_protected=result.subscription_protected,
+                        monthly_yield_cap_applied=result.monthly_yield_cap_applied,
+                        yield_excess_to_uata_jpy=result.yield_excess_to_uata_jpy,
+                        user_takehome_jpy=result.user_takehome_jpy,
+                        affiliate_id=result.affiliate_id,
+                        affiliate_amount_jpy=result.affiliate_amount_jpy,
+                    )
+                )
+            else:
+                existing.tier = result.tier
+                existing.risk_mode = result.risk_mode
+                existing.deposit_amount_jpy = result.deposit_jpy
+                existing.gross_profit_jpy = result.gross_profit_jpy
+                existing.expense_jpy = result.expense_jpy
+                existing.net_profit_jpy = result.net_profit_jpy
+                existing.fee_rate_applied = result.fee_rate_applied
+                existing.fee_amount_jpy = result.fee_amount_jpy
+                existing.subscription_rate_applied = result.subscription_rate_applied
+                existing.subscription_amount_jpy = result.subscription_amount_jpy
+                existing.subscription_protected = result.subscription_protected
+                existing.monthly_yield_cap_applied = result.monthly_yield_cap_applied
+                existing.yield_excess_to_uata_jpy = result.yield_excess_to_uata_jpy
+                existing.user_takehome_jpy = result.user_takehome_jpy
+                existing.affiliate_id = result.affiliate_id
+                existing.affiliate_amount_jpy = result.affiliate_amount_jpy
+
+        total_fee += result.fee_amount_jpy
+        total_sub += result.subscription_amount_jpy
+        total_takehome += result.user_takehome_jpy
+        processed += 1
+
+    if not dry_run:
+        db.commit()
+
+    logger.info(
+        "finalize_month: month=%s processed=%d skipped_no_snap=%d skipped_finalized=%d"
+        " total_fee=%s dry_run=%s",
+        month_start,
+        processed,
+        skipped_no_snapshot,
+        skipped_finalized,
+        total_fee,
+        dry_run,
+    )
+
+    return FinalizeMonthResponse(
+        calculation_month=month_start,
+        usd_jpy_rate=str(usd_jpy_rate),
+        dry_run=dry_run,
+        users_processed=processed,
+        users_skipped_no_snapshot=skipped_no_snapshot,
+        users_skipped_already_finalized=skipped_finalized,
+        total_fee_jpy=str(total_fee),
+        total_subscription_jpy=str(total_sub),
+        total_user_takehome_jpy=str(total_takehome),
+    )
 
 
 # ===========================================================================
@@ -400,19 +582,32 @@ def list_all_users_fees(
 
 @router.post(
     "/finalize-month",
-    summary="月次 finalize (F-7 で本実装、現状スケルトン)",
+    response_model=FinalizeMonthResponse,
+    summary="月次 finalize バッチ実行 (F-7 / Asana 1214120401388139)",
     dependencies=[Depends(require_admin)],
 )
-def finalize_month(month: date) -> dict[str, Any]:
-    """F-7 (1214120401388139) で本実装予定。本タスクでは 501 を返すスケルトン。"""
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail=(
-            "Not yet implemented. Will be implemented in F-7 "
-            "(Asana 1214120401388139). Requested month: "
-            f"{month.isoformat()}"
-        ),
-    )
+def finalize_month(
+    month: date,
+    usd_jpy_rate: Decimal = Query(
+        default=Decimal("150"),
+        gt=0,
+        description="USD/JPY 換算レート (デフォルト 150)",
+    ),
+    dry_run: bool = Query(
+        default=False,
+        description="True の場合は計算のみ行い DB 書込をしない",
+    ),
+    db: Session = Depends(get_db),
+    config: FeeConfigV10 = Depends(_get_active_fee_config),
+) -> FinalizeMonthResponse:
+    """各ユーザーの portfolio_snapshots から月次損益を算出し fee_transactions に書き込む。
+
+    - month: 対象月の月初日 (例: 2026-05-01)
+    - usd_jpy_rate: 計算に使う USD/JPY レート (省略時 150)
+    - dry_run: True の場合は DB 書込なしで結果のみ返す
+    - expense_jpy は F-9 実装まで 0 として計算する
+    """
+    return finalize_month_core(db, config, month.replace(day=1), usd_jpy_rate, dry_run=dry_run)
 
 
 @router.get(

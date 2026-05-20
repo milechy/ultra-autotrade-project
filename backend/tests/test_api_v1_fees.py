@@ -23,7 +23,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-api-v1-fees"
@@ -616,19 +616,155 @@ class TestAllUsersEndpoint:
 
 
 # ===========================================================================
-# Admin: /finalize-month (501 stub)
+# Admin: /finalize-month (F-7 実装済み)
 # ===========================================================================
 
 
-class TestFinalizeMonthStub:
-    def test_returns_501_with_f7_reference(self, client: TestClient) -> None:
+def _add_portfolio_snapshot(
+    SessionFactory,
+    *,
+    user_id: int,
+    recorded_at: datetime,
+    total_supply_usd: Decimal,
+    total_value_usd: Decimal | None = None,
+) -> None:
+    from app.portfolio.models import PortfolioSnapshot  # noqa: PLC0415
+
+    with SessionFactory() as db:
+        snap = PortfolioSnapshot(
+            user_id=user_id,
+            total_value_usd=total_value_usd or total_supply_usd,
+            total_supply_usd=total_supply_usd,
+            total_borrow_usd=Decimal("0"),
+            health_factor=None,
+            recorded_at=recorded_at,
+        )
+        db.add(snap)
+        db.commit()
+
+
+class TestFinalizeMonth:
+    """F-7: POST /api/v1/fees/finalize-month の正常系・境界テスト。"""
+
+    def test_requires_admin(self, client: TestClient) -> None:
+        r = client.post("/api/v1/fees/finalize-month?month=2026-05-01")
+        assert r.status_code == 401
+
+    def test_user_without_snapshot_is_skipped(self, client: TestClient, test_db) -> None:
+        override_get_db, SessionFactory = test_db
+        with SessionFactory() as db:
+            _seed_active_config(db)
         token = _register_admin(client)
+
         r = client.post(
             "/api/v1/fees/finalize-month?month=2026-05-01",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert r.status_code == 501
-        assert "F-7" in r.json()["detail"] or "1214120401388139" in r.json()["detail"]
+        assert r.status_code == 200
+        body = r.json()
+        assert body["users_processed"] == 0
+        assert body["users_skipped_no_snapshot"] >= 1
+
+    def test_creates_fee_transaction_for_user_with_snapshots(
+        self, client: TestClient, test_db
+    ) -> None:
+        override_get_db, SessionFactory = test_db
+        with SessionFactory() as db:
+            _seed_active_config(db)
+        token = _register_admin(client)
+        user_id = _create_user(SessionFactory, email="fee_u@example.com", username="fee_u")
+
+        month_start = datetime(2026, 5, 1, 0, 0, tzinfo=timezone.utc)
+        month_end = datetime(2026, 5, 31, 23, 0, tzinfo=timezone.utc)
+        _add_portfolio_snapshot(
+            SessionFactory,
+            user_id=user_id,
+            recorded_at=month_start,
+            total_supply_usd=Decimal("10000"),
+        )
+        _add_portfolio_snapshot(
+            SessionFactory,
+            user_id=user_id,
+            recorded_at=month_end,
+            total_supply_usd=Decimal("10200"),  # $200 利益
+        )
+
+        r = client.post(
+            "/api/v1/fees/finalize-month?month=2026-05-01&usd_jpy_rate=150",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["users_processed"] == 1
+        assert body["calculation_month"] == "2026-05-01"
+        assert Decimal(body["total_fee_jpy"]) > Decimal("0")
+
+        with SessionFactory() as db:
+            tx = db.scalar(select(FeeTransaction).where(FeeTransaction.user_id == user_id))
+            assert tx is not None
+            assert tx.deposit_amount_jpy == Decimal("1530000")  # 10200 * 150
+            assert tx.gross_profit_jpy == Decimal("30000")  # 200 * 150
+
+    def test_dry_run_does_not_write_db(self, client: TestClient, test_db) -> None:
+        override_get_db, SessionFactory = test_db
+        with SessionFactory() as db:
+            _seed_active_config(db)
+        token = _register_admin(client)
+        user_id = _create_user(SessionFactory, email="dryrun@example.com", username="dryrun_u")
+        _add_portfolio_snapshot(
+            SessionFactory,
+            user_id=user_id,
+            recorded_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+            total_supply_usd=Decimal("5000"),
+        )
+        _add_portfolio_snapshot(
+            SessionFactory,
+            user_id=user_id,
+            recorded_at=datetime(2026, 5, 31, tzinfo=timezone.utc),
+            total_supply_usd=Decimal("5100"),
+        )
+
+        r = client.post(
+            "/api/v1/fees/finalize-month?month=2026-05-01&dry_run=true",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["dry_run"] is True
+        assert r.json()["users_processed"] == 1
+
+        with SessionFactory() as db:
+            count = db.scalar(
+                select(func.count(FeeTransaction.id)).where(FeeTransaction.user_id == user_id)
+            )
+            assert count == 0  # dry_run なので DB 未書込
+
+    def test_already_finalized_is_skipped(self, client: TestClient, test_db) -> None:
+        override_get_db, SessionFactory = test_db
+        with SessionFactory() as db:
+            _seed_active_config(db)
+        token = _register_admin(client)
+        user_id = _create_user(SessionFactory, email="finalized@example.com", username="fin_u")
+        _add_fee_tx(
+            SessionFactory,
+            user_id=user_id,
+            month=date(2026, 5, 1),
+            finalized=True,
+        )
+        _add_portfolio_snapshot(
+            SessionFactory,
+            user_id=user_id,
+            recorded_at=datetime(2026, 5, 15, tzinfo=timezone.utc),
+            total_supply_usd=Decimal("8000"),
+        )
+
+        r = client.post(
+            "/api/v1/fees/finalize-month?month=2026-05-01",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["users_skipped_already_finalized"] >= 1
+        assert body["users_processed"] == 0
 
 
 # ===========================================================================

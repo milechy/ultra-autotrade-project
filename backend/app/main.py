@@ -538,6 +538,20 @@ def create_app() -> FastAPI:
             except BaseException as exc:
                 logger.error("Failed to start loop %s: %s", name, exc)
 
+        # --- 月次手数料バッチ (opt-in: ENABLE_MONTHLY_FEE_BATCH=1) ---
+        if os.getenv("ENABLE_MONTHLY_FEE_BATCH", "0") == "1":
+            try:
+                from decimal import Decimal as _Decimal  # noqa: PLC0415
+
+                usd_jpy_rate = _Decimal(os.getenv("USD_TO_JPY_RATE", "150"))
+                await scheduled_manager.start_monthly_fee_batch(
+                    usd_jpy_rate=usd_jpy_rate,
+                    on_error=_make_scheduler_error_handler("monthly_fee_batch_loop"),
+                )
+                logger.info("Monthly fee batch scheduled (rate=%s)", usd_jpy_rate)
+            except BaseException as exc:
+                logger.error("Failed to start monthly fee batch: %s", exc)
+
     @app.on_event("startup")
     async def startup_health_probes() -> None:
         """Start background probes for /health/detail (OpenAI / Perplexity / Aave safety)."""
