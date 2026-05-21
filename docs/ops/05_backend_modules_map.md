@@ -1,6 +1,6 @@
 # Ultra AutoTrade — バックエンドモジュールマップ
 
-> 生成: 2026-04-24 / 更新: 2026-05-19（Phase 2 以降追加分を反映）
+> 生成: 2026-04-24 / 更新: 2026-05-21（billing 物理削除・ai_optimizer 登録・user_settings / ai_decisions / ai_feedback 追加・InvestmentTier.GENERAL 削除反映）
 > `backend/app/` 実コードから抽出（推測なし）
 > FastAPI (Python 3.11)、SQLAlchemy、PostgreSQL 16
 
@@ -13,7 +13,7 @@
 | # | モジュール | prefix | tags | 備考 |
 |---|-----------|--------|------|------|
 | 1 | auth | `/auth` | auth | Phase12 |
-| ~~2~~ | ~~invitations~~ | ~~`/api/invitations`~~ | — | **コメントアウト済** (Phase 2 物理削除予定 → `/partner/referral` に置換) |
+| ~~-~~ | ~~invitations~~ | ~~`/api/invitations`~~ | — | **コメントアウト済・物理削除予定** (`/partner/referral` に置換済) |
 | 2 | partner | `/api/partner` | partner | Wave 2 |
 | 3 | allocation | `/api/partner` | partner-allocations | 資金割り振り |
 | 4 | users | `/users` | users | Phase12 |
@@ -34,14 +34,14 @@
 | 19 | data_feeds | `/api/data-feeds` | — | Phase 2 外部データ |
 | 20 | reports | `/api/reports` | — | 月次レポート |
 | 21 | fees_v10 | `/api/v1/fees` | fees-v10 | **Fee Model v10 API (F-1〜F-16)** |
-| 22 | billing | `/api/billing` | — | 請求 |
-| 23 | ai_decisions | — | — | AI判定 API |
-| 24 | ai_feedback | — | — | AI フィードバック (Layer 4) |
+| 22 | ai_decisions | `/api/ai/decisions` | ai-decisions | **AI判定履歴 API (2026-04-24 以降)** |
+| 23 | ai_feedback | `/api/ai/feedback` | ai-feedback | **AI フィードバック (Layer 4)** |
+| 24 | ai_optimizer | `/api/ai/optimizer` | ai-optimizer | **AI Optimizer (Phase 2 / ENB) — main.py 登録済** |
 | 25 | transactions | `/api/transactions` | — | トランザクション |
 | 26 | admin_transactions | — | — | admin 用トランザクション |
 | 27 | proposals | `/api/proposals` | — | 提案 API |
 | 28 | portfolio | `/api/portfolio` | — | ポートフォリオ履歴 |
-| 29 | user_settings | — | — | ユーザー設定 |
+| 29 | user_settings | `/api/user` | user-settings | **ユーザー設定・運用停止/再開 (2026-05-06 追加)** |
 | 30 | alias | — | — | `/api/safety-score` 等エイリアス |
 | 31 | notification | `/notifications` | — | PWA 通知 |
 | 32 | notification_api | `/api/notifications` | — | PWA 通知エイリアス |
@@ -54,6 +54,9 @@
 特殊エンドポイント (inline):
 - `GET /health` — スケジューラー・DB・接続状態を返す
 - `GET /health/detail` — 詳細ヘルスチェック (admin 認証必須、`health/detail_router.py`)
+
+**削除済みルーター（2026-04-24 以降）:**
+- ~~billing~~ — **F-13 (2026-04-30) で物理削除** (`api/v1/fees` に統合済み)。`backend/app/billing/` は `__pycache__` のみ残存。
 
 ---
 
@@ -87,6 +90,25 @@
 **主要クラス:** `AIService`  
 **エンドポイント数:** 4 (GET×3, POST×1)  
 **主要スキーマ:** `AIAnalysisRequest`, `AIAnalysisResult`, `TradeAction`, `LLMDecision`, `CrossValidationResult`
+
+### ai/decisions `/api/ai/decisions`
+**役割:** AI 判定履歴の取得・詳細照会・フィードバック登録  
+**エンドポイント数:** 4 (GET×3, POST×1)  
+**主要スキーマ:** `AIDecisionResponse`, `AIDecisionListResponse`  
+**注意:** `prompt_version` を DB に永続化 (fix #330 / 2026-05-19)
+
+### ai/feedback `/api/ai/feedback`
+**役割:** AI フィードバック Layer 4 — 判定結果へのユーザー評価・学習ループ  
+**エンドポイント数:** 3 (GET×2, POST×1)  
+**主要スキーマ:** `FeedbackCreateRequest`, `FeedbackResponse`
+
+### ai/optimizer `/api/ai/optimizer`
+**役割:** AI Optimizer — プロトコル間の配分最適化・戦略スコアリング・ENB (Expected Net Benefit) 計算  
+**主要クラス:** `PortfolioAllocator`, `StrategyScorer`, `NetBenefitCalculator`, `StrategyComparator`  
+**エンドポイント数:** 1 (POST×1)  
+**エンドポイント:** `POST /api/ai/optimizer/recommend`  
+**主要スキーマ:** `OptimizerRequest`, `OptimizerResponse` (`ai/optimizer/schemas.py`)  
+**注意:** main.py 登録済み (2026-05-15 commit `688b684`)。Phase 2 PoC 実装。
 
 ### aave `/api/aave`
 **役割:** Aave V3 (Base) への deposit/withdraw/health_factor/monitor  
@@ -123,10 +145,9 @@
 **エンドポイント数:** 4 (GET×3, POST×1)  
 **主要スキーマ:** `TransactionCreate`, `TransactionResponse`, `TransactionListResponse`, `TransactionStatsResponse`
 
-### billing `/api/billing`
-**役割:** 手数料計算、請求期間管理  
-**エンドポイント数:** 4 (GET×3, POST×1)  
-**主要スキーマ:** `FeeConfigResponse`, `FeeCalculationResponse`, `FeeSummaryResponse`
+### ~~billing~~ (削除済み)
+**状態:** **F-13 (PR #ab0fdec / 2026-04-30) で物理削除。** `backend/app/billing/` ディレクトリは `__pycache__` のみ残存。  
+**移行先:** 手数料計算ロジックは `app/fees/` + `app/api/v1/fees` (fees_v10 router) に統合済み。`FeeConfigResponse` 等のスキーマは `api/v1/fees.py` に移行。
 
 ### dca `/dca`
 **役割:** DCA Bot 設定・実行、Grid Bot 設定  
@@ -138,9 +159,10 @@
 **エンドポイント数:** 9 (GET×4, POST×5)
 
 ### invitations `/api/invitations`
-**役割:** 招待リンク発行・検証  
+**役割:** 招待リンク発行・検証（main.py コメントアウト済・物理削除予定）  
 **エンドポイント数:** 3 (GET×2, POST×1)  
-**主要スキーマ:** `InvitationCreateRequest`, `InvitationResponse`, `InvitationValidateResponse`
+**主要スキーマ:** `InvitationCreateRequest`, `InvitationResponse`, `InvitationValidateResponse`  
+**注意:** `referral` router に置換。`app/invitations/` ファイルは残存するが router は未登録。
 
 ### portfolio `/api/portfolio`
 **役割:** ポートフォリオスナップショット履歴  
@@ -171,7 +193,7 @@
 
 ---
 
-## 2b. Phase 2 以降追加モジュール（2026-05-19 反映）
+## 2b. Phase 2 以降追加モジュール（2026-05-21 最新化）
 
 ### protocols/lido `/api/protocols/lido`
 **役割:** Lido Finance V2 — ETH ステーキング・stETH 取得・引き出し・APR 確認  
@@ -195,25 +217,27 @@
 **エンドポイント数:** 4 (GET×4)  
 **エンドポイント:** `GET /api/protocols/health`, `GET /api/protocols/health/aave`, `GET /api/protocols/health/lido`, `GET /api/protocols/health/pendle`  
 **主要スキーマ:** `ProtocolHealth`  
-**注意:** `CompoundRiskAssessor` / `AutoEvacuator` は安全装置系 (P0 孤立コード対象)。
-
-### ai/optimizer (`/api/ai/optimizer` — main.py 登録待ち)
-**役割:** AI Optimizer — プロトコル間の配分最適化・戦略スコアリング・ENB (Expected Net Benefit) 計算  
-**主要クラス:** `PortfolioAllocator`, `StrategyScorer`, `NetBenefitCalculator`, `StrategyComparator`  
-**状態:** `router.py` 実装済み (PR #282 / 2026-05-19)。`app/main.py` への登録は Phase B (Tier S) で実施予定  
-**主要スキーマ:** `OptimizerRequest`, `OptimizerResponse` (`schemas.py`)  
-**エンドポイント:** `POST /api/ai/optimizer/recommend` (main.py 登録後に有効化)
+**注意:** `CompoundRiskAssessor` / `AutoEvacuator` は安全装置系。aave/service への配線は PR #240 (2026-05-14) で完了。
 
 ### fees (app/fees/)
 **役割:** Fee Model v10 純粋計算エンジン (router なし / `api/v1/fees` router から呼ばれる)  
 **主要クラス:** `FeeCalculator`, `TradeGate`  
-**注意:** DB / 外部 API 依存なし。純粋関数として実装。エンドポイントは `api/v1/fees` 経由。
+**注意:** DB / 外部 API 依存なし。純粋関数として実装。エンドポイントは `api/v1/fees` 経由。  
+**2026-04-30 変更:** 旧 `billing/` モジュールから `trade_gate.py` を移行 (F-13)。`billing/` は物理削除済み。
 
 ### api/v1/fees `/api/v1/fees`
-**役割:** Fee Model v10 REST API — 手数料設定取得・計算・請求プレビュー・管理  
+**役割:** Fee Model v10 REST API — 手数料設定取得・計算・請求プレビュー・管理・月次バッチ  
 **エンドポイント数:** 8 (GET×6, POST×2)  
 **主要スキーマ:** `FeeConfigResponse`, `FeeCalculationRequest`, `FeeBillingPreview`  
-**依存:** `fees/calculator.py`, `auth.service`
+**依存:** `fees/calculator.py`, `auth.service`  
+**追加 (F-7):** `finalize_month` バッチエンドポイント (2026-05-05)
+
+### user_settings `/api/user`
+**役割:** ユーザー設定取得・更新、運用一時停止/再開  
+**エンドポイント数:** 5 (GET×2, PUT×1, POST×2)  
+**エンドポイント:** `GET /api/user/settings`, `PUT /api/user/settings`, `GET /api/user/fee-summary`, `POST /api/user/pause`, `POST /api/user/resume`  
+**主要スキーマ:** `UserSettingsResponse` (`users/settings_schemas.py`)  
+**注意:** `users/settings_router.py` に実装。`UserSettings` モデルは `main.py` import 経由で DB 登録 (fix #333 / 2026-05-06)。
 
 ### referral `/partner/referral`
 **役割:** Partner Affiliate System (RAS Lane 2) — 紹介コード発行・使用・報酬追跡  
@@ -225,14 +249,15 @@
 **役割:** 月次レポート生成 (独立モジュール。旧 `api/automation_dashboard` とは別)  
 **エンドポイント数:** 1 (GET×1)  
 **エンドポイント:** `GET /api/reports/monthly`  
-**依存:** `billing.service`, `transactions.service`
+**依存:** `billing.service` → **削除済み。`fees/calculator.py` + `transactions.service` に移行**
 
 ### health `/health/detail`
 **役割:** 詳細ヘルスチェック — DB 接続・スケジューラー状態・各サービス ping を詳細報告  
 **主要クラス:** `HealthDetailResponse` (schemas.py)  
 **エンドポイント数:** 1 (GET×1)  
 **エンドポイント:** `GET /health/detail` (admin 認証必須)  
-**依存:** `automation.monitoring_service`, `database`
+**依存:** `automation.monitoring_service`, `database`  
+**追加 (2026-05-19):** openai / perplexity / aave-safety probe ループが startup 時に起動 (`health/probes.py`)
 
 ### utils (ライブラリ — ルーター非登録)
 **役割:** 共通ユーティリティ  
@@ -271,7 +296,7 @@ ai/optimizer/
 ### protocols/risk の安全装置依存
 ```
 protocols/risk/
-├── auto_evacuate.py (AutoEvacuator) ← P0: aave/service に配線確認必要
+├── auto_evacuate.py (AutoEvacuator) ← aave/service に配線済み (PR #240 / 2026-05-14)
 ├── compound_risk.py (CompoundRiskAssessor) ← ai/optimizer が参照
 ├── peg_monitor.py (PegMonitor) ← stETH/PT peg 監視
 ├── maturity_manager.py (MaturityManager) ← Pendle YT 満期管理
@@ -303,12 +328,15 @@ users/router.py
 | partner | 5 | 0 | 5 (全て) | — | 0 |
 | proposals | 8 | 2 | 5 | 1 | 0 |
 | ai | 4 | 0 | 0 | ~4 | 0 |
+| ai/decisions | 4 | 0 | 0 | ~4 | 0 |
+| ai/feedback | 3 | 0 | 0 | ~3 | 0 |
+| ai/optimizer | 1 | 0 | 0 | 1 | 0 |
 | aave | 4 | 2 | 0 | 2 | 0 |
 | exchange | 2 | 0 | 0 | 2 | 0 |
 | knowledge | 6 | 2 | 0 | 4 | 0 |
 | notifications | 5 | 2 | 0 | 3 | 0 |
 | transactions | 4 | 2 | 0 | 2 | 0 |
-| billing | 4 | 2 | 0 | 2 | 0 |
+| ~~billing~~ | **削除済み** | — | — | — | — |
 | data_feeds | 9 | 5 | 0 | 4 | 0 |
 | dca | 6 | 0 | 0 | 6 | 0 |
 | invitations | 3 | 1 | 0 | 1 | 1 |
@@ -324,6 +352,7 @@ users/router.py
 | referral | 3 | 0 | 2 | 1 | 0 |
 | reports | 1 | 1 | 0 | 0 | 0 |
 | fees_v10 | 8 | 4 | 0 | 4 | 0 |
+| user_settings | 5 | 0 | 0 | 5 | 0 |
 | health/detail | 1 | 1 | 0 | 0 | 0 |
 
 ---
@@ -344,7 +373,7 @@ monitoring = MonitoringService()  # NG
 新規カラム追加は Hetzner 本番サーバーで手動 `ALTER TABLE` を実行。
 `docs/ops/03_deploy_procedures.md` §DB マイグレーション手順 参照。
 
-### 既知の本番 DB 差分 (2026-04-26 時点)
+### 既知の本番 DB 差分 (2026-05-21 時点)
 
 #### 適用済み
 ```sql
@@ -352,12 +381,21 @@ monitoring = MonitoringService()  # NG
 ALTER TABLE users ADD COLUMN IF NOT EXISTS tier VARCHAR(20) NOT NULL DEFAULT 'LOWER';
 -- 適用済み (2026-04-24 インシデント対応)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_judgment_at TIMESTAMP WITH TIME ZONE NULL;
+-- 適用済み (F-7 月次手数料バッチ / 2026-05-05)
+-- fee_billing_periods テーブル追加 (fee_model_v10.md §F-7 参照)
+-- 適用済み (user_settings テーブル / fix #333 / 2026-05-06)
+-- UserSettings テーブル追加 (main.py import 経由で登録)
 ```
 
-#### users.tier の状態 (F-2/F-6 完了後)
-- **enum**: `InvestmentTier` — `LOWER` / `MIDDLE` / `UPPER` / `GENERAL` (deprecated, F-13で物理削除予定)
+#### users.tier の状態 (F-13 完了後 / 2026-05-21)
+- **enum**: `InvestmentTier` — `LOWER` / `MIDDLE` / `UPPER` の 3 値のみ
+- **`GENERAL` 値は物理削除済み** (F-13 PR #347 / 2026-05-21)。旧 `normalize_tier()` ヘルパーも削除。
 - **DB DEFAULT**: `'LOWER'` (F-2 で `'GENERAL'` から変更済み)
-- **normalize_tier()**: LEGACY値 (`GENERAL` 等) を `LOWER` に正規化するヘルパー実装済み (F-6 完了 2026-04-26)
-- **既存ユーザー6名**: 現状 `'GENERAL'` のまま (F-16 で `LOWER`/`MIDDLE`/`UPPER` に物理 UPDATE 予定)
 - **判定関数**: `app.users.tier_service.determine_tier_jpy()` — JPY 入金額からティア自動判定
-- **日本語ラベル**: `app.auth.models.TIER_JP_LABELS` — `LOWER`→ローリスク等の表示変換
+- **日本語ラベル**: `app.auth.models.TIER_JP_LABELS` — `LOWER`→一般 / `MIDDLE`→ミドル / `UPPER`→アッパー
+
+### billing → fees 移行サマリー (F-13 / 2026-04-30 完了)
+- **削除:** `backend/app/billing/` の Python ファイルをすべて削除 (router/service/schemas)
+- **移行先:** `trade_gate.py` → `backend/app/fees/trade_gate.py`、スキーマ → `api/v1/fees.py` に統合
+- **billing フォルダ:** `__pycache__` のみ残存 (次回クリーンアップで除去可)
+- **main.py:** `billing` import なし (`fees_v10_router` のみ)
