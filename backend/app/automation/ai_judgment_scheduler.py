@@ -38,6 +38,12 @@ _DEFAULT_INTERVAL_UPPER = 4
 _DEFAULT_INTERVAL_MIDDLE = 6
 _DEFAULT_INTERVAL_LOWER = 8
 
+# 起動直後の即時 fan-out 抑制: 再起動のたびに全 due user が一斉実行されるのを防ぐ。
+# AI_JUDGMENT_STARTUP_DELAY_SEC (デフォルト 300 秒) 待機後に第1 tick を実行する。
+# watchdog / Slack 通知 / Cloudflare Tunnel 等が立ち上がる猶予を確保する目的。
+# 0 を設定すると遅延なし（テスト・デバッグ用途）。
+_DEFAULT_STARTUP_DELAY_SEC = int(os.getenv("AI_JUDGMENT_STARTUP_DELAY_SEC", "300"))
+
 logger = logging.getLogger(__name__)
 
 # --- スケジューラー実行状態（/health から参照） ---
@@ -430,6 +436,7 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
 async def ai_judgment_loop(
     interval_hours: int = _DEFAULT_INTERVAL_UPPER,
     on_error: Optional[Callable[[Exception], None]] = None,
+    startup_delay_sec: Optional[int] = None,
 ) -> None:
     """UPPER ティア間隔（最小値）で tick し、ユーザーごとにティア別間隔を適用するループ。
 
@@ -437,13 +444,31 @@ async def ai_judgment_loop(
     各 tick で _create_proposals_for_users がユーザーごとのティア間隔を確認し、
     GENERAL ティアのユーザーは 8 時間未満の場合はスキップされる。
 
+    起動直後の fan-out 抑制 (P3-5):
+        再起動のたびに全 due user が即時 fan-out する問題を防ぐため、
+        第1 tick の前に startup_delay_sec だけ待機する。
+        デフォルトは AI_JUDGMENT_STARTUP_DELAY_SEC 環境変数（既定 300 秒）。
+        watchdog / Cloudflare Tunnel 等が立ち上がる猶予を確保する。
+
     Args:
         interval_hours: tick 間隔（時間）。デフォルトは UPPER ティア間隔。
         on_error: 失敗時に呼び出す同期コールバック（Slack 通知等）。
+        startup_delay_sec: 起動直後の待機秒数。None の場合は環境変数値を使用。
+            0 を渡すと遅延なし（テスト・デバッグ用途）。
     """
     global _scheduler_started, _last_run_at, _next_run_at, _last_error_msg
     _scheduler_started = True
-    await asyncio.sleep(0)  # イベントループに制御を返す
+
+    # P3-5: 起動直後の即時 fan-out を抑制するための startup delay
+    delay = startup_delay_sec if startup_delay_sec is not None else _DEFAULT_STARTUP_DELAY_SEC
+    if delay > 0:
+        logger.info(
+            "AI judgment scheduler: startup delay %d sec (P3-5 fan-out suppression). "
+            "Set AI_JUDGMENT_STARTUP_DELAY_SEC=0 to disable.",
+            delay,
+        )
+        await asyncio.sleep(delay)
+
     while True:
         try:
             loop = asyncio.get_running_loop()
