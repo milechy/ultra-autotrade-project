@@ -24,9 +24,9 @@ version: "3.9"
 # 環境変数: .env.production  (DATABASE_URL をフルURLで定義すること)
 # ============================================================
 #
-# NOTE: The Loki Docker logging driver must be installed on the host before starting this stack:
-#   docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
-# Verify installation with: docker plugin ls
+# NOTE: Loki Docker logging driver plugin is NO LONGER REQUIRED (P0-2 2026-05-21).
+# All services now use json-file logging. Logs are forwarded to Loki via promtail
+# (docker_sd_configs + docker-files scrape). No host plugin installation needed.
 
 volumes:
   ultra-state:
@@ -114,14 +114,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    # P0-2 (2026-05-21 loki cascade fix): json-file に切替。ログ収集は promtail が
+    # docker_sd_configs (Docker socket) + docker-files (json.log) 二重経路で担当。
     logging:
-      driver: loki
+      driver: "json-file"
       options:
-        loki-url: "http://loki:3100/loki/api/v1/push"
-        loki-batch-size: "400"
-        loki-retries: "3"
-        loki-timeout: "10s"
-        loki-external-labels: "service=postgres,env=production"
+        max-size: "10m"
+        max-file: "3"
 
   # ===== Blue/Green Backend =====
   # 両者は build / env / volume が同一。container_name と公開ポートのみ異なる。
@@ -166,14 +165,12 @@ services:
     restart: always
     networks:
       - production-net
+    # P0-2 (2026-05-21 loki cascade fix): json-file に切替。promtail 経由で Loki 収集継続。
     logging:
-      driver: loki
+      driver: "json-file"
       options:
-        loki-url: "http://loki:3100/loki/api/v1/push"
-        loki-batch-size: "400"
-        loki-retries: "3"
-        loki-timeout: "10s"
-        loki-external-labels: "service=backend-blue,env=production"
+        max-size: "10m"
+        max-file: "3"
 
   backend-green:
     container_name: ultra-autotrade-backend-green-production
@@ -205,14 +202,12 @@ services:
     restart: always
     networks:
       - production-net
+    # P0-2 (2026-05-21 loki cascade fix): json-file に切替。promtail 経由で Loki 収集継続。
     logging:
-      driver: loki
+      driver: "json-file"
       options:
-        loki-url: "http://loki:3100/loki/api/v1/push"
-        loki-batch-size: "400"
-        loki-retries: "3"
-        loki-timeout: "10s"
-        loki-external-labels: "service=backend-green,env=production"
+        max-size: "10m"
+        max-file: "3"
 
   # ===== Reverse Proxy =====
   # nginx -s reload は POSIX 仕様で既存接続を引き継ぐため、ゼロダウンタイム保証。
@@ -232,14 +227,12 @@ services:
     restart: always
     networks:
       - production-net
+    # P0-2 (2026-05-21 loki cascade fix): json-file に切替。promtail 経由で Loki 収集継続。
     logging:
-      driver: loki
+      driver: "json-file"
       options:
-        loki-url: "http://loki:3100/loki/api/v1/push"
-        loki-batch-size: "400"
-        loki-retries: "3"
-        loki-timeout: "10s"
-        loki-external-labels: "service=nginx,env=production"
+        max-size: "10m"
+        max-file: "3"
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -295,11 +288,9 @@ services:
     restart: always
     networks:
       - production-net
+    # P0-2 (2026-05-21 loki cascade fix): json-file に切替。promtail 経由で Loki 収集継続。
     logging:
-      driver: loki
+      driver: "json-file"
       options:
-        loki-url: "http://loki:3100/loki/api/v1/push"
-        loki-batch-size: "400"
-        loki-retries: "3"
-        loki-timeout: "10s"
-        loki-external-labels: "service=frontend,env=production"
+        max-size: "10m"
+        max-file: "3"
