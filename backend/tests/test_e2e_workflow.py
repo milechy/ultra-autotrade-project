@@ -96,6 +96,7 @@ class TestE2EWorkflow:
             knowledge_service=mock_ks,
             ai_service=mock_ai,
             exchange_service=exchange,
+            execution_policy="auto_execute",  # P3-1: 実行パス検証なので明示
         )
 
         assert isinstance(result, WorkflowRunResult)
@@ -173,6 +174,7 @@ class TestE2EWorkflow:
             knowledge_service=mock_ks,
             ai_service=mock_ai,
             exchange_service=exchange,
+            execution_policy="auto_execute",  # P3-1: エラーパス検証 (policy は任意だが明示)
         )
 
         assert isinstance(result, WorkflowRunResult)
@@ -223,6 +225,7 @@ class TestE2EWorkflow:
             ai_service=mock_ai,
             exchange_service=exchange,
             dry_run=True,
+            execution_policy="auto_execute",  # P3-1: dry_run パス検証なので明示
         )
 
         assert isinstance(result, WorkflowRunResult)
@@ -250,6 +253,7 @@ class TestE2EWorkflow:
             knowledge_service=mock_ks,
             ai_service=mock_ai,
             exchange_service=exchange,
+            execution_policy="auto_execute",  # P3-1: 実行パス検証なので明示
         )
 
         assert isinstance(result, WorkflowRunResult)

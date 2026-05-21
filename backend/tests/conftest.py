@@ -12,7 +12,9 @@ Pytest configuration for Ultra AutoTrade backend tests.
 
 import os
 import sys
+from decimal import Decimal
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -71,6 +73,55 @@ def client():
 #
 # CI では VCR_RECORD_MODE=none が設定されており、実 API は呼ばれない。
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# CompoundRiskAssessor グローバルモック (workflow 統合テスト保護)
+#
+# CompoundRiskAssessor は Lido/Pendle のネットワーク呼び出しを行う。
+# テスト環境では RPC/API に疎通できず should_evacuate=True (CRITICAL) になるため、
+# workflow.process_pending_knowledge() が全件 HOLD を返してしまう。
+# autouse fixture でモックし、should_evacuate=False (LOW) を固定する。
+# テストで実際の CompoundRiskAssessor 動作を検証する場合は @pytest.mark.real_compound_risk で除外できる。
+# ---------------------------------------------------------------------------
+
+
+def _make_safe_compound_risk_assessment():
+    """should_evacuate=False の安全な CompoundRiskAssessment を返す。"""
+    from app.protocols.risk.schemas import CompoundRiskAssessment, RiskLevel
+
+    return CompoundRiskAssessment(
+        overall_risk=RiskLevel.LOW,
+        protocol_risks=[],
+        peg_status=None,
+        maturity_alerts=[],
+        total_exposure_usd=Decimal("0"),
+        risk_score=Decimal("10"),
+        recommendations=[],
+        should_evacuate=False,
+        evacuation_reason=None,
+    )
+
+
+@pytest.fixture(autouse=True)
+def _mock_compound_risk_assessor(request):
+    """CompoundRiskAssessor をモックし、テスト環境でのネットワーク呼び出しをブロックする。
+
+    @pytest.mark.real_compound_risk マーク付きテストはスキップ（実 Assessor を使う）。
+    """
+    if request.node.get_closest_marker("real_compound_risk"):
+        yield
+        return
+
+    safe_assessment = _make_safe_compound_risk_assessment()
+    mock_assessor = MagicMock()
+    mock_assessor.assess = AsyncMock(return_value=safe_assessment)
+
+    with patch(
+        "app.protocols.risk.compound_risk.CompoundRiskAssessor",
+        return_value=mock_assessor,
+    ):
+        yield
 
 
 @pytest.fixture(scope="module")
