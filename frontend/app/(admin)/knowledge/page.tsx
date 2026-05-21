@@ -207,7 +207,7 @@ export default function KnowledgeIndexPage() {
   }
 
   return (
-    <AuthGuard>
+    <AuthGuard adminOnly>
       <>
         <title>ナレッジ Hub - Ultra AutoTrade</title>
 

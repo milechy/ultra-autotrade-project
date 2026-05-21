@@ -51,7 +51,7 @@ export default function KnowledgeSearchPage() {
   }
 
   return (
-    <AuthGuard>
+    <AuthGuard adminOnly>
       <>
         <title>RAG検索 - ナレッジ Hub - Ultra AutoTrade</title>
 

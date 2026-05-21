@@ -397,7 +397,7 @@ function TradesContent() {
 
 export default function TradesPage() {
   return (
-    <AuthGuard>
+    <AuthGuard adminOnly>
       <>
         <title>取引履歴 - Ultra AutoTrade</title>
         <TradesContent />

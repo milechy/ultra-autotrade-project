@@ -4,6 +4,7 @@
 
 import { useState, useMemo } from 'react'
 import { Users, Search } from 'lucide-react'
+import AuthGuard from '@/components/AuthGuard'
 import { UserTable, UserDetailPanel } from './_components'
 import type { UserDetail } from './_components/UserDetailPanel'
 
@@ -108,7 +109,8 @@ export default function UsersPage() {
   const totalAUM = users.reduce((sum, u) => sum + u.aum, 0)
 
   return (
-    <>
+    <AuthGuard adminOnly>
+      <>
       <title>ユーザー管理 - Ultra AutoTrade</title>
 
       {/* ── Page header ──────────────────────────────────────────────────── */}
@@ -165,7 +167,8 @@ export default function UsersPage() {
         onClose={() => setSelectedUser(null)}
         onTogglePause={handleTogglePause}
       />
-    </>
+      </>
+    </AuthGuard>
   )
 }
 

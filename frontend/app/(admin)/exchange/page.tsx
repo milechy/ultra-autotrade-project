@@ -227,7 +227,7 @@ function ExchangeContent() {
 
 export default function ExchangePage() {
   return (
-    <AuthGuard>
+    <AuthGuard adminOnly>
       <>
         <title>取引所管理 - Ultra AutoTrade</title>
         <ExchangeContent />

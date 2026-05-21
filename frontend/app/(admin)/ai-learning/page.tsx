@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Brain, CheckCircle, XCircle, TrendingUp } from 'lucide-react'
+import AuthGuard from '@/components/AuthGuard'
 import { useAuth } from '@/lib/auth'
 import { KPICard } from '@/components/shared/KPICard'
 import { AILearningCharts } from './_components/AILearningCharts'
@@ -13,7 +14,11 @@ import type { AIFeedbackStats } from '@/lib/api/ai-feedback'
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function AILearningPage() {
-  return <AILearningContent />
+  return (
+    <AuthGuard adminOnly>
+      <AILearningContent />
+    </AuthGuard>
+  )
 }
 
 // ─── Page content ─────────────────────────────────────────────────────────────

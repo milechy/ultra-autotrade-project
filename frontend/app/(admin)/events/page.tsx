@@ -470,7 +470,7 @@ function EventsContent() {
 
 export default function EventsPage() {
   return (
-    <AuthGuard>
+    <AuthGuard adminOnly>
       <>
         <title>監視イベントログ - Ultra AutoTrade</title>
         <EventsContent />
