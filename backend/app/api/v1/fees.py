@@ -43,9 +43,9 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_active_user, require_admin
 from app.auth.models import InvestmentTier, RiskMode, User
-from app.billing.v10_models import FeeConfigV10, FeeTransaction
 from app.database import get_db
 from app.fees import FeeCalculationInput, FeeCalculator
+from app.fees.models import FeeConfigV10, FeeTransaction
 from app.portfolio.models import PortfolioSnapshot
 from app.transactions.models import Transaction
 

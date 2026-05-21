@@ -35,7 +35,7 @@ if _BACKEND_DIR not in sys.path:
 
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-seed-fee-config")
 
-from app.billing.v10_models import FeeConfigV10  # noqa: E402
+from app.fees.models import FeeConfigV10  # noqa: E402
 from scripts.seed_fee_config_v10 import (  # noqa: E402
     V10_DEFAULT_CONFIG_NAME,
     build_v10_default_config,

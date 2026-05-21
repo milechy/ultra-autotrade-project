@@ -43,7 +43,7 @@ from sqlalchemy import select  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from app.auth.models import RISK_MODE_SUBSCRIPTION_RATES, RiskMode  # noqa: E402
-from app.billing.v10_models import FeeConfigV10  # noqa: E402
+from app.fees.models import FeeConfigV10  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
 
 logger = logging.getLogger(__name__)

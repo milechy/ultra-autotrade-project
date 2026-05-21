@@ -16,8 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # Import all models so Alembic autogenerate can detect them
 from app.ai.models import AIDecision  # noqa: F401, E402
 from app.auth.models import User  # noqa: F401, E402
-from app.billing.v10_models import FeeConfigV10, FeeTransaction  # noqa: F401, E402
 from app.database import Base, get_database_url  # noqa: E402
+from app.fees.models import FeeConfigV10, FeeTransaction  # noqa: F401, E402
 from app.knowledge.models import (  # noqa: F401, E402
     KnowledgeChunk,
     KnowledgeDocument,

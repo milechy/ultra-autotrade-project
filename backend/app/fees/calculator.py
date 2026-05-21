@@ -32,7 +32,7 @@ from decimal import ROUND_DOWN, Decimal
 from typing import Final
 
 from app.auth.models import InvestmentTier, RiskMode
-from app.billing.v10_models import FeeConfigV10
+from app.fees.models import FeeConfigV10
 
 #: 円未満切り捨て (ROUND_DOWN, 整数 JPY 用 Decimal 量子化単位)。
 #: ``Decimal("1234.56").quantize(JPY_QUANTIZE, rounding=ROUND_DOWN) == Decimal("1234")``

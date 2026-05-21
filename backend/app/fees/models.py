@@ -1,26 +1,13 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # Unauthorized copying or distribution is strictly prohibited.
-# backend/app/billing/v10_models.py
-"""
-Fee Model v10 SQLAlchemy ORM 定義 (Option A: 既存 billing/models.py を完全置換予定)。
+# backend/app/fees/models.py
+"""Fee Model v10 SQLAlchemy ORM 定義。
 
 テーブル:
-- fee_configs      : v10 設定 (リスクモード × tier の手数料率マトリクス)
+- fee_configs      : v10 設定 (tier × risk_mode の手数料率マトリクス)
 - fee_transactions : 月次手数料計算結果
 
-設計方針:
-- 既存 ``app.billing.models.FeeConfig`` 等は **F-1 では削除しない** (F-13 で物理削除)
-- ただし両者は同じ ``__tablename__`` を保持するため、同じ ``Base.metadata`` に登録すると
-  SQLAlchemy 起動時に "Table is already defined" エラーが発生する
-- そのため本モジュールは **専用の ``V10Base``** を使い、既存 ``app.database.Base`` とは
-  メタデータを分離する
-- DDL は ``backend/alembic/versions/d4e5f6a7b8c9_fee_v10_tables.py`` および
-  ``backend/alembic/sql/045_fee_v10_tables.sql`` が真実の源 (本モデル定義はクエリ用)
-- F-13 で旧モデル削除後、本モジュールを ``app.billing.models`` にマージし
-  ``V10Base`` を削除して通常の ``Base`` に統合する
-
-Tier / RiskMode の Python Enum は本モジュール内で暫定定義する。F-2 (InvestmentTier
-3 層化) / F-3 (RiskMode enum) で正式モジュール化する際に import を差し替える。
+DDL の真実の源: backend/alembic/sql/045_fee_v10_tables.sql
 """
 
 from __future__ import annotations
@@ -39,39 +26,21 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    MetaData,
     Numeric,
     String,
     UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.database import Base
 
 #: PostgreSQL では JSONB、それ以外 (SQLite テスト等) では JSON を使う型 alias。
-#: 本番は PG なので JSONB の挙動 (バイナリ格納・GIN index 可能) は維持される。
 _JSONB_OR_JSON = JSONB().with_variant(JSON(), "sqlite")
 
 
-class V10Base(DeclarativeBase):
-    """v10 専用 Declarative Base (旧 billing/models.py との衝突回避用).
-
-    F-13 で旧モデル削除後、本クラスを廃止し ``app.database.Base`` に統合する。
-    """
-
-    metadata = MetaData()
-
-
-#: F-2 で `app.auth.models.InvestmentTier` に統合済み。
-#: 後方互換のため alias として残置 (F-13 で v9 物理削除時に消去)。
-from app.auth.models import InvestmentTier as FeeTier  # noqa: E402, F401
-
-#: F-3 で ``app.auth.models.RiskMode`` (conservative/balanced/aggressive) に統合済み。
-#: 後方互換のため alias として残置 (F-13 で v9 物理削除時に消去)。
-from app.auth.models import RiskMode as FeeRiskMode  # noqa: E402, F401
-
-
-class FeeConfigV10(V10Base):
+class FeeConfigV10(Base):
     """v10 手数料設定。
 
     1 レコード = 1 つの設定スナップショット。``is_active=True`` かつ最新の
@@ -127,7 +96,7 @@ class FeeConfigV10(V10Base):
         return f"<FeeConfigV10(id={self.id}, name={self.config_name!r}, active={self.is_active})>"
 
 
-class FeeTransaction(V10Base):
+class FeeTransaction(Base):
     """v10 月次手数料計算結果。
 
     1 ユーザー × 1 ヶ月 (calculation_month は月初日) で 1 レコード。
@@ -197,7 +166,9 @@ class FeeTransaction(V10Base):
         default=lambda: datetime.now(timezone.utc),
         server_default=text("NOW()"),
     )
-    finalized_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    finalized_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -205,9 +176,6 @@ class FeeTransaction(V10Base):
             name="chk_fee_tx_tier",
         ),
         CheckConstraint(
-            # F-4 (046 マイグレーション): F-3 RiskMode 内部値に揃える。
-            # Aave MDD / Optimizer / Risk Profile が conservative/balanced/aggressive を
-            # 直参照しているため、fee_transactions も同じ値を使う。
             "risk_mode IN ('conservative', 'balanced', 'aggressive')",
             name="chk_fee_tx_risk_mode",
         ),
