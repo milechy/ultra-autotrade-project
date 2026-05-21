@@ -73,4 +73,24 @@ if (backups.length > 0) {
   log(`Restored ${backups.length} page/layout file(s) with force-dynamic`);
 }
 
+// 5. Restore dynamic route page directories
+const dynamicRouteDirs = [
+  path.join(ROOT, 'app', 'r', '[code]'),
+  path.join(ROOT, 'app', '(partner)', 'partner', 'users', '[id]'),
+  path.join(ROOT, 'app', '(partner)', 'partner', 'referral', '[id]'),
+];
+for (const originalDir of dynamicRouteDirs) {
+  const parentDir = path.dirname(originalDir);
+  const dirName = path.basename(originalDir);
+  const skipName = `_cf_skip_${dirName.replace(/[\[\]\.]/g, '_')}`;
+  const skipPath = path.join(parentDir, skipName);
+  if (fs.existsSync(skipPath)) {
+    if (fs.existsSync(originalDir)) {
+      fs.rmSync(originalDir, { recursive: true });
+    }
+    fs.renameSync(skipPath, originalDir);
+    log(`Restored ${path.relative(ROOT, originalDir)}`);
+  }
+}
+
 log('Postbuild complete. Source tree restored to original state.');

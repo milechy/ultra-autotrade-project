@@ -42,3 +42,4 @@ e2e/.auth/
 # CF Pages build temp files (cf-pages-prebuild.js)
 *.cf_bak
 app/_api_cf_skip/
+app/*/_cf_skip_*/

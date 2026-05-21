@@ -20,6 +20,11 @@
  * 4. Removing `export const dynamic = 'force-dynamic'` from pages.
  *    Static export cannot coexist with force-dynamic.
  *
+ * 5. Moving dynamic route page directories to _cf_skip_<name>.
+ *    Static export requires generateStaticParams() for dynamic routes.
+ *    Client-only dynamic pages (r/[code], partner/users/[id], etc.) don't have
+ *    generateStaticParams() and are not needed for the demo.
+ *
  * The companion script cf-pages-postbuild.js restores all modified files.
  *
  * Context: PR #372 reverts PR #335's accidental main merge. CF Pages project
@@ -117,6 +122,30 @@ for (const filePath of allFiles) {
 }
 if (patchedCount > 0) {
   log(`Commented out 'force-dynamic' in ${patchedCount} file(s)`);
+}
+
+// 5. Move dynamic route page directories that lack generateStaticParams()
+// With output:'export', dynamic routes require generateStaticParams() or are unsupported.
+// These pages are client-side only and not needed for the static demo.
+const dynamicRouteDirs = [
+  path.join(ROOT, 'app', 'r', '[code]'),
+  path.join(ROOT, 'app', '(partner)', 'partner', 'users', '[id]'),
+  path.join(ROOT, 'app', '(partner)', 'partner', 'referral', '[id]'),
+];
+let dynamicSkippedCount = 0;
+for (const dirPath of dynamicRouteDirs) {
+  if (fs.existsSync(dirPath)) {
+    const parentDir = path.dirname(dirPath);
+    const dirName = path.basename(dirPath);
+    const skipName = `_cf_skip_${dirName.replace(/[\[\]\.]/g, '_')}`;
+    const skipPath = path.join(parentDir, skipName);
+    fs.renameSync(dirPath, skipPath);
+    dynamicSkippedCount++;
+    log(`Moved ${path.relative(ROOT, dirPath)} → ${path.relative(ROOT, skipPath)} (no generateStaticParams)`);
+  }
+}
+if (dynamicSkippedCount === 0) {
+  log('No dynamic route dirs to skip');
 }
 
 log('Prebuild complete. Run cf-pages-postbuild.js after build to restore files.');
