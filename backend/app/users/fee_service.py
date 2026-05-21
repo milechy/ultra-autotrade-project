@@ -8,8 +8,6 @@ v10 三層戦略 (F-2 2026-04-25 〜):
   LOWER:  手数料率 3〜10% (〜100 万円)
   MIDDLE: 手数料率 8〜18% (100 万〜1000 万円)
   UPPER:  手数料率 15〜25% (1000 万円〜)
-
-GENERAL は v9 過渡期互換 (LOWER と同一レンジ)。F-13 で削除予定。
 """
 
 from typing_extensions import TypedDict
@@ -59,17 +57,14 @@ _FEE_SCHEDULE: dict[str, FeeRateRange] = {
     "LOWER": _LOWER,
     "MIDDLE": _MIDDLE,
     "UPPER": _UPPER,
-    # v9 互換 (DEPRECATED, F-13 で削除)
-    "GENERAL": _LOWER,
 }
 
 
 def get_fee_rate_range(tier: str) -> FeeRateRange:
-    """
-    ティア文字列から手数料率レンジを返す。
+    """ティア文字列から手数料率レンジを返す。
 
     Args:
-        tier: "LOWER" / "MIDDLE" / "UPPER" (または v9 互換 "GENERAL")
+        tier: "LOWER" / "MIDDLE" / "UPPER"
 
     Returns:
         FeeRateRange dict
@@ -83,9 +78,5 @@ def get_fee_rate_range(tier: str) -> FeeRateRange:
 
 
 def get_full_fee_schedule() -> list[FeeRateRange]:
-    """
-    全ティアの手数料率レンジ一覧を返す (LOWER → MIDDLE → UPPER の順)。
-
-    v9 互換の GENERAL は内部 alias のため返却しない。
-    """
+    """全ティアの手数料率レンジ一覧を返す (LOWER → MIDDLE → UPPER の順)。"""
     return [_LOWER, _MIDDLE, _UPPER]

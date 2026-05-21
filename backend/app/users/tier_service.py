@@ -8,13 +8,6 @@ v10 三層戦略 (F-2 2026-04-25 〜):
   LOWER:  deposit_jpy <= 1,000,000
   MIDDLE: 1,000,001 <= deposit_jpy <= 10,000,000
   UPPER:  deposit_jpy >= 10,000,001
-
-v9 二層戦略 (パートナー配下の active 割り振り合計 USD):
-  GENERAL: total_allocated_usd < TIER_THRESHOLD_USD (≒ $20,000)
-  UPPER:   total_allocated_usd >= TIER_THRESHOLD_USD
-
-  v9 経路 (refresh_partner_tier) は本タスクでも残置するが、戻り値は v10 LOWER/UPPER
-  に揃えた (GENERAL は廃止予定の互換値)。F-13 で完全廃止予定。
 """
 
 import logging
@@ -50,11 +43,6 @@ def _get_threshold() -> Decimal:
 def determine_tier(total_allocated_usd: Decimal) -> str:
     """
     v9 互換: 割り振り合計額 (USD) からティアを判定する。
-
-    F-2 までは ``"GENERAL" / "UPPER"`` を返していたが、v10 移行に伴い
-    GENERAL → ``InvestmentTier.LOWER.value`` に置換した。F-16 マイグレーションで
-    既存 6 ユーザーの ``users.tier`` GENERAL レコードが LOWER/MIDDLE/UPPER に
-    再判定される。
 
     Args:
         total_allocated_usd: パートナー配下の active 割り振り合計額（USD, Decimal）

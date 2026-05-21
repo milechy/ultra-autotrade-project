@@ -37,7 +37,6 @@ from app.proposals.models import Proposal
 _DEFAULT_INTERVAL_UPPER = 4
 _DEFAULT_INTERVAL_MIDDLE = 6
 _DEFAULT_INTERVAL_LOWER = 8
-_DEFAULT_INTERVAL_GENERAL = 8  # v9 互換 (LOWER と同値)
 
 logger = logging.getLogger(__name__)
 
@@ -175,16 +174,13 @@ def _get_tier_interval_hours(tier: str) -> int:
     - AI_JUDGMENT_INTERVAL_HOURS_UPPER (デフォルト 4)
     - AI_JUDGMENT_INTERVAL_HOURS_MIDDLE (デフォルト 6)
     - AI_JUDGMENT_INTERVAL_HOURS_LOWER (デフォルト 8)
-    - AI_JUDGMENT_INTERVAL_HOURS_GENERAL (デフォルト 8、v9 互換)
     """
     if tier == InvestmentTier.UPPER.value:
         return int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS_UPPER", str(_DEFAULT_INTERVAL_UPPER)))
     if tier == InvestmentTier.MIDDLE.value:
         return int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS_MIDDLE", str(_DEFAULT_INTERVAL_MIDDLE)))
-    if tier == InvestmentTier.LOWER.value:
-        return int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS_LOWER", str(_DEFAULT_INTERVAL_LOWER)))
-    # GENERAL (v9 互換) または未知の値 → GENERAL のデフォルト (= LOWER と同値)
-    return int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS_GENERAL", str(_DEFAULT_INTERVAL_GENERAL)))
+    # LOWER または未知の値 → LOWER デフォルト
+    return int(os.getenv("AI_JUDGMENT_INTERVAL_HOURS_LOWER", str(_DEFAULT_INTERVAL_LOWER)))
 
 
 def _is_user_due_for_judgment(user: User, now: datetime) -> bool:

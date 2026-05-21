@@ -54,35 +54,23 @@ class UserRole(str, Enum):
 
 
 class InvestmentTier(str, Enum):
-    """投資ティア。
+    """投資ティア。v10 (F-2 2026-04-25 〜): LOWER / MIDDLE / UPPER の 3 層
 
-    v10 (F-2 2026-04-25 〜): LOWER / MIDDLE / UPPER の 3 層
       - LOWER:  〜1,000,000 円
       - MIDDLE: 1,000,001 〜 10,000,000 円
       - UPPER:  10,000,001 円 〜
-
-    GENERAL は v9 過渡期互換値 (DEPRECATED)。F-16 で users.tier の
-    全 GENERAL レコードを LOWER/MIDDLE/UPPER に再判定後、F-13 で本 enum から削除。
     """
 
     LOWER = "LOWER"
     MIDDLE = "MIDDLE"
     UPPER = "UPPER"
-    GENERAL = "GENERAL"  # DEPRECATED (v9). 削除は F-13 (F-16 マイグレーション完了後)
 
-
-#: v9 GENERAL → v10 デフォルト変換マップ (read-time fallback)。
-#: F-16 マイグレーションで DB から GENERAL が消失した時点で参照箇所も削除可能。
-LEGACY_TIER_MAP: dict[str, "InvestmentTier"] = {
-    "GENERAL": InvestmentTier.LOWER,
-}
 
 #: tier 値 → 日本語ラベル。フロント表示および通知文言で使用。
 TIER_JP_LABELS: dict[InvestmentTier, str] = {
     InvestmentTier.LOWER: "一般",
     InvestmentTier.MIDDLE: "ミドル",
     InvestmentTier.UPPER: "アッパー",
-    InvestmentTier.GENERAL: "一般",  # GENERAL は LOWER と同じラベル (過渡期)
 }
 
 
@@ -163,18 +151,12 @@ def normalize_tier(raw_tier: str | None, *, user_id: int | None = None) -> Inves
     経路で、``user.tier`` を ``calculate_fee_by_market`` に渡す前の正規化に使う。
 
     優先順:
-      1. ``LEGACY_TIER_MAP`` のキー (現状: GENERAL → LOWER) → マップ値を返す
-         (deprecated 値を v10 系列に強制正規化するため、enum 解決より優先)
-      2. ``InvestmentTier`` の有効値 (LOWER/MIDDLE/UPPER) → そのまま enum で返す
-      3. それ以外 (None / 不明値) → WARNING ログ + ``InvestmentTier.LOWER`` フォールバック
+      1. ``InvestmentTier`` の有効値 (LOWER/MIDDLE/UPPER) → そのまま enum で返す
+      2. それ以外 (None / 不明値) → WARNING ログ + ``InvestmentTier.LOWER`` フォールバック
 
     フォールバック時に ``ValueError`` は raise しない (フィー計算は継続、HOLD 転換させない)。
-    F-13 で GENERAL を物理削除後も、本関数の不明値フォールバックパスで安全に吸収できる。
     """
     if raw_tier is not None:
-        mapped = LEGACY_TIER_MAP.get(raw_tier)
-        if mapped is not None:
-            return mapped
         try:
             return InvestmentTier(raw_tier)
         except ValueError:

@@ -52,16 +52,14 @@ class TestGetFeeRateRange:
         assert result["min_rate_pct"] == "15"
         assert result["max_rate_pct"] == "25"
 
-    def test_general_legacy_tier_returns_lower(self) -> None:
-        # GENERAL は v9 互換 alias → LOWER と同じ内容を返す
-        result = get_fee_rate_range("GENERAL")
-        assert result["tier"] == "LOWER"
-        assert result["min_rate"] == "0.03"
-        assert result["max_rate"] == "0.10"
-
     def test_unknown_tier_raises(self) -> None:
         with pytest.raises(ValueError, match="Unknown tier"):
             get_fee_rate_range("PLATINUM")
+
+    def test_general_legacy_tier_raises(self) -> None:
+        # F-13: GENERAL は削除済み → ValueError
+        with pytest.raises(ValueError, match="Unknown tier"):
+            get_fee_rate_range("GENERAL")
 
 
 class TestGetFullFeeSchedule:
@@ -173,7 +171,7 @@ class TestUserFeeInfoEndpoint:
         assert r.status_code == 200
         data = r.json()
         assert data["user_id"] == user_id
-        assert data["tier"] in ("LOWER", "MIDDLE", "UPPER", "GENERAL")
+        assert data["tier"] in ("LOWER", "MIDDLE", "UPPER")
         assert "fee_rate_range" in data
         assert "min_rate" in data["fee_rate_range"]
         assert "max_rate" in data["fee_rate_range"]

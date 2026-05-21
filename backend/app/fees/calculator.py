@@ -39,12 +39,10 @@ from app.billing.v10_models import FeeConfigV10
 JPY_QUANTIZE: Final[Decimal] = Decimal("1")
 
 #: tier → tier_fee_rates / tier_monthly_yield_caps 配列の index。
-#: GENERAL は LOWER 扱い (F-2 LEGACY_TIER_MAP と同方針)。
 _TIER_INDEX: Final[dict[InvestmentTier, int]] = {
     InvestmentTier.LOWER: 0,
     InvestmentTier.MIDDLE: 1,
     InvestmentTier.UPPER: 2,
-    InvestmentTier.GENERAL: 0,  # DEPRECATED, F-13 で削除
 }
 
 
@@ -102,12 +100,7 @@ class FeeCalculationResult:
 
 
 def _normalize_tier_for_db(tier: InvestmentTier) -> str:
-    """``InvestmentTier`` → ``fee_transactions.tier`` CHECK 制約準拠の文字列。
-
-    GENERAL (F-2 deprecated) は LOWER に正規化する。
-    """
-    if tier == InvestmentTier.GENERAL:
-        return str(InvestmentTier.LOWER.value)
+    """``InvestmentTier`` → ``fee_transactions.tier`` CHECK 制約準拠の文字列。"""
     return str(tier.value)
 
 
