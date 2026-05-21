@@ -541,7 +541,7 @@ function RebalanceContent() {
 
 export default function RebalancePage() {
   return (
-    <AuthGuard>
+    <AuthGuard adminOnly>
       <>
         <title>Aave リバランス - Ultra AutoTrade</title>
         <RebalanceContent />

@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React from "react";
+import AuthGuard from "@/components/AuthGuard";
 import ReportSummaryPanel from "@/components/dashboard/ReportSummaryPanel";
 import { fetchLatestReport } from "@/lib/api/automation";
 import { useAuth } from "@/lib/auth";
@@ -30,7 +31,8 @@ export default function ReportsPage() {
   React.useEffect(() => { load(); }, []);
 
   return (
-    <>
+    <AuthGuard adminOnly>
+      <>
       <title>レポート - Ultra AutoTrade</title>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
@@ -66,6 +68,7 @@ export default function ReportsPage() {
           <li>レポート生成が失敗した場合、ReportingService のログと依存関係を確認。</li>
         </ul>
       </section>
-    </>
+      </>
+    </AuthGuard>
   );
 }

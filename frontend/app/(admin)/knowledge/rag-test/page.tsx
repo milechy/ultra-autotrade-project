@@ -115,7 +115,7 @@ export default function RagTestPage() {
   }
 
   return (
-    <AuthGuard>
+    <AuthGuard adminOnly>
       <>
         <title>RAG 検索テスト (Admin) - Ultra AutoTrade</title>
 

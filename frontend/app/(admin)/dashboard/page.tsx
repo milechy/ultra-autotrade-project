@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { fetchExchangeStatus } from "@/lib/api/exchange";
 
@@ -33,17 +34,19 @@ export default function DashboardPage() {
   }, [token]);
 
   return (
-    <div style={{ padding: "2rem" }}>
-      <h1 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "1.5rem" }}>
-        運用ダッシュボード
-      </h1>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
-        <Card label="システムステータス" value={status} />
-        <Card label="Health Factor" value={hf} />
-        <Card label="本日の取引" value={trades} />
-        <Card label="総AUM" value="$15,000" />
+    <AuthGuard adminOnly>
+      <div style={{ padding: "2rem" }}>
+        <h1 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "1.5rem" }}>
+          運用ダッシュボード
+        </h1>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+          <Card label="システムステータス" value={status} />
+          <Card label="Health Factor" value={hf} />
+          <Card label="本日の取引" value={trades} />
+          <Card label="総AUM" value="$15,000" />
+        </div>
       </div>
-    </div>
+    </AuthGuard>
   );
 }
 

@@ -4,6 +4,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw } from 'lucide-react'
+import AuthGuard from '@/components/AuthGuard'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -238,6 +239,7 @@ export default function ProtocolsPage() {
   }, [fetchHealth])
 
   return (
+    <AuthGuard adminOnly>
     <div style={{ padding: '1.5rem', maxWidth: 960, margin: '0 auto' }}>
       {/* Page Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
@@ -300,5 +302,6 @@ export default function ProtocolsPage() {
         データ取得時刻: {data.fetched_at ? formatTime(data.fetched_at) : '—'}
       </p>
     </div>
+    </AuthGuard>
   )
 }

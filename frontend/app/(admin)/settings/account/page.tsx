@@ -11,7 +11,7 @@ import RiskModeSelector from "@/components/settings/RiskModeSelector";
 
 export default function AccountSettingsPage() {
   return (
-    <AuthGuard>
+    <AuthGuard adminOnly>
       <AccountSettingsContent />
     </AuthGuard>
   );

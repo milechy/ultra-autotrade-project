@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import AuthGuard from "@/components/AuthGuard";
 import {
   fetchGeoRisk,
   fetchNews,
@@ -158,6 +159,7 @@ export default function DataFeedsPage() {
   );
 
   return (
+    <AuthGuard adminOnly>
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
@@ -257,5 +259,6 @@ export default function DataFeedsPage() {
         </Card>
       </div>
     </div>
+    </AuthGuard>
   );
 }

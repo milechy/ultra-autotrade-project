@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { DollarSign } from 'lucide-react'
+import AuthGuard from '@/components/AuthGuard'
 import {
   HealthFactorGauge,
   StatusBadge,
@@ -18,6 +19,7 @@ import {
 
 export default function ComponentsPreviewPage() {
   return (
+    <AuthGuard adminOnly>
     <div className="container mx-auto p-8 space-y-10">
       <h1 className="text-3xl font-bold">共通コンポーネントプレビュー</h1>
 
@@ -213,5 +215,6 @@ export default function ComponentsPreviewPage() {
         }}
       />
     </div>
+    </AuthGuard>
   )
 }

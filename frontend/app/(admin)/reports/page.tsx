@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React from "react";
+import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { getJson, postJson } from "@/lib/api/http";
 
@@ -530,7 +531,11 @@ function ReportViewerContent() {
 }
 
 export default function ReportsPage() {
-  return <ReportViewerContent />;
+  return (
+    <AuthGuard adminOnly>
+      <ReportViewerContent />
+    </AuthGuard>
+  );
 }
 
 // ── Style constants ────────────────────────────────────────────────────────
