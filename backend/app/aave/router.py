@@ -55,9 +55,12 @@ def rebalance(
     """
     BUY/SELL/HOLD に応じて deposit / withdraw / NOOP を実行する。
 
-    chain_name 未指定時はプライマリチェーン（arbitrum）を使用する。
+    chain_name 未指定時は AAVE_ACTIVE_CHAINS の先頭チェーンを使用する（本番: base）。
     """
-    chain = body.chain_name or "arbitrum"
+    import os  # noqa: PLC0415
+
+    default_chain = os.getenv("AAVE_ACTIVE_CHAINS", "base").split(",")[0].strip()
+    chain = body.chain_name or default_chain
     try:
         result = multi_service.execute_rebalance(
             chain_name=chain,

@@ -142,7 +142,7 @@ class AaveRebalanceRequest(BaseModel):
     )
     chain_name: Optional[str] = Field(
         None,
-        description="対象チェーン名。未指定時はプライマリチェーン（arbitrum）を使用する。",
+        description="対象チェーン名。未指定時は AAVE_ACTIVE_CHAINS の先頭チェーン（本番デフォルト: base）を使用する。",
     )
 
 

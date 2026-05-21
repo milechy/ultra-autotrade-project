@@ -151,13 +151,16 @@ def get_active_chains() -> list[AaveChainConfig]:
     """
     環境変数 AAVE_ACTIVE_CHAINS からアクティブなチェーン一覧を取得する。
 
-    カンマ区切りで複数チェーンを指定可能（例: "arbitrum,optimism"）。
-    未設定の場合は "arbitrum" をデフォルトとする。
+    カンマ区切りで複数チェーンを指定可能（例: "base,optimism"）。
+    未設定の場合は "base" をデフォルトとする（本番は Base Mainnet 運用）。
+
+    NOTE: 旧デフォルト "arbitrum" から "base" に変更（2026-05-21）。
+    AAVE_RPC_URL_ARBITRUM が未設定の本番環境で ValueError が発生していた根本原因。
 
     :return: アクティブなチェーンの AaveChainConfig リスト
     :raises ValueError: 未知のチェーン名が含まれる場合
     """
-    raw = os.getenv("AAVE_ACTIVE_CHAINS", "arbitrum")
+    raw = os.getenv("AAVE_ACTIVE_CHAINS", "base")
     chain_names = [name.strip() for name in raw.split(",") if name.strip()]
     return [get_chain_config(name) for name in chain_names]
 

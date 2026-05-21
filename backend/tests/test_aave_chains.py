@@ -116,14 +116,18 @@ class TestGetActiveChains:
             get_active_chains()
 
     @patch.dict("os.environ", {}, clear=False)
-    def test_env_not_set_defaults_to_arbitrum(self) -> None:
-        """AAVE_ACTIVE_CHAINS 未設定時は arbitrum をデフォルトとする。"""
+    def test_env_not_set_defaults_to_base(self) -> None:
+        """AAVE_ACTIVE_CHAINS 未設定時は base をデフォルトとする（本番は Base Mainnet 運用）。
+
+        2026-05-21 変更: 旧デフォルト "arbitrum" → "base"。
+        AAVE_RPC_URL_ARBITRUM 未設定の本番環境で ValueError が発生していた根本対策。
+        """
         import os
 
         os.environ.pop("AAVE_ACTIVE_CHAINS", None)
         chains = get_active_chains()
         assert len(chains) == 1
-        assert chains[0].chain_name == "arbitrum"
+        assert chains[0].chain_name == "base"
 
 
 class TestGetRpcUrlForChain:
@@ -138,3 +142,117 @@ class TestGetRpcUrlForChain:
         with patch.dict("os.environ", {}, clear=True):
             with pytest.raises(ValueError, match="RPC URL"):
                 get_rpc_url_for_chain(config)
+
+    def test_base_rpc_url_from_env(self) -> None:
+        """本番環境想定: AAVE_RPC_URL_BASE が設定されていれば base RPC URL を返す。"""
+        config = get_chain_config("base")
+        with patch.dict("os.environ", {"AAVE_RPC_URL_BASE": "https://base-rpc.example.com"}):
+            url = get_rpc_url_for_chain(config)
+            assert url == "https://base-rpc.example.com"
+
+    def test_arbitrum_rpc_not_set_raises(self) -> None:
+        """AAVE_RPC_URL_ARBITRUM 未設定時は ValueError（本番インシデント P0 の再現テスト）。"""
+        config = get_chain_config("arbitrum")
+        with patch.dict("os.environ", {}, clear=True):
+            with pytest.raises(ValueError, match="AAVE_RPC_URL_ARBITRUM"):
+                get_rpc_url_for_chain(config)
+
+
+class TestMakeMultiChainClientsRpcGuard:
+    """make_multi_chain_clients の RPC 未設定チェーンスキップ動作を検証する。
+
+    P0 GID 1214993061793196: AAVE_ACTIVE_CHAINS に arbitrum が含まれ
+    AAVE_RPC_URL_ARBITRUM が未設定の場合、起動 ValueError を防ぐためスキップする。
+    """
+
+    def test_skips_chain_without_rpc_in_web3_mode(self) -> None:
+        """web3 モードで RPC 未設定チェーンはスキップされ、結果に含まれない。"""
+        from unittest.mock import patch
+
+        from app.aave.client import make_multi_chain_clients
+
+        # AAVE_ACTIVE_CHAINS=arbitrum, RPC 未設定 → arbitrum はスキップ
+        with patch.dict(
+            "os.environ",
+            {"AAVE_ACTIVE_CHAINS": "arbitrum", "AAVE_CLIENT_TYPE": "web3"},
+            clear=False,
+        ):
+            # AAVE_RPC_URL_ARBITRUM を確実に未設定にする
+            import os
+
+            os.environ.pop("AAVE_RPC_URL_ARBITRUM", None)
+            clients = make_multi_chain_clients(client_type="web3")
+            # RPC 未設定 → スキップ → 空
+            assert "arbitrum" not in clients
+
+    def test_includes_chain_with_rpc_set_in_web3_mode(self) -> None:
+        """web3 モードで RPC 設定済みチェーンは結果に含まれる。"""
+        from unittest.mock import MagicMock, patch
+
+        from app.aave.client import make_multi_chain_clients
+
+        with patch.dict(
+            "os.environ",
+            {
+                "AAVE_ACTIVE_CHAINS": "base",
+                "AAVE_RPC_URL_BASE": "https://base-rpc.example.com",
+                "AAVE_CLIENT_TYPE": "web3",
+            },
+            clear=False,
+        ):
+            with patch("app.aave.client.make_aave_client") as mock_factory:
+                mock_factory.return_value = MagicMock()
+                clients = make_multi_chain_clients(client_type="web3")
+                assert "base" in clients
+
+    def test_dummy_mode_includes_all_chains_regardless_of_rpc(self) -> None:
+        """dummy モードでは RPC 未設定でもスキップしない（テスト環境で動くため）。"""
+        import os
+        from unittest.mock import MagicMock, patch
+
+        from app.aave.client import make_multi_chain_clients
+
+        os.environ.pop("AAVE_RPC_URL_ARBITRUM", None)
+
+        with patch.dict(
+            "os.environ",
+            {"AAVE_ACTIVE_CHAINS": "arbitrum"},
+            clear=False,
+        ):
+            with patch("app.aave.client.make_aave_client") as mock_factory:
+                mock_factory.return_value = MagicMock()
+                clients = make_multi_chain_clients(client_type="dummy")
+                assert "arbitrum" in clients
+
+
+class TestGetPrimaryChainDefault:
+    """proposals/router.py の _get_primary_chain() のデフォルト挙動を検証する。
+
+    P0 GID 1214993061793196: 旧デフォルト "arbitrum_sepolia" / "arbitrum" → "base" に統一。
+    """
+
+    def test_default_chain_is_base_when_env_not_set(self) -> None:
+        """AAVE_ACTIVE_CHAINS 未設定時は "base" が返る。"""
+        import os
+
+        from app.proposals.router import _get_primary_chain
+
+        os.environ.pop("AAVE_ACTIVE_CHAINS", None)
+        chain = _get_primary_chain()
+        assert chain == "base"
+
+    def test_returns_first_chain_from_env(self) -> None:
+        """AAVE_ACTIVE_CHAINS=base,arbitrum → "base" が返る（先頭チェーン）。"""
+        with patch.dict("os.environ", {"AAVE_ACTIVE_CHAINS": "base,arbitrum"}):
+            from app.proposals.router import _get_primary_chain
+
+            chain = _get_primary_chain()
+            assert chain == "base"
+
+    def test_base_only_env_returns_base(self) -> None:
+        """本番環境想定: AAVE_ACTIVE_CHAINS=base → "base" が返る。"""
+        with patch.dict("os.environ", {"AAVE_ACTIVE_CHAINS": "base"}):
+            from app.proposals.router import _get_primary_chain
+
+            chain = _get_primary_chain()
+            assert chain == "base"

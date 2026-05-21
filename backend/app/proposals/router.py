@@ -53,8 +53,12 @@ def _expire_old_proposals(db: Session, user_id: int) -> None:
 
 
 def _get_primary_chain() -> str:
-    """AAVE_ACTIVE_CHAINS の先頭チェーンを返す。未設定時は arbitrum_sepolia。"""
-    raw = os.getenv("AAVE_ACTIVE_CHAINS", "arbitrum_sepolia")
+    """AAVE_ACTIVE_CHAINS の先頭チェーンを返す。未設定時は "base"（本番は Base Mainnet 運用）。
+
+    NOTE: 旧デフォルト "arbitrum_sepolia" から "base" に変更（2026-05-21）。
+    chains.py の get_active_chains() のデフォルトと統一する。
+    """
+    raw = os.getenv("AAVE_ACTIVE_CHAINS", "base")
     return raw.split(",")[0].strip()
 
 
