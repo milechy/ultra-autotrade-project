@@ -233,77 +233,98 @@ def _create_proposals_for_users(
 
     count = 0
     for user in active_users:
-        if not _is_user_due_for_judgment(user, now):
-            logger.debug(
-                "Skipping proposal for user %d (tier=%s, last_judgment_at=%s)",
-                user.id,
-                user.tier,
-                user.last_judgment_at,
-            )
-            continue
-
-        # fund_allocations から per-user 提案金額を動的計算 (Decimal("0") = skip)
-        proposal_amount_usd = _resolve_proposal_amount(db, user.id)
-        if proposal_amount_usd <= Decimal("0"):
-            # _resolve_proposal_amount 内で警告・Slack 通知済み
-            continue
-
-        # 動的手数料計算: デフォルトAPY 4%（安定期）を使用
-        # 30日保有での予想利益 = amount × (APY/100) × (30/365)
-        _default_apy = Decimal("4")
-        _expected_profit = (
-            proposal_amount_usd * _default_apy / Decimal("100") * Decimal("30") / Decimal("365")
-        )
-        market_fee = calculate_fee_by_market(
-            trade_amount_usd=proposal_amount_usd,
-            tier=normalize_tier(user.tier, user_id=user.id).value,
-            current_apy=_default_apy,
-            expected_profit_usd=_expected_profit,
-            fixed_cost_usd=fixed_cost,
-        )
-
-        if not market_fee.should_trade:
-            logger.info(
-                "DynamicFee: should_trade=False for user %d — skipping proposal (%s)",
-                user.id,
-                market_fee.reason,
-            )
-            continue
-
-        proposal = Proposal(
-            user_id=user.id,
-            ai_decision_id=decision.id,
-            operation=operation,
-            asset=_PROPOSAL_ASSET,
-            amount=proposal_amount_usd,
-            amount_usd=proposal_amount_usd,
-            reason=reason,
-            expires_at=expires_at,
-            fee_rate=market_fee.fee_rate,
-            fee_amount=market_fee.fee_amount,
-        )
-        db.add(proposal)
-        user.last_judgment_at = now
-        count += 1
-
-        # ai_proposal_notification: best-effort（失敗しても Proposal 作成は継続）
         try:
-            from app.notifications.factory import get_notification_service  # noqa: PLC0415
-            from app.notifications.templates import ai_proposal_notification  # noqa: PLC0415
+            # per-user SAVEPOINT: 1ユーザーの DB エラー (SELECT 失敗等) で session が汚染され
+            # 後続ユーザー全員が fail する問題を防ぐ。例外時はこの savepoint のみ自動 rollback
+            # され、先行ユーザーの proposal は維持される。素朴な db.rollback() は単一 commit
+            # 設計下で全 user 分を破棄するため不可。最終 commit は呼び出し側で 1 回行う。
+            with db.begin_nested():
+                if not _is_user_due_for_judgment(user, now):
+                    logger.debug(
+                        "Skipping proposal for user %d (tier=%s, last_judgment_at=%s)",
+                        user.id,
+                        user.tier,
+                        user.last_judgment_at,
+                    )
+                    continue
 
-            _payload = ai_proposal_notification(
-                operation=operation,
-                asset=_PROPOSAL_ASSET,
-                amount=proposal_amount_usd,
-                confidence=result.final_confidence,
-            )
-            _payload.notification_message.user_id = user.id
-            get_notification_service().send(_payload.notification_message)
-        except Exception as _notif_exc:  # noqa: BLE001
-            logger.warning(
-                "ai_proposal_notification failed for user %d (skipping): %s",
+                # fund_allocations から per-user 提案金額を動的計算 (Decimal("0") = skip)
+                proposal_amount_usd = _resolve_proposal_amount(db, user.id)
+                if proposal_amount_usd <= Decimal("0"):
+                    # _resolve_proposal_amount 内で警告・Slack 通知済み
+                    continue
+
+                # 動的手数料計算: デフォルトAPY 4%（安定期）を使用
+                # 30日保有での予想利益 = amount × (APY/100) × (30/365)
+                _default_apy = Decimal("4")
+                _expected_profit = (
+                    proposal_amount_usd
+                    * _default_apy
+                    / Decimal("100")
+                    * Decimal("30")
+                    / Decimal("365")
+                )
+                market_fee = calculate_fee_by_market(
+                    trade_amount_usd=proposal_amount_usd,
+                    tier=normalize_tier(user.tier, user_id=user.id).value,
+                    current_apy=_default_apy,
+                    expected_profit_usd=_expected_profit,
+                    fixed_cost_usd=fixed_cost,
+                )
+
+                if not market_fee.should_trade:
+                    logger.info(
+                        "DynamicFee: should_trade=False for user %d — skipping proposal (%s)",
+                        user.id,
+                        market_fee.reason,
+                    )
+                    continue
+
+                proposal = Proposal(
+                    user_id=user.id,
+                    ai_decision_id=decision.id,
+                    operation=operation,
+                    asset=_PROPOSAL_ASSET,
+                    amount=proposal_amount_usd,
+                    amount_usd=proposal_amount_usd,
+                    reason=reason,
+                    expires_at=expires_at,
+                    fee_rate=market_fee.fee_rate,
+                    fee_amount=market_fee.fee_amount,
+                )
+                db.add(proposal)
+                user.last_judgment_at = now
+                count += 1
+
+                # ai_proposal_notification: best-effort（失敗しても Proposal 作成は継続）
+                try:
+                    from app.notifications.factory import get_notification_service  # noqa: PLC0415
+                    from app.notifications.templates import (
+                        ai_proposal_notification,  # noqa: PLC0415
+                    )
+
+                    _payload = ai_proposal_notification(
+                        operation=operation,
+                        asset=_PROPOSAL_ASSET,
+                        amount=proposal_amount_usd,
+                        confidence=result.final_confidence,
+                    )
+                    _payload.notification_message.user_id = user.id
+                    get_notification_service().send(_payload.notification_message)
+                except Exception as _notif_exc:  # noqa: BLE001
+                    logger.warning(
+                        "ai_proposal_notification failed for user %d (skipping): %s",
+                        user.id,
+                        _notif_exc,
+                    )
+        except Exception as _user_exc:  # noqa: BLE001
+            # 1ユーザーの失敗が他のユーザーの提案生成を止めないようにする。
+            # savepoint は with ブロック脱出時に当該ユーザー分のみ自動 rollback 済。
+            # DB クエリ例外 / 未想定エラーはここで捕捉し、ループ継続。
+            logger.error(
+                "Proposal creation failed for user %d (skipping, continuing to next user): %s",
                 user.id,
-                _notif_exc,
+                _user_exc,
             )
 
     return count

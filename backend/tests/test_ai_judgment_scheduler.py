@@ -941,3 +941,157 @@ def test_run_ai_judgment_job_passes_cognitive_state(db_session):
     assert passed_state is fake_state
     assert passed_state.consecutive_holds == 3
     assert passed_state.total_judgments == 10
+
+
+# ---------------------------------------------------------------------------
+# _resolve_proposal_amount: min/max クランプ境界値テスト (PR #323 follow-up P1)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_proposal_amount_clamps_to_min(db_session):
+    """allocated × 10% < $50 のとき、$50 にクランプされること。
+
+    境界値: $499 × 10% = $49.90 → $50 (min)
+    """
+    from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
+
+    user = _add_active_user(db_session, "clamp_min@example.com")
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("499"))
+    db_session.commit()
+
+    result = _resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("50"), f"expected $50 (min clamp) but got {result}"
+
+
+def test_resolve_proposal_amount_clamps_to_max(db_session):
+    """allocated × 10% > $2,000 のとき、$2,000 にクランプされること。
+
+    境界値: $20001 × 10% = $2000.10 → $2000 (max)
+    """
+    from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
+
+    user = _add_active_user(db_session, "clamp_max@example.com")
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("20001"))
+    db_session.commit()
+
+    result = _resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("2000"), f"expected $2000 (max clamp) but got {result}"
+
+
+def test_resolve_proposal_amount_exact_min_boundary(db_session):
+    """allocated × 10% = $50 ちょうどのとき、$50 が返ること（境界 = min の場合は min 返却）。
+
+    $500 × 10% = $50.00
+    """
+    from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
+
+    user = _add_active_user(db_session, "boundary_min@example.com")
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("500"))
+    db_session.commit()
+
+    result = _resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("50.00")
+
+
+def test_resolve_proposal_amount_exact_max_boundary(db_session):
+    """allocated × 10% = $2,000 ちょうどのとき、$2,000 が返ること（境界 = max の場合は max 返却）。
+
+    $20000 × 10% = $2000.00
+    """
+    from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
+
+    user = _add_active_user(db_session, "boundary_max@example.com")
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("20000"))
+    db_session.commit()
+
+    result = _resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("2000.00")
+
+
+def test_resolve_proposal_amount_yamamoto_san(db_session):
+    """山本さん想定値: $4,600 × 10% = $460 (クランプなし、実機確認済み)。"""
+    from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
+
+    user = _add_active_user(db_session, "yamamoto@example.com")
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("4600"))
+    db_session.commit()
+
+    result = _resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("460.00")
+
+
+def test_resolve_proposal_amount_multiple_allocations_summed(db_session):
+    """複数の active fund_allocations がある場合、合計値に比率を乗じること。
+
+    allocation1: $3,000, allocation2: $2,000 → sum=$5,000 × 10% = $500
+    """
+    from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
+
+    user = _add_active_user(db_session, "multi_alloc@example.com")
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("3000"))
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("2000"))
+    db_session.commit()
+
+    result = _resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("500.00")
+
+
+def test_create_proposals_db_error_one_user_does_not_stop_others(db_session):
+    """_resolve_proposal_amount が DB 例外を投げたとき、他ユーザーの処理が継続すること。
+
+    1ユーザーの例外が全体ループを止めないことを確認する（PR #323 follow-up P1）。
+    """
+    from unittest.mock import MagicMock  # noqa: PLC0415
+
+    from app.auth.constants import ExecutionPolicy  # noqa: PLC0415
+    from app.automation.ai_judgment_scheduler import _create_proposals_for_users  # noqa: PLC0415
+
+    user_ok = MagicMock()
+    user_ok.id = 1
+    user_ok.is_active = True
+    user_ok.execution_policy = ExecutionPolicy.REQUIRE_APPROVAL.value
+    user_ok.last_judgment_at = None
+    user_ok.tier = "LOWER"
+
+    user_fail = MagicMock()
+    user_fail.id = 2
+    user_fail.is_active = True
+    user_fail.execution_policy = ExecutionPolicy.REQUIRE_APPROVAL.value
+    user_fail.last_judgment_at = None
+    user_fail.tier = "LOWER"
+
+    decision = MagicMock()
+    decision.id = 99
+
+    cv_result = _make_cross_validation_result(TradeAction.BUY)
+
+    mock_db = MagicMock()
+    mock_db.scalars.return_value.all.return_value = [user_fail, user_ok]
+
+    call_count = 0
+
+    def resolve_side_effect(_db, user_id):
+        nonlocal call_count
+        call_count += 1
+        if user_id == user_fail.id:
+            raise RuntimeError("simulated DB error for user 2")
+        return Decimal("460")
+
+    with (
+        patch(
+            "app.automation.ai_judgment_scheduler._resolve_proposal_amount",
+            side_effect=resolve_side_effect,
+        ),
+        patch("app.fees.trade_gate.calculate_fee_by_market") as mock_fee,
+        patch("app.notifications.factory.get_notification_service"),
+    ):
+        mock_fee.return_value.should_trade = True
+        mock_fee.return_value.fee_rate = Decimal("0.05")
+        mock_fee.return_value.fee_amount = Decimal("23.00")
+
+        count = _create_proposals_for_users(mock_db, decision, cv_result)
+
+    # user_fail は例外でスキップ、user_ok は成功 → count=1
+    assert count == 1, f"Expected 1 proposal (user_ok only) but got {count}"
+    # _resolve_proposal_amount は両ユーザー分呼ばれていること
+    assert call_count == 2, f"Expected resolve called twice but got {call_count}"
