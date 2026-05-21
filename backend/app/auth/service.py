@@ -24,6 +24,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from web3 import Web3
 
+from .constants import ExecutionPolicy
 from .models import User, UserRole
 from .schemas import RegisterRequest, RegisterWithReferralRequest, UserCreateRequest
 
@@ -214,6 +215,26 @@ class AuthService:
             return None
         return user
 
+    @staticmethod
+    def _validate_viewer_no_autoexec(role: str, execution_policy: str) -> None:
+        """viewer ロールに auto_execute を設定しようとした場合に ValueError を送出する。
+
+        viewer は自動執行の権限を持たない設計のため、role=viewer かつ
+        execution_policy=auto_execute の組み合わせは app 層で拒否する。
+
+        Args:
+            role: 設定しようとするロール文字列
+            execution_policy: 設定しようとする (または現在の) execution_policy 文字列
+
+        Raises:
+            ValueError: viewer ロールに auto_execute が指定された場合
+        """
+        if role == UserRole.VIEWER.value and execution_policy == ExecutionPolicy.AUTO_EXECUTE.value:
+            raise ValueError(
+                "viewer role cannot have auto_execute execution_policy. "
+                "Use require_approval or proposal_only instead."
+            )
+
     @classmethod
     def create_user(
         cls,
@@ -234,6 +255,7 @@ class AuthService:
 
         Raises:
             ValueError: メールまたはユーザー名が既に使用されている場合
+            ValueError: viewer ロールに auto_execute を設定しようとした場合
         """
         # 重複チェック
         if cls.get_user_by_email(db, request.email):
@@ -244,6 +266,14 @@ class AuthService:
         # UserCreateRequest の場合はロールを取得
         if isinstance(request, UserCreateRequest):
             role = request.role.value
+
+        # viewer + auto_execute の組み合わせを拒否 (防御的チェック)。
+        # UserCreateRequest に execution_policy フィールドは存在しないため、
+        # 作成時に auto_execute が渡ってくることはない。将来フィールド追加に備え、
+        # また P3-1 (default を require_approval に変更) 後の安全確保のため明示チェック。
+        # 作成経路では require_approval を安全側 effective_policy として評価する。
+        effective_policy = ExecutionPolicy.REQUIRE_APPROVAL.value
+        cls._validate_viewer_no_autoexec(role, effective_policy)
 
         user = User(
             email=request.email,
@@ -287,6 +317,7 @@ class AuthService:
 
         Raises:
             ValueError: メールまたはユーザー名が既に使用されている場合
+            ValueError: viewer ロールへの変更時にユーザーの execution_policy が auto_execute の場合
         """
         if email and email != user.email:
             if cls.get_user_by_email(db, email):
@@ -302,6 +333,10 @@ class AuthService:
             user.hashed_password = cls.hash_password(password)
 
         if role is not None:
+            # viewer ロールへの変更時は auto_execute を禁止する。
+            # 降格後も execution_policy が auto_execute のままだと設計違反になるため拒否。
+            # 管理者側は先に execution_policy を変更してから role を変更すること。
+            cls._validate_viewer_no_autoexec(role, user.execution_policy)
             user.role = role
 
         if is_active is not None:
