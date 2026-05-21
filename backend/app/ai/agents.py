@@ -135,6 +135,49 @@ class MultiAgentContext(BaseModel):
             return 50
         return int(sum(s.confidence for s in signals) / len(signals))
 
+    # ------------------------------------------------------------------
+    # SELL/BUY AND-condition guard (v4/v5 rule engine, 2026-05-21)
+    # ------------------------------------------------------------------
+
+    #: Minimum confidence required for either core agent to qualify as directional.
+    _DIRECTIONAL_THRESHOLD: int = 70
+
+    def indicator_and_macro_agree_bearish(self) -> bool:
+        """Return True only when BOTH Indicator AND Macro agents are BEARISH >= threshold.
+
+        Purpose: prevent a single continuously-BEARISH Macro Agent from triggering
+        repeated SELL signals (root cause of the SELL-spam issue on v4 prompts).
+
+        Evaluated by the Python rule engine BEFORE the LLM call so the guard is
+        deterministic and cannot be overridden by the LLM's prompt interpretation.
+        """
+        ind = self.indicator_signal
+        mac = self.macro_signal
+        if ind is None or mac is None:
+            return False
+        return (
+            ind.bias == Bias.BEARISH
+            and ind.confidence >= self._DIRECTIONAL_THRESHOLD
+            and mac.bias == Bias.BEARISH
+            and mac.confidence >= self._DIRECTIONAL_THRESHOLD
+        )
+
+    def indicator_and_macro_agree_bullish(self) -> bool:
+        """Return True only when BOTH Indicator AND Macro agents are BULLISH >= threshold.
+
+        Symmetric guard to prevent single-agent BULLISH from triggering BUY.
+        """
+        ind = self.indicator_signal
+        mac = self.macro_signal
+        if ind is None or mac is None:
+            return False
+        return (
+            ind.bias == Bias.BULLISH
+            and ind.confidence >= self._DIRECTIONAL_THRESHOLD
+            and mac.bias == Bias.BULLISH
+            and mac.confidence >= self._DIRECTIONAL_THRESHOLD
+        )
+
 
 # ============================================================
 # Specialist Agents (pure functions — no side effects)

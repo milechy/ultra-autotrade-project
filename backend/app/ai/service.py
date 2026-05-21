@@ -226,10 +226,13 @@ class AIService:
         """
         ai_settings = settings or get_ai_settings()
         version = ai_settings.prompt_version
+        # AND-condition flag: set True if agents disagree and v4/v5 guard applies
+        _and_condition_failed = False
 
-        # Rule engine: COMPOUND RISK → force HOLD before LLM call
+        # Rule engine: pre-LLM checks (deterministic, cannot be overridden by LLM)
         if market_context is not None:
             agent_ctx_check = run_all_agents(market_context)
+            # Guard 1: COMPOUND RISK → force HOLD
             if agent_ctx_check.has_compound_risk():
                 logger.warning("COMPOUND RISK detected by Risk Agent. Forcing HOLD.")
                 compound_decision = LLMDecision(
@@ -247,6 +250,20 @@ class AIService:
                     final_confidence=95,
                     final_reason="COMPOUND RISK detected. Rule engine forced HOLD before LLM call.",
                 )
+            # Guard 2: AND-condition for v4/v5 — SELL/BUY needs both Indicator AND Macro >=70%
+            if version in ("v4", "v5") and not (
+                agent_ctx_check.indicator_and_macro_agree_bearish()
+                or agent_ctx_check.indicator_and_macro_agree_bullish()
+            ):
+                _and_condition_failed = True
+                logger.debug(
+                    "AND-condition not met: Indicator=%s/%s Macro=%s/%s. "
+                    "Post-LLM clamping enabled.",
+                    getattr(agent_ctx_check.indicator_signal, "bias", "N/A"),
+                    getattr(agent_ctx_check.indicator_signal, "confidence", 0),
+                    getattr(agent_ctx_check.macro_signal, "bias", "N/A"),
+                    getattr(agent_ctx_check.macro_signal, "confidence", 0),
+                )
 
         system_prompt, user_content = self._build_rag_prompt(
             query, rag_context, version, market_context, cognitive_state
@@ -261,6 +278,36 @@ class AIService:
             secondary = self._call_openai(system_prompt, user_content, ai_settings, version)
 
         result = self._cross_validate(primary, secondary)
+
+        # Post-LLM: enforce AND-condition guard (v4/v5) — clamp SELL/BUY to HOLD
+        # when Indicator and Macro did not both agree on direction >=70%.
+        if _and_condition_failed and result.final_action in (TradeAction.SELL, TradeAction.BUY):
+            logger.warning(
+                "AND-condition guard: %s → HOLD (Indicator+Macro not both >=70%%). conf=%s",
+                result.final_action.value,
+                result.final_confidence,
+            )
+            _clamp_reason = (
+                f"AND-condition not met: LLM proposed {result.final_action.value} but "
+                "Indicator and Macro agents did not both agree >=70%. "
+                f"Original: {result.final_reason}"
+            )
+            _clamped = LLMDecision(
+                provider=LLMProvider.RULE_BASED,
+                action=TradeAction.HOLD,
+                confidence=min(result.final_confidence, 45),
+                reason=_clamp_reason,
+                prompt_version=version,
+            )
+            result = CrossValidationResult(
+                primary=_clamped,
+                secondary=result.secondary,
+                agreed=result.agreed,
+                final_action=TradeAction.HOLD,
+                final_confidence=_clamped.confidence,
+                final_reason=_clamp_reason,
+                prompt_version=version,
+            )
 
         # Shadow Mode: record judgment and attach shadow_mode flag before returning.
         # Caller should skip actual trade execution when shadow_mode=True.
@@ -305,7 +352,7 @@ class AIService:
             agent_ctx = run_all_agents(market_context)
 
         # Build user content — v3/v4 inject agent_signals into the template itself
-        if version in ("v3", "v4"):
+        if version in ("v3", "v4", "v5"):
             agent_signals_text = (
                 agent_ctx.to_decision_prompt()
                 if agent_ctx is not None
