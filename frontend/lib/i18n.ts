@@ -1,11 +1,11 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
-// demo/frontend-static: locale 固定 'ja' (next/headers 削除で static export 対応)。
-// 本番 (output: 'standalone') は main branch の i18n.ts を使用。
 import { getRequestConfig } from 'next-intl/server'
+import { headers } from 'next/headers'
 
 export default getRequestConfig(async () => {
-  const locale = 'ja'
+  const headersList = headers()
+  const locale = headersList.get('x-locale') || 'ja'
   return {
     locale,
     messages: (await import(`../messages/${locale}.json`)).default,
