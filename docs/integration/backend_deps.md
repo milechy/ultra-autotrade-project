@@ -5,6 +5,20 @@
 
 ---
 
+## PR #373 (Stream 4): scheduler 二重起動防止 — Blue/Green color guard (2026-05-22)
+
+### 変更: active color のみ ai_judgment_loop を起動
+- **対象凍結ファイル**: `backend/app/main.py`, `docker-compose.production.yml`, `docker-compose.staging.yml`, `scripts/deploy_production.sh`, `scripts/deploy_staging.sh`
+- **変更内容**:
+  - `_is_scheduler_enabled()` に `BACKEND_COLOR` vs `ACTIVE_BACKEND_COLOR` 比較ガード追加（inactive color は scheduler skip + ログ出力）
+  - compose (production/staging): backend-blue/green に `BACKEND_COLOR`(blue/green 固定) + `ACTIVE_BACKEND_COLOR: ${ACTIVE_BACKEND_COLOR:-}` を追加
+  - deploy_production.sh / deploy_staging.sh: Blue/Green 切替時（upstream.conf 更新後）に `.env` の `ACTIVE_BACKEND_COLOR` を awk+tmpfile で更新
+- **理由**: backend-blue/green の両方が ai_judgment_loop を起動し ai_decisions が 2倍生成される問題（2026-05-21 P0 / staging 観測で確認）の根本対策
+- **影響範囲**: scheduler 起動判定のみ。`DISABLE_AI_JUDGMENT_SCHEDULER` ロジック・既存エンドポイント・トレード実行への影響なし。後方互換（`ACTIVE_BACKEND_COLOR` 未設定時は従来通り両起動）
+- **承認**: claude.ai 明朝レビュー待ち（PR #373）。本番 deploy は HUMAN-REVIEW-REQUIRED
+
+---
+
 ## backend/app/main.py
 
 ### 変更 #3: /health エンドポイントに AI モデル設定を追加 (PR #95 / 2026-04-20)
