@@ -7,15 +7,21 @@
 # 真因: deploy_production.sh の down --remove-orphans が staging-new を道連れ削除していた
 # 根本修正: deploy_production.sh から --remove-orphans を除去 (fix/staging-orphan-protection-20260520)
 # 本スクリプト: defense-in-depth として staging 停止時に自動 up -d する
+#
+# 2026-05-21 追加: Slack flood 抑制 (COOLDOWN)。staging が継続的に down かつ復旧が定着しない場合、
+# 従来は 5 分毎に「停止を検知」を Slack へ連発していた。COOLDOWN_SEC 内は復旧は試みるが
+# 通知は抑制し、復旧 or cooldown 経過時のみ通知する。
 
-set -euo pipefail
+set -uo pipefail
 
-COMPOSE_DIR="/opt/ultra-autotrade"
-COMPOSE_FILE="docker-compose.staging.yml"
-ENV_FILE=".env.staging-new"
-SENTINEL_CONTAINER="ultra-autotrade-postgres-staging-new"
+COMPOSE_DIR="${COMPOSE_DIR:-/opt/ultra-autotrade}"
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.staging.yml}"
+ENV_FILE="${ENV_FILE:-.env.staging-new}"
+SENTINEL_CONTAINER="${SENTINEL_CONTAINER:-ultra-autotrade-postgres-staging-new}"
+WEBHOOK_FILE="${WEBHOOK_FILE:-${COMPOSE_DIR}/.env.production}"
+COOLDOWN_SEC="${COOLDOWN_SEC:-1800}"  # 30分: down 継続時の通知連発抑制
+STATE_FILE="${STATE_FILE:-${TMPDIR:-/tmp}/.staging_watchdog_alert}"
 LOG_PREFIX="[staging-watchdog] $(date '+%Y-%m-%dT%H:%M:%S')"
-WEBHOOK_FILE="${COMPOSE_DIR}/.env.production"
 
 notify_slack() {
   local msg="$1"
@@ -33,16 +39,36 @@ is_staging_alive() {
   docker ps --filter "name=${SENTINEL_CONTAINER}" --filter "status=running" -q | grep -q .
 }
 
+# ---- 正常時: 直前に alert を出していたら復旧通知して state クリア ----
 if is_staging_alive; then
-  echo "${LOG_PREFIX} staging healthy (${SENTINEL_CONTAINER} running)"
+  if [[ -f "${STATE_FILE}" ]]; then
+    echo "${LOG_PREFIX} RECOVERED: staging stack restored (alert state クリア)"
+    notify_slack "✅ [staging-watchdog] staging stack 復旧確認 (${SENTINEL_CONTAINER} running)。"
+    rm -f "${STATE_FILE}" 2>/dev/null || true
+  else
+    echo "${LOG_PREFIX} staging healthy (${SENTINEL_CONTAINER} running)"
+  fi
   exit 0
 fi
 
-echo "${LOG_PREFIX} WARN: staging stack down — starting auto-recovery"
-notify_slack "⚠️ [staging-watchdog] staging stack 停止を検知。自動復旧を開始します。"
+# ---- 異常時: cooldown 判定 (通知抑制。復旧自体は毎回試みる) ----
+now=$(date +%s)
+should_notify=1
+if [[ -f "${STATE_FILE}" ]]; then
+  last=$(cat "${STATE_FILE}" 2>/dev/null || echo "0")
+  if (( now - last < COOLDOWN_SEC )); then
+    should_notify=0
+  fi
+fi
 
-cd "${COMPOSE_DIR}"
-docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d 2>&1
+echo "${LOG_PREFIX} WARN: staging stack down — starting auto-recovery (notify=${should_notify})"
+if [[ "${should_notify}" == "1" ]]; then
+  notify_slack "⚠️ [staging-watchdog] staging stack 停止を検知。自動復旧を開始します。(以後 ${COOLDOWN_SEC}s は通知抑制)"
+  echo "${now}" > "${STATE_FILE}" 2>/dev/null || true
+fi
+
+cd "${COMPOSE_DIR}" || { echo "${LOG_PREFIX} ERROR: cd ${COMPOSE_DIR} 失敗"; exit 1; }
+docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d 2>&1 || true
 
 # 15秒待って確認
 sleep 15
@@ -50,8 +76,12 @@ sleep 15
 if is_staging_alive; then
   echo "${LOG_PREFIX} RECOVERED: staging stack restored"
   notify_slack "✅ [staging-watchdog] staging stack 自動復旧完了。"
+  rm -f "${STATE_FILE}" 2>/dev/null || true
 else
   echo "${LOG_PREFIX} ERROR: staging stack recovery FAILED"
-  notify_slack "❌ [staging-watchdog] staging stack 自動復旧失敗。手動対応が必要です。"
+  # 復旧失敗通知も should_notify のときのみ (連発防止)。
+  if [[ "${should_notify}" == "1" ]]; then
+    notify_slack "❌ [staging-watchdog] staging stack 自動復旧失敗。手動対応が必要です。(以後 ${COOLDOWN_SEC}s は通知抑制 — 継続 down 中)"
+  fi
   exit 1
 fi

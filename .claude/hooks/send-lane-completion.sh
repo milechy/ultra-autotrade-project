@@ -32,6 +32,14 @@ FILES_COUNT="${6:-}"
 TIER="${7:-}"
 NEXT_ACTION="${8:-}"
 
+# Stop hook として無引数で呼ばれた場合 (lane/phase/status が全て unknown) は通知しない。
+# settings.json の Stop イベント登録では positional 引数が渡らず "unknown" 連発で
+# Slack が flood する (2026-05-21 night-mode で背景エージェント Stop 多発時に顕在化)。
+# 明示的に lane 等を指定した正規呼び出し (Agent Teams lane 完了通知) のみ通知する。
+if [[ "${LANE}" == "unknown" && "${PHASE}" == "unknown" && "${STATUS}" == "unknown" ]]; then
+  exit 0
+fi
+
 # 数値フィールドを jq --argjson 用に整形 (空 → null, 数値 → そのまま, 非数値 → null)
 to_jsonnum() {
   local v="$1"
