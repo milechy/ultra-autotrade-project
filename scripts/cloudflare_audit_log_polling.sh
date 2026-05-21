@@ -101,10 +101,13 @@ fi
 
 # ─── 監視対象アクション判定 ───────────────────────────────────────────
 # Tunnel 関連 / DNS 関連 / Firewall ルール変更のみフィルタ
-INTERESTING_ENTRIES=$(echo "${RESPONSE}" | python3 - <<'PYEOF'
-import sys, json
+INTERESTING_ENTRIES=$(RESPONSE="${RESPONSE}" python3 <<'PYEOF'
+import json
+import os
 
-data = json.load(sys.stdin)
+# 注: python3 を `- <<EOF` で起動すると heredoc が stdin を占有し、
+# `echo | ` の pipe 入力は上書きされ届かない (SC2259)。データは env var で渡す。
+data = json.loads(os.environ["RESPONSE"])
 result = data.get("result", [])
 
 WATCH_RESOURCE_TYPES = {
@@ -162,10 +165,12 @@ fi
 # ─── 変更検知 → Slack 通知 ────────────────────────────────────────────
 SLACK_TEXT="*[cloudflare-audit] Dashboard 変更を検知 (${ENTRY_COUNT} 件)*\n\n"
 
-ENTRIES_SUMMARY=$(echo "${INTERESTING_ENTRIES}" | python3 - <<'PYEOF'
-import sys, json
+ENTRIES_SUMMARY=$(INTERESTING_ENTRIES="${INTERESTING_ENTRIES}" python3 <<'PYEOF'
+import json
+import os
 
-entries = json.load(sys.stdin)
+# SC2259 回避: stdin は heredoc 専用。データは env var 経由で渡す。
+entries = json.loads(os.environ["INTERESTING_ENTRIES"])
 lines = []
 for e in entries[:10]:  # 最大 10 件表示
     when = e.get("when", "")[:16]  # YYYY-MM-DDTHH:MM
