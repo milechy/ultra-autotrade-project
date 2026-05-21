@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "node ./node_modules/next/dist/bin/next dev -p 3000",
+    "prebuild": "node -e \"if(process.env.CF_PAGES==='1'){require('./scripts/cf-pages-prebuild.js')}\"",
     "build": "node ./node_modules/next/dist/bin/next build",
+    "postbuild": "node -e \"if(process.env.CF_PAGES==='1'){require('./scripts/cf-pages-postbuild.js')}\"",
     "start": "node ./node_modules/next/dist/bin/next start -p 3000",
     "lint": "node ./node_modules/next/dist/bin/next lint",
     "test:e2e": "playwright test",

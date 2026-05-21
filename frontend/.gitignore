@@ -38,3 +38,7 @@ next-env.d.ts
 
 # Playwright auth state (contains JWT tokens)
 e2e/.auth/
+
+# CF Pages build temp files (cf-pages-prebuild.js)
+*.cf_bak
+app/_api_cf_skip/
