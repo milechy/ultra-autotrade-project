@@ -422,7 +422,7 @@ production DB に対してデータ変更 SQL（INSERT / UPDATE / DELETE）を�
    `docs/16_infra_deployment_guide.md` (or 新規 `docs/<番号>_infra_change_checklist.md`) に定義する「インフラ変更チェックリスト」を経由しないかぎり Dashboard 直接変更は禁止。Dashboard 直接変更を恒常運用しない (Phase 3b PR-A で token → config.yml 移行と合わせて完了)。`docker-compose.production.yml` / `docker-compose.staging.yml` の `ports:` 行や nginx port を変更する PR は、PR description のテストプランに「インフラ変更チェックリスト実行済」を明記する。
 
 2. **cloudflared は token 方式 (dashboard 管理) を避け、`config.yml` 方式に移行する。**
-   `--token` 方式では ingress がリポジトリ外で管理されるため、git diff / コードレビューで port mismatch を検知できない (CLAUDE.md L546 既知制約の延長)。Phase 3b PR-A で production / staging を独立 cloudflared + 独立 `config.yml` に分離する。
+   `--token` 方式では ingress がリポジトリ外で管理されるため、git diff / コードレビューで port mismatch を検知できない (CLAUDE.md「cloudflared token 方式の既知制約」の延長)。Phase 3b PR-A で production / staging を独立 cloudflared + 独立 `config.yml` に分離する。
 
 3. **deploy 後の外形 healthcheck を必須化する (Gate 8)。**
    `staging-deploy.yml` / `deploy_production.sh` 両方に `curl -fsS https://api{,-staging}.ultra-auto-trade.com/health` を deploy 直後に実行し、失敗したら Slack #ultra-auto-project に通知 + 自動ロールバック判断。内部 `127.0.0.1:8082/health` の確認だけでは「外形経路（cloudflared → nginx → backend）」は検証できない。
@@ -491,10 +491,9 @@ Docker embedded DNS (127.0.0.11) で 1 回だけ解決し、ワーカーメモ�
 backend container が recreate されて新 IP を取得すると、nginx は古い IP に proxy_pass し続け、
 `docker restart nginx` 以外復旧手段なし。
 
-**トリガー:** `deploy_production.sh --frontend-only` 経路 (L367-384) が
+**トリガー:** `deploy_production.sh --frontend-only` 経路が
 `--no-deps --force-recreate` フラグなしで `docker compose up -d frontend` を実行。
-compose の依存再評価で backend が recreate された (CLAUDE.md「本番フロントエンド操作ルール」
-L1009 違反)。
+compose の依存再評価で backend が recreate された (CLAUDE.md「本番フロントエンド操作ルール」違反)。
 
 **鉄則 (絶対):**
 
@@ -519,7 +518,7 @@ L1009 違反)。
    docker logs 経由でしか保持していないため、`docker restart nginx` で過去ログが完全消失する。
    今回の本番側 RCA で error.log を取得できなかった構造的弱点。
 
-**Dashboard 管理設定の事故パターン (4 回目、L588 表に追加):**
+**Dashboard 管理設定の事故パターン (4 回目、旧 CLAUDE.md 「Dashboard 管理設定の事故パターン」表に追加):**
 
 | 日付 | 事象 | 共通点 |
 |---|---|---|
