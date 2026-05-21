@@ -295,8 +295,8 @@ def test_run_job_sell_creates_withdraw_proposals(db_session):
 
 
 @pytest.mark.asyncio
-async def test_scheduler_runs_immediately_on_start():
-    """起動直後（interval sleep前）にrun_ai_judgment_jobが呼ばれること。"""
+async def test_scheduler_runs_after_startup_delay_then_interval():
+    """startup_delay_sec=0 の場合、delay sleep なしで job が実行され、その後 interval sleep が来ること。"""
     call_order: list[tuple] = []
 
     async def fake_sleep(seconds: float) -> None:
@@ -313,18 +313,82 @@ async def test_scheduler_runs_immediately_on_start():
         patch("asyncio.sleep", side_effect=fake_sleep),
     ):
         try:
-            await ai_judgment_loop(interval_hours=1)
+            await ai_judgment_loop(interval_hours=1, startup_delay_sec=0)
         except asyncio.CancelledError:
             pass
 
-    # The job must have been called before the long sleep
+    # The job must have been called before the long interval sleep
     assert ("job",) in call_order
-    # The first non-zero sleep should come AFTER the job
+    # The first non-zero sleep should come AFTER the job (interval sleep, not startup delay)
     first_job_idx = call_order.index(("job",))
     first_long_sleep_idx = next(
         i for i, item in enumerate(call_order) if item[0] == "sleep" and item[1] > 0
     )
     assert first_job_idx < first_long_sleep_idx
+
+
+@pytest.mark.asyncio
+async def test_scheduler_startup_delay_fires_before_job():
+    """startup_delay_sec > 0 の場合、delay sleep が job より先に来ること (P3-5)。"""
+    call_order: list[tuple] = []
+    startup_delay = 300
+
+    async def fake_sleep(seconds: float) -> None:
+        call_order.append(("sleep", seconds))
+        if seconds == startup_delay:
+            return  # startup delay: continue past it
+        if seconds > 0:
+            raise asyncio.CancelledError  # stop after interval sleep
+
+    def fake_run_job() -> dict:
+        call_order.append(("job",))
+        return {"action": "HOLD", "confidence": 70, "proposals_created": 0, "decision_id": 1}
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.run_ai_judgment_job", side_effect=fake_run_job),
+        patch("asyncio.sleep", side_effect=fake_sleep),
+    ):
+        try:
+            await ai_judgment_loop(interval_hours=1, startup_delay_sec=startup_delay)
+        except asyncio.CancelledError:
+            pass
+
+    # startup delay sleep must come before the job
+    assert ("sleep", startup_delay) in call_order
+    assert ("job",) in call_order
+    startup_sleep_idx = call_order.index(("sleep", startup_delay))
+    first_job_idx = call_order.index(("job",))
+    assert startup_sleep_idx < first_job_idx, (
+        f"startup delay sleep (idx={startup_sleep_idx}) must precede first job (idx={first_job_idx})"
+    )
+
+
+@pytest.mark.asyncio
+async def test_scheduler_startup_delay_zero_skips_delay():
+    """startup_delay_sec=0 の場合、300秒 sleep が発生しないこと (P3-5)。"""
+    sleep_calls: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+        if seconds > 0:
+            raise asyncio.CancelledError
+
+    def fake_run_job() -> dict:
+        return {"action": "HOLD", "confidence": 70, "proposals_created": 0, "decision_id": 1}
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.run_ai_judgment_job", side_effect=fake_run_job),
+        patch("asyncio.sleep", side_effect=fake_sleep),
+    ):
+        try:
+            await ai_judgment_loop(interval_hours=1, startup_delay_sec=0)
+        except asyncio.CancelledError:
+            pass
+
+    # No 300-second startup delay sleep should have been issued
+    assert 300 not in sleep_calls, (
+        f"startup_delay_sec=0 should not sleep 300s but got {sleep_calls}"
+    )
 
 
 @pytest.mark.asyncio
@@ -336,7 +400,7 @@ async def test_scheduler_repeats_after_interval():
     async def fake_sleep(seconds: float) -> None:
         nonlocal sleep_call_count
         sleep_call_count += 1
-        if sleep_call_count >= 3:  # stop after 3rd sleep (0 + interval + interval)
+        if sleep_call_count >= 3:  # stop after 3rd sleep (interval + interval + interval)
             raise asyncio.CancelledError
 
     def fake_run_job() -> dict:
@@ -354,7 +418,8 @@ async def test_scheduler_repeats_after_interval():
         patch("asyncio.sleep", side_effect=fake_sleep),
     ):
         try:
-            await ai_judgment_loop(interval_hours=1)
+            # startup_delay_sec=0 to skip startup delay and focus on interval repetition
+            await ai_judgment_loop(interval_hours=1, startup_delay_sec=0)
         except asyncio.CancelledError:
             pass
 
@@ -406,7 +471,7 @@ async def test_scheduler_calls_on_error_on_failure():
         patch("asyncio.sleep", side_effect=fake_sleep),
     ):
         try:
-            await ai_judgment_loop(interval_hours=1, on_error=fake_on_error)
+            await ai_judgment_loop(interval_hours=1, on_error=fake_on_error, startup_delay_sec=0)
         except asyncio.CancelledError:
             pass
 
@@ -438,7 +503,7 @@ async def test_scheduler_clears_error_on_success():
         patch("asyncio.sleep", side_effect=fake_sleep),
     ):
         try:
-            await ai_judgment_loop(interval_hours=1)
+            await ai_judgment_loop(interval_hours=1, startup_delay_sec=0)
         except asyncio.CancelledError:
             pass
 
@@ -470,7 +535,7 @@ async def test_scheduler_on_error_failure_does_not_crash_loop():
         patch("asyncio.sleep", side_effect=fake_sleep),
     ):
         try:
-            await ai_judgment_loop(interval_hours=1, on_error=bad_callback)
+            await ai_judgment_loop(interval_hours=1, on_error=bad_callback, startup_delay_sec=0)
         except asyncio.CancelledError:
             pass
 
