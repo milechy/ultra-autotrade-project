@@ -490,10 +490,12 @@ class TestPromptVersioning:
 
         tmpl = get_prompt_template("v4")
         assert tmpl.version == "v4"
-        assert "HOLD bias" in tmpl.description
+        # v4 description updated to reflect AND-condition fix (2026-05-21)
+        assert "v4" in tmpl.description or "AND-condition" in tmpl.description
         assert "COMPOUND RISK" in tmpl.system_prompt
         assert "HF < 1.6" in tmpl.system_prompt
-        assert "Disagreement" in tmpl.system_prompt
+        # v4 SELL rule now requires AND (not OR) — verify AND-condition present
+        assert "AND" in tmpl.system_prompt
         assert "{agent_signals}" in tmpl.user_template
         assert "{context}" in tmpl.user_template
         assert "{query}" in tmpl.user_template
@@ -503,8 +505,11 @@ class TestPromptVersioning:
 
         tmpl = get_prompt_template("v4")
         assert "迷ったら HOLD" not in tmpl.system_prompt
-        assert "Disagreement" in tmpl.system_prompt
-        assert "does NOT automatically mean HOLD" in tmpl.system_prompt
+        # v4 was updated (2026-05-21) to AND-condition: SELL needs BOTH Indicator AND Macro >=70%
+        # Old: "Disagreement does NOT automatically mean HOLD" (HOLD bias 解消 intent)
+        # New: AND-condition — single-agent BEARISH alone is NOT sufficient for SELL
+        assert "SELL" in tmpl.system_prompt
+        assert "AND" in tmpl.system_prompt
 
     def test_build_prompt_content_v4_receives_agent_signals(self):
         """v4 prompt の _build_prompt_content が agent_signals を受け取る回帰テスト。

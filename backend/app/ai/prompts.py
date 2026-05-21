@@ -101,11 +101,11 @@ Decision rules:
 - Weight: Risk Agent 40%, Indicator 25%, Macro 20%, Pattern 15%
 
 Respond in JSON format ONLY:
-{
+{{
     "action": "BUY" | "SELL" | "HOLD",
     "confidence": 0-100,
     "reason": "Brief explanation referencing agent signals"
-}"""
+}}"""
 
 _V3_USER_TEMPLATE = """## Specialist Agent Reports:
 {agent_signals}
@@ -122,6 +122,10 @@ Synthesize the agent reports and provide your final judgment in JSON format only
 # v4: HOLD bias 解消版 — 中庸 confidence でも方向シグナルがあれば BUY/SELL 許可
 # agents disagree → default to HOLD (v3 ルール) を廃止し、多数派方向に従う
 # リスク guard (compound risk→HOLD, HF<1.6→保守) は維持
+# NOTE: v4 の元 SELL ルール「Indicator or Macro BEARISH ≥70%」は単一エージェント発火を
+# 許してしまい Macro Agent 継続 BEARISH で SELL 連発を引き起こした (SELL-spam 問題)。
+# 2026-05-21 に AND 条件へ修正。Python rule engine (service.py Guard 2) と二重防衛。
+# 新規利用は v5 を推奨。v4 は後方互換のため保持。
 _V4_SYSTEM = """You are the Decision Agent of Ultra AutoTrade, a DeFi robo-advisor.
 
 You receive analysis from 4 specialist agents:
@@ -132,22 +136,22 @@ You receive analysis from 4 specialist agents:
 
 Your job: Synthesize all agent signals into a SINGLE final judgment.
 
-Decision rules (v4 — reduced HOLD bias):
+Decision rules (v4 — AND-condition for directional trades):
 - HARD STOP (always HOLD): Risk Agent detects COMPOUND RISK, or HF < 1.6
-- SELL: Indicator or Macro Agent reports BEARISH with confidence >= 70%
-- BUY: 2+ agents lean BULLISH, OR a single agent reports BULLISH with confidence >= 65%
-- HOLD: Use HOLD only when no single agent has confidence >= 65% AND no majority direction exists
-- Disagreement does NOT automatically mean HOLD — if 2+ agents agree on a direction, act on it
-- Moderate confidence (45–65) with a clear directional signal warrants BUY or SELL, not HOLD
+- SELL: BOTH Indicator AND Macro Agent report BEARISH with confidence >= 70%
+- BUY: BOTH Indicator AND Macro Agent report BULLISH with confidence >= 70%
+- HOLD: Use HOLD when agents disagree, when only one agent is directional,
+  or when confidence < 70% for either Indicator or Macro
+- Single-agent BEARISH/BULLISH alone is NOT sufficient for SELL/BUY
 
 Weight for confidence calculation: Risk Agent 40%, Indicator 25%, Macro 20%, Pattern 15%
 
 Respond in JSON format ONLY:
-{
+{{
     "action": "BUY" | "SELL" | "HOLD",
     "confidence": 0-100,
     "reason": "Brief explanation referencing agent signals"
-}"""
+}}"""
 
 _V4_USER_TEMPLATE = """## Specialist Agent Reports:
 {agent_signals}
@@ -159,6 +163,58 @@ _V4_USER_TEMPLATE = """## Specialist Agent Reports:
 {query}
 
 Synthesize the agent reports and provide your final judgment in JSON format only."""
+
+
+# v5: AND-condition 明文化版 — SELL/BUY は Indicator AND Macro 両方が同方向 ≥70% のみ
+# v4 SELL-spam 問題の根本対策。Python 側 rule engine と組み合わせて二重防衛。
+# Rationale: Macro Agent は macro news に引っ張られて継続 BEARISH になりやすい。
+# Indicator Agent (on-chain HF/utilization) との AND を要求することで
+# on-chain 実態と乖離した経済環境シグナルだけで SELL 連発するのを防ぐ。
+_V5_SYSTEM = """You are the Decision Agent of Ultra AutoTrade, a DeFi robo-advisor.
+
+You receive analysis from 4 specialist agents:
+1. Indicator Agent — Aave on-chain metrics (HF, utilization, APY)
+2. Pattern Agent — behavioral analysis (recent decision patterns, win rate)
+3. Risk Agent — composite risk (geopolitical, stablecoin, compound risks)
+4. Macro Agent — macro-economic environment (FED policy, news sentiment)
+
+Your job: Synthesize all agent signals into a SINGLE final judgment.
+
+Decision rules (v5 — AND-condition for directional trades):
+- HARD STOP (always HOLD): Risk Agent detects COMPOUND RISK, or HF < 1.6
+- SELL: BOTH Indicator Agent AND Macro Agent must independently report BEARISH
+  with confidence >= 70%. A single BEARISH agent alone is NOT sufficient for SELL.
+- BUY: BOTH Indicator Agent AND Macro Agent must independently report BULLISH
+  with confidence >= 70%. A single BULLISH agent alone is NOT sufficient for BUY.
+- HOLD: Use HOLD whenever agents disagree, when only one agent is directional,
+  or when confidence < 70% for either core agent (Indicator or Macro).
+- Pattern Agent and Risk Agent are supporting signals — they inform confidence
+  calculation but cannot alone trigger SELL or BUY.
+
+Rationale: Requiring both Indicator (on-chain reality) and Macro (economic
+environment) to align prevents a single stuck-BEARISH macro feed from causing
+repeated SELL signals in stable on-chain conditions.
+
+Weight for confidence calculation: Risk Agent 40%, Indicator 25%, Macro 20%, Pattern 15%
+
+Respond in JSON format ONLY:
+{{
+    "action": "BUY" | "SELL" | "HOLD",
+    "confidence": 0-100,
+    "reason": "Brief explanation referencing which agents agreed and their confidence"
+}}"""
+
+_V5_USER_TEMPLATE = """## Specialist Agent Reports:
+{agent_signals}
+
+## Retrieved Context (from Knowledge Hub):
+{context}
+
+## Analysis Request:
+{query}
+
+Synthesize the agent reports and provide your final judgment in JSON format only.
+Remember: SELL requires BOTH Indicator AND Macro BEARISH >=70%. BUY requires BOTH BULLISH >=70%."""
 
 
 PROMPT_REGISTRY: Dict[str, PromptTemplate] = {
@@ -182,9 +238,15 @@ PROMPT_REGISTRY: Dict[str, PromptTemplate] = {
     ),
     "v4": PromptTemplate(
         version="v4",
-        description="HOLD bias 解消版 — 中庸 confidence でも方向シグナルがあれば BUY/SELL 許可",
+        description="AND-condition 版 (SELL-spam 修正済) — 新規利用は v5 推奨",
         system_prompt=_V4_SYSTEM,
         user_template=_V4_USER_TEMPLATE,
+    ),
+    "v5": PromptTemplate(
+        version="v5",
+        description="AND-condition 明文化版 — SELL/BUY は Indicator AND Macro 両方が同方向 >=70% のみ",
+        system_prompt=_V5_SYSTEM,
+        user_template=_V5_USER_TEMPLATE,
     ),
 }
 
