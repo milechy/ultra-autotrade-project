@@ -22,7 +22,7 @@ class UserRole(str, Enum):
     VIEWER = "viewer"
 
 
-# InvestmentTier は app.auth.models で定義 (v10 3 層 + GENERAL 過渡期互換)。
+# InvestmentTier は app.auth.models で定義 (v10 3 層: LOWER / MIDDLE / UPPER)。
 # F-2 までは本ファイルでも重複定義していたが、単一情報源 (auth/models.py) に統合した。
 from app.auth.models import InvestmentTier as InvestmentTier  # noqa: E402, F401
 from app.auth.models import normalize_tier  # noqa: E402

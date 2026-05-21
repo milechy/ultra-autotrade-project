@@ -424,7 +424,7 @@ class TestTradeGate:
         # net_profit = 100 - 0.27 = 99.73 > 0 → should_trade=True
         result = calculate_fee_by_market(
             trade_amount_usd=Decimal("10000"),
-            tier="GENERAL",
+            tier="LOWER",
             current_apy=Decimal("2"),
             expected_profit_usd=Decimal("100"),
             fixed_cost_usd=Decimal("0.27"),
@@ -458,7 +458,7 @@ class TestTradeGate:
 
     def test_all_tiers_return_zero_fee(self) -> None:
         """tier に関わらず per-trade fee は 0 (月次バッチで計算)。"""
-        for tier in ("LOWER", "MIDDLE", "UPPER", "GENERAL"):
+        for tier in ("LOWER", "MIDDLE", "UPPER"):
             result = calculate_fee_by_market(
                 trade_amount_usd=Decimal("10000"),
                 tier=tier,
@@ -488,43 +488,7 @@ class TestTradeGate:
 
 
 # ---------------------------------------------------------------------------
-# Class 7: GENERAL tier (deprecated) handling
-# ---------------------------------------------------------------------------
-
-
-class TestGeneralTierLegacyHandling:
-    """GENERAL は LOWER と同等扱い (F-2 LEGACY_TIER_MAP 方針)。"""
-
-    def test_general_tier_normalized_to_lower_in_output(self, calculator: FeeCalculator) -> None:
-        result = calculator.calculate_monthly(
-            _make_input(
-                deposit=Decimal("100000"),
-                gross=Decimal("1000"),
-                tier=InvestmentTier.GENERAL,
-            )
-        )
-        # tier フィールドは "LOWER" に正規化される (CHECK 制約準拠)
-        assert result.tier == "LOWER"
-
-    def test_general_tier_uses_lower_fee_rate(self, calculator: FeeCalculator) -> None:
-        # GENERAL → tier_fee_rates[0] = 0.30 (LOWER と同じ)
-        result_general = calculator.calculate_monthly(
-            _make_input(
-                deposit=Decimal("100000"),
-                gross=Decimal("1000"),
-                tier=InvestmentTier.GENERAL,
-            )
-        )
-        result_lower = calculator.calculate_monthly(
-            _make_input(deposit=Decimal("100000"), gross=Decimal("1000"))
-        )
-        assert result_general.fee_rate_applied == result_lower.fee_rate_applied
-        assert result_general.fee_amount_jpy == result_lower.fee_amount_jpy
-        assert result_general.user_takehome_jpy == result_lower.user_takehome_jpy
-
-
-# ---------------------------------------------------------------------------
-# Class 8: Debug log
+# Class 7: Debug log
 # ---------------------------------------------------------------------------
 
 

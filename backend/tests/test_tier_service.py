@@ -329,10 +329,6 @@ class TestTierJpLabels:
     def test_upper_label(self) -> None:
         assert TIER_JP_LABELS[InvestmentTier.UPPER] == "アッパー"
 
-    def test_general_legacy_label(self) -> None:
-        # GENERAL (v9 互換) は LOWER と同じラベル
-        assert TIER_JP_LABELS[InvestmentTier.GENERAL] == "一般"
-
     def test_all_enum_values_have_labels(self) -> None:
         for tier in InvestmentTier:
             assert tier in TIER_JP_LABELS, f"Missing JP label for {tier}"
