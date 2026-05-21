@@ -42,6 +42,9 @@ CURL_TIMEOUT=10
 DISK_WARN_THRESHOLD="${DISK_WARN_THRESHOLD:-80}"
 DISK_CRITICAL_THRESHOLD="${DISK_CRITICAL_THRESHOLD:-90}"
 
+# L8 (Gate 8): Loki /ready 死活監視 (P0-2 / 2026-05-17 cascade postmortem)
+LOKI_READY_URL="${LOKI_READY_URL:-http://127.0.0.1:3100/ready}"
+
 # Twilio 電話エスカレーション設定
 TWILIO_ACCOUNT_SID="${TWILIO_ACCOUNT_SID:-}"
 TWILIO_AUTH_TOKEN="${TWILIO_AUTH_TOKEN:-}"
@@ -331,6 +334,25 @@ check_disk() {
 }
 
 # =============================================================================
+# L8 (Gate 8): Loki /ready 死活チェック (P0-2 / 2026-05-17 cascade postmortem)
+# loki が落ちると json-file 未移行サービスが道連れになるため /ready を外形監視。
+# FAIL は overall FAIL に寄与 (cascade 早期検知が目的)。
+# =============================================================================
+check_loki() {
+  local status="PASS"
+  local http_code="000"
+
+  http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "${CURL_TIMEOUT}" "${LOKI_READY_URL}" 2>/dev/null || echo "000")
+
+  if [[ "${http_code}" != "200" ]]; then
+    status="FAIL"
+  fi
+
+  printf '{"status":"%s","loki_ready_url":"%s","http_code":"%s"}' \
+    "${status}" "${LOKI_READY_URL}" "${http_code}"
+}
+
+# =============================================================================
 # Slack 通知
 # =============================================================================
 send_slack() {
@@ -482,9 +504,13 @@ main() {
   local l7_json; l7_json=$(check_disk)
   local l7_status; l7_status=$(echo "${l7_json}" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])" 2>/dev/null || echo "WARN")
 
-  # 全体判定 (L6 WARN は FAIL ではない / L7 CRITICAL → FAIL / L7 WARN は FAIL ではない)
+  log "L8 (Gate 8): Loki /ready チェック"
+  local l8_json; l8_json=$(check_loki)
+  local l8_status; l8_status=$(echo "${l8_json}" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])" 2>/dev/null || echo "FAIL")
+
+  # 全体判定 (L6 WARN は FAIL ではない / L7 CRITICAL → FAIL / L7 WARN は FAIL ではない / L8 FAIL → FAIL)
   local overall_status="PASS"
-  for s in "${l1_status}" "${l2_status}" "${l3_status}" "${l4_status}" "${l5_status}"; do
+  for s in "${l1_status}" "${l2_status}" "${l3_status}" "${l4_status}" "${l5_status}" "${l8_status}"; do
     if [[ "${s}" == "FAIL" ]]; then
       overall_status="FAIL"
       break
@@ -494,7 +520,7 @@ main() {
     overall_status="FAIL"
   fi
 
-  log "結果: L1=${l1_status} L2=${l2_status} L3=${l3_status} L4=${l4_status} L5=${l5_status} L6=${l6_status} L7=${l7_status} → ${overall_status}"
+  log "結果: L1=${l1_status} L2=${l2_status} L3=${l3_status} L4=${l4_status} L5=${l5_status} L6=${l6_status} L7=${l7_status} L8=${l8_status} → ${overall_status}"
 
   # Slack 通知 JSON 組み立て
   local slack_json
@@ -512,6 +538,7 @@ l4 = json.loads('''${l4_json}''')
 l5 = json.loads('''${l5_json}''')
 l6 = json.loads('''${l6_json}''')
 l7 = json.loads('''${l7_json}''')
+l8 = json.loads('''${l8_json}''')
 
 icon = '✅' if overall == 'PASS' else '🚨'
 results = {
@@ -526,6 +553,7 @@ results = {
     'L5': l5,
     'L6': l6,
     'L7_disk': l7,
+    'L8_loki': l8,
   },
   'next_check': next_check
 }
@@ -568,6 +596,7 @@ print(json.dumps(payload))
       [[ "${l4_status}" == "FAIL" ]] && failed_layers="${failed_layers}L4 "
       [[ "${l5_status}" == "FAIL" ]] && failed_layers="${failed_layers}L5 "
       [[ "${l7_status}" == "CRITICAL" ]] && failed_layers="${failed_layers}L7(disk) "
+      [[ "${l8_status}" == "FAIL" ]] && failed_layers="${failed_layers}L8(loki) "
       failed_layers="${failed_layers:-L1-L5}"
       log "5連続FAIL到達 (${fail_count}回) — Twilio 電話エスカレーション発動: ${failed_layers}"
       call_twilio_phone "${fail_count}" "${failed_layers}"
