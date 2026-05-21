@@ -19,7 +19,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from app.billing.v10_models import FeeConfigV10
+from app.fees.models import FeeConfigV10
 
 #: JST タイムゾーン (effective_from の TZ 一致用)。
 _JST = timezone(timedelta(hours=9))

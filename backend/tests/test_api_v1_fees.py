@@ -34,19 +34,13 @@ os.environ["INITIAL_ADMIN_EMAIL"] = "fees_admin@example.com"
 from app.auth.models import InvestmentTier, RiskMode, User, UserRole  # noqa: E402
 from app.auth.schemas import UserCreateRequest  # noqa: E402
 from app.auth.service import AuthService  # noqa: E402
-from app.billing.v10_models import FeeConfigV10, FeeTransaction, V10Base  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app.fees import FeeCalculationInput, FeeCalculator  # noqa: E402
+from app.fees.models import FeeConfigV10, FeeTransaction  # noqa: E402
 from app.main import create_app  # noqa: E402
 from tests.helpers.fee_config_factory import make_v10_default_config  # noqa: E402
 
 _JST = timezone(timedelta(hours=9))
-
-# FeeTransaction の FK ('users.id') が別 metadata を参照しているため、
-# テスト用に users テーブル定義を V10Base.metadata に複製する (1 度だけ)。
-# 本番 PG では Alembic SQL で全テーブルが同一 schema に作成されるため不要。
-if "users" not in V10Base.metadata.tables:
-    User.__table__.to_metadata(V10Base.metadata)  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
@@ -59,11 +53,8 @@ def test_db() -> Generator[tuple, None, None]:
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     engine = create_engine(f"sqlite:///{path}", connect_args={"check_same_thread": False})
+    # FeeConfigV10 / FeeTransaction は app.database.Base に統合済み (F-13 billing cleanup)
     Base.metadata.create_all(bind=engine)
-    # v9 billing モデル (FeeConfig/fee_calculations/high_water_marks) は F-13 で物理削除済み。
-    # Base.metadata に fee_configs 重複なし → V10Base をそのまま create_all する。
-    FeeConfigV10.__table__.create(bind=engine)  # type: ignore[attr-defined]
-    FeeTransaction.__table__.create(bind=engine)  # type: ignore[attr-defined]
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
     def override_get_db() -> Generator[Session, None, None]:
@@ -74,8 +65,6 @@ def test_db() -> Generator[tuple, None, None]:
             db.close()
 
     yield override_get_db, SessionLocal
-    FeeTransaction.__table__.drop(bind=engine)  # type: ignore[attr-defined]
-    FeeConfigV10.__table__.drop(bind=engine)  # type: ignore[attr-defined]
     Base.metadata.drop_all(bind=engine)
     os.unlink(path)
 

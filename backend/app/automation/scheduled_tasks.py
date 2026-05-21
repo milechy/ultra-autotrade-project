@@ -168,7 +168,7 @@ def _monthly_fee_batch_sync(calculation_month: date, usd_jpy_rate: Decimal) -> N
     from sqlalchemy import select as _select  # noqa: PLC0415
 
     from app.api.v1.fees import finalize_month_core  # noqa: PLC0415
-    from app.billing.v10_models import FeeConfigV10  # noqa: PLC0415
+    from app.fees.models import FeeConfigV10  # noqa: PLC0415
 
     with SessionLocal() as db:
         config = db.scalar(
