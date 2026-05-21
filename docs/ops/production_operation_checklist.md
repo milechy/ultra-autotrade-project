@@ -168,6 +168,31 @@ du -sh /var/log/journal/ 2>/dev/null
 
 ---
 
+## ゲート 9: PR merge 前チェック (大型 PR)
+
+以下のいずれかに該当する PR は **CI all green 必須**。red のまま merge 禁止。
+
+**大型 PR 判定条件 (ⓐⓑⓒ いずれか 1 つ該当で大型)**
+
+| 条件 | 内容 | 例 |
+|------|------|----|
+| ⓐ 大 diff | 100行超 diff OR Tier S ファイル変更 | main.py / docker-compose / migrations / models / package.json / requirements.txt |
+| ⓑ 多ディレクトリ | 3 ディレクトリ以上にまたがる変更 | backend/ + frontend/ + docs/ |
+| ⓒ 古い PR | 起票から 7日超の PR | |
+
+**merge 必須条件**
+
+```
+✅ CI 必須 pass: ruff lint/format, mypy, pytest (coverage 80%+), tsc --noEmit, npm run build
+⚠️  CI 無視可: E2E Smoke Tests (staging 依存 / night-mode は明示的に無視可)
+❌ 禁止: その他の CI red 状態での merge
+```
+
+**違反事例 (2026-05-21)**
+- #347 (F-13 InvestmentTier 削除, 3ディレクトリ跨ぎ) が red CI のまま merge → 残骸 PR が 2件発生 (#351 ruff fix / #355 pytest fix)、main 赤化で当日の他 PR merge ゲートをブロック
+
+---
+
 ## 緊急時参照
 
 | 事象 | 対応 |
