@@ -598,17 +598,17 @@ def test_get_tier_interval_hours_upper_default():
     assert _get_tier_interval_hours(InvestmentTier.UPPER.value) == 4
 
 
-def test_get_tier_interval_hours_general_default():
-    """GENERAL ティアのデフォルト間隔は 8 時間であること。"""
-    assert _get_tier_interval_hours(InvestmentTier.GENERAL.value) == 8
+def test_get_tier_interval_hours_lower_default():
+    """LOWER ティアのデフォルト間隔は 8 時間であること。"""
+    assert _get_tier_interval_hours(InvestmentTier.LOWER.value) == 8
 
 
 def test_get_tier_interval_hours_env_override(monkeypatch):
     """環境変数で間隔を上書きできること。"""
     monkeypatch.setenv("AI_JUDGMENT_INTERVAL_HOURS_UPPER", "6")
-    monkeypatch.setenv("AI_JUDGMENT_INTERVAL_HOURS_GENERAL", "12")
+    monkeypatch.setenv("AI_JUDGMENT_INTERVAL_HOURS_LOWER", "12")
     assert _get_tier_interval_hours(InvestmentTier.UPPER.value) == 6
-    assert _get_tier_interval_hours(InvestmentTier.GENERAL.value) == 12
+    assert _get_tier_interval_hours(InvestmentTier.LOWER.value) == 12
 
 
 def test_is_user_due_first_time():
@@ -619,7 +619,7 @@ def test_is_user_due_first_time():
         email="first@example.com",
         username="first",
         hashed_password="x",
-        tier=InvestmentTier.GENERAL.value,
+        tier=InvestmentTier.LOWER.value,
         last_judgment_at=None,
     )
     now = datetime.now(timezone.utc)
@@ -656,48 +656,48 @@ def test_is_user_due_upper_past_interval():
     assert _is_user_due_for_judgment(user, now) is True
 
 
-def test_is_user_due_general_within_interval():
-    """GENERAL ユーザーが 8 時間未満の場合はスキップ。"""
+def test_is_user_due_lower_within_interval():
+    """LOWER ユーザーが 8 時間未満の場合はスキップ。"""
     from datetime import datetime, timedelta, timezone  # noqa: PLC0415
 
     now = datetime.now(timezone.utc)
     user = User(
-        email="general@example.com",
-        username="general",
+        email="lower@example.com",
+        username="lower",
         hashed_password="x",
-        tier=InvestmentTier.GENERAL.value,
+        tier=InvestmentTier.LOWER.value,
         last_judgment_at=now - timedelta(hours=5),
     )
     assert _is_user_due_for_judgment(user, now) is False
 
 
-def test_is_user_due_general_past_interval():
-    """GENERAL ユーザーが 8 時間以上経過した場合は判定対象。"""
+def test_is_user_due_lower_past_interval():
+    """LOWER ユーザーが 8 時間以上経過した場合は判定対象。"""
     from datetime import datetime, timedelta, timezone  # noqa: PLC0415
 
     now = datetime.now(timezone.utc)
     user = User(
-        email="general2@example.com",
-        username="general2",
+        email="lower2@example.com",
+        username="lower2",
         hashed_password="x",
-        tier=InvestmentTier.GENERAL.value,
+        tier=InvestmentTier.LOWER.value,
         last_judgment_at=now - timedelta(hours=8, minutes=1),
     )
     assert _is_user_due_for_judgment(user, now) is True
 
 
-def test_buy_skips_general_user_within_interval(db_session):
-    """BUY 判定時、GENERAL ユーザーが 8 時間未満の場合は Proposal を作成しないこと。"""
+def test_buy_skips_lower_user_within_interval(db_session):
+    """BUY 判定時、LOWER ユーザーが 8 時間未満の場合は Proposal を作成しないこと。"""
     from datetime import datetime, timedelta, timezone  # noqa: PLC0415
 
     recent = datetime.now(timezone.utc) - timedelta(hours=5)
     user = User(
-        email="general_recent@example.com",
-        username="general_recent",
+        email="lower_recent@example.com",
+        username="lower_recent",
         hashed_password="x",
         is_active=True,
         execution_policy="require_approval",
-        tier=InvestmentTier.GENERAL.value,
+        tier=InvestmentTier.LOWER.value,
         last_judgment_at=recent,
     )
     db_session.add(user)
@@ -717,7 +717,7 @@ def test_buy_skips_general_user_within_interval(db_session):
     assert result["proposals_created"] == 0
 
 
-def test_buy_includes_upper_user_within_general_interval(db_session):
+def test_buy_includes_upper_user_within_lower_interval(db_session):
     """BUY 判定時、UPPER ユーザーは 4 時間経過で Proposal が作成されること。"""
     from datetime import datetime, timedelta, timezone  # noqa: PLC0415
 
@@ -789,16 +789,16 @@ def test_buy_updates_last_judgment_at(db_session):
 def test_create_proposals_uses_normalized_tier(db_session):
     """``user.tier`` が calculate_fee_by_market に渡される際 normalize_tier 経由になっていること。
 
-    GENERAL ユーザーは LEGACY_TIER_MAP で LOWER に正規化されるため、
+    LOWER ユーザーは LEGACY_TIER_MAP で LOWER に正規化されるため、
     呼び出し時の tier 引数は "LOWER" になる。
     """
     user = User(
-        email="legacy_general@example.com",
-        username="legacy_general",
+        email="legacy_lower@example.com",
+        username="legacy_lower",
         hashed_password="x",
         is_active=True,
         execution_policy="require_approval",
-        tier=InvestmentTier.GENERAL.value,
+        tier=InvestmentTier.LOWER.value,
         last_judgment_at=None,
     )
     db_session.add(user)
@@ -824,7 +824,7 @@ def test_create_proposals_uses_normalized_tier(db_session):
     assert mock_fee.call_count == 1
     call_kwargs = mock_fee.call_args.kwargs
     assert call_kwargs["tier"] == InvestmentTier.LOWER.value, (
-        f"GENERAL は LOWER に正規化されるべきだが {call_kwargs['tier']!r} が渡された"
+        f"LOWER は LOWER に正規化されるべきだが {call_kwargs['tier']!r} が渡された"
     )
 
 
