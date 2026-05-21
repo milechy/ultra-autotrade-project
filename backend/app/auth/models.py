@@ -56,9 +56,9 @@ class UserRole(str, Enum):
 class InvestmentTier(str, Enum):
     """投資ティア。v10 (F-2 2026-04-25 〜): LOWER / MIDDLE / UPPER の 3 層
 
-      - LOWER:  〜1,000,000 円
-      - MIDDLE: 1,000,001 〜 10,000,000 円
-      - UPPER:  10,000,001 円 〜
+    - LOWER:  〜1,000,000 円
+    - MIDDLE: 1,000,001 〜 10,000,000 円
+    - UPPER:  10,000,001 円 〜
     """
 
     LOWER = "LOWER"

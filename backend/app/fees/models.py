@@ -166,9 +166,7 @@ class FeeTransaction(Base):
         default=lambda: datetime.now(timezone.utc),
         server_default=text("NOW()"),
     )
-    finalized_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    finalized_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
