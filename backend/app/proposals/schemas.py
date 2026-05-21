@@ -40,6 +40,7 @@ class ProposalResponse(BaseModel):
     fee_rate: Optional[Decimal]
     fee_amount: Optional[Decimal]
     status: str
+    execution_attempts: int = 0
     approved_at: Optional[datetime]
     rejected_at: Optional[datetime]
     executed_at: Optional[datetime]

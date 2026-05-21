@@ -254,6 +254,35 @@ def _create_proposals_for_users(
                     )
                     continue
 
+                # 既存の pending 提案がある場合はスキップ (2026-05-21 P0 重複作成ガード)
+                # 承認待ち提案がすでに存在するのに新たな提案を作ると
+                # 管理者が連続 approve した際に同一ユーザーへの Aave 操作が重複する。
+                try:
+                    _pending_raw = db.scalar(
+                        select(func.count(Proposal.id)).where(
+                            Proposal.user_id == user.id,
+                            Proposal.status == "pending",
+                        )
+                    )
+                    # isinstance guard: MagicMock (test) は int でないため 0 扱い (fail-open)
+                    _pending_count: int = int(_pending_raw) if isinstance(_pending_raw, int) else 0
+                except Exception as _guard_exc:  # noqa: BLE001
+                    # DB エラー時は安全側: スキップしない (fail-open)
+                    logger.warning(
+                        "pending proposal check failed for user %d (fail-open): %s",
+                        user.id,
+                        _guard_exc,
+                    )
+                    _pending_count = 0
+                if _pending_count > 0:
+                    logger.info(
+                        "Skipping proposal creation for user %d: "
+                        "%d pending proposal(s) already exist",
+                        user.id,
+                        _pending_count,
+                    )
+                    continue
+
                 # fund_allocations から per-user 提案金額を動的計算 (Decimal("0") = skip)
                 proposal_amount_usd = _resolve_proposal_amount(db, user.id)
                 if proposal_amount_usd <= Decimal("0"):
