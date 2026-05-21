@@ -1045,8 +1045,10 @@ def make_multi_chain_clients(
     """
     AAVE_ACTIVE_CHAINS の全チェーンに対してクライアントを生成する。
 
+    RPC URL 未設定のチェーンは警告ログを出力してスキップする（ValueError で起動失敗しない）。
+
     :param client_type: "dummy" | "web3"。未指定時は AAVE_CLIENT_TYPE env var を参照。
-    :returns: chain_name -> AaveClientBase のマッピング
+    :returns: chain_name -> AaveClientBase のマッピング（RPC 未設定チェーンは含まれない）
     """
     from .chains import get_active_chains
 
@@ -1057,10 +1059,18 @@ def make_multi_chain_clients(
             client_type = "web3" if env == "staging" else "dummy"
 
     active_chains = get_active_chains()
-    return {
-        chain.chain_name: make_aave_client(
+    result: dict[str, AaveClientBase] = {}
+    for chain in active_chains:
+        # web3 モードでは RPC 未設定チェーンをスキップ（本番は AAVE_ACTIVE_CHAINS=base のみ想定）
+        if client_type == "web3" and not os.getenv(chain.rpc_url_env_var):
+            logger.warning(
+                "Skipping chain %r: RPC URL env var %r is not set",
+                chain.chain_name,
+                chain.rpc_url_env_var,
+            )
+            continue
+        result[chain.chain_name] = make_aave_client(
             client_type=client_type,
             chain_name=chain.chain_name,
         )
-        for chain in active_chains
-    }
+    return result

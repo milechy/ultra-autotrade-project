@@ -138,8 +138,9 @@ def test_aave_rebalance_buy_returns_200() -> None:
     assert data["result"]["operation"] == "DEPOSIT"
     assert data["result"]["status"] == "success"
     assert service.calls  # at least 1 call
-    # Default chain should be arbitrum
-    assert service.calls[0][0] == "arbitrum"
+    # Default chain should be base (P3-3: 旧 arbitrum default が Base 専用本番で
+    # AAVE_RPC_URL_ARBITRUM ValueError を起こした bug を修正し base に統一)
+    assert service.calls[0][0] == "base"
 
 
 def test_aave_rebalance_validation_error_for_negative_amount() -> None:
