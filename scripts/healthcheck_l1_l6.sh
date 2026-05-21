@@ -45,6 +45,14 @@ DISK_CRITICAL_THRESHOLD="${DISK_CRITICAL_THRESHOLD:-90}"
 # L8 (Gate 8): Loki /ready 死活監視 (P0-2 / 2026-05-17 cascade postmortem)
 LOKI_READY_URL="${LOKI_READY_URL:-http://127.0.0.1:3100/ready}"
 
+# L9: Proposal 発火レート異常検知 (P0-X2 / 2026-05-21)
+# 直近1時間の proposals 件数が閾値を超えたら異常検知。
+# FAIL は overall FAIL に寄与する (7分30件のような爆発的発火を即検知するため)。
+# WARN は非 fatal (overall に影響しない)。
+# dev VPS / psql 不在環境では psql 失敗時に WARN/skip して overall を壊さない。
+PROPOSAL_RATE_WARN="${PROPOSAL_RATE_WARN:-20}"
+PROPOSAL_RATE_FAIL="${PROPOSAL_RATE_FAIL:-40}"
+
 # Twilio 電話エスカレーション設定
 TWILIO_ACCOUNT_SID="${TWILIO_ACCOUNT_SID:-}"
 TWILIO_AUTH_TOKEN="${TWILIO_AUTH_TOKEN:-}"
@@ -353,6 +361,47 @@ check_loki() {
 }
 
 # =============================================================================
+# L9: Proposal 発火レート異常検知 (P0-X2 / 2026-05-21)
+# 直近1時間の proposals 件数で爆発的発火 (例: 7分30件) を早期検知する。
+#
+# 判定ロジック:
+#   proposals_1h >= PROPOSAL_RATE_FAIL (default: 40) → FAIL → overall FAIL に寄与
+#   proposals_1h >= PROPOSAL_RATE_WARN (default: 20) → WARN → overall 非 fatal (WARN 止まり)
+#   proposals_1h <  PROPOSAL_RATE_WARN               → PASS
+#
+# フォールバック:
+#   dev VPS / docker exec 失敗 / psql 不在などで件数取得不可の場合は WARN/skip を返し
+#   overall を壊さない。本番環境での psql 失敗は L1 (containers check) で先に検知される。
+# =============================================================================
+check_proposal_rate() {
+  local status="PASS"
+  local proposals_1h=0
+  local psql_ok=true
+
+  proposals_1h=$(psql_count \
+    "SELECT COUNT(*) FROM proposals WHERE created_at > NOW() - INTERVAL '1 hour';" \
+    || echo "")
+
+  # psql 失敗 or 空値 → フォールバック (WARN/skip、overall を壊さない)
+  if [[ -z "${proposals_1h}" ]]; then
+    psql_ok=false
+    printf '{"status":"WARN","proposals_1h":-1,"warn":%s,"fail":%s,"note":"psql 取得失敗 — dev VPS or DB 不在のため skip (L1 で検知済みのはず)"}' \
+      "${PROPOSAL_RATE_WARN}" "${PROPOSAL_RATE_FAIL}"
+    return
+  fi
+
+  # 数値として評価
+  if (( proposals_1h >= PROPOSAL_RATE_FAIL )); then
+    status="FAIL"
+  elif (( proposals_1h >= PROPOSAL_RATE_WARN )); then
+    status="WARN"
+  fi
+
+  printf '{"status":"%s","proposals_1h":%s,"warn":%s,"fail":%s}' \
+    "${status}" "${proposals_1h}" "${PROPOSAL_RATE_WARN}" "${PROPOSAL_RATE_FAIL}"
+}
+
+# =============================================================================
 # Slack 通知
 # =============================================================================
 send_slack() {
@@ -508,9 +557,19 @@ main() {
   local l8_json; l8_json=$(check_loki)
   local l8_status; l8_status=$(echo "${l8_json}" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])" 2>/dev/null || echo "FAIL")
 
-  # 全体判定 (L6 WARN は FAIL ではない / L7 CRITICAL → FAIL / L7 WARN は FAIL ではない / L8 FAIL → FAIL)
+  # L9: Proposal 発火レート異常検知 (P0-X2 / 2026-05-21)
+  # psql 失敗時は WARN/skip を返し overall を壊さない。FAIL 時は overall FAIL に寄与。
+  log "L9: Proposal 発火レートチェック"
+  local l9_json; l9_json=$(check_proposal_rate)
+  local l9_status; l9_status=$(echo "${l9_json}" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])" 2>/dev/null || echo "WARN")
+
+  # 全体判定
+  # - L6 WARN は FAIL ではない (UAT期間中常態化)
+  # - L7 CRITICAL → FAIL / L7 WARN は FAIL ではない
+  # - L8 FAIL → FAIL (cascade 早期検知)
+  # - L9 FAIL → FAIL (proposal 爆発的発火検知) / L9 WARN は非 fatal
   local overall_status="PASS"
-  for s in "${l1_status}" "${l2_status}" "${l3_status}" "${l4_status}" "${l5_status}" "${l8_status}"; do
+  for s in "${l1_status}" "${l2_status}" "${l3_status}" "${l4_status}" "${l5_status}" "${l8_status}" "${l9_status}"; do
     if [[ "${s}" == "FAIL" ]]; then
       overall_status="FAIL"
       break
@@ -520,7 +579,7 @@ main() {
     overall_status="FAIL"
   fi
 
-  log "結果: L1=${l1_status} L2=${l2_status} L3=${l3_status} L4=${l4_status} L5=${l5_status} L6=${l6_status} L7=${l7_status} L8=${l8_status} → ${overall_status}"
+  log "結果: L1=${l1_status} L2=${l2_status} L3=${l3_status} L4=${l4_status} L5=${l5_status} L6=${l6_status} L7=${l7_status} L8=${l8_status} L9=${l9_status} → ${overall_status}"
 
   # Slack 通知 JSON 組み立て
   local slack_json
@@ -539,10 +598,11 @@ l5 = json.loads('''${l5_json}''')
 l6 = json.loads('''${l6_json}''')
 l7 = json.loads('''${l7_json}''')
 l8 = json.loads('''${l8_json}''')
+l9 = json.loads('''${l9_json}''')
 
 icon = '✅' if overall == 'PASS' else '🚨'
 results = {
-  'task': 'healthcheck_l1_l6',
+  'task': 'healthcheck_l1_l9',
   'status': overall,
   'timestamp': ts,
   'results': {
@@ -554,6 +614,7 @@ results = {
     'L6': l6,
     'L7_disk': l7,
     'L8_loki': l8,
+    'L9_proposal_rate': l9,
   },
   'next_check': next_check
 }
@@ -597,6 +658,7 @@ print(json.dumps(payload))
       [[ "${l5_status}" == "FAIL" ]] && failed_layers="${failed_layers}L5 "
       [[ "${l7_status}" == "CRITICAL" ]] && failed_layers="${failed_layers}L7(disk) "
       [[ "${l8_status}" == "FAIL" ]] && failed_layers="${failed_layers}L8(loki) "
+      [[ "${l9_status}" == "FAIL" ]] && failed_layers="${failed_layers}L9(proposal_rate) "
       failed_layers="${failed_layers:-L1-L5}"
       log "5連続FAIL到達 (${fail_count}回) — Twilio 電話エスカレーション発動: ${failed_layers}"
       call_twilio_phone "${fail_count}" "${failed_layers}"
