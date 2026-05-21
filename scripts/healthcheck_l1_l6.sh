@@ -29,7 +29,12 @@ set -uo pipefail
 SCRIPT_NAME="healthcheck_l1_l6"
 ENV_FILE="${ENV_FILE:-/opt/ultra-autotrade/.env.production}"
 
-HEALTH_URL_INTERNAL="${HEALTH_URL_INTERNAL:-http://127.0.0.1:8010/health}"
+# nginx 経由 (host:8000 → nginx container:8080 → active backend)
+# nginx が active color (blue:8010 / green:8011) へルーティングするため、
+# この URL は Blue/Green color に依存せず常に active backend の /health に到達する。
+# docker-compose.production.yml: ports "8000:8080" (host→nginx container)
+# 旧値 http://127.0.0.1:8010/health は backend-blue 直ポート = Blue/Green 非依存 NG
+HEALTH_URL_INTERNAL="${HEALTH_URL_INTERNAL:-http://127.0.0.1:8000/health}"
 HEALTH_URL_EXTERNAL="${HEALTH_URL_EXTERNAL:-https://api.ultra-auto-trade.com/health}"
 POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-ultra-autotrade-postgres-production}"
 DB_USER="${DB_USER:-ultra}"

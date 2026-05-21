@@ -520,7 +520,7 @@ tmux attach -t phase-<X>
 
 - **コンテナ名**: production は `*-production` suffix（2026-04-24 container_name 衝突インシデント後にリネーム済み）
 - **staging**: Shadow Mode専用（`AI_SHADOW_MODE=true` / `REBALANCE_SHADOW_MODE=true`）、Base Sepolia、port 3001/8082(nginx経由)/5433（注: 旧8001は廃止。`curl http://127.0.0.1:8082/health` で確認）
-- **production**: 実資金・実トレード、Base Mainnet、port 3000/8010(nginx経由)/5432
+- **production**: 実資金・実トレード、Base Mainnet、port 3000/8000(nginx host port)/8080(nginx container)/5432（8010=backend-blue直ポート、8011=backend-green直ポート、nginx経由=8000→8080→active backend）
 
 ---
 
