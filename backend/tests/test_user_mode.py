@@ -81,9 +81,9 @@ class TestUserModeSettings:
         data = r.json()
         assert "user_mode" in data
         assert "execution_policy" in data
-        # defaults
+        # defaults (P3-1: execution_policy safe default は require_approval)
         assert data["user_mode"] == "managed"
-        assert data["execution_policy"] == "auto_execute"
+        assert data["execution_policy"] == "require_approval"
 
     def test_put_user_mode_active_sets_require_approval(self, client: TestClient) -> None:
         """PUT with user_mode='active' auto-sets execution_policy='require_approval'."""

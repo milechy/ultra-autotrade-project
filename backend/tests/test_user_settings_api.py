@@ -189,13 +189,16 @@ class TestUserSettingsAPI:
         assert "execution_policy" in r.json()
 
     def test_get_me_includes_execution_policy(self, client: TestClient) -> None:
-        """GET /auth/me レスポンスに execution_policy が含まれること。"""
+        """GET /auth/me レスポンスに execution_policy が含まれること。
+
+        P3-1: 新規ユーザーの execution_policy safe default は require_approval。
+        """
         token = register_and_login(client)
         r = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         data = r.json()
         assert "execution_policy" in data
-        assert data["execution_policy"] == "auto_execute"
+        assert data["execution_policy"] == "require_approval"
 
     def test_get_me_execution_policy_reflects_update(self, client: TestClient) -> None:
         """/api/user/settings で execution_policy を更新後、/auth/me に反映されること。"""

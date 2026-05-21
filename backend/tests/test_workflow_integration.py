@@ -149,6 +149,7 @@ class TestProcessPendingKnowledge:
             knowledge_service=ks,
             ai_service=ai,
             exchange_service=ex,
+            execution_policy="auto_execute",  # P3-1: explicit auto_execute (not default)
         )
 
         assert isinstance(result, WorkflowRunResult)
@@ -269,6 +270,7 @@ class TestProcessPendingKnowledge:
             knowledge_service=ks,
             ai_service=ai,
             exchange_service=ex,
+            execution_policy="auto_execute",  # P3-1: explicit auto_execute (not default)
         )
 
         assert result.fetched_count == 1
@@ -417,6 +419,7 @@ class TestStressControllerInWorkflow:
             ai_service=ai,
             exchange_service=ex,
             monitoring_service=ms,
+            execution_policy="auto_execute",  # P3-1: explicit auto_execute (not default)
         )
 
         # StressController stage 0 → normal flow → BUY should be executed
@@ -436,6 +439,7 @@ class TestStressControllerInWorkflow:
             ai_service=ai,
             exchange_service=ex,
             monitoring_service=ms,
+            execution_policy="auto_execute",  # P3-1: explicit auto_execute (not default)
         )
 
         assert result.status == "completed"
@@ -613,6 +617,7 @@ class TestLineNotificationsConnected:
                     knowledge_service=ks,
                     ai_service=ai,
                     exchange_service=ex,
+                    execution_policy="auto_execute",  # P3-1: explicit auto_execute (not default)
                 )
 
         assert result.traded_count == 1

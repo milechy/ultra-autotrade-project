@@ -363,7 +363,7 @@ def process_pending_knowledge(
     shadow_mode_service: Optional[ShadowModeService] = None,
     trade_amount_usd: Decimal = Decimal("50"),
     dry_run: bool = False,
-    execution_policy: str = "auto_execute",
+    execution_policy: str = "require_approval",
     user_id: Optional[int] = None,
 ) -> WorkflowRunResult:
     """Process pending knowledge items through the full pipeline.
@@ -734,7 +734,7 @@ def _process_single_item(
     dry_run: bool,
     shadow_mode_service: Optional[ShadowModeService] = None,
     health_factor: Optional[Decimal] = None,
-    execution_policy: str = "auto_execute",
+    execution_policy: str = "require_approval",
     user_id: Optional[int] = None,
 ) -> _SingleItemResult:
     """Process a single knowledge item through the full pipeline."""
