@@ -31,7 +31,7 @@ os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"
 os.environ["INITIAL_ADMIN_EMAIL"] = "fees_admin@example.com"
 
-from app.auth.models import InvestmentTier, RiskMode, User, UserRole  # noqa: E402
+from app.auth.models import InvestmentTier, RiskMode, UserRole  # noqa: E402
 from app.auth.schemas import UserCreateRequest  # noqa: E402
 from app.auth.service import AuthService  # noqa: E402
 from app.database import Base, get_db  # noqa: E402

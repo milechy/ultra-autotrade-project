@@ -21,8 +21,8 @@ from sqlalchemy import inspect as sa_inspect
 
 from app.ai.models import AIDecision  # noqa: F401
 from app.auth.models import User  # noqa: F401
-from app.fees.models import FeeConfigV10, FeeTransaction  # noqa: F401
 from app.database import Base, get_database_url
+from app.fees.models import FeeConfigV10, FeeTransaction  # noqa: F401
 from app.invitations.models import Invitation  # noqa: F401
 from app.knowledge.models import (  # noqa: F401
     KnowledgeChunk,
