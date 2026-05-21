@@ -142,6 +142,12 @@ services:
     environment:
       REBALANCE_SHADOW_MODE: "false"
       DEPLOY_SLOT: "blue"
+      # Stream 4 (2026-05-21): Blue/Green scheduler 二重起動防止。
+      # BACKEND_COLOR はこのコンテナの固有色。ACTIVE_BACKEND_COLOR は .env.production から
+      # 注入され deploy_production.sh の Blue/Green 切替時に更新される。
+      # 両変数が設定済みかつ値が異なる場合のみ scheduler が skip される。
+      BACKEND_COLOR: "blue"
+      ACTIVE_BACKEND_COLOR: ${ACTIVE_BACKEND_COLOR:-}
     # 2026-05-19: OOM対策。起動時 import (web3/anthropic/openai) + 8並列タスクで約300MB消費。
     # 768m = 余裕をもった上限。memswap=mem と同値にしてスワップで延命せずフェイルファスト化。
     mem_limit: ${BACKEND_MEM_LIMIT:-768m}
@@ -188,6 +194,9 @@ services:
     environment:
       REBALANCE_SHADOW_MODE: "false"
       DEPLOY_SLOT: "green"
+      # Stream 4 (2026-05-21): Blue/Green scheduler 二重起動防止。
+      BACKEND_COLOR: "green"
+      ACTIVE_BACKEND_COLOR: ${ACTIVE_BACKEND_COLOR:-}
     mem_limit: ${BACKEND_MEM_LIMIT:-768m}
     memswap_limit: ${BACKEND_MEM_LIMIT:-768m}
     ports:

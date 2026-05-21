@@ -154,6 +154,10 @@ services:
       REBALANCE_SHADOW_MODE: "true"
       AI_SHADOW_MODE: "true"
       DEPLOY_SLOT: "blue"
+      # Stream 4 (2026-05-21): Blue/Green scheduler 二重起動防止。
+      # ACTIVE_BACKEND_COLOR は .env.staging-new から注入。deploy_staging.sh の切替時に更新される。
+      BACKEND_COLOR: "blue"
+      ACTIVE_BACKEND_COLOR: ${ACTIVE_BACKEND_COLOR:-}
     mem_limit: ${BACKEND_MEM_LIMIT:-768m}
     memswap_limit: ${BACKEND_MEM_LIMIT:-768m}
     ports:
@@ -194,6 +198,9 @@ services:
       REBALANCE_SHADOW_MODE: "true"
       AI_SHADOW_MODE: "true"
       DEPLOY_SLOT: "green"
+      # Stream 4 (2026-05-21): Blue/Green scheduler 二重起動防止。
+      BACKEND_COLOR: "green"
+      ACTIVE_BACKEND_COLOR: ${ACTIVE_BACKEND_COLOR:-}
     mem_limit: ${BACKEND_MEM_LIMIT:-768m}
     memswap_limit: ${BACKEND_MEM_LIMIT:-768m}
     ports:

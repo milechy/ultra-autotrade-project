@@ -219,6 +219,28 @@ deploy_backend_zero_downtime() {
   log "upstream.conf を ${inactive_slot} に書き換え..."
   write_upstream_conf "${inactive_slot}"
 
+  # 4b. Stream 4 (2026-05-21): ACTIVE_BACKEND_COLOR を .env.production に書き込む
+  # scheduler color ガードが正しく動くよう、新 active slot を .env に反映する。
+  # awk + tmpfile + cat > で inode 保持（sed -i 禁止ルール / mv は bind-mount を壊す）。
+  log "ACTIVE_BACKEND_COLOR を ${inactive_slot} に更新 (${ENV_FILE})..."
+  local _env_tmp
+  _env_tmp=$(mktemp "${ENV_FILE}.XXXXXX")
+  if grep -q '^ACTIVE_BACKEND_COLOR=' "${ENV_FILE}"; then
+    awk -v slot="${inactive_slot}" '{
+      if ($0 ~ /^ACTIVE_BACKEND_COLOR=/) {
+        print "ACTIVE_BACKEND_COLOR=" slot
+      } else {
+        print
+      }
+    }' "${ENV_FILE}" > "${_env_tmp}"
+  else
+    awk '{print}' "${ENV_FILE}" > "${_env_tmp}"
+    printf '\nACTIVE_BACKEND_COLOR=%s\n' "${inactive_slot}" >> "${_env_tmp}"
+  fi
+  cat "${_env_tmp}" > "${ENV_FILE}"
+  rm -f "${_env_tmp}"
+  log "ACTIVE_BACKEND_COLOR=${inactive_slot} → ${ENV_FILE} に書き込み完了"
+
   # 5. nginx -s reload (POSIX 仕様で既存接続を引き継ぐ → ゼロダウンタイム保証)
   log "nginx -s reload を実行..."
   if ! docker exec "${NGINX_CONTAINER}" nginx -s reload; then

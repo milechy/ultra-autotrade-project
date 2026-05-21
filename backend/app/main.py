@@ -96,11 +96,25 @@ def _is_scheduler_enabled() -> bool:
     判定ロジック:
     - DISABLE_AI_JUDGMENT_SCHEDULER=1 → 無効（新方式）
     - ENABLE_AI_JUDGMENT_SCHEDULER=0  → 無効（旧方式後方互換）
+    - Blue/Green color ガード (Stream 4 P0 対策):
+        BACKEND_COLOR と ACTIVE_BACKEND_COLOR の両方が設定されており、
+        かつ値が異なる場合 → 無効（inactive color: scheduler skip）
+        どちらか一方でも未設定の場合 → 後方互換で有効（従来動作を維持）
     - それ以外 → 有効
     """
     if os.getenv("DISABLE_AI_JUDGMENT_SCHEDULER", "0") == "1":
         return False
     if os.getenv("ENABLE_AI_JUDGMENT_SCHEDULER") == "0":
+        return False
+    # Blue/Green color ガード
+    backend_color = os.getenv("BACKEND_COLOR", "").strip().lower()
+    active_backend_color = os.getenv("ACTIVE_BACKEND_COLOR", "").strip().lower()
+    if backend_color and active_backend_color and backend_color != active_backend_color:
+        logger.info(
+            "inactive color: scheduler skip (BACKEND_COLOR=%s, ACTIVE_BACKEND_COLOR=%s)",
+            backend_color,
+            active_backend_color,
+        )
         return False
     return True
 
