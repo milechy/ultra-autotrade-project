@@ -3,12 +3,13 @@
 """ExecutionPolicy enum / CHECK 制約 / server_default の挙動検証テスト。
 
 GID 1214176344039867 (P1) で導入。
+P0 GID 1214993061793196 (P3-1): default を require_approval に変更 (2026-05-21)。
 
 検証観点:
 1. ExecutionPolicy.values() が全 valid 値を返す
 2. CHECK 制約が無効値の直 INSERT を拒否する
 3. PUT /api/user/settings が enum と整合した値検証を行う
-4. User 作成時に execution_policy 未指定で default ('auto_execute') が適用される
+4. User 作成時に execution_policy 未指定で safe default ('require_approval') が適用される
 """
 
 import os
@@ -190,7 +191,11 @@ def test_settings_api_rejects_invalid_value(client: TestClient) -> None:
 
 
 def test_default_value_on_user_creation(test_db) -> None:
-    """User() で execution_policy 未指定時に default 'auto_execute' が適用される。"""
+    """User() で execution_policy 未指定時に safe default 'require_approval' が適用される。
+
+    P0 GID 1214993061793196 (P3-1): 金融システムの安全既定として require_approval を
+    デフォルト値にした。role default=VIEWER + auto_execute の組み合わせは設計違反。
+    """
     _, _, SessionLocal = test_db
     session = SessionLocal()
     try:
@@ -199,6 +204,32 @@ def test_default_value_on_user_creation(test_db) -> None:
             username="defaultuser",
             hashed_password="hashed",
             is_active=True,
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        assert user.execution_policy == ExecutionPolicy.REQUIRE_APPROVAL.value, (
+            f"新規 User の execution_policy は '{ExecutionPolicy.REQUIRE_APPROVAL.value}' であるべき。"
+            f" 実際の値: '{user.execution_policy}'"
+        )
+    finally:
+        session.close()
+
+
+def test_explicit_auto_execute_still_works(test_db) -> None:
+    """execution_policy を明示的に auto_execute で指定した場合は正常に保存される。
+
+    safe default 変更後も、明示的な値指定は機能し続けることを確認。
+    """
+    _, _, SessionLocal = test_db
+    session = SessionLocal()
+    try:
+        user = User(
+            email="explicit_auto@example.com",
+            username="explicit_auto_user",
+            hashed_password="hashed",
+            is_active=True,
+            execution_policy=ExecutionPolicy.AUTO_EXECUTE.value,
         )
         session.add(user)
         session.commit()

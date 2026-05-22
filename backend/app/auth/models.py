@@ -20,6 +20,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS ix_users_privy_did ON users (privy_did) WHERE 
 ALTER TABLE users ADD CONSTRAINT users_execution_policy_check
     CHECK (execution_policy IN ('auto_execute', 'require_approval', 'proposal_only'));
 
+-- P0 GID 1214993061793196 (P3-1): execution_policy safe default 変更
+-- 新規ユーザーの DB default を auto_execute → require_approval に変更。
+-- 既存 auto_execute 行の UPDATE は別途 P0 対応で実施する (本 PR 対象外)。
+ALTER TABLE users ALTER COLUMN execution_policy SET DEFAULT 'require_approval';
+
 -- RAS (Referral / Partner Affiliate System) Lane 1 schema. Lane 1 が DB schema 本体を
 -- 所有するが、Lane 2 (本ファイル) でも型解決のため同一定義を先行追加している。
 -- Lane 1 マージ時は同一定義のため conflict 解消は trivial。
@@ -235,8 +240,8 @@ class User(Base):
     execution_policy: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
-        default=ExecutionPolicy.AUTO_EXECUTE.value,
-        server_default=ExecutionPolicy.AUTO_EXECUTE.value,
+        default=ExecutionPolicy.REQUIRE_APPROVAL.value,
+        server_default=ExecutionPolicy.REQUIRE_APPROVAL.value,
     )
     wallet_address: Mapped[Optional[str]] = mapped_column(
         String(42), unique=True, nullable=True, index=True, default=None

@@ -266,6 +266,7 @@ class TestAIRiskExecutionFlow:
             knowledge_service=ks,
             ai_service=ai,
             exchange_service=ex,
+            execution_policy="auto_execute",  # P3-1: 実行パス検証なので明示
         )
 
         assert isinstance(result, WorkflowRunResult)
@@ -294,6 +295,7 @@ class TestAIRiskExecutionFlow:
             knowledge_service=ks,
             ai_service=ai,
             exchange_service=ex,
+            execution_policy="auto_execute",  # P3-1: 実行パス検証なので明示
         )
 
         assert result.traded_count == 1
@@ -398,6 +400,7 @@ class TestAIRiskExecutionFlow:
             knowledge_service=ks,
             ai_service=ai,
             exchange_service=ex,
+            execution_policy="auto_execute",  # P3-1: エラーパス検証 (policy は任意だが明示)
         )
 
         assert result.fetched_count == 1
@@ -425,6 +428,7 @@ class TestAIRiskExecutionFlow:
             knowledge_service=ks,
             ai_service=ai,
             exchange_service=ex,
+            execution_policy="auto_execute",  # P3-1: exchange 失敗パス検証なので明示
         )
 
         assert result.fetched_count == 1
@@ -473,6 +477,7 @@ class TestAIRiskExecutionFlow:
             knowledge_service=ks,
             ai_service=ai,
             exchange_service=ex,
+            execution_policy="auto_execute",  # P3-1: 実行パス検証なので明示
         )
 
         assert result.fetched_count == 2

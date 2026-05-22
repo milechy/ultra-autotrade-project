@@ -147,6 +147,7 @@ class TestShadowMode:
             ai_service=mock_ai,
             exchange_service=exchange,
             shadow_mode_service=shadow_svc,
+            execution_policy="auto_execute",  # P3-1: 実行パス検証なので明示
         )
 
         assert result.traded_count == 1
@@ -169,6 +170,7 @@ class TestShadowMode:
             ai_service=mock_ai,
             exchange_service=exchange,
             shadow_mode_service=None,
+            execution_policy="auto_execute",  # P3-1: 実行パス検証なので明示
         )
 
         assert result.traded_count == 1
@@ -275,6 +277,7 @@ class TestEmergencyStopAndHF:
             ai_service=mock_ai,
             exchange_service=exchange,
             monitoring_service=monitoring,
+            execution_policy="auto_execute",  # P3-1: 実行パス検証なので明示
         )
 
         assert result.traded_count == 1
@@ -357,6 +360,7 @@ class TestExchangeClientSwitch:
             knowledge_service=mock_ks,
             ai_service=mock_ai,
             exchange_service=exchange,
+            execution_policy="auto_execute",  # P3-1: 実行パス検証なので明示
         )
 
         assert result.traded_count == 1
@@ -380,6 +384,7 @@ class TestExchangeClientSwitch:
             knowledge_service=mock_ks,
             ai_service=mock_ai,
             exchange_service=exchange,
+            execution_policy="auto_execute",  # P3-1: 実行パス検証なので明示
         )
 
         assert result.traded_count == 1
