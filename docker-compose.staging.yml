@@ -69,6 +69,9 @@ services:
       retries: 3
       start_period: 30s
     restart: always
+    # 2026-05-22 OOM対策: runtime メモリ上限 (build とは別、Next build は host swap 利用)
+    mem_limit: 384m
+    memswap_limit: 384m
     networks:
       - staging-net
     logging:
@@ -88,6 +91,9 @@ services:
     depends_on:
       - loki
     restart: always
+    # 2026-05-22 OOM対策: runtime メモリ上限 (build とは別、Next build は host swap 利用)
+    mem_limit: 128m
+    memswap_limit: 128m
     networks:
       - staging-net
     logging:
@@ -108,6 +114,9 @@ services:
     volumes:
       - postgres-data-staging-new:/var/lib/postgresql/data
     restart: always
+    # 2026-05-22 OOM対策: runtime メモリ上限 (build とは別、Next build は host swap 利用)
+    mem_limit: 512m
+    memswap_limit: 512m
     networks:
       - staging-net
     healthcheck:
@@ -221,6 +230,9 @@ services:
     depends_on:
       - backend-blue
     restart: always
+    # 2026-05-22 OOM対策: runtime メモリ上限 (build とは別、Next build は host swap 利用)
+    mem_limit: 64m
+    memswap_limit: 64m
     networks:
       - staging-net
     # P0-2 (2026-05-21 loki cascade fix): json-file に切替。promtail 経由で Loki 収集継続。
@@ -265,6 +277,9 @@ services:
     depends_on:
       - nginx
     restart: always
+    # 2026-05-22 OOM対策: runtime メモリ上限 (build とは別、Next build は host swap 利用)
+    mem_limit: 512m
+    memswap_limit: 512m
     networks:
       - staging-net
     # P0-2 (2026-05-21 loki cascade fix): json-file に切替。promtail 経由で Loki 収集継続。
