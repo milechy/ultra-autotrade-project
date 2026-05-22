@@ -23,9 +23,13 @@ docker exec ultra-autotrade-postgres-production psql -U ultra -d ultra_autotrade
 - **0 rows(想定)** → そのまま alembic へ(backfill UPDATE は対象なしで no-op)
 - **viewer 以外が出た** → 想定外。STOP → claude.ai 報告(HUMAN-REVIEW)
 ```bash
-cd backend && alembic current && alembic upgrade head --sql | tee /tmp/mig_g7h8.sql
+cd backend && alembic current     # ★直前 head が f6a7b8c9d0e1 であること
+alembic upgrade head --sql | tee /tmp/mig_g7h8.sql
 ```
-★STOP: SQL が「SET DEFAULT 'require_approval'(UPDATE 句はあるが対象0件で no-op)」であること確認
+★STOP(本番 DB 操作・必須):
+- `alembic current` が **f6a7b8c9d0e1**(g7h8i9j0k1l2 の直前)であること
+- `--sql` 出力が **g7h8i9j0k1l2 のみ**(`ALTER ... SET DEFAULT 'require_approval'` + 対象0件 no-op の UPDATE)であること
+- **g7h8i9j0k1l2 以外の未適用 migration が --sql 出力に含まれていたら STOP → claude.ai 報告**(機械適用しない)
 ```bash
 alembic upgrade head && alembic current   # → g7h8i9j0k1l2 (head)
 cd ..
@@ -68,6 +72,14 @@ docker logs ultra-autotrade-backend-<inactive>-production 2>&1 | grep -iE 'inact
 docker exec ultra-autotrade-postgres-production psql -U ultra -d ultra_autotrade -c "\d proposals" | grep execution_attempts
 ```
 ★STOP: scheduler_healthy=true / active のみ判定起動 / inactive は info skip(誤報なし)/ 列存在 → 完了
+```bash
+# R-6 実効確認: production AI 判定が再開し ai_decisions が増えるか(deploy 時刻を控える)
+docker exec ultra-autotrade-postgres-production psql -U ultra -d ultra_autotrade -c "SELECT max(created_at) FROM ai_decisions;"
+```
+★STOP(R-6 実効確認):
+- max(created_at) が **deploy 時刻より後** → R-6 実効(judgment 再開)。完了。
+- まだ → **AI_JUDGMENT_INTERVAL** 待って再確認(production は tier 別既定: UPPER 4h / MIDDLE 6h / LOWER 8h。`.env.production` に `AI_JUDGMENT_INTERVAL_HOURS_*` の短縮があればその値)。次 tick は各 user の last_judgment_at + interval で決まり最大 interval 分かかり得る(deploy セッションを長時間ブロックしない=後追い確認で可)。
+- interval 経過後も新規 0 → **STOP → 調査**(scheduler enabled だが判定が出ない: color guard / tier interval / 対象 user / scheduler ログ)。
 
 ## ロールバック
 - ③: .env.production を戻し backend recreate
