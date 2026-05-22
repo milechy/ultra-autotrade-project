@@ -156,6 +156,8 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
         )
         return
 
+    chain = _get_primary_chain()
+
     # --- デッドレター上限チェック (2026-05-21 P0 対策) ---
     if proposal.execution_attempts >= MAX_EXECUTION_ATTEMPTS:
         error_message = (
@@ -168,13 +170,16 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
             error_message,
         )
         failed_at = datetime.now(timezone.utc)
+        # 修正1: 既に failed 済みなら通知 flood を防ぐ (初回遷移時のみ通知)
+        if proposal.status != "failed":
+            _notify_aave_failure(proposal.id, error_message, failed_at)
         proposal.status = "failed"
         proposal.error_message = error_message
         proposal.executed_at = failed_at
-        _notify_aave_failure(proposal.id, error_message, failed_at)
+        # 修正2: 監査 gap 解消 — transient 分岐と同様に failed トランザクションを記録する
+        _record_failed_transaction(proposal, chain, error_message, db)
         return
 
-    chain = _get_primary_chain()
     try:
         multi_service = MultiChainAaveService()
         result = multi_service.execute_rebalance(

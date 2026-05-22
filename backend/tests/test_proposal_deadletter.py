@@ -100,6 +100,7 @@ def test_dead_letter_at_max_attempts(db_session: Session) -> None:
 
     with (
         patch("app.proposals.router._notify_aave_failure") as mock_notify,
+        patch("app.proposals.router._record_failed_transaction") as mock_record,
         patch("app.aave.service.MultiChainAaveService.execute_rebalance") as mock_exec,
     ):
         _execute_aave_for_proposal(proposal, db_session)
@@ -109,8 +110,28 @@ def test_dead_letter_at_max_attempts(db_session: Session) -> None:
     assert str(MAX_EXECUTION_ATTEMPTS) in (proposal.error_message or "")
     # Aave 実行は呼ばれない
     mock_exec.assert_not_called()
-    # Slack 通知は呼ばれる
+    # Slack 通知は呼ばれる（初回遷移のため）
     mock_notify.assert_called_once()
+    # 修正2: failed トランザクションが記録される
+    mock_record.assert_called_once()
+
+
+def test_dead_letter_no_duplicate_notify_when_already_failed(db_session: Session) -> None:
+    """修正1: status が既に 'failed' の場合は通知を送らない（flood dedup）。"""
+    proposal = _make_proposal(db_session, execution_attempts=MAX_EXECUTION_ATTEMPTS)
+    proposal.status = "failed"  # 既にデッドレター済み
+
+    with (
+        patch("app.proposals.router._notify_aave_failure") as mock_notify,
+        patch("app.proposals.router._record_failed_transaction"),
+        patch("app.aave.service.MultiChainAaveService.execute_rebalance") as mock_exec,
+    ):
+        _execute_aave_for_proposal(proposal, db_session)
+
+    assert proposal.status == "failed"
+    mock_exec.assert_not_called()
+    # 既に failed なので通知は送らない
+    mock_notify.assert_not_called()
 
 
 def test_no_dead_letter_below_max_attempts(db_session: Session) -> None:
@@ -292,6 +313,7 @@ def test_three_failures_lead_to_dead_letter(db_session: Session) -> None:
     proposal.status = "approved"
     with (
         patch("app.proposals.router._notify_aave_failure") as mock_notify,
+        patch("app.proposals.router._record_failed_transaction") as mock_record,
         patch("app.aave.service.MultiChainAaveService.execute_rebalance") as mock_exec,
     ):
         _execute_aave_for_proposal(proposal, db_session)
@@ -300,6 +322,8 @@ def test_three_failures_lead_to_dead_letter(db_session: Session) -> None:
     assert "dead-lettered" in (proposal.error_message or "")
     mock_exec.assert_not_called()
     mock_notify.assert_called_once()
+    # 修正2: dead-letter でも failed トランザクションが記録される
+    mock_record.assert_called_once()
     # attempts は変わらない（dead-letter フローでは加算しない）
     assert proposal.execution_attempts == MAX_EXECUTION_ATTEMPTS
 
