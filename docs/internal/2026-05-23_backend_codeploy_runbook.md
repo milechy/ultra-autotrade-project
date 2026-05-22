@@ -12,15 +12,20 @@ git status -sb     # クリーン & HEAD が #374 merge 以降
 ★STOP
 
 ## ② DB 準備(backend 起動前)
-### ②-a #369 backfill(事前 SELECT 結果に従う)
+### ②-a #369 backfill — 事前確定で「対象行ゼロ=実行不要」(2026-05-22 事前SELECT 確認済)
+2026-05-22 の事前 SELECT 結果 = **0 rows**(既存 auto_execute なし。引継ぎ §2「6人全員 require_approval」を実機裏付け)。
+→ **backfill UPDATE は対象行ゼロのため実行されない**。#369 migration は「今後の新規行」の DEFAULT 変更(予防措置)のみ。当日は alembic upgrade head を流すだけ。
+当日も冒頭で同 SELECT を**再実行して 0件を再確認**(deploy 直前に状態が変わっていないことの確認):
 ```bash
 docker exec ultra-autotrade-postgres-production psql -U ultra -d ultra_autotrade -c "SELECT role,count(*) FROM users WHERE execution_policy='auto_execute' GROUP BY role;"
 ```
-★STOP: viewer 以外が出たら止めて claude.ai 報告 / 0件 or viewer のみ → 続行
+★STOP:
+- **0 rows(想定)** → そのまま alembic へ(backfill UPDATE は対象なしで no-op)
+- **viewer 以外が出た** → 想定外。STOP → claude.ai 報告(HUMAN-REVIEW)
 ```bash
 cd backend && alembic current && alembic upgrade head --sql | tee /tmp/mig_g7h8.sql
 ```
-★STOP: SQL が「SET DEFAULT 'require_approval' + 全 auto_execute UPDATE」であること確認
+★STOP: SQL が「SET DEFAULT 'require_approval'(UPDATE 句はあるが対象0件で no-op)」であること確認
 ```bash
 alembic upgrade head && alembic current   # → g7h8i9j0k1l2 (head)
 cd ..
