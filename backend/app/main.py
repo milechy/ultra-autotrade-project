@@ -90,17 +90,35 @@ logger = logging.getLogger(__name__)
 logging.getLogger("app").setLevel(logging.INFO)
 
 
+def _is_inactive_color_skip() -> bool:
+    """Blue/Green color ガードによる scheduler skip 判定。
+
+    BACKEND_COLOR と ACTIVE_BACKEND_COLOR の両方が設定されており、
+    かつ値が異なる場合 → True（inactive color: 正常 skip）。
+    どちらか一方でも未設定の場合 → False（後方互換で有効）。
+    """
+    backend_color = os.getenv("BACKEND_COLOR", "").strip().lower()
+    active_backend_color = os.getenv("ACTIVE_BACKEND_COLOR", "").strip().lower()
+    return bool(backend_color and active_backend_color and backend_color != active_backend_color)
+
+
 def _is_scheduler_enabled() -> bool:
     """AIスケジューラーの有効/無効判定。デフォルト有効。
 
     判定ロジック:
     - DISABLE_AI_JUDGMENT_SCHEDULER=1 → 無効（新方式）
     - ENABLE_AI_JUDGMENT_SCHEDULER=0  → 無効（旧方式後方互換）
+    - Blue/Green color ガード (Stream 4 P0 対策):
+        BACKEND_COLOR と ACTIVE_BACKEND_COLOR の両方が設定されており、
+        かつ値が異なる場合 → 無効（inactive color: scheduler skip）
+        どちらか一方でも未設定の場合 → 後方互換で有効（従来動作を維持）
     - それ以外 → 有効
     """
     if os.getenv("DISABLE_AI_JUDGMENT_SCHEDULER", "0") == "1":
         return False
     if os.getenv("ENABLE_AI_JUDGMENT_SCHEDULER") == "0":
+        return False
+    if _is_inactive_color_skip():
         return False
     return True
 
@@ -575,6 +593,16 @@ def create_app() -> FastAPI:
     async def startup_ai_judgment_scheduler() -> None:
         """4時間ごとのAI判定スケジューラーを開始する。デフォルト有効。"""
         import asyncio
+
+        # color ガード専用 early return: inactive color による正常 skip は
+        # Slack 通知不要（Blue/Green 切替時の非 active 側コンテナの期待動作）。
+        if _is_inactive_color_skip():
+            logger.info(
+                "inactive color: scheduler skip (BACKEND_COLOR=%s, ACTIVE_BACKEND_COLOR=%s)",
+                os.getenv("BACKEND_COLOR", "").strip().lower(),
+                os.getenv("ACTIVE_BACKEND_COLOR", "").strip().lower(),
+            )
+            return
 
         if not _is_scheduler_enabled():
             logger.error(

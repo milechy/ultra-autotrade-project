@@ -203,6 +203,29 @@ deploy_backend_zero_downtime() {
     ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" build "backend-${inactive_slot}"
   fi
 
+  # Stream 4 (2026-05-21): ACTIVE_BACKEND_COLOR を .env.staging-new に書き込む
+  # 新コンテナ起動より前に確定させることで、新コンテナが正しい color を読んで起動し
+  # scheduler color ガードが「自分 = active」と正しく判定できる。
+  # awk + tmpfile + cat > で inode 保持（sed -i 禁止ルール / mv は bind-mount を壊す）。
+  log "ACTIVE_BACKEND_COLOR を ${inactive_slot} に更新 (${ENV_FILE})..."
+  local _env_tmp
+  _env_tmp=$(mktemp "${ENV_FILE}.XXXXXX")
+  if grep -q '^ACTIVE_BACKEND_COLOR=' "${ENV_FILE}"; then
+    awk -v slot="${inactive_slot}" '{
+      if ($0 ~ /^ACTIVE_BACKEND_COLOR=/) {
+        print "ACTIVE_BACKEND_COLOR=" slot
+      } else {
+        print
+      }
+    }' "${ENV_FILE}" > "${_env_tmp}"
+  else
+    awk '{print}' "${ENV_FILE}" > "${_env_tmp}"
+    printf '\nACTIVE_BACKEND_COLOR=%s\n' "${inactive_slot}" >> "${_env_tmp}"
+  fi
+  cat "${_env_tmp}" > "${ENV_FILE}"
+  rm -f "${_env_tmp}"
+  log "ACTIVE_BACKEND_COLOR=${inactive_slot} → ${ENV_FILE} に書き込み完了"
+
   log "backend-${inactive_slot} を起動..."
   ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d --no-deps "backend-${inactive_slot}"
 
