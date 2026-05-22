@@ -6,6 +6,8 @@
 #   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS fee_rate DECIMAL(10, 6);
 #   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS fee_amount DECIMAL(20, 2);
 #   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS error_message TEXT;
+#   -- Stream 2 retry 暴走対策 (2026-05-21 P0 デッドレター化):
+#   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS execution_attempts INTEGER NOT NULL DEFAULT 0;
 
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -43,6 +45,9 @@ class Proposal(Base):
         Numeric(precision=20, scale=2), nullable=True
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
+    # execution_attempts: Aave 実行試行回数 (2026-05-21 P0 デッドレター化対策)
+    # MAX_EXECUTION_ATTEMPTS (= 3) 超過で status を 'failed' に強制遷移させ再試行を停止する。
+    execution_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     rejected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     executed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

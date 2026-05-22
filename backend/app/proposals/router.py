@@ -36,6 +36,18 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/proposals", tags=["proposals"])
 
+# 再試行上限: この回数を超えたらデッドレター化 (status='failed') して再試行を停止する。
+# 恒久エラー (ValueError/KeyError 等の設定起因) は 1回目で即 failed。
+MAX_EXECUTION_ATTEMPTS = 3
+
+# 恒久エラー (RPC 設定未完成 / チェーン未設定 等): 再試行しても無意味なので即 failed。
+_PERMANENT_EXCEPTION_TYPES = (ValueError, KeyError)
+
+
+def _is_permanent_error(exc: Exception) -> bool:
+    """恒久エラー判定: True なら attempts カウントせず即 failed。"""
+    return isinstance(exc, _PERMANENT_EXCEPTION_TYPES)
+
 
 def _expire_old_proposals(db: Session, user_id: int) -> None:
     """期限切れのpending提案をexpiredに更新する。"""
@@ -117,6 +129,11 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
     - WITHDRAW → TradeAction.SELL (withdraw)
     - BORROW / REPAY → 現フェーズでは NOOP（approved のまま）
 
+    デッドレター化ロジック (2026-05-21 P0 対策):
+    - MAX_EXECUTION_ATTEMPTS 超過 → 即 failed（Slack 通知付き）。再試行しない。
+    - 恒久エラー (ValueError/KeyError = RPC/chain 設定起因) → attempts 加算なし・即 failed
+    - 一時エラー → execution_attempts++ して failed
+
     Aave 実行失敗時は proposal.status を 'failed' に遷移させ、
     error_message と transactions(status='failed') を記録し、Slack 通知を送る。
     呼び出し元は db.commit() を実行する責務を持つ。
@@ -140,6 +157,29 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
         return
 
     chain = _get_primary_chain()
+
+    # --- デッドレター上限チェック (2026-05-21 P0 対策) ---
+    if proposal.execution_attempts >= MAX_EXECUTION_ATTEMPTS:
+        error_message = (
+            f"dead-lettered after {proposal.execution_attempts} attempts "
+            f"(MAX_EXECUTION_ATTEMPTS={MAX_EXECUTION_ATTEMPTS})"
+        )
+        logger.error(
+            "proposal %d: %s — forcing failed (dead-letter)",
+            proposal.id,
+            error_message,
+        )
+        failed_at = datetime.now(timezone.utc)
+        # 修正1: 既に failed 済みなら通知 flood を防ぐ (初回遷移時のみ通知)
+        if proposal.status != "failed":
+            _notify_aave_failure(proposal.id, error_message, failed_at)
+        proposal.status = "failed"
+        proposal.error_message = error_message
+        proposal.executed_at = failed_at
+        # 修正2: 監査 gap 解消 — transient 分岐と同様に failed トランザクションを記録する
+        _record_failed_transaction(proposal, chain, error_message, db)
+        return
+
     try:
         multi_service = MultiChainAaveService()
         result = multi_service.execute_rebalance(
@@ -150,6 +190,8 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
             dry_run=False,
         )
 
+        # 成功: attempt カウントも記録（診断用）
+        proposal.execution_attempts += 1
         proposal.tx_hash = result.tx_hash
         proposal.status = "executed"
         proposal.executed_at = datetime.now(timezone.utc)
@@ -170,18 +212,39 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
         )
         db.add(tx)
         logger.info(
-            "proposal %d: %s %s executed on %s — tx=%s status=%s",
+            "proposal %d: %s %s executed on %s — tx=%s status=%s (attempt=%d)",
             proposal.id,
             proposal.operation,
             proposal.asset,
             chain,
             result.tx_hash,
             result.status,
+            proposal.execution_attempts,
         )
     except Exception as exc:  # noqa: BLE001
         error_message = f"{type(exc).__name__}: {exc}"
-        logger.error("proposal %d: Aave execution failed — %s", proposal.id, exc, exc_info=True)
         failed_at = datetime.now(timezone.utc)
+
+        if _is_permanent_error(exc):
+            # 恒久エラー: attempts 加算なし・即 failed（再試行しても無意味）
+            logger.error(
+                "proposal %d: permanent Aave error — failing immediately (no retry): %s",
+                proposal.id,
+                exc,
+                exc_info=True,
+            )
+        else:
+            # 一時エラー: attempts++ して failed
+            proposal.execution_attempts += 1
+            logger.error(
+                "proposal %d: Aave execution failed (attempt=%d/%d) — %s",
+                proposal.id,
+                proposal.execution_attempts,
+                MAX_EXECUTION_ATTEMPTS,
+                exc,
+                exc_info=True,
+            )
+
         proposal.status = "failed"
         proposal.error_message = error_message
         proposal.executed_at = failed_at
