@@ -9,18 +9,25 @@
 
 | 環境 | URL | compose file | env file | ポート |
 |------|-----|-------------|----------|--------|
-| **production** | app/api.ultra-auto-trade.com | `docker-compose.production.yml` | `.env.production` | frontend:3000 / backend:8000 / postgres:5432 |
-| **staging** | staging/api-staging.ultra-auto-trade.com | `docker-compose.staging.yml` | `.env.staging-new` | frontend:3001 / backend:8001 / postgres:5433 |
+| **production** | app/api.ultra-auto-trade.com | `docker-compose.production.yml` | `.env.production` | frontend:3000 / backend:8000(nginx経由) / postgres:5432 |
+| **staging** | staging/api-staging.ultra-auto-trade.com | `docker-compose.staging.yml` | `.env.staging-new` | frontend:3001 / nginx:8082(backend経由) / postgres:5433（旧 backend:8001 は廃止、nginx upstream = backend-blue:8000） |
 
 ---
 
-## コンテナ名一覧（2026-04-24 container_name 衝突修正後）
+## コンテナ名一覧（2026-04-24 container_name 衝突修正後 / 2026-05-22 Blue/Green 反映）
+
+> **2026-05-22 訂正**: staging compose (`docker-compose.staging.yml`) は `profiles:` 指定なし。
+> `up -d` 既定で **7 サービス全て**（postgres / backend-blue / backend-green / nginx / frontend / loki / promtail）が起動する。
+> 旧記述「backend 単体（backend-staging-new）/ 5コンテナ構成」は B案リネーム期の名残であり、現 compose と矛盾するため削除。
+> nginx upstream は `docker/nginx/upstream.staging.conf` の `set $backend backend-blue:8000;` で blue 固定。
 
 | サービス | production | staging |
 |---------|-----------|---------|
-| backend | `ultra-autotrade-backend-production` | `ultra-autotrade-backend-staging-new` |
+| backend-blue | `ultra-autotrade-backend-blue-production` | `ultra-autotrade-backend-blue-staging-new` |
+| backend-green | `ultra-autotrade-backend-green-production` | `ultra-autotrade-backend-green-staging-new` |
 | frontend | `ultra-autotrade-frontend-production` | `ultra-autotrade-frontend-staging-new` |
 | postgres | `ultra-autotrade-postgres-production` | `ultra-autotrade-postgres-staging-new` |
+| nginx | `ultra-autotrade-nginx-production` | `ultra-autotrade-nginx-staging-new` |
 | cloudflared | `ultra-autotrade-cloudflared-production` | (なし) |
 | loki | `ultra-autotrade-loki-production` | `ultra-autotrade-loki-staging-new` |
 | promtail | `ultra-autotrade-promtail-production` | `ultra-autotrade-promtail-staging-new` |
@@ -230,8 +237,8 @@ cd /opt/ultra-autotrade
 ./scripts/deploy_staging.sh --frontend-only   # フロントのみ
 ./scripts/deploy_staging.sh --backend-only    # バックエンドのみ
 
-# ヘルスチェック（staging ポート: 8001/3001）
-curl http://localhost:8001/health
+# ヘルスチェック（staging ポート: 8082/3001 / 旧8001は廃止）
+curl http://127.0.0.1:8082/health
 curl http://localhost:3001
 ```
 

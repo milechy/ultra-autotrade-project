@@ -519,7 +519,7 @@ tmux attach -t phase-<X>
 | **staging** | staging/api-staging.ultra-auto-trade.com（Phase 4設定予定）| `docker-compose.staging.yml` | `.env.staging` | `scripts/deploy_staging.sh` |
 
 - **コンテナ名**: production は `*-production` suffix（2026-04-24 container_name 衝突インシデント後にリネーム済み）
-- **staging**: Shadow Mode専用（`AI_SHADOW_MODE=true` / `REBALANCE_SHADOW_MODE=true`）、Base Sepolia、port 3001/8082(nginx経由)/5433（注: 旧8001は廃止。`curl http://127.0.0.1:8082/health` で確認）
+- **staging**: Shadow Mode専用（`AI_SHADOW_MODE=true` / `REBALANCE_SHADOW_MODE=true`）、Base Sepolia、port 3001/8082(nginx経由)/5433（注: 旧8001は廃止。`curl http://127.0.0.1:8082/health` で確認）。`docker-compose.staging.yml` は `profiles:` 指定なし = `up -d` 既定で **7 サービス**（postgres / backend-blue / backend-green / nginx / frontend / loki / promtail）が全起動。nginx upstream は `docker/nginx/upstream.staging.conf` で `backend-blue:8000` に固定。旧記述「5コンテナ / green のみ」は B案リネーム期の名残であり現 compose と矛盾（2026-05-22 訂正）。
 - **production**: 実資金・実トレード、Base Mainnet、port 3000/8000(nginx host port)/8080(nginx container)/5432（8010=backend-blue直ポート、8011=backend-green直ポート、nginx経由=8000→8080→active backend）
 
 ---
