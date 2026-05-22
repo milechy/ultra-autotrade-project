@@ -7,7 +7,6 @@ import { useState, useEffect, useCallback } from 'react'
 
 import { TrendingUp, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
-import { UserProviders } from '@/components/user/UserProviders'
 import AuthGuard from '@/components/AuthGuard'
 import { CopyTradingCard } from '@/components/user/CopyTradingCard'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -151,10 +150,8 @@ function CopyTradingPage() {
 
 export default function CopyTradingPageWrapper() {
   return (
-    <UserProviders>
-      <AuthGuard>
-        <CopyTradingPage />
-      </AuthGuard>
-    </UserProviders>
+    <AuthGuard>
+      <CopyTradingPage />
+    </AuthGuard>
   )
 }

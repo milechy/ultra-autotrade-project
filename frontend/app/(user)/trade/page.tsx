@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import AuthGuard from '@/components/AuthGuard'
 import { useAuth } from '@/lib/auth'
-import { UserProviders } from '@/components/user/UserProviders'
 import { postJson, getJson } from '@/lib/api/http'
 
 type TradeAction = 'BUY' | 'SELL'
@@ -333,10 +332,8 @@ function TradePage() {
 
 export default function TradeApprovalPage() {
   return (
-    <UserProviders>
-      <AuthGuard>
-        <TradePage />
-      </AuthGuard>
-    </UserProviders>
+    <AuthGuard>
+      <TradePage />
+    </AuthGuard>
   )
 }
