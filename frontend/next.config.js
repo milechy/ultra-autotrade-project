@@ -1,9 +1,8 @@
 /** @type {import('next').NextConfig} */
-// demo/frontend-static: Cloudflare Pages 向け static export 設定。
-// - output: 'export' で out/ に静的書出
-// - images.unoptimized: true で next/image の SSR 最適化を無効化
-// - headers() は static export で無効のため public/_headers に移行 (CSP/XFO/XCTO)
-// 本番 (output: 'standalone') は main branch の next.config.js を使用。
+// main branch (VPS/Docker 本番): output: 'standalone' で .next/standalone を生成し
+// node server として配信。Dockerfile runner 段が COPY --from=builder /app/.next/standalone/ /app/ で参照する。
+// output: 'export' (Cloudflare Pages 向け静的書出) は demo/frontend-static ブランチ専用。
+// main には export を置かない。
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
 // CSP は public/_headers で配信される。本変数は cspConnectSrc 派生で参照されないが、
 // 既存 import 依存性を破壊しないため定義のみ残す。
@@ -31,7 +30,7 @@ const nextConfig = {
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
   },
-  output: 'export',
+  output: 'standalone',
   images: { unoptimized: true },
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
