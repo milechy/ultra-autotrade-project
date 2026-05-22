@@ -11,6 +11,7 @@
 # 2026-05-21 追加: Slack flood 抑制 (COOLDOWN)。staging が継続的に down かつ復旧が定着しない場合、
 # 従来は 5 分毎に「停止を検知」を Slack へ連発していた。COOLDOWN_SEC 内は復旧は試みるが
 # 通知は抑制し、復旧 or cooldown 経過時のみ通知する。
+# 2026-05-22 根本修正: --no-build + image存在ガード + flock 多重実行防止 (OOM螺旋 incident 対応)
 
 set -uo pipefail
 
@@ -22,6 +23,10 @@ WEBHOOK_FILE="${WEBHOOK_FILE:-${COMPOSE_DIR}/.env.production}"
 COOLDOWN_SEC="${COOLDOWN_SEC:-1800}"  # 30分: down 継続時の通知連発抑制
 STATE_FILE="${STATE_FILE:-${TMPDIR:-/tmp}/.staging_watchdog_alert}"
 LOG_PREFIX="[staging-watchdog] $(date '+%Y-%m-%dT%H:%M:%S')"
+
+# 多重実行ガード: 前回の復旧/build が走行中に重ねて起動しない (OOM螺旋の遮断)
+exec 9>"${TMPDIR:-/tmp}/.staging_watchdog.lock"
+flock -n 9 || { echo "${LOG_PREFIX} 別 watchdog 実行中 — skip"; exit 0; }
 
 notify_slack() {
   local msg="$1"
@@ -68,7 +73,21 @@ if [[ "${should_notify}" == "1" ]]; then
 fi
 
 cd "${COMPOSE_DIR}" || { echo "${LOG_PREFIX} ERROR: cd ${COMPOSE_DIR} 失敗"; exit 1; }
-docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d 2>&1 || true
+
+# 根本修正: 必須 image が欠落していたら build せず alert して退避 (OOM螺旋の遮断)。
+# watchdog は「既存 image の再起動」だけを行い、決して build しない。
+missing=""
+for img in $(docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" config --images 2>/dev/null); do
+  docker image inspect "$img" >/dev/null 2>&1 || missing="${missing} ${img}"
+done
+if [[ -n "${missing}" ]]; then
+  echo "${LOG_PREFIX} ABORT: 必須 image 欠落 →${missing}. build は誘発せず手動対応待ち。"
+  [[ "${should_notify}" == "1" ]] && notify_slack "❌ [staging-watchdog] image 欠落で自動復旧を中止(build抑止):${missing}。手動 build が必要。"
+  exit 1
+fi
+
+# 根本修正: watchdog は決して build しない (--no-build)。image 欠落は上で弾く。
+docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d --no-build 2>&1 || true
 
 # 15秒待って確認
 sleep 15
