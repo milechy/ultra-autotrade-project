@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "node ./node_modules/next/dist/bin/next dev -p 3000",
+    "prebuild": "node scripts/cf-pages-build-hooks.js pre",
     "build": "node ./node_modules/next/dist/bin/next build",
+    "postbuild": "node scripts/cf-pages-build-hooks.js post",
     "start": "node ./node_modules/next/dist/bin/next start -p 3000",
     "lint": "node ./node_modules/next/dist/bin/next lint",
     "test:e2e": "playwright test",
