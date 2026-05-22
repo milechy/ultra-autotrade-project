@@ -21,7 +21,7 @@
 | 環境 | compose ファイル | env ファイル | DB 名 | nginx active |
 |---|---|---|---|---|
 | production | `docker-compose.production.yml` | `.env.production` | `ultra_autotrade` | blue (port 8010) |
-| staging | `docker-compose.staging.yml` | `.env.staging-new` | `ultra_autotrade_staging` | green (port 8021) |
+| staging | `docker-compose.staging.yml` | `.env.staging-new` | `ultra_autotrade_staging` | blue (port 8020、`docker/nginx/upstream.staging.conf` で `backend-blue:8000` に固定) |
 | local | `docker-compose.local.yml` | `.env.local` | (任意) | - |
 
 **注意**:
@@ -33,15 +33,21 @@
 
 | サービス | production | staging |
 |---|---|---|
-| backend (active) | `ultra-autotrade-backend-blue-production` | `ultra-autotrade-backend-green-staging-new` |
+| backend-blue | `ultra-autotrade-backend-blue-production` | `ultra-autotrade-backend-blue-staging-new` |
+| backend-green | `ultra-autotrade-backend-green-production` | `ultra-autotrade-backend-green-staging-new` |
 | frontend | `ultra-autotrade-frontend-production` | `ultra-autotrade-frontend-staging-new` |
 | postgres | `ultra-autotrade-postgres-production` | `ultra-autotrade-postgres-staging-new` |
 | nginx | `ultra-autotrade-nginx-production` | `ultra-autotrade-nginx-staging-new` |
 | cloudflared | `ultra-autotrade-cloudflared-production` | (不在) |
 | promtail | `ultra-autotrade-promtail-production` | `ultra-autotrade-promtail-staging-new` |
-| loki | `ultra-autotrade-loki-production` | (不在) |
+| loki | `ultra-autotrade-loki-production` | `ultra-autotrade-loki-staging-new` |
 
-**重要**: 無印の `ultra-autotrade-backend-production` コンテナは**存在しない**。Blue/Green 移行後は **active 側コンテナ名** で操作する。
+> **2026-05-22 訂正**: 旧記述では staging active = `backend-green-staging-new` としていたが、
+> `docker/nginx/upstream.staging.conf` の実体は `set $backend backend-blue:8000;` であり
+> nginx upstream = blue が正しい。また compose に `profiles:` 指定はなく `up -d` 既定で
+> blue + green の**両方**が起動する（green 単独運用は既定では不可能）。
+
+**重要**: 無印の `ultra-autotrade-backend-production` / `ultra-autotrade-backend-staging-new` コンテナは**存在しない**。Blue/Green 移行後は blue/green コンテナ名で操作する。
 
 切替方法: `nginx.conf` の upstream を blue⇔green で書き換えて nginx reload。詳細は §5.
 
