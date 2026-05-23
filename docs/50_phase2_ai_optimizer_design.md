@@ -517,7 +517,40 @@ POST /api/optimizer/analyze (balanced, flag=on) → 200, allocation=[AAVE≥60%,
 ### 9.5 後続タスク
 
 - P5 (manual UI): `user_actions` への INSERT 経路を実装（POST endpoint）。
-- Hermes ローダ: `scripts/export_learning_data.py` の TODO（SQLAlchemy 抽出ロジック）を埋め、
-  JSONL を学習パイプラインに食わせる。
+- Hermes ローダ: `scripts/export_learning_data.py` の SQLAlchemy 抽出を本実装済み
+  （後段で feature ストアに食わせる）。
 - 個人情報の取り扱い: `context_json` / `prompt_features_json` に PII が混入しないよう、
   POST 側でホワイトリストフィルタを実装すること（本 PR の scope 外）。
+
+### 9.6 export スクリプトの使用例
+
+`scripts/export_learning_data.py` は SQLAlchemy 経由で 3 表 (+ user_actions サブクエリ) を
+結合し、1 ai_decision = 1 JSON レコードで JSONL/CSV を吐く。
+
+```bash
+# JSONL に書き出し (デフォルト)
+DATABASE_URL=postgresql://user:pass@db:5432/uata \
+  python scripts/export_learning_data.py \
+    --since 2026-05-01 \
+    --until 2026-05-23 \
+    --out /tmp/learning_dump_20260523.jsonl
+
+# CSV (ネストは JSON 文字列に flatten)
+python scripts/export_learning_data.py \
+  --since 2026-05-01 --until 2026-05-23 \
+  --out /tmp/learning_dump.csv --format csv \
+  --db-url postgresql://user:pass@host:5432/db
+
+# 上限を 50000 行に拡張 + user_actions の時刻窓を 60 分に拡張
+python scripts/export_learning_data.py \
+  --since 2026-05-01 --until 2026-05-23 \
+  --out /tmp/big.jsonl \
+  --limit 50000 \
+  --user-action-window-minutes 60
+```
+
+### 9.7 出力サンプル (JSONL 1 行)
+
+```json
+{"decision_id": 12345, "user_id": 7, "decided_at": "2026-05-10T12:34:56+00:00", "decision": {"query": "should I rebalance USDC?", "action": "HOLD", "confidence": 72, "reason": "HF margin is sufficient", "agreed": true, "prompt_version": "v1"}, "ai_response": {"primary_provider": "anthropic", "primary_action": "HOLD", "primary_confidence": 75, "secondary_provider": "openai", "secondary_action": "HOLD", "secondary_confidence": 70, "rag_context_json": {"docs": ["aave-hf-rule"]}}, "features": {"id": 9001, "ai_decision_id": 12345, "portfolio_snapshot_id": 4567, "market_apy_supply": 3.21, "market_apy_borrow": 5.47, "health_factor": 2.13, "gas_gwei": 12.5, "price_usd": 1.0001, "prompt_features_json": {"asset": "USDC"}}, "snapshot": {"id": 4567, "user_id": 7, "total_value_usd": 12345.67, "health_factor": 2.13}, "user_actions": [{"id": 333, "user_id": 7, "action_type": "manual_buy_click", "target_type": "proposal", "target_id": "p-2026-05-10-001", "clicked_at": "2026-05-10T12:40:01+00:00", "session_id": "sess-abc", "context_json": {"src": "dashboard"}}]}
+```
