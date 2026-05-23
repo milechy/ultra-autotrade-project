@@ -1,7 +1,7 @@
 # 企画書 v2: MVP〜1000人 スケール & ハードニング計画
 **Date:** 2026-05-23 / **Scope:** MVP launch(5/24)→ Phase A〜D(〜1000人・6ヶ月)
 **Predecessors:** v1(議論ベース・未PR) / 4 LLM crowdsource(ChatGPT/Gemini/Grok/Perplexity)
-**Status:** v2 確定版・claude.ai レビュー済
+**Status:** v2 ドラフト・claude.ai レビュー後に確定
 
 ## 1. v1 → v2 の主要決定事項
 1. **Manual UI = 本物の execution gate に**(a 採用、Full Auto 廃止)
@@ -16,7 +16,7 @@
    - 構造変更((a) 採用)で discretionary 疑惑 大幅低減 → 4/4 LLM の警告レベルも下がる
 
 ## 2. 7本柱(v1 から維持)
-H1 SSOT + drift / H2 isolation / H3 型・境界 / H4 テスト中断 / H5 失敗モード / H6 並行性 / H7 自動化
+H1 SSOT + drift / H2 isolation / H3 型・境界 / H4 テスト中段 / H5 失敗モード / H6 並行性 / H7 自動化
 
 ## 3. ツール採用 Wave(v2 確定)
 ### Wave 1(即採用)
