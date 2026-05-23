@@ -148,24 +148,30 @@ export function ProposalCard({
         {/* Transaction status */}
         <TransactionStatus status={status} txHash={txHash} />
 
-        {/* Action buttons */}
+        {/* Action buttons (P5 display-only: 実取引 API は呼ばず user_actions に記録のみ) */}
         {!isDone && (
-          <div className="flex gap-2 pt-1">
-            <Button
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => onApprove(proposal.id)}
-              disabled={isProcessing}
-            >
-              {isProcessing ? '処理中...' : '承認'}
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => onReject(proposal.id)}
-              disabled={isProcessing}
-            >
-              却下
-            </Button>
+          <div className="flex flex-col gap-1.5 pt-1">
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => onApprove(proposal.id)}
+                disabled={isProcessing}
+              >
+                {isProcessing ? '処理中...' : '承認'}
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => onReject(proposal.id)}
+                disabled={isProcessing}
+              >
+                却下
+              </Button>
+            </div>
+            {/* P5 display-only label: 法務 sign-off 後に文言は最終化 */}
+            <small className="text-xs text-muted-foreground">
+              本機能は機能説明用です。実取引は全自動で実行されます。
+            </small>
           </div>
         )}
       </CardContent>

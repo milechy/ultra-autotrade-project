@@ -3,59 +3,60 @@
 "use client";
 
 import { useState } from "react";
+import { logUserAction } from "@/lib/api/user_actions";
 
+// P5 onboarding flow: welcome → login 確認 → 入金確認 (USDC >= $200) → manual UI 説明 → main
+// 仕様: 各ステップは「次へ」で進む。step state は useState。
+// 入金確認は P2-onramp の UsdcOnrampCard を呼ぶ前提だが、未 merge の現状は placeholder。
 const steps = [
   {
     id: 1,
-    title: "ウォレットを準備する",
-    emoji: "👛",
-    description: "MetaMaskをインストールして、ウォレットを作成します。",
+    title: "ようこそ Ultra AutoTrade へ",
+    emoji: "👋",
+    description: "AI が DeFi 運用を全自動で実行します。まずは 4 つのステップで準備を整えましょう。",
     details: [
-      { text: "MetaMask公式サイトにアクセス", link: "https://metamask.io/download/" },
-      { text: "Chrome拡張機能をインストール" },
-      { text: "「新しいウォレットを作成」を選択" },
-      { text: "パスワードを設定（強力なものを使用）" },
-      { text: "シードフレーズを安全な場所に保管", warning: "シードフレーズは絶対に誰にも教えないでください" },
+      { text: "AI が市場・リスク・マクロ・行動の 4 観点を常時監視" },
+      { text: "提案 → 実行はスケジューラが全自動で処理" },
+      { text: "あなたは進捗を確認するだけ" },
     ],
-    tip: "MetaMaskの代わりにRabby WalletやCoinbase Walletも使えます。",
+    tip: "本オンボーディングは約 3 分で完了します。",
   },
   {
     id: 2,
-    title: "ネットワークを追加する",
-    emoji: "🌐",
-    description: "Base Sepoliaネットワークをウォレットに追加します。",
+    title: "ログイン状態を確認",
+    emoji: "🔐",
+    description: "Privy 経由でログインが完了していることを確認します。",
     details: [
-      { text: "ChainListにアクセス", link: "https://chainlist.org/?search=base+sepolia&testnets=true" },
-      { text: "「Base Sepolia」を検索して「Add to MetaMask」をクリック" },
-      { text: "MetaMaskのポップアップで「承認」を選択" },
-      { text: "MetaMaskの上部ネットワーク欄が「Base Sepolia」になっていることを確認" },
+      { text: "ログイン済みであれば次へ進めます" },
+      { text: "未ログインの場合は /login へリダイレクト" },
+      { text: "ウォレット連携も Privy が代行（秘密鍵は当社で扱いません）" },
     ],
-    tip: "ChainListを使うと、ネットワーク情報を手入力する必要がありません。",
+    tip: "依存: P1 (Privy MVP)。本ステップは Privy セッションが有効である前提です。",
   },
   {
     id: 3,
-    title: "テスト用ETHを入手する",
-    emoji: "💰",
-    description: "ガス代用のテストETH（SepoliaETH）をウォレットに送金します。",
+    title: "USDC を入金（最低 $200）",
+    emoji: "💵",
+    description: "運用元本となる USDC を Ultra AutoTrade ウォレットに入金します。残高 ≥ $200 で次へ進めます。",
     details: [
-      { text: "Coinbase Faucetにアクセス", link: "https://faucet.quicknode.com/base/sepolia" },
-      { text: "ウォレットアドレスを入力してテストETHを受け取る" },
-      { text: "MetaMaskに「Base Sepolia ETH」が届いたことを確認" },
+      { text: "オンランプ経由でクレジットカード等から USDC を購入" },
+      { text: "既存ウォレットからの直接送金にも対応" },
+      { text: "入金確認は P2-onramp の UsdcOnrampCard コンポーネントで実施" },
     ],
-    tip: "テストネットのため、実際の資産は不要です。フォーセットから無料でテストETHが取得できます。",
+    tip: "依存: P2-onramp (UsdcOnrampCard)。未 merge の現状は placeholder を表示します。",
   },
   {
     id: 4,
-    title: "Ultra AutoTradeに接続する",
-    emoji: "🔗",
-    description: "ウォレットをUltra AutoTradeに接続して運用を開始します。",
+    title: "Manual UI の使い方（display-only）",
+    emoji: "🧭",
+    description: "/approve ページの説明です。実取引は AI が全自動で行うため、本画面は display-only(機能説明用)です。",
     details: [
-      { text: "Ultra AutoTradeにログイン" },
-      { text: "「ウォレット接続」ボタンをクリック" },
-      { text: "MetaMaskのポップアップで接続を承認" },
-      { text: "AIの提案を確認し、実行する場合は署名して承認" },
+      { text: "AI の提案カードを確認できます" },
+      { text: "「承認 / 却下」ボタンは UI 操作のログにのみ記録されます" },
+      { text: "実取引はスケジューラが自動執行（あなたの署名は不要）" },
+      { text: "本機能は機能説明用です。実取引は全自動で実行されます。", warning: "実取引 API は本画面から呼ばれません" },
     ],
-    tip: "接続はウォレットアドレスの読み取りのみです。当社が秘密鍵を聞くことは一切ありません。",
+    tip: "/approve に進むと提案一覧が確認できます。",
   },
 ];
 
@@ -152,6 +153,18 @@ function StepCard({
               </div>
             ))}
           </div>
+          {/* P5: step 3 (入金) は P2-onramp の UsdcOnrampCard を呼ぶ placeholder */}
+          {step.id === 3 && (
+            <div className="rounded-lg border border-dashed border-amber-700 bg-amber-950/20 p-4">
+              <p className="text-xs text-amber-400 mb-1 font-semibold">
+                [Placeholder] UsdcOnrampCard
+              </p>
+              <p className="text-xs text-zinc-400">
+                TODO(P2-onramp): UsdcOnrampCard コンポーネント merge 後に差し替え。
+                残高 ≥ $200 のチェックも同コンポーネント側で実装予定。
+              </p>
+            </div>
+          )}
           {step.tip && (
             <div className="rounded-lg bg-zinc-800/50 border border-zinc-700 p-3">
               <p className="text-xs text-zinc-400">💡 {step.tip}</p>
@@ -167,6 +180,29 @@ export default function OnboardingPage() {
   const [activeStep, setActiveStep] = useState(1);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
+  const goNext = () => {
+    setActiveStep((s) => {
+      const next = Math.min(steps.length, s + 1);
+      if (next !== s) {
+        void logUserAction({
+          action_type: "onboarding_step_advance",
+          target_type: "onboarding_step",
+          target_id: next,
+          context_json: { from: s, to: next },
+        });
+      }
+      if (next === steps.length && s !== steps.length) {
+        void logUserAction({
+          action_type: "onboarding_completed",
+          target_type: "onboarding_step",
+          target_id: steps.length,
+        });
+      }
+      return next;
+    });
+  };
+  const goPrev = () => setActiveStep((s) => Math.max(1, s - 1));
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6">
       <div className="max-w-3xl mx-auto space-y-8">
@@ -174,7 +210,7 @@ export default function OnboardingPage() {
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold">はじめに</h1>
           <p className="text-zinc-400">
-            Ultra AutoTradeで資産運用を始めるための4つのステップ
+            ログイン → 入金 → manual UI 説明 → メインアプリの 4 ステップで準備
           </p>
         </div>
 
@@ -205,18 +241,18 @@ export default function OnboardingPage() {
         {/* Navigation buttons */}
         <div className="flex justify-between">
           <button
-            onClick={() => setActiveStep((s) => Math.max(1, s - 1))}
+            onClick={goPrev}
             disabled={activeStep === 1}
             className="px-4 py-2 text-sm rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            ← 前のステップ
+            ← 前へ
           </button>
           <button
-            onClick={() => setActiveStep((s) => Math.min(steps.length, s + 1))}
+            onClick={goNext}
             disabled={activeStep === steps.length}
             className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            次のステップ →
+            次へ →
           </button>
         </div>
 
@@ -266,14 +302,18 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        {/* CTA */}
+        {/* CTA: 最終ステップ完了後はメインアプリ(/approve)へ */}
         <div className="text-center py-6">
           <a
-            href="/user/wallet"
+            href="/user/approve"
             className="inline-block rounded-lg bg-blue-600 px-8 py-3 text-sm font-bold text-white hover:bg-blue-500 transition-all"
           >
-            ウォレットを接続して始める →
+            メインアプリへ進む →
           </a>
+          {/* P5 display-only label */}
+          <p className="text-xs text-zinc-500 mt-3">
+            本機能は機能説明用です。実取引は全自動で実行されます。
+          </p>
         </div>
       </div>
     </div>

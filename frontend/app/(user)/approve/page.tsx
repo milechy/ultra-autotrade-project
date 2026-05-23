@@ -5,8 +5,9 @@ import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { apiFetch, apiPost } from '@/lib/api/client'
+import { apiFetch } from '@/lib/api/client'
 import { useAuth } from '@/lib/auth'
+import { logUserAction } from '@/lib/api/user_actions'
 import { EmptyStateWithAIStatus } from '@/components/approve/EmptyStateWithAIStatus'
 import {
   ProposalCard,
@@ -110,35 +111,48 @@ export default function ApprovePage() {
     if (isAuthenticated) { fetchData() }
   }, [fetchData, isAuthenticated])
 
+  // ⚠️ P5 display-only: 本ハンドラは「実取引 API」を呼びません。
+  // 本機能は機能説明用 (manual UI is display-only) です。
+  // 実取引は AI スケジューラが全自動で実行します (main.py / ai_judgment_scheduler.py)。
+  // クリックは user_actions ログにのみ記録し、proposal 一覧の見た目だけ更新します。
+  //
+  // ※ 旧実装: apiPost(`/api/proposals/${id}/approve`) を直接呼んでいた箇所を撤去。
+  //   今後 manual 取引 API を再有効化する場合も、法務 sign-off と
+  //   AI スケジューラ停止フラグの整合確認を経た上で別 PR で行うこと。
   const handleApprove = useCallback(async (id: string) => {
+    console.log('[manual-ui] display-only approve click', { proposal_id: id })
     setProposalStates((prev) => ({ ...prev, [id]: { status: 'approving' } }))
-    try {
-      const result = await apiPost<ProposalAPIResponse>(`/api/proposals/${id}/approve`, {})
+    // best-effort log; never blocks UI even if backend endpoint is pending
+    void logUserAction({
+      action_type: 'manual_approve_click',
+      target_type: 'proposal',
+      target_id: id,
+    })
+    // visually mark as "received" without performing a real on-chain action
+    setTimeout(() => {
       setProposalStates((prev) => ({
         ...prev,
-        [id]: { status: 'success', txHash: result.tx_hash ?? undefined },
+        [id]: { status: 'success' },
       }))
-      setTimeout(() => {
-        setProposals((prev) => prev.filter((p) => p.id !== id))
-      }, 2000)
-    } catch {
-      setProposalStates((prev) => ({ ...prev, [id]: { status: 'pending' } }))
-      setError('承認に失敗しました')
-    }
+    }, 300)
+    setTimeout(() => {
+      setProposals((prev) => prev.filter((p) => p.id !== id))
+    }, 2000)
   }, [])
 
   const handleReject = useCallback(async (id: string) => {
-    try {
-      await apiPost<ProposalAPIResponse>(`/api/proposals/${id}/reject`, {})
-      setProposals((prev) => prev.filter((p) => p.id !== id))
-      setProposalStates((prev) => {
-        const next = { ...prev }
-        delete next[id]
-        return next
-      })
-    } catch {
-      setError('拒否に失敗しました')
-    }
+    console.log('[manual-ui] display-only reject click', { proposal_id: id })
+    void logUserAction({
+      action_type: 'manual_reject_click',
+      target_type: 'proposal',
+      target_id: id,
+    })
+    setProposals((prev) => prev.filter((p) => p.id !== id))
+    setProposalStates((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
   }, [])
 
   const pendingCount = proposals.filter((p) => {
@@ -175,6 +189,10 @@ export default function ApprovePage() {
             <p className="text-sm text-muted-foreground mt-0.5">
               AIが提案した取引を確認・承認してください
             </p>
+            {/* P5 display-only label: 法務 sign-off 後に文言は最終化 */}
+            <small className="block text-muted-foreground mt-1">
+              本機能は機能説明用です。実取引は全自動で実行されます。
+            </small>
           </div>
         </div>
 
