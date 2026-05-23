@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { apiFetch } from '@/lib/api/client'
 import { useAuth } from '@/lib/auth'
 import { logUserAction } from '@/lib/api/user_actions'
+import { LegalGate } from '@/components/onboarding/LegalGate'
 import { EmptyStateWithAIStatus } from '@/components/approve/EmptyStateWithAIStatus'
 import {
   ProposalCard,
@@ -31,6 +32,8 @@ interface ProposalAPIResponse {
   tx_hash: string | null
   expires_at: string
   created_at: string
+  // AI 判定根拠 (P0-RAG): rag_context_json があれば読み取り専用で表示する
+  rag_context_json?: Record<string, unknown> | null
 }
 
 interface ProposalListResponse {
@@ -51,6 +54,7 @@ function mapToProposal(item: ProposalAPIResponse): Proposal {
     estimatedGas: item.estimated_gas_usd ? parseFloat(item.estimated_gas_usd) : 0,
     slippage: null,
     createdAt: item.created_at,
+    ragContext: item.rag_context_json ?? null,
   }
 }
 
@@ -81,6 +85,8 @@ export default function ApprovePage() {
   const [proposalStates, setProposalStates] = useState<
     Record<string, ProposalState>
   >({})
+  // display-only banner の expandable info
+  const [showAutoInfo, setShowAutoInfo] = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -175,9 +181,12 @@ export default function ApprovePage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {/* 法務 sign-off 前 banner (launch gate) */}
+        <LegalGate />
+
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div>
+          <div className="flex-1">
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold">取引承認</h1>
               {pendingCount > 0 && (
@@ -187,12 +196,53 @@ export default function ApprovePage() {
               )}
             </div>
             <p className="text-sm text-muted-foreground mt-0.5">
-              AIが提案した取引を確認・承認してください
+              AIが提案した取引を確認できます
             </p>
-            {/* P5 display-only label: 法務 sign-off 後に文言は最終化 */}
-            <small className="block text-muted-foreground mt-1">
-              本機能は機能説明用です。実取引は全自動で実行されます。
-            </small>
+          </div>
+        </div>
+
+        {/* P5 display-only banner: 法務 sign-off 後に文言は最終化 */}
+        <div
+          role="note"
+          aria-label="display-only banner"
+          data-testid="display-only-banner"
+          className="rounded-xl border-2 border-amber-600 bg-amber-950/30 px-4 py-3"
+        >
+          <div className="flex items-start gap-3">
+            <span className="text-xl" aria-hidden="true">
+              ⚠️
+            </span>
+            <div className="flex-1 space-y-2">
+              <p className="text-sm font-bold text-amber-300">
+                本機能は機能説明用です (display-only)
+              </p>
+              <p className="text-xs text-amber-200/90 leading-relaxed">
+                実取引は AI スケジューラが全自動で実行します。
+                下の「承認 / 却下」ボタンは押せません。
+                <button
+                  type="button"
+                  onClick={() => setShowAutoInfo((v) => !v)}
+                  className="ml-1 underline text-amber-300 hover:text-amber-200"
+                  data-testid="display-only-banner-toggle"
+                >
+                  {showAutoInfo ? "詳細を閉じる" : "全自動の仕組みを見る"}
+                </button>
+              </p>
+              {showAutoInfo && (
+                <div className="text-xs text-amber-100/90 leading-relaxed bg-amber-950/40 border border-amber-800 rounded p-2 space-y-1">
+                  <p>
+                    ・スケジューラ (ai_judgment_scheduler) が定期的に AI 判定を実行
+                  </p>
+                  <p>
+                    ・判定結果は executor が直接 on-chain で執行（あなたの署名不要）
+                  </p>
+                  <p>
+                    ・本画面は「何が起きたか」を確認するための表示専用 UI です
+                  </p>
+                  <p>・本機能は機能説明用です。</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

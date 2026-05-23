@@ -1,6 +1,7 @@
 'use client'
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 
+import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -20,6 +21,8 @@ export interface Proposal {
   estimatedGas: number
   slippage: number | null
   createdAt: string
+  /** AI 判定根拠 (rag_context_json)。API から渡る場合のみ表示。 */
+  ragContext?: Record<string, unknown> | null
 }
 
 export interface ProposalCardProps {
@@ -78,8 +81,23 @@ export function ProposalCard({
   const slippageWarning =
     proposal.slippage !== null && proposal.slippage > 0.5
 
-  const isProcessing = status === 'approving' || status === 'confirming'
+  // 旧実装で使っていた isProcessing は P5 display-only 化により不要
   const isDone = status === 'success' || status === 'failed'
+
+  // AI 判定根拠 (rag_context_json) を expandable で表示
+  const [showRag, setShowRag] = useState(false)
+  const hasRag =
+    proposal.ragContext !== null &&
+    proposal.ragContext !== undefined &&
+    Object.keys(proposal.ragContext).length > 0
+
+  // P5 display-only: 承認/却下 ボタンは完全に非活性。
+  // onApprove / onReject は親 (page.tsx) から渡されるが、本コンポーネントの
+  // ボタンが常に disabled なので発火することはない。
+  // 後で manual UI を「click だけログを取る」モードに戻す可能性があるため
+  // props のシグネチャは残す。lint の no-unused-vars を回避するため void で消費。
+  void onApprove
+  void onReject
 
   return (
     <Card className="w-full dark:bg-gray-900 border-border">
@@ -119,6 +137,38 @@ export function ProposalCard({
           {proposal.reason}
         </p>
 
+        {/* AI 判定根拠 (rag_context_json) — 読み取り専用 expandable */}
+        {hasRag && (
+          <div className="rounded-lg border border-zinc-700 bg-zinc-900/40">
+            <button
+              type="button"
+              onClick={() => setShowRag((v) => !v)}
+              aria-expanded={showRag}
+              data-testid="proposal-rag-toggle"
+              className="w-full flex items-center justify-between px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800/40 rounded-lg"
+            >
+              <span>
+                {showRag ? '▼' : '▶'} AI 判定根拠 (rag_context)
+              </span>
+              <span className="text-[10px] text-zinc-500">読み取り専用</span>
+            </button>
+            {showRag && (
+              <pre
+                data-testid="proposal-rag-content"
+                className="text-[11px] text-zinc-400 px-3 pb-3 overflow-x-auto whitespace-pre-wrap break-words leading-relaxed"
+              >
+                {(() => {
+                  try {
+                    return JSON.stringify(proposal.ragContext, null, 2)
+                  } catch {
+                    return '[rag_context_json parse error]'
+                  }
+                })()}
+              </pre>
+            )}
+          </div>
+        )}
+
         {/* Metrics row */}
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="bg-muted/40 rounded-lg px-3 py-2">
@@ -148,29 +198,35 @@ export function ProposalCard({
         {/* Transaction status */}
         <TransactionStatus status={status} txHash={txHash} />
 
-        {/* Action buttons (P5 display-only: 実取引 API は呼ばず user_actions に記録のみ) */}
+        {/* Action buttons (P5 display-only: ボタンは完全に非活性。実取引は AI が自動執行) */}
         {!isDone && (
           <div className="flex flex-col gap-1.5 pt-1">
             <div className="flex gap-2">
               <Button
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => onApprove(proposal.id)}
-                disabled={isProcessing}
+                className="flex-1 bg-green-600 text-white opacity-50 cursor-not-allowed"
+                disabled
+                aria-disabled="true"
+                title="実行は自動です"
+                data-testid="proposal-approve-button"
+                tabIndex={-1}
               >
-                {isProcessing ? '処理中...' : '承認'}
+                承認（自動執行）
               </Button>
               <Button
                 variant="outline"
-                className="flex-1"
-                onClick={() => onReject(proposal.id)}
-                disabled={isProcessing}
+                className="flex-1 opacity-50 cursor-not-allowed"
+                disabled
+                aria-disabled="true"
+                title="実行は自動です"
+                data-testid="proposal-reject-button"
+                tabIndex={-1}
               >
-                却下
+                却下（自動執行）
               </Button>
             </div>
             {/* P5 display-only label: 法務 sign-off 後に文言は最終化 */}
-            <small className="text-xs text-muted-foreground">
-              本機能は機能説明用です。実取引は全自動で実行されます。
+            <small className="text-xs text-amber-500">
+              ⚠️ 本機能は機能説明用です。実取引は AI が全自動で実行します。
             </small>
           </div>
         )}
