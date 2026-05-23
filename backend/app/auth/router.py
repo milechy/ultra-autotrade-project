@@ -13,9 +13,9 @@ GET  /auth/me       - Retrieve current user information
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -702,6 +702,62 @@ def wallet_link(
 # ── Privy セッション callback (P1 embedded wallet MVP) ─────────────────────────
 
 
+def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
+    """Authorization ヘッダから Bearer token を取り出す.
+
+    - ``None`` / 空文字 / ``Bearer`` prefix 無しの場合は ``None`` を返す.
+    - prefix 大文字小文字は区別しない (RFC 7235).
+    """
+    if not authorization:
+        return None
+    parts = authorization.strip().split(maxsplit=1)
+    if len(parts) != 2:
+        return None
+    scheme, token = parts
+    if scheme.lower() != "bearer":
+        return None
+    token = token.strip()
+    return token or None
+
+
+def _verify_privy_jwt(token: str) -> dict[str, Any]:
+    """Privy ID Token を検証して payload (dict) を返す.
+
+    - 内部的に ``PrivyVerifier`` を経由して ``iss=privy.io`` / ``aud=PRIVY_APP_ID``
+      を確認する。署名検証は ES256 + JWKS (or `PRIVY_VERIFICATION_KEY`).
+    - 検証失敗時は ``HTTPException(401)`` を raise する。
+    - ``PRIVY_APP_ID`` 未設定 (verifier=None) の場合は 503 として「未設定なのに
+      検証要求された」状態を明示する (silent OK にしない).
+
+    Returns:
+        decoded JWT payload。少なくとも ``sub`` (= Privy DID) を含む。
+    """
+    verifier = get_privy_verifier()
+    if verifier is None:
+        # PRIVY_APP_ID 未設定。/auth/privy/session で Bearer 検証を要求されている
+        # 環境にも関わらず verifier が組み立てられないのは構成ミスなので 503 を返す。
+        logger.error(
+            "_verify_privy_jwt called but PRIVY_APP_ID is not configured — "
+            "cannot verify token. Set PRIVY_APP_ID + (PRIVY_VERIFICATION_KEY or PRIVY_JWKS_URL).",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Privy verification not configured on server",
+        )
+
+    # verify_id_token は sub を返すが、payload 全体を欲しいので低レイヤを呼び直す。
+    # PrivyVerifier 内部の jwt.decode と同じ手順を踏むため、ここでは検証成功した
+    # sub を再利用して payload を再構成する: verifier.verify_id_token() は
+    # 失敗時に HTTPException(401) を投げてくれるので、その挙動に乗る。
+    sub = verifier.verify_id_token(token)
+    # Privy JWT は iss/aud/sub のみで十分。caller は dict を扱えればよい。
+    return {
+        "sub": sub,
+        "iss": "privy.io",
+        "aud": verifier.app_id,
+    }
+
+
 class PrivySessionRequest(BaseModel):
     """Privy login 完了後にフロントから送信される session 同期 payload.
 
@@ -736,9 +792,18 @@ class PrivySessionResponse(BaseModel):
 def privy_session(
     request: PrivySessionRequest,
     db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(default=None),
 ) -> PrivySessionResponse:
     """
     Privy login 完了後にフロントが叩く同期エンドポイント.
+
+    認証:
+    - ``Authorization: Bearer <privy_id_token>`` ヘッダが付与されている場合は
+      ``_verify_privy_jwt`` で検証し、``request.privy_did`` が token の ``sub`` と
+      一致しているかをチェックする。一致しなければ 401.
+    - ヘッダ未付与 & ``PRIVY_APP_ID`` 未設定: 後方互換モードとして検証を skip し、
+      privy_did/wallet_address を信頼する (MVP 互換).
+    - ヘッダ未付与 & ``PRIVY_APP_ID`` 設定済: 401 を返して Bearer token を要求する.
 
     シナリオ:
     1. ``privy_did`` で既存ユーザーを lookup. 見つかれば wallet_address を同期して JWT 発行.
@@ -748,12 +813,39 @@ def privy_session(
        (role=viewer / risk_mode=conservative / privy_did 紐付け).
 
     NOTE:
-    - 本エンドポイントは ``/auth/wallet/connect`` (署名検証あり) と異なり、
-      Privy 側で完結した認証セッションをそのまま信頼する。
-      本番運用時は ``PRIVY_APP_ID`` + 公開鍵を設定し、別途 ID Token 検証を追加すること
-      (現状は MVP として DID/wallet_address を一意キーとして利用).
     - ``backend/app/main.py`` (Tier-S) には触らず、本ルーター上で完結する.
     """
+    # ── Privy ID Token 検証 (Bearer header があれば必ず検証) ──
+    token = _extract_bearer_token(authorization)
+    verifier = get_privy_verifier()
+    if token is not None:
+        # ヘッダがあれば、verifier の有無に関わらず検証を試みる。
+        # verifier 未設定なら _verify_privy_jwt が 503 を返す。
+        payload = _verify_privy_jwt(token)
+        token_sub = payload.get("sub")
+        if not isinstance(token_sub, str) or token_sub != request.privy_did:
+            logger.warning(
+                "Privy session: token.sub != request.privy_did (sub=%s..., did=%s...)",
+                (token_sub or "")[:20],
+                request.privy_did[:20],
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Privy DID does not match ID token sub",
+            )
+    elif verifier is not None:
+        # 本番運用 (PRIVY_APP_ID 設定済) で Bearer token 無しは拒否。
+        logger.warning(
+            "Privy session: Bearer token missing while PRIVY_APP_ID is configured (did=%s...)",
+            request.privy_did[:20],
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Privy ID token required (Authorization: Bearer <token>)",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    # else: PRIVY_APP_ID 未設定 & Bearer 無し → 後方互換 (検証 skip).
+
     wallet_lower = request.wallet_address.lower()
 
     # 1. privy_did でユーザー lookup

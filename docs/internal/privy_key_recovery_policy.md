@@ -19,10 +19,25 @@ Ultra AutoTrade は Privy embedded wallet を採用し、user に EVM 秘密鍵�
 | login method | identity provider | recovery factor (Privy 側) | recovery factor (UAT 側) |
 |--------------|-------------------|----------------------------|--------------------------|
 | LINE         | LINE Login OAuth  | LINE sub (line_user_id) を Privy が保持 | `users.privy_did`, `users.line_sub` を DB 保管 |
-| Email (OTP)  | Privy Email OTP   | Email アドレス             | `users.privy_did`, `users.email` を DB 保管 |
+| Email (OTP)  | Privy Email OTP / magic link | Email アドレス  | `users.privy_did`, `users.email` を DB 保管 |
+| Passkey      | WebAuthn (FIDO2)  | platform authenticator     | (UAT 側では privy_did 経由でのみ参照) |
 
-Privy 内部では MPC 方式で秘密鍵を分散保管しており、`privy_did` が同一であれば
-LINE / Email どちらの login でも同じ embedded wallet address に到達できる。
+Privy 内部では MPC 方式 (Shamir's Secret Sharing + TEE) で秘密鍵を分散保管しており、
+`privy_did` が同一であれば LINE / Email / Passkey のいずれの login でも
+同じ embedded wallet address に到達できる。
+
+### 2.1 Privy が提供する recovery 機構の実情報
+
+- **Email magic link** — Privy Email login の主たる recovery 経路。再ログイン時に
+  `<random>@privy.io` から magic link を送付し、デバイス独立で鍵 share を再構築する。
+- **Passkey** — 2024 年以降の Privy default 推奨。WebAuthn を活用し、
+  platform authenticator (Touch ID / Face ID / Windows Hello) に share を保管。
+  Email/LINE recovery の補強として「あれば使う」位置付け (Privy console で ON/OFF 可).
+- **iCloud Keychain / Google Password Manager** — passkey の同期 (Apple/Google エコシステム内).
+  UAT が直接制御するものではなく、user 環境依存。
+- **Recovery password** (deprecated 系) — 旧 SDK 互換のオプション。本 MVP では使わない。
+- **Embedded wallet export** — user が Privy UI から秘密鍵 / mnemonic を export 可能。
+  ただし export 実行後の秘密鍵管理は user 自身に帰属し、UAT は責任を負わない (FAQ Q4 参照).
 
 ## 3. リカバリ シナリオ別ポリシー
 
@@ -96,6 +111,23 @@ export 後も UAT 側の自動運用は継続可能ですが、Privy 側 wallet 
 A. UAT 退会フロー (将来 P5) からリクエストすると、DB 上の wallet_address を null に
 戻し、Privy 側でも unlink します。`privy_did` は監査保存のため一定期間残ります。
 
+### Q6. Passkey (Touch ID / Face ID) を登録するとどう変わりますか?
+
+A. Privy console から passkey を有効化すると、再ログイン時に LINE / Email magic link を
+受け取らずとも、端末の生体認証だけで wallet に access できるようになります。
+ただし passkey は端末ローカル (もしくは Apple/Google アカウント経由の同期) に
+紐付くため、**LINE / Email も併用する** ことで端末喪失時の復旧経路を確保してください。
+
+### Q7. 鍵がロックされて何もできなくなりました。サポートに復旧してもらえますか?
+
+A. UAT 側では Privy の MPC share を再生成できないため、Privy 自身の recovery
+(magic link / passkey / passwordless 等) を試した上でも wallet にアクセスできない場合は、
+UAT support に KYC + 法的本人確認 (運転免許 / マイナンバーカード等) を提出いただき、
+**新しい wallet に資産を移し替えるリカバリ手続き** (手動・有償・SLA 数営業日) を実施します。
+詳細は P5 で公開する support SOP を参照してください。
+
 ---
 
-(本ドキュメントは P3 完了時点で更新予定。delegated signing と recovery の境界が確定する.)
+(本ドキュメントは P3 完了時点で更新予定。delegated signing と recovery の境界が確定する.
+
+関連: [[privy-delegated-signing-poc-design]] / [[paste-verbatim-not-summary]])
