@@ -441,3 +441,83 @@ POST /api/optimizer/analyze (balanced, flag=on) → 200, allocation=[AAVE≥60%,
 | `docs/13_security_design.md` | Health Factor 制約、セキュリティルール |
 | `docs/07_aave_operation_logic.md` | Aave 運用ロジック、HF 閾値 |
 | `docs/14_test_strategy.md` | テスト戦略、E2E 実行方法 |
+
+---
+
+## 9. 学習データ層（Hermes 受け入れ前提）
+
+**Asana**: P0-6
+**migration**: `backend/alembic/versions/h8i9j0k1l2m3_add_user_actions_and_ai_decision_features.py`
+**export 雛形**: `scripts/export_learning_data.py`
+
+### 9.1 目的
+
+将来 Hermes（社内学習モデル）に対し、AI 判定の **prompt 入力（特徴量）** と
+**ユーザの実際の行動（supervised signal）** を時系列で食わせるための蓄積基盤を準備する。
+既存資産（`portfolio_snapshots`, `ai_decisions.rag_context_json`）は維持し、再発明しない。
+
+### 9.2 表構成
+
+```
+            +-------------------------+      +-----------------------+
+            | portfolio_snapshots     |      | users                 |
+            | (既存・変更なし)        |      | (既存・変更なし)      |
+            | backend/app/portfolio/  |      | id, ...               |
+            |   models.py:18          |      +-----------+-----------+
+            +-----------+-------------+                  |
+                        ^                                |
+                        | N:1                            | 1:N
+                        |                                v
+            +-----------+-------------+      +-----------------------+
+            | ai_decisions            |      | user_actions          |
+            | (既存・変更なし)        |      | (新規)                |
+            | id, user_id, query,     |      | id, user_id,          |
+            |   action, confidence,   |      |   action_type,        |
+            |   rag_context_json, ... |      |   target_type/_id,    |
+            +-----------+-------------+      |   clicked_at,         |
+                        ^                    |   session_id,         |
+                        | 1:1 (unique)       |   context_json        |
+                        v                    +-----------------------+
+            +-------------------------+
+            | ai_decision_features    |
+            | (新規)                  |
+            | id, ai_decision_id,     |
+            |   portfolio_snapshot_id,|
+            |   market_apy_*,         |
+            |   health_factor,        |
+            |   gas_gwei, price_usd,  |
+            |   prompt_features_json  |
+            +-------------------------+
+```
+
+| 表 | 状態 | 役割 |
+|----|------|------|
+| `portfolio_snapshots` | 既存 | 30 分 / イベント駆動のポートフォリオ snapshot |
+| `ai_decisions` | 既存 | AI 判定の結果。`rag_context_json` は維持 |
+| `ai_decision_features` | **新規** | `ai_decisions` と 1:1。判定時点の特徴量を分離保存（prompt 入力の再現性） |
+| `user_actions` | **新規** | manual UI / onboarding の click ログ。supervised signal の供給源 |
+
+### 9.3 関係
+
+- `ai_decisions` ←(1:1, UNIQUE)— `ai_decision_features`
+- `ai_decisions` ←(N:1)— `portfolio_snapshots`（`ai_decision_features.portfolio_snapshot_id`）
+- `user_actions` は `(user_id, clicked_at)` のインデックスで時系列引きできる。
+  学習データ抽出時は `session_id` 一致もしくは `|clicked_at - ai_decision.created_at| < W`
+  の窓で `ai_decisions` と結合する。
+
+### 9.4 再発明しない設計判断
+
+| 課題 | 採用案 | 理由 |
+|------|--------|------|
+| 特徴量の保存先 | **`ai_decision_features` (新規) に分離** | `ai_decisions.rag_context_json` は監査・人間読解用に維持しつつ、高頻度な学習クエリは正規化された別表で引く |
+| ポートフォリオ snapshot | **既存 `portfolio_snapshots` を FK 参照** | 新規 snapshot 表を作らない。既存 30 分 / イベント駆動の蓄積を再利用 |
+| ユーザ行動の保存先 | **`user_actions` (新規) を単独表で導入** | `ai_decisions` への混入を避け、judgement なしの click（onramp 完了など）も同じ表で受ける |
+| JSON カラム | **`JSONB`** | 既存 `d4e5f6a7b8c9_fee_v10_tables.py` と同じ `postgresql.JSONB()` を踏襲 |
+
+### 9.5 後続タスク
+
+- P5 (manual UI): `user_actions` への INSERT 経路を実装（POST endpoint）。
+- Hermes ローダ: `scripts/export_learning_data.py` の TODO（SQLAlchemy 抽出ロジック）を埋め、
+  JSONL を学習パイプラインに食わせる。
+- 個人情報の取り扱い: `context_json` / `prompt_features_json` に PII が混入しないよう、
+  POST 側でホワイトリストフィルタを実装すること（本 PR の scope 外）。
