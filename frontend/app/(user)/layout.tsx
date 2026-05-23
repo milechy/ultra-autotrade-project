@@ -6,6 +6,7 @@ import { UserProviders } from '@/components/user/UserProviders'
 import { UserHeader } from '@/components/user/UserHeader'
 import { BottomNav } from '@/components/shared/BottomNav'
 import { EmergencyStopFloat } from '@/components/shared/EmergencyStopFloat'
+import { DepositGate } from '@/components/onboarding/DepositGate'
 
 export default async function UserAppLayout({
   children,
@@ -19,7 +20,7 @@ export default async function UserAppLayout({
       <UserProviders>
         <UserHeader />
         <div className="min-h-screen pb-16">
-          {children}
+          <DepositGate>{children}</DepositGate>
         </div>
         <BottomNav />
         <EmergencyStopFloat />
