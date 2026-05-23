@@ -34,7 +34,11 @@ export function PrivyRootClient({ children }: { children: ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
-        loginMethods: ['email', 'wallet'],
+        // P1 (privy-embedded-wallet-mvp):
+        // - LINE / Email を一次 login method として明示
+        //   (既存の 'wallet' は外部 wallet 連携用に維持)
+        // - 全 user に embedded wallet を自動作成 (createOnLogin: 'all-users')
+        loginMethods: ['line', 'email', 'wallet'],
         appearance: {
           theme: 'dark',
           accentColor: '#6366f1',
@@ -42,7 +46,7 @@ export function PrivyRootClient({ children }: { children: ReactNode }) {
         supportedChains: [base, baseSepolia],
         defaultChain,
         embeddedWallets: {
-          ethereum: { createOnLogin: 'users-without-wallets' },
+          ethereum: { createOnLogin: 'all-users' },
         },
       }}
     >

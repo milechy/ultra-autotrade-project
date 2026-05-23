@@ -699,6 +699,157 @@ def wallet_link(
     )
 
 
+# ── Privy セッション callback (P1 embedded wallet MVP) ─────────────────────────
+
+
+class PrivySessionRequest(BaseModel):
+    """Privy login 完了後にフロントから送信される session 同期 payload.
+
+    フィールド:
+    - privy_did: Privy 固有の DID (例: ``did:privy:xxxxx``). 一意。
+    - wallet_address: Privy embedded wallet の EVM address (0x-prefixed).
+    - email: Privy 経由で取得した email (任意).
+    - line_sub: Privy linkedAccount 経由で取得した LINE sub (任意).
+    """
+
+    privy_did: str
+    wallet_address: str
+    email: str | None = None
+    line_sub: str | None = None
+
+
+class PrivySessionResponse(BaseModel):
+    """Privy session callback の応答 (短命 JWT を返す)."""
+
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user_id: int
+    is_new_user: bool
+
+
+@router.post(
+    "/privy/session",
+    response_model=PrivySessionResponse,
+    summary="Privy session callback (privy_did ↔ wallet_address 同期)",
+)
+def privy_session(
+    request: PrivySessionRequest,
+    db: Session = Depends(get_db),
+) -> PrivySessionResponse:
+    """
+    Privy login 完了後にフロントが叩く同期エンドポイント.
+
+    シナリオ:
+    1. ``privy_did`` で既存ユーザーを lookup. 見つかれば wallet_address を同期して JWT 発行.
+    2. ``privy_did`` で見つからなければ ``wallet_address`` で lookup.
+       既存ユーザーがいれば ``privy_did`` を後追い保存 (``update_privy_did``).
+    3. どちらでも見つからなければ ``create_wallet_user`` で新規作成
+       (role=viewer / risk_mode=conservative / privy_did 紐付け).
+
+    NOTE:
+    - 本エンドポイントは ``/auth/wallet/connect`` (署名検証あり) と異なり、
+      Privy 側で完結した認証セッションをそのまま信頼する。
+      本番運用時は ``PRIVY_APP_ID`` + 公開鍵を設定し、別途 ID Token 検証を追加すること
+      (現状は MVP として DID/wallet_address を一意キーとして利用).
+    - ``backend/app/main.py`` (Tier-S) には触らず、本ルーター上で完結する.
+    """
+    wallet_lower = request.wallet_address.lower()
+
+    # 1. privy_did でユーザー lookup
+    user: User | None = db.query(User).filter(User.privy_did == request.privy_did).first()
+    is_new_user = False
+
+    if user is not None:
+        # 既存ユーザー → wallet_address が未設定 / 変わっていれば更新
+        if user.wallet_address != wallet_lower:
+            logger.info(
+                "Privy session: updating wallet_address for user_id=%d (did=%s...)",
+                user.id,
+                request.privy_did[:20],
+            )
+            try:
+                user.wallet_address = wallet_lower
+                db.commit()
+                db.refresh(user)
+            except IntegrityError as exc:
+                db.rollback()
+                constraint = AuthService._extract_constraint_name(exc)
+                logger.warning(
+                    "Privy session wallet_address conflict (constraint=%s): "
+                    "did=%s..., wallet=%s...",
+                    constraint or "<unknown>",
+                    request.privy_did[:20],
+                    wallet_lower[:10],
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="wallet already linked to another account",
+                ) from exc
+    else:
+        # 2. wallet_address で lookup → 既存なら privy_did を後追い
+        existing_by_wallet = AuthService.get_user_by_wallet(db, wallet_lower)
+        if existing_by_wallet is not None:
+            user = existing_by_wallet
+            if not user.privy_did:
+                try:
+                    AuthService.update_privy_did(db, user, request.privy_did)
+                except IntegrityError as exc:
+                    db.rollback()
+                    constraint = AuthService._extract_constraint_name(exc)
+                    if constraint and "privy_did" in constraint:
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail="Privy DID already linked to another user",
+                        ) from exc
+                    logger.exception(
+                        "privy_did backfill failed (constraint=%s)",
+                        constraint or "<unknown>",
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="DID backfill failed",
+                    ) from exc
+            elif user.privy_did != request.privy_did:
+                logger.warning(
+                    "Privy session DID mismatch: existing did=%s..., request did=%s...",
+                    user.privy_did[:20],
+                    request.privy_did[:20],
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="wallet already linked to a different Privy DID",
+                )
+        else:
+            # 3. 新規ユーザー作成
+            user, is_new_user = AuthService.create_wallet_user(
+                db, wallet_lower, privy_did=request.privy_did
+            )
+
+    # JWT 発行
+    token, expires_in = AuthService.create_access_token(
+        user_id=user.id,
+        email=user.email,
+        role=user.role,
+    )
+
+    logger.info(
+        "Privy session synced: user_id=%d did=%s... wallet=%s... new=%s",
+        user.id,
+        request.privy_did[:20],
+        wallet_lower[:10],
+        is_new_user,
+    )
+
+    return PrivySessionResponse(
+        access_token=token,
+        token_type="bearer",  # noqa: S106
+        expires_in=expires_in,
+        user_id=user.id,
+        is_new_user=is_new_user,
+    )
+
+
 # ── LINE LIFF認証 ────────────────────────────────────────────────────────────
 
 
