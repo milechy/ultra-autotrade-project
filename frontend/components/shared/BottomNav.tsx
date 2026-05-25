@@ -26,8 +26,11 @@ const partnerNavItems = [
   { href: '/partner/settings', label: '設定', icon: Settings },
 ]
 
+// viewer (tester) も自分宛て proposal を承認する必要があるため、/user/approve への
+// 導線を提示する。RBAC は backend 側 (/api/proposals/pending は本人 user_id でフィルタ)。
 const viewerNavItems = [
   { href: '/user/dashboard', label: 'ホーム', icon: Home },
+  { href: '/user/approve', label: '承認', icon: CheckCircle },
   { href: '/user/ai-feed', label: 'AI判定', icon: Brain },
   { href: '/user/help', label: 'ヘルプ', icon: HelpCircle },
 ]

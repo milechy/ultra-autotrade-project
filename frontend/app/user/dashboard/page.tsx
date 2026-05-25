@@ -13,6 +13,7 @@ import {
   LatestDecision,
   SafetyScore,
   AiAccuracyCard,
+  PendingApprovalsCard,
 } from './_components'
 import { useAuthFetch } from '@/hooks/useAuthFetch'
 
@@ -217,6 +218,11 @@ function RecentOpsCard() {
 function ManagedDashboard() {
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
+      {/* 承認待ち — UAT ブロッカー回避: viewer の承認導線を dashboard に必ず提示 */}
+      <section>
+        <PendingApprovalsCard />
+      </section>
+
       {/* 資金割り振り — メインコンテンツ */}
       <section>
         <AllocationCard />
@@ -240,6 +246,11 @@ function ActiveDashboard() {
       <div className="flex items-center gap-2">
         <RiskModeBadge />
       </div>
+
+      {/* 承認待ち — Risk mode と PortfolioSummary の間に置き、UAT 中の見落とし防止 */}
+      <section>
+        <PendingApprovalsCard />
+      </section>
 
       <section>
         <PortfolioSummary />

@@ -85,7 +85,12 @@
     "allocationPnl": "PnL",
     "noAllocation": "No funds allocated yet",
     "allocationActive": "Active",
-    "allocationWithdrawn": "Withdrawn"
+    "allocationWithdrawn": "Withdrawn",
+    "pendingApprovals": "Pending approvals",
+    "noPendingApprovals": "No pending approvals",
+    "pendingApprovalsCount": "{count} transaction(s) waiting for your approval",
+    "pendingApprovalsNext": "Next: {operation} {asset} (~${amount})",
+    "pendingApprovalsAria": "{count} pending approvals — tap to open approve page"
   },
   "Decisions": {
     "title": "AI Decision History",

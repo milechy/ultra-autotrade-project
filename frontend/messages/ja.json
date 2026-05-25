@@ -85,7 +85,12 @@
     "allocationPnl": "損益",
     "noAllocation": "まだ資金が割り振られていません",
     "allocationActive": "運用中",
-    "allocationWithdrawn": "引き出し済み"
+    "allocationWithdrawn": "引き出し済み",
+    "pendingApprovals": "承認待ちの取引",
+    "noPendingApprovals": "承認待ちの取引はありません",
+    "pendingApprovalsCount": "{count}件の取引があなたの承認を待っています",
+    "pendingApprovalsNext": "直近: {operation} {asset} (約 ${amount})",
+    "pendingApprovalsAria": "承認待ち {count} 件 — タップして承認画面へ"
   },
   "Decisions": {
     "title": "AI判定履歴",
