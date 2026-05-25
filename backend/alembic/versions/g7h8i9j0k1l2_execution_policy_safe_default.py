@@ -67,9 +67,12 @@ def upgrade() -> None:
         existing_nullable=False,
     )
     # Backfill: 全 auto_execute 行を安全側 (require_approval) に倒す (role 限定なし)
+    # NOTE: ステートメント末尾の `;` は文字列内に書かない (alembic が `--sql` 出力で
+    # 自動的に `;` を付けるため、文字列に含めると `;;` の重複が出る — 動作影響なしだが
+    # 見栄え悪)。
     op.execute(
         "UPDATE users SET execution_policy='require_approval' "
-        "WHERE execution_policy='auto_execute';"
+        "WHERE execution_policy='auto_execute'"
     )
 
 

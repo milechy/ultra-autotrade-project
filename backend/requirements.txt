@@ -15,6 +15,7 @@ python-dotenv>=1.0.0
 
 # Authentication & Database (Phase 12)
 sqlalchemy>=2.0.0
+alembic>=1.13.0    # SQLAlchemy 2.0 互換。本番 deploy 時の `alembic upgrade head` および dev での migration 操作に必要
 bcrypt>=4.1.0
 PyJWT[crypto]>=2.9.0    # [crypto] extra で cryptography (RS256/ES256 等) を有効化 — Privy ID Token 検証に必要
 pydantic[email]>=2.0.0
