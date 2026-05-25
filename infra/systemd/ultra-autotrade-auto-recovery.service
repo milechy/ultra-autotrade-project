@@ -1,0 +1,28 @@
+[Unit]
+Description=Ultra AutoTrade Auto-Recovery Check (one-shot per timer firing)
+Documentation=https://github.com/milechy/ultra-autotrade-project/blob/main/docs/auto_recovery_scope.md
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Run as ultra user (same as docker compose). adjust if production differs.
+User=ultra
+Group=ultra
+WorkingDirectory=/opt/ultra-autotrade
+# DRY_RUN=false の本番反映は人間が後から ON-Calendar 起動を確認した後で
+# /etc/default/ultra-autotrade-auto-recovery で上書きすること。本 unit
+# テンプレ自体は DRY_RUN=true を default に保ち、観察期間を取れる設計。
+Environment=DRY_RUN=true
+EnvironmentFile=-/etc/default/ultra-autotrade-auto-recovery
+ExecStart=/usr/bin/env bash /opt/ultra-autotrade/scripts/auto_recovery.sh --check-all
+StandardOutput=append:/var/log/ultra/auto_recovery.log
+StandardError=append:/var/log/ultra/auto_recovery.log
+# auto_recovery.sh 自体が cool-down を実装しているため systemd 側 retry は最小に
+Restart=no
+TimeoutStartSec=120
+# nginx/backend/cloudflared restart 用に docker socket への書き込み権限が必要。
+# ultra ユーザを docker group に所属させること (本番反映時に systemctl で有効化前)。
+
+[Install]
+WantedBy=multi-user.target

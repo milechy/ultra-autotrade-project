@@ -1,0 +1,14 @@
+[Unit]
+Description=Ultra AutoTrade Auto-Recovery Check Timer
+Documentation=https://github.com/milechy/ultra-autotrade-project/blob/main/docs/auto_recovery_scope.md
+After=docker.service
+
+[Timer]
+# Check every 5 minutes — matches existing staging-watchdog cadence
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
