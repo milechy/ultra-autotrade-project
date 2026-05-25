@@ -34,7 +34,6 @@ import logging
 import os
 import sys
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 # backend/ をパスに追加 (seed_test_data.py と同じパターン)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -44,6 +43,14 @@ from sqlalchemy.orm import Session  # noqa: E402
 
 from app.auth.models import RISK_MODE_SUBSCRIPTION_RATES, RiskMode  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
+from app.fees.constants import (  # noqa: E402
+    AFFILIATE_RATE,
+    EXPENSE_MARKUP_ENABLED_DEFAULT,
+    EXPENSE_MARKUP_RATE_DEFAULT,
+    TIER_FEE_RATES,
+    TIER_MONTHLY_YIELD_CAPS,
+    TIER_THRESHOLDS_JPY,
+)
 from app.fees.models import FeeConfigV10  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -70,16 +77,17 @@ def build_v10_default_config() -> dict[str, object]:
     """
     return {
         "config_name": V10_DEFAULT_CONFIG_NAME,
-        "tier_thresholds_jpy": [1_000_000, 10_000_000],
-        "tier_fee_rates": [0.30, 0.25, 0.20],
-        "tier_monthly_yield_caps": [0.018, 0.023, 0.030],
+        # SSOT: app.fees.constants — 値変更時は constants と docs を同期更新する
+        "tier_thresholds_jpy": list(TIER_THRESHOLDS_JPY),
+        "tier_fee_rates": list(TIER_FEE_RATES),
+        "tier_monthly_yield_caps": list(TIER_MONTHLY_YIELD_CAPS),
         "subscription_rates": {
             mode.value: float(RISK_MODE_SUBSCRIPTION_RATES[mode]) for mode in RiskMode
         },
         # → {"conservative": 0.0, "balanced": 0.003, "aggressive": 0.01}
-        "expense_markup_enabled": False,
-        "expense_markup_rate": Decimal("0"),
-        "affiliate_rate": Decimal("0.30"),
+        "expense_markup_enabled": EXPENSE_MARKUP_ENABLED_DEFAULT,
+        "expense_markup_rate": EXPENSE_MARKUP_RATE_DEFAULT,
+        "affiliate_rate": AFFILIATE_RATE,
         "is_active": True,
         "effective_from": V10_DEFAULT_EFFECTIVE_FROM,
     }

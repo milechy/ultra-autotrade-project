@@ -18,3 +18,21 @@
 - API レスポンス: UserResponse に `risk_mode_label` (computed_field) 追加、フロントは英語値→日本語化辞書を持たない
 - 関連 endpoint: `GET /auth/risk-modes` (新規、全モード一覧 + Phase + 許可状態)
 - NULL 4 ユーザーの 'conservative' 物理 UPDATE: `docs/47_users_risk_mode_migration_plan.md` (F-16 で実行)
+
+## Tier × 料率 / Yield Cap マトリクス (P0-18、launch 値)
+
+> **SSOT: `backend/app/fees/constants.py`**。値変更時は本ドキュメントと
+> `scripts/seed_fee_config_v10.py` の 3 箇所を同時更新する (前者を import するだけ
+> で後者は自動同期、本ドキュメントは手動)。整合性は `tests/fees/test_constants.py` が機械検査。
+
+| Tier | JPY 境界 | 月次料率 | 月次 yield cap |
+|---|---|---|---|
+| **LOWER** | 〜 1,000,000 | 30% | 1.8% |
+| **MIDDLE** | 1,000,001 〜 10,000,000 | 25% | 2.3% |
+| **UPPER** | 10,000,001 〜 | 20% | 3.0% |
+
+- アフィリエイト還元率: **30%** (`AFFILIATE_RATE`)
+- 経費マークアップ: 既定 **OFF** (`EXPENSE_MARKUP_ENABLED_DEFAULT=False`)
+- Invariant: `tier_fee_rates` は単調 **減少** (上位ほど低料率)、`tier_monthly_yield_caps` は単調 **増加** (上位ほど高 cap)
+
+Launch 反映手順: `docs/48_fee_config_seed_runbook.md` の 3 段プロンプトに従い `seed_fee_config_v10.py` を実行 (F-16)。
