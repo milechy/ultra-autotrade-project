@@ -90,6 +90,11 @@ def get_notification_service() -> CompositeNotificationService:
             line_sender = LINENotificationSender(
                 channel_access_token=settings.line_channel_access_token,
                 user_id=settings.line_user_id,
+                min_severity=settings.line_min_severity,
+            )
+            logger.info(
+                "LINENotificationSender: 設定済み (min_severity=%s)。",
+                settings.line_min_severity.value,
             )
             senders.append(line_sender)
 

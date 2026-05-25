@@ -12,11 +12,12 @@ from unittest.mock import patch
 from app.notifications.config import (
     NotificationSettings,
     _parse_notification_channel,
+    _parse_severity,
     get_notification_settings,
     load_notification_settings,
     reset_notification_settings,
 )
-from app.notifications.schemas import NotificationChannel
+from app.notifications.schemas import NotificationChannel, NotificationSeverity
 
 
 class TestParseNotificationChannel:
@@ -142,6 +143,52 @@ class TestLoadNotificationSettings:
             assert settings.line_notify_token is None
             assert settings.slack_webhook_url is None
             assert settings.default_channel == NotificationChannel.INTERNAL_LOG
+
+
+class TestParseSeverity:
+    """_parse_severity 関数のテスト (LINE_MIN_SEVERITY 用)"""
+
+    def test_parse_warning(self):
+        assert (
+            _parse_severity("warning", NotificationSeverity.ALERT) == NotificationSeverity.WARNING
+        )
+
+    def test_parse_alert_uppercase(self):
+        assert _parse_severity("ALERT", NotificationSeverity.ALERT) == NotificationSeverity.ALERT
+
+    def test_parse_none_returns_default(self):
+        assert _parse_severity(None, NotificationSeverity.ALERT) == NotificationSeverity.ALERT
+
+    def test_parse_empty_returns_default(self):
+        assert _parse_severity("", NotificationSeverity.ALERT) == NotificationSeverity.ALERT
+
+    def test_parse_invalid_returns_default(self):
+        assert _parse_severity("bogus", NotificationSeverity.ALERT) == NotificationSeverity.ALERT
+
+
+class TestLoadNotificationSettingsLineMinSeverity:
+    """LINE_MIN_SEVERITY env var の解釈テスト"""
+
+    def test_load_line_min_severity_default_alert(self):
+        """LINE_MIN_SEVERITY 未設定 → ALERT (既定挙動を維持)。"""
+        env = {
+            k: v for k, v in os.environ.items() if k != "LINE_MIN_SEVERITY"
+        }
+        with patch.dict(os.environ, env, clear=True):
+            settings = load_notification_settings()
+            assert settings.line_min_severity == NotificationSeverity.ALERT
+
+    def test_load_line_min_severity_warning_opt_in(self):
+        """LINE_MIN_SEVERITY=warning → WARNING (AI proposal opt-in)。"""
+        with patch.dict(os.environ, {"LINE_MIN_SEVERITY": "warning"}):
+            settings = load_notification_settings()
+            assert settings.line_min_severity == NotificationSeverity.WARNING
+
+    def test_load_line_min_severity_invalid_falls_back(self):
+        """不正な LINE_MIN_SEVERITY → ALERT にフォールバック。"""
+        with patch.dict(os.environ, {"LINE_MIN_SEVERITY": "loud"}):
+            settings = load_notification_settings()
+            assert settings.line_min_severity == NotificationSeverity.ALERT
 
 
 class TestGetNotificationSettings:
