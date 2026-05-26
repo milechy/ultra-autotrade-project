@@ -387,11 +387,11 @@ class Web3AaveClient(AaveClientBase):
             raise AaveClientError("web3 package is required. Install with: pip install web3")
 
         # 後方互換: settings から rpc_url/pool_address を取得することもできる
+        # wallet_private_key は read-only ユースケース (Indicator Agent / shadow mode) のため任意化。
+        # 署名 tx (supply/withdraw) は呼出時に fail-fast する。v4 §14「backend wallet 持たない」設計と整合。
         if settings is not None:
             if not settings.rpc_url:
                 raise AaveClientError("AAVE_RPC_URL is required for Web3AaveClient")
-            if not settings.wallet_private_key:
-                raise AaveClientError("AAVE_WALLET_PRIVATE_KEY is required for Web3AaveClient")
             if not settings.pool_address:
                 raise AaveClientError("AAVE_POOL_ADDRESS is required for Web3AaveClient")
             if not settings.usdc_address:
@@ -446,23 +446,31 @@ class Web3AaveClient(AaveClientBase):
             self._w3_tx = self._w3
 
         # 後方互換: settings が渡された場合はウォレット情報を保持
+        # wallet_private_key が未設定なら self.account は設定せず、read-only クライアントとして動作。
+        # supply/withdraw は呼出時に getattr(self, "account", None) 経由で fail-fast する。
         if settings is not None:
-            try:
-                from eth_account import Account
+            self.w3 = self._w3
+            self.pool = self._pool
+            self.settings = settings
+            # トークンアドレスマップ（後方互換）
+            if settings.usdc_address:
+                self.token_addresses = {
+                    "USDC": Web3.to_checksum_address(settings.usdc_address),
+                }
+            if settings.wallet_private_key:
+                try:
+                    from eth_account import Account
 
-                self.account = Account.from_key(settings.wallet_private_key)
-                self.w3 = self._w3
-                self.pool = self._pool
-                self.settings = settings
-                # トークンアドレスマップ（後方互換）
-                if settings.usdc_address:
-                    self.token_addresses = {
-                        "USDC": Web3.to_checksum_address(settings.usdc_address),
-                    }
-            except ImportError as exc:
-                raise AaveClientError(
-                    "eth-account package is required. Install with: pip install eth-account"
-                ) from exc
+                    self.account = Account.from_key(settings.wallet_private_key)
+                except ImportError as exc:
+                    raise AaveClientError(
+                        "eth-account package is required. Install with: pip install eth-account"
+                    ) from exc
+            else:
+                logger.info(
+                    "Web3AaveClient: wallet_private_key 未設定 → read-only モードで起動 "
+                    "(supply/withdraw は呼出時に fail-fast)"
+                )
 
         logger.info(
             "Web3AaveClient 初期化完了 (pool=%s...%s)",
@@ -635,6 +643,13 @@ class Web3AaveClient(AaveClientBase):
                 "amount": str(amount),
                 "dry_run": True,
             }
+
+        # 署名 tx (非 dry_run) 経路では signer 必須。
+        # __init__ 時の wallet_private_key を任意化したため、ここで明示 fail-fast。
+        if not getattr(self, "account", None) and not private_key:
+            raise AaveClientError(
+                "AAVE_WALLET_PRIVATE_KEY (or private_key arg) is required for signed supply tx"
+            )
 
         try:
             # ERC-20 コントラクト取得
@@ -858,6 +873,13 @@ class Web3AaveClient(AaveClientBase):
                 "amount": str(amount),
                 "dry_run": True,
             }
+
+        # 署名 tx (非 dry_run) 経路では signer 必須。
+        # __init__ 時の wallet_private_key を任意化したため、ここで明示 fail-fast。
+        if not getattr(self, "account", None) and not private_key:
+            raise AaveClientError(
+                "AAVE_WALLET_PRIVATE_KEY (or private_key arg) is required for signed withdraw tx"
+            )
 
         try:
             # CRITICAL: HF check before withdrawal (docs/13_security_design.md rule 2)

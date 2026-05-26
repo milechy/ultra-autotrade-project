@@ -131,12 +131,67 @@ def test_missing_rpc_url_raises_error(mock_settings):
         Web3AaveClient(settings=mock_settings)
 
 
-def test_missing_wallet_private_key_raises_error(mock_settings):
-    """ウォレット秘密鍵が未設定の場合にエラーが発生すること。"""
-    mock_settings.wallet_private_key = None
+@patch("eth_account.Account")
+@patch("app.aave.client.Web3")
+def test_missing_wallet_private_key_allows_read_only_init(mock_web3, mock_account, mock_settings):
+    """wallet_private_key 未設定でも read-only モードで初期化できること (v4 §14 設計)。
 
-    with pytest.raises(AaveClientError, match="AAVE_WALLET_PRIVATE_KEY is required"):
-        Web3AaveClient(settings=mock_settings)
+    Indicator Agent / shadow mode 等の eth_call のみ経路では signer 不要。
+    署名 tx (supply/withdraw) 呼出時に fail-fast する。
+    """
+    mock_settings.wallet_private_key = None
+    mock_web3_instance = MagicMock()
+    mock_web3_instance.is_connected.return_value = True
+    mock_web3.return_value = mock_web3_instance
+    mock_web3.HTTPProvider = MagicMock()
+    mock_web3.to_checksum_address = lambda addr: addr
+
+    client = Web3AaveClient(settings=mock_settings)
+    assert not hasattr(client, "account") or client.account is None
+
+
+@patch("eth_account.Account")
+@patch("app.aave.client.Web3")
+def test_supply_without_wallet_fails_fast(mock_web3, mock_account, mock_settings):
+    """wallet 未設定の read-only クライアントで supply を呼ぶと fail-fast すること。"""
+    mock_settings.wallet_private_key = None
+    mock_web3_instance = MagicMock()
+    mock_web3_instance.is_connected.return_value = True
+    mock_web3.return_value = mock_web3_instance
+    mock_web3.HTTPProvider = MagicMock()
+    mock_web3.to_checksum_address = lambda addr: addr
+
+    client = Web3AaveClient(settings=mock_settings)
+    with pytest.raises(
+        AaveClientError, match="AAVE_WALLET_PRIVATE_KEY.*required for signed supply"
+    ):
+        client.deposit(
+            asset_address="0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f",
+            amount=Decimal("1.0"),
+            wallet_address="0x" + "a" * 40,
+        )
+
+
+@patch("eth_account.Account")
+@patch("app.aave.client.Web3")
+def test_withdraw_without_wallet_fails_fast(mock_web3, mock_account, mock_settings):
+    """wallet 未設定の read-only クライアントで withdraw を呼ぶと fail-fast すること。"""
+    mock_settings.wallet_private_key = None
+    mock_web3_instance = MagicMock()
+    mock_web3_instance.is_connected.return_value = True
+    mock_web3.return_value = mock_web3_instance
+    mock_web3.HTTPProvider = MagicMock()
+    mock_web3.to_checksum_address = lambda addr: addr
+
+    client = Web3AaveClient(settings=mock_settings)
+    with pytest.raises(
+        AaveClientError, match="AAVE_WALLET_PRIVATE_KEY.*required for signed withdraw"
+    ):
+        client.withdraw(
+            asset_address="0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f",
+            amount=Decimal("1.0"),
+            wallet_address="0x" + "a" * 40,
+        )
 
 
 def test_missing_pool_address_raises_error(mock_settings):
