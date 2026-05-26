@@ -167,16 +167,18 @@ export default function SettingsPage() {
           />
         )}
 
-        {/* 2. リスク設定 — riskMode synced with PUT /auth/risk-mode */}
-        <RiskSettingsCard
-          riskMode={settings.riskMode}
-          onRiskModeChange={(mode) => set('riskMode', mode)}
-          maxSingleTradeUsd={settings.maxSingleTradeUsd}
-          onMaxSingleTradeUsdChange={(value) => set('maxSingleTradeUsd', value)}
-          maxDailyTradeUsd={settings.maxDailyTradeUsd}
-          onMaxDailyTradeUsdChange={(value) => set('maxDailyTradeUsd', value)}
-          allowedModes={allowedModes}
-        />
+        {/* 2. リスク設定 — admin/partner のみ表示（viewer/tester は非表示） */}
+        {isPartner && (
+          <RiskSettingsCard
+            riskMode={settings.riskMode}
+            onRiskModeChange={(mode) => set('riskMode', mode)}
+            maxSingleTradeUsd={settings.maxSingleTradeUsd}
+            onMaxSingleTradeUsdChange={(value) => set('maxSingleTradeUsd', value)}
+            maxDailyTradeUsd={settings.maxDailyTradeUsd}
+            onMaxDailyTradeUsdChange={(value) => set('maxDailyTradeUsd', value)}
+            allowedModes={allowedModes}
+          />
+        )}
 
         {/* 3. 通知設定 — synced with PUT /api/user/settings */}
         <NotificationCard
@@ -192,12 +194,14 @@ export default function SettingsPage() {
           onLanguageChange={(value) => set('language', value)}
         />
 
-        {/* 5. ウォレット情報 */}
-        <WalletInfoCard
-          address={address}
-          chainId={chainId}
-          onDisconnect={disconnect}
-        />
+        {/* 5. ウォレット情報 — admin/partner のみ表示（viewer/tester は非表示） */}
+        {isPartner && (
+          <WalletInfoCard
+            address={address}
+            chainId={chainId}
+            onDisconnect={disconnect}
+          />
+        )}
 
         {/* 6. パスワード変更 */}
         <PasswordChangeCard />

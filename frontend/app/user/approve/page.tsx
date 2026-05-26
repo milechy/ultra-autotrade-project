@@ -95,7 +95,7 @@ type ProposalState = {
 }
 
 export default function ApprovePage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { isAuthenticated, isLoading: authLoading, isPartner } = useAuth()
   const router = useRouter()
   const { isConnected, chainId } = useWallet()
   const { isReady, approve: approveToken, supply, withdraw, borrow, repay } = useAaveV3()
@@ -130,12 +130,14 @@ export default function ApprovePage() {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace('/login?redirect=/user/approve')
+    } else if (!authLoading && isAuthenticated && !isPartner) {
+      router.replace('/user/dashboard')
     }
-  }, [authLoading, isAuthenticated, router])
+  }, [authLoading, isAuthenticated, isPartner, router])
 
   useEffect(() => {
-    if (isAuthenticated) { fetchData() }
-  }, [fetchData, isAuthenticated])
+    if (isAuthenticated && isPartner) { fetchData() }
+  }, [fetchData, isAuthenticated, isPartner])
 
   const handleApprove = useCallback(async (id: string) => {
     const proposal = proposals.find((p) => p.id === id)
