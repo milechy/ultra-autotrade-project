@@ -150,11 +150,22 @@ class MultiAgentContext(BaseModel):
 
         Evaluated by the Python rule engine BEFORE the LLM call so the guard is
         deterministic and cannot be overridden by the LLM's prompt interpretation.
+
+        fed_stance="unknown" branch (2026-05-26): when the FED signal is unavailable
+        (e.g. Perplexity Finance returned no usable data), the macro agent's
+        confidence floor of 25 would permanently block SELL. In that case drop the
+        macro axis from the AND requirement and qualify on Indicator alone. The
+        COMPOUND RISK guard (service.py Guard 1, evaluated before this method) is
+        the safety net that keeps SELL from running away in that mode. The
+        fed_stance="neutral" case is intentionally NOT relaxed — neutral means data
+        exists but the signal is non-directional, which is a meaningful HOLD vote.
         """
         ind = self.indicator_signal
         mac = self.macro_signal
         if ind is None or mac is None:
             return False
+        if mac.key_data.get("fed_stance") == "unknown":
+            return ind.bias == Bias.BEARISH and ind.confidence >= self._DIRECTIONAL_THRESHOLD
         return (
             ind.bias == Bias.BEARISH
             and ind.confidence >= self._DIRECTIONAL_THRESHOLD
@@ -166,11 +177,17 @@ class MultiAgentContext(BaseModel):
         """Return True only when BOTH Indicator AND Macro agents are BULLISH >= threshold.
 
         Symmetric guard to prevent single-agent BULLISH from triggering BUY.
+
+        See ``indicator_and_macro_agree_bearish`` for the fed_stance="unknown"
+        branch rationale; the same relaxation applies here so BUY is not
+        permanently blocked when FED data is unavailable.
         """
         ind = self.indicator_signal
         mac = self.macro_signal
         if ind is None or mac is None:
             return False
+        if mac.key_data.get("fed_stance") == "unknown":
+            return ind.bias == Bias.BULLISH and ind.confidence >= self._DIRECTIONAL_THRESHOLD
         return (
             ind.bias == Bias.BULLISH
             and ind.confidence >= self._DIRECTIONAL_THRESHOLD

@@ -46,12 +46,14 @@ def _make_agent_signal(
     bias: Bias,
     confidence: int,
     reasoning: str = "",
+    key_data: dict[str, object] | None = None,
 ) -> AgentSignal:
     return AgentSignal(
         agent_name=name,
         bias=bias,
         confidence=confidence,
         reasoning=reasoning or f"{bias.value} signal",
+        key_data=key_data or {},
     )
 
 
@@ -190,6 +192,133 @@ class TestIndicatorAndMacroAgreeBullish:
             macro_signal=_make_agent_signal("Macro", Bias.BEARISH, 75),
         )
         assert mac.indicator_and_macro_agree_bullish() is False
+
+
+class TestFedStanceUnknownBranch:
+    """fed_stance="unknown" relaxes the AND-condition to Indicator-only (2026-05-26).
+
+    Rationale: when FED data is unavailable (Perplexity Finance returned no
+    parseable data → fed_stance="unknown"), the macro agent's confidence is
+    pinned at the floor of 25 and AND-condition is permanently false. That made
+    staging soak emit 100% HOLD for 48h+. The fix drops the macro axis from the
+    AND requirement specifically when fed_stance="unknown"; the COMPOUND RISK
+    guard (service.py Guard 1) remains the safety net upstream.
+
+    fed_stance="neutral" is NOT relaxed — neutral is a real, non-directional
+    macro vote.
+    """
+
+    def test_unknown_with_indicator_bearish_only_returns_true(self) -> None:
+        """fed_stance=unknown + Indicator BEARISH>=70 + Macro NEUTRAL → True."""
+        mac = MultiAgentContext(
+            indicator_signal=_make_agent_signal("Indicator", Bias.BEARISH, 75),
+            macro_signal=_make_agent_signal(
+                "Macro",
+                Bias.NEUTRAL,
+                25,
+                key_data={"fed_stance": "unknown"},
+            ),
+        )
+        assert mac.indicator_and_macro_agree_bearish() is True
+
+    def test_unknown_with_indicator_bullish_only_returns_true(self) -> None:
+        """fed_stance=unknown + Indicator BULLISH>=70 + Macro NEUTRAL → True."""
+        mac = MultiAgentContext(
+            indicator_signal=_make_agent_signal("Indicator", Bias.BULLISH, 75),
+            macro_signal=_make_agent_signal(
+                "Macro",
+                Bias.NEUTRAL,
+                25,
+                key_data={"fed_stance": "unknown"},
+            ),
+        )
+        assert mac.indicator_and_macro_agree_bullish() is True
+
+    def test_unknown_ignores_opposite_macro_bias(self) -> None:
+        """Under fed_stance=unknown, macro bias direction is disregarded entirely."""
+        mac = MultiAgentContext(
+            indicator_signal=_make_agent_signal("Indicator", Bias.BEARISH, 80),
+            macro_signal=_make_agent_signal(
+                "Macro",
+                Bias.BULLISH,
+                75,
+                key_data={"fed_stance": "unknown"},
+            ),
+        )
+        assert mac.indicator_and_macro_agree_bearish() is True
+
+    def test_unknown_still_requires_indicator_threshold(self) -> None:
+        """Even under fed_stance=unknown, Indicator confidence must be >=70."""
+        mac = MultiAgentContext(
+            indicator_signal=_make_agent_signal("Indicator", Bias.BEARISH, 65),
+            macro_signal=_make_agent_signal(
+                "Macro",
+                Bias.NEUTRAL,
+                25,
+                key_data={"fed_stance": "unknown"},
+            ),
+        )
+        assert mac.indicator_and_macro_agree_bearish() is False
+
+    def test_unknown_still_requires_indicator_directional(self) -> None:
+        """Under fed_stance=unknown, NEUTRAL indicator does not qualify."""
+        mac = MultiAgentContext(
+            indicator_signal=_make_agent_signal("Indicator", Bias.NEUTRAL, 80),
+            macro_signal=_make_agent_signal(
+                "Macro",
+                Bias.NEUTRAL,
+                25,
+                key_data={"fed_stance": "unknown"},
+            ),
+        )
+        assert mac.indicator_and_macro_agree_bearish() is False
+        assert mac.indicator_and_macro_agree_bullish() is False
+
+    def test_neutral_fed_stance_NOT_relaxed_bearish(self) -> None:
+        """fed_stance=neutral is intentionally NOT relaxed — macro must still co-sign."""
+        mac = MultiAgentContext(
+            indicator_signal=_make_agent_signal("Indicator", Bias.BEARISH, 80),
+            macro_signal=_make_agent_signal(
+                "Macro",
+                Bias.NEUTRAL,
+                25,
+                key_data={"fed_stance": "neutral"},
+            ),
+        )
+        assert mac.indicator_and_macro_agree_bearish() is False
+
+    def test_neutral_fed_stance_NOT_relaxed_bullish(self) -> None:
+        mac = MultiAgentContext(
+            indicator_signal=_make_agent_signal("Indicator", Bias.BULLISH, 80),
+            macro_signal=_make_agent_signal(
+                "Macro",
+                Bias.NEUTRAL,
+                25,
+                key_data={"fed_stance": "neutral"},
+            ),
+        )
+        assert mac.indicator_and_macro_agree_bullish() is False
+
+    def test_dovish_fed_stance_NOT_relaxed_when_indicator_disagrees(self) -> None:
+        """Sanity: with a real macro signal (dovish), the AND requirement still holds."""
+        mac = MultiAgentContext(
+            indicator_signal=_make_agent_signal("Indicator", Bias.BEARISH, 80),
+            macro_signal=_make_agent_signal(
+                "Macro",
+                Bias.BULLISH,
+                75,
+                key_data={"fed_stance": "dovish"},
+            ),
+        )
+        assert mac.indicator_and_macro_agree_bearish() is False
+
+    def test_missing_fed_stance_key_falls_through_to_AND(self) -> None:
+        """If key_data has no fed_stance entry at all, treat as the non-unknown path."""
+        mac = MultiAgentContext(
+            indicator_signal=_make_agent_signal("Indicator", Bias.BEARISH, 80),
+            macro_signal=_make_agent_signal("Macro", Bias.NEUTRAL, 25),
+        )
+        assert mac.indicator_and_macro_agree_bearish() is False
 
 
 # ---------------------------------------------------------------------------
