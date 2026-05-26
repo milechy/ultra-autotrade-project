@@ -88,6 +88,9 @@ from app.webhook.router import router as webhook_router
 logger = logging.getLogger(__name__)
 # Ensure app.* loggers output at INFO level regardless of root logger config
 logging.getLogger("app").setLevel(logging.INFO)
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s", force=True
+)
 
 
 def _is_inactive_color_skip() -> bool:
