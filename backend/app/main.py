@@ -313,6 +313,23 @@ def create_app() -> FastAPI:
         _validate_model_config()
         logger.info("AI model config validation passed")
 
+    # --- Aave Oracle staleness threshold env validation (fail-fast) ---
+    @app.on_event("startup")
+    async def startup_validate_oracle_staleness_env() -> None:
+        """Fail-fast: reject invalid AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS at boot.
+
+        Long-heartbeat feeds (Base Sepolia / Base mainnet USDC/USD ≈ 24h) must
+        configure this env to avoid spurious HOLD; default 3600s is unsafe there.
+        """
+        from app.aave.oracle_checker import validate_staleness_threshold_env  # noqa: PLC0415
+
+        threshold = validate_staleness_threshold_env()
+        logger.info(
+            "Aave oracle staleness threshold validated: %ds "
+            "(env=AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS)",
+            threshold,
+        )
+
     # --- Database initialization (Phase12) ---
     @app.on_event("startup")
     async def startup_database() -> None:
