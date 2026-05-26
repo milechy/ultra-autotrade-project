@@ -171,9 +171,7 @@ class TestLoadNotificationSettingsLineMinSeverity:
 
     def test_load_line_min_severity_default_alert(self):
         """LINE_MIN_SEVERITY 未設定 → ALERT (既定挙動を維持)。"""
-        env = {
-            k: v for k, v in os.environ.items() if k != "LINE_MIN_SEVERITY"
-        }
+        env = {k: v for k, v in os.environ.items() if k != "LINE_MIN_SEVERITY"}
         with patch.dict(os.environ, env, clear=True):
             settings = load_notification_settings()
             assert settings.line_min_severity == NotificationSeverity.ALERT

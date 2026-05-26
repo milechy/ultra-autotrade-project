@@ -166,9 +166,7 @@ def load_notification_settings() -> NotificationSettings:
     channel_str = os.getenv("NOTIFICATION_CHANNEL")
     line_channel_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN") or ""
     line_user_id = os.getenv("LINE_USER_ID") or ""
-    line_min_severity = _parse_severity(
-        os.getenv("LINE_MIN_SEVERITY"), NotificationSeverity.ALERT
-    )
+    line_min_severity = _parse_severity(os.getenv("LINE_MIN_SEVERITY"), NotificationSeverity.ALERT)
     # Twilio
     twilio_account_sid = os.getenv("TWILIO_ACCOUNT_SID") or None
     twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN") or None
