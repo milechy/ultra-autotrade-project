@@ -10,7 +10,7 @@ docs/14_test_strategy.md §3.4:
 """
 
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -156,9 +156,17 @@ class TestWeb3AaveClient:
 
     @patch("app.aave.client.Web3")
     def test_rpc_connection_failure(self, mock_web3_cls: MagicMock) -> None:
-        """初期化時に RPC 未接続 → AaveClientError"""
+        """初期化時に RPC 未接続 → AaveClientError
+
+        接続判定は RPCProvider.get_web3() に一本化されており、内部の `_is_connected`
+        が `eth.block_number` で疎通確認する。block_number の取得が例外を投げる
+        ケースを模擬すれば primary/secondary ともに失敗扱いとなり ConnectionError
+        が伝播し、Web3AaveClient.__init__ で AaveClientError に変換される。
+        """
         mock_w3 = MagicMock()
-        mock_w3.is_connected.return_value = False
+        # RPCProvider._is_connected は eth.block_number で疎通確認するので
+        # ここを例外にすれば接続失敗扱いになる
+        type(mock_w3.eth).block_number = PropertyMock(side_effect=Exception("rpc down"))
         mock_web3_cls.return_value = mock_w3
         mock_web3_cls.HTTPProvider = MagicMock()
 
