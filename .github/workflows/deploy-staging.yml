@@ -1,9 +1,16 @@
 name: Deploy to Staging
 
+# 2026-05-26: push→main 自動トリガーを撤去し opt-in 化。
+# 背景: soak 観測中の PR merge が毎回 staging を recreate し、観測データが分断される。
+# 詳細: Asana 1215116762898441 / CLAUDE.lessons.md 2026-05-26「自動 deploy と手動操作の衝突」
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Deploy reason (e.g., manual rollout, soak test, post-merge sync)'
+        required: false
+        type: string
+        default: 'manual deploy'
 
 concurrency:
   group: staging-deployment
@@ -21,9 +28,14 @@ jobs:
           host: ${{ secrets.HETZNER_HOST }}
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
+          # 2026-05-26: command_timeout を 10m(default) → 20m に延長。
+          # 背景: frontend npm build (~9min) + backend blue/green parallel build (~1min)
+          # + up -d + healthcheck で 10m を超え、SSH session timeout で workflow が
+          # failure 扱いになる (例: run 26427578136、10:55:38 Run Command Timeout)。
+          command_timeout: 20m
           script: |
             set -euo pipefail
-            echo "🚀 Starting staging deployment..."
+            echo "🚀 Starting staging deployment (reason: ${{ github.event.inputs.reason }})..."
             cd /opt/ultra-autotrade
             git fetch origin
             git reset --hard origin/main
