@@ -424,10 +424,12 @@ class Web3AaveClient(AaveClientBase):
             raise AaveClientError(
                 f"RPC に接続できません: {effective_rpc_url[:20]}..."
             ) from exc  # URLを切り詰めてログ
-        if not self._w3.is_connected():
-            raise AaveClientError(
-                f"RPC に接続できません: {effective_rpc_url[:20]}..."
-            )  # URLを切り詰めてログ
+        # NOTE: 旧コードは self._w3.is_connected() を二重 health check していたが、
+        # web3.py 7.x の Web3.is_connected() は内部で `web3_clientVersion` RPC を呼ぶ。
+        # Base Sepolia 公式 public RPC (https://sepolia.base.org) 等の一部 RPC は
+        # この method を未サポート → False 返却 → false positive で AaveClientError。
+        # RPCProvider.get_web3() 内で既に `eth.block_number` で疎通確認済みなので、
+        # 二重チェックは削除して RPCProvider を単一責任の疎通判定窓口とする。
         self._pool = self._w3.eth.contract(
             address=Web3.to_checksum_address(effective_pool_address),
             abi=_POOL_ABI_MINIMAL,

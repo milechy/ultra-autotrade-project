@@ -160,15 +160,22 @@ def test_missing_usdc_address_raises_error(mock_settings):
 # ==============================================================================
 
 
+@patch("app.aave.rpc_provider.RPCProvider")
 @patch("eth_account.Account")
 @patch("app.aave.client.Web3")
-def test_web3_connection_error(mock_web3, mock_account, mock_settings):
-    """RPC 接続失敗時のエラーハンドリング。"""
-    # Web3 接続失敗をシミュレート
-    mock_web3_instance = MagicMock()
-    mock_web3_instance.is_connected.return_value = False
-    mock_web3.return_value = mock_web3_instance
+def test_web3_connection_error(mock_web3, mock_account, mock_rpc_provider_cls, mock_settings):
+    """RPC 接続失敗時のエラーハンドリング。
+
+    接続判定は RPCProvider.get_web3() に一本化されており、ConnectionError を投げる
+    ケースのみが「RPC に接続できません」エラーに繋がる。`Web3.is_connected()` は
+    web3.py 7.x で `web3_clientVersion` RPC を呼ぶ仕様となり、Base Sepolia 等の一部
+    public RPC で false positive を返すため、二段目のチェックは削除済み。
+    """
     mock_web3.HTTPProvider = MagicMock()
+
+    mock_provider_instance = MagicMock()
+    mock_provider_instance.get_web3.side_effect = ConnectionError("All RPC endpoints unavailable")
+    mock_rpc_provider_cls.return_value = mock_provider_instance
 
     with pytest.raises(AaveClientError, match="RPC に接続できません"):
         Web3AaveClient(settings=mock_settings)
