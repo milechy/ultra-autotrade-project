@@ -10,12 +10,60 @@ Aave V3 Oracle (Chainlink) 鮮度チェック・Circuit Breaker。
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# Default fallback for staleness threshold when env var is unset.
+# Conservative 1h default suits fast-heartbeat feeds; long-heartbeat feeds
+# (Base Sepolia USDC/USD ≈ 24h, Base mainnet USDC/USD ≈ 24h) must override
+# via AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS to avoid spurious HOLD.
+_DEFAULT_STALENESS_THRESHOLD_SECONDS = 3600
+
+# Bounds for env-based override. Reject 0 / negatives and absurdly large values
+# (over 7 days) at startup to surface misconfiguration early.
+_MIN_STALENESS_THRESHOLD_SECONDS = 60
+_MAX_STALENESS_THRESHOLD_SECONDS = 7 * 24 * 3600  # 604800
+
+_ENV_STALENESS_THRESHOLD = "AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS"
+
+
+def get_staleness_threshold_from_env(default: int = _DEFAULT_STALENESS_THRESHOLD_SECONDS) -> int:
+    """
+    Read AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS from env, validating bounds.
+
+    Raises RuntimeError on invalid values so misconfiguration is loud.
+    """
+    raw = os.getenv(_ENV_STALENESS_THRESHOLD)
+    if raw is None or raw == "":
+        return default
+
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"Invalid integer for {_ENV_STALENESS_THRESHOLD}: {raw!r}") from exc
+
+    if value < _MIN_STALENESS_THRESHOLD_SECONDS or value > _MAX_STALENESS_THRESHOLD_SECONDS:
+        raise RuntimeError(
+            f"{_ENV_STALENESS_THRESHOLD}={value} out of bounds "
+            f"[{_MIN_STALENESS_THRESHOLD_SECONDS}, {_MAX_STALENESS_THRESHOLD_SECONDS}]"
+        )
+    return value
+
+
+def validate_staleness_threshold_env() -> int:
+    """
+    Startup validation entry point.
+
+    Returns the resolved threshold (env or default) so it can be logged.
+    Raises RuntimeError on invalid env, blocking startup.
+    """
+    return get_staleness_threshold_from_env()
+
 
 _AGGREGATOR_ABI = [
     {
@@ -66,15 +114,21 @@ class OracleCheckResult:
 def check_oracle_staleness(
     feed_address: str,
     rpc_url: str,
-    staleness_threshold_seconds: int = 3600,
+    staleness_threshold_seconds: Optional[int] = None,
     deviation_threshold_pct: Decimal = Decimal("10"),
     previous_price: Optional[Decimal] = None,
 ) -> Optional[OracleCheckResult]:
     """
     Chainlink price feed の鮮度と価格乖離を検証する。
 
+    staleness_threshold_seconds=None の場合は AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS を読む
+    (default _DEFAULT_STALENESS_THRESHOLD_SECONDS)。明示指定があれば env より優先する。
+
     Returns None if web3 is unavailable or RPC call fails.
     """
+    if staleness_threshold_seconds is None:
+        staleness_threshold_seconds = get_staleness_threshold_from_env()
+
     try:
         from web3 import Web3  # noqa: PLC0415
     except ImportError:
@@ -198,12 +252,11 @@ def is_oracle_fresh(
     """Zero-arg convenience wrapper for use in rule engine.
 
     Reads AAVE_ORACLE_FEED_ADDRESS and WEB3_RPC_URL from environment if not provided.
+    Threshold is read from AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS (default 3600s).
     Returns True if oracle data is fresh (safe to trade).
     Returns False (fail-closed) if RPC fails or oracle is stale.
     If env vars are not configured, oracle check is skipped (returns True).
     """
-    import os  # noqa: PLC0415
-
     _feed = feed_address or os.getenv("AAVE_ORACLE_FEED_ADDRESS")
     _rpc = rpc_url or os.getenv("WEB3_RPC_URL") or os.getenv("POLYGON_RPC_URL")
 
@@ -215,7 +268,13 @@ def is_oracle_fresh(
         return True  # env not configured → skip check
 
     try:
-        result = check_oracle_staleness(_feed, _rpc)
+        threshold = get_staleness_threshold_from_env()
+    except RuntimeError as exc:
+        logger.error("[oracle_checker] invalid staleness threshold env - fail-closed: %s", exc)
+        return False
+
+    try:
+        result = check_oracle_staleness(_feed, _rpc, staleness_threshold_seconds=threshold)
     except Exception as exc:
         logger.error("[oracle_checker] is_oracle_fresh call failed - fail-closed: %s", exc)
         return False
