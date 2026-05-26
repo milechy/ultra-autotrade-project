@@ -6,6 +6,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import AppShell from '@/components/layout/AppShell'
+import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
 import { Toaster } from 'sonner'
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
@@ -35,6 +36,7 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
 export function AdminProviders({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
+      <SessionExpiryBanner loginHref="/login" />
       <AdminGuard>
         <AppShell>
           {children}
