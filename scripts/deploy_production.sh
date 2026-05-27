@@ -278,6 +278,7 @@ for arg in "$@"; do
     --frontend-only) FRONTEND_ONLY=true ;;
     --backend-only)  BACKEND_ONLY=true ;;
     --no-build)      NO_BUILD=true ;;
+    --skip-gate)     ;;  # launch_gate bypass — 後段で処理
     --help)          show_help ;;
     *) err "不明なオプション: ${arg}"; exit 1 ;;
   esac
@@ -392,6 +393,40 @@ fi
 
 echo "✅ All production deploy guards passed"
 # === End of guardrails ===
+
+# ───────────────────────────────────────────────
+# Launch Gate (L0-L5)
+# 2026-05-27 追加 (Asana 1215151958676195 / [LAUNCH-GATE-B]):
+#   schema / env / smoke / e2e / kill switch / wiring lint を一括で
+#   deploy 時 gate として実行する。失敗時 deploy 中止。
+#
+#   緊急時 bypass:
+#     SKIP_LAUNCH_GATE=1 ./scripts/deploy_production.sh
+#     ./scripts/deploy_production.sh --skip-gate
+#
+#   launch_gate.sh は別タスク A が作成中。未配置の場合は WARN ログのみで続行。
+# ───────────────────────────────────────────────
+_SKIP_GATE=0
+for _arg in "$@"; do
+  if [[ "${_arg}" == "--skip-gate" ]]; then
+    _SKIP_GATE=1
+  fi
+done
+
+if [[ "${SKIP_LAUNCH_GATE:-0}" == "1" || "${_SKIP_GATE}" == "1" ]]; then
+  log "⚠️  WARN: launch_gate を skip しました (SKIP_LAUNCH_GATE=${SKIP_LAUNCH_GATE:-0} / --skip-gate=${_SKIP_GATE})"
+else
+  if [[ -x "${SCRIPT_DIR}/launch_gate.sh" ]]; then
+    log "Running launch_gate (set SKIP_LAUNCH_GATE=1 or --skip-gate to bypass)"
+    if ! "${SCRIPT_DIR}/launch_gate.sh" --env=production --skip=L3,L4; then
+      err "launch_gate failed. Aborting deploy."
+      exit 1
+    fi
+    log "✅ launch_gate passed"
+  else
+    log "ℹ️  launch_gate.sh not found yet (待機中: tasks/A 着手前) — skipping"
+  fi
+fi
 
 DC=$(resolve_dc)
 log "docker compose コマンド: ${DC}"

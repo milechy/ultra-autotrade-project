@@ -1,9 +1,18 @@
 # 環境ファイル — Docker build context に secrets を含めない
 # .env.staging は 2026-04-17 以降 .env.staging-new が正式
+#
+# 2026-05-27 追記 (Asana [chore] backend image env 焼き込み調査):
+#   旧パターン `.env.*` はルート直下しかマッチせず、`backend/.env.production`
+#   や `backend/.env.staging-new` が image に焼き込まれていた。
+#   `**/` プレフィックスで全階層を対象にする。
 .env
 .env.*
+**/.env
+**/.env.*
 !.env.example
 !.env.*.example
+!**/.env.example
+!**/.env.*.example
 
 # Git / CI — build context 削減
 .git/

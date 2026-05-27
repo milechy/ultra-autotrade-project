@@ -4,6 +4,9 @@ on:
   schedule:
     # 毎日 02:00 JST (= 17:00 UTC 前日)
     - cron: '0 17 * * *'
+  pull_request:
+  push:
+    branches: [main, dev]
   workflow_dispatch:
     inputs:
       slack_notify:
