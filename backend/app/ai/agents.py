@@ -202,11 +202,25 @@ class MultiAgentContext(BaseModel):
 def indicator_agent(ctx: MarketContext) -> AgentSignal:
     """Analyze Aave on-chain indicators (utilization, APY, HF).
 
-    Rules:
-    - HF < 1.6 → bearish (liquidation risk)
-    - HF 1.6-2.0 → neutral (safe but watch)
-    - HF > 2.0 → bullish (plenty of room)
-    - High utilization (>80%) → bearish (less liquidity, higher rates)
+    Scoring (2026-05-27 — neutral-stuck mitigation):
+      The original three-tier HF curve produced a -25 step-function at HF=2.0
+      (1.99 → -10, 2.00 → +15) and left the dominant "moderately healthy" case
+      (HF 1.7-1.99 / util 50-80% / APY 2-4%) at score=40 → NEUTRAL, blocking the
+      v4/v5 AND-condition (Indicator+Macro both ≥70% conf) and pinning soak HOLD
+      at ~100%.
+
+      Mitigation: replace the three-tier HF with a smoother five-band curve,
+      reward moderate utilization (ample liquidity) instead of only <50%, and
+      add a mild bearish nudge when supply APY collapses (yield compression).
+      This lets realistic-but-favourable data clear score≥65 and confidence≥70.
+
+    Rules (post-fix):
+    - HF < 1.6 → strongly bearish; HF 1.6-1.75 → bearish; 1.75-1.9 → mild cau-
+      tion; 1.9-2.1 → mild comfort; 2.1-2.5 → bullish; ≥2.5 → strongly bullish.
+    - Util >85% → bearish; 70-85% → mild caution; 30-70% → mild comfort;
+      <30% → bullish (ample liquidity).
+    - Supply APY >5% → bullish (attractive yield); <1% → mild bearish (yield
+      compression suggests over-supply / weak demand).
     """
     hf = ctx.health_factor
     util = ctx.aave_utilization_rate
@@ -222,27 +236,47 @@ def indicator_agent(ctx: MarketContext) -> AgentSignal:
         if hf_float < 1.6:
             score -= 40
             reasons.append(f"HF={hf} is critically low")
-        elif hf_float < 2.0:
-            score -= 10
+        elif hf_float < 1.75:
+            score -= 18
+            reasons.append(f"HF={hf} is thin — liquidation risk if price moves")
+        elif hf_float < 1.9:
+            score -= 6
             reasons.append(f"HF={hf} is acceptable but watch closely")
-        else:
-            score += 15
+        elif hf_float < 2.1:
+            score += 8
+            reasons.append(f"HF={hf} provides reasonable buffer")
+        elif hf_float < 2.5:
+            score += 16
             reasons.append(f"HF={hf} provides comfortable buffer")
+        else:
+            score += 22
+            reasons.append(f"HF={hf} provides ample buffer")
 
     if util is not None:
+        util_float = float(util)
         key_data["utilization_rate"] = str(util)
-        if float(util) > 80:
-            score -= 15
-            reasons.append(f"Utilization at {util}% — liquidity pressure")
-        elif float(util) < 50:
-            score += 10
+        if util_float > 85:
+            score -= 18
+            reasons.append(f"Utilization at {util}% — heavy liquidity pressure")
+        elif util_float > 70:
+            score -= 4
+            reasons.append(f"Utilization at {util}% — elevated, monitor")
+        elif util_float >= 30:
+            score += 6
             reasons.append(f"Utilization at {util}% — healthy liquidity")
+        else:
+            score += 12
+            reasons.append(f"Utilization at {util}% — ample liquidity")
 
     if supply_apy is not None:
+        apy_float = float(supply_apy)
         key_data["supply_apy"] = str(supply_apy)
-        if float(supply_apy) > 5:
+        if apy_float > 5:
             score += 10
             reasons.append(f"Supply APY at {supply_apy}% — attractive yield")
+        elif apy_float < 1:
+            score -= 6
+            reasons.append(f"Supply APY at {supply_apy}% — yield compressed, weak demand")
 
     if score >= 65:
         bias = Bias.BULLISH
