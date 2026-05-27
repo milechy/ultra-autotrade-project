@@ -1,0 +1,30 @@
+name: Wiring Lint (include_router)
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/**/*.py'
+      - 'scripts/ci/check_wiring_lint.sh'
+  push:
+    branches: [main, dev]
+
+jobs:
+  check-wiring-lint:
+    name: APIRouter 配線漏れ検出
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run wiring lint
+        env:
+          # 2026-05-27 [LAUNCH-GATE-B] 初回投入時の既知の孤立 router 4 件。
+          # 人間判断のうえ「廃止予定」と確認できているものを暫定で除外する。
+          #   - app.invitations.router:router   # main.py で「Phase 2 物理削除予定」とコメント
+          #   - app.automation.router:router    # automation_router 経由で配線済の旧実装
+          #   - app.api.automation_reports:router  # automation_dashboard 経由で配線
+          #   - app.notion.router:router        # notion 連携未配線 (要レビュー)
+          # 新規追加禁止: 配線漏れは構造的に直すこと。
+          WIRING_LINT_ALLOWLIST: "app.invitations.router:router app.automation.router:router app.api.automation_reports:router app.notion.router:router"
+        run: |
+          bash scripts/ci/check_wiring_lint.sh
