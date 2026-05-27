@@ -9,15 +9,15 @@ Background:
 - launch_gate L0 (schema sync) で「コード ↔ alembic ↔ DB」の三者一致を担保するため、
   本マイグレーションで alembic 履歴に正式登録する。
 
-このマイグレーションは 2 つの並行 head (a7b8c9d0e1f2, g7h8i9j0k1l2) をマージし
-かつ proposals.execution_attempts を冪等に追加する merge revision。
+このマイグレーションは g7h8i9j0k1l2 を親とする通常 revision で、
+proposals.execution_attempts を冪等に追加する。
 
 Idempotent:
 - postgres: ADD COLUMN IF NOT EXISTS を使い、既に手動 ALTER 済みの DB でも no-op。
 - sqlite (テスト): batch_alter_table で対応。テスト DB には未投入なので新規追加。
 
 Revision ID: h8i9j0k1l2m3
-Revises: a7b8c9d0e1f2, g7h8i9j0k1l2
+Revises: g7h8i9j0k1l2
 Create Date: 2026-05-27 00:00:00.000000
 
 """
@@ -30,7 +30,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "h8i9j0k1l2m3"
-down_revision: Union[str, Sequence[str], None] = ("a7b8c9d0e1f2", "g7h8i9j0k1l2")
+down_revision: Union[str, Sequence[str], None] = "g7h8i9j0k1l2"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
