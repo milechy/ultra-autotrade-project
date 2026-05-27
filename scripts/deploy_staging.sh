@@ -318,8 +318,8 @@ log "現在の active slot: $(read_active_slot)"
 # ───────────────────────────────────────────────
 # 共通ステップ
 # ───────────────────────────────────────────────
-log "git pull origin main"
-git pull origin main
+log "git pull origin staging"
+git pull origin staging
 
 log "${ENV_FILE} を読み込み（ビルド ARG 用）"
 # shellcheck disable=SC2046
