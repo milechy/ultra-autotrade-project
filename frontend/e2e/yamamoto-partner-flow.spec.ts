@@ -27,6 +27,12 @@
 //   - E2E_PARTNER_EMAIL / E2E_PARTNER_PASSWORD が未設定なら
 //     認証必須のテストは test.skip() で明示スキップする。
 //   - 未認証側 (login ページ形状、未認証リダイレクト) だけは必ず実行する。
+//   - launch_gate L3_e2e.sh はこの「全 skip 状態」を **FAIL** として扱う
+//     (§7 verify.sh 罠防止: skip だらけで緑にしない)。
+//
+// E2E user 前提 (scripts/seed_e2e_user.sh が staging DB に seed):
+//   - id=999998 / role=partner / execution_policy=require_approval
+//   - email は E2E_PARTNER_EMAIL で上書き可。山本さん user_id=11 と絶対衝突しない。
 //
 // スクリーンショット:
 //   - 各画面のエビデンスを e2e/screenshots/yamamoto-partner/ に保存する。
@@ -51,9 +57,12 @@ if (!fs.existsSync(SCREENSHOT_DIR)) {
 // Mocked partner user returned in place of the real /auth/me response.
 // Production DB is missing `tier` and `last_judgment_at` columns; until the
 // ALTER TABLE migration runs on Hetzner every /auth/me call returns 500.
+//
+// id=999998: e2e 専用 testnet user (scripts/seed_e2e_user.sh で staging DB に seed)。
+// 山本さん本番 user_id=11 と絶対衝突しない固定値。
 const PARTNER_MOCK_USER = {
-  id: 1,
-  username: 'partner-e2e',
+  id: 999998,
+  username: 'e2e-partner',
   role: 'partner',
   is_active: true,
   created_at: '2026-01-01T00:00:00+00:00',
