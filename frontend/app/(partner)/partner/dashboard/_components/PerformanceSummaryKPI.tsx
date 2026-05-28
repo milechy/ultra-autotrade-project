@@ -3,11 +3,12 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useEffect, useState } from 'react'
-import { DollarSign, TrendingUp, Users, Shield } from 'lucide-react'
+import { DollarSign, TrendingUp, Users, Shield, Wallet, AlertTriangle } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { fetchPerformance, type PerformanceResponse } from '@/lib/api/allocations'
 import { getStoredToken } from '@/lib/auth'
+import { useWalletBalance } from '@/hooks/useWalletBalance'
 
 function fmtUsd(v: number | undefined | null): string {
   const n = Number(v ?? 0)
@@ -35,9 +36,18 @@ function hfColor(hf: number | null): string {
   return 'text-red-600 dark:text-red-400'
 }
 
+function fmtTokenAmount(v: string | number | undefined | null, maxFractionDigits = 4): string {
+  const n = Number(v ?? 0)
+  if (!Number.isFinite(n)) return '0'
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: maxFractionDigits,
+  }).format(n)
+}
+
 export default function PerformanceSummaryKPI() {
   const [data, setData] = useState<PerformanceResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const { data: walletBalance, loading: walletLoading } = useWalletBalance()
 
   useEffect(() => {
     const load = () => {
@@ -57,8 +67,8 @@ export default function PerformanceSummaryKPI() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
           <Skeleton key={i} className="h-28 rounded-xl" />
         ))}
       </div>
@@ -78,7 +88,7 @@ export default function PerformanceSummaryKPI() {
   const hf = data?.health_factor != null ? Number(data.health_factor) : null
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
       {/* 現在の運用残高 */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -141,6 +151,39 @@ export default function PerformanceSummaryKPI() {
           {hf != null && (
             <div className={`text-xs mt-1 ${hfColor(hf)}`}>
               {hf > 1.8 ? '安全' : hf >= 1.6 ? '注意' : '危険'}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ウォレット残高 (Base) — USDC + ETH on Base mainnet。Aave supply 分は含まない */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            ウォレット残高 (Base)
+          </CardTitle>
+          <div className="flex items-center gap-1">
+            {walletBalance?.fallback_used && (
+              <AlertTriangle
+                className="h-4 w-4 text-yellow-500"
+                aria-label="価格またはRPC取得失敗 (フォールバック使用中)"
+              />
+            )}
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">
+            {walletLoading
+              ? '—'
+              : walletBalance != null
+                ? `$${fmtUsd(Number(walletBalance.total_usd))}`
+                : '—'}
+          </div>
+          {walletBalance != null && (
+            <div className="text-xs text-muted-foreground mt-1">
+              ETH {fmtTokenAmount(walletBalance.eth_balance)} / USDC{' '}
+              {fmtTokenAmount(walletBalance.usdc_balance, 2)}
             </div>
           )}
         </CardContent>
