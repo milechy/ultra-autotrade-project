@@ -74,6 +74,39 @@ def _get_primary_chain() -> str:
     return raw.split(",")[0].strip()
 
 
+def _notify_missing_wallet(proposal_id: int, user_id: int) -> None:
+    """user.wallet_address が NULL の状態で Aave 執行に進んだことを Slack で警告する。
+
+    fallback として env AAVE_WALLET_ADDRESS が使われるが、partner 別資金分離の前提が
+    破れているため (2026-05-28 PR #438 の橋口さん wallet 未登録パターン)、即時に
+    管理者へ通知する。本処理は止めない (fail-safe)。
+    """
+    try:
+        from app.notifications.factory import get_notification_service  # noqa: PLC0415
+        from app.notifications.schemas import (  # noqa: PLC0415
+            NotificationChannel,
+            NotificationMessage,
+            NotificationSeverity,
+        )
+
+        message = NotificationMessage(
+            channel=NotificationChannel.SLACK,
+            severity=NotificationSeverity.ALERT,
+            title=f"Aave wallet fallback (proposal #{proposal_id})",
+            body=(
+                f"proposal_id: {proposal_id}\n"
+                f"user_id: {user_id}\n"
+                "reason: user.wallet_address is NULL; "
+                "falling back to AAVE_WALLET_ADDRESS env (partner separation broken)."
+            ),
+        )
+        get_notification_service().send(message)
+    except Exception:  # noqa: BLE001 — 通知失敗で本処理を止めない
+        logger.exception(
+            "proposal %d: failed to send wallet-fallback Slack notification", proposal_id
+        )
+
+
 def _notify_aave_failure(proposal_id: int, error_message: str, failed_at: datetime) -> None:
     """Aave 実行失敗を管理者向けに Slack 通知する（失敗しても本処理を止めない）。"""
     try:
@@ -180,6 +213,28 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
         _record_failed_transaction(proposal, chain, error_message, db)
         return
 
+    # --- partner 別 wallet 伝播 (2026-05-28 Lane 13) ---
+    # proposal owner の wallet_address を取得し、Aave 実行時に伝播する。
+    # NULL の場合は env AAVE_WALLET_ADDRESS fallback + Slack 警告 (partner 別資金分離の前提が破れる)。
+    user = db.scalars(select(User).where(User.id == proposal.user_id)).first()
+    user_wallet: str | None = user.wallet_address if user is not None else None
+    if user_wallet:
+        masked_wallet = f"{user_wallet[:6]}...{user_wallet[-4:]}"
+        logger.info(
+            "proposal %d: executing as user_id=%d wallet=%s",
+            proposal.id,
+            proposal.user_id,
+            masked_wallet,
+        )
+    else:
+        logger.warning(
+            "proposal %d: user_id=%d wallet_address is NULL — "
+            "falling back to AAVE_WALLET_ADDRESS env (partner separation broken)",
+            proposal.id,
+            proposal.user_id,
+        )
+        _notify_missing_wallet(proposal.id, proposal.user_id)
+
     try:
         multi_service = MultiChainAaveService()
         result = multi_service.execute_rebalance(
@@ -188,6 +243,7 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
             amount=Decimal(str(proposal.amount_usd)),
             asset_symbol=proposal.asset,
             dry_run=False,
+            wallet_address=user_wallet,
         )
 
         # 成功: attempt カウントも記録（診断用）
