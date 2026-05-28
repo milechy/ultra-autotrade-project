@@ -144,23 +144,15 @@ if [[ ! -f "${RESULTS_JSON}" ]]; then
   exit 1
 fi
 
-if ! command -v jq >/dev/null 2>&1; then
-  # jq が無い環境 → 後方互換で rc のみ見る (skip-only 判定はできないので警告)
-  echo "[WARN] jq が見つからないため json 解析できません。rc のみで判定します。"
-  if [[ "${playwright_rc}" -eq 0 ]]; then
-    gate_record PASS "${LABEL}" "playwright rc=0 (jq 不在で skip-only 判定 skip)"
-    exit 0
-  fi
-  gate_record FAIL "${LABEL}" "playwright rc=${playwright_rc}"
-  exit 1
-fi
+# lib.sh 提供 _parse_playwright_stat による 3 段フォールバック (jq → python3 → grep)。
+# jq 不在環境でも skip-only 判定が機能するよう helper 経由化 (G scope, Asana 1215186819755146)。
+# memory [[feedback-skip-only-fail-at-gate-not-spec]]: gate 側で構造的に skip-only を FAIL に。
+PASSED=$(_parse_playwright_stat "${RESULTS_JSON}" "expected")
+FAILED=$(_parse_playwright_stat "${RESULTS_JSON}" "unexpected")
+SKIPPED=$(_parse_playwright_stat "${RESULTS_JSON}" "skipped")
+FLAKY=$(_parse_playwright_stat "${RESULTS_JSON}" "flaky")
 
-PASSED=$(jq -r '.stats.expected // 0' "${RESULTS_JSON}" 2>/dev/null || echo 0)
-FAILED=$(jq -r '.stats.unexpected // 0' "${RESULTS_JSON}" 2>/dev/null || echo 0)
-SKIPPED=$(jq -r '.stats.skipped // 0' "${RESULTS_JSON}" 2>/dev/null || echo 0)
-FLAKY=$(jq -r '.stats.flaky // 0' "${RESULTS_JSON}" 2>/dev/null || echo 0)
-
-# 数値防御 (jq が null 返した場合の保険)
+# 数値防御 (helper が空文字を返した場合の保険)
 PASSED=${PASSED:-0}
 FAILED=${FAILED:-0}
 SKIPPED=${SKIPPED:-0}

@@ -8,6 +8,8 @@
 #   - log_pass / log_fail / log_skip   (統一フォーマット出力)
 #   - is_dev_vps                       (dev VPS 判定 — prod に SSH 不可な環境かどうか)
 #   - gate_record / gate_summary       (結果集約用)
+#   - assert_not_skip_only_playwright  (Playwright JSON で skip-only を構造的 FAIL に)
+#   - assert_not_skip_only_pytest      (pytest summary 行で skip-only を構造的 FAIL に)
 #
 # 出力フォーマット (色・CR は使わない):
 #   [PASS] L0 schema: <要約>
@@ -134,4 +136,103 @@ gate_project_root() {
   lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   # scripts/launch_gate/ から 2 つ上が PROJECT_ROOT
   (cd "${lib_dir}/../.." && pwd)
+}
+
+# ---------------------------------------------------------------------------
+# skip-only 構造的判定 helper (G scope, 2026-05-28 追加)
+#
+# memory [[feedback-skip-only-fail-at-gate-not-spec]] の意図:
+#   spec 内に skip-on-skip 多段配線するのではなく、gate script 側で
+#   「PASS=0 / FAIL=0 / SKIP>0」を機械的に検出して FAIL に倒す。
+#
+# 使い方:
+#   # Playwright JSON 結果
+#   if ! assert_not_skip_only_playwright "${RESULTS_JSON}"; then
+#     gate_record FAIL "${LABEL}" "skip-only run (gate 側構造的 FAIL)"
+#     exit 1
+#   fi
+#
+#   # pytest log (将来 L6/L7 で pytest 系を追加した場合)
+#   pytest ... 2>&1 | tee /tmp/Lx_pytest.log
+#   if ! assert_not_skip_only_pytest /tmp/Lx_pytest.log; then
+#     gate_record FAIL "${LABEL}" "pytest skip-only (gate 側構造的 FAIL)"
+#     exit 1
+#   fi
+#
+# 戻り値:
+#   0 — skip-only でない (passed>0 or failed>0)、または判定不能 (ファイル無し)
+#   1 — skip-only (passed=0 && failed=0 && skipped>0)
+# ---------------------------------------------------------------------------
+
+# Playwright JSON stats フィールド取得 (jq → python3 → grep の 3 段フォールバック)
+_parse_playwright_stat() {
+  local json="$1" field="$2"
+  if [[ ! -f "${json}" ]]; then
+    echo 0
+    return 0
+  fi
+  if command -v jq >/dev/null 2>&1; then
+    jq -r ".stats.${field} // 0" "${json}" 2>/dev/null || echo 0
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c "import json,sys
+try:
+  d=json.load(open('${json}'))
+  print(d.get('stats',{}).get('${field}',0))
+except Exception:
+  print(0)" 2>/dev/null || echo 0
+  else
+    # 最終フォールバック: grep ベース (脆弱だが skip 判定よりは強い)
+    grep -oE "\"${field}\"[[:space:]]*:[[:space:]]*[0-9]+" "${json}" 2>/dev/null \
+      | head -1 \
+      | grep -oE '[0-9]+$' \
+      || echo 0
+  fi
+}
+
+assert_not_skip_only_playwright() {
+  local json="${1:-}"
+  if [[ -z "${json}" || ! -f "${json}" ]]; then
+    # JSON 無し → 判定不能、別の check で扱う
+    return 0
+  fi
+  local passed failed skipped flaky passed_total
+  passed=$(_parse_playwright_stat "${json}" "expected")
+  failed=$(_parse_playwright_stat "${json}" "unexpected")
+  skipped=$(_parse_playwright_stat "${json}" "skipped")
+  flaky=$(_parse_playwright_stat "${json}" "flaky")
+  # 数値防御
+  passed=${passed:-0}; failed=${failed:-0}; skipped=${skipped:-0}; flaky=${flaky:-0}
+  passed_total=$(( passed + flaky ))
+  if [[ "${passed_total}" -eq 0 && "${failed}" -eq 0 && "${skipped}" -gt 0 ]]; then
+    log_info "assert_not_skip_only_playwright: skip-only detected (passed=0 failed=0 skipped=${skipped})"
+    return 1
+  fi
+  return 0
+}
+
+assert_not_skip_only_pytest() {
+  local logfile="${1:-}"
+  if [[ -z "${logfile}" || ! -f "${logfile}" ]]; then
+    return 0
+  fi
+  # pytest 最終 summary 行を抽出
+  # 例: "===== 5 passed, 1 skipped in 1.23s ====="
+  #     "===== 3 skipped in 0.5s ====="
+  #     "===== 3 failed, 2 passed in 0.5s ====="
+  local summary
+  summary=$(grep -E '^=+ .*=+$' "${logfile}" 2>/dev/null | grep -E ' in [0-9.]+s ?' | tail -1)
+  if [[ -z "${summary}" ]]; then
+    # summary 行なし → 判定不能
+    return 0
+  fi
+  local has_pass has_fail has_skip
+  has_pass=$(echo "${summary}" | grep -cE '[0-9]+ passed' || true)
+  has_fail=$(echo "${summary}" | grep -cE '[0-9]+ (failed|error)' || true)
+  has_skip=$(echo "${summary}" | grep -cE '[0-9]+ skipped' || true)
+  has_pass=${has_pass:-0}; has_fail=${has_fail:-0}; has_skip=${has_skip:-0}
+  if [[ "${has_pass}" -eq 0 && "${has_fail}" -eq 0 && "${has_skip}" -gt 0 ]]; then
+    log_info "assert_not_skip_only_pytest: skip-only summary detected ('${summary}')"
+    return 1
+  fi
+  return 0
 }
