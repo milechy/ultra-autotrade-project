@@ -32,6 +32,14 @@ PERPLEXITY_API_URL = "https://api.perplexity.ai/chat/completions"
 _VALID_FED_STANCES = ("hawkish", "neutral", "dovish")
 _VALID_STABLECOIN_RISKS = ("low", "medium", "high")
 
+# 2026-05-28: staging soak で sonar-pro が 200/400 交互。
+# 1) 非2xx 時に response body をログ (DoD: 真因特定)。
+# 2) 4xx/5xx/timeout を一過性とみなし最大 1 回 retry (DoD: 200 安定化)。
+_PERPLEXITY_MAX_ATTEMPTS = 2
+_PERPLEXITY_RETRY_BACKOFF_SECONDS = 2.0
+# auth 系は retry 不要 (key が違うだけ無駄打ち) なので除外。
+_PERPLEXITY_NON_RETRIABLE_STATUSES = frozenset({401, 403})
+
 
 # ============================================================
 # Schemas
@@ -115,15 +123,7 @@ async def fetch_finance_data(client: httpx.AsyncClient) -> FinanceFeedResult:
             "temperature": 0.1,
         }
 
-        resp = await client.post(
-            PERPLEXITY_API_URL,
-            json=payload,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            timeout=20.0,
-        )
+        resp = await _post_with_retry(client, payload, api_key)
         resp.raise_for_status()
         data = resp.json()
 
@@ -178,11 +178,84 @@ async def fetch_finance_data(client: httpx.AsyncClient) -> FinanceFeedResult:
             )
 
     except httpx.HTTPStatusError as exc:
-        logger.error("Perplexity Finance API error: %s", exc.response.status_code)
+        body_preview = ""
+        try:
+            body_preview = exc.response.text[:500]
+        except Exception:  # noqa: BLE001 — body may be unreadable
+            body_preview = "<body unavailable>"
+        logger.error(
+            "Perplexity Finance API error %s — body: %s",
+            exc.response.status_code,
+            body_preview,
+        )
         return FinanceFeedResult(macro_summary="API error: %d" % exc.response.status_code)
     except Exception as exc:
         logger.error("Perplexity Finance fetch failed: %s", exc)
         return FinanceFeedResult(macro_summary="Finance data fetch failed.")
+
+
+async def _post_with_retry(
+    client: httpx.AsyncClient,
+    payload: dict,
+    api_key: str,
+) -> httpx.Response:
+    """POST to Perplexity with bounded retry on transient errors.
+
+    Why: 2026-05-28 soak で sonar-pro が 200/400 交互。alternating pattern は
+    Perplexity 内部の web search 層がたまに失敗する一過性エラーが本命なので、
+    短い backoff の 1 回 retry で 200 化を狙う (Asana 1215189378837169)。
+    """
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    last_resp: Optional[httpx.Response] = None
+    for attempt in range(1, _PERPLEXITY_MAX_ATTEMPTS + 1):
+        try:
+            resp = await client.post(
+                PERPLEXITY_API_URL,
+                json=payload,
+                headers=headers,
+                timeout=20.0,
+            )
+        except (httpx.TimeoutException, httpx.TransportError) as exc:
+            if attempt >= _PERPLEXITY_MAX_ATTEMPTS:
+                raise
+            logger.warning(
+                "Perplexity Finance transport error on attempt %d/%d: %s — retrying in %.1fs",
+                attempt,
+                _PERPLEXITY_MAX_ATTEMPTS,
+                exc,
+                _PERPLEXITY_RETRY_BACKOFF_SECONDS,
+            )
+            await asyncio.sleep(_PERPLEXITY_RETRY_BACKOFF_SECONDS)
+            continue
+
+        if resp.status_code < 400 or resp.status_code in _PERPLEXITY_NON_RETRIABLE_STATUSES:
+            return resp
+
+        last_resp = resp
+        if attempt >= _PERPLEXITY_MAX_ATTEMPTS:
+            return resp
+
+        body_preview = ""
+        try:
+            body_preview = resp.text[:500]
+        except Exception:  # noqa: BLE001
+            body_preview = "<body unavailable>"
+        logger.warning(
+            "Perplexity Finance %s on attempt %d/%d — body: %s — retrying in %.1fs",
+            resp.status_code,
+            attempt,
+            _PERPLEXITY_MAX_ATTEMPTS,
+            body_preview,
+            _PERPLEXITY_RETRY_BACKOFF_SECONDS,
+        )
+        await asyncio.sleep(_PERPLEXITY_RETRY_BACKOFF_SECONDS)
+
+    # Unreachable: loop always returns or raises, but mypy/pyright wants this.
+    assert last_resp is not None
+    return last_resp
 
 
 # ============================================================
