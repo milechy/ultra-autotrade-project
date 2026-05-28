@@ -896,7 +896,7 @@ claude.ai が Step 0 をスキップして §9 を実行した場合、それは
 - [ ] staging-production クロスコンタミがないか(PR #154 / #155)
 - [ ] DATABASE_URL / AAVE_NETWORK / *_API_KEY / container_name / volume が分離されているか
 - [ ] APP_ENV が正しい値か(staging で APP_ENV=staging, prod で APP_ENV=production)
-- [ ] AAVE_NETWORK が staging=base_sepolia / production=base_mainnet か
+- [ ] AAVE_NETWORK が staging=base_sepolia / production=base か
 
 ### Migration / Schema
 - [ ] models 変更で alembic migration が生成されているか(PR #155 privy_did)
