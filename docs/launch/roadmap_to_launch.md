@@ -244,6 +244,7 @@ docker exec ultra-autotrade-postgres-production \
 | `docs/launch/lanes/lane2_approval_rate.md` | §4.3 / §4.4 / §3 Lane 2 | 既存 (PR #325 merge 済) |
 | `docs/launch/lanes/lane3_sales_ops.md` | §3 Lane 3 | 既存 (PR #325 merge 済) |
 | `docs/launch/lanes/lane4_mori_dm.md` | §1 条件 5 / §3 Lane 4 | 既存 (PR #325 merge 済) |
+| `docs/launch/2026-06-01_partner_launch_runbook.md` | §1 条件 4 (UAT 14日観察 起算点) / §5 D-day 朝チェックリスト・緊急停止・Slack 監視 | **Lane M (新規 / 6/1 D-day 当日運用)** |
 
 ### Slack
 
