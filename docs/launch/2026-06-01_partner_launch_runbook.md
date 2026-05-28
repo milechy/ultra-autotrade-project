@@ -145,6 +145,25 @@ ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 \
 
 - [ ] 200
 
+#### A-4. `REBALANCE_SHADOW_MODE` 現状値確認 (切替前 baseline)
+
+> 2026-05-28 以降、production は scheduler 稼働 + 実 tx 停止の safety valve として `REBALANCE_SHADOW_MODE=true` に戻している。
+> 6/1 運用開始時に **§3.0 で `false` に切替** しないと実 tx が走らない。本 Step では切替前の現状値を記録するだけ。
+>
+> 定義元: `docker-compose.production.yml` L143 (blue) / L195 (green) の `environment:` 直書き (`.env.production` ではない)。
+
+```bash
+ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 <<'ENDSSH'
+docker exec ultra-autotrade-backend-blue-production printenv 2>/dev/null | grep REBALANCE_SHADOW_MODE || echo 'blue not running'
+docker exec ultra-autotrade-backend-green-production printenv 2>/dev/null | grep REBALANCE_SHADOW_MODE || echo 'green not running'
+grep -nE "REBALANCE_SHADOW_MODE" /opt/ultra-autotrade/docker-compose.production.yml
+ENDSSH
+```
+
+- [ ] active backend (blue または green) の値を記録 (期待値: `REBALANCE_SHADOW_MODE=true`)
+- [ ] `docker-compose.production.yml` L143 / L195 の値も記録
+- [ ] **`true` のまま §3 launch 宣言してはならない** — §3.0 で必ず `false` に切替
+
 ### Step B. 両 partner login (08:45〜09:00)
 
 > partner 本人ではなく **小林さんが代理で確認** する。partner 本人 login 確認は 09:00 以降に partner 自身で実施。
@@ -242,6 +261,99 @@ ENDSSH
 ## 3. D-day Launch 宣言 (10:00 JST)
 
 朝チェックリスト Step A〜D 全 PASS 後、以下を実施。
+
+### 3.0 `REBALANCE_SHADOW_MODE` 切替 (`true` → `false`) ⚠️ Tier S 本番操作
+
+> **CLAUDE.md §13 3 段プロトコル準拠**。実 tx を解放する最終ゲート。partner 通知 (§3.1) の **直前** に実施。
+>
+> 背景: 2026-05-28 に scheduler は稼働させつつ実 tx を止める safety valve として `REBALANCE_SHADOW_MODE=true` に戻している。6/1 運用開始時に `false` に戻さないと実 tx が走らない。
+>
+> 定義元: `docker-compose.production.yml` L143 (blue) / L195 (green) の `environment:` 直書き (`.env.production` **ではない**)。
+>
+> **`sed -i` 禁止** (`.claude/CLAUDE.md` ファイル編集ルール / 前行連結バグ防止) — `awk + tmpfile + mv` を使う。
+>
+> **§3 3 段プロトコル適用**: ① 本 §3.0 に基づき小林さんが手順を読み上げ → ② 実機 1 行ずつ実行 + 各 step 結果を Slack `#ultra-auto-project` thread に貼る → ③ §3.0.5 記録欄を埋めて commit。
+
+#### 3.0.1 切替前 backup + md5 記録
+
+```bash
+ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 <<'ENDSSH'
+cd /opt/ultra-autotrade
+TS=$(date +%Y%m%d-%H%M%S)
+cp docker-compose.production.yml docker-compose.production.yml.bak-${TS}
+md5sum docker-compose.production.yml docker-compose.production.yml.bak-${TS}
+grep -nE "REBALANCE_SHADOW_MODE" docker-compose.production.yml
+ENDSSH
+```
+
+- [ ] backup ファイル名 (`docker-compose.production.yml.bak-YYYYMMDD-HHMMSS`) を §3.0.5 にメモ
+- [ ] 切替前 md5sum を §3.0.5 にメモ (rollback 時の照合用)
+- [ ] L143 / L195 の両方が `"true"` であることを確認 (L番号は yml 編集で前後する可能性あり、行番号より値で判定)
+
+#### 3.0.2 `awk + tmpfile + mv` で `"true"` → `"false"` 置換 (blue + green 両方)
+
+```bash
+ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 <<'ENDSSH'
+cd /opt/ultra-autotrade
+awk '/REBALANCE_SHADOW_MODE/ { gsub(/"true"/, "\"false\""); print; next } { print }' \
+  docker-compose.production.yml > /tmp/docker-compose.production.yml.new
+mv /tmp/docker-compose.production.yml.new docker-compose.production.yml
+echo "--- after replace ---"
+grep -nE "REBALANCE_SHADOW_MODE" docker-compose.production.yml
+echo "--- diff against backup (REBALANCE_SHADOW_MODE 行のみ変化していることを確認) ---"
+diff docker-compose.production.yml.bak-* docker-compose.production.yml | head -20
+md5sum docker-compose.production.yml
+ENDSSH
+```
+
+- [ ] L143 / L195 (相当行) の両方が `"false"` に変わっていることを確認
+- [ ] `diff` 出力が REBALANCE_SHADOW_MODE 行 2 件のみ (他行への副作用ゼロ)
+- [ ] 切替後 md5sum を §3.0.5 にメモ
+
+#### 3.0.3 blue / green コンテナを force-recreate
+
+> `docker compose restart` は `environment:` の再読み込みが効かない場合がある (CLAUDE.lessons.md 2026-04-01 教訓)。`up -d --force-recreate --no-deps` を使う。
+
+```bash
+ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 <<'ENDSSH'
+cd /opt/ultra-autotrade
+docker compose -f docker-compose.production.yml up -d --force-recreate --no-deps backend-blue backend-green
+sleep 15
+docker ps --filter name=ultra-autotrade-backend --format 'table {{.Names}}\t{{.Status}}'
+ENDSSH
+```
+
+- [ ] blue / green 両方が `Up X seconds (healthy)` になるまで待つ (15-30 秒)
+- [ ] active backend (nginx upstream が向いている側) の `/health` が 200
+- [ ] healthy 表示にならない場合は §5.5 で即時 rollback、原因特定後に再実行
+
+#### 3.0.4 `printenv` で `false` が反映されているか確認
+
+```bash
+ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 <<'ENDSSH'
+docker exec ultra-autotrade-backend-blue-production printenv | grep REBALANCE_SHADOW_MODE
+docker exec ultra-autotrade-backend-green-production printenv | grep REBALANCE_SHADOW_MODE
+ENDSSH
+```
+
+- [ ] blue: `REBALANCE_SHADOW_MODE=false`
+- [ ] green: `REBALANCE_SHADOW_MODE=false`
+- [ ] **どちらかが `true` のまま** なら force-recreate が効いていない → §5.5 rollback して §3.0.3 から再実行
+
+#### 3.0.5 切替記録 (§6.6 にも貼付)
+
+| 項目 | 値 |
+|---|---|
+| 切替実施時刻 (JST) | TBD (例: 2026-06-01 09:55) |
+| backup ファイル名 | TBD (例: `docker-compose.production.yml.bak-20260601-095512`) |
+| 切替前 md5 | TBD |
+| 切替後 md5 | TBD |
+| blue `printenv` 結果 | TBD (期待: `REBALANCE_SHADOW_MODE=false`) |
+| green `printenv` 結果 | TBD (期待: `REBALANCE_SHADOW_MODE=false`) |
+| 実施者 | 小林さん |
+
+- [ ] 上記すべて埋めて §6.6 に転記
+- [ ] Slack `#ultra-auto-project` に「REBALANCE_SHADOW_MODE: true → false 切替完了 (実 tx 解放)」を投稿
 
 ### 3.1 partner 本人通知 (小林さん本人送信)
 
@@ -389,6 +501,48 @@ curl -X POST https://api.ultra-auto-trade.com/api/automation/emergency-stop/resu
 4. Slack `#ultra-auto-project` に中止理由 + 再判定予定日を投稿
 5. roadmap §1 条件 4 の起算点を更新
 
+### 5.5 `REBALANCE_SHADOW_MODE` rollback (`false` → `true`) ⚠️ Tier S 本番操作
+
+> §3.0 で切替した `REBALANCE_SHADOW_MODE` を即座に `true` に戻す (実 tx 停止 + scheduler は稼働継続)。
+> 緊急停止フラグ ON (§5.2) と組み合わせると二重防御。**手順は §3.0 と同一・置換方向のみ逆**。
+> §13 3 段プロトコル準拠 (緊急時も skip しない)。
+
+#### 5.5.1 rollback 実行
+
+```bash
+ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 <<'ENDSSH'
+cd /opt/ultra-autotrade
+TS=$(date +%Y%m%d-%H%M%S)
+cp docker-compose.production.yml docker-compose.production.yml.bak-rollback-${TS}
+md5sum docker-compose.production.yml docker-compose.production.yml.bak-rollback-${TS}
+
+awk '/REBALANCE_SHADOW_MODE/ { gsub(/"false"/, "\"true\""); print; next } { print }' \
+  docker-compose.production.yml > /tmp/docker-compose.production.yml.new
+mv /tmp/docker-compose.production.yml.new docker-compose.production.yml
+grep -nE "REBALANCE_SHADOW_MODE" docker-compose.production.yml
+
+docker compose -f docker-compose.production.yml up -d --force-recreate --no-deps backend-blue backend-green
+sleep 15
+docker ps --filter name=ultra-autotrade-backend --format 'table {{.Names}}\t{{.Status}}'
+docker exec ultra-autotrade-backend-blue-production printenv | grep REBALANCE_SHADOW_MODE
+docker exec ultra-autotrade-backend-green-production printenv | grep REBALANCE_SHADOW_MODE
+ENDSSH
+```
+
+- [ ] blue / green 両方が `REBALANCE_SHADOW_MODE=true` に戻っていることを確認
+- [ ] rollback 後 md5 を §6.6 にメモ
+- [ ] Slack `#ultra-auto-project` に rollback 理由 + 時刻 + md5 を投稿
+- [ ] partner 両者に状況連絡 (小林さん本人送信 / 5 分以内)
+- [ ] 14 日カウントは中断 — 再開条件は §5.4 launch 中止判定の再判定ルートを準用
+
+#### 5.5.2 緊急停止フラグも併用する場合
+
+> tx 発生中の取引異常など、shadow mode rollback だけでは間に合わない時は §5.2 を **先に** 実行してから §5.5.1。
+
+1. §5.2 緊急停止 ON (実 tx を強制停止)
+2. §5.5.1 shadow=true rollback (scheduler が次サイクルで dry-run になる)
+3. 両方反映確認後、原因究明 → 24h 以内に方針判断 (再 launch / launch 中止)
+
 ---
 
 ## 6. 14 日カウント起算記録 (D-day 実施後に埋める)
@@ -445,6 +599,18 @@ curl -X POST https://api.ultra-auto-trade.com/api/automation/emergency-stop/resu
 - [ ] 両 partner から「継続 OK」明示承認 (DM)
 - [ ] Asana 「Partner UAT 完走判定」タスク close
 - [ ] roadmap §1 条件 4 を ✅ に更新
+
+### 6.6 `REBALANCE_SHADOW_MODE` 切替記録 (§3.0.5 / §5.5 の転記先)
+
+> §3.0 実施後・§5.5 rollback 実施後にそれぞれ追記。複数回 rollback した場合は行追加。
+
+| 時刻 (JST) | 方向 | backup ファイル名 | 切替前 md5 | 切替後 md5 | blue printenv | green printenv | 実施者 | 備考 |
+|---|---|---|---|---|---|---|---|---|
+| TBD | true→false (§3.0) | TBD | TBD | TBD | TBD | TBD | 小林さん | launch 宣言直前 |
+| (rollback 発生時のみ) | false→true (§5.5) | TBD | TBD | TBD | TBD | TBD | 小林さん | rollback 理由: TBD |
+
+- [ ] §3.0 切替記録を 1 行目に転記
+- [ ] §5.5 rollback が発生した場合は 2 行目以降に追記
 
 ---
 
