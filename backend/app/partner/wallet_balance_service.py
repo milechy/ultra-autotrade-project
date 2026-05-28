@@ -88,18 +88,16 @@ def _get_base_rpc_url() -> Optional[str]:
       2. BASE_RPC_URL (汎用)
       3. WEB3_RPC_URL (legacy)
     """
-    return (
-        os.getenv("AAVE_RPC_URL_BASE")
-        or os.getenv("BASE_RPC_URL")
-        or os.getenv("WEB3_RPC_URL")
-    )
+    return os.getenv("AAVE_RPC_URL_BASE") or os.getenv("BASE_RPC_URL") or os.getenv("WEB3_RPC_URL")
 
 
 def _get_web3() -> Optional[Any]:
     """Web3 client を返す。web3 未インストール / RPC URL 未設定なら None。"""
     rpc_url = _get_base_rpc_url()
     if not rpc_url:
-        logger.warning("[wallet_balance] Base RPC URL not configured (AAVE_RPC_URL_BASE / BASE_RPC_URL)")
+        logger.warning(
+            "[wallet_balance] Base RPC URL not configured (AAVE_RPC_URL_BASE / BASE_RPC_URL)"
+        )
         return None
 
     try:
@@ -149,7 +147,9 @@ def _fetch_eth_usd_price(w3: Any) -> tuple[Decimal, bool]:
         round_data = feed.functions.latestRoundData().call()
         _round_id, answer, _started_at, _updated_at, _answered_in_round = round_data
         if answer <= 0:
-            logger.warning("[wallet_balance] Chainlink ETH/USD returned non-positive answer: %s", answer)
+            logger.warning(
+                "[wallet_balance] Chainlink ETH/USD returned non-positive answer: %s", answer
+            )
             return ETH_USD_FALLBACK_PRICE, True
         price = Decimal(answer) / Decimal(10**CHAINLINK_DECIMALS)
         return price, False

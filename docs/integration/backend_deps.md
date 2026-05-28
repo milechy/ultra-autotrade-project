@@ -89,6 +89,16 @@
 - **影響範囲**: 新規 router 追加のみ。既存 endpoint への影響なし。tests/test_referral_router.py で既存 endpoint の404でないことを保証。
 - **承認**: feature/ras-l2-backend-api → main の通常フロー経由（PR #194）
 
+### 変更 #9: Partner wallet balance KPI — wallet_balance_router 登録 (PR #440 / 2026-05-28)
+- **コミット範囲**: `6713794` (feat/partner-wallet-balance-20260527)
+- **変更内容**:
+  - `from app.partner.wallet_balance_router import router as wallet_balance_router` を追加
+  - `app.include_router(wallet_balance_router, prefix="/api/partner", tags=["partner"])` を `allocation_router` の直後に追加
+  - 計 4 行追加のみ。既存 router・エンドポイント・ロジックへの変更なし
+- **理由**: Asana 1215185901145482 / partner ダッシュボード — partner 自身のウォレット残高 (USDC + ETH on Base mainnet) を `/api/partner/wallet-balance` で取得し、`PerformanceSummaryKPI.tsx` に表示する。既存 `partner_router` / `allocation_router` と同パターンの新規 router 登録。
+- **影響範囲**: 新規 router 追加のみ。既存 endpoint への影響なし。`backend/tests/partner/test_wallet_balance.py` で endpoint の存在と response shape を保証。
+- **承認**: feat/partner-wallet-balance-20260527 → main の通常フロー経由（PR #440）
+
 ### 変更 #8: P0-2 Safety wiring — compound_risk_monitor startup 登録 (PR #240 / 2026-05-15)
 - **コミット範囲**: `d6a4ed3` (feat/safety-wiring)
 - **変更内容**:
