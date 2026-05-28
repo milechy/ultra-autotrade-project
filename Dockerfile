@@ -55,8 +55,12 @@ RUN if [ "$BUILD_MODE" = "production" ]; then \
     fi
 
 # 非 root ユーザーで実行（docs/13_security_design.md）
-RUN useradd --no-create-home --shell /bin/false appuser
-RUN mkdir -p /var/log/ultra-autotrade && chown appuser:appuser /var/log/ultra-autotrade
+# UID/GID は 10001 で固定。docker-compose の ultra-state-init が同じ UID で
+# named volume (/var/run/ultra) を chown するためここと値が一致している必要がある。
+RUN groupadd --gid 10001 appuser \
+    && useradd --no-create-home --shell /bin/false --uid 10001 --gid 10001 appuser
+RUN mkdir -p /var/log/ultra-autotrade /var/run/ultra \
+    && chown appuser:appuser /var/log/ultra-autotrade /var/run/ultra
 USER appuser
 
 EXPOSE 8000
