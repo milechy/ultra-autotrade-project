@@ -130,7 +130,7 @@ grep '^BYBIT_SANDBOX=' .env.production
 
 # AAVE_NETWORK が mainnet か（sepolia が含まれないか）
 grep '^AAVE_NETWORK=' .env.production
-# → AAVE_NETWORK=base_mainnet
+# → AAVE_NETWORK=base
 
 # INTERNAL_API_TOKEN が設定されているか
 grep '^INTERNAL_API_TOKEN=' .env.production
