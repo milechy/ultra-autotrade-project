@@ -218,55 +218,63 @@ grep "Step 0 確認済" /opt/ultra-autotrade/logs/morning_protocol.log | wc -l
 
 ---
 
-## 4. 山本さん UAT 完走
+## 4. Partner UAT 完走
+
+> 2026-05-28 改訂: 2 partner 体制（山本+橋口）対応。SQL を `user_id=11` ハードコードから `role='partner' AND is_active=TRUE` 一般化（Asana 1215185448109917）。
+> 詳細閾値・partner 別内訳 SQL は `docs/uat_completion_criteria.md` 参照。
 
 ### 4.1 定義
 
-「山本さん UAT 完走」= 以下の**全条件**を満たす状態:
+「Partner UAT 完走」= 以下の**全条件**を満たす状態:
 
 | 条件 | 測定方法 |
 |---|---|
 | UAT シナリオ全ステップ実行完了 | Asana id=16 (A-4) タスクで閾値詳細化中 |
-| 山本さん (user_id=11) の全 proposals が `executed` or `expired` | `non_executed_active = 0` (下記 SQL) |
-| proposals が実際に生成・承認フローを経ている | `total_proposals ≥ 5` かつ `executed ≥ 1` |
-| 山本さんから小林さんへの明示的承認メッセージ受領 | DM 確認 (非自動化) |
+| 全 partner (`role='partner' AND is_active=TRUE`) の active な未完了 proposals が 0 | `non_executed_active = 0` (下記 SQL) |
+| partner 合算で proposals が実際に生成・承認フローを経ている | `total_proposals ≥ 5` かつ `executed ≥ 1` |
+| 各 partner から小林さんへの明示的承認メッセージ受領 | DM 確認 (非自動化) |
 
-> **注**: id=16 Lane で proposals 全件 EXECUTED の数値閾値を詳細化中。本ドキュメントでは枠組みのみ。
+> **注**: id=16 Lane で proposals 全件 EXECUTED の数値閾値を詳細化済 (`docs/uat_completion_criteria.md` PR #251 → Asana 1215185448109917 改訂)。本ドキュメントは枠組みのみ。
 
 ### 4.2 UAT 完走判定 SQL
 
 ```sql
--- 山本さん (user_id=11) UAT 状態確認
+-- Partner UAT 状態確認 (role='partner' AND is_active=TRUE で合算)
+WITH partners AS (
+  SELECT id FROM users WHERE role = 'partner' AND is_active = TRUE
+)
 SELECT
-  (SELECT COUNT(*) FROM proposals WHERE user_id = 11) AS total_proposals,
-  (SELECT COUNT(*) FROM proposals WHERE user_id = 11 AND status = 'executed') AS executed,
-  (SELECT COUNT(*) FROM proposals WHERE user_id = 11 AND status = 'expired') AS expired,
-  (SELECT COUNT(*) FROM proposals WHERE user_id = 11 AND status = 'rejected') AS rejected,
+  (SELECT COUNT(*) FROM proposals p JOIN partners ON partners.id = p.user_id) AS total_proposals,
+  (SELECT COUNT(*) FROM proposals p JOIN partners ON partners.id = p.user_id WHERE p.status = 'executed') AS executed,
+  (SELECT COUNT(*) FROM proposals p JOIN partners ON partners.id = p.user_id WHERE p.status = 'expired')  AS expired,
+  (SELECT COUNT(*) FROM proposals p JOIN partners ON partners.id = p.user_id WHERE p.status = 'rejected') AS rejected,
   (SELECT COUNT(*)
-   FROM proposals
-   WHERE user_id = 11
-     AND status NOT IN ('executed', 'expired', 'rejected')
-     AND expires_at > NOW()) AS non_executed_active,
-  -- UAT 完走候補判定: active な未完了 proposals が 0件かつ total >= 5
+     FROM proposals p
+     JOIN partners ON partners.id = p.user_id
+    WHERE p.status NOT IN ('executed', 'expired', 'rejected')
+      AND p.expires_at > NOW()) AS non_executed_active,
+  -- UAT 完走候補判定: active な未完了 proposals が 0件かつ partner 合算 total >= 5
   CASE
-    WHEN (SELECT COUNT(*) FROM proposals WHERE user_id = 11) < 5
+    WHEN (SELECT COUNT(*) FROM proposals p JOIN partners ON partners.id = p.user_id) < 5
       THEN 'WAITING (proposals 生成待ち)'
-    WHEN (SELECT COUNT(*) FROM proposals WHERE user_id = 11
-          AND status NOT IN ('executed','expired','rejected')
-          AND expires_at > NOW()) = 0
+    WHEN (SELECT COUNT(*) FROM proposals p JOIN partners ON partners.id = p.user_id
+          WHERE p.status NOT IN ('executed','expired','rejected')
+            AND p.expires_at > NOW()) = 0
       THEN 'CANDIDATE (最終承認 DM 待ち)'
     ELSE 'IN_PROGRESS'
   END AS uat_state;
 ```
 
-### 4.3 現在値 (2026-05-18 時点)
+partner 別内訳は `docs/uat_completion_criteria.md` § partner 別内訳 SQL を参照。
+
+### 4.3 現在値 (2026-05-28 改訂時点)
 
 | 項目 | 現在値 |
 |---|---|
-| UAT 進行段階 | ウォレット接続完了、proposals 生成待ち |
-| total_proposals (user_id=11) | 0件 (AI 判定 14件あるが proposals 生成に至っていない) |
+| UAT 進行段階 | 山本さん wallet `0x2064...cc66` 登録済、橋口さん 2026-06-01 までに wallet 登録予定。proposals 生成待ち |
+| total_proposals (partner 合算) | 旧値（2026-05-18, 山本さん単独）2件 expired のみ。本 PR マージ後に partner 合算で再計測 |
 | non_executed_active | 0件 (proposals 自体が未生成のため) |
-| 山本さん承認 DM | 未受領 |
+| partner 承認 DM | 未受領 |
 | 判定 | ❌ 未完走 (proposals 生成・承認フロー未到達) |
 
 ---
@@ -395,15 +403,16 @@ recent AS (
      WHERE recorded_at > NOW() - INTERVAL '24 hours')                        AS l6_zero_pct
 ),
 
--- 山本さん UAT 状態
+-- Partner UAT 状態 (2026-05-28: 2 partner 化 / role='partner' AND is_active=TRUE 一般化)
 uat AS (
   SELECT
     COUNT(*)                                                                   AS total,
-    COUNT(*) FILTER (WHERE status = 'executed')                               AS executed,
-    COUNT(*) FILTER (WHERE status NOT IN ('executed','expired','rejected')
-                     AND expires_at > NOW())                                   AS active_non_exec
-  FROM proposals
-  WHERE user_id = 11
+    COUNT(*) FILTER (WHERE p.status = 'executed')                              AS executed,
+    COUNT(*) FILTER (WHERE p.status NOT IN ('executed','expired','rejected')
+                     AND p.expires_at > NOW())                                 AS active_non_exec
+  FROM proposals p
+  JOIN users u ON u.id = p.user_id
+  WHERE u.role = 'partner' AND u.is_active = TRUE
 )
 
 SELECT '============================================' AS metric, '' AS value

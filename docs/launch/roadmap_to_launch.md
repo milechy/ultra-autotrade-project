@@ -62,13 +62,15 @@
 - **6/3 達成見込み**: 計測機能実装 (別 Tier B タスク) + 直近 PR の Approve 状況確認後に評価
 - **依存タスク**: Step 0 記録機能実装 (要別タスク起票)
 
-### 条件 4: 山本さん UAT 完走 (proposals 全件 EXECUTED 判定基準満たす)
-- **詳細仕様**: `docs/launch_decision_criteria_v2.md` §4 (UAT 完走 SQL: `non_executed_active = 0` かつ `total_proposals ≥ 5` かつ `executed ≥ 1` + 山本さんから明示承認 DM)
-- **判定 SQL** (同 docs §4.2): `proposals` テーブル WHERE `user_id=11` の group by status + uat_state 判定 CASE 式
-- **現状値 (2026-05-18 時点、同 docs §4.3)**: ❌ 未完走 (total_proposals=0、ウォレット接続完了 / proposals 生成待ち)
+### 条件 4: Partner UAT 完走 (proposals 全件 EXECUTED 判定基準満たす)
+- **詳細仕様**: `docs/launch_decision_criteria_v2.md` §4 (UAT 完走 SQL: `non_executed_active = 0` かつ `total_proposals ≥ 5` かつ `executed ≥ 1` + 各 partner から明示承認 DM)
+- **判定 SQL** (同 docs §4.2): `proposals` JOIN `users` WHERE `role='partner' AND is_active=TRUE` の group by status + uat_state 判定 CASE 式（2026-05-28 改訂で 2 partner 化 / Asana 1215185448109917）
+- **partner 別内訳 SQL**: `docs/uat_completion_criteria.md` § partner 別内訳 SQL（合算で達成しても 1 partner に集中していないか確認）
+- **現状値 (2026-05-28 改訂時点)**: ❌ 未完走 (旧山本さん単独 total_proposals=2 expired のみ / 橋口さん proposals 未生成 / partner 合算 baseline は本改訂後再計測)
 - **5/20 進捗**: P0-X2 fund_allocations $4,600 INSERT 完了 (Asana 1214825504961756 / id=6 / 2026-05-20 04:49:51 UTC) — UAT proposals 生成フローの起算点が立った
-- **6/3 達成見込み**: proposals 5 件以上生成 + 全件 EXECUTED/EXPIRED/REJECTED + 山本さん承認 DM。proposals 生成速度に依存 (TBD)
-- **依存タスク**: id=16 (A-4) UAT 完走閾値詳細化 / 山本さん wallet 接続後の proposals 生成
+- **5/28 進捗**: 橋口さん (id=18, role=partner) を `users` テーブルに INSERT 済。山本さん wallet `0x2064...cc66` 登録済、橋口さん 2026-06-01 までに wallet 登録予定 — 2 partner 並走で UAT を回す体制が整った
+- **6/3 達成見込み**: proposals 5 件以上生成 + 全件 EXECUTED/EXPIRED/REJECTED + 各 partner 承認 DM。proposals 生成速度に依存 (TBD)
+- **依存タスク**: id=16 (A-4) UAT 完走閾値詳細化 / 橋口さん wallet 登録 (6/1 までに) → 2 partner 体制で proposals 生成
 
 ### 条件 5: 森先生 法務確認 (BVI / non-custodial)
 - **詳細仕様**: `docs/launch_decision_criteria_v2.md` §5 (BVI 設立 / non-custodial 構造 / 日本居住者向け配信)
@@ -86,17 +88,17 @@
 >
 > 1. 6/3-6/5 最早が本当に最早か実機ベースで再計算
 > 2. 各条件の進捗が引継ぎパッケージの数字を鵜呑みにしただけ
-> 3. 山本さん UAT 14日観察が 5/25 - 6/8 で完走できるか (現状 100% HOLD)
+> 3. Partner UAT 14日観察が 5/25 - 6/8 で完走できるか (現状 100% HOLD / 2026-05-28 から 2 partner 体制)
 > 4. chaos test 3日連続が staging で実施可能か (PR #253 実機状態未確認)
 > 5. 並列 4本構成の Tier S 禁止ファイル抵触リスク
-> 6. 抜けているリスク (HUMAN-REVIEW 14本処理 / v4 反映後の観察期間 / 山本さん wallet 接続 / 営業チーム運用 docs / Phase 2 機能の Phase 1 ローンチ前必要性)
+> 6. 抜けているリスク (HUMAN-REVIEW 14本処理 / v4 反映後の観察期間 / 橋口さん wallet 接続 (6/1 までに登録予定 / 山本さんは 0x2064...cc66 登録済) / 営業チーム運用 docs / Phase 2 機能の Phase 1 ローンチ前必要性)
 > 7. (handoff 内に明示なし)
 
 ### 2.1 起算点と着地点 (calendar 計算)
 
 | 起算イベント | 起算日 (実機) | 必要日数 | 着地日 |
 |---|---|---|---|
-| 山本さん UAT 開始 (P0-X2 INSERT) | 2026-05-20 04:49:51 UTC (Asana 1214825504961756 / id=6 完了) | proposals 生成速度依存 (TBD) | TBD |
+| Partner UAT 開始 (P0-X2 INSERT) | 2026-05-20 04:49:51 UTC (Asana 1214825504961756 / id=6 完了 / 2026-05-28 から 2 partner 体制: 山本=id 11 wallet 登録済、橋口=id 18 wallet 6/1 まで登録予定) | proposals 生成速度依存 (TBD) | TBD |
 | chaos test 3日連続 | TBD (Lane 1 起動次第) | 3日 + 観測 1日 | TBD |
 | HUMAN-REVIEW 14本処理完了 | TBD | TBD | TBD |
 | v4 反映後の観察期間 | 2026-05-19 (PR #302 merge済) | TBD | TBD |
@@ -117,7 +119,7 @@
 | L1-L6 14日連続緑 | 0/14 日 | ❌ 未達 | L2 閾値 270min 修正 (id=29) → 修正後から連続緑カウント開始 |
 | chaos test 3日連続 | 未実施 | ❌ 未計測 | id=10 タスク起動 |
 | Tier S 承認率 100% | 未計測 | ❌ 未計測 | gh CLI 計測 + Step 0 記録機能実装 |
-| 山本さん UAT 完走 | 進行中 | ❌ 未完走 | proposals 生成フロー到達待ち (5/20 INSERT 完了で起点進行) |
+| Partner UAT 完走 (山本+橋口) | 進行中 | ❌ 未完走 | proposals 生成フロー到達待ち (5/20 INSERT 完了で起点進行 / 5/28 から 2 partner 体制) |
 | 森先生 法務確認 | 未送信 | ❌ 未確認 | 5/22 DM 送信 (id=9 / Lane 4) |
 | **総合** | **0/5 green** | ❌ **ローンチ不可** (2026-05-18 評価) | L2 修正 → 14日緑積み上げ → 他項目並行 |
 
@@ -198,7 +200,7 @@ docker exec ultra-autotrade-postgres-production \
   -f /opt/ultra-autotrade/scripts/launch_dashboard.sql
 ```
 
-集計対象: L3 (ai_decisions 14日)、L4 (proposals expired_rate)、L5 (transactions fail_rate)、直近 24h スナップショット、山本さん UAT (user_id=11) 状態。
+集計対象: L3 (ai_decisions 14日)、L4 (proposals expired_rate)、L5 (transactions fail_rate)、直近 24h スナップショット、Partner UAT (`role='partner' AND is_active=TRUE` で合算: 山本 id=11 + 橋口 id=18) 状態。
 
 ---
 
