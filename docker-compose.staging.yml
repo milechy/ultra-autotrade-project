@@ -132,6 +132,34 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ===== Init: backend volume permissions =====
+  # 主目的: state.json (Asana 1215189630575554, 2026-05-28 soak 調査)。
+  # 名前付き volume `ultra-state-staging-new` は作成時に root:root で初期化されるため
+  # Dockerfile の `USER appuser` (UID=10001) では state.json を書けず、
+  # `Failed to write state file /var/run/ultra/state.json: [Errno 13] Permission denied`
+  # を毎分発生させていた。root で chown 10001:10001 する。
+  #
+  # 副次対応: `ultra-log-staging-new` も chown する。Dockerfile で appuser を
+  # UID 固定 (10001) に変更したため、旧 dynamic UID で chown 済みの既存 log volume
+  # 内ファイル所有者を新 UID に揃える必要がある。
+  #
+  # 毎回の `docker compose up` で実行されるが、idempotent で数百 ms で完了する。
+  backend-volume-init:
+    image: alpine:3.19
+    container_name: ultra-autotrade-backend-volume-init-staging-new
+    command: ["chown", "-R", "10001:10001", "/var/run/ultra", "/var/log/ultra-autotrade"]
+    volumes:
+      - ultra-state-staging-new:/var/run/ultra
+      - ultra-log-staging-new:/var/log/ultra-autotrade
+    restart: "no"
+    networks:
+      - staging-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "1"
+
   # ===== Blue/Green Backend =====
   # active 側のみ nginx の upstream.conf に登録される。
   # host側 port は production (8010/8011) と衝突回避のため 8020/8021。
@@ -170,6 +198,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      backend-volume-init:
+        condition: service_completed_successfully
     restart: always
     networks:
       - staging-net
@@ -212,6 +242,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      backend-volume-init:
+        condition: service_completed_successfully
     restart: always
     networks:
       - staging-net
