@@ -76,6 +76,16 @@ PYEOF
 #       app.aave.router router router   (alias なしのケース)
 IMPORTS_RAW="$(grep -nE '^[[:space:]]*from[[:space:]]+app\.[A-Za-z0-9_.]+[[:space:]]+import[[:space:]]+' "${MAIN_PY}" || true)"
 
+# Known nested include_router allowlist:
+# 他 router ファイルから include_router(<alias>) されている router は main.py に
+# 直接 register されないため、本 lint は false positive を出す。
+# 完全な nested 追跡は過剰実装になるため、既知ケースは module:symbol で除外する。
+#
+# 各エントリ "module:symbol  reason" の形式 (1 行 1 件)。
+ALLOWLIST_NESTED=(
+  "app.exchange.copy_trading:router  # included by exchange/router.py:31"
+)
+
 # router 定義のあるファイルを列挙
 ROUTER_FILES="$(grep -rlE 'APIRouter\(' "${APP_DIR}" 2>/dev/null | sort -u || true)"
 
@@ -103,6 +113,20 @@ while IFS= read -r f; do
   module="app.${rel//\//.}"
 
   for sym in ${symbols}; do
+    # Allowlist: nested include_router 経由で配線済みの既知ケースを除外
+    skip_entry=""
+    for allow in "${ALLOWLIST_NESTED[@]}"; do
+      allow_key="${allow%% *}" # "module:symbol" 部分のみ
+      if [[ "${allow_key}" == "${module}:${sym}" ]]; then
+        skip_entry="${allow}"
+        break
+      fi
+    done
+    if [[ -n "${skip_entry}" ]]; then
+      echo "  allowlisted: ${skip_entry}"
+      continue
+    fi
+
     # main.py の import 行から、この module+symbol が import されているか / alias は何か
     # 例: "from app.aave.router import router as aave_router"
     #     "from app.aave.router import router"
