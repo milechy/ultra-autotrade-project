@@ -176,7 +176,7 @@ test.describe('TC-F2-1: /partner/users/[id] 詳細ページ', () => {
     await expect(page.getByRole('heading', { name: 'テスター詳細' })).toBeVisible({ timeout: 10_000 })
 
     // KPI ラベルが 3 枚分表示される
-    const kpiLabels = ['今日の運用総額', '今月の利回り', '昨日の利回り']
+    const kpiLabels = ['今日の運用残高', '今月の利回り', '昨日の利回り']
     for (const label of kpiLabels) {
       await expect(page.getByText(label).first()).toBeVisible({ timeout: 10_000 })
     }
@@ -231,7 +231,7 @@ test.describe('TC-F2-2: DOM 制約 — wallet_address / tx_hash 非表示', () =
 // ── TC-F2-3: /partner/referral/[id] KPI セクション ────────────────────────────
 
 test.describe('TC-F2-3: /partner/referral/[id] 運用状況 KPI', () => {
-  test('KPI セクション（今日の運用総額 / 今月の利回り）が表示される', async ({ page }) => {
+  test('KPI セクション（今日の運用残高 / 今月の利回り）が表示される', async ({ page }) => {
     await setupPartnerMocks(page)
     await page.goto('/partner/referral/1')
     await page.waitForLoadState('domcontentloaded')
@@ -240,7 +240,7 @@ test.describe('TC-F2-3: /partner/referral/[id] 運用状況 KPI', () => {
     expect(page.url()).toContain('/partner/referral/1')
 
     // KPI ラベル
-    await expect(page.getByText('今日の運用総額').first()).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('今日の運用残高').first()).toBeVisible({ timeout: 10_000 })
     await expect(page.getByText('今月の利回り').first()).toBeVisible({ timeout: 10_000 })
 
     // 「紹介一覧に戻る」リンク

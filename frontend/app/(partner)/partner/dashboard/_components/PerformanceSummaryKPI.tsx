@@ -79,10 +79,10 @@ export default function PerformanceSummaryKPI() {
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      {/* 運用総額 */}
+      {/* 現在の運用残高 */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">運用総額</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">現在の運用残高</CardTitle>
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
