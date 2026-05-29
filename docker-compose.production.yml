@@ -168,7 +168,6 @@ services:
     env_file:
       - .env.production
     environment:
-      REBALANCE_SHADOW_MODE: "false"
       DEPLOY_SLOT: "blue"
       # Stream 4 (2026-05-21): Blue/Green scheduler 二重起動防止。
       # BACKEND_COLOR はこのコンテナの固有色。ACTIVE_BACKEND_COLOR は .env.production から
@@ -222,7 +221,6 @@ services:
     env_file:
       - .env.production
     environment:
-      REBALANCE_SHADOW_MODE: "false"
       DEPLOY_SLOT: "green"
       # Stream 4 (2026-05-21): Blue/Green scheduler 二重起動防止。
       BACKEND_COLOR: "green"
