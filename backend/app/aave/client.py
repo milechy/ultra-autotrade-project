@@ -279,10 +279,10 @@ class AaveClient(Protocol):
     def get_health_factor(self, wallet_address: str = "") -> Optional[Decimal]:
         """現在のポジションのヘルスファクターを返す。空の場合はクライアントのデフォルトを使用。"""
 
-    def deposit(self, asset_symbol: str, amount: Decimal) -> str:
+    def deposit(self, asset_symbol: str, amount: Decimal, wallet_address: str = "") -> str:
         """指定したトークンを Aave に deposit する。"""
 
-    def withdraw(self, asset_symbol: str, amount: Decimal) -> str:
+    def withdraw(self, asset_symbol: str, amount: Decimal, wallet_address: str = "") -> str:
         """指定したトークンを Aave から withdraw する。"""
 
     def get_account_data(self, wallet_address: str) -> "AccountData":
@@ -597,10 +597,12 @@ class Web3AaveClient(AaveClientBase):
             if not asset_addr:
                 raise AaveClientError(f"Unknown asset: {asset_symbol}")
             asset_address = asset_addr
-            if hasattr(self, "account"):
-                wallet_address = self.account.address
-            else:
-                raise AaveClientError("No wallet configured")
+            # NULL wallet guard (Layer 3): execute 経路ではデフォルト wallet fallback を使わない
+            if not wallet_address:
+                raise AaveClientError(
+                    "wallet_address is required for on-chain deposit: "
+                    "default account fallback disabled on execute paths"
+                )
 
         # 後方互換: asset_address が "0x" で始まらない場合は asset_symbol として扱う
         if asset_address and not asset_address.startswith("0x"):
@@ -611,10 +613,12 @@ class Web3AaveClient(AaveClientBase):
             if not asset_addr:
                 raise AaveClientError(f"Unknown asset: {_sym}")
             asset_address = asset_addr
-            if hasattr(self, "account"):
-                wallet_address = self.account.address
-            else:
-                raise AaveClientError("No wallet configured")
+            # NULL wallet guard (Layer 3): execute 経路ではデフォルト wallet fallback を使わない
+            if not wallet_address:
+                raise AaveClientError(
+                    "wallet_address is required for on-chain deposit: "
+                    "default account fallback disabled on execute paths"
+                )
 
         # amount バリデーション
         if amount <= 0:
@@ -657,9 +661,13 @@ class Web3AaveClient(AaveClientBase):
 
                 account = Account.from_key(private_key)
 
-            checksum_wallet = Web3.to_checksum_address(
-                wallet_address if wallet_address else account.address
-            )
+            # NULL wallet guard (Layer 3 final): 空 wallet で on-chain 操作に到達したら raise
+            if not wallet_address:
+                raise AaveClientError(
+                    "wallet_address is required for on-chain deposit: "
+                    "default account fallback disabled on execute paths"
+                )
+            checksum_wallet = Web3.to_checksum_address(wallet_address)
 
             # approve → supply (→ revoke on failure) は同一フローの連続 tx。
             # RPC ノードの nonce 伝播遅延を避けるためローカル tracker で明示的に管理する。
@@ -822,10 +830,12 @@ class Web3AaveClient(AaveClientBase):
             if not asset_addr:
                 raise AaveClientError(f"Unknown asset: {asset_symbol}")
             asset_address = asset_addr
-            if hasattr(self, "account"):
-                wallet_address = self.account.address
-            else:
-                raise AaveClientError("No wallet configured")
+            # NULL wallet guard (Layer 3): execute 経路ではデフォルト wallet fallback を使わない
+            if not wallet_address:
+                raise AaveClientError(
+                    "wallet_address is required for on-chain withdraw: "
+                    "default account fallback disabled on execute paths"
+                )
 
         # 後方互換: asset_address が "0x" で始まらない場合は asset_symbol として扱う
         if asset_address and not asset_address.startswith("0x"):
@@ -836,10 +846,12 @@ class Web3AaveClient(AaveClientBase):
             if not asset_addr:
                 raise AaveClientError(f"Unknown asset: {_sym}")
             asset_address = asset_addr
-            if hasattr(self, "account"):
-                wallet_address = self.account.address
-            else:
-                raise AaveClientError("No wallet configured")
+            # NULL wallet guard (Layer 3): execute 経路ではデフォルト wallet fallback を使わない
+            if not wallet_address:
+                raise AaveClientError(
+                    "wallet_address is required for on-chain withdraw: "
+                    "default account fallback disabled on execute paths"
+                )
 
         if amount <= 0:
             raise ValueError(f"withdraw amount must be positive, got {amount}")
@@ -885,9 +897,13 @@ class Web3AaveClient(AaveClientBase):
 
                 account = Account.from_key(private_key)
 
-            checksum_wallet = Web3.to_checksum_address(
-                wallet_address if wallet_address else account.address
-            )
+            # NULL wallet guard (Layer 3 final): 空 wallet で on-chain 操作に到達したら raise
+            if not wallet_address:
+                raise AaveClientError(
+                    "wallet_address is required for on-chain withdraw: "
+                    "default account fallback disabled on execute paths"
+                )
+            checksum_wallet = Web3.to_checksum_address(wallet_address)
 
             # withdraw は単発 tx だが mempool-aware な nonce (pending) を使うため tracker を経由する。
             nonce_tracker = _NonceTracker(self._w3, checksum_wallet)

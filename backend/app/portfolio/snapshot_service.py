@@ -159,13 +159,13 @@ def record_portfolio_snapshot(db: Optional[Session] = None) -> dict[str, Any]:
             if not testers:
                 continue
 
-            # partner の wallet_address を解決（未設定は env フォールバック）
+            # partner の wallet_address を解決（未設定は skip のみ — 他人の wallet で取得しない）
             partner_user = db.get(User, partner_id)
             partner_wallet = (
                 partner_user.wallet_address
                 if partner_user and partner_user.wallet_address
                 else None
-            ) or os.getenv("AAVE_WALLET_ADDRESS", "")
+            )
             if not partner_wallet:
                 logger.warning(
                     "portfolio_snapshot: partner %d has no wallet_address, skipping",

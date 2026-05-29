@@ -62,11 +62,11 @@ class FakeAaveClient:
     def get_health_factor(self, wallet_address: str = "") -> Decimal:
         return Decimal("2.0")
 
-    def deposit(self, asset_symbol: str, amount: Decimal) -> str:
+    def deposit(self, asset_symbol: str, amount: Decimal, wallet_address: str = "") -> str:
         self.deposit_calls.append({"asset_symbol": asset_symbol, "amount": amount})
         return f"fake-deposit-tx-{asset_symbol}-{amount}"
 
-    def withdraw(self, asset_symbol: str, amount: Decimal) -> str:
+    def withdraw(self, asset_symbol: str, amount: Decimal, wallet_address: str = "") -> str:
         self.withdraw_calls.append({"asset_symbol": asset_symbol, "amount": amount})
         return f"fake-withdraw-tx-{asset_symbol}-{amount}"
 
