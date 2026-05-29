@@ -173,6 +173,7 @@ def test_scenario_buy_to_deposit(
         action=TradeAction.BUY,
         amount=Decimal("50"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
 
     # Aave 検証: operation==DEPOSIT, status==SUCCESS
@@ -236,6 +237,7 @@ def test_scenario_sell_to_withdraw(
         action=TradeAction.SELL,
         amount=Decimal("50"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
 
     # Aave 検証: operation==WITHDRAW, status==SUCCESS
@@ -294,6 +296,7 @@ def test_scenario_low_confidence_skipped(
         action=TradeAction.HOLD,
         amount=Decimal("50"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
 
     # Aave 検証: operation==NOOP, status==SKIPPED, deposit/withdraw 両方とも空

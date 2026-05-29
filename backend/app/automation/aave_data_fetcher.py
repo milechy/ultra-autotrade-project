@@ -19,6 +19,7 @@ Decimal 型を使用 (CLAUDE.md セキュリティルール 11: 金融計算は 
 """
 
 import logging
+import os
 from decimal import Decimal
 from typing import Optional, TypedDict
 
@@ -132,7 +133,9 @@ def _fetch_health_factor() -> Optional[Decimal]:
     """
     try:
         client = get_default_aave_client()
-        hf = client.get_health_factor()
+        # monitoring path: env AAVE_WALLET_ADDRESS を明示渡し (account.address fallback 撤去に対応)
+        _wallet = os.getenv("AAVE_WALLET_ADDRESS", "")
+        hf = client.get_health_factor(_wallet)
         if hf is None or hf == Decimal("inf"):
             return None
         return hf

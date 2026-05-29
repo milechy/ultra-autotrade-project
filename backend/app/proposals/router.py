@@ -227,13 +227,26 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
             masked_wallet,
         )
     else:
-        logger.warning(
-            "proposal %d: user_id=%d wallet_address is NULL — "
-            "falling back to AAVE_WALLET_ADDRESS env (partner separation broken)",
+        # wallet_address NULL → 執行をブロック (partner separation guard / Layer 1)
+        # env AAVE_WALLET_ADDRESS への fallback は禁止: 橋口提案が山本 wallet で執行される致命構造を防ぐ。
+        _missing_msg = (
+            f"wallet_address is NULL for user_id={proposal.user_id} "
+            f"— execution blocked (partner separation guard)"
+        )
+        logger.error(
+            "proposal %d: user_id=%d wallet_address is NULL — blocking execution",
             proposal.id,
             proposal.user_id,
         )
         _notify_missing_wallet(proposal.id, proposal.user_id)
+        _block_at = datetime.now(timezone.utc)
+        if proposal.status != "failed":
+            _notify_aave_failure(proposal.id, _missing_msg, _block_at)
+        proposal.status = "failed"
+        proposal.error_message = _missing_msg
+        proposal.executed_at = _block_at
+        _record_failed_transaction(proposal, chain, _missing_msg, db)
+        return
 
     try:
         multi_service = MultiChainAaveService()

@@ -485,9 +485,12 @@ class Web3AaveClient(AaveClientBase):
         if Web3 is None:
             raise AaveClientError("web3 package is required. Install with: pip install web3")
 
-        # 後方互換: wallet_address が未指定の場合は self.account.address を使用
-        if not wallet_address and hasattr(self, "account"):
-            wallet_address = self.account.address
+        # partner separation guard: 空 wallet は on-chain 層まで到達させない
+        if not wallet_address:
+            raise AaveClientError(
+                "wallet_address required for get_health_factor; "
+                "empty wallet reached on-chain layer (partner separation guard)"
+            )
 
         try:
             checksum_addr = Web3.to_checksum_address(wallet_address)
@@ -537,8 +540,12 @@ class Web3AaveClient(AaveClientBase):
         if Web3 is None:
             raise AaveClientError("web3 package is required. Install with: pip install web3")
 
-        if not wallet_address and hasattr(self, "account"):
-            wallet_address = self.account.address
+        # partner separation guard: 空 wallet は on-chain 層まで到達させない
+        if not wallet_address:
+            raise AaveClientError(
+                "wallet_address required for get_account_data; "
+                "empty wallet reached on-chain layer (partner separation guard)"
+            )
 
         try:
             checksum_addr = Web3.to_checksum_address(wallet_address)

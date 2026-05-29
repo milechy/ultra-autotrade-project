@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session, sessionmaker
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-partner-wallet")
 os.environ.setdefault("INITIAL_ADMIN_EMAIL", "admin@partner-wallet-test.com")
 
-from app.aave.client import AccountData  # noqa: E402
+from app.aave.client import AaveClientError, AccountData  # noqa: E402
 from app.aave.schemas import (  # noqa: E402
     AaveOperationResult,
     AaveOperationStatus,
@@ -310,3 +310,112 @@ class TestProposalWalletRouting:
         # 橋口の提案は橋口 wallet → 山本 wallet ではない
         assert captured_wallet[0] == HASHIGUCHI_WALLET
         assert captured_wallet[0] != YAMAMOTO_WALLET
+
+    def test_null_wallet_blocks_execution(self, db_session: Session) -> None:
+        """wallet_address=NULL のとき router が execute_rebalance を呼ばず proposal を failed にする (Layer 1 guard)。"""
+        from app.proposals.router import _execute_aave_for_proposal
+
+        # wallet_address なしの partner
+        partner = User(
+            id=99,
+            email="nowall@test.com",
+            username="nowall",
+            hashed_password="x",
+            role="partner",
+            is_active=True,
+            wallet_address=None,
+        )
+        db_session.add(partner)
+        proposal = _make_proposal(db_session, user_id=partner.id)
+        db_session.commit()
+
+        with (
+            patch("app.aave.service.MultiChainAaveService.execute_rebalance") as mock_execute,
+            patch("app.proposals.router._notify_missing_wallet"),
+            patch("app.proposals.router._notify_aave_failure"),
+            patch("app.proposals.router._record_failed_transaction"),
+        ):
+            _execute_aave_for_proposal(proposal, db_session)
+
+        # execute_rebalance は呼ばれない
+        mock_execute.assert_not_called()
+        # proposal が failed になっていること (autoflush=False なので in-memory state を直接確認)
+        assert proposal.status == "failed"
+        assert proposal.error_message is not None
+        assert "wallet" in proposal.error_message.lower()
+
+
+# ---------------------------------------------------------------------------
+# NULL ガード + 構造バグ検出テスト
+# ---------------------------------------------------------------------------
+
+
+class TestNullWalletGuards:
+    def test_get_health_factor_raises_on_empty_wallet(self) -> None:
+        """Web3AaveClient.get_health_factor は空 wallet で AaveClientError を上げる (Layer 2 guard)。"""
+        from unittest.mock import MagicMock, patch
+
+        from app.aave.client import Web3AaveClient
+
+        with patch("app.aave.client.Web3") as mock_web3_cls:
+            mock_web3 = MagicMock()
+            mock_web3_cls.return_value = mock_web3
+            mock_web3_cls.HTTPProvider.return_value = MagicMock()
+            mock_web3_cls.to_checksum_address.side_effect = lambda x: x
+
+            client = Web3AaveClient.__new__(Web3AaveClient)
+            client._w3 = mock_web3
+            client._pool = MagicMock()
+
+            with pytest.raises(AaveClientError, match="wallet_address required"):
+                client.get_health_factor("")
+
+    def test_get_account_data_raises_on_empty_wallet(self) -> None:
+        """Web3AaveClient.get_account_data は空 wallet で AaveClientError を上げる (Layer 2 guard)。"""
+        from app.aave.client import Web3AaveClient
+
+        client = Web3AaveClient.__new__(Web3AaveClient)
+        client._pool = MagicMock()
+
+        with pytest.raises(AaveClientError, match="wallet_address required"):
+            client.get_account_data("")
+
+    def test_execute_rebalance_raises_on_none_wallet(self) -> None:
+        """AaveService.execute_rebalance は wallet_address=None で AaveClientError を上げる (Layer 3 guard)。"""
+        from app.aave.client import DummyAaveClient
+        from app.aave.service import AaveService
+        from app.ai.schemas import TradeAction
+
+        client = DummyAaveClient()
+        service = AaveService(client=client)
+
+        with pytest.raises(AaveClientError, match="wallet_address"):
+            service.execute_rebalance(
+                action=TradeAction.BUY,
+                amount=Decimal("100"),
+                wallet_address=None,
+            )
+
+    def test_execute_rebalance_passes_wallet_to_health_factor(self) -> None:
+        """execute_rebalance が受けた wallet_address を get_health_factor に渡すこと (Layer 3 構造バグ修正確認)。
+        account.address (山本 wallet) ではなく partner wallet で HF チェックが走ること。
+        """
+        from unittest.mock import MagicMock
+
+        from app.aave.service import AaveService
+        from app.ai.schemas import TradeAction
+
+        mock_client = MagicMock()
+        mock_client.get_health_factor.return_value = Decimal("2.5")
+
+        service = AaveService(client=mock_client)
+
+        partner_wallet = "0xPartnerWalletABC1234567890abcdef12345678"
+        service.execute_rebalance(
+            action=TradeAction.HOLD,
+            amount=Decimal("100"),
+            wallet_address=partner_wallet,
+        )
+
+        # get_health_factor は partner_wallet で呼ばれること (account.address ではない)
+        mock_client.get_health_factor.assert_called_once_with(partner_wallet)

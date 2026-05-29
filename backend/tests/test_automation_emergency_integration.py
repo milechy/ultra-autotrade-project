@@ -74,6 +74,7 @@ def test_execute_rebalance_respects_emergency_stop() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
 
     # 緊急停止中のため NOOP となり、実際の deposit は呼ばれない想定

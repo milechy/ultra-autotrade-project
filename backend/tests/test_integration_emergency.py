@@ -111,6 +111,7 @@ def test_emergency_stop_blocks_rebalance() -> None:
         action=TradeAction.BUY,
         amount=Decimal("100"),
         dry_run=False,
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     # 緊急停止中は NOOP になること
     assert result.operation == AaveOperationType.NOOP

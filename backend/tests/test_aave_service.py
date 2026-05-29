@@ -124,6 +124,7 @@ def test_buy_executes_deposit_when_safe() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
 
     assert result.operation is AaveOperationType.DEPOSIT
@@ -142,6 +143,7 @@ def test_sell_executes_withdraw() -> None:
         action=TradeAction.SELL,
         amount=Decimal("5"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
 
     assert result.operation is AaveOperationType.WITHDRAW
@@ -160,6 +162,7 @@ def test_hold_results_in_noop() -> None:
         action=TradeAction.HOLD,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
 
     assert result.operation is AaveOperationType.NOOP
@@ -179,6 +182,7 @@ def test_health_factor_below_threshold_skips_buy() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
 
     assert result.operation is AaveOperationType.NOOP
@@ -201,6 +205,7 @@ def test_cooldown_skips_second_trade() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
 
     assert result.operation is AaveOperationType.NOOP
@@ -220,6 +225,7 @@ def test_negative_amount_raises_value_error() -> None:
             action=TradeAction.BUY,
             amount=Decimal("-1"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
 
 
@@ -253,6 +259,7 @@ def test_hard_stop_mode_blocks_all_operations() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result_buy.operation is AaveOperationType.NOOP
     assert result_buy.status is AaveOperationStatus.SKIPPED
@@ -264,6 +271,7 @@ def test_hard_stop_mode_blocks_all_operations() -> None:
         action=TradeAction.SELL,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result_sell.operation is AaveOperationType.NOOP
     assert result_sell.status is AaveOperationStatus.SKIPPED
@@ -297,6 +305,7 @@ def test_safe_mode_blocks_buy_only() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result_buy.operation is AaveOperationType.NOOP
     assert "safe_mode" in result_buy.message.lower()
@@ -307,6 +316,7 @@ def test_safe_mode_blocks_buy_only() -> None:
         action=TradeAction.SELL,
         amount=Decimal("5"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result_sell.operation is AaveOperationType.WITHDRAW
     assert result_sell.status is AaveOperationStatus.SUCCESS
@@ -340,6 +350,7 @@ def test_normal_mode_allows_all() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result_buy.operation is AaveOperationType.DEPOSIT
     assert result_buy.status is AaveOperationStatus.SUCCESS
@@ -351,6 +362,7 @@ def test_normal_mode_allows_all() -> None:
         action=TradeAction.SELL,
         amount=Decimal("5"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result_sell.operation is AaveOperationType.WITHDRAW
     assert result_sell.status is AaveOperationStatus.SUCCESS
@@ -372,6 +384,7 @@ def test_stale_state_forces_noop() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result.operation is AaveOperationType.NOOP
     assert result.status is AaveOperationStatus.SKIPPED
@@ -405,6 +418,7 @@ def test_emergency_stop_in_state_blocks_all() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result_buy.operation is AaveOperationType.NOOP
     assert result_buy.status is AaveOperationStatus.SKIPPED
@@ -416,6 +430,7 @@ def test_emergency_stop_in_state_blocks_all() -> None:
         action=TradeAction.SELL,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result_sell.operation is AaveOperationType.NOOP
     assert result_sell.status is AaveOperationStatus.SKIPPED
@@ -447,6 +462,7 @@ def test_circuit_open_blocks_all() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result_buy.operation is AaveOperationType.NOOP
     assert result_buy.status is AaveOperationStatus.SKIPPED
@@ -458,6 +474,7 @@ def test_circuit_open_blocks_all() -> None:
         action=TradeAction.SELL,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result_sell.operation is AaveOperationType.NOOP
     assert result_sell.status is AaveOperationStatus.SKIPPED
@@ -524,6 +541,7 @@ def test_missing_state_file_is_not_stale() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result.operation is AaveOperationType.DEPOSIT
     assert result.status is AaveOperationStatus.SUCCESS
@@ -576,6 +594,7 @@ def test_transient_parse_error_recovers() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result.operation is AaveOperationType.DEPOSIT
     assert result.status is AaveOperationStatus.SUCCESS
@@ -619,6 +638,7 @@ def test_persistent_parse_error_stays_stale() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     # 永続的エラー → NOOP
     assert result.operation is AaveOperationType.NOOP
@@ -672,6 +692,7 @@ def test_file_deleted_after_error_recovers() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     # 初期状態で動作
     assert result.operation is AaveOperationType.DEPOSIT
@@ -781,6 +802,7 @@ def test_parse_error_blocks_all_operations() -> None:
         action=TradeAction.BUY,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result_buy.operation is AaveOperationType.NOOP
     assert result_buy.status is AaveOperationStatus.SKIPPED
@@ -792,6 +814,7 @@ def test_parse_error_blocks_all_operations() -> None:
         action=TradeAction.SELL,
         amount=Decimal("10"),
         asset_symbol="USDC",
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result_sell.operation is AaveOperationType.NOOP
     assert result_sell.status is AaveOperationStatus.SKIPPED

@@ -133,20 +133,29 @@ def test_aave_data_safe_inf_health_factor_returns_none():
     assert abs(result["borrow_apy"] - Decimal("8.328")) < Decimal("0.01")
 
 
-def test_aave_data_safe_calls_get_health_factor_no_args():
-    """get_health_factor は no-args で呼ばれること (Web3AaveClient は self.account.address を使う)。"""
+def test_aave_data_safe_calls_get_health_factor_with_env_wallet():
+    """get_health_factor は AAVE_WALLET_ADDRESS env を引数として呼ばれること。
+
+    account.address fallback 撤去後は caller が明示的に wallet を渡す責務を持つ。
+    aave_data_fetcher は os.getenv("AAVE_WALLET_ADDRESS", "") を渡す。
+    """
+    import os
+
     mock_client = MagicMock()
     mock_client.get_health_factor.return_value = Decimal("2.5")
-    # Pool 側は失敗させて HF 取得検証に集中
     mock_client.w3.eth.contract.side_effect = Exception("skip")
 
-    with patch(
-        "app.automation.aave_data_fetcher.get_default_aave_client",
-        return_value=mock_client,
+    test_wallet = "0xTestWalletAddress1234"
+    with (
+        patch(
+            "app.automation.aave_data_fetcher.get_default_aave_client",
+            return_value=mock_client,
+        ),
+        patch.dict(os.environ, {"AAVE_WALLET_ADDRESS": test_wallet}),
     ):
         result = fetch_aave_market_data_safe()
 
-    mock_client.get_health_factor.assert_called_once_with()
+    mock_client.get_health_factor.assert_called_once_with(test_wallet)
     assert result["health_factor"] == Decimal("2.5")
 
 

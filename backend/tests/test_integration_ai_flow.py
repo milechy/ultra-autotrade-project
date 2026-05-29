@@ -116,6 +116,7 @@ def test_rule_engine_hf_check() -> None:
         action=TradeAction.BUY,
         amount=Decimal("100"),
         dry_run=True,
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     # HF < min_health_factor なら NOOP になること
     assert result.operation == AaveOperationType.NOOP
@@ -160,6 +161,7 @@ def test_rule_engine_cooldown() -> None:
         action=TradeAction.BUY,
         amount=Decimal("100"),
         dry_run=False,
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     assert result.operation == AaveOperationType.NOOP
 
@@ -200,6 +202,7 @@ def test_rule_engine_daily_limit() -> None:
         symbol="BTCUSDT",
         amount_usd=Decimal("100"),
         dry_run=False,
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     result = service.execute_trade(request)
     assert result.status == OrderStatus.SKIPPED

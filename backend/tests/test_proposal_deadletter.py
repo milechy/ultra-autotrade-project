@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session, sessionmaker
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-deadletter")
 os.environ.setdefault("INITIAL_ADMIN_EMAIL", "deadletter_admin@example.com")
 
+from app.auth.models import User  # noqa: E402
 from app.database import Base  # noqa: E402
 from app.proposals.models import Proposal  # noqa: E402
 from app.proposals.router import (  # noqa: E402
@@ -32,6 +33,8 @@ from app.proposals.router import (  # noqa: E402
     _execute_aave_for_proposal,
     _is_permanent_error,
 )
+
+_DEADLETTER_TEST_WALLET = "0xDeadLetter000000000000000000000000000000"
 
 
 @pytest.fixture()
@@ -50,8 +53,27 @@ def db_session() -> Generator[Session, None, None]:
     os.unlink(path)
 
 
+def _ensure_user(db: Session, user_id: int = 1) -> User:
+    """テスト用ユーザーを作成または取得する (Layer 1 guard 用に wallet_address を設定)。"""
+    user = db.scalars(select(User).where(User.id == user_id)).first()
+    if user is None:
+        user = User(
+            id=user_id,
+            email=f"dl_user{user_id}@test.com",
+            username=f"dl_user{user_id}",
+            hashed_password="x",
+            role="partner",
+            is_active=True,
+            wallet_address=_DEADLETTER_TEST_WALLET,
+        )
+        db.add(user)
+        db.commit()
+    return user
+
+
 def _make_proposal(db: Session, execution_attempts: int = 0) -> Proposal:
     """テスト用 approved 提案を作成して DB に保存する。"""
+    _ensure_user(db)  # Layer 1 guard 通過に必要
     p = Proposal(
         user_id=1,
         operation="SUPPLY",

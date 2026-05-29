@@ -114,6 +114,7 @@ class TestAaveIntegration:
             action=TradeAction.BUY,
             amount=Decimal("10"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
 
         assert result.operation is AaveOperationType.DEPOSIT
@@ -130,6 +131,7 @@ class TestAaveIntegration:
             action=TradeAction.SELL,
             amount=Decimal("5"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
 
         assert result.operation is AaveOperationType.WITHDRAW
@@ -146,6 +148,7 @@ class TestAaveIntegration:
             action=TradeAction.HOLD,
             amount=Decimal("10"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
 
         assert result.operation is AaveOperationType.NOOP
@@ -162,6 +165,7 @@ class TestAaveIntegration:
             action=TradeAction.BUY,
             amount=Decimal("10"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
 
         assert result.operation is AaveOperationType.NOOP
@@ -178,6 +182,7 @@ class TestAaveIntegration:
             action=TradeAction.BUY,
             amount=Decimal("10"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result1.operation is AaveOperationType.DEPOSIT
         assert result1.status is AaveOperationStatus.SUCCESS
@@ -187,6 +192,7 @@ class TestAaveIntegration:
             action=TradeAction.BUY,
             amount=Decimal("10"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result2.operation is AaveOperationType.NOOP
         assert result2.status is AaveOperationStatus.SKIPPED
@@ -203,6 +209,7 @@ class TestAaveIntegration:
             amount=Decimal("10"),
             asset_symbol="USDC",
             dry_run=True,
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
 
         assert result.operation is AaveOperationType.DEPOSIT

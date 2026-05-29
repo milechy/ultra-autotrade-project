@@ -238,7 +238,7 @@ def test_get_health_factor_returns_value(mock_web3, mock_account, mock_settings)
     mock_web3_instance.eth.contract.return_value = mock_pool
 
     client = Web3AaveClient(settings=mock_settings)
-    hf = client.get_health_factor()
+    hf = client.get_health_factor("0xTest000000000000000000000000000000000000")
 
     assert hf == Decimal("2.0")
 
@@ -272,7 +272,7 @@ def test_get_health_factor_returns_none_for_no_debt(mock_web3, mock_account, moc
     mock_web3_instance.eth.contract.return_value = mock_pool
 
     client = Web3AaveClient(settings=mock_settings)
-    hf = client.get_health_factor()
+    hf = client.get_health_factor("0xTest000000000000000000000000000000000000")
 
     assert hf == Decimal("inf")
 
@@ -306,7 +306,7 @@ def test_get_health_factor_returns_zero_for_critical_debt(mock_web3, mock_accoun
     mock_web3_instance.eth.contract.return_value = mock_pool
 
     client = Web3AaveClient(settings=mock_settings)
-    hf = client.get_health_factor()
+    hf = client.get_health_factor("0xTest000000000000000000000000000000000000")
 
     # 借入ありで HF=0 の場合は Decimal('0') を返す（fail-closed 原則）
     assert hf == Decimal("0")
@@ -369,7 +369,7 @@ def test_dummy_client_health_factor():
     )
     client = DummyAaveClient(settings=settings)
 
-    assert client.get_health_factor() == Decimal("2.5")
+    assert client.get_health_factor("0xTest000000000000000000000000000000000000") == Decimal("2.5")
 
 
 def test_dummy_client_deposit():
@@ -487,7 +487,7 @@ def test_web3_client_initialization_live(mock_settings):
 def test_get_health_factor_live(mock_settings):
     """ヘルスファクター取得（ライブテスト）。"""
     client = Web3AaveClient(settings=mock_settings)
-    hf = client.get_health_factor()
+    hf = client.get_health_factor("0xTest000000000000000000000000000000000000")
     # ポジションがない場合は None が返る
     assert hf is None or hf > Decimal("0")
 

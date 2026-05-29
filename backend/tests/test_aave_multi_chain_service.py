@@ -151,6 +151,7 @@ class TestMultiChainAaveService:
             action=TradeAction.BUY,
             amount=Decimal("50"),
             dry_run=True,
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
 
         assert result.operation == AaveOperationType.DEPOSIT
@@ -201,6 +202,7 @@ class TestMultiChainAaveService:
             chain_name="arbitrum",
             action=TradeAction.BUY,
             amount=Decimal("50"),
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result_arb.operation == AaveOperationType.NOOP
         assert result_arb.status == AaveOperationStatus.SKIPPED
@@ -211,6 +213,7 @@ class TestMultiChainAaveService:
             chain_name="optimism",
             action=TradeAction.BUY,
             amount=Decimal("50"),
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result_opt.operation == AaveOperationType.DEPOSIT
         assert result_opt.status == AaveOperationStatus.SUCCESS

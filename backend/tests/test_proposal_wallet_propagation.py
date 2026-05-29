@@ -141,25 +141,19 @@ def test_wallet_address_is_propagated_to_execute_rebalance(
     )
 
 
-def test_null_wallet_falls_back_and_emits_slack_warning(client: TestClient, test_db: tuple) -> None:
-    """user.wallet_address が NULL の場合、execute_rebalance に None が渡り Slack 警告が出ること。"""
+def test_null_wallet_blocks_execution_and_marks_failed(client: TestClient, test_db: tuple) -> None:
+    """user.wallet_address が NULL の場合、execute_rebalance を呼ばず proposal を failed にする (Layer 1 guard)。
+
+    旧動作 (NULL → env fallback + Slack 警告のみ) から新動作 (execution ブロック) に変更。
+    """
     _override, SessionLocal = test_db
     token = _admin_token(client)
     proposal_id = _create_proposal(client, token)
     _set_admin_wallet(SessionLocal, None)
 
-    fake_result = AaveOperationResult(
-        operation=AaveOperationType.DEPOSIT,
-        status=AaveOperationStatus.SUCCESS,
-        asset_symbol="USDC",
-        amount=Decimal("1000.00"),
-        tx_hash="0xfallback_hash",
-    )
-
     with (
         patch(
             "app.aave.service.MultiChainAaveService.execute_rebalance",
-            return_value=fake_result,
         ) as mock_execute,
         patch("app.notifications.factory.get_notification_service") as mock_get_service,
     ):
@@ -170,19 +164,16 @@ def test_null_wallet_falls_back_and_emits_slack_warning(client: TestClient, test
         )
 
     assert r.status_code == 200
-    assert r.json()["status"] == "executed"
+    # NULL wallet → execution がブロックされ failed になること
+    assert r.json()["status"] == "failed"
 
-    kwargs = mock_execute.call_args.kwargs
-    assert kwargs.get("wallet_address") is None, (
-        f"wallet_address should be None for fallback. kwargs={kwargs}"
-    )
+    # execute_rebalance は呼ばれないこと (partner separation guard)
+    mock_execute.assert_not_called()
 
-    # Slack 警告 (wallet fallback) が送られたこと
+    # Slack 警告 (wallet NULL) が送られたこと
     assert mock_service.send.called
-    sent_message = mock_service.send.call_args.args[0]
+    sent_message = mock_service.send.call_args_list[0].args[0]
     assert f"#{proposal_id}" in sent_message.title
-    assert "wallet" in sent_message.title.lower() or "fallback" in sent_message.title.lower()
-    assert "user.wallet_address is NULL" in sent_message.body
 
 
 def test_two_users_propagate_their_own_wallets(client: TestClient, test_db: tuple) -> None:

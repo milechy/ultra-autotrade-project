@@ -509,6 +509,7 @@ class TestAaveServiceFlow:
             action=TradeAction.BUY,
             amount=Decimal("100"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result.operation == AaveOperationType.DEPOSIT
         assert result.status == AaveOperationStatus.SUCCESS
@@ -527,6 +528,7 @@ class TestAaveServiceFlow:
             action=TradeAction.SELL,
             amount=Decimal("50"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result.operation == AaveOperationType.WITHDRAW
         assert result.status == AaveOperationStatus.SUCCESS
@@ -543,6 +545,7 @@ class TestAaveServiceFlow:
             action=TradeAction.HOLD,
             amount=Decimal("50"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result.operation == AaveOperationType.NOOP
         assert result.status == AaveOperationStatus.SKIPPED
@@ -558,6 +561,7 @@ class TestAaveServiceFlow:
             action=TradeAction.BUY,
             amount=Decimal("100"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         # Emergency stop → no deposit should happen
         assert result.status in (AaveOperationStatus.SKIPPED, AaveOperationStatus.ERROR)
@@ -575,6 +579,7 @@ class TestAaveServiceFlow:
                 action=TradeAction.BUY,
                 amount=Decimal("-1"),
                 asset_symbol="USDC",
+                wallet_address="0xTest000000000000000000000000000000000000",
             )
 
 
@@ -617,6 +622,7 @@ class TestOctoBotAaveFlow:
             action=TradeAction.BUY,
             amount=Decimal("50"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert aave_result.operation == AaveOperationType.DEPOSIT
         assert aave_result.status == AaveOperationStatus.SUCCESS
@@ -651,6 +657,7 @@ class TestOctoBotAaveFlow:
             action=TradeAction.SELL,
             amount=Decimal("50"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert aave_result.operation == AaveOperationType.WITHDRAW
 
@@ -686,6 +693,7 @@ class TestOctoBotAaveFlow:
             action=TradeAction.HOLD,
             amount=Decimal("50"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert aave_result.operation == AaveOperationType.NOOP
         assert len(fake_aave_client.deposit_calls) == 0

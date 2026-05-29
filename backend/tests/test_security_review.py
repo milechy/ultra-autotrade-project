@@ -300,6 +300,7 @@ class TestHealthFactorHardStop:
             action=TradeAction.BUY,
             amount=Decimal("10"),
             asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
 
         assert result.operation is AaveOperationType.NOOP
@@ -354,7 +355,10 @@ class TestHealthFactorHardStop:
         service = AaveService(client=client, settings=settings, state_manager=state_manager)
 
         result_buy = service.execute_rebalance(
-            action=TradeAction.BUY, amount=Decimal("10"), asset_symbol="USDC"
+            action=TradeAction.BUY,
+            amount=Decimal("10"),
+            asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result_buy.operation is AaveOperationType.NOOP
         assert result_buy.status is AaveOperationStatus.SKIPPED
@@ -362,7 +366,10 @@ class TestHealthFactorHardStop:
         assert client.deposit_calls == []
 
         result_sell = service.execute_rebalance(
-            action=TradeAction.SELL, amount=Decimal("10"), asset_symbol="USDC"
+            action=TradeAction.SELL,
+            amount=Decimal("10"),
+            asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result_sell.operation is AaveOperationType.NOOP
         assert result_sell.status is AaveOperationStatus.SKIPPED
@@ -727,7 +734,10 @@ class TestHardStopBlocking:
         """HARD_STOP mode: BUY returns SKIPPED."""
         service, client = self._make_service_with_mode(AaveOperationMode.HARD_STOP)
         result = service.execute_rebalance(
-            action=TradeAction.BUY, amount=Decimal("10"), asset_symbol="USDC"
+            action=TradeAction.BUY,
+            amount=Decimal("10"),
+            asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result.status is AaveOperationStatus.SKIPPED
         assert result.operation is AaveOperationType.NOOP
@@ -737,7 +747,10 @@ class TestHardStopBlocking:
         """HARD_STOP mode: SELL returns SKIPPED."""
         service, client = self._make_service_with_mode(AaveOperationMode.HARD_STOP)
         result = service.execute_rebalance(
-            action=TradeAction.SELL, amount=Decimal("10"), asset_symbol="USDC"
+            action=TradeAction.SELL,
+            amount=Decimal("10"),
+            asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result.status is AaveOperationStatus.SKIPPED
         assert result.operation is AaveOperationType.NOOP
@@ -747,7 +760,10 @@ class TestHardStopBlocking:
         """HARD_STOP result message must mention 'hard_stop'."""
         service, _ = self._make_service_with_mode(AaveOperationMode.HARD_STOP)
         result = service.execute_rebalance(
-            action=TradeAction.BUY, amount=Decimal("10"), asset_symbol="USDC"
+            action=TradeAction.BUY,
+            amount=Decimal("10"),
+            asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result.message is not None
         assert "hard_stop" in result.message.lower()
@@ -758,7 +774,10 @@ class TestHardStopBlocking:
 
         # BUY is blocked
         result_buy = service.execute_rebalance(
-            action=TradeAction.BUY, amount=Decimal("10"), asset_symbol="USDC"
+            action=TradeAction.BUY,
+            amount=Decimal("10"),
+            asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result_buy.status is AaveOperationStatus.SKIPPED
         assert "safe_mode" in result_buy.message.lower()
@@ -766,7 +785,10 @@ class TestHardStopBlocking:
 
         # SELL is allowed
         result_sell = service.execute_rebalance(
-            action=TradeAction.SELL, amount=Decimal("5"), asset_symbol="USDC"
+            action=TradeAction.SELL,
+            amount=Decimal("5"),
+            asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result_sell.status is AaveOperationStatus.SUCCESS
         assert result_sell.operation is AaveOperationType.WITHDRAW
@@ -777,7 +799,10 @@ class TestHardStopBlocking:
         service, client = self._make_service_with_mode(AaveOperationMode.NORMAL)
 
         result_buy = service.execute_rebalance(
-            action=TradeAction.BUY, amount=Decimal("10"), asset_symbol="USDC"
+            action=TradeAction.BUY,
+            amount=Decimal("10"),
+            asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result_buy.status is AaveOperationStatus.SUCCESS
         assert client.deposit_calls == [("USDC", Decimal("10"))]
@@ -785,7 +810,10 @@ class TestHardStopBlocking:
         # Reset cooldown
         service._recent_actions = []
         result_sell = service.execute_rebalance(
-            action=TradeAction.SELL, amount=Decimal("5"), asset_symbol="USDC"
+            action=TradeAction.SELL,
+            amount=Decimal("5"),
+            asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result_sell.status is AaveOperationStatus.SUCCESS
         assert client.withdraw_calls == [("USDC", Decimal("5"))]
@@ -797,7 +825,10 @@ class TestHardStopBlocking:
         )
 
         result = service.execute_rebalance(
-            action=TradeAction.BUY, amount=Decimal("10"), asset_symbol="USDC"
+            action=TradeAction.BUY,
+            amount=Decimal("10"),
+            asset_symbol="USDC",
+            wallet_address="0xTest000000000000000000000000000000000000",
         )
         assert result.status is AaveOperationStatus.SKIPPED
         assert "emergency_stop" in result.message.lower()

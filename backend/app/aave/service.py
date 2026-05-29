@@ -184,20 +184,22 @@ class AaveService:
             渡された場合はマスク済みで監査ログに出力する (partner 別 wallet 監査用)。
         """
         token = asset_symbol or self._settings.default_asset_symbol
-        if wallet_address:
-            masked = f"{wallet_address[:6]}...{wallet_address[-4:]}"
-            logger.info(
-                "AaveService.execute_rebalance: action=%s amount=%s wallet=%s",
-                action,
-                amount,
-                masked,
+
+        # partner separation guard (Layer 3): None/空 wallet はここで弾く
+        # router.py Layer 1 でブロック済みのはずだが、直接呼び出し経路への防御。
+        if not wallet_address:
+            raise AaveClientError(
+                "execute_rebalance requires wallet_address; "
+                "None/empty wallet indicates partner routing failure (partner separation guard)"
             )
-        else:
-            logger.info(
-                "AaveService.execute_rebalance: action=%s amount=%s wallet=<env fallback>",
-                action,
-                amount,
-            )
+
+        masked = f"{wallet_address[:6]}...{wallet_address[-4:]}"
+        logger.info(
+            "AaveService.execute_rebalance: action=%s amount=%s wallet=%s",
+            action,
+            amount,
+            masked,
+        )
 
         # 1. state.json の stale チェック（最優先）
         if self._state_manager.is_stale():
@@ -297,9 +299,10 @@ class AaveService:
             )
 
         # ヘルスファクター取得（失敗してもエラーにはせず、None として扱う）
+        # wallet_address を明示的に渡す — account.address への fallback を防ぐ (Layer 3 構造バグ修正)
         before_hf: Optional[Decimal]
         try:
-            before_hf = self._client.get_health_factor()
+            before_hf = self._client.get_health_factor(wallet_address)
         except AaveClientError as exc:
             logger.error("Failed to fetch health factor: %s", exc)
             before_hf = None
@@ -481,7 +484,10 @@ class MultiChainAaveService:
         result: dict[str, Optional[Decimal]] = {}
         for name, service in self._get_services().items():
             try:
-                hf = service._client.get_health_factor()
+                # monitoring path: client の設定 wallet を使用 (account.address fallback 撤去に対応)
+                _acct = getattr(service._client, "account", None)
+                _wallet = _acct.address if _acct is not None else ""
+                hf = service._client.get_health_factor(_wallet)
                 result[name] = hf
             except Exception:
                 logger.error("Failed to get health factor for chain %s", name, exc_info=True)

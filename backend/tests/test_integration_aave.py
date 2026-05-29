@@ -230,6 +230,7 @@ def test_single_trade_limit_10pct() -> None:
         action=TradeAction.BUY,
         amount=Decimal("200"),
         dry_run=True,
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     # NOOP ではなく DEPOSIT (dry_run なので skipped になる場合もある)
     # いずれにせよ amount は 100 にクリップされているはず
@@ -271,6 +272,7 @@ def test_daily_trade_limit_30pct() -> None:
         symbol="BTC/USDT",
         amount_usd=Decimal("100"),
         dry_run=False,
+        wallet_address="0xTest000000000000000000000000000000000000",
     )
     result = service.execute_trade(request)
     assert result.status == OrderStatus.SKIPPED

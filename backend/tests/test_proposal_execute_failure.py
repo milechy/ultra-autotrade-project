@@ -28,10 +28,13 @@ from app.aave.schemas import (  # noqa: E402
     AaveOperationStatus,
     AaveOperationType,
 )
+from app.auth.models import User  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.proposals.models import Proposal  # noqa: E402
 from app.transactions.models import Transaction  # noqa: E402
+
+_TEST_WALLET = "0xTestAdmin000000000000000000000000000000"
 
 SAMPLE_PROPOSAL = {
     "user_id": 1,
@@ -81,6 +84,18 @@ def _admin_token(client: TestClient) -> str:
     return r.json()["access_token"]
 
 
+def _set_user_wallet(session_local: sessionmaker, user_id: int, wallet: str) -> None:  # type: ignore[type-arg]
+    """テスト用: user.wallet_address を設定 (Layer 1 guard を通過させるため)。"""
+    db = session_local()
+    try:
+        user = db.scalars(select(User).where(User.id == user_id)).first()
+        if user:
+            user.wallet_address = wallet
+            db.commit()
+    finally:
+        db.close()
+
+
 def _create_proposal(client: TestClient, token: str) -> int:
     r = client.post(
         "/api/proposals",
@@ -95,6 +110,7 @@ def test_aave_execution_success_marks_proposal_executed(client: TestClient, test
     """Aave 実行成功 → proposal.status='executed', transaction(status='completed') 記録。"""
     _override, SessionLocal = test_db
     token = _admin_token(client)
+    _set_user_wallet(SessionLocal, 1, _TEST_WALLET)  # Layer 1 guard を通過させるため
     proposal_id = _create_proposal(client, token)
 
     fake_result = AaveOperationResult(
@@ -141,6 +157,7 @@ def test_aave_execution_failure_marks_proposal_failed(client: TestClient, test_d
     """Aave 実行失敗 → proposal.status='failed', error_message 記録, transaction(status='failed') 記録。"""
     _override, SessionLocal = test_db
     token = _admin_token(client)
+    _set_user_wallet(SessionLocal, 1, _TEST_WALLET)  # Layer 1 guard を通過させるため
     proposal_id = _create_proposal(client, token)
 
     boom = RuntimeError("RPC connection refused")
@@ -183,9 +200,13 @@ def test_aave_execution_failure_marks_proposal_failed(client: TestClient, test_d
         db.close()
 
 
-def test_aave_execution_failure_sends_slack_notification(client: TestClient) -> None:
+def test_aave_execution_failure_sends_slack_notification(
+    client: TestClient, test_db: tuple
+) -> None:
     """Aave 実行失敗時に通知サービスの send() が呼ばれることを検証（mock）。"""
+    _override, SessionLocal = test_db
     token = _admin_token(client)
+    _set_user_wallet(SessionLocal, 1, _TEST_WALLET)  # Layer 1 guard を通過させるため
     proposal_id = _create_proposal(client, token)
 
     boom = RuntimeError("web3 provider unreachable")
