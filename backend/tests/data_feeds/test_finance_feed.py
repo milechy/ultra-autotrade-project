@@ -133,6 +133,78 @@ async def test_fetch_finance_data_list_of_dicts() -> None:
 
 
 @pytest.mark.asyncio
+async def test_fetch_finance_data_400_logs_response_body(caplog: pytest.LogCaptureFixture) -> None:
+    """400 error: response body must be logged to diagnose root cause."""
+    import httpx
+
+    mock_resp = MagicMock(spec=httpx.Response)
+    mock_resp.status_code = 400
+    mock_resp.text = '{"error":{"message":"model not found","type":"invalid_request_error"}}'
+    mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+        message="400",
+        request=MagicMock(),
+        response=mock_resp,
+    )
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_resp
+        async with httpx.AsyncClient() as client:
+            with patch.dict(os.environ, {"PERPLEXITY_API_KEY": "test-key"}):
+                with caplog.at_level(logging.ERROR, logger="app.data_feeds.finance_feed"):
+                    result = await fetch_finance_data(client)
+
+    assert result.updated_at is None
+    assert "400" in result.macro_summary
+    assert any("model not found" in r.message for r in caplog.records), (
+        "400 response body must appear in error log"
+    )
+    assert any("sonar-pro" in r.message for r in caplog.records), (
+        "model name must appear in error log"
+    )
+
+
+@pytest.mark.asyncio
+async def test_fetch_finance_data_429_retries(caplog: pytest.LogCaptureFixture) -> None:
+    """429 rate-limit: retries once with delay, succeeds on second attempt."""
+    import httpx
+
+    payload_success = {
+        "macro_summary": "Retry succeeded.",
+        "fed_stance": "neutral",
+        "stablecoin_risk": "low",
+        "key_indicators": [],
+    }
+    success_resp = _make_mock_response(json.dumps(payload_success))
+
+    mock_resp_429 = MagicMock(spec=httpx.Response)
+    mock_resp_429.status_code = 429
+    mock_resp_429.text = '{"error":"rate_limit_exceeded"}'
+    mock_resp_429.raise_for_status.side_effect = httpx.HTTPStatusError(
+        message="429",
+        request=MagicMock(),
+        response=mock_resp_429,
+    )
+
+    call_count = 0
+
+    async def _side_effect(*_args: object, **_kwargs: object) -> MagicMock:
+        nonlocal call_count
+        call_count += 1
+        return mock_resp_429 if call_count == 1 else success_resp
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock, side_effect=_side_effect):
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            async with httpx.AsyncClient() as client:
+                with patch.dict(os.environ, {"PERPLEXITY_API_KEY": "test-key"}):
+                    result = await fetch_finance_data(client)
+
+    assert result.fed_stance == "neutral"
+    assert result.updated_at is not None
+    assert call_count == 2, "should have retried exactly once"
+    mock_sleep.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_fetch_finance_data_no_api_key() -> None:
     """Missing PERPLEXITY_API_KEY returns default result without error."""
     import httpx
