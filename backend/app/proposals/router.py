@@ -331,6 +331,20 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
         _wallet_address[:6] + "..." if len(_wallet_address) > 6 else _wallet_address or "(none)",
     )
 
+    # NULL wallet guard (Layer 1): wallet 未設定 partner は執行を拒否してデフォルト wallet 汚染を防ぐ
+    if not _wallet_address:
+        _error_msg = (
+            f"user {proposal.user_id} has no wallet_address configured — execution blocked"
+        )
+        logger.error("proposal %d: %s", proposal.id, _error_msg)
+        _blocked_at = datetime.now(timezone.utc)
+        proposal.status = "failed"
+        proposal.error_message = _error_msg
+        proposal.executed_at = _blocked_at
+        _record_failed_transaction(proposal, chain, _error_msg, db)
+        _notify_aave_failure(proposal.id, _error_msg, _blocked_at)
+        return
+
     try:
         multi_service = MultiChainAaveService()
         result = multi_service.execute_rebalance(

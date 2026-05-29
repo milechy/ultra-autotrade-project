@@ -52,6 +52,22 @@ def db_session() -> Generator[Session, None, None]:
 
 def _make_proposal(db: Session, execution_attempts: int = 0) -> Proposal:
     """テスト用 approved 提案を作成して DB に保存する。"""
+    from app.auth.models import User
+
+    # NULL wallet guard: user が存在し wallet_address が設定されていないと execute がブロックされる
+    if db.get(User, 1) is None:
+        u = User(
+            id=1,
+            email="deadletter-test@example.com",
+            username="deadletter_user",
+            hashed_password="hashed",
+            is_active=True,
+            role="viewer",
+            wallet_address="0xDeadLetterTestWallet000000000000000000000",
+        )
+        db.add(u)
+        db.flush()
+
     p = Proposal(
         user_id=1,
         operation="SUPPLY",

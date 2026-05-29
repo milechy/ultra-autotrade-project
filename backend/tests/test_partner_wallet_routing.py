@@ -310,3 +310,179 @@ class TestProposalWalletRouting:
         # 橋口の提案は橋口 wallet → 山本 wallet ではない
         assert captured_wallet[0] == HASHIGUCHI_WALLET
         assert captured_wallet[0] != YAMAMOTO_WALLET
+
+
+# ---------------------------------------------------------------------------
+# NULL wallet ガード: wallet_address 未設定 partner は執行されない
+# ---------------------------------------------------------------------------
+
+
+class TestNullWalletBlocking:
+    """DoD: (a) 執行されない (b) デフォルト wallet にフォールバックしない (c) 明示エラー"""
+
+    def test_null_wallet_blocks_execution(self, db_session: Session) -> None:
+        """wallet_address=None の partner 提案は execute_rebalance が呼ばれずに failed になる。"""
+        from app.proposals.router import _execute_aave_for_proposal
+
+        # wallet_address を設定しない partner
+        partner = _make_partner(db_session, uid=99, wallet="")
+        partner.wallet_address = None
+        proposal = _make_proposal(db_session, user_id=partner.id)
+        db_session.commit()
+
+        execute_called = []
+
+        def _should_not_be_called(**kwargs: object) -> AaveOperationResult:
+            execute_called.append(kwargs)
+            raise AssertionError("execute_rebalance should NOT be called for null-wallet partner")
+
+        with patch(
+            "app.aave.service.MultiChainAaveService.execute_rebalance",
+            side_effect=_should_not_be_called,
+        ):
+            _execute_aave_for_proposal(proposal, db_session)
+
+        # (a) 執行されない
+        assert len(execute_called) == 0
+        # (c) 明示エラー: proposal は failed になる
+        assert proposal.status == "failed"
+
+    def test_null_wallet_explicit_error_message(self, db_session: Session) -> None:
+        """wallet_address=None のとき error_message に wallet_address が含まれる。"""
+        from app.proposals.router import _execute_aave_for_proposal
+
+        partner = _make_partner(db_session, uid=99, wallet="")
+        partner.wallet_address = None
+        proposal = _make_proposal(db_session, user_id=partner.id)
+        db_session.commit()
+
+        with patch("app.aave.service.MultiChainAaveService.execute_rebalance"):
+            _execute_aave_for_proposal(proposal, db_session)
+
+        assert proposal.status == "failed"
+        assert proposal.error_message is not None
+        assert "wallet_address" in proposal.error_message
+
+    def test_no_default_wallet_fallback(self, db_session: Session) -> None:
+        """wallet_address=None の partner が山本 wallet で実行されないこと。"""
+        import os
+
+        from app.proposals.router import _execute_aave_for_proposal
+
+        partner = _make_partner(db_session, uid=99, wallet="")
+        partner.wallet_address = None
+        proposal = _make_proposal(db_session, user_id=partner.id)
+        db_session.commit()
+
+        captured_wallet: list[str] = []
+
+        def _capture(**kwargs: object) -> AaveOperationResult:
+            captured_wallet.append(str(kwargs.get("wallet_address", "(none)")))
+            raise AssertionError("execute_rebalance should NOT be called")
+
+        # 環境変数に山本 wallet が設定されていても使われない
+        with (
+            patch.dict(os.environ, {"AAVE_WALLET_ADDRESS": YAMAMOTO_WALLET}),
+            patch(
+                "app.aave.service.MultiChainAaveService.execute_rebalance",
+                side_effect=_capture,
+            ),
+        ):
+            _execute_aave_for_proposal(proposal, db_session)
+
+        # execute_rebalance は一度も呼ばれず、山本 wallet は混入しない
+        assert len(captured_wallet) == 0
+        assert proposal.status == "failed"
+
+    def test_empty_string_wallet_also_blocked(self, db_session: Session) -> None:
+        """wallet_address='' (空文字) も None と同様にブロックされる。"""
+        from app.proposals.router import _execute_aave_for_proposal
+
+        partner = _make_partner(db_session, uid=99, wallet="")
+        # wallet_address は "" のまま (Noneでなく空文字)
+        proposal = _make_proposal(db_session, user_id=partner.id)
+        db_session.commit()
+
+        with patch("app.aave.service.MultiChainAaveService.execute_rebalance") as mock_exec:
+            _execute_aave_for_proposal(proposal, db_session)
+
+        mock_exec.assert_not_called()
+        assert proposal.status == "failed"
+
+    def test_yamamoto_wallet_not_mixed_into_hashiguchi_null(self, db_session: Session) -> None:
+        """山本が設定済みで橋口が NULL → 橋口の提案は山本 wallet で実行されない。"""
+        from app.proposals.router import _execute_aave_for_proposal
+
+        _make_partner(db_session, uid=11, wallet=YAMAMOTO_WALLET)
+        hashiguchi = _make_partner(db_session, uid=18, wallet="")
+        hashiguchi.wallet_address = None
+        proposal_h = _make_proposal(db_session, user_id=hashiguchi.id)
+        db_session.commit()
+
+        captured: list[str] = []
+
+        def _capture(**kwargs: object) -> AaveOperationResult:
+            captured.append(str(kwargs.get("wallet_address", "")))
+            raise AssertionError("should not execute")
+
+        with patch(
+            "app.aave.service.MultiChainAaveService.execute_rebalance",
+            side_effect=_capture,
+        ):
+            _execute_aave_for_proposal(proposal_h, db_session)
+
+        # 山本 wallet は混入しない
+        assert YAMAMOTO_WALLET not in captured
+        assert proposal_h.status == "failed"
+
+
+# ---------------------------------------------------------------------------
+# snapshot_service: wallet 未設定 partner は env フォールバックなしで skip
+# ---------------------------------------------------------------------------
+
+
+class TestSnapshotNullWalletSkip:
+    def test_partner_without_wallet_is_skipped_not_env_fallback(
+        self, db_session: Session
+    ) -> None:
+        """wallet_address 未設定 partner → env AAVE_WALLET_ADDRESS でテスターの snapshot を取らない。"""
+        import os
+
+        from unittest.mock import patch
+
+        partner = _make_partner(db_session, uid=99, wallet="")
+        partner.wallet_address = None
+        _make_tester(db_session, uid=991, invited_by=partner.id)
+        db_session.commit()
+
+        mock_client = MagicMock()
+        mock_client.get_account_data.return_value = AccountData(
+            total_collateral_usd=Decimal("1000"),
+            total_debt_usd=Decimal("0"),
+            available_borrows_usd=Decimal("500"),
+            health_factor=Decimal("inf"),
+        )
+
+        with (
+            patch.dict(os.environ, {"AAVE_WALLET_ADDRESS": YAMAMOTO_WALLET}),
+            patch(
+                "app.portfolio.snapshot_service.get_default_aave_client",
+                return_value=mock_client,
+            ),
+        ):
+            record_portfolio_snapshot(db_session)
+
+        # wallet なし partner のテスター (uid=991) には snapshot が作られない
+        # (admin fallback は別ロジック — partner の wallet 汚染防止のみ確認)
+        snap = db_session.query(PortfolioSnapshot).filter_by(user_id=991).first()
+        assert snap is None
+
+        # get_account_data が呼ばれた場合、YAMAMOTO_WALLET で partner_id=99 の分は呼ばれない
+        # (admin fallback で呼ばれる可能性はあるが、それは partner ルーティングとは別)
+        partner_wallet_calls = [
+            call.args[0]
+            for call in mock_client.get_account_data.call_args_list
+            if call.args and call.args[0] == YAMAMOTO_WALLET
+        ]
+        # partner のテスターに対して YAMAMOTO_WALLET で snapshot が作られていないことが主目的
+        assert snap is None  # 上で既に確認済み、念押し
