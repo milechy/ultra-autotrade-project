@@ -20,6 +20,7 @@ export interface Proposal {
   estimatedGas: number
   slippage: number | null
   createdAt: string
+  expiresAt: string
 }
 
 export interface ProposalCardProps {
