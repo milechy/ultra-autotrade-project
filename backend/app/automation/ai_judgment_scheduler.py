@@ -215,12 +215,8 @@ def _build_raw_features_json(
         "utilization_rate": str(aave_data["utilization_rate"])
         if aave_data["utilization_rate"] is not None
         else None,
-        "supply_apy": str(aave_data["supply_apy"])
-        if aave_data["supply_apy"] is not None
-        else None,
-        "borrow_apy": str(aave_data["borrow_apy"])
-        if aave_data["borrow_apy"] is not None
-        else None,
+        "supply_apy": str(aave_data["supply_apy"]) if aave_data["supply_apy"] is not None else None,
+        "borrow_apy": str(aave_data["borrow_apy"]) if aave_data["borrow_apy"] is not None else None,
         "health_factor": str(aave_data["health_factor"])
         if aave_data["health_factor"] is not None
         else None,

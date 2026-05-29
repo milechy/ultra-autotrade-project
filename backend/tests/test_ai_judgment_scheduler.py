@@ -1195,9 +1195,7 @@ def test_save_ai_decision_features_inserts_row(db_session):
     }
     market_ctx = {"degraded": True, "reason": "test"}
 
-    with patch(
-        "app.automation.ai_judgment_scheduler._generate_embedding", return_value=None
-    ):
+    with patch("app.automation.ai_judgment_scheduler._generate_embedding", return_value=None):
         save_ai_decision_features(db_session, decision, result, aave_data, market_ctx)
 
     db_session.flush()
@@ -1267,9 +1265,7 @@ def test_run_ai_judgment_job_inserts_features(test_db):
                     "health_factor": None,
                 },
             ),
-            patch(
-                "app.automation.ai_judgment_scheduler.get_judgment_logger"
-            ) as mock_logger,
+            patch("app.automation.ai_judgment_scheduler.get_judgment_logger") as mock_logger,
             patch(
                 "app.automation.ai_judgment_scheduler.build_market_context",
                 side_effect=RuntimeError("degraded"),
