@@ -687,3 +687,82 @@ class TestDecimalIntegrity:
             value = getattr(resp, field_name)
             assert isinstance(value, Decimal), f"{field_name} should be Decimal, got {type(value)}"
             assert not isinstance(value, float), f"{field_name} must not be float"
+
+
+# ==============================================================================
+# HF infinity cap tests (Aave V3 ではポジションなし時に HF=∞ が返る)
+# ==============================================================================
+
+
+class TestHFInfinityCap:
+    """HF=inf を受けても ValidationError にならず 999.0 に丸めることを確認する。"""
+
+    _INF = Decimal("Infinity")
+
+    def test_rebalance_status_response_hf_inf_capped(self) -> None:
+        resp = _make_rebalance_status_response(health_factor=self._INF)
+        assert resp.health_factor == Decimal("999.0")
+
+    def test_rebalance_status_response_hf_inf_no_validation_error(self) -> None:
+        try:
+            _make_rebalance_status_response(health_factor=self._INF)
+        except Exception as exc:
+            pytest.fail(f"ValidationError raised for inf health_factor: {exc}")
+
+    def test_rebalance_proposal_hf_before_inf_capped(self) -> None:
+        proposal = _make_rebalance_proposal(health_factor_before=self._INF)
+        assert proposal.health_factor_before == Decimal("999.0")
+
+    def test_rebalance_proposal_estimated_hf_after_inf_capped(self) -> None:
+        proposal = _make_rebalance_proposal(estimated_health_factor_after=self._INF)
+        assert proposal.estimated_health_factor_after == Decimal("999.0")
+
+    def test_rebalance_proposal_estimated_hf_after_none_unchanged(self) -> None:
+        proposal = _make_rebalance_proposal(estimated_health_factor_after=None)
+        assert proposal.estimated_health_factor_after is None
+
+    def test_rebalance_result_hf_before_inf_capped(self) -> None:
+        result = _make_rebalance_result(health_factor_before=self._INF)
+        assert result.health_factor_before == Decimal("999.0")
+
+    def test_rebalance_result_hf_after_inf_capped(self) -> None:
+        result = _make_rebalance_result(health_factor_after=self._INF)
+        assert result.health_factor_after == Decimal("999.0")
+
+    def test_rebalance_result_hf_after_none_unchanged(self) -> None:
+        result = _make_rebalance_result(health_factor_after=None)
+        assert result.health_factor_after is None
+
+    def test_rebalance_history_entry_hf_before_inf_capped(self) -> None:
+        entry = RebalanceHistoryEntry(
+            proposal_id="h-inf",
+            created_at=_NOW,
+            executed_at=None,
+            status=RebalanceExecutionStatus.SUCCESS,
+            total_value_usd=Decimal("10000"),
+            operations_count=1,
+            health_factor_before=self._INF,
+            health_factor_after=None,
+        )
+        assert entry.health_factor_before == Decimal("999.0")
+
+    def test_rebalance_history_entry_hf_after_inf_capped(self) -> None:
+        entry = RebalanceHistoryEntry(
+            proposal_id="h-inf",
+            created_at=_NOW,
+            executed_at=None,
+            status=RebalanceExecutionStatus.SUCCESS,
+            total_value_usd=Decimal("10000"),
+            operations_count=1,
+            health_factor_before=Decimal("2.0"),
+            health_factor_after=self._INF,
+        )
+        assert entry.health_factor_after == Decimal("999.0")
+
+    def test_finite_hf_unchanged(self) -> None:
+        resp = _make_rebalance_status_response(health_factor=Decimal("1.85"))
+        assert resp.health_factor == Decimal("1.85")
+
+    def test_capped_value_is_finite(self) -> None:
+        resp = _make_rebalance_status_response(health_factor=self._INF)
+        assert resp.health_factor.is_finite()
