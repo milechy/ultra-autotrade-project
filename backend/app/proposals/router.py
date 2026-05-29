@@ -21,6 +21,7 @@ from app.auth.dependencies import (
 from app.auth.models import User
 from app.auth.models import User as UserModel
 from app.database import get_db
+from app.policy.engine import PolicyContext, get_policy_engine
 
 from .models import Proposal
 from .schemas import (
@@ -152,6 +153,58 @@ def _record_failed_transaction(
         error_message=error_message,
     )
     db.add(tx)
+
+
+def _policy_gate_create(
+    user_id: int,
+    asset: str,
+    operation: str,
+    amount_usd: Decimal,
+    expected_hf_after: Optional[Decimal],
+    db: Session,
+) -> None:
+    """提案生成時ポリシーチェック（1点目）。違反時は HTTP 422 を上げて DB に書かない。"""
+    ctx = PolicyContext(
+        user_id=user_id,
+        asset=asset,
+        operation=operation,
+        amount_usd=amount_usd,
+        expected_hf_after=expected_hf_after,
+    )
+    result = get_policy_engine().check(ctx, db)
+    if result.blocked:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="[POLICY] " + "; ".join(result.violations),
+        )
+
+
+def _policy_gate_approve(proposal: Proposal, db: Session) -> None:
+    """承認時ポリシーチェック（2点目）。
+    違反時は proposal.status='failed' / error_message 記録 → commit → HTTP 422。
+    #461 wallet NULL ガードは _execute_aave_for_proposal 内で後段に適用される。
+    """
+    ctx = PolicyContext(
+        user_id=proposal.user_id,
+        asset=proposal.asset,
+        operation=proposal.operation,
+        amount_usd=Decimal(str(proposal.amount_usd)),
+        expected_hf_after=(
+            Decimal(str(proposal.expected_hf_after))
+            if proposal.expected_hf_after is not None
+            else None
+        ),
+        proposal_id=proposal.id,
+    )
+    result = get_policy_engine().check(ctx, db)
+    if result.blocked:
+        proposal.status = "failed"
+        proposal.error_message = "[POLICY] " + "; ".join(result.violations)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=proposal.error_message,
+        )
 
 
 def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
@@ -459,6 +512,9 @@ def approve_proposal(
             detail=f"Cannot approve proposal with status '{proposal.status}'",
         )
 
+    # --- Policy gate (承認時: 2点目) ---
+    _policy_gate_approve(proposal, db)
+
     # Step 1: 承認済みにマーク
     proposal.status = "approved"
     proposal.approved_at = datetime.now(timezone.utc)
@@ -523,6 +579,15 @@ def create_proposal(
     db: Session = Depends(get_db),
 ) -> ProposalResponse:
     """提案を作成する（内部呼び出し用）。"""
+    # --- Policy gate (生成時: 1点目) ---
+    _policy_gate_create(
+        user_id=request.user_id,
+        asset=request.asset,
+        operation=request.operation,
+        amount_usd=Decimal(str(request.amount_usd)),
+        expected_hf_after=request.expected_hf_after,
+        db=db,
+    )
     expires_at = request.expires_at or (datetime.now(timezone.utc) + timedelta(hours=72))
     proposal = Proposal(
         user_id=request.user_id,
