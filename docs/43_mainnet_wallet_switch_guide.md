@@ -53,7 +53,7 @@
 | `AAVE_WALLET_ADDRESS` | Sepolia アドレス | Mainnet アドレス (新規) | |
 | `BYBIT_SANDBOX` | `true` | `false` | 実資金取引に切替 |
 | `AI_SHADOW_MODE` | `false` | `false` | 変更なし |
-| `REBALANCE_SHADOW_MODE` | `true` | `true` | `.env.production` で管理 (compose は `${REBALANCE_SHADOW_MODE:-false}` 参照) |
+| `REBALANCE_SHADOW_MODE` | `true` | `true` | `.env.production` で管理 (compose は参照しない) |
 
 > **補足 — チェーンレジストリとの対応:**
 > `AAVE_ACTIVE_CHAINS=base` に設定すると、`chains.py` の `"base"` エントリを読み込む。
