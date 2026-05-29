@@ -184,8 +184,9 @@ async def fetch_finance_data(client: httpx.AsyncClient) -> FinanceFeedResult:
         except Exception:  # noqa: BLE001 — body may be unreadable
             body_preview = "<body unavailable>"
         logger.error(
-            "Perplexity Finance API error %s — body: %s",
+            "Perplexity Finance API error %s (model: %s) — body: %s",
             exc.response.status_code,
+            payload.get("model", "unknown"),
             body_preview,
         )
         return FinanceFeedResult(macro_summary="API error: %d" % exc.response.status_code)
@@ -253,8 +254,9 @@ async def _post_with_retry(
         )
         await asyncio.sleep(_PERPLEXITY_RETRY_BACKOFF_SECONDS)
 
-    # Unreachable: loop always returns or raises, but mypy/pyright wants this.
-    assert last_resp is not None
+    # Unreachable: loop always returns or raises, but mypy needs a non-None guard.
+    if last_resp is None:  # pragma: no cover
+        raise RuntimeError("_post_with_retry: exhausted retries without response")
     return last_resp
 
 
