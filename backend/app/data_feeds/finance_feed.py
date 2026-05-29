@@ -20,7 +20,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 from pydantic import BaseModel, Field
@@ -196,7 +196,7 @@ async def fetch_finance_data(client: httpx.AsyncClient) -> FinanceFeedResult:
 
 async def _post_with_retry(
     client: httpx.AsyncClient,
-    payload: dict,
+    payload: dict[str, Any],
     api_key: str,
 ) -> httpx.Response:
     """POST to Perplexity with bounded retry on transient errors.
@@ -253,8 +253,9 @@ async def _post_with_retry(
         )
         await asyncio.sleep(_PERPLEXITY_RETRY_BACKOFF_SECONDS)
 
-    # Unreachable: loop always returns or raises, but mypy/pyright wants this.
-    assert last_resp is not None
+    # Unreachable: loop always returns or raises, but mypy needs a non-None guard.
+    if last_resp is None:  # pragma: no cover
+        raise RuntimeError("_post_with_retry: exhausted retries without response")
     return last_resp
 
 
