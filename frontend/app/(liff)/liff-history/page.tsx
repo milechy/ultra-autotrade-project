@@ -98,13 +98,14 @@ export default function LiffHistoryPage() {
     );
   }
 
-  // --- Auth token missing ---
+  // --- Auth token missing (ITP によるセッション消去を含む) ---
   if (!token) {
+    if (typeof window !== 'undefined') {
+      window.location.replace('/liff-login')
+    }
     return (
       <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
-        <p className="text-zinc-400 text-sm">
-          認証が必要です。ログインしてください。
-        </p>
+        <p className="text-zinc-400 text-sm">再認証中...</p>
       </div>
     );
   }

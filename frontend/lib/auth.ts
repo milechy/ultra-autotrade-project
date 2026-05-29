@@ -21,6 +21,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { login as apiLogin, getMe, logout as apiLogout, walletConnect, type UserResponse, type TokenResponse } from "./api/auth";
 import { resolveAuthReady } from "./auth-state";
+import { updateLastSeen } from "./session/itp-guard";
 
 const TOKEN_KEY = "ultra_auth_token";
 const TOKEN_EXPIRES_KEY = "ultra_auth_expires";
@@ -124,6 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Only save to localStorage on success
       localStorage.setItem(TOKEN_KEY, newToken);
       localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt));
+      updateLastSeen();
       setToken(newToken);
       setUser(userInfo);
       return userInfo;
@@ -146,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userInfo = await getMe(newToken);
       localStorage.setItem(TOKEN_KEY, newToken);
       localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt));
+      updateLastSeen();
       setToken(newToken);
       setUser(userInfo);
       return userInfo;
