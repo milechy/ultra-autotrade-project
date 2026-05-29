@@ -179,7 +179,7 @@ services:
       - .env.staging-new
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade_staging}
-      REBALANCE_SHADOW_MODE: ${REBALANCE_SHADOW_MODE}
+      REBALANCE_SHADOW_MODE: ${REBALANCE_SHADOW_MODE:-true}
       AI_SHADOW_MODE: "true"
       DEPLOY_SLOT: "blue"
       # Stream 4 (2026-05-21): Blue/Green scheduler 二重起動防止。
@@ -225,7 +225,7 @@ services:
       - .env.staging-new
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade_staging}
-      REBALANCE_SHADOW_MODE: ${REBALANCE_SHADOW_MODE}
+      REBALANCE_SHADOW_MODE: ${REBALANCE_SHADOW_MODE:-true}
       AI_SHADOW_MODE: "true"
       DEPLOY_SLOT: "green"
       # Stream 4 (2026-05-21): Blue/Green scheduler 二重起動防止。
