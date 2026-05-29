@@ -253,8 +253,9 @@ async def _post_with_retry(
         )
         await asyncio.sleep(_PERPLEXITY_RETRY_BACKOFF_SECONDS)
 
-    # Unreachable: loop always returns or raises, but mypy/pyright wants this.
-    assert last_resp is not None
+    # Unreachable: loop always returns or raises, but mypy needs a non-None guard.
+    if last_resp is None:  # pragma: no cover
+        raise RuntimeError("_post_with_retry: exhausted retries without response")
     return last_resp
 
 
