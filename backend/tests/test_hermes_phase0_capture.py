@@ -106,11 +106,7 @@ class TestAiDecisionFeatureModel:
         db_session.add(feature)
         db_session.flush()
 
-        row = (
-            db_session.query(AiDecisionFeature)
-            .filter_by(ai_decision_id=decision.id)
-            .one()
-        )
+        row = db_session.query(AiDecisionFeature).filter_by(ai_decision_id=decision.id).one()
         assert row.judge_action == "HOLD"
         assert row.cross_verify is True
         assert row.agent_signals["indicator"]["bias"] == "bullish"
