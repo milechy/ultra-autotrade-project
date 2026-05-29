@@ -20,7 +20,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 from pydantic import BaseModel, Field
@@ -196,7 +196,7 @@ async def fetch_finance_data(client: httpx.AsyncClient) -> FinanceFeedResult:
 
 async def _post_with_retry(
     client: httpx.AsyncClient,
-    payload: dict,
+    payload: dict[str, Any],
     api_key: str,
 ) -> httpx.Response:
     """POST to Perplexity with bounded retry on transient errors.
