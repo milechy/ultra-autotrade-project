@@ -116,6 +116,62 @@ class TestIndicatorAgent:
         assert signal.key_data.get("supply_apy") == "0.5"
         assert "compressed" in signal.reasoning.lower() or "weak demand" in signal.reasoning.lower()
 
+    # ------------------------------------------------------------------
+    # HF=inf (借入なし) の伝播テスト (2026-05-29)
+    # _fetch_health_factor が inf を None に潰していたバグ修正に対応。
+    # inf → score+22 → BULLISH が通ることを確認する。
+    # ------------------------------------------------------------------
+
+    def test_inf_hf_no_borrowing_scores_ample_buffer(self) -> None:
+        """HF=inf (借入なし=清算リスクゼロ) は score+22 で BULLISH を生成すること。
+
+        修正前: _fetch_health_factor が Decimal("inf") を None に潰す
+          → indicator_agent は hf=None として処理 → score に HF 寄与なし
+          → util=50%/APY=3% の典型入力で NEUTRAL になり BUY ゲートを通過できない。
+        修正後: inf がそのまま伝播 → MarketContext で 999.0 に変換
+          → hf_float=999.0 >= 2.5 → else 分岐で score+22
+          → 同入力で BULLISH → BUY 通過可。
+        MarketContext.cap_infinity_hf が inf → 999.0 に変換するため、
+        build_market_context(health_factor=Decimal("inf")) は ctx.health_factor=999.0 になる。
+        """
+        ctx = build_market_context(
+            health_factor=Decimal("inf"),
+            aave_utilization_rate=Decimal("50"),
+            aave_supply_apy=Decimal("3.0"),
+        )
+        assert ctx.health_factor == Decimal("999.0"), (
+            f"MarketContext は inf を 999.0 に変換するべき (got {ctx.health_factor})"
+        )
+        signal = indicator_agent(ctx)
+        assert signal.bias == Bias.BULLISH, (
+            f"HF=inf (借入なし) は BULLISH になるべき (got {signal.bias})"
+        )
+        assert signal.confidence >= 70, (
+            f"HF=inf シナリオは confidence >= 70 が必要 (got {signal.confidence})"
+        )
+        assert "buffer" in signal.reasoning.lower(), (
+            f"HF=999 の reasoning に 'buffer' が含まれるべき: {signal.reasoning}"
+        )
+
+    def test_inf_hf_is_distinct_from_none_hf(self) -> None:
+        """HF=inf (借入なし) と HF=None (取得失敗) は異なる score を生成すること。
+
+        None: score に HF 寄与なし → util/APY のみで判定
+        inf (→999.0): score+22 → 同 util/APY でも BULLISH に傾く
+        """
+        same_other = {
+            "aave_utilization_rate": Decimal("50"),
+            "aave_supply_apy": Decimal("3.0"),
+        }
+        sig_inf = indicator_agent(build_market_context(health_factor=Decimal("inf"), **same_other))
+        sig_none = indicator_agent(build_market_context(health_factor=None, **same_other))
+        assert sig_inf.bias != sig_none.bias or sig_inf.confidence > sig_none.confidence, (
+            "inf と None は異なるスコア/バイアスになるべき"
+        )
+        assert sig_inf.bias == Bias.BULLISH, (
+            f"inf シナリオは BULLISH になるべき (got {sig_inf.bias})"
+        )
+
 
 class TestPatternAgent:
     def test_no_history_is_neutral(self) -> None:

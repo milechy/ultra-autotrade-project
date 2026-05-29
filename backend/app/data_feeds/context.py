@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.ai.judgment_log import CognitiveState
 from app.data_feeds.finance_feed import FinanceFeedResult, get_cached_finance
@@ -32,6 +32,14 @@ class MarketContext(BaseModel):
     aave_supply_apy: Optional[Decimal] = None
     aave_borrow_apy: Optional[Decimal] = None
     health_factor: Optional[Decimal] = None
+
+    @field_validator("health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """借入なし (HF=∞) を 999.0 に変換して pydantic finite_number 制約を回避する。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
 
     # News context (Perplexity Sonar — 15min cache)
     news: NewsFeedResult = Field(default_factory=get_cached_news)
