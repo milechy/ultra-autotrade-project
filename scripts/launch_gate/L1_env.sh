@@ -10,7 +10,7 @@
 #
 # 実装:
 #   1. 既存 scripts/check_env_separation.sh を呼ぶ (exit 0 必須)
-#   2. .env.production の重要キー (APP_ENV=production, AAVE_NETWORK=base_mainnet 等)
+#   2. .env.production の重要キー (APP_ENV=production, AAVE_NETWORK=base 等)
 #      を手元 grep でも検証する (二重チェック)
 #
 # Usage:
@@ -51,7 +51,7 @@ if [[ "${#missing[@]}" -gt 0 ]]; then
          grep -E '^(APP_ENV|AAVE_NETWORK|BYBIT_SANDBOX)=' ${STAGING_ENV}
 
        期待値:
-         .env.production: APP_ENV=production / AAVE_NETWORK=base_mainnet / BYBIT_SANDBOX=false
+         .env.production: APP_ENV=production / AAVE_NETWORK=base / BYBIT_SANDBOX=false
          .env.staging:    APP_ENV=staging    / AAVE_NETWORK=base_sepolia / BYBIT_SANDBOX=true
 EOF
   gate_record SKIP "${LABEL}" "${missing[*]} がこの host に無し (prod VPS で要手動確認)"
@@ -82,13 +82,13 @@ else
   echo "  [ok] APP_ENV=production"
 fi
 
-# AAVE_NETWORK=base_mainnet 必須
+# AAVE_NETWORK=base 必須 (Base Mainnet。chains.py CHAIN_REGISTRY のキー名は "base")
 aave_net=$(grep -E '^AAVE_NETWORK=' "${PROD_ENV}" | head -n 1 | cut -d= -f2- | tr -d '[:space:]')
-if [[ "${aave_net}" != "base_mainnet" ]]; then
-  violations+=("AAVE_NETWORK expected=base_mainnet got='${aave_net}'")
-  echo "  [ng] AAVE_NETWORK='${aave_net}' (期待: base_mainnet)"
+if [[ "${aave_net}" != "base" ]]; then
+  violations+=("AAVE_NETWORK expected=base got='${aave_net}'")
+  echo "  [ng] AAVE_NETWORK='${aave_net}' (期待: base)"
 else
-  echo "  [ok] AAVE_NETWORK=base_mainnet"
+  echo "  [ok] AAVE_NETWORK=base"
 fi
 
 # DATABASE_URL は存在のみ (値はマスク)
