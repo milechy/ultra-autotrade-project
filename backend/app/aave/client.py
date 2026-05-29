@@ -327,8 +327,8 @@ class AaveClient(Protocol):
     deposit / withdraw / get_health_factor を備えた実装であれば差し替え可能。
     """
 
-    def get_health_factor(self) -> Optional[Decimal]:
-        """現在のポジションのヘルスファクターを返す。"""
+    def get_health_factor(self, wallet_address: str = "") -> Optional[Decimal]:
+        """現在のポジションのヘルスファクターを返す。空の場合はクライアントのデフォルトを使用。"""
 
     def deposit(self, asset_symbol: str, amount: Decimal, wallet_address: str = "") -> str:
         """指定したトークンを Aave に deposit する。"""

@@ -24,7 +24,7 @@ class FakeAaveClientForEmergency:
         self.deposit_calls: list[Decimal] = []
         self.withdraw_calls: list[Decimal] = []
 
-    def get_health_factor(self) -> Decimal:
+    def get_health_factor(self, wallet_address: str = "") -> Decimal:
         # テストでは固定値を返す（MonitoringService 側で別途テスト済み）
         return Decimal("1.5")
 

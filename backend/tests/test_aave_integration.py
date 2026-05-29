@@ -30,7 +30,7 @@ class FakeAaveClient:
         self.deposit_calls: list = []
         self.withdraw_calls: list = []
 
-    def get_health_factor(self) -> Decimal:
+    def get_health_factor(self, wallet_address: str = "") -> Decimal:
         return self.health_factor
 
     def deposit(self, asset_symbol: str, amount: Decimal, wallet_address: str = "") -> str:

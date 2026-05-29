@@ -299,7 +299,7 @@ class AaveService:
         # ヘルスファクター取得（失敗してもエラーにはせず、None として扱う）
         before_hf: Optional[Decimal]
         try:
-            before_hf = self._client.get_health_factor()
+            before_hf = self._client.get_health_factor(wallet_address)
         except AaveClientError as exc:
             logger.error("Failed to fetch health factor: %s", exc)
             before_hf = None
