@@ -12,13 +12,11 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Optional
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.aave.client import get_default_aave_client
 from app.auth.models import User
 from app.database import SessionLocal
-from app.partner.allocation_models import FundAllocation
 from app.portfolio.models import PortfolioHistory, PortfolioSnapshot
 
 logger = logging.getLogger(__name__)
@@ -117,16 +115,15 @@ def record_portfolio_snapshot(db: Optional[Session] = None) -> dict[str, Any]:
     """Aaveポートフォリオスナップショットを記録する（スケジュールタスク用）。
 
     処理フロー:
-    1. Aave get_account_data() でポートフォリオ取得
-    2. FundAllocation 比率に基づき、パートナーが招待したテスターに按分して
-       PortfolioSnapshot を保存
-    3. テスターが存在しない場合は管理者ユーザーに全体スナップショットを保存
+    1. パートナーごとに user.wallet_address で Aave get_account_data() を呼び出す
+    2. 各パートナーのテスターに均等按分して PortfolioSnapshot を保存
+    3. テスターが存在しない場合は env AAVE_WALLET_ADDRESS を使って管理者に保存
     4. 日次 PortfolioHistory を作成または更新
 
-    Aave 接続エラー時はログのみで早期リターン（fail-open）。
+    wallet_address が未設定のパートナーはスキップ（警告ログのみ）。
 
     Returns:
-        dict: {"snapshots_created": int, "total_supply_usd": str, ...}
+        dict: {"snapshots_created": int, ...}
     """
     _own_session = db is None
     if _own_session:
@@ -138,36 +135,20 @@ def record_portfolio_snapshot(db: Optional[Session] = None) -> dict[str, Any]:
     snapshots_created = 0
 
     try:
-        # --- Aaveデータ取得（失敗時はスキップ） ---
-        wallet_address = os.getenv("AAVE_WALLET_ADDRESS", "")
-        try:
-            client = get_default_aave_client()
-            account_data = client.get_account_data(wallet_address)
-        except Exception as exc:
-            logger.warning("portfolio_snapshot: Aave get_account_data failed, skipping: %s", exc)
-            return {"snapshots_created": 0, "skipped": True, "reason": str(exc)}
+        client = get_default_aave_client()
 
-        total_supply = Decimal(str(account_data.total_collateral_usd))
-        total_debt = Decimal(str(account_data.total_debt_usd))
-        net_worth = total_supply - total_debt
-        hf = _normalize_hf(Decimal(str(account_data.health_factor)))
-
-        # --- グローバルFundAllocation合計（比率計算用） ---
-        global_allocated_raw = (
-            db.query(func.sum(FundAllocation.allocated_amount_usd))
-            .filter(FundAllocation.status == "active")
-            .scalar()
-        )
-        global_total = Decimal(str(global_allocated_raw)) if global_allocated_raw else Decimal("0")
-
-        # --- パートナーごとにテスターへ按分して保存 ---
+        # --- パートナーごとに wallet_address で Aave データを取得してテスターに保存 ---
         partner_rows = (
             db.query(User.invited_by)
             .filter(User.invited_by.isnot(None), User.is_active == True)  # noqa: E712
             .distinct()
             .all()
         )
-        n_partners = len(partner_rows) or 1
+
+        # 最後に取得したパートナーのデータ（ログ・fallback 用）
+        _last_supply: Decimal = Decimal("0")
+        _last_debt: Decimal = Decimal("0")
+        _last_hf: Optional[Decimal] = None
 
         for (partner_id,) in partner_rows:
             testers = (
@@ -178,27 +159,35 @@ def record_portfolio_snapshot(db: Optional[Session] = None) -> dict[str, Any]:
             if not testers:
                 continue
 
-            # このパートナーのアクティブFundAllocation合計
-            partner_allocated_raw = (
-                db.query(func.sum(FundAllocation.allocated_amount_usd))
-                .filter(
-                    FundAllocation.partner_id == partner_id,
-                    FundAllocation.status == "active",
+            # partner の wallet_address を解決（未設定は env フォールバック）
+            partner_user = db.get(User, partner_id)
+            partner_wallet = (
+                partner_user.wallet_address
+                if partner_user and partner_user.wallet_address
+                else None
+            ) or os.getenv("AAVE_WALLET_ADDRESS", "")
+            if not partner_wallet:
+                logger.warning(
+                    "portfolio_snapshot: partner %d has no wallet_address, skipping",
+                    partner_id,
                 )
-                .scalar()
-            )
-            partner_allocated = (
-                Decimal(str(partner_allocated_raw)) if partner_allocated_raw else Decimal("0")
-            )
+                continue
 
-            # パートナーの全体比率（FundAllocationがない場合はパートナー数で均等割り）
-            if global_total > Decimal("0") and partner_allocated > Decimal("0"):
-                partner_ratio = partner_allocated / global_total
-            else:
-                partner_ratio = Decimal("1") / Decimal(str(n_partners))
+            try:
+                partner_data = client.get_account_data(partner_wallet)
+            except Exception as exc:
+                logger.warning(
+                    "portfolio_snapshot: partner %d get_account_data failed: %s", partner_id, exc
+                )
+                return {"snapshots_created": 0, "skipped": True, "reason": str(exc)}
 
-            partner_supply = (total_supply * partner_ratio).quantize(Decimal("0.000001"))
-            partner_debt = (total_debt * partner_ratio).quantize(Decimal("0.000001"))
+            partner_supply = Decimal(str(partner_data.total_collateral_usd))
+            partner_debt = Decimal(str(partner_data.total_debt_usd))
+            partner_hf = _normalize_hf(Decimal(str(partner_data.health_factor)))
+
+            _last_supply = partner_supply
+            _last_debt = partner_debt
+            _last_hf = partner_hf
 
             # テスターに均等按分
             n_testers = Decimal(str(len(testers)))
@@ -207,34 +196,48 @@ def record_portfolio_snapshot(db: Optional[Session] = None) -> dict[str, Any]:
             tester_net = tester_supply - tester_debt
 
             for tester in testers:
-                _save_snapshot(db, tester.id, tester_supply, tester_debt, tester_net, hf, now)
-                _upsert_daily_history(db, tester.id, tester_net, hf, now)
+                _save_snapshot(
+                    db, tester.id, tester_supply, tester_debt, tester_net, partner_hf, now
+                )
+                _upsert_daily_history(db, tester.id, tester_net, partner_hf, now)
                 snapshots_created += 1
 
-        # --- テスターが誰もいない場合は管理者ユーザーに全体スナップショットを保存 ---
+        # --- テスターが誰もいない場合は env wallet で管理者ユーザーに保存 ---
         if snapshots_created == 0:
+            fallback_wallet = os.getenv("AAVE_WALLET_ADDRESS", "")
+            try:
+                fallback_data = client.get_account_data(fallback_wallet)
+            except Exception as exc:
+                logger.warning("portfolio_snapshot: admin fallback Aave failed, skipping: %s", exc)
+                return {"snapshots_created": 0, "skipped": True, "reason": str(exc)}
+
+            _last_supply = Decimal(str(fallback_data.total_collateral_usd))
+            _last_debt = Decimal(str(fallback_data.total_debt_usd))
+            fallback_net = _last_supply - _last_debt
+            _last_hf = _normalize_hf(Decimal(str(fallback_data.health_factor)))
+
             admin = (
                 db.query(User)
                 .filter(User.role == "admin", User.is_active == True)  # noqa: E712
                 .first()
             )
             if admin is not None:
-                _save_snapshot(db, admin.id, total_supply, total_debt, net_worth, hf, now)
-                _upsert_daily_history(db, admin.id, net_worth, hf, now)
+                _save_snapshot(db, admin.id, _last_supply, _last_debt, fallback_net, _last_hf, now)
+                _upsert_daily_history(db, admin.id, fallback_net, _last_hf, now)
                 snapshots_created += 1
 
         db.commit()
         logger.info(
             "portfolio_snapshot completed: snapshots_created=%d, total_supply=%s, health_factor=%s",
             snapshots_created,
-            total_supply,
-            hf,
+            _last_supply,
+            _last_hf,
         )
         return {
             "snapshots_created": snapshots_created,
-            "total_supply_usd": str(total_supply),
-            "total_debt_usd": str(total_debt),
-            "health_factor": str(hf) if hf is not None else None,
+            "total_supply_usd": str(_last_supply),
+            "total_debt_usd": str(_last_debt),
+            "health_factor": str(_last_hf) if _last_hf is not None else None,
         }
 
     except Exception as exc:

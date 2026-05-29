@@ -180,6 +180,16 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
         _record_failed_transaction(proposal, chain, error_message, db)
         return
 
+    # proposal.user_id から wallet_address を解決して partner 別に伝播させる
+    _user = db.get(UserModel, proposal.user_id)
+    _wallet_address = (_user.wallet_address or "") if _user else ""
+    logger.info(
+        "proposal %d: user_id=%d wallet=%s",
+        proposal.id,
+        proposal.user_id,
+        _wallet_address[:6] + "..." if len(_wallet_address) > 6 else _wallet_address or "(none)",
+    )
+
     try:
         multi_service = MultiChainAaveService()
         result = multi_service.execute_rebalance(
@@ -188,6 +198,7 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
             amount=Decimal(str(proposal.amount_usd)),
             asset_symbol=proposal.asset,
             dry_run=False,
+            wallet_address=_wallet_address,
         )
 
         # 成功: attempt カウントも記録（診断用）

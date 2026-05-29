@@ -18,7 +18,6 @@ os.environ.setdefault("INITIAL_ADMIN_EMAIL", "admin@snapshot-test.com")
 from app.aave.client import AccountData  # noqa: E402
 from app.auth.models import User  # noqa: E402
 from app.database import Base  # noqa: E402
-from app.partner.allocation_models import FundAllocation  # noqa: E402
 from app.portfolio.models import PortfolioHistory, PortfolioSnapshot  # noqa: E402
 from app.portfolio.snapshot_service import (  # noqa: E402
     _normalize_hf,
@@ -66,6 +65,7 @@ def _make_user(
     uid: int,
     invited_by: int | None = None,
     role: str = "viewer",
+    wallet_address: str | None = None,
 ) -> User:
     user = User(
         id=uid,
@@ -75,6 +75,7 @@ def _make_user(
         role=role,
         is_active=True,
         invited_by=invited_by,
+        wallet_address=wallet_address,
     )
     db.add(user)
     db.flush()
@@ -202,8 +203,8 @@ class TestRecordPortfolioSnapshot:
         assert Decimal(str(snap.total_value_usd)) == Decimal("7000")  # net_worth
 
     def test_with_testers_saves_per_tester(self, db_session: Session) -> None:
-        """テスターが2人いる場合、それぞれにスナップショットを保存する。"""
-        partner = _make_user(db_session, uid=10, role="partner")
+        """テスターが2人いる場合、partner wallet_address で取得したデータを均等按分して保存。"""
+        partner = _make_user(db_session, uid=10, role="partner", wallet_address="0xPartner10")
         _make_user(db_session, uid=11, invited_by=partner.id)
         _make_user(db_session, uid=12, invited_by=partner.id)
         db_session.commit()
@@ -261,36 +262,28 @@ class TestRecordPortfolioSnapshot:
         assert Decimal(str(history.open_value_usd)) == Decimal("8000")
         assert history.snapshot_count == 1
 
-    def test_fund_allocation_ratio(self, db_session: Session) -> None:
-        """FundAllocation の比率に基づいて按分される。"""
-        partner1 = _make_user(db_session, uid=10, role="partner")
-        partner2 = _make_user(db_session, uid=20, role="partner")
+    def test_two_partners_separate_wallets(self, db_session: Session) -> None:
+        """partner 別 wallet_address で各自の Aave データを取得してテスターに保存する。"""
+        partner1 = _make_user(db_session, uid=10, role="partner", wallet_address="0xWallet10")
+        partner2 = _make_user(db_session, uid=20, role="partner", wallet_address="0xWallet20")
         tester1 = _make_user(db_session, uid=11, invited_by=partner1.id)
         tester2 = _make_user(db_session, uid=21, invited_by=partner2.id)
-
-        # partner1: 6000, partner2: 4000 → 合計10000
-        db_session.add(
-            FundAllocation(
-                partner_id=partner1.id,
-                tester_name="tester1",
-                allocated_amount_usd=Decimal("6000"),
-                status="active",
-            )
-        )
-        db_session.add(
-            FundAllocation(
-                partner_id=partner2.id,
-                tester_name="tester2",
-                allocated_amount_usd=Decimal("4000"),
-                status="active",
-            )
-        )
         db_session.commit()
 
-        account_data = _make_account_data("10000", "0", "999")
+        # partner1 wallet → 6000 supply, partner2 wallet → 4000 supply
+        def _side_effect(wallet: str) -> AccountData:
+            if wallet == "0xWallet10":
+                return _make_account_data("6000", "0", "999")
+            if wallet == "0xWallet20":
+                return _make_account_data("4000", "0", "999")
+            return _make_account_data("0", "0", "1")
+
+        mock_client = MagicMock()
+        mock_client.get_account_data.side_effect = _side_effect
+
         with patch(
             "app.portfolio.snapshot_service.get_default_aave_client",
-            return_value=self._mock_aave_client(account_data),
+            return_value=mock_client,
         ):
             result = record_portfolio_snapshot(db_session)
 
@@ -299,13 +292,15 @@ class TestRecordPortfolioSnapshot:
         snap2 = db_session.query(PortfolioSnapshot).filter_by(user_id=tester2.id).first()
         assert snap1 is not None
         assert snap2 is not None
-        # partner1(60%): supply=6000, partner2(40%): supply=4000
+        # partner1 の wallet → supply=6000, partner2 の wallet → supply=4000
         assert Decimal(str(snap1.total_supply_usd)) == Decimal("6000.000000")
         assert Decimal(str(snap2.total_supply_usd)) == Decimal("4000.000000")
 
     def test_inactive_tester_excluded(self, db_session: Session) -> None:
         """is_active=False のテスターはスナップショット対象外。"""
-        partner = _make_user(db_session, uid=10, role="partner")
+        partner = _make_user(
+            db_session, uid=10, role="partner", wallet_address="0xPartner10Inactive"
+        )
         _make_user(db_session, uid=11, invited_by=partner.id)
         inactive = _make_user(db_session, uid=12, invited_by=partner.id)
         inactive.is_active = False

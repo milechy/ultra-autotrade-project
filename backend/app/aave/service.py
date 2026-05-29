@@ -170,6 +170,7 @@ class AaveService:
         amount: Decimal,
         asset_symbol: str | None = None,
         dry_run: bool = False,
+        wallet_address: str = "",
     ) -> AaveOperationResult:
         """
         BUY/SELL/HOLD に応じて Aave 上のポジションを調整するメイン処理。
@@ -178,6 +179,7 @@ class AaveService:
         :param amount: 希望するトレード金額（USD 相当）
         :param asset_symbol: 対象トークン。None の場合は設定値のデフォルトを使用。
         :param dry_run: True の場合は実際のトランザクションを送信しない。
+        :param wallet_address: 対象 partner wallet。空文字の場合はクライアントのデフォルトを使用。
         """
         token = asset_symbol or self._settings.default_asset_symbol
 
@@ -281,7 +283,7 @@ class AaveService:
         # ヘルスファクター取得（失敗してもエラーにはせず、None として扱う）
         before_hf: Optional[Decimal]
         try:
-            before_hf = self._client.get_health_factor()
+            before_hf = self._client.get_health_factor(wallet_address)
         except AaveClientError as exc:
             logger.error("Failed to fetch health factor: %s", exc)
             before_hf = None
@@ -435,11 +437,13 @@ class MultiChainAaveService:
         amount: Decimal,
         asset_symbol: str | None = None,
         dry_run: bool = False,
+        wallet_address: str = "",
     ) -> AaveOperationResult:
         """
         指定チェーンでリバランスを実行する。
 
         :param chain_name: 対象チェーン名
+        :param wallet_address: 対象 partner wallet。空文字の場合はクライアントのデフォルトを使用。
         """
         service = self.get_service(chain_name)
         return service.execute_rebalance(
@@ -447,6 +451,7 @@ class MultiChainAaveService:
             amount=amount,
             asset_symbol=asset_symbol,
             dry_run=dry_run,
+            wallet_address=wallet_address,
         )
 
     def get_all_health_factors(self) -> dict[str, Optional[Decimal]]:
