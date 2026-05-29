@@ -1160,3 +1160,132 @@ def test_create_proposals_db_error_one_user_does_not_stop_others(db_session):
     assert count == 1, f"Expected 1 proposal (user_ok only) but got {count}"
     # _resolve_proposal_amount は両ユーザー分呼ばれていること
     assert call_count == 2, f"Expected resolve called twice but got {call_count}"
+
+
+# ---------------------------------------------------------------------------
+# Hermes Phase 0 capture: save_ai_decision_features + save_ai_decision_outcomes
+# ---------------------------------------------------------------------------
+
+
+def test_save_ai_decision_features_inserts_row(db_session):
+    """save_ai_decision_features が ai_decision_features テーブルに1行 INSERT すること。"""
+    from unittest.mock import patch  # noqa: PLC0415
+
+    from app.ai.models import AiDecisionFeature  # noqa: PLC0415
+    from app.automation.ai_judgment_scheduler import save_ai_decision_features  # noqa: PLC0415
+
+    decision = AIDecision(
+        query="test",
+        action="HOLD",
+        confidence=60,
+        primary_provider="claude",
+        primary_action="HOLD",
+        primary_confidence=60,
+        agreed=True,
+    )
+    db_session.add(decision)
+    db_session.flush()
+
+    result = _make_cross_validation_result(TradeAction.HOLD)
+    aave_data = {
+        "utilization_rate": None,
+        "supply_apy": None,
+        "borrow_apy": None,
+        "health_factor": None,
+    }
+    market_ctx = {"degraded": True, "reason": "test"}
+
+    with patch(
+        "app.automation.ai_judgment_scheduler._generate_embedding", return_value=None
+    ):
+        save_ai_decision_features(db_session, decision, result, aave_data, market_ctx)
+
+    db_session.flush()
+    row = db_session.query(AiDecisionFeature).filter_by(ai_decision_id=decision.id).one()
+    assert row.judge_action == "HOLD"
+    assert row.confidence == 80
+    assert row.cross_verify is True
+
+
+def test_save_ai_decision_features_fail_open(db_session):
+    """save_ai_decision_features が失敗しても例外を伝播しないこと (fail-open)。"""
+    from unittest.mock import patch  # noqa: PLC0415
+
+    from app.automation.ai_judgment_scheduler import save_ai_decision_features  # noqa: PLC0415
+
+    decision = AIDecision(
+        query="test",
+        action="HOLD",
+        confidence=60,
+        primary_provider="claude",
+        primary_action="HOLD",
+        primary_confidence=60,
+        agreed=True,
+    )
+    db_session.add(decision)
+    db_session.flush()
+
+    result = _make_cross_validation_result(TradeAction.HOLD)
+    aave_data = {
+        "utilization_rate": None,
+        "supply_apy": None,
+        "borrow_apy": None,
+        "health_factor": None,
+    }
+
+    # db.add が例外を投げてもエラー伝播しないことを確認
+    with patch.object(db_session, "add", side_effect=RuntimeError("db add error")):
+        save_ai_decision_features(db_session, decision, result, aave_data, {})
+    # ここに到達すれば fail-open 動作が確認できている
+
+
+def test_run_ai_judgment_job_inserts_features(test_db):
+    """run_ai_judgment_job 実行後に ai_decision_features が INSERT されること。"""
+    from unittest.mock import patch  # noqa: PLC0415
+
+    from app.ai.models import AiDecisionFeature  # noqa: PLC0415
+    from app.automation.ai_judgment_scheduler import run_ai_judgment_job  # noqa: PLC0415
+
+    session = test_db()
+    try:
+        result = _make_cross_validation_result(TradeAction.HOLD)
+        with (
+            patch(
+                "app.automation.ai_judgment_scheduler.AIService.judge_with_rag",
+                return_value=result,
+            ),
+            patch(
+                "app.automation.ai_judgment_scheduler.KnowledgeService.search",
+                return_value=[],
+            ),
+            patch(
+                "app.automation.ai_judgment_scheduler.fetch_aave_market_data_safe",
+                return_value={
+                    "utilization_rate": None,
+                    "supply_apy": None,
+                    "borrow_apy": None,
+                    "health_factor": None,
+                },
+            ),
+            patch(
+                "app.automation.ai_judgment_scheduler.get_judgment_logger"
+            ) as mock_logger,
+            patch(
+                "app.automation.ai_judgment_scheduler.build_market_context",
+                side_effect=RuntimeError("degraded"),
+            ),
+            patch(
+                "app.automation.ai_judgment_scheduler._generate_embedding",
+                return_value=None,
+            ),
+        ):
+            from app.ai.judgment_log import CognitiveState  # noqa: PLC0415
+
+            mock_logger.return_value.get_cognitive_state.return_value = CognitiveState()
+            run_ai_judgment_job(db=session)
+
+        rows = session.query(AiDecisionFeature).all()
+        assert len(rows) == 1
+        assert rows[0].judge_action == "HOLD"
+    finally:
+        session.close()
