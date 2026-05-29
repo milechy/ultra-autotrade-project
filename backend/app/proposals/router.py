@@ -49,6 +49,44 @@ def _is_permanent_error(exc: Exception) -> bool:
     return isinstance(exc, _PERMANENT_EXCEPTION_TYPES)
 
 
+def _capture_partner_decision(
+    db: Session,
+    ai_decision_id: Optional[int],
+    partner_approved: bool,
+) -> None:
+    """Hermes Phase 0: partner 承認/却下を ai_decision_outcomes に INSERT (fail-open)。
+
+    ai_decision_id が NULL の提案 (手動作成等) は no-op。
+    INSERT 失敗は WARNING に留め、呼び出し元の処理には影響させない。
+    """
+    if ai_decision_id is None:
+        return
+    try:
+        from app.ai.models import AiDecisionOutcome  # noqa: PLC0415
+
+        outcome = AiDecisionOutcome(
+            decision_id=ai_decision_id,
+            partner_approved=partner_approved,
+        )
+        db.add(outcome)
+        db.commit()
+        logger.info(
+            "ai_decision_outcomes captured: decision_id=%d partner_approved=%s",
+            ai_decision_id,
+            partner_approved,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "_capture_partner_decision failed (fail-open, decision_id=%d): %s",
+            ai_decision_id,
+            exc,
+        )
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def _expire_old_proposals(db: Session, user_id: int) -> None:
     """期限切れのpending提案をexpiredに更新する。"""
     now = datetime.now(timezone.utc)
@@ -465,6 +503,9 @@ def approve_proposal(
     db.commit()
     db.refresh(proposal)
 
+    # Hermes Phase 0: partner 承認を ai_decision_outcomes に capture (fail-open)
+    _capture_partner_decision(db, proposal.ai_decision_id, partner_approved=True)
+
     # Step 2: Aave 操作を実行（失敗時は 'failed' に遷移）
     _execute_aave_for_proposal(proposal, db)
     db.commit()
@@ -494,6 +535,10 @@ def reject_proposal(
     proposal.rejected_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(proposal)
+
+    # Hermes Phase 0: partner 却下を ai_decision_outcomes に capture (fail-open)
+    _capture_partner_decision(db, proposal.ai_decision_id, partner_approved=False)
+
     return ProposalResponse.model_validate(proposal)
 
 
