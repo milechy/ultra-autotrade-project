@@ -33,6 +33,20 @@ from app.database import Base, get_db  # noqa: E402
 from app.main import create_app  # noqa: E402
 
 YAMAMOTO_WALLET = "0x2064000000000000000000000000000000000cc66"[:42]
+
+
+@pytest.fixture(autouse=True)
+def _bypass_policy_for_wallet_tests(monkeypatch):
+    """Wallet 伝播テストは policy タイミング依存チェックを経由させない。
+    policy の correct/fail は test_policy_engine.py で検証済み。"""
+    from app.policy.engine import PolicyResult
+
+    monkeypatch.setattr(
+        "app.policy.engine.PolicyEngine.check",
+        lambda self, ctx, db: PolicyResult(passed=True),
+    )
+
+
 HASHIGUCHI_WALLET = "0xabcdef0123456789abcdef0123456789abcdef01"
 
 SAMPLE_PROPOSAL = {
