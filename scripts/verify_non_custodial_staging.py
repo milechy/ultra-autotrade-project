@@ -25,6 +25,7 @@ DoD 確認:
 import argparse
 import os
 import sys
+import time
 from decimal import Decimal
 from pathlib import Path
 
@@ -44,6 +45,9 @@ ERC20_ABI = [
     {"name": "approve", "type": "function",
      "inputs": [{"name": "spender", "type": "address"}, {"name": "amount", "type": "uint256"}],
      "outputs": [{"name": "", "type": "bool"}]},
+    {"name": "allowance", "type": "function",
+     "inputs": [{"name": "owner", "type": "address"}, {"name": "spender", "type": "address"}],
+     "outputs": [{"name": "", "type": "uint256"}]},
     {"name": "balanceOf", "type": "function",
      "inputs": [{"name": "account", "type": "address"}],
      "outputs": [{"name": "", "type": "uint256"}]},
@@ -162,10 +166,15 @@ def main() -> None:
         return
 
     # --- Step 1: approve ---
+    # approve amount を supply より余裕を持たせる (2倍) でapprove
+    # spender = Pool (Pool が transferFrom で USDC を引き出す)
+    approve_amount_wei = amount_wei * 2
     print("[Step 1] USDC approve (partner 署名, from=partner)")
+    print(f"  spender:        {POOL_ADDRESS}")
+    print(f"  approve_amount: {Decimal(approve_amount_wei) / Decimal(10 ** USDC_DECIMALS)} USDC (supply の2倍)")
     nonce = w3.eth.get_transaction_count(partner_address, "pending")
     approve_tx = usdc.functions.approve(
-        Web3.to_checksum_address(POOL_ADDRESS), amount_wei
+        Web3.to_checksum_address(POOL_ADDRESS), approve_amount_wei
     ).build_transaction({
         "from": partner_address,
         "nonce": nonce,
@@ -181,6 +190,21 @@ def main() -> None:
         sys.exit(1)
     print(f"  confirmed (block {receipt_approve['blockNumber']})")
     print(f"  from:    {receipt_approve['from']}")
+
+    # RPC ステートラグ対策: allowance が amount_wei 以上になるまで最大30秒ポーリング
+    print("  allowance 確認中 (RPC ステートラグ対策)...")
+    pool_cs = Web3.to_checksum_address(POOL_ADDRESS)
+    current_allowance = 0
+    for attempt in range(15):
+        current_allowance = usdc.functions.allowance(partner_address, pool_cs).call()
+        print(f"  attempt {attempt+1}: allowance = {current_allowance} (need >= {amount_wei})")
+        if current_allowance >= amount_wei:
+            print(f"  allowance OK: {current_allowance}")
+            break
+        time.sleep(2)
+    else:
+        print(f"ERROR: allowance が {amount_wei} 以上にならない (現在: {current_allowance})")
+        sys.exit(1)
 
     # --- Step 2: supply ---
     print("\n[Step 2] Pool.supply (partner 署名, from=partner, onBehalfOf=partner)")
