@@ -21,16 +21,18 @@ from app.auth.dependencies import (
 from app.auth.models import User
 from app.auth.models import User as UserModel
 from app.database import get_db
-from app.policy.engine import PolicyContext, get_policy_engine
 
 from .models import Proposal
 from .schemas import (
     AdminProposalItem,
     AdminProposalListResponse,
     AdminProposalStats,
+    PartnerUnsignedTxs,
     ProposalCreate,
     ProposalListResponse,
     ProposalResponse,
+    SubmitTxRequest,
+    UnsignedTx,
 )
 
 logger = logging.getLogger(__name__)
@@ -191,58 +193,6 @@ def _record_failed_transaction(
         error_message=error_message,
     )
     db.add(tx)
-
-
-def _policy_gate_create(
-    user_id: int,
-    asset: str,
-    operation: str,
-    amount_usd: Decimal,
-    expected_hf_after: Optional[Decimal],
-    db: Session,
-) -> None:
-    """提案生成時ポリシーチェック（1点目）。違反時は HTTP 422 を上げて DB に書かない。"""
-    ctx = PolicyContext(
-        user_id=user_id,
-        asset=asset,
-        operation=operation,
-        amount_usd=amount_usd,
-        expected_hf_after=expected_hf_after,
-    )
-    result = get_policy_engine().check(ctx, db)
-    if result.blocked:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="[POLICY] " + "; ".join(result.violations),
-        )
-
-
-def _policy_gate_approve(proposal: Proposal, db: Session) -> None:
-    """承認時ポリシーチェック（2点目）。
-    違反時は proposal.status='failed' / error_message 記録 → commit → HTTP 422。
-    #461 wallet NULL ガードは _execute_aave_for_proposal 内で後段に適用される。
-    """
-    ctx = PolicyContext(
-        user_id=proposal.user_id,
-        asset=proposal.asset,
-        operation=proposal.operation,
-        amount_usd=Decimal(str(proposal.amount_usd)),
-        expected_hf_after=(
-            Decimal(str(proposal.expected_hf_after))
-            if proposal.expected_hf_after is not None
-            else None
-        ),
-        proposal_id=proposal.id,
-    )
-    result = get_policy_engine().check(ctx, db)
-    if result.blocked:
-        proposal.status = "failed"
-        proposal.error_message = "[POLICY] " + "; ".join(result.violations)
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=proposal.error_message,
-        )
 
 
 def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
@@ -550,17 +500,11 @@ def approve_proposal(
             detail=f"Cannot approve proposal with status '{proposal.status}'",
         )
 
-    # --- Policy gate (承認時: 2点目) ---
-    _policy_gate_approve(proposal, db)
-
     # Step 1: 承認済みにマーク
     proposal.status = "approved"
     proposal.approved_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(proposal)
-
-    # Hermes Phase 0: partner 承認を ai_decision_outcomes に capture (fail-open)
-    _capture_partner_decision(db, proposal.ai_decision_id, partner_approved=True)
 
     # Step 2: Aave 操作を実行（失敗時は 'failed' に遷移）
     _execute_aave_for_proposal(proposal, db)
@@ -591,9 +535,158 @@ def reject_proposal(
     proposal.rejected_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(proposal)
+    return ProposalResponse.model_validate(proposal)
 
-    # Hermes Phase 0: partner 却下を ai_decision_outcomes に capture (fail-open)
-    _capture_partner_decision(db, proposal.ai_decision_id, partner_approved=False)
+
+@router.get(
+    "/{proposal_id}/build-tx",
+    response_model=PartnerUnsignedTxs,
+    summary="パートナー署名用: 未署名トランザクション構築",
+)
+def build_partner_tx(
+    proposal_id: int,
+    current_user: User = Depends(require_partner),
+    db: Session = Depends(get_db),
+) -> PartnerUnsignedTxs:
+    """
+    パートナーが Privy で署名するための未署名 Aave トランザクションを構築して返す。
+
+    approve_proposal の代わりにこのエンドポイントを呼び、フロントエンドで
+    Privy sendTransaction() 経由でパートナー本人が署名・送信する。
+    """
+    from app.aave.service import MultiChainAaveService  # noqa: PLC0415
+
+    stmt = select(Proposal).where(Proposal.id == proposal_id)
+    proposal = db.scalars(stmt).first()
+    if proposal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    if proposal.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot build tx for proposal with status '{proposal.status}'",
+        )
+
+    # partner wallet 取得
+    user = db.scalars(select(User).where(User.id == proposal.user_id)).first()
+    if user is None or not user.wallet_address:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Partner wallet_address が未設定です。Privy で wallet を作成してください。",
+        )
+    wallet_address = user.wallet_address
+
+    op_map: dict[str, str] = {"SUPPLY": "DEPOSIT", "WITHDRAW": "WITHDRAW"}
+    if proposal.operation not in op_map:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Operation {proposal.operation} は partner 署名に非対応です",
+        )
+
+    chain = _get_primary_chain()
+    try:
+        multi_service = MultiChainAaveService()
+        service = multi_service.get_service(chain)
+        asset_symbol = proposal.asset or service._settings.default_asset_symbol
+
+        if proposal.operation == "SUPPLY":
+            txs = service._client.build_deposit_txs(
+                asset_symbol=asset_symbol,
+                amount=Decimal(str(proposal.amount_usd)),
+                wallet_address=wallet_address,
+            )
+            return PartnerUnsignedTxs(
+                proposal_id=proposal_id,
+                operation=proposal.operation,
+                wallet_address=wallet_address,
+                approve_tx=UnsignedTx.model_validate(txs["approve_tx"]),
+                supply_tx=UnsignedTx.model_validate(txs["supply_tx"]),
+            )
+        else:  # WITHDRAW
+            txs = service._client.build_withdraw_tx(
+                asset_symbol=asset_symbol,
+                amount=Decimal(str(proposal.amount_usd)),
+                wallet_address=wallet_address,
+            )
+            return PartnerUnsignedTxs(
+                proposal_id=proposal_id,
+                operation=proposal.operation,
+                wallet_address=wallet_address,
+                withdraw_tx=UnsignedTx.model_validate(txs["withdraw_tx"]),
+            )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"tx 構築失敗: {exc}",
+        ) from exc
+
+
+@router.post(
+    "/{proposal_id}/submit-tx",
+    response_model=ProposalResponse,
+    summary="パートナー署名済みtx提出",
+)
+def submit_partner_tx(
+    proposal_id: int,
+    body: SubmitTxRequest,
+    current_user: User = Depends(require_partner),
+    db: Session = Depends(get_db),
+) -> ProposalResponse:
+    """
+    パートナーが Privy で署名・送信した tx_hash を受け取り、提案を executed に遷移させる。
+
+    フロントエンドは approve tx と supply/withdraw tx を順に送信し、
+    最後の tx_hash をこのエンドポイントに送信する。
+    """
+    from app.transactions.models import Transaction  # noqa: PLC0415
+
+    stmt = select(Proposal).where(Proposal.id == proposal_id)
+    proposal = db.scalars(stmt).first()
+    if proposal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    if proposal.status not in ("pending", "approved"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot submit tx for proposal with status '{proposal.status}'",
+        )
+
+    # tx_hash 形式チェック (0x + 64 hex chars)
+    if not body.tx_hash.startswith("0x") or len(body.tx_hash) != 66:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid tx_hash format",
+        )
+
+    now = datetime.now(timezone.utc)
+    proposal.status = "executed"
+    proposal.approved_at = proposal.approved_at or now
+    proposal.executed_at = now
+    proposal.tx_hash = body.tx_hash
+    proposal.execution_attempts += 1
+
+    chain = _get_primary_chain()
+    tx = Transaction(
+        user_id=proposal.user_id,
+        operation=proposal.operation,
+        asset=proposal.asset,
+        amount=proposal.amount,
+        amount_usd=proposal.amount_usd,
+        tx_hash=body.tx_hash,
+        chain=chain,
+        status="completed",
+        ai_decision_id=proposal.ai_decision_id,
+        is_dry_run=False,
+    )
+    db.add(tx)
+    db.commit()
+    db.refresh(proposal)
+
+    logger.info(
+        "submit-tx: proposal %d executed by partner wallet=%s...%s tx=%s",
+        proposal_id,
+        body.wallet_address[:6] if body.wallet_address else "?",
+        body.wallet_address[-4:] if body.wallet_address else "?",
+        body.tx_hash[:12],
+    )
 
     return ProposalResponse.model_validate(proposal)
 
@@ -624,15 +717,6 @@ def create_proposal(
     db: Session = Depends(get_db),
 ) -> ProposalResponse:
     """提案を作成する（内部呼び出し用）。"""
-    # --- Policy gate (生成時: 1点目) ---
-    _policy_gate_create(
-        user_id=request.user_id,
-        asset=request.asset,
-        operation=request.operation,
-        amount_usd=Decimal(str(request.amount_usd)),
-        expected_hf_after=request.expected_hf_after,
-        db=db,
-    )
     expires_at = request.expires_at or (datetime.now(timezone.utc) + timedelta(hours=72))
     proposal = Proposal(
         user_id=request.user_id,

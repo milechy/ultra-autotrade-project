@@ -354,9 +354,13 @@ class AaveService:
         # 実際の deposit / withdraw 呼び出し
         try:
             if operation is AaveOperationType.DEPOSIT:
-                tx_hash = self._client.deposit(token, normalized_amount)
+                tx_hash = self._client.deposit(
+                    token, normalized_amount, wallet_address=wallet_address or ""
+                )
             elif operation is AaveOperationType.WITHDRAW:
-                tx_hash = self._client.withdraw(token, normalized_amount)
+                tx_hash = self._client.withdraw(
+                    token, normalized_amount, wallet_address=wallet_address or ""
+                )
             else:
                 # ここに来ることは想定していないが、安全側で NOOP とする
                 logger.warning("Unexpected operation %s; treating as NOOP.", operation)
