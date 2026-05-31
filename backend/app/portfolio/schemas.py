@@ -6,7 +6,14 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
+
+
+def _cap_hf_inf(v: Optional[Decimal]) -> Optional[Decimal]:
+    """Aave V3 ではポジションがないと HF=∞ を返す。finite_number 制約を回避するため 999.0 に丸める。"""
+    if v is not None and isinstance(v, Decimal) and not v.is_finite():
+        return Decimal("999.0")
+    return v
 
 
 class PortfolioSnapshotCreate(BaseModel):
@@ -17,6 +24,11 @@ class PortfolioSnapshotCreate(BaseModel):
     health_factor: Optional[Decimal] = None
     positions_json: Optional[List[Any]] = None
     recorded_at: Optional[datetime] = None
+
+    @field_validator("health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        return _cap_hf_inf(v)
 
 
 class PortfolioSnapshotResponse(BaseModel):
@@ -30,6 +42,11 @@ class PortfolioSnapshotResponse(BaseModel):
     health_factor: Optional[Decimal]
     positions_json: Optional[List[Any]]
     recorded_at: datetime
+
+    @field_validator("health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        return _cap_hf_inf(v)
 
 
 class PortfolioHistoryResponse(BaseModel):
@@ -50,6 +67,11 @@ class PortfolioCurrentResponse(BaseModel):
     recorded_at: Optional[datetime] = None
     has_data: bool = False
 
+    @field_validator("health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        return _cap_hf_inf(v)
+
 
 class PortfolioLiveResponse(BaseModel):
     """GET /api/portfolio ライブAaveデータレスポンス。"""
@@ -61,3 +83,8 @@ class PortfolioLiveResponse(BaseModel):
     positions: list[Any] = []
     chain: str
     fetched_at: str  # ISO 8601
+
+    @field_validator("health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        return _cap_hf_inf(v)

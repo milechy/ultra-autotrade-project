@@ -17,7 +17,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from app.aave.schemas import AaveOperationResult, AaveOperationType
 
@@ -157,6 +157,14 @@ class RebalanceProposal(BaseModel):
 
     model_config = ConfigDict()
 
+    @field_validator("health_factor_before", "estimated_health_factor_after", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Aave V3 ではポジションがないと HF=∞ を返す。finite_number 制約を回避するため 999.0 に丸める。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
+
     @field_serializer("health_factor_before", "total_value_usd", "max_single_trade_pct")
     @classmethod
     def serialize_decimal(cls, v: Decimal) -> str:
@@ -206,6 +214,14 @@ class RebalanceResult(BaseModel):
     )
 
     model_config = ConfigDict()
+
+    @field_validator("health_factor_before", "health_factor_after", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Aave V3 ではポジションがないと HF=∞ を返す。finite_number 制約を回避するため 999.0 に丸める。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
 
     @field_serializer("health_factor_before")
     @classmethod
@@ -262,6 +278,14 @@ class RebalanceHistoryEntry(BaseModel):
     )
 
     model_config = ConfigDict()
+
+    @field_validator("health_factor_before", "health_factor_after", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Aave V3 ではポジションがないと HF=∞ を返す。finite_number 制約を回避するため 999.0 に丸める。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
 
     @field_serializer("total_value_usd", "health_factor_before")
     @classmethod
@@ -332,6 +356,14 @@ class RebalanceStatusResponse(BaseModel):
     )
 
     model_config = ConfigDict()
+
+    @field_validator("health_factor", mode="before")
+    @classmethod
+    def cap_infinity_hf(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        """Aave V3 ではポジションがないと HF=∞ を返す。finite_number 制約を回避するため 999.0 に丸める。"""
+        if v is not None and isinstance(v, Decimal) and not v.is_finite():
+            return Decimal("999.0")
+        return v
 
     @field_serializer("health_factor", "total_value_usd", "deviation_threshold_pct")
     @classmethod
