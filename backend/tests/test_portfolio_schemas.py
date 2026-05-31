@@ -2,10 +2,8 @@
 # backend/tests/test_portfolio_schemas.py
 """ポートフォリオスキーマの HF infinity cap バリデーションテスト。"""
 
-from decimal import Decimal
 from datetime import datetime, timezone
-
-import pytest
+from decimal import Decimal
 
 from app.portfolio.schemas import (
     PortfolioCurrentResponse,
