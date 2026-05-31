@@ -9,7 +9,7 @@ staging サーバーウォレットから partner test wallet に:
 使い方:
   python3 scripts/fund_partner_test_wallet.py --partner 0xD3b437...
 
-.env.staging を自動 load (AAVE_PRIVATE_KEY / AAVE_WALLET_ADDRESS / AAVE_RPC_URL_BASE_SEPOLIA)
+/opt/ultra-autotrade/.env.staging-new を自動 load (AAVE_WALLET_PRIVATE_KEY / AAVE_WALLET_ADDRESS / ALCHEMY_RPC_URL_BASE_SEPOLIA or AAVE_RPC_URL)
 
 WARNING: staging / testnet 専用。本番環境で絶対に使わない。
 """
@@ -28,8 +28,8 @@ except ImportError as e:
     print(f"Missing dependency: {e}. pip install web3 eth-account python-dotenv")
     sys.exit(1)
 
-# .env.staging から読み込む
-_env_path = Path(__file__).parent.parent / ".env.staging"
+# /opt/ultra-autotrade/.env.staging-new から読み込む (本番VPS絶対パス)
+_env_path = Path("/opt/ultra-autotrade/.env.staging-new")
 if _env_path.exists():
     load_dotenv(_env_path)
     print(f"[INFO] Loaded {_env_path}")
@@ -41,7 +41,7 @@ FAUCET_ADDRESS = "0xD9145b5F45Ad4519c7ACcD6E0A4A82e83bB8A6Dc"
 USDC_ADDRESS = "0xba50cd2a20f6da35d788639e581bca8d0b5d4d5f"
 USDC_DECIMALS = 6
 ETH_TO_SEND = Decimal("0.02")
-USDC_TO_MINT = Decimal("10")
+USDC_TO_MINT = Decimal("5")
 
 FAUCET_ABI = [
     {
@@ -72,12 +72,12 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    rpc_url = os.environ.get("AAVE_RPC_URL_BASE_SEPOLIA", "https://sepolia.base.org")
-    server_key = os.environ.get("AAVE_PRIVATE_KEY", "")
+    rpc_url = os.environ.get("ALCHEMY_RPC_URL_BASE_SEPOLIA") or os.environ.get("AAVE_RPC_URL", "https://sepolia.base.org")
+    server_key = os.environ.get("AAVE_WALLET_PRIVATE_KEY", "")
     server_addr = os.environ.get("AAVE_WALLET_ADDRESS", "")
 
     if not server_key or not server_addr:
-        print("ERROR: AAVE_PRIVATE_KEY / AAVE_WALLET_ADDRESS が設定されていません (.env.staging 要確認)")
+        print("ERROR: AAVE_WALLET_PRIVATE_KEY / AAVE_WALLET_ADDRESS が設定されていません (.env.staging-new 要確認)")
         sys.exit(1)
 
     w3 = Web3(Web3.HTTPProvider(rpc_url))
@@ -95,7 +95,7 @@ def main() -> None:
     server = Web3.to_checksum_address(server_addr)
 
     if server_account.address.lower() != server.lower():
-        print(f"ERROR: AAVE_PRIVATE_KEY のアドレス {server_account.address} と AAVE_WALLET_ADDRESS {server} が不一致")
+        print(f"ERROR: AAVE_WALLET_PRIVATE_KEY のアドレス {server_account.address} と AAVE_WALLET_ADDRESS {server} が不一致")
         sys.exit(1)
 
     # 残高確認
