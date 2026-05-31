@@ -16,6 +16,10 @@ set -euo pipefail
 #   PHASE 3 (WRITE)      deploy_production.sh --backend-only (Blue/Green)
 #   PHASE 4 (READ)       os.getenv 検証 / ValidationError チェック / 焼き込み grep
 #
+# ⚠️  本 deploy は backend のみ (--backend-only)。
+#     #466 (frontend itp-reauth) は frontend 変更のため本スクリプトでは反映されない。
+#     #466 は別途 deploy_production.sh --frontend-only で個別デプロイすること。
+#
 # ============================================================
 
 for _arg in "$@"; do
@@ -402,7 +406,7 @@ GREP_RESULT=$(docker exec "${BACKEND_POST}" \
     -e "POLICY_DAILY_VELOCITY_CAP_USD" \
     -e "POLICY_HOURLY_VELOCITY_CAP_USD" \
     -e "REBALANCE_SHADOW_MODE" \
-    /app/backend/app/ \
+    /app/app/ \
     --include="*.py" -l 2>/dev/null || echo "")
 
 if [[ -n "${GREP_RESULT}" ]]; then
