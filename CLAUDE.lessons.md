@@ -1029,3 +1029,26 @@ docker exec ultra-autotrade-frontend-production sh -c \
 
 **Lane 1 ブロック包括依頼テンプレ** は `CLAUDE.md` core §9 朝プロトコル直後に常駐化済。
 本 P1-P5 違反パターンは「`CLAUDE.md` 朝プロトコル §9 Step 0 でこの lessons ファイル全体を SessionStart Hook 経由で auto-Read」される運用で防止する。
+
+---
+
+## 2026-05-31 custodial 実装が5ゲート全漏れ — テストが実装と同じ前提を持つと欠陥を追認する
+
+**真因**: Aave 実行が最初から custodial 設計（サーバー共通鍵署名・サーバー wallet 資産・`onBehalfOf=サーバー`）。`client.py` 初出 commit `b1274b4`（5/27）時点で `AaveClient Protocol` が `deposit(asset, amount)` の 2 引数。`user.wallet_address` は監査ログのみで on-chain 未伝達。規約 ver03 / §17-5 / §20 の non-custodial と矛盾。`shadow=true` だったため実 tx が出ず顕在化せず、6/1 実 tx 解禁直前（5/31）にコード追跡で発覚。
+
+**なぜ5ゲート全漏れか（全て「成功可否」は見たが「誰の資産が動いたか」を見ていない）**:
+- **Gate A/B pytest**: `FakeAaveClient` も2引数で実装と同形。`supply` の `onBehalfOf` を assert せず回数だけ検証 → mock が欠陥を正常として追認
+- **Gate C E2E**: `AaveService` を bypass しサーバー鍵で直接 `Web3AaveClient` を呼び完走 → 実コードパス未通過
+- **Gate D/E dry run/UAT DoD**: basescan で `status=Success` のみ。`from` / `onBehalfOf` 未確認
+
+**構造的教訓**:
+- テストダブルが実装と同じ前提を持つと欠陥を検出でなく追認する。5/10 の `page.route` mock（mock pass → 実環境 fail）と同型の反復。
+- money が動く操作は tx 成功でなく「誰の・どのアドレスの資産が・誰の署名で動いたか」を検証しなければ完走と呼べない。
+
+**再発防止（§7 / §14 / checklist に反映）**:
+1. §14 完走条件4: tx の `from=partner AND onBehalfOf=partner` を必須確認
+2. §7 Gate1: Fake は `wallet_address` を記録・assert。`onBehalfOf` 引数を中身まで assert
+3. §7 Gate4: `AaveService` を bypass しない。on-chain `from` / `onBehalfOf` を assert、mock 不可
+4. 横断: money 操作は「誰の資産が・誰の署名で」を検証する原則を明文化
+
+**対応**: Asana 1215263804492320（方式2 non-custodial 改修）で実装中。6/1 `shadow=false` 切替は本改修 + staging `from`/`onBehalfOf=partner` 実証まで凍結。
