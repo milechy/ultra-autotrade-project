@@ -98,9 +98,11 @@ export default function PartnerProposalsPage() {
    */
   const handleApprove = async (id: number) => {
     if (!token) return
-    const wallet = wallets[0]
+    // embedded wallet (Privy TEE) のみ使用。外部 wallet (MetaMask 等) は秘密鍵がサーバーに渡る
+    // 懸念があるため除外。walletClientType === 'privy' が Privy embedded wallet の識別子。
+    const wallet = wallets.find(w => w.walletClientType === 'privy') ?? null
     if (!wallet) {
-      setError('ウォレットが接続されていません。先にウォレットを接続してください。')
+      setError('Privy embedded wallet が見つかりません。Privy メールアドレスでログインしてください（MetaMask 等の外部 wallet は使用不可）。')
       return
     }
 

@@ -646,10 +646,11 @@ class Web3AaveClient(AaveClientBase):
             if not asset_addr:
                 raise AaveClientError(f"Unknown asset: {asset_symbol}")
             asset_address = asset_addr
-            if not wallet_address and hasattr(self, "account"):
-                wallet_address = self.account.address
-            else:
-                raise AaveClientError("No wallet configured")
+            if not wallet_address:
+                if hasattr(self, "account"):
+                    wallet_address = self.account.address
+                else:
+                    raise AaveClientError("No wallet configured")
 
         # 後方互換: asset_address が "0x" で始まらない場合は asset_symbol として扱う
         if asset_address and not asset_address.startswith("0x"):
@@ -660,10 +661,11 @@ class Web3AaveClient(AaveClientBase):
             if not asset_addr:
                 raise AaveClientError(f"Unknown asset: {_sym}")
             asset_address = asset_addr
-            if not wallet_address and hasattr(self, "account"):
-                wallet_address = self.account.address
-            else:
-                raise AaveClientError("No wallet configured")
+            if not wallet_address:
+                if hasattr(self, "account"):
+                    wallet_address = self.account.address
+                else:
+                    raise AaveClientError("No wallet configured")
 
         # amount バリデーション
         if amount <= 0:
@@ -871,10 +873,11 @@ class Web3AaveClient(AaveClientBase):
             if not asset_addr:
                 raise AaveClientError(f"Unknown asset: {asset_symbol}")
             asset_address = asset_addr
-            if not wallet_address and hasattr(self, "account"):
-                wallet_address = self.account.address
-            else:
-                raise AaveClientError("No wallet configured")
+            if not wallet_address:
+                if hasattr(self, "account"):
+                    wallet_address = self.account.address
+                else:
+                    raise AaveClientError("No wallet configured")
 
         # 後方互換: asset_address が "0x" で始まらない場合は asset_symbol として扱う
         if asset_address and not asset_address.startswith("0x"):
@@ -885,10 +888,11 @@ class Web3AaveClient(AaveClientBase):
             if not asset_addr:
                 raise AaveClientError(f"Unknown asset: {_sym}")
             asset_address = asset_addr
-            if not wallet_address and hasattr(self, "account"):
-                wallet_address = self.account.address
-            else:
-                raise AaveClientError("No wallet configured")
+            if not wallet_address:
+                if hasattr(self, "account"):
+                    wallet_address = self.account.address
+                else:
+                    raise AaveClientError("No wallet configured")
 
         if amount <= 0:
             raise ValueError(f"withdraw amount must be positive, got {amount}")
