@@ -18,11 +18,17 @@
 #
 # SSH: ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155
 #
-# 必須 env:
-#   ADMIN_EMAIL       staging admin ユーザーメール
-#   ADMIN_PASSWORD    staging admin パスワード
+# 認証情報 (呼び出し側で export 不要 — §13 準拠):
+#   STAGING_CREDENTIALS_FILE (default: /opt/ultra-autotrade/.env.staging-new) から
+#   ADMIN_EMAIL / ADMIN_PASSWORD を自動読み込み。
+#   ps / shell 履歴 / ログへの平文漏洩を防ぐため、呼び出し前の export は禁止。
+#
+#   認証情報ファイルに以下を記載しておく:
+#     ADMIN_EMAIL=staging-admin@example.com
+#     ADMIN_PASSWORD=<staging admin password>
 #
 # オプション env:
+#   STAGING_CREDENTIALS_FILE   認証情報ファイルパス (default: /opt/ultra-autotrade/.env.staging-new)
 #   STAGING_BASE_URL           default: http://127.0.0.1:8082
 #   POSTGRES_CONTAINER         default: 自動検出 (*postgres*staging*)
 #   BACKEND_CONTAINER          default: 自動検出 (nginx upstream の active 側)
@@ -58,6 +64,7 @@ set -uo pipefail
 # =============================================================================
 SCRIPT_NAME="e2e_emergency_stop"
 ENV_FILE="${ENV_FILE:-/opt/ultra-autotrade/.env.production}"
+STAGING_CREDENTIALS_FILE="${STAGING_CREDENTIALS_FILE:-/opt/ultra-autotrade/.env.staging-new}"
 BASE_URL="${STAGING_BASE_URL:-http://127.0.0.1:8082}"
 DB_USER="${DB_USER:-ultra}"
 DB_NAME="${DB_NAME:-ultra_autotrade_staging}"
@@ -177,10 +184,9 @@ _safety_check() {
        実行手順:
          1) iMac で:
               ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155
-         2) 本番 VPS で:
-              export ADMIN_EMAIL='<staging admin email>'
-              export ADMIN_PASSWORD='<staging admin password>'
+         2) 本番 VPS で (ADMIN_EMAIL/PASSWORD は export 不要):
               cd /opt/ultra-autotrade
+              # .env.staging-new に ADMIN_EMAIL / ADMIN_PASSWORD が記載されていることを確認
               bash scripts/e2e_emergency_stop.sh
 EOF
     exit 0
@@ -207,6 +213,41 @@ _require_env() {
     echo "[FATAL] 必須 env 未設定: ${name}" >&2
     exit 2
   fi
+}
+
+# =============================================================================
+# 認証情報読み込み (§13 準拠: ps/履歴/ログへの平文漏洩防止)
+#
+# ADMIN_EMAIL / ADMIN_PASSWORD を STAGING_CREDENTIALS_FILE から grep+cut で抽出。
+# 呼び出し側で export 不要。source は実行リスクがあるため使用しない。
+# =============================================================================
+_load_credentials() {
+  if [[ -n "${ADMIN_EMAIL:-}" && -n "${ADMIN_PASSWORD:-}" ]]; then
+    log_info "認証情報: 環境変数から取得済み (email=${ADMIN_EMAIL})"
+    return 0
+  fi
+
+  local cred_file="${STAGING_CREDENTIALS_FILE}"
+  if [[ ! -f "${cred_file}" ]]; then
+    cred_file="/opt/ultra-autotrade/.env.staging"
+  fi
+  if [[ ! -f "${cred_file}" ]]; then
+    echo "[FATAL] 認証情報ファイルが見つかりません: ${STAGING_CREDENTIALS_FILE}" >&2
+    echo "        STAGING_CREDENTIALS_FILE を設定するか、ファイルに ADMIN_EMAIL/ADMIN_PASSWORD を追記してください" >&2
+    exit 2
+  fi
+
+  ADMIN_EMAIL=$(grep '^ADMIN_EMAIL=' "${cred_file}" 2>/dev/null | head -1 \
+    | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+  ADMIN_PASSWORD=$(grep '^ADMIN_PASSWORD=' "${cred_file}" 2>/dev/null | head -1 \
+    | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+
+  if [[ -z "${ADMIN_EMAIL:-}" || -z "${ADMIN_PASSWORD:-}" ]]; then
+    echo "[FATAL] ${cred_file} に ADMIN_EMAIL または ADMIN_PASSWORD が見つかりません" >&2
+    exit 2
+  fi
+
+  log_info "認証情報: ${cred_file} から取得 (email=${ADMIN_EMAIL})"
 }
 
 # =============================================================================
@@ -281,8 +322,17 @@ _get_admin_token() {
     -H 'Content-Type: application/json' \
     -d "${login_payload}" 2>/dev/null || echo "")
   ADMIN_TOKEN=$(echo "${login_body}" | jq -r '.access_token // empty' 2>/dev/null || echo "")
+
+  # 認証情報をメモリから消去 (JWT 取得後は不要。以降は ADMIN_TOKEN のみ使用)
+  unset ADMIN_EMAIL ADMIN_PASSWORD login_payload
+
   if [[ -z "${ADMIN_TOKEN}" ]]; then
-    echo "[FATAL] /auth/login 失敗。response: ${login_body}" >&2
+    # access_token / password フィールドをマスクしてからエラー出力 (秘密値漏洩防止)
+    local masked_body
+    masked_body=$(echo "${login_body}" \
+      | jq 'del(.access_token, .password, .token, .refresh_token) // .' 2>/dev/null \
+      || echo "(response masked)")
+    echo "[FATAL] /auth/login 失敗。response: ${masked_body}" >&2
     exit 2
   fi
   log_info "admin JWT 取得 OK (len=${#ADMIN_TOKEN})"
@@ -1027,9 +1077,7 @@ main() {
 
   _safety_check
   _load_slack_webhook
-
-  _require_env ADMIN_EMAIL
-  _require_env ADMIN_PASSWORD
+  _load_credentials
 
   _detect_containers
   _verify_staging
