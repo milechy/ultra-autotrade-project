@@ -178,6 +178,7 @@ def main() -> None:
     ).build_transaction({
         "from": partner_address,
         "nonce": nonce,
+        "gas": 100000,
         "gasPrice": w3.eth.gas_price,
         "chainId": chain_id,
     })
@@ -209,6 +210,9 @@ def main() -> None:
     # --- Step 2: supply ---
     print("\n[Step 2] Pool.supply (partner 署名, from=partner, onBehalfOf=partner)")
     nonce2 = w3.eth.get_transaction_count(partner_address, "pending")
+    # gas=300000 を明示: build_transaction が内部で呼ぶ eth_estimateGas は
+    # public RPC のステートラグで "transfer amount exceeds allowance" を返すことがある。
+    # allowance は上のポーリングで確認済みなので estimateGas をバイパスして固定 gas を使う。
     supply_tx = pool.functions.supply(
         Web3.to_checksum_address(USDC_ADDRESS),
         amount_wei,
@@ -217,6 +221,7 @@ def main() -> None:
     ).build_transaction({
         "from": partner_address,
         "nonce": nonce2,
+        "gas": 300000,
         "gasPrice": w3.eth.gas_price,
         "chainId": chain_id,
     })
