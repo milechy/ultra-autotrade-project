@@ -66,6 +66,13 @@ def mask(addr: str) -> str:
     return f"{addr[:6]}...{addr[-4:]}" if len(addr) > 10 else addr
 
 
+def _mask_url(url: str) -> str:
+    """RPC URL の API キー部分をマスク (末尾 8 文字を *** に置換)。"""
+    if len(url) > 20:
+        return url[:12] + "...***"
+    return "***"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--partner", required=True, help="Partner test wallet address")
@@ -81,11 +88,15 @@ def main() -> None:
         sys.exit(1)
 
     w3 = Web3(Web3.HTTPProvider(rpc_url))
-    if not w3.is_connected():
-        print(f"ERROR: RPC に接続できません ({rpc_url})")
+    # is_connected() は Base/Alchemy で False を返すことがある (§21教訓)
+    # chain_id 取得成功をもって接続確認とする
+    try:
+        chain_id = w3.eth.chain_id
+    except Exception as e:
+        print(f"ERROR: RPC に接続できません (url={_mask_url(rpc_url)}): {e}")
         sys.exit(1)
 
-    chain_id = w3.eth.chain_id
+    print(f"[INFO] RPC 接続確認 (chain_id={chain_id}, url={_mask_url(rpc_url)})")
     if chain_id != 84532:
         print(f"ERROR: Chain ID {chain_id} は Base Sepolia (84532) ではありません")
         sys.exit(1)
