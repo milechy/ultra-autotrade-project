@@ -29,10 +29,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Optional
-
-if TYPE_CHECKING:
-    from web3 import Web3 as Web3Type
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
