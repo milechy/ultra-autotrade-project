@@ -105,9 +105,13 @@ def test_aave_execution_success_marks_proposal_executed(client: TestClient, test
         tx_hash="0xabcdef1234",
     )
 
-    with patch(
-        "app.aave.service.MultiChainAaveService.execute_rebalance",
-        return_value=fake_result,
+    # AUTO_EXECUTION_ENABLED=true: custodial auto-execution パスを有効化
+    with (
+        patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
+        patch(
+            "app.aave.service.MultiChainAaveService.execute_rebalance",
+            return_value=fake_result,
+        ),
     ):
         r = client.post(
             f"/api/proposals/{proposal_id}/approve",
@@ -145,9 +149,13 @@ def test_aave_execution_failure_marks_proposal_failed(client: TestClient, test_d
 
     boom = RuntimeError("RPC connection refused")
 
-    with patch(
-        "app.aave.service.MultiChainAaveService.execute_rebalance",
-        side_effect=boom,
+    # AUTO_EXECUTION_ENABLED=true: custodial auto-execution パスを有効化
+    with (
+        patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
+        patch(
+            "app.aave.service.MultiChainAaveService.execute_rebalance",
+            side_effect=boom,
+        ),
     ):
         r = client.post(
             f"/api/proposals/{proposal_id}/approve",
@@ -190,7 +198,9 @@ def test_aave_execution_failure_sends_slack_notification(client: TestClient) -> 
 
     boom = RuntimeError("web3 provider unreachable")
 
+    # AUTO_EXECUTION_ENABLED=true: custodial auto-execution パスを有効化
     with (
+        patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
         patch(
             "app.aave.service.MultiChainAaveService.execute_rebalance",
             side_effect=boom,

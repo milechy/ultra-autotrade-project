@@ -7,6 +7,9 @@
 #   execution_attempts: h8i9j0k1l2m3_add_proposals_execution_attempts.py で alembic 化
 #                       (launch_gate L0 schema sync, 2026-05-27)。
 #                       適用前は本ファイル先頭のコメント記載通り手動 ALTER で先行投入されていた。
+#   expected_from / expected_to: non-custodial method2 submit-tx on-chain receipt 検証用 (2026-06-01)。
+#   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS expected_from VARCHAR(42);
+#   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS expected_to VARCHAR(42);
 
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -54,6 +57,9 @@ class Proposal(Base):
     rejected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     executed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     tx_hash: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    # submit-tx receipt 検証: partner が送信した tx の from/to アドレスを保存して照合する
+    expected_from: Mapped[Optional[str]] = mapped_column(String(42), nullable=True)
+    expected_to: Mapped[Optional[str]] = mapped_column(String(42), nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

@@ -21,16 +21,18 @@ from app.auth.dependencies import (
 from app.auth.models import User
 from app.auth.models import User as UserModel
 from app.database import get_db
-from app.policy.engine import PolicyContext, get_policy_engine
 
 from .models import Proposal
 from .schemas import (
     AdminProposalItem,
     AdminProposalListResponse,
     AdminProposalStats,
+    PartnerUnsignedTxs,
     ProposalCreate,
     ProposalListResponse,
     ProposalResponse,
+    SubmitTxRequest,
+    UnsignedTx,
 )
 
 logger = logging.getLogger(__name__)
@@ -191,58 +193,6 @@ def _record_failed_transaction(
         error_message=error_message,
     )
     db.add(tx)
-
-
-def _policy_gate_create(
-    user_id: int,
-    asset: str,
-    operation: str,
-    amount_usd: Decimal,
-    expected_hf_after: Optional[Decimal],
-    db: Session,
-) -> None:
-    """提案生成時ポリシーチェック（1点目）。違反時は HTTP 422 を上げて DB に書かない。"""
-    ctx = PolicyContext(
-        user_id=user_id,
-        asset=asset,
-        operation=operation,
-        amount_usd=amount_usd,
-        expected_hf_after=expected_hf_after,
-    )
-    result = get_policy_engine().check(ctx, db)
-    if result.blocked:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="[POLICY] " + "; ".join(result.violations),
-        )
-
-
-def _policy_gate_approve(proposal: Proposal, db: Session) -> None:
-    """承認時ポリシーチェック（2点目）。
-    違反時は proposal.status='failed' / error_message 記録 → commit → HTTP 422。
-    #461 wallet NULL ガードは _execute_aave_for_proposal 内で後段に適用される。
-    """
-    ctx = PolicyContext(
-        user_id=proposal.user_id,
-        asset=proposal.asset,
-        operation=proposal.operation,
-        amount_usd=Decimal(str(proposal.amount_usd)),
-        expected_hf_after=(
-            Decimal(str(proposal.expected_hf_after))
-            if proposal.expected_hf_after is not None
-            else None
-        ),
-        proposal_id=proposal.id,
-    )
-    result = get_policy_engine().check(ctx, db)
-    if result.blocked:
-        proposal.status = "failed"
-        proposal.error_message = "[POLICY] " + "; ".join(result.violations)
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=proposal.error_message,
-        )
 
 
 def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
@@ -550,22 +500,26 @@ def approve_proposal(
             detail=f"Cannot approve proposal with status '{proposal.status}'",
         )
 
-    # --- Policy gate (承認時: 2点目) ---
-    _policy_gate_approve(proposal, db)
-
     # Step 1: 承認済みにマーク
     proposal.status = "approved"
     proposal.approved_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(proposal)
 
-    # Hermes Phase 0: partner 承認を ai_decision_outcomes に capture (fail-open)
-    _capture_partner_decision(db, proposal.ai_decision_id, partner_approved=True)
-
-    # Step 2: Aave 操作を実行（失敗時は 'failed' に遷移）
-    _execute_aave_for_proposal(proposal, db)
-    db.commit()
-    db.refresh(proposal)
+    # Step 2: Aave 自動実行 (AUTO_EXECUTION_ENABLED=true の場合のみ)
+    # non-custodial 方式2 では default=false。partner 手動署名 (submit_partner_tx) のみが実 tx を立てる。
+    # AAVE_WALLET_PRIVATE_KEY が署名する経路はこのフラグで完全に無効化される。
+    auto_execution_enabled = os.getenv("AUTO_EXECUTION_ENABLED", "false").lower() == "true"
+    if auto_execution_enabled:
+        _execute_aave_for_proposal(proposal, db)
+        db.commit()
+        db.refresh(proposal)
+    else:
+        logger.info(
+            "proposal %d: AUTO_EXECUTION_ENABLED=false — skipping custodial auto-execution; "
+            "waiting for partner manual approve via submit-tx",
+            proposal.id,
+        )
 
     return ProposalResponse.model_validate(proposal)
 
@@ -591,9 +545,283 @@ def reject_proposal(
     proposal.rejected_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(proposal)
+    return ProposalResponse.model_validate(proposal)
 
-    # Hermes Phase 0: partner 却下を ai_decision_outcomes に capture (fail-open)
-    _capture_partner_decision(db, proposal.ai_decision_id, partner_approved=False)
+
+@router.get(
+    "/{proposal_id}/build-tx",
+    response_model=PartnerUnsignedTxs,
+    response_model_by_alias=True,
+    summary="パートナー署名用: 未署名トランザクション構築",
+)
+def build_partner_tx(
+    proposal_id: int,
+    current_user: User = Depends(require_partner),
+    db: Session = Depends(get_db),
+) -> PartnerUnsignedTxs:
+    """
+    パートナーが Privy で署名するための未署名 Aave トランザクションを構築して返す。
+
+    approve_proposal の代わりにこのエンドポイントを呼び、フロントエンドで
+    Privy sendTransaction() 経由でパートナー本人が署名・送信する。
+    """
+    from app.aave.service import MultiChainAaveService  # noqa: PLC0415
+
+    stmt = select(Proposal).where(Proposal.id == proposal_id)
+    proposal = db.scalars(stmt).first()
+    if proposal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    if proposal.user_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this proposal"
+        )
+    if proposal.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot build tx for proposal with status '{proposal.status}'",
+        )
+
+    # partner wallet 取得
+    user = db.scalars(select(User).where(User.id == proposal.user_id)).first()
+    if user is None or not user.wallet_address:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Partner wallet_address が未設定です。Privy で wallet を作成してください。",
+        )
+    wallet_address = user.wallet_address
+
+    op_map: dict[str, str] = {"SUPPLY": "DEPOSIT", "WITHDRAW": "WITHDRAW"}
+    if proposal.operation not in op_map:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Operation {proposal.operation} は partner 署名に非対応です",
+        )
+
+    chain = _get_primary_chain()
+    try:
+        multi_service = MultiChainAaveService()
+        service = multi_service.get_service(chain)
+        asset_symbol = proposal.asset or service._settings.default_asset_symbol
+
+        if proposal.operation == "SUPPLY":
+            txs = service._client.build_deposit_txs(
+                asset_symbol=asset_symbol,
+                amount=Decimal(str(proposal.amount_usd)),
+                wallet_address=wallet_address,
+            )
+            return PartnerUnsignedTxs(
+                proposal_id=proposal_id,
+                operation=proposal.operation,
+                wallet_address=wallet_address,
+                approve_tx=UnsignedTx.model_validate(txs["approve_tx"]),
+                supply_tx=UnsignedTx.model_validate(txs["supply_tx"]),
+            )
+        else:  # WITHDRAW
+            txs = service._client.build_withdraw_tx(
+                asset_symbol=asset_symbol,
+                amount=Decimal(str(proposal.amount_usd)),
+                wallet_address=wallet_address,
+            )
+            return PartnerUnsignedTxs(
+                proposal_id=proposal_id,
+                operation=proposal.operation,
+                wallet_address=wallet_address,
+                withdraw_tx=UnsignedTx.model_validate(txs["withdraw_tx"]),
+            )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"tx 構築失敗: {exc}",
+        ) from exc
+
+
+def _verify_on_chain_receipt(
+    tx_hash: str,
+    expected_from: str,
+    expected_to: str,
+    rpc_url: str,
+    poll_interval: float = 5.0,
+    max_wait: float = 60.0,
+) -> dict[str, object]:
+    """
+    on-chain tx_hash の receipt を取得して from/to/status を検証する。
+
+    - status == 1 必須 (reverted は 422)
+    - receipt['from'].lower() == expected_from.lower() 必須
+    - receipt['to'].lower() == expected_to.lower() を確認 (可能な場合)
+    - receipt が pending (None) なら poll_interval 秒おきに max_wait 秒まで再試行
+    - max_wait 経過しても pending なら ValueError を送出 (呼び出し元で 400)
+
+    :returns: receipt dict (AttributeDict)
+    :raises ValueError: receipt が pending / status=0 / from/to 不一致
+    """
+    import time  # noqa: PLC0415
+
+    try:
+        from web3 import Web3  # noqa: PLC0415
+    except ImportError as exc:
+        raise ValueError("web3 ライブラリが未インストールです") from exc
+
+    w3 = Web3(Web3.HTTPProvider(rpc_url))
+
+    elapsed = 0.0
+    receipt = None
+    while elapsed <= max_wait:
+        receipt = w3.eth.get_transaction_receipt(tx_hash)  # type: ignore[arg-type]
+        if receipt is not None:
+            break
+        time.sleep(poll_interval)
+        elapsed += poll_interval
+
+    if receipt is None:
+        raise ValueError(
+            f"tx {tx_hash[:12]}... は {max_wait:.0f}秒経過後も pending です。"
+            "しばらく待ってから再試行してください。"
+        )
+
+    if receipt["status"] != 1:
+        raise ValueError(f"tx {tx_hash[:12]}... は reverted (status={receipt['status']}) です。")
+
+    actual_from = receipt.get("from", "")
+    if actual_from.lower() != expected_from.lower():
+        raise ValueError(
+            f"tx の from アドレスが一致しません: "
+            f"expected={expected_from[:10]}... actual={actual_from[:10]}..."
+        )
+
+    actual_to = receipt.get("to", "")
+    if actual_to and actual_to.lower() != expected_to.lower():
+        raise ValueError(
+            f"tx の to アドレスが一致しません: "
+            f"expected={expected_to[:10]}... actual={actual_to[:10]}..."
+        )
+
+    return dict(receipt)
+
+
+@router.post(
+    "/{proposal_id}/submit-tx",
+    response_model=ProposalResponse,
+    summary="パートナー署名済みtx提出",
+)
+def submit_partner_tx(
+    proposal_id: int,
+    body: SubmitTxRequest,
+    current_user: User = Depends(require_partner),
+    db: Session = Depends(get_db),
+) -> ProposalResponse:
+    """
+    パートナーが Privy で署名・送信した tx_hash を受け取り、on-chain receipt を検証して
+    提案を executed に遷移させる。
+
+    フロントエンドは approve tx と supply/withdraw tx を順に送信し、
+    最後の tx_hash (supply/withdraw tx) をこのエンドポイントに送信する。
+
+    検証フロー:
+    1. tx_hash 形式チェック (regex)
+    2. web3 get_transaction_receipt でポーリング (最大60秒)
+    3. status==1 / from==partner_wallet / to==Aave Pool 確認
+    4. 全通過後のみ proposal.status='executed' に遷移
+    """
+    from app.transactions.models import Transaction  # noqa: PLC0415
+
+    stmt = select(Proposal).where(Proposal.id == proposal_id)
+    proposal = db.scalars(stmt).first()
+    if proposal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    if proposal.user_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this proposal"
+        )
+    if proposal.status not in ("pending", "approved"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot submit tx for proposal with status '{proposal.status}'",
+        )
+
+    # tx_hash 形式チェック (0x + 64 hex chars)
+    import re  # noqa: PLC0415
+
+    if not re.fullmatch(r"0x[0-9a-fA-F]{64}", body.tx_hash):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid tx_hash format",
+        )
+
+    # on-chain receipt 検証
+    chain_name = _get_primary_chain()
+    try:
+        from app.aave.chains import get_chain_config, get_rpc_url_for_chain  # noqa: PLC0415
+
+        chain_cfg = get_chain_config(chain_name)
+        rpc_url = get_rpc_url_for_chain(chain_cfg)
+        pool_address = chain_cfg.pool_address
+    except (ValueError, KeyError) as exc:
+        logger.warning(
+            "submit-tx: chain config unavailable (%s) — skipping on-chain receipt verification",
+            exc,
+        )
+        rpc_url = None
+        pool_address = None
+
+    partner_wallet = body.wallet_address
+    if rpc_url and pool_address:
+        try:
+            _verify_on_chain_receipt(
+                tx_hash=body.tx_hash,
+                expected_from=partner_wallet,
+                expected_to=pool_address,
+                rpc_url=rpc_url,
+            )
+            logger.info(
+                "submit-tx: proposal %d receipt verified on-chain chain=%s tx=%s",
+                proposal_id,
+                chain_name,
+                body.tx_hash[:12],
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"on-chain receipt 検証失敗: {exc}",
+            ) from exc
+    else:
+        logger.warning(
+            "submit-tx: proposal %d on-chain verification skipped (RPC/chain unavailable)",
+            proposal_id,
+        )
+
+    now = datetime.now(timezone.utc)
+    proposal.status = "executed"
+    proposal.approved_at = proposal.approved_at or now
+    proposal.executed_at = now
+    proposal.tx_hash = body.tx_hash
+    proposal.expected_from = partner_wallet
+    proposal.expected_to = pool_address
+    proposal.execution_attempts += 1
+
+    tx = Transaction(
+        user_id=proposal.user_id,
+        operation=proposal.operation,
+        asset=proposal.asset,
+        amount=proposal.amount,
+        amount_usd=proposal.amount_usd,
+        tx_hash=body.tx_hash,
+        chain=chain_name,
+        status="completed",
+        ai_decision_id=proposal.ai_decision_id,
+        is_dry_run=False,
+    )
+    db.add(tx)
+    db.commit()
+    db.refresh(proposal)
+
+    logger.info(
+        "submit-tx: proposal %d executed by partner wallet=%s...%s tx=%s",
+        proposal_id,
+        partner_wallet[:6] if partner_wallet else "?",
+        partner_wallet[-4:] if partner_wallet else "?",
+        body.tx_hash[:12],
+    )
 
     return ProposalResponse.model_validate(proposal)
 
@@ -624,15 +852,6 @@ def create_proposal(
     db: Session = Depends(get_db),
 ) -> ProposalResponse:
     """提案を作成する（内部呼び出し用）。"""
-    # --- Policy gate (生成時: 1点目) ---
-    _policy_gate_create(
-        user_id=request.user_id,
-        asset=request.asset,
-        operation=request.operation,
-        amount_usd=Decimal(str(request.amount_usd)),
-        expected_hf_after=request.expected_hf_after,
-        db=db,
-    )
     expires_at = request.expires_at or (datetime.now(timezone.utc) + timedelta(hours=72))
     proposal = Proposal(
         user_id=request.user_id,

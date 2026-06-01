@@ -136,10 +136,13 @@ def test_wallet_address_is_propagated_to_execute_rebalance(
         tx_hash="0xpartner_b_hash",
     )
 
-    with patch(
-        "app.aave.service.MultiChainAaveService.execute_rebalance",
-        return_value=fake_result,
-    ) as mock_execute:
+    with (
+        patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
+        patch(
+            "app.aave.service.MultiChainAaveService.execute_rebalance",
+            return_value=fake_result,
+        ) as mock_execute,
+    ):
         r = client.post(
             f"/api/proposals/{proposal_id}/approve",
             headers={"Authorization": f"Bearer {token}"},
@@ -171,6 +174,7 @@ def test_null_wallet_falls_back_and_emits_slack_warning(client: TestClient, test
     )
 
     with (
+        patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
         patch(
             "app.aave.service.MultiChainAaveService.execute_rebalance",
             return_value=fake_result,
@@ -219,10 +223,13 @@ def test_two_users_propagate_their_own_wallets(client: TestClient, test_db: tupl
         tx_hash="0xyamamoto_hash",
     )
 
-    with patch(
-        "app.aave.service.MultiChainAaveService.execute_rebalance",
-        return_value=fake_result,
-    ) as mock_execute_a:
+    with (
+        patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
+        patch(
+            "app.aave.service.MultiChainAaveService.execute_rebalance",
+            return_value=fake_result,
+        ) as mock_execute_a,
+    ):
         r1 = client.post(
             f"/api/proposals/{proposal_id_yamamoto}/approve",
             headers={"Authorization": f"Bearer {token}"},
@@ -234,10 +241,13 @@ def test_two_users_propagate_their_own_wallets(client: TestClient, test_db: tupl
     proposal_id_hashiguchi = _create_proposal(client, token)
     _set_admin_wallet(SessionLocal, HASHIGUCHI_WALLET)
 
-    with patch(
-        "app.aave.service.MultiChainAaveService.execute_rebalance",
-        return_value=fake_result,
-    ) as mock_execute_b:
+    with (
+        patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
+        patch(
+            "app.aave.service.MultiChainAaveService.execute_rebalance",
+            return_value=fake_result,
+        ) as mock_execute_b,
+    ):
         r2 = client.post(
             f"/api/proposals/{proposal_id_hashiguchi}/approve",
             headers={"Authorization": f"Bearer {token}"},
