@@ -136,7 +136,10 @@ export default function PartnerProposalsPage() {
 
         // approve の確認を待ってから supply を送信
         setSigningStep('approve 確認中...')
-        await ethProvider.waitForTransaction(approveTxHash)
+        const approveReceipt = await ethProvider.waitForTransaction(approveTxHash)
+        if (approveReceipt === null || approveReceipt.status === 0) {
+          throw new Error('approve トランザクションが revert しました。残高・ガス代を確認してください。')
+        }
 
         setSigningStep('Step 2/2: Aave supply に署名してください...')
         finalTxHash = await eip1193.request({
