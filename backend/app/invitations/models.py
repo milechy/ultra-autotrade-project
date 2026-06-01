@@ -43,7 +43,10 @@ class Invitation(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(16), unique=True, nullable=False, index=True)
     type: Mapped[str] = mapped_column(
-        String(10), nullable=False, default=INVITATION_TYPE_INVITE, server_default=INVITATION_TYPE_INVITE
+        String(10),
+        nullable=False,
+        default=INVITATION_TYPE_INVITE,
+        server_default=INVITATION_TYPE_INVITE,
     )
     partner_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True

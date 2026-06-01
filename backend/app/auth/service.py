@@ -244,7 +244,10 @@ class AuthService:
     def create_user(
         cls,
         db: Session,
-        request: RegisterRequest | RegisterWithReferralRequest | UserCreateRequest | OpenRegisterRequest,
+        request: RegisterRequest
+        | RegisterWithReferralRequest
+        | UserCreateRequest
+        | OpenRegisterRequest,
         role: str = UserRole.VIEWER.value,
     ) -> User:
         """
