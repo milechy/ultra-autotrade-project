@@ -52,29 +52,59 @@ CHAIN_ID = 84532
 FEE_USD_TEST = Decimal("0.01")  # 0.01 USDC (最小テスト金額)
 
 ERC20_ABI = [
-    {"name": "approve", "type": "function", "stateMutability": "nonpayable",
-     "inputs": [{"name": "spender", "type": "address"}, {"name": "amount", "type": "uint256"}],
-     "outputs": [{"name": "", "type": "bool"}]},
-    {"name": "allowance", "type": "function", "stateMutability": "view",
-     "inputs": [{"name": "owner", "type": "address"}, {"name": "spender", "type": "address"}],
-     "outputs": [{"name": "", "type": "uint256"}]},
-    {"name": "balanceOf", "type": "function", "stateMutability": "view",
-     "inputs": [{"name": "account", "type": "address"}],
-     "outputs": [{"name": "", "type": "uint256"}]},
-    {"name": "decimals", "type": "function", "stateMutability": "view",
-     "inputs": [], "outputs": [{"name": "", "type": "uint8"}]},
-    {"name": "transferFrom", "type": "function", "stateMutability": "nonpayable",
-     "inputs": [{"name": "from", "type": "address"}, {"name": "to", "type": "address"},
-                {"name": "amount", "type": "uint256"}],
-     "outputs": [{"name": "", "type": "bool"}]},
+    {
+        "name": "approve",
+        "type": "function",
+        "stateMutability": "nonpayable",
+        "inputs": [{"name": "spender", "type": "address"}, {"name": "amount", "type": "uint256"}],
+        "outputs": [{"name": "", "type": "bool"}],
+    },
+    {
+        "name": "allowance",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [{"name": "owner", "type": "address"}, {"name": "spender", "type": "address"}],
+        "outputs": [{"name": "", "type": "uint256"}],
+    },
+    {
+        "name": "balanceOf",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [{"name": "account", "type": "address"}],
+        "outputs": [{"name": "", "type": "uint256"}],
+    },
+    {
+        "name": "decimals",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"name": "", "type": "uint8"}],
+    },
+    {
+        "name": "transferFrom",
+        "type": "function",
+        "stateMutability": "nonpayable",
+        "inputs": [
+            {"name": "from", "type": "address"},
+            {"name": "to", "type": "address"},
+            {"name": "amount", "type": "uint256"},
+        ],
+        "outputs": [{"name": "", "type": "bool"}],
+    },
 ]
 
 DATA_PROVIDER_ABI = [
-    {"name": "getReserveTokensAddresses", "type": "function", "stateMutability": "view",
-     "inputs": [{"name": "asset", "type": "address"}],
-     "outputs": [{"name": "aTokenAddress", "type": "address"},
-                 {"name": "stableDebtTokenAddress", "type": "address"},
-                 {"name": "variableDebtTokenAddress", "type": "address"}]},
+    {
+        "name": "getReserveTokensAddresses",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [{"name": "asset", "type": "address"}],
+        "outputs": [
+            {"name": "aTokenAddress", "type": "address"},
+            {"name": "stableDebtTokenAddress", "type": "address"},
+            {"name": "variableDebtTokenAddress", "type": "address"},
+        ],
+    },
 ]
 
 
@@ -85,12 +115,16 @@ def main() -> None:
     user_wallet = os.getenv("TEST_USER_WALLET", "")
     user_key = os.getenv("TEST_USER_PRIVATE_KEY", "")
 
-    missing = [k for k, v in [
-        ("ALCHEMY_RPC_URL_BASE_SEPOLIA", rpc_url),
-        ("OPERATOR_FEE_WALLET_ADDRESS", operator_addr),
-        ("OPERATOR_FEE_WALLET_KEY", operator_key),
-        ("TEST_USER_WALLET", user_wallet),
-    ] if not v]
+    missing = [
+        k
+        for k, v in [
+            ("ALCHEMY_RPC_URL_BASE_SEPOLIA", rpc_url),
+            ("OPERATOR_FEE_WALLET_ADDRESS", operator_addr),
+            ("OPERATOR_FEE_WALLET_KEY", operator_key),
+            ("TEST_USER_WALLET", user_wallet),
+        ]
+        if not v
+    ]
     if missing:
         print(f"[ERROR] 環境変数未設定: {missing}")
         print("  設定方法は本スクリプト冒頭のコメントを参照してください。")
@@ -122,7 +156,7 @@ def main() -> None:
     op_cs = w3.to_checksum_address(operator_addr)
 
     balance = atoken.functions.balanceOf(user_cs).call()
-    balance_usd = Decimal(balance) / Decimal(10 ** decimals)
+    balance_usd = Decimal(balance) / Decimal(10**decimals)
     print(f"[OK] ユーザー aUSDC 残高: {balance_usd:.6f} USDC (raw={balance})")
 
     if balance == 0:
@@ -133,7 +167,7 @@ def main() -> None:
 
     # Step 1: allowance 確認 / 付与
     current_allowance = atoken.functions.allowance(user_cs, op_cs).call()
-    test_units = int(FEE_USD_TEST * Decimal(10 ** decimals))
+    test_units = int(FEE_USD_TEST * Decimal(10**decimals))
     print(f"\n[INFO] current allowance: {current_allowance} raw (need {test_units})")
 
     if current_allowance < test_units:
@@ -145,13 +179,15 @@ def main() -> None:
         print(f"[INFO] allowance 付与中: {test_units} raw → operator {op_cs[:10]}...")
         user_account = w3.eth.account.from_key(user_key)
         nonce = w3.eth.get_transaction_count(user_account.address, "pending")
-        approve_tx = atoken.functions.approve(op_cs, test_units * 10).build_transaction({
-            "from": user_account.address,
-            "nonce": nonce,
-            "chainId": CHAIN_ID,
-            "gas": 80000,
-            "gasPrice": w3.eth.gas_price,
-        })
+        approve_tx = atoken.functions.approve(op_cs, test_units * 10).build_transaction(
+            {
+                "from": user_account.address,
+                "nonce": nonce,
+                "chainId": CHAIN_ID,
+                "gas": 80000,
+                "gasPrice": w3.eth.gas_price,
+            }
+        )
         signed_approve = w3.eth.account.sign_transaction(approve_tx, private_key=user_key)
         approve_hash = w3.eth.send_raw_transaction(signed_approve.raw_transaction)
         print(f"[INFO] approve tx 送信: {approve_hash.hex()}")
@@ -167,6 +203,7 @@ def main() -> None:
     print(f"  amount: {test_units} raw ({FEE_USD_TEST} USDC)")
 
     from app.fees.fee_transfer_service import FeeTransferConfig, FeeTransferService  # noqa: PLC0415
+
     cfg = FeeTransferConfig(
         enabled=True,
         operator_wallet_address=operator_addr,
