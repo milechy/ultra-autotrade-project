@@ -1,6 +1,6 @@
 # Ultra AutoTrade — DB テーブル一覧
 
-> 生成: 2026-04-24 / ソース: `backend/app/*/models.py`
+> 生成: 2026-04-24 / 更新: 2026-06-01 (fee_configs v10 + fee_transactions 全カラム反映) / ソース: `backend/app/*/models.py`
 > DB: PostgreSQL 16 + pgvector (pg16)
 > 接続: `postgresql://ultra:<PW>@postgres:5432/ultra_autotrade`
 
@@ -273,46 +273,29 @@ docker exec ultra-autotrade-postgres-production \
 
 ---
 
-### `fee_configs` (billing/models.py)
+### `fee_configs` (fees/models.py — v10)
+
+> Fee Model v10 設定スナップショット。`is_active=True` かつ最新 `effective_from` のレコードが現行設定。
+> F-16 本番適用前は旧 v9 スキーマ (management_fee_rate 等) が存在する。適用手順: `alembic/sql/045_fee_v10_tables.sql`。
 
 | カラム | 型 | NULL | 説明 |
 |--------|-----|------|------|
-| id | Integer PK | NO | 自動採番 |
-| management_fee_rate | Numeric | NO | 管理手数料率 |
-| performance_fee_rate | Numeric | NO | 成功報酬率 |
-| high_water_mark_enabled | Boolean | NO | HWM有効 |
-| minimum_aum | Numeric | NO | 最低運用額 |
+| id | BigInteger PK | NO | 自動採番 |
+| config_name | String(64) UNIQUE | NO | 設定名 (例: `v10_default`) |
+| tier_thresholds_jpy | JSONB | NO | tier 境界 JPY 配列 (例: `[1000000, 10000000]`) |
+| tier_fee_rates | JSONB | NO | tier 別手数料率配列 (例: `[0.30, 0.25, 0.20]`) |
+| tier_monthly_yield_caps | JSONB | NO | tier 別月次利回り上限 (例: `[0.018, 0.023, 0.030]`) |
+| subscription_rates | JSONB | NO | リスクモード別月額サブスク率 (例: `{"conservative":0,"balanced":0.003,"aggressive":0.010}`) |
+| expense_markup_enabled | Boolean | NO | 経費マークアップ有効 (default: FALSE) |
+| expense_markup_rate | Numeric(6,4) | NO | 経費マークアップ率 (default: 0) |
+| affiliate_rate | Numeric(6,4) | NO | アフィリエイト率 (default: 0.30) |
+| is_active | Boolean | NO | 現行設定フラグ (default: FALSE) |
+| effective_from | DateTime(tz) | NO | 適用開始日時 |
 | created_at | DateTime(tz) | NO | 作成日時 |
 | updated_at | DateTime(tz) | NO | 更新日時 |
 
----
-
-### `fee_calculations` (billing/models.py)
-
-| カラム | 型 | NULL | 説明 |
-|--------|-----|------|------|
-| id | Integer PK | NO | 自動採番 |
-| user_id | Integer FK(users.id) | NO | ユーザーID |
-| calculation_date | Date | NO | 計算日 |
-| period_type | String(10) | NO | `daily` / `monthly` |
-| aum_snapshot | Numeric | NO | AUMスナップショット |
-| management_fee | Numeric | NO | 管理手数料 |
-| performance_fee | Numeric | NO | 成功報酬 |
-| total_fee | Numeric | NO | 合計手数料 |
-| profit_since_hwm | Numeric | NO | HWM以降の利益 |
-| high_water_mark | Numeric | NO | ハイウォーターマーク |
-| created_at | DateTime(tz) | NO | 作成日時 |
-
----
-
-### `high_water_marks` (billing/models.py)
-
-| カラム | 型 | NULL | 説明 |
-|--------|-----|------|------|
-| id | Integer PK | NO | 自動採番 |
-| user_id | Integer FK(users.id) UNIQUE | NO | ユーザーID |
-| hwm_value | Numeric | NO | HWM値 |
-| updated_at | DateTime(tz) | NO | 更新日時 |
+> **v9 旧テーブル** (`fee_calculations`, `high_water_marks`) は F-16 の 045 SQL 適用時に DROP される。
+> v9 fee_configs は 0 行確認済み (2026-04-25) のため安全に置換可能。
 
 ### `ai_feedbacks` (ai/feedback_models.py)
 
@@ -349,29 +332,37 @@ docker exec ultra-autotrade-postgres-production \
 
 > ⚠️ `fund_allocations` は本番DBクリーンアップインシデント (2026-04-28) の対象テーブル。テストデータ投入禁止。
 
-### `fee_transactions` (billing/v10_models.py)
+### `fee_transactions` (fees/models.py — v10)
 
 > Fee Model v10 (F-1〜F-16) の月次手数料計算結果。1ユーザー×1ヶ月で1レコード。
+> F-16 本番適用前はテーブル未作成。適用手順: `alembic/sql/045_fee_v10_tables.sql`。
+>
+> CHECK 制約: `tier IN ('LOWER','MIDDLE','UPPER')` / `risk_mode IN ('conservative','balanced','aggressive')`
+> UNIQUE: `(user_id, calculation_month)`
 
 | カラム | 型 | NULL | 説明 |
 |--------|-----|------|------|
 | id | BigInteger PK | NO | 自動採番 |
 | user_id | Integer FK(users.id) | NO | ユーザーID |
 | calculation_month | Date | NO | 計算月 (月初日) |
-| tier | VARCHAR(16) | NO | `LOWER` / `MIDDLE` / `UPPER` |
-| risk_mode | VARCHAR(16) | NO | `conservative` / `balanced` / `aggressive` |
+| tier | VARCHAR(16) | NO | `LOWER` / `MIDDLE` / `UPPER` (CHECK 制約あり) |
+| risk_mode | VARCHAR(16) | NO | `conservative` / `balanced` / `aggressive` (CHECK 制約あり) |
 | deposit_amount_jpy | Numeric(18,2) | NO | 運用元本 (JPY) |
-| gross_profit_jpy | Numeric(18,2) | NO | 総利益 (JPY) |
-| expense_jpy | Numeric(18,2) | NO | 費用 (JPY) |
-| net_profit_jpy | Numeric(18,2) | NO | 純利益 (JPY) |
-| fee_rate_applied | Numeric(6,4) | NO | 適用手数料率 |
-| fee_amount_jpy | Numeric(18,2) | NO | 手数料金額 (JPY) |
-| subscription_rate_applied | Numeric(6,4) | NO | 月額サブスク率 |
-| subscription_amount_jpy | Numeric(18,2) | NO | 月額サブスク金額 (JPY) |
-| user_takehome_jpy | Numeric(18,2) | NO | ユーザー手取り (JPY) |
-| finalized_at | DateTime(tz) | YES | 確定日時 (NULL=再計算可能) |
-| created_at | DateTime(tz) | NO | 作成日時 |
-| updated_at | DateTime(tz) | NO | 更新日時 |
+| gross_profit_jpy | Numeric(18,2) | NO | 総利益 (JPY, default 0) |
+| expense_jpy | Numeric(18,2) | NO | 費用 (JPY, default 0) |
+| net_profit_jpy | Numeric(18,2) | NO | 純利益 (JPY, default 0) |
+| fee_rate_applied | Numeric(6,4) | NO | 適用手数料率 (default 0) |
+| fee_amount_jpy | Numeric(18,2) | NO | 手数料金額 (JPY, default 0) |
+| subscription_rate_applied | Numeric(6,4) | NO | 月額サブスク率 (default 0) |
+| subscription_amount_jpy | Numeric(18,2) | NO | 月額サブスク金額 (JPY, default 0) |
+| subscription_protected | Boolean | NO | サブスク控除で手取り負防止フラグ (default FALSE) |
+| monthly_yield_cap_applied | Numeric(6,4) | NO | 適用月次利回り上限 (default 0) |
+| yield_excess_to_uata_jpy | Numeric(18,2) | NO | 上限超過分UATA取得額 (JPY, default 0) |
+| user_takehome_jpy | Numeric(18,2) | NO | ユーザー手取り (JPY, default 0) |
+| affiliate_id | Integer FK(users.id) | YES | アフィリエイターID (ON DELETE SET NULL) |
+| affiliate_amount_jpy | Numeric(18,2) | NO | アフィリエイト金額 (JPY, default 0) |
+| calculated_at | DateTime(tz) | NO | 計算実行日時 (default NOW()) |
+| finalized_at | DateTime(tz) | YES | 確定日時 (NULL=再計算可能)
 
 ---
 
