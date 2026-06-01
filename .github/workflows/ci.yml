@@ -275,8 +275,22 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('frontend/package-lock.json') }}
+
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
+        timeout-minutes: 10
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+
+      - name: Install Playwright system deps (cache hit)
+        run: npx playwright install-deps chromium
+        timeout-minutes: 5
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
 
       - name: Build frontend
         run: npm run build
