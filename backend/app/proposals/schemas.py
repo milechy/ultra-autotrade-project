@@ -45,6 +45,8 @@ class ProposalResponse(BaseModel):
     rejected_at: Optional[datetime]
     executed_at: Optional[datetime]
     tx_hash: Optional[str]
+    expected_from: Optional[str] = None
+    expected_to: Optional[str] = None
     error_message: Optional[str] = None
     expires_at: datetime
     created_at: datetime
