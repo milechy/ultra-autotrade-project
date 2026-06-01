@@ -67,6 +67,17 @@ def _today_month_start() -> date:
 # ===========================================================================
 
 
+class AllowanceInfoResponse(BaseModel):
+    """fee aToken allowance 承認に必要な情報。フロントエンドが approve tx を構築するために使用。"""
+
+    operator_address: str
+    usdc_address: str
+    data_provider_address: str
+    chain_id: int
+    recommended_allowance_usdc: str  # Decimal str (6 decimals), e.g. "10.000000"
+    configured: bool  # OPERATOR_FEE_WALLET_ADDRESS が設定済みか
+
+
 class FeeConfigResponse(BaseModel):
     """現行 active fee_config (v10_default 等)。"""
 
@@ -666,4 +677,49 @@ def get_uata_income(
         yield_excess_total=_decimal_str(excess_d),
         affiliate_payout_total=_decimal_str(aff_d),
         uata_income_total=_decimal_str(uata),
+    )
+
+
+@router.get(
+    "/allowance-info",
+    response_model=AllowanceInfoResponse,
+    summary="fee aToken allowance 承認情報 (authenticated user)",
+)
+def get_allowance_info(
+    _user: User = Depends(require_active_user),
+) -> AllowanceInfoResponse:
+    """フロントエンドが aToken.approve(operator, amount) を構築するための情報を返す。
+
+    - operator_address: OPERATOR_FEE_WALLET_ADDRESS env var から取得
+    - usdc_address / data_provider_address: チェーン設定から取得
+    - recommended_allowance_usdc: 上限付き approve を推奨 (MaxUint256 禁止)
+      デフォルト 10 USDC (月額手数料の余裕を持つ上限)
+    - configured: operator アドレスが環境変数に設定されているか
+    """
+    from app.aave.chains import get_active_chains  # noqa: PLC0415
+
+    operator_address = os.getenv("OPERATOR_FEE_WALLET_ADDRESS", "")
+
+    active_chains = get_active_chains()
+    chain = active_chains[0] if active_chains else None
+    if chain is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="chain configuration unavailable",
+        )
+
+    usdc_address = chain.tokens.get("USDC", "")
+    data_provider = chain.data_provider_address or ""
+
+    # 上限付き approve 推奨額 (MaxUint256 禁止): 10 USDC
+    # 月額手数料の見積もりに余裕を持たせる。不足時はユーザーが再承認可能。
+    recommended = Decimal("10.000000")
+
+    return AllowanceInfoResponse(
+        operator_address=operator_address,
+        usdc_address=usdc_address,
+        data_provider_address=data_provider,
+        chain_id=chain.chain_id,
+        recommended_allowance_usdc=str(recommended),
+        configured=bool(operator_address),
     )
