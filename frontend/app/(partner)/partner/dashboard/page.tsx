@@ -18,6 +18,7 @@ import {
 } from '@/lib/api/allocations'
 import { getStoredToken, useAuth } from '@/lib/auth'
 import PerformanceSummaryKPI from './_components/PerformanceSummaryKPI'
+import { AiTransparencyCard } from '@/components/transparency/AiTransparencyCard'
 import AllocationTable from './_components/AllocationTable'
 import type { MonthlyData } from './_components/MonthlyChartRecharts'
 
@@ -362,6 +363,12 @@ export default function PartnerDashboardPage() {
             )}
           </CardContent>
         </Card>
+      </section>
+
+      {/* AI 判断透明性カード */}
+      <section>
+        <h2 className="text-base font-semibold mb-3">最新 AI 判断</h2>
+        <AiTransparencyCard />
       </section>
 
       {/* User Table */}
