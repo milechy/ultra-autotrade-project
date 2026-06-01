@@ -26,7 +26,12 @@ from web3 import Web3
 
 from .constants import ExecutionPolicy
 from .models import User, UserRole
-from .schemas import RegisterRequest, RegisterWithReferralRequest, UserCreateRequest
+from .schemas import (
+    OpenRegisterRequest,
+    RegisterRequest,
+    RegisterWithReferralRequest,
+    UserCreateRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +244,7 @@ class AuthService:
     def create_user(
         cls,
         db: Session,
-        request: RegisterRequest | RegisterWithReferralRequest | UserCreateRequest,
+        request: RegisterRequest | RegisterWithReferralRequest | UserCreateRequest | OpenRegisterRequest,
         role: str = UserRole.VIEWER.value,
     ) -> User:
         """
