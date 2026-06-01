@@ -85,7 +85,8 @@
     "allocationPnl": "損益",
     "noAllocation": "まだ資金が割り振られていません",
     "allocationActive": "運用中",
-    "allocationWithdrawn": "引き出し済み"
+    "allocationWithdrawn": "引き出し済み",
+    "pnlChart": "損益推移"
   },
   "Decisions": {
     "title": "AI判定履歴",
