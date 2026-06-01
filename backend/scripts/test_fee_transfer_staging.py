@@ -196,7 +196,7 @@ def main() -> None:
         print(f"         debug: {line}")
 
     if result.status == "sent" and result.tx_hash:
-        print(f"\n[SUCCESS] basescan で確認:")
+        print("\n[SUCCESS] basescan で確認:")
         print(f"  https://sepolia.basescan.org/tx/{result.tx_hash}")
         print("\n確認すべき項目:")
         print(f"  1. from: {user_cs}")
