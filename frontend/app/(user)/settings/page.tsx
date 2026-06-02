@@ -156,28 +156,32 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-4 px-4 py-4 pb-24 max-w-4xl mx-auto">
-        {/* 1. 運用モード — admin/partner のみ表示（viewer/tester は非表示） */}
+        {/* 1. 運用モード — admin/partner のみ表示（viewer/editor は非表示） */}
         {isPartner && (
-          <OperationModeCard
-            isRunning={settings.isRunning}
-            onToggle={handleToggleRunning}
-            disabled={isStopped}
-            userMode={settings.userMode}
-            onModeChange={(mode) => setSettings((prev) => ({ ...prev, userMode: mode }))}
-          />
+          <div data-testid="operation-mode-section">
+            <OperationModeCard
+              isRunning={settings.isRunning}
+              onToggle={handleToggleRunning}
+              disabled={isStopped}
+              userMode={settings.userMode}
+              onModeChange={(mode) => setSettings((prev) => ({ ...prev, userMode: mode }))}
+            />
+          </div>
         )}
 
-        {/* 2. リスク設定 — admin/partner のみ表示（viewer/tester は非表示） */}
+        {/* 2. リスク設定 — admin/partner のみ表示（viewer/editor は非表示） */}
         {isPartner && (
-          <RiskSettingsCard
-            riskMode={settings.riskMode}
-            onRiskModeChange={(mode) => set('riskMode', mode)}
-            maxSingleTradeUsd={settings.maxSingleTradeUsd}
-            onMaxSingleTradeUsdChange={(value) => set('maxSingleTradeUsd', value)}
-            maxDailyTradeUsd={settings.maxDailyTradeUsd}
-            onMaxDailyTradeUsdChange={(value) => set('maxDailyTradeUsd', value)}
-            allowedModes={allowedModes}
-          />
+          <div data-testid="risk-settings-section">
+            <RiskSettingsCard
+              riskMode={settings.riskMode}
+              onRiskModeChange={(mode) => set('riskMode', mode)}
+              maxSingleTradeUsd={settings.maxSingleTradeUsd}
+              onMaxSingleTradeUsdChange={(value) => set('maxSingleTradeUsd', value)}
+              maxDailyTradeUsd={settings.maxDailyTradeUsd}
+              onMaxDailyTradeUsdChange={(value) => set('maxDailyTradeUsd', value)}
+              allowedModes={allowedModes}
+            />
+          </div>
         )}
 
         {/* 3. 通知設定 — synced with PUT /api/user/settings */}

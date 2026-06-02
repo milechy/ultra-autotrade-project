@@ -151,7 +151,7 @@ export function ProposalCard({
 
         {/* Action buttons */}
         {!isDone && (
-          <div className="flex gap-2 pt-1">
+          <div className="flex gap-2 pt-1" data-testid="proposal-action-buttons">
             <Button
               className="flex-1 bg-green-600 hover:bg-green-700 text-white"
               onClick={() => onApprove(proposal.id)}
