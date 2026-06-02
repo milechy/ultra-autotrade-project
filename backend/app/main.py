@@ -41,6 +41,7 @@ from app.ai.optimizer.router import router as ai_optimizer_router
 from app.ai.router import router as ai_router
 from app.api.alias_router import router as alias_router
 from app.api.automation_dashboard import router as automation_dashboard_router
+from app.api.v1.fee_transfer import router as fee_transfer_router
 from app.api.v1.fees import router as fees_v10_router
 from app.auth.router import router as auth_router
 from app.auth.service import AuthService
@@ -257,6 +258,7 @@ def create_app() -> FastAPI:
     app.include_router(data_feeds_router)  # External data feeds (Phase 2)
     app.include_router(reports_router, prefix="/api/reports")  # Monthly reports
     app.include_router(fees_v10_router, prefix="/api/v1")  # Fee Model v10 API (/api/v1/fees/*)
+    app.include_router(fee_transfer_router, prefix="/api/v1")  # Fee Transfer & Allowance (Lane R)
     app.include_router(ai_decisions_router)  # AI Decisions API
     app.include_router(ai_feedback_router)  # AI Feedback API (Layer 4)
     app.include_router(ai_optimizer_router)  # AI Optimizer (Phase 2 / ENB)
