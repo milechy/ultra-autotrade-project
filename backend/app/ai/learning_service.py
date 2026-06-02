@@ -307,7 +307,6 @@ class AILearningService:
 
         直近 30 日・horizon_hours IS NOT NULL の行のみを対象とする。
         """
-        from sqlalchemy import func  # noqa: PLC0415
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=30)
         stmt = (

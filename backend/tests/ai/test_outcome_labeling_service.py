@@ -32,7 +32,6 @@ from app.ai.outcome_labeling_service import (  # noqa: E402
 from app.database import Base  # noqa: E402
 from app.portfolio.models import PortfolioSnapshot  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -259,7 +258,7 @@ class TestOutcomeLabelingServiceIntegration:
     def test_idempotent_skips_existing_horizon(self, db: Session) -> None:
         now = datetime.now(timezone.utc)
         decision_at = now - timedelta(hours=50)
-        decision = _make_decision(db, action="HOLD", created_at=decision_at)
+        _make_decision(db, action="HOLD", created_at=decision_at)
 
         _make_snapshot(
             db,

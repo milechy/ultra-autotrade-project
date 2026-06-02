@@ -16,7 +16,6 @@ regret_score / is_positive_example を INSERT する。
 from __future__ import annotations
 
 import logging
-import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -25,7 +24,7 @@ from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.ai.models import AIDecision, AiDecisionFeature, AiDecisionOutcome
+from app.ai.models import AIDecision, AiDecisionOutcome
 from app.portfolio.models import PortfolioSnapshot
 
 logger = logging.getLogger(__name__)
@@ -237,6 +236,7 @@ class OutcomeLabelingService:
 
         # 最近傍の recorded_at 時刻を 1 つ選ぶ (ABS 距離最小)
         # SQLite には ABS(epoch diff) で近傍選択、PostgreSQL も同様に動く
+        target_epoch = target_time.timestamp()
         nearest_time_stmt = (
             select(PortfolioSnapshot.recorded_at)
             .where(
@@ -246,7 +246,7 @@ class OutcomeLabelingService:
             .order_by(
                 func.abs(
                     func.extract("epoch", PortfolioSnapshot.recorded_at)
-                    - func.extract("epoch", target_time)
+                    - target_epoch
                 )
             )
             .limit(1)
