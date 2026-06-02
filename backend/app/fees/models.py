@@ -168,6 +168,14 @@ class FeeTransaction(Base):
     )
     finalized_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # F-S6: on-chain fee transfer 追跡 (j0k1l2m3n4o5 migration)
+    # ALTER TABLE fee_transactions ADD COLUMN IF NOT EXISTS transfer_status VARCHAR(16);
+    # ALTER TABLE fee_transactions ADD COLUMN IF NOT EXISTS transfer_tx_hash VARCHAR(66);
+    # ALTER TABLE fee_transactions ADD COLUMN IF NOT EXISTS usd_jpy_rate NUMERIC(8,2);
+    transfer_status: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    transfer_tx_hash: Mapped[Optional[str]] = mapped_column(String(66), nullable=True)
+    usd_jpy_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 2), nullable=True)
+
     __table_args__ = (
         CheckConstraint(
             "tier IN ('LOWER', 'MIDDLE', 'UPPER')",

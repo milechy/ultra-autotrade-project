@@ -45,6 +45,11 @@ from app.auth.dependencies import require_active_user, require_admin
 from app.auth.models import InvestmentTier, RiskMode, User
 from app.database import get_db
 from app.fees import FeeCalculationInput, FeeCalculator
+from app.fees.fee_transfer_service import (
+    FeeTransferConfig,
+    FeeTransferService,
+    is_fee_transfer_enabled,
+)
 from app.fees.models import FeeConfigV10, FeeTransaction
 from app.portfolio.models import PortfolioSnapshot
 from app.transactions.models import Transaction
@@ -179,7 +184,7 @@ class UataIncomeResponse(BaseModel):
 
 
 class FinalizeMonthResponse(BaseModel):
-    """月次 finalize バッチの実行結果サマリ (F-7)。"""
+    """月次 finalize バッチの実行結果サマリ (F-7 + F-S6)。"""
 
     calculation_month: date
     usd_jpy_rate: str
@@ -190,6 +195,11 @@ class FinalizeMonthResponse(BaseModel):
     total_fee_jpy: str
     total_subscription_jpy: str
     total_user_takehome_jpy: str
+    # F-S6: on-chain transfer 統計
+    fee_transfer_enabled: bool = False
+    transfer_sent: int = 0
+    transfer_skipped: int = 0
+    transfer_failed: int = 0
 
 
 # ===========================================================================
@@ -352,6 +362,7 @@ def finalize_month_core(
                         user_takehome_jpy=result.user_takehome_jpy,
                         affiliate_id=result.affiliate_id,
                         affiliate_amount_jpy=result.affiliate_amount_jpy,
+                        usd_jpy_rate=usd_jpy_rate,
                     )
                 )
             else:
@@ -371,6 +382,7 @@ def finalize_month_core(
                 existing.user_takehome_jpy = result.user_takehome_jpy
                 existing.affiliate_id = result.affiliate_id
                 existing.affiliate_amount_jpy = result.affiliate_amount_jpy
+                existing.usd_jpy_rate = usd_jpy_rate
 
         total_fee += result.fee_amount_jpy
         total_sub += result.subscription_amount_jpy
@@ -391,6 +403,73 @@ def finalize_month_core(
         dry_run,
     )
 
+    # --- F-S6: on-chain fee transfer (FEE_TRANSFER_ENABLED=true の場合のみ) ---
+    # FEE_TRANSFER_ENABLED=false (default) → DB 記録のみ、送金しない (現状維持)
+    # FEE_TRANSFER_ENABLED=true  → operator wallet が aToken.transferFrom を実行
+    # non-custodial §14a: operator wallet は自身の鍵 (OPERATOR_FEE_WALLET_KEY) を使用。
+    # ユーザーの秘密鍵は不要。ユーザーが事前に aToken の allowance を operator に付与。
+    transfer_sent = 0
+    transfer_skipped = 0
+    transfer_failed = 0
+    fee_transfer_enabled = is_fee_transfer_enabled()
+
+    if not dry_run and fee_transfer_enabled:
+        transfer_cfg = FeeTransferConfig.from_env()
+        transfer_svc = FeeTransferService(transfer_cfg)
+
+        fee_txs_to_transfer = (
+            db.execute(
+                select(FeeTransaction).where(
+                    FeeTransaction.calculation_month == month_start,
+                    FeeTransaction.finalized_at.is_(None),
+                    FeeTransaction.transfer_status.is_(None),
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        for fee_tx in fee_txs_to_transfer:
+            fee_user = db.get(User, fee_tx.user_id)
+            user_wallet = fee_user.wallet_address if fee_user else None
+            t_result = transfer_svc.transfer_fee(
+                user_id=fee_tx.user_id,
+                user_wallet=user_wallet or "",
+                fee_amount_jpy=fee_tx.fee_amount_jpy or Decimal("0"),
+                subscription_amount_jpy=fee_tx.subscription_amount_jpy or Decimal("0"),
+                yield_excess_jpy=fee_tx.yield_excess_to_uata_jpy or Decimal("0"),
+                usd_jpy_rate=usd_jpy_rate,
+            )
+            fee_tx.transfer_status = t_result.status
+            fee_tx.transfer_tx_hash = t_result.tx_hash
+            if t_result.status == "sent":
+                fee_tx.finalized_at = datetime.now(timezone.utc)
+                transfer_sent += 1
+                logger.info(
+                    "fee_transfer sent: user_id=%d tx=%s fee_usd=%s",
+                    fee_tx.user_id,
+                    t_result.tx_hash,
+                    t_result.fee_usd,
+                )
+            elif t_result.status in ("skipped", "low_fee"):
+                transfer_skipped += 1
+            else:
+                transfer_failed += 1
+                logger.warning(
+                    "fee_transfer %s: user_id=%d error=%s",
+                    t_result.status,
+                    fee_tx.user_id,
+                    t_result.error,
+                )
+
+        db.commit()
+        logger.info(
+            "fee_transfer phase done: sent=%d skipped=%d failed=%d",
+            transfer_sent,
+            transfer_skipped,
+            transfer_failed,
+        )
+
     return FinalizeMonthResponse(
         calculation_month=month_start,
         usd_jpy_rate=str(usd_jpy_rate),
@@ -401,6 +480,10 @@ def finalize_month_core(
         total_fee_jpy=str(total_fee),
         total_subscription_jpy=str(total_sub),
         total_user_takehome_jpy=str(total_takehome),
+        fee_transfer_enabled=fee_transfer_enabled,
+        transfer_sent=transfer_sent,
+        transfer_skipped=transfer_skipped,
+        transfer_failed=transfer_failed,
     )
 
 
