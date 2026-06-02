@@ -289,7 +289,7 @@ jobs:
         run: npx wait-on http://localhost:3000 http://localhost:8000/health --timeout 30000
 
       - name: Run smoke tests
-        run: npm run test:e2e -- --reporter=list
+        run: npm run test:e2e:smoke -- --reporter=list
         env:
           STAGING_URL: http://localhost:3000
 
