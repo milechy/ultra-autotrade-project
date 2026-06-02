@@ -222,6 +222,45 @@ class UserUpdateRequest(BaseModel):
         return v.lower()
 
 
+class OpenRegisterRequest(BaseModel):
+    """一般登録（open）リクエスト。partner 招待不要で自己申請。
+
+    terms_consent == True が必須。KYC ゲートは別 Lane で実装予定。
+    """
+
+    email: EmailStr
+    username: str = Field(min_length=3, max_length=50)
+    password: str = Field(min_length=8, max_length=100)
+    terms_consent: bool = Field(..., description="利用規約への同意（必須）")
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("ユーザー名は空白のみにできません")
+        if not (v[0].isalpha() or v[0].isdigit()):
+            raise ValueError(
+                "ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)"
+            )
+        if not re.match(r"^[\w\s\-]+$", v):
+            raise ValueError("ユーザー名には文字・数字・スペース・_・- のみ使用できます")
+        return v.lower()
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+    @field_validator("terms_consent")
+    @classmethod
+    def consent_must_be_true(cls, v: bool) -> bool:
+        if not v:
+            raise ValueError("利用規約への同意が必要です (terms_consent must be True)")
+        return v
+
+
 class PasswordChangeRequest(BaseModel):
     """パスワード変更リクエスト。"""
 
