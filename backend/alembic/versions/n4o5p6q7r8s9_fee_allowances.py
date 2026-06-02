@@ -6,8 +6,8 @@ on_chain_tx_hash stores the tx hash after FEE_TRANSFER_ENABLED=true transfers.
 
 Asana: 1215272587496967 / 1215273755294098
 
-Revision ID: j0k1l2m3n4o5
-Revises: i9j0k1l2m3n4
+Revision ID: n4o5p6q7r8s9
+Revises: m3n4o5p6q7r8
 Create Date: 2026-06-02 00:00:00.000000
 """
 
@@ -17,8 +17,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision: str = "j0k1l2m3n4o5"
-down_revision: Union[str, Sequence[str], None] = "i9j0k1l2m3n4"
+revision: str = "n4o5p6q7r8s9"
+down_revision: Union[str, Sequence[str], None] = "m3n4o5p6q7r8"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

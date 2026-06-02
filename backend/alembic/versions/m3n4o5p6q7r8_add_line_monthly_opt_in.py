@@ -5,7 +5,7 @@
 users テーブルに line_monthly_opt_in カラムを追加する (Lane P)。
 
 Revision ID: m3n4o5p6q7r8
-Revises: k1l2m3n4o5p6
+Revises: l2m3n4o5p6q7
 Create Date: 2026-06-02 00:00:00.000000
 
 """
@@ -18,7 +18,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "m3n4o5p6q7r8"
-down_revision: Union[str, None] = "k1l2m3n4o5p6"
+down_revision: Union[str, None] = "l2m3n4o5p6q7"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
