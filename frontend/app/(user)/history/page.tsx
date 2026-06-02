@@ -13,6 +13,7 @@ import type { Transaction, OperationType } from './_components'
 import { apiFetch } from '@/lib/api/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import AuthGuard from '@/components/AuthGuard'
+import { getStoredToken } from '@/lib/auth'
 
 // ---------------------------------------------------------------------------
 // API response types
@@ -72,9 +73,43 @@ function mapToTransaction(item: TransactionAPIResponse): Transaction {
 // ---------------------------------------------------------------------------
 
 const LIMIT = 20
+const CURRENT_YEAR = new Date().getFullYear()
+
+async function downloadCryptactCsv(year: number | null): Promise<void> {
+  const token = getStoredToken()
+  const base = (process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? '').replace(/\/$/, '')
+  const yearParam = year !== null ? `?year=${year}` : ''
+  const url = `${base}/api/proposals/tax/cryptact-csv${yearParam}`
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) throw new Error(`CSV取得失敗: ${res.status}`)
+  const blob = await res.blob()
+  const href = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = href
+  a.download = year ? `cryptact_aave_${year}.csv` : 'cryptact_aave.csv'
+  a.click()
+  URL.revokeObjectURL(href)
+}
 
 function HistoryPageContent() {
   const [activeType, setActiveType] = useState<OperationType>('ALL')
+  const [csvYear, setCsvYear] = useState<number>(CURRENT_YEAR)
+  const [csvDownloading, setCsvDownloading] = useState(false)
+  const [csvError, setCsvError] = useState<string | null>(null)
+
+  const handleCsvDownload = async () => {
+    setCsvDownloading(true)
+    setCsvError(null)
+    try {
+      await downloadCryptactCsv(csvYear)
+    } catch {
+      setCsvError('CSVのダウンロードに失敗しました')
+    } finally {
+      setCsvDownloading(false)
+    }
+  }
   // Initialize to 30-day range to match DateRangeFilter's default visual state
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | 'all'>(() => {
     const from = new Date()
@@ -172,6 +207,37 @@ function HistoryPageContent() {
           >
             手数料明細を見る →
           </Link>
+        </div>
+
+        {/* 税務CSV (Cryptact) ダウンロード */}
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-zinc-200">税務CSV (Cryptact形式)</p>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              実行済みAave操作をCryptact無料版フォーマットでエクスポートします
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <select
+              value={csvYear}
+              onChange={(e) => setCsvYear(Number(e.target.value))}
+              className="text-sm bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i).map((y) => (
+                <option key={y} value={y}>{y}年</option>
+              ))}
+            </select>
+            <button
+              onClick={handleCsvDownload}
+              disabled={csvDownloading}
+              className="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-md transition-colors"
+            >
+              {csvDownloading ? 'ダウンロード中...' : 'CSVダウンロード'}
+            </button>
+          </div>
+          {csvError && (
+            <p className="text-xs text-red-400">{csvError}</p>
+          )}
         </div>
 
         {/* Stats */}

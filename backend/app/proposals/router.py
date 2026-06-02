@@ -2,13 +2,16 @@
 # backend/app/proposals/router.py
 """提案API ルーター定義。"""
 
+import csv
+import io
 import logging
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -436,6 +439,77 @@ def admin_proposal_stats(
         today_approved=today_approved,
         today_rejected=today_rejected,
         expired=expired,
+    )
+
+
+_JST = ZoneInfo("Asia/Tokyo")
+
+# Cryptact 無料版フォーマット: Action マッピング
+_OPERATION_TO_CRYPTACT_ACTION: dict[str, str] = {
+    "SUPPLY": "LENDING",
+    "WITHDRAW": "UNLENDING",
+    "BORROW": "BORROW",
+    "REPAY": "REPAY",
+}
+
+
+@router.get("/tax/cryptact-csv", summary="Cryptact無料版フォーマットCSVダウンロード")
+def download_cryptact_csv(
+    year: Optional[int] = Query(None, description="絞り込む年 (例: 2026)。省略時は全件"),
+    current_user: User = Depends(require_viewer),
+    db: Session = Depends(get_db),
+) -> Response:
+    """
+    実行済み提案 (status='executed') を Cryptact 無料版 CSV 形式で返す。
+
+    CSV カラム: Timestamp, Action, Source, Base, Volume, Price, Counter, Fee, FeeCcy
+    - Timestamp: JST (UTC+9) 形式 YYYY/MM/DD HH:MM:SS
+    - Action: LENDING (SUPPLY) / UNLENDING (WITHDRAW)
+    - Source: AAVE_V3
+    - Base: 資産シンボル (USDC 等)
+    - Volume: トークン数量 (Decimal)
+    - Price: 空欄（Cryptact が自動補完）
+    - Counter: USD
+    - Fee: 手数料 USD (fee_amount。NULL の場合は 0)
+    - FeeCcy: USD
+    """
+    stmt = select(Proposal).where(
+        Proposal.user_id == current_user.id,
+        Proposal.status == "executed",
+        Proposal.executed_at.is_not(None),
+    )
+    if year is not None:
+        stmt = stmt.where(func.extract("year", Proposal.executed_at) == year)
+    stmt = stmt.order_by(Proposal.executed_at.asc())
+    proposals = db.scalars(stmt).all()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        ["Timestamp", "Action", "Source", "Base", "Volume", "Price", "Counter", "Fee", "FeeCcy"]
+    )
+
+    for p in proposals:
+        if p.executed_at is None:
+            continue
+        dt = p.executed_at
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        executed_jst = dt.astimezone(_JST)
+        timestamp = executed_jst.strftime("%Y/%m/%d %H:%M:%S")
+        action = _OPERATION_TO_CRYPTACT_ACTION.get(p.operation, p.operation)
+        # Volume: Decimal文字列 → そのまま出力（Cryptactは文字列でも受容）
+        volume = str(p.amount)
+        fee = str(p.fee_amount) if p.fee_amount is not None else "0"
+        writer.writerow([timestamp, action, "AAVE_V3", p.asset, volume, "", "USD", fee, "USD"])
+
+    csv_bytes = buf.getvalue().encode("utf-8-sig")  # BOM付きUTF-8 (Excel対応)
+    year_suffix = f"_{year}" if year else ""
+    filename = f"cryptact_aave{year_suffix}.csv"
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
