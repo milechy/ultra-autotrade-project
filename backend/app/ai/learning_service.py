@@ -148,8 +148,7 @@ class AILearningService:
         try:
             results.outcome_label_stats = self._aggregate_outcome_label_stats()
             logger.info(
-                "Step 4 done: labeled=%d positive=%d negative=%d positive_rate=%s"
-                " avg_regret=%s",
+                "Step 4 done: labeled=%d positive=%d negative=%d positive_rate=%s avg_regret=%s",
                 results.outcome_label_stats.total_labeled,
                 results.outcome_label_stats.positive_count,
                 results.outcome_label_stats.negative_count,
@@ -309,15 +308,12 @@ class AILearningService:
         """
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-        stmt = (
-            select(
-                AiDecisionOutcome.is_positive_example,
-                AiDecisionOutcome.regret_score,
-            )
-            .where(
-                AiDecisionOutcome.horizon_hours.isnot(None),
-                AiDecisionOutcome.created_at >= cutoff,
-            )
+        stmt = select(
+            AiDecisionOutcome.is_positive_example,
+            AiDecisionOutcome.regret_score,
+        ).where(
+            AiDecisionOutcome.horizon_hours.isnot(None),
+            AiDecisionOutcome.created_at >= cutoff,
         )
         rows = list(self.db.execute(stmt).all())
 
@@ -394,7 +390,9 @@ class AILearningService:
 
         if ols:
             pos_rate = f"{ols.positive_rate:.1%}" if ols.positive_rate is not None else "N/A"
-            avg_regret = f"{ols.avg_regret_score:.3f}" if ols.avg_regret_score is not None else "N/A"
+            avg_regret = (
+                f"{ols.avg_regret_score:.3f}" if ols.avg_regret_score is not None else "N/A"
+            )
             lines.append(
                 f"  OutcomeLabels(30d): labeled={ols.total_labeled}, "
                 f"positive={ols.positive_count}, "

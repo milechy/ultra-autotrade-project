@@ -239,10 +239,14 @@ class TestOutcomeLabelingServiceIntegration:
 
         assert result.total_processed == 2  # 24h + 48h
 
-        outcomes = db.query(AiDecisionOutcome).filter(
-            AiDecisionOutcome.decision_id == decision.id,
-            AiDecisionOutcome.horizon_hours.isnot(None),
-        ).all()
+        outcomes = (
+            db.query(AiDecisionOutcome)
+            .filter(
+                AiDecisionOutcome.decision_id == decision.id,
+                AiDecisionOutcome.horizon_hours.isnot(None),
+            )
+            .all()
+        )
         assert len(outcomes) == 2
 
         h24 = next(o for o in outcomes if o.horizon_hours == 24)
@@ -313,10 +317,14 @@ class TestOutcomeLabelingServiceIntegration:
         result = svc.run_batch()
         assert result.total_processed == 2
 
-        outcomes = db.query(AiDecisionOutcome).filter(
-            AiDecisionOutcome.decision_id == decision.id,
-            AiDecisionOutcome.horizon_hours.isnot(None),
-        ).all()
+        outcomes = (
+            db.query(AiDecisionOutcome)
+            .filter(
+                AiDecisionOutcome.decision_id == decision.id,
+                AiDecisionOutcome.horizon_hours.isnot(None),
+            )
+            .all()
+        )
         for o in outcomes:
             assert o.asset == "ETH"
             assert o.protocol == "lido"

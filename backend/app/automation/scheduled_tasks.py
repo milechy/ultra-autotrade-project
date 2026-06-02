@@ -2077,9 +2077,7 @@ class ScheduledTaskManager:
         except asyncio.CancelledError:
             logger.info("Outcome labeling task cancelled successfully")
         except asyncio.TimeoutError:
-            logger.warning(
-                "Outcome labeling task did not stop within %.1fs timeout", timeout
-            )
+            logger.warning("Outcome labeling task did not stop within %.1fs timeout", timeout)
         except Exception as exc:
             logger.error("Error while stopping outcome labeling task: %s", exc)
 

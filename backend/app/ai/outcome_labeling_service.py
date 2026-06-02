@@ -125,9 +125,7 @@ class OutcomeLabelingService:
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.warning("outcome_labeling horizon=%dh failed: %s", horizon, exc)
-                result.horizons.append(
-                    HorizonResult(horizon_hours=horizon, errors=[str(exc)])
-                )
+                result.horizons.append(HorizonResult(horizon_hours=horizon, errors=[str(exc)]))
         result.completed_at = datetime.now(timezone.utc)
         return result
 
@@ -243,12 +241,7 @@ class OutcomeLabelingService:
                 PortfolioSnapshot.recorded_at >= lo,
                 PortfolioSnapshot.recorded_at <= hi,
             )
-            .order_by(
-                func.abs(
-                    func.extract("epoch", PortfolioSnapshot.recorded_at)
-                    - target_epoch
-                )
-            )
+            .order_by(func.abs(func.extract("epoch", PortfolioSnapshot.recorded_at) - target_epoch))
             .limit(1)
         )
         nearest_time = self.db.scalar(nearest_time_stmt)
@@ -262,9 +255,7 @@ class OutcomeLabelingService:
         )
         return Decimal(str(total)) if total is not None else None
 
-    def _get_hf_min_in_window(
-        self, t_start: datetime, t_end: datetime
-    ) -> Optional[float]:
+    def _get_hf_min_in_window(self, t_start: datetime, t_end: datetime) -> Optional[float]:
         """[t_start, t_end] 区間の health_factor 最小値 (全ユーザー min)。"""
         result = self.db.scalar(
             select(func.min(PortfolioSnapshot.health_factor)).where(

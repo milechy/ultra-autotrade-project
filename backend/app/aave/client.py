@@ -1193,8 +1193,7 @@ def make_aave_client(
         # build_deposit_txs / build_withdraw_tx が "Unknown asset" で失敗する (method2 バグ修正)。
         if token_addresses and not hasattr(client, "token_addresses"):
             client.token_addresses = {
-                sym: Web3.to_checksum_address(addr)
-                for sym, addr in token_addresses.items()
+                sym: Web3.to_checksum_address(addr) for sym, addr in token_addresses.items()
             }
         return client
     raise ValueError(f"不明な AAVE_CLIENT_TYPE: {client_type!r} (dummy | web3)")

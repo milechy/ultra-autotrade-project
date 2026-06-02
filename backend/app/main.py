@@ -461,9 +461,7 @@ def create_app() -> FastAPI:
 
                 labeling_interval = int(os.getenv("OUTCOME_LABELING_INTERVAL_HOURS", "6")) * 3600
                 asyncio.create_task(outcome_labeling_loop(interval_seconds=labeling_interval))
-                logger.info(
-                    "outcome_labeling_loop started (interval=%ds)", labeling_interval
-                )
+                logger.info("outcome_labeling_loop started (interval=%ds)", labeling_interval)
             mmt_enabled = os.getenv("MMT_API_ENABLED", "false").lower() in ("true", "1", "yes")
             if mmt_enabled:
                 mmt_interval = int(os.getenv("MMT_UPDATE_INTERVAL", "1800")) // 60
