@@ -37,6 +37,7 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # builder の wheel をコピーしてインストール（ネットワーク不要）
@@ -54,18 +55,25 @@ RUN if [ "$BUILD_MODE" = "production" ]; then \
       find backend/app/ai -name "*.py" ! -name "__init__.py" ! -name "schemas.py" ! -name "router.py" ! -name "decisions_router.py" ! -name "decisions_schemas.py" ! -name "models.py" -delete; \
     fi
 
-# 非 root ユーザーで実行（docs/13_security_design.md）
-# UID/GID は 10001 で固定。docker-compose の ultra-state-init が同じ UID で
-# named volume (/var/run/ultra) を chown するためここと値が一致している必要がある。
+# 非 root ユーザーを作成（docs/13_security_design.md）
+# UID/GID は 10001 で固定。docker-compose の backend-volume-init と
+# entrypoint.sh の chown 対象 UID と一致させる必要がある。
 RUN groupadd --gid 10001 appuser \
     && useradd --no-create-home --shell /bin/false --uid 10001 --gid 10001 appuser
+# イメージ層でもディレクトリを作成しておく（新規 volume の初回 population 時に
+# chown 済み状態でコピーされる）。
 RUN mkdir -p /var/log/ultra-autotrade /var/run/ultra \
     && chown appuser:appuser /var/log/ultra-autotrade /var/run/ultra
-USER appuser
+
+# entrypoint: root で起動 → named volume を chown → gosu で appuser に降格して CMD を exec
+# USER appuser は設定しない（entrypoint が権限降格を担う）
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
