@@ -7,14 +7,11 @@ from __future__ import annotations
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-import pytest
-
+from app.automation.scheduled_tasks import _extract_line_user_id
 from app.notifications.line_messaging import (
     LINEFlexMessageSender,
-    build_alert_flex_bubble,
     build_monthly_report_flex_bubble,
 )
-from app.automation.scheduled_tasks import _extract_line_user_id
 
 
 # ── build_monthly_report_flex_bubble ──────────────────────────────────────────
@@ -145,8 +142,9 @@ def test_send_flex_http_error() -> None:
 
 def test_user_model_has_line_monthly_opt_in() -> None:
     """User モデルに line_monthly_opt_in カラムが定義されている。"""
-    from app.auth.models import User
     from sqlalchemy import inspect
+
+    from app.auth.models import User
 
     mapper = inspect(User)
     col_names = [c.key for c in mapper.mapper.column_attrs]
