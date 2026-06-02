@@ -902,6 +902,7 @@ claude.ai が Step 0 をスキップして §9 を実行した場合、それは
 - [ ] models 変更で alembic migration が生成されているか(PR #155 privy_did)
 - [ ] migration が staging / production に適用済みか
 - [ ] schema 削除/型変更が含まれる場合の sanitize step があるか(PR #162)
+- [ ] **CHECK 制約の enum 値が models.py と一致しているか** (models.py が唯一の真実源。migration 内で独自定義しない → 下記「CHECK制約ルール」参照)
 
 ### 配線
 - [ ] 新規 class / router / scheduler / startup hook / endpoint が register / startup / crontab に登録済みか
@@ -937,6 +938,7 @@ claude.ai が Step 0 をスキップして §9 を実行した場合、それは
 - production DB 未適用 alembic migration の手動適用漏れ
 - proposals.execution_attempts のような新規列が片方の env にしかない
 - models 変更時 alembic 必須化 CI が無いと検出されない
+- **CHECK 制約 enum 値を migration 内で独自定義した結果 models.py と乖離 → IntegrityError** (例: d4 migration が `'LOW','MIDDLE','HIGH'` を定義、models.py は `'conservative','balanced','aggressive'` → 本番 INSERT 即死。Asana 1215272519685583)
 
 ### 配線 / 孤立コード
 - AutoEvacuator + CompoundRiskAssessor 安全装置が register されず
@@ -954,3 +956,40 @@ claude.ai が Step 0 をスキップして §9 を実行した場合、それは
 
 該当しそうなものがあれば、修正してから完了宣言する。同種が出たら個別修正でなく
 `scripts/launch_gate.sh` / CI gate に追加して再発防止する。
+
+---
+
+## 📐 CHECK制約と migration の二重管理ルール (Asana 1215272519685583)
+
+### ルール: models.py が唯一の真実源
+
+```
+backend/app/<module>/models.py  ←  CHECK 制約 enum の正とする
+        ↓ 従う
+alembic/versions/*.py           ←  models.py の enum を読んで CHECK を書く
+```
+
+**やってはいけない:**
+```python
+# migration 内で独自 enum を定義 → models.py と乖離しやすい
+sa.CheckConstraint("tier IN ('LOW','MIDDLE','HIGH')", name="ck_tier")
+```
+
+**やるべきこと:**
+```python
+# migration は models.py の enum 値リストを文字通り使う
+# または CheckConstraint を設けず application-layer で制御する
+# (値変更時は migration + models.py を同時に更新する)
+```
+
+### 背景
+fee_transactions の d4 migration が `'LOW','MIDDLE','HIGH'` を CHECK 制約に定義、
+一方 `models.py` は `'conservative','balanced','aggressive'` を使用していた。
+production 適用後の INSERT が IntegrityError になり、production fee schema が壊れた。
+
+### 確認コマンド
+```bash
+# CHECK 制約 enum と models.py の enum が一致するか grep で突き合わせ
+grep -rn "CheckConstraint\|IN (" alembic/versions/ | grep -v "^Binary"
+grep -rn "class.*Enum\|values\s*=\s*\[" backend/app/*/models.py
+```
