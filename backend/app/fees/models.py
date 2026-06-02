@@ -160,6 +160,14 @@ class FeeTransaction(Base):
     affiliate_amount_jpy: Mapped[Decimal] = mapped_column(
         Numeric(18, 2), nullable=False, server_default=text("0")
     )
+    #: 課金ベンダーが返した参照 ID (Stripe charge_id / Paidy payment_id 等)。
+    #: ベンダー未定期間は StubBillingAdapter が "stub-YYYY-MM-uN" を格納。
+    #: NULL = 課金未実行 (dry_run / vendor_adapter=None)。
+    vendor_reference_id: Mapped[Optional[str]] = mapped_column(
+        String(128), nullable=True, index=True
+    )
+    #: 課金ベンダーが subscription を処理した日時。NULL = 未課金。
+    charged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     calculated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

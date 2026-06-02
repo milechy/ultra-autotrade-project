@@ -168,6 +168,7 @@ def _monthly_fee_batch_sync(calculation_month: date, usd_jpy_rate: Decimal) -> N
     from sqlalchemy import select as _select  # noqa: PLC0415
 
     from app.api.v1.fees import finalize_month_core  # noqa: PLC0415
+    from app.fees.billing_adapter import StubBillingAdapter  # noqa: PLC0415
     from app.fees.models import FeeConfigV10  # noqa: PLC0415
 
     with SessionLocal() as db:
@@ -183,15 +184,20 @@ def _monthly_fee_batch_sync(calculation_month: date, usd_jpy_rate: Decimal) -> N
                 calculation_month,
             )
             return
-        result = finalize_month_core(db, config, calculation_month, usd_jpy_rate)
+        vendor = StubBillingAdapter()
+        result = finalize_month_core(
+            db, config, calculation_month, usd_jpy_rate, vendor_adapter=vendor
+        )
         logger.info(
             "monthly_fee_batch done: month=%s processed=%d skipped_no_snap=%d"
-            " skipped_finalized=%d total_fee=%s",
+            " skipped_finalized=%d total_fee=%s vendor_charges=%d/%d",
             calculation_month,
             result.users_processed,
             result.users_skipped_no_snapshot,
             result.users_skipped_already_finalized,
             result.total_fee_jpy,
+            result.vendor_charges_succeeded,
+            result.vendor_charges_attempted,
         )
 
 
