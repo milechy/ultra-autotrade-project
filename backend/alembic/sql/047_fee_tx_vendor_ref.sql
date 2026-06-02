@@ -1,6 +1,6 @@
 -- 047_fee_tx_vendor_ref.sql
 -- Add vendor_reference_id and charged_at to fee_transactions (F-7 vendor-agnostic adapter)
--- Corresponds to alembic revision: k1l2m3n4o5p6
+-- Corresponds to alembic revision: l2m3n4o5p6q7
 
 ALTER TABLE fee_transactions
     ADD COLUMN IF NOT EXISTS vendor_reference_id VARCHAR(128),
