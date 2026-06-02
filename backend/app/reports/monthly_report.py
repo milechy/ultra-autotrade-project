@@ -11,6 +11,12 @@ import csv
 import io
 import logging
 from dataclasses import dataclass
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +35,75 @@ class MonthlyReportData:
     annual_yield_pct: float
 
 
+def build_monthly_report_data(
+    db: Session,
+    year: int,
+    month: int,
+    user_id: int | None = None,
+) -> MonthlyReportData:
+    """DB から実データを集計して MonthlyReportData を構築する。
+
+    Args:
+        db: SQLAlchemy セッション
+        year: 対象年
+        month: 対象月
+        user_id: 集計対象ユーザー ID。None の場合は全ユーザー集計。
+    """
+    from app.fees.models import FeeTransaction
+    from app.proposals.models import Proposal
+
+    period_str = f"{year}年{month}月"
+
+    start_dt = datetime(year, month, 1, tzinfo=timezone.utc)
+    if month == 12:
+        end_dt = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        end_dt = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+
+    # --- proposals 集計 ---
+    q = db.query(Proposal).filter(
+        Proposal.created_at >= start_dt,
+        Proposal.created_at < end_dt,
+    )
+    if user_id is not None:
+        q = q.filter(Proposal.user_id == user_id)
+
+    proposals = q.all()
+    total_proposals = len(proposals)
+    positive_results = sum(1 for p in proposals if p.status == "executed")
+    win_rate = (positive_results / total_proposals * 100.0) if total_proposals > 0 else 0.0
+
+    # --- fee_transactions 集計 (JPY ベース) ---
+    calc_month = date(year, month, 1)
+    ft_q = db.query(FeeTransaction).filter(FeeTransaction.calculation_month == calc_month)
+    if user_id is not None:
+        ft_q = ft_q.filter(FeeTransaction.user_id == user_id)
+
+    fee_txs = ft_q.all()
+
+    total_gain_jpy = int(sum(ft.net_profit_jpy for ft in fee_txs))
+    total_fees_jpy = int(sum(ft.fee_amount_jpy for ft in fee_txs))
+    avg_gain_per_trade_jpy = (total_gain_jpy // total_proposals) if total_proposals > 0 else 0
+
+    # 年率換算: (月次利益 / 預け入れ元本) * 12 * 100
+    deposit_total = sum(ft.deposit_amount_jpy for ft in fee_txs)
+    annual_yield_pct = 0.0
+    if deposit_total > 0:
+        monthly_yield = Decimal(str(total_gain_jpy)) / deposit_total
+        annual_yield_pct = round(float(monthly_yield) * 12 * 100, 2)
+
+    return MonthlyReportData(
+        period=period_str,
+        total_proposals=total_proposals,
+        positive_results=positive_results,
+        win_rate=round(win_rate, 1),
+        total_gain_jpy=total_gain_jpy,
+        avg_gain_per_trade_jpy=avg_gain_per_trade_jpy,
+        total_fees_jpy=total_fees_jpy,
+        annual_yield_pct=annual_yield_pct,
+    )
+
+
 def _fmt_yen(amount: int) -> str:
     """円額を ¥1,234,567 形式にフォーマットする。"""
     return f"¥{amount:,}"
@@ -36,13 +111,13 @@ def _fmt_yen(amount: int) -> str:
 
 def _generate_pdf(data: MonthlyReportData) -> bytes:
     """reportlab で PDF バイトを生成する。"""
-    from reportlab.lib import colors  # type: ignore[import-untyped]
-    from reportlab.lib.pagesizes import A4  # type: ignore[import-untyped]
-    from reportlab.lib.styles import getSampleStyleSheet  # type: ignore[import-untyped]
-    from reportlab.lib.units import mm  # type: ignore[import-untyped]
-    from reportlab.pdfbase import pdfmetrics  # type: ignore[import-untyped]
-    from reportlab.pdfbase.ttfonts import TTFont  # type: ignore[import-untyped]
-    from reportlab.platypus import (  # type: ignore[import-untyped]
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.platypus import (
         Paragraph,
         SimpleDocTemplate,
         Spacer,
@@ -153,7 +228,7 @@ def generate_monthly_report_pdf(data: MonthlyReportData) -> tuple[bytes, str]:
         (bytes, content_type) のタプル
     """
     try:
-        import reportlab  # type: ignore[import-untyped]  # noqa: F401
+        import reportlab  # noqa: F401
 
         return _generate_pdf(data), "application/pdf"
     except ImportError:
