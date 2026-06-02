@@ -39,6 +39,7 @@ DAILY_REPORT_TIME = time(0, 30)  # 00:30 JST
 WEEKLY_REPORT_TIME = time(1, 0)  # 01:00 JST
 WEEKLY_REPORT_DAY = 0  # Monday (0 = Monday, 6 = Sunday)
 MONTHLY_FEE_BATCH_TIME = time(9, 0)  # 毎月1日 09:00 JST
+MONTHLY_LINE_REPORT_TIME = time(10, 0)  # 毎月1日 10:00 JST (手数料バッチ完了後)
 
 # RSS フェッチ間隔（秒）
 RSS_FETCH_INTERVAL_SECONDS = 1800  # 30 分
@@ -231,6 +232,213 @@ async def monthly_fee_batch_loop(
 
         except Exception as exc:
             logger.error("Error in monthly fee batch loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+            await asyncio.sleep(3600)
+
+
+def _extract_line_user_id(email: str) -> Optional[str]:
+    """LINE 認証ユーザーのメールアドレスから LINE user_id を抽出する。
+
+    LINE 認証ユーザーのメールは line_{user_id}@line.local 形式。
+    """
+    prefix = "line_"
+    suffix = "@line.local"
+    if email.startswith(prefix) and email.endswith(suffix):
+        return email[len(prefix) : -len(suffix)]
+    return None
+
+
+def _monthly_line_report_sync(calculation_month: date, channel_access_token: str) -> int:
+    """月次 LINE レポートを送信する同期関数 (asyncio.to_thread から呼ばれる)。
+
+    line_monthly_opt_in=True かつ LINE 認証済み (email=line_*@line.local) の
+    ユーザーに Flex Message を一括送信する。
+
+    Returns:
+        送信成功ユーザー数
+    """
+
+    from decimal import Decimal as _Decimal  # noqa: PLC0415
+
+    from sqlalchemy import func, select  # noqa: PLC0415
+
+    from app.auth.models import User  # noqa: PLC0415
+    from app.fees.models import FeeTransaction  # noqa: PLC0415
+    from app.notifications.line_messaging import (  # noqa: PLC0415
+        LINEFlexMessageSender,
+        build_monthly_report_flex_bubble,
+    )
+    from app.proposals.models import Proposal  # noqa: PLC0415
+
+    period_str = f"{calculation_month.year}年{calculation_month.month}月"
+
+    with SessionLocal() as db:
+        # opt-in かつ LINE 認証済みユーザーを抽出
+        opted_in_users = (
+            db.query(User)
+            .filter(
+                User.line_monthly_opt_in.is_(True),
+                User.email.like("line_%@line.local"),
+                User.is_active.is_(True),
+            )
+            .all()
+        )
+
+        if not opted_in_users:
+            logger.info(
+                "monthly_line_report: no opted-in LINE users for month=%s", calculation_month
+            )
+            return 0
+
+        sent_count = 0
+        for user in opted_in_users:
+            line_user_id = _extract_line_user_id(user.email)
+            if not line_user_id:
+                continue
+
+            # ユーザー個別の月次データを集計
+            fee_row = db.execute(
+                select(
+                    func.sum(FeeTransaction.net_profit_jpy).label("net_profit"),
+                    func.sum(FeeTransaction.fee_amount_jpy).label("fee_amount"),
+                ).where(
+                    FeeTransaction.user_id == user.id,
+                    FeeTransaction.calculation_month == calculation_month,
+                )
+            ).one()
+
+            net_profit = fee_row.net_profit or _Decimal("0")
+            fee_amount = fee_row.fee_amount or _Decimal("0")
+
+            # 提案・勝率集計
+            month_start = calculation_month
+            if month_start.month == 12:
+                month_end = date(month_start.year + 1, 1, 1)
+            else:
+                month_end = date(month_start.year, month_start.month + 1, 1)
+
+            total_proposals = (
+                db.query(func.count(Proposal.id))
+                .filter(
+                    Proposal.user_id == user.id,
+                    Proposal.created_at >= month_start,
+                    Proposal.created_at < month_end,
+                )
+                .scalar()
+                or 0
+            )
+            executed_count = (
+                db.query(func.count(Proposal.id))
+                .filter(
+                    Proposal.user_id == user.id,
+                    Proposal.created_at >= month_start,
+                    Proposal.created_at < month_end,
+                    Proposal.status == "executed",
+                )
+                .scalar()
+                or 0
+            )
+            win_rate = (executed_count / total_proposals * 100.0) if total_proposals > 0 else 0.0
+
+            flex_msg = build_monthly_report_flex_bubble(
+                period=period_str,
+                net_profit_jpy=net_profit,
+                fee_amount_jpy=fee_amount,
+                win_rate=win_rate,
+                total_proposals=total_proposals,
+            )
+
+            sender = LINEFlexMessageSender(
+                channel_access_token=channel_access_token,
+                user_id=line_user_id,
+            )
+            if sender.push_flex_message(flex_msg):
+                sent_count += 1
+                logger.info(
+                    "monthly_line_report sent: user_id=%d, month=%s",
+                    user.id,
+                    calculation_month,
+                )
+            else:
+                logger.warning(
+                    "monthly_line_report send failed: user_id=%d, month=%s",
+                    user.id,
+                    calculation_month,
+                )
+
+        logger.info(
+            "monthly_line_report done: month=%s sent=%d/%d",
+            calculation_month,
+            sent_count,
+            len(opted_in_users),
+        )
+        return sent_count
+
+
+async def monthly_line_report_loop(
+    *,
+    tz: ZoneInfo = DEFAULT_TIMEZONE,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """月次 LINE レポート送信ループ: 毎月1日 10:00 JST に実行。
+
+    ENABLE_MONTHLY_LINE_REPORT=1 かつ LINE_CHANNEL_ACCESS_TOKEN 設定時に
+    main.py から起動される。月次手数料バッチ (09:00 JST) 完了後の
+    10:00 JST に、opt-in 済み一般ユーザーへ Flex Message を一括送信する。
+    """
+    import os  # noqa: PLC0415
+
+    channel_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
+    if not channel_access_token:
+        logger.warning(
+            "monthly_line_report_loop: LINE_CHANNEL_ACCESS_TOKEN not set, loop will not send"
+        )
+
+    logger.info(
+        "Starting monthly LINE report loop (schedule: 1st of month %s JST)",
+        MONTHLY_LINE_REPORT_TIME,
+    )
+
+    while True:
+        try:
+            wait_seconds = _calculate_seconds_until_month_first(tz=tz)
+            # fee_batch は 09:00、LINE レポートは 10:00 → 3600 秒ずらす
+            wait_seconds = max(wait_seconds + 3600, 60.0)
+            logger.debug(
+                "Waiting %.1f seconds until next monthly LINE report",
+                wait_seconds,
+            )
+            await asyncio.sleep(wait_seconds)
+
+            if not channel_access_token:
+                logger.warning(
+                    "monthly_line_report_loop: skipping (LINE_CHANNEL_ACCESS_TOKEN not set)"
+                )
+                await asyncio.sleep(3600)
+                continue
+
+            now_jst = datetime.now(tz)
+            target_month = _prev_month_start(now_jst.date())
+
+            logger.info("Running monthly LINE report for month=%s", target_month)
+            await asyncio.to_thread(
+                _monthly_line_report_sync,
+                target_month,
+                channel_access_token,
+            )
+
+            await asyncio.sleep(3600)  # 重複実行防止
+
+        except asyncio.CancelledError:
+            logger.info("Monthly LINE report loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in monthly LINE report loop: %s", exc)
             if on_error:
                 try:
                     on_error(exc)
@@ -1027,6 +1235,7 @@ class ScheduledTaskManager:
         self._learning_task: Optional[asyncio.Task[None]] = None
         self._compound_risk_task: Optional[asyncio.Task[None]] = None
         self._monthly_fee_batch_task: Optional[asyncio.Task[None]] = None
+        self._monthly_line_report_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -1087,6 +1296,50 @@ class ScheduledTaskManager:
     def is_monthly_fee_batch_running(self) -> bool:
         """月次手数料バッチタスクが動作中かどうか。"""
         return self._monthly_fee_batch_task is not None and not self._monthly_fee_batch_task.done()
+
+    @property
+    def is_monthly_line_report_running(self) -> bool:
+        """月次 LINE レポートタスクが動作中かどうか。"""
+        return (
+            self._monthly_line_report_task is not None and not self._monthly_line_report_task.done()
+        )
+
+    async def start_monthly_line_report(
+        self,
+        *,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """月次 LINE レポートタスクを開始する。"""
+        if self.is_monthly_line_report_running:
+            raise RuntimeError("Monthly LINE report already running")
+
+        logger.info("Starting monthly LINE report task")
+        self._monthly_line_report_task = asyncio.create_task(
+            monthly_line_report_loop(on_error=on_error)
+        )
+        logger.info("Monthly LINE report task started")
+
+    async def stop_monthly_line_report(self, timeout: float = 5.0) -> None:
+        """月次 LINE レポートタスクを停止する。"""
+        if not self.is_monthly_line_report_running:
+            logger.debug("Monthly LINE report not running - nothing to stop")
+            return
+
+        logger.info("Stopping monthly LINE report task")
+        assert self._monthly_line_report_task is not None  # noqa: S101
+        self._monthly_line_report_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._monthly_line_report_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Monthly LINE report task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning("Monthly LINE report task did not stop within %.1fs timeout", timeout)
+        except Exception as exc:
+            logger.error("Error while stopping monthly LINE report task: %s", exc)
+
+        self._monthly_line_report_task = None
+        logger.info("Monthly LINE report task stopped")
 
     async def start_monthly_fee_batch(
         self,
@@ -1807,6 +2060,7 @@ class ScheduledTaskManager:
             self.stop_learning(timeout=timeout),
             self.stop_compound_risk_monitor(timeout=timeout),
             self.stop_monthly_fee_batch(timeout=timeout),
+            self.stop_monthly_line_report(timeout=timeout),
             return_exceptions=True,
         )
 

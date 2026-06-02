@@ -84,6 +84,8 @@ def update_user_settings(
                 detail=("execution_policy must be one of: " + ", ".join(ExecutionPolicy.values())),
             )
         current_user.execution_policy = request.execution_policy
+    if request.line_monthly_opt_in is not None:
+        current_user.line_monthly_opt_in = request.line_monthly_opt_in
     db.add(current_user)
     db.commit()
     db.refresh(current_user)

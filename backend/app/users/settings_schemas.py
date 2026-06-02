@@ -21,6 +21,7 @@ class UserSettingsResponse(BaseModel):
     max_daily_trade_usd: Optional[Decimal]
     user_mode: str
     execution_policy: str
+    line_monthly_opt_in: bool = False
 
 
 class UserSettingsUpdate(BaseModel):
@@ -30,3 +31,4 @@ class UserSettingsUpdate(BaseModel):
     max_daily_trade_usd: Optional[Decimal] = None
     user_mode: Optional[str] = None
     execution_policy: Optional[str] = None
+    line_monthly_opt_in: Optional[bool] = None
