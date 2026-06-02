@@ -32,6 +32,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(16) NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS ix_users_referral_code ON users (referral_code) WHERE referral_code IS NOT NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referrer_id INTEGER NULL REFERENCES users(id);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_consent_at TIMESTAMP WITH TIME ZONE NULL;
+
+-- Lane P: LINE 月次レポート通知 opt-in
+ALTER TABLE users ADD COLUMN IF NOT EXISTS line_monthly_opt_in BOOLEAN NOT NULL DEFAULT FALSE;
 """
 
 import logging
@@ -268,6 +271,7 @@ class User(Base):
     referred_consent_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
+    line_monthly_opt_in: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"

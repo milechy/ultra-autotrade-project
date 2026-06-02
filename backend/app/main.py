@@ -591,6 +591,16 @@ def create_app() -> FastAPI:
             except BaseException as exc:
                 logger.error("Failed to start monthly fee batch: %s", exc)
 
+        # --- 月次 LINE レポート (opt-in: ENABLE_MONTHLY_LINE_REPORT=1) ---
+        if os.getenv("ENABLE_MONTHLY_LINE_REPORT", "0") == "1":
+            try:
+                await scheduled_manager.start_monthly_line_report(
+                    on_error=_make_scheduler_error_handler("monthly_line_report_loop"),
+                )
+                logger.info("Monthly LINE report scheduled")
+            except BaseException as exc:
+                logger.error("Failed to start monthly LINE report: %s", exc)
+
     @app.on_event("startup")
     async def startup_health_probes() -> None:
         """Start background probes for /health/detail (OpenAI / Perplexity / Aave safety)."""
