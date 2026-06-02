@@ -120,7 +120,7 @@ def mask_email(email: str) -> str:
     return f"{local[0]}***@{domain}"
 
 
-def get_referral_earnings(db: Session, partner_id: int) -> dict:
+def get_referral_earnings(db: Session, partner_id: int) -> dict[str, str | int]:
     """アフィリエイター収益サマリーを返す。
 
     - referral_count: referrer_id == partner_id のユーザー数
