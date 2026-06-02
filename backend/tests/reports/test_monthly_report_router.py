@@ -63,6 +63,7 @@ def test_db():
 @pytest.fixture()
 def client(test_db) -> TestClient:
     override_get_db, _ = test_db
+    os.environ["INITIAL_ADMIN_EMAIL"] = _ADMIN_EMAIL  # 他テストの上書きを防ぐため fixture で再設定
     app = create_app()
     app.dependency_overrides[get_db] = override_get_db
     return TestClient(app)
