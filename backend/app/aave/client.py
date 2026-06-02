@@ -427,6 +427,7 @@ class Web3AaveClient(AaveClientBase):
         pool_address: Optional[str] = None,
         settings: Optional[AaveSettings] = None,
         flashbots_rpc_url: Optional[str] = None,
+        token_addresses: Optional[dict[str, str]] = None,
     ) -> None:
         # 2026-05-01: pool_address のデフォルトを Sepolia hardcode から None に変更。
         # 旧デフォルトは mainnet 切替後に silent regression (testnet pool に書き込み) を
@@ -514,6 +515,17 @@ class Web3AaveClient(AaveClientBase):
                 raise AaveClientError(
                     "eth-account package is required. Install with: pip install eth-account"
                 ) from exc
+
+        # マルチチェーン経路（settings 無し）での token_addresses 配線。
+        # make_aave_client(chain_name=...) が chains.py の chain_config.tokens を渡す。
+        # これが無いと build_deposit_txs / build_withdraw_tx が hasattr ガードで
+        # "Unknown asset" を投げ、non-custodial partner 署名フロー (build-tx) が
+        # 500 になる（2026-06-02 launch ブロッカー修正）。
+        # settings 経路が既に self.token_addresses を設定済みの場合は上書きしない。
+        if token_addresses and not hasattr(self, "token_addresses"):
+            self.token_addresses = {
+                symbol: Web3.to_checksum_address(addr) for symbol, addr in token_addresses.items()
+            }
 
         logger.info(
             "Web3AaveClient 初期化完了 (pool=%s...%s)",
@@ -1137,6 +1149,9 @@ def make_aave_client(
     if client_type == "dummy":
         return DummyAaveClient()
     if client_type == "web3":
+        # chain_config.tokens を client に配線するためのマップ（chain_name 経路のみ）。
+        # 未配線だと build_deposit_txs / build_withdraw_tx が "Unknown asset" を投げる。
+        token_addresses: Optional[dict[str, str]] = None
         if chain_name is not None:
             from .chains import get_chain_config, get_rpc_url_for_chain
 
@@ -1148,6 +1163,7 @@ def make_aave_client(
                 if chain_config.flashbots_rpc_env_var is not None
                 else None
             )
+            token_addresses = chain_config.tokens
         if not rpc_url:
             raise ValueError("AAVE_CLIENT_TYPE=web3 の場合は AAVE_RPC_URL が必須です")
 
@@ -1169,6 +1185,7 @@ def make_aave_client(
             rpc_url=rpc_url,
             pool_address=pool_address,
             flashbots_rpc_url=flashbots_rpc_url,
+            token_addresses=token_addresses,
         )
     raise ValueError(f"不明な AAVE_CLIENT_TYPE: {client_type!r} (dummy | web3)")
 

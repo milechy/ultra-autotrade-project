@@ -721,3 +721,129 @@ def test_withdraw_uses_partner_wallet_as_to(mock_web3, mock_rpc_provider_cls, mo
         f"to={to_address} はパートナー wallet であるべき (={partner_wallet})"
     )
     assert to_address != server_account.address
+
+
+# ==============================================================================
+# 回帰テスト: マルチチェーン client の token_addresses 配線
+# (2026-06-02 launch ブロッカー: make_aave_client(chain_name=...) が
+#  chain_config.tokens を Web3AaveClient に渡さず、build_deposit_txs /
+#  build_withdraw_tx が "Unknown asset" で 500 になっていた)
+# ==============================================================================
+
+_BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+_BASE_SEPOLIA_USDC = "0xba50cd2a20f6da35d788639e581bca8d0b5d4d5f"
+
+
+def _mock_multichain_client(mock_web3, mock_rpc_provider_cls, chain_name):
+    """settings 無し（マルチチェーン経路）で make_aave_client を実行するヘルパー。"""
+    mock_rpc_provider_instance = MagicMock()
+    mock_w3 = MagicMock()
+    mock_w3.eth.chain_id = 8453 if chain_name == "base" else 84532
+    mock_rpc_provider_instance.get_web3.return_value = mock_w3
+    mock_rpc_provider_cls.return_value = mock_rpc_provider_instance
+
+    mock_web3.HTTPProvider = MagicMock()
+    mock_web3.to_checksum_address = lambda x: x
+
+    mock_pool = MagicMock()
+    mock_pool.address = "0xPOOL"
+    mock_pool.functions.decimals.return_value.call.return_value = 6
+    mock_pool.encodeABI.return_value = "0xdeadbeef"
+    mock_w3.eth.contract.return_value = mock_pool
+
+    client = make_aave_client(client_type="web3", chain_name=chain_name)
+    return client, mock_pool
+
+
+@patch("app.aave.rpc_provider.RPCProvider")
+@patch("app.aave.client.Web3")
+def test_make_aave_client_base_wires_token_addresses(mock_web3, mock_rpc_provider_cls):
+    """
+    回帰: make_aave_client(chain_name="base") が chain_config.tokens を client に配線し、
+    token_addresses 属性が存在して USDC が解決できること。
+    (配線漏れだと hasattr=False → build_deposit_txs が "Unknown asset")
+    """
+    with patch.dict(os.environ, {"AAVE_RPC_URL_BASE": "https://base.example"}):
+        client, _pool = _mock_multichain_client(mock_web3, mock_rpc_provider_cls, "base")
+
+    assert hasattr(client, "token_addresses"), "token_addresses 未配線 (Unknown asset の原因)"
+    assert client.token_addresses.get("USDC") == _BASE_USDC
+    # chain_config.tokens の他トークンも配線される
+    assert "WETH" in client.token_addresses
+    assert "WBTC" in client.token_addresses
+
+
+@patch("app.aave.rpc_provider.RPCProvider")
+@patch("app.aave.client.Web3")
+def test_make_aave_client_base_sepolia_wires_token_addresses(mock_web3, mock_rpc_provider_cls):
+    """回帰: base_sepolia でも token_addresses が配線される (staging proof 経路)。"""
+    with patch.dict(os.environ, {"ALCHEMY_RPC_URL_BASE_SEPOLIA": "https://sepolia.base.org"}):
+        client, _pool = _mock_multichain_client(mock_web3, mock_rpc_provider_cls, "base_sepolia")
+
+    assert hasattr(client, "token_addresses")
+    assert client.token_addresses.get("USDC") == _BASE_SEPOLIA_USDC
+
+
+@patch("app.aave.rpc_provider.RPCProvider")
+@patch("app.aave.client.Web3")
+def test_build_deposit_txs_multichain_no_unknown_asset(mock_web3, mock_rpc_provider_cls):
+    """
+    回帰 (本丸): マルチチェーン経路で生成した client の build_deposit_txs("USDC") が
+    "Unknown asset" を投げず、approve_tx / supply_tx を返すこと。
+    onBehalfOf/from は partner wallet (build_deposit_txs は checksum_wallet を from に使う)。
+    """
+    partner_wallet = "0x" + "d" * 40
+    with patch.dict(os.environ, {"AAVE_RPC_URL_BASE": "https://base.example"}):
+        client, _pool = _mock_multichain_client(mock_web3, mock_rpc_provider_cls, "base")
+
+        result = client.build_deposit_txs(
+            asset_symbol="USDC",
+            amount=Decimal("1.0"),
+            wallet_address=partner_wallet,
+        )
+
+    assert "approve_tx" in result and "supply_tx" in result
+    # non-custodial: 両 tx の from は partner wallet
+    assert result["approve_tx"]["from"] == partner_wallet
+    assert result["supply_tx"]["from"] == partner_wallet
+
+
+@patch("app.aave.rpc_provider.RPCProvider")
+@patch("app.aave.client.Web3")
+def test_build_withdraw_tx_multichain_no_unknown_asset(mock_web3, mock_rpc_provider_cls):
+    """回帰 (withdraw): マルチチェーン経路で build_withdraw_tx も Unknown asset を出さない。"""
+    partner_wallet = "0x" + "d" * 40
+    with patch.dict(os.environ, {"AAVE_RPC_URL_BASE": "https://base.example"}):
+        client, _pool = _mock_multichain_client(mock_web3, mock_rpc_provider_cls, "base")
+
+        result = client.build_withdraw_tx(
+            asset_symbol="USDC",
+            amount=Decimal("1.0"),
+            wallet_address=partner_wallet,
+        )
+
+    assert "withdraw_tx" in result
+    assert result["withdraw_tx"]["from"] == partner_wallet
+
+
+@patch("app.aave.rpc_provider.RPCProvider")
+@patch("app.aave.client.Web3")
+def test_web3client_token_addresses_param_sets_attr(mock_web3, mock_rpc_provider_cls):
+    """
+    回帰: Web3AaveClient(settings=None, token_addresses=...) で token_addresses が設定され、
+    checksum 化されること。
+    """
+    mock_rpc_provider_instance = MagicMock()
+    mock_rpc_provider_instance.get_web3.return_value = MagicMock()
+    mock_rpc_provider_cls.return_value = mock_rpc_provider_instance
+    mock_web3.HTTPProvider = MagicMock()
+    mock_web3.to_checksum_address = lambda x: x.upper()  # checksum 化が呼ばれることを確認
+
+    client = Web3AaveClient(
+        rpc_url="https://base.example",
+        pool_address="0xpool",
+        token_addresses={"USDC": _BASE_USDC},
+    )
+
+    assert hasattr(client, "token_addresses")
+    assert client.token_addresses["USDC"] == _BASE_USDC.upper()
