@@ -7,8 +7,8 @@ Columns added:
   transfer_tx_hash  VARCHAR(66)  NULL: on-chain tx hash (0x... 64 hex)
   usd_jpy_rate      NUMERIC(8,2) NULL: 計算時の USD/JPY レート (手数料 USD 換算に使用)
 
-Revision ID: j0k1l2m3n4o5
-Revises: i9j0k1l2m3n4
+Revision ID: k1l2m3n4o5p6
+Revises: j0k1l2m3n4o5
 Create Date: 2026-06-01 00:00:00.000000
 """
 
@@ -18,8 +18,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision: str = "j0k1l2m3n4o5"
-down_revision: Union[str, Sequence[str], None] = "i9j0k1l2m3n4"
+revision: str = "k1l2m3n4o5p6"
+down_revision: Union[str, Sequence[str], None] = "j0k1l2m3n4o5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
