@@ -22,6 +22,7 @@ from app.transactions.models import Transaction
 from . import service
 from .schemas import (
     ReferralCodeResponse,
+    ReferralEarningsResponse,
     ReferralTransactionResponse,
     ReferredUserResponse,
 )
@@ -60,6 +61,20 @@ def post_referral_code(
         referral_code=code,
         share_url=service.build_share_url(code),
     )
+
+
+@router.get(
+    "/earnings",
+    response_model=ReferralEarningsResponse,
+    summary="アフィリエイター収益サマリー (partner 専用)",
+)
+def get_referral_earnings(
+    current_user: User = Depends(require_partner_only),
+    db: Session = Depends(get_db),
+) -> ReferralEarningsResponse:
+    """紹介数・今月報酬・累計 payout を返す。"""
+    data = service.get_referral_earnings(db, current_user.id)
+    return ReferralEarningsResponse(**data)
 
 
 @router.get(

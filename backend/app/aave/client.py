@@ -1182,12 +1182,21 @@ def make_aave_client(
         # pool_address 未指定 + network 既知 → network から解決
         if pool_address is None and network is not None and network in _network_pool:
             pool_address = _network_pool[network]
-        return Web3AaveClient(
+        client = Web3AaveClient(
             rpc_url=rpc_url,
             pool_address=pool_address,
             flashbots_rpc_url=flashbots_rpc_url,
             token_addresses=token_addresses,
         )
+        # chain_name 経由時は chain config のトークンアドレスを注入する。
+        # Web3AaveClient.__init__ は settings=None の場合に token_addresses を設定しないため
+        # build_deposit_txs / build_withdraw_tx が "Unknown asset" で失敗する (method2 バグ修正)。
+        if token_addresses and not hasattr(client, "token_addresses"):
+            client.token_addresses = {
+                sym: Web3.to_checksum_address(addr)
+                for sym, addr in token_addresses.items()
+            }
+        return client
     raise ValueError(f"不明な AAVE_CLIENT_TYPE: {client_type!r} (dummy | web3)")
 
 

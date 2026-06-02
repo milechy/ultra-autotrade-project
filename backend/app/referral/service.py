@@ -13,11 +13,15 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import date
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 
 from app.auth.models import User
+from app.fees.models import FeeConfigV10, FeeTransaction
 from app.transactions.models import Transaction
 
 from .code_generator import generate_referral_code
@@ -114,3 +118,54 @@ def mask_email(email: str) -> str:
     if not local:
         return f"***@{domain}"
     return f"{local[0]}***@{domain}"
+
+
+def get_referral_earnings(db: Session, partner_id: int) -> dict:
+    """アフィリエイター収益サマリーを返す。
+
+    - referral_count: referrer_id == partner_id のユーザー数
+    - current_month_reward_jpy: 今月の affiliate_amount_jpy 合計
+    - total_payout_jpy: finalized 済みの affiliate_amount_jpy 累計
+    - affiliate_rate: active FeeConfigV10 の affiliate_rate (デフォルト 0.30)
+    """
+    referral_count: int = (
+        db.query(func.count(User.id)).filter(User.referrer_id == partner_id).scalar() or 0
+    )
+
+    today = date.today()
+    current_month = date(today.year, today.month, 1)
+
+    current_month_raw = (
+        db.query(func.sum(FeeTransaction.affiliate_amount_jpy))
+        .filter(
+            FeeTransaction.affiliate_id == partner_id,
+            FeeTransaction.calculation_month == current_month,
+        )
+        .scalar()
+    )
+    current_month_reward = current_month_raw if current_month_raw is not None else Decimal("0")
+
+    total_payout_raw = (
+        db.query(func.sum(FeeTransaction.affiliate_amount_jpy))
+        .filter(
+            FeeTransaction.affiliate_id == partner_id,
+            FeeTransaction.finalized_at.isnot(None),
+        )
+        .scalar()
+    )
+    total_payout = total_payout_raw if total_payout_raw is not None else Decimal("0")
+
+    active_config = (
+        db.query(FeeConfigV10)
+        .filter(FeeConfigV10.is_active.is_(True))
+        .order_by(FeeConfigV10.effective_from.desc())
+        .first()
+    )
+    affiliate_rate = active_config.affiliate_rate if active_config else Decimal("0.30")
+
+    return {
+        "referral_count": referral_count,
+        "current_month_reward_jpy": str(current_month_reward),
+        "total_payout_jpy": str(total_payout),
+        "affiliate_rate": str(affiliate_rate),
+    }

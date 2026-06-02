@@ -43,3 +43,15 @@ class ReferralTransactionResponse(BaseModel):
     occurred_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ReferralEarningsResponse(BaseModel):
+    """アフィリエイター収益サマリー。
+
+    金額は Decimal を文字列で返却 (CLAUDE.md §21)。
+    """
+
+    referral_count: int
+    current_month_reward_jpy: str
+    total_payout_jpy: str
+    affiliate_rate: str  # e.g. "0.3000"

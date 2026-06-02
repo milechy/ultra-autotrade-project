@@ -20,6 +20,13 @@ export interface ReferralTransaction {
   occurred_at: string
 }
 
+export interface ReferralEarnings {
+  referral_count: number
+  current_month_reward_jpy: string
+  total_payout_jpy: string
+  affiliate_rate: string
+}
+
 export interface RegisterWithReferralPayload {
   email: string
   password: string
@@ -53,6 +60,12 @@ export function getReferralList(token: string): Promise<ReferredUser[]> {
 
 export function getReferralTransactions(token: string, userId: number): Promise<ReferralTransaction[]> {
   return getJson<ReferralTransaction[]>(`/partner/referral/users/${userId}/transactions`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
+export function getReferralEarnings(token: string): Promise<ReferralEarnings> {
+  return getJson<ReferralEarnings>('/partner/referral/earnings', {
     headers: { Authorization: `Bearer ${token}` },
   })
 }
