@@ -167,6 +167,7 @@ class FeeTransaction(Base):
         server_default=text("NOW()"),
     )
     finalized_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    on_chain_tx_hash: Mapped[Optional[str]] = mapped_column(String(66), nullable=True)
 
     # F-S6: on-chain fee transfer 追跡 (j0k1l2m3n4o5 migration)
     # ALTER TABLE fee_transactions ADD COLUMN IF NOT EXISTS transfer_status VARCHAR(16);
