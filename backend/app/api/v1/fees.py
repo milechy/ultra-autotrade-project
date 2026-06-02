@@ -45,6 +45,7 @@ from app.auth.dependencies import require_active_user, require_admin
 from app.auth.models import InvestmentTier, RiskMode, User
 from app.database import get_db
 from app.fees import FeeCalculationInput, FeeCalculator
+from app.fees.billing_adapter import BillingVendorAdapter, ChargeRequest
 from app.fees.fee_transfer_service import (
     FeeTransferConfig,
     FeeTransferService,
@@ -211,6 +212,10 @@ class FinalizeMonthResponse(BaseModel):
     transfer_sent: int = 0
     transfer_skipped: int = 0
     transfer_failed: int = 0
+    #: vendor adapter 経由で課金を試みたユーザー数 (subscription_amount > 0)
+    vendor_charges_attempted: int = 0
+    #: vendor adapter が success=True を返したユーザー数
+    vendor_charges_succeeded: int = 0
 
 
 # ===========================================================================
@@ -255,6 +260,7 @@ def finalize_month_core(
     usd_jpy_rate: Decimal,
     *,
     dry_run: bool = False,
+    vendor_adapter: BillingVendorAdapter | None = None,
 ) -> FinalizeMonthResponse:
     """月次手数料バッチのコアロジック (API endpoint / 定期実行タスク 共通)。
 
@@ -262,6 +268,10 @@ def finalize_month_core(
     FeeCalculator で手数料を計算して fee_transactions に書き込む。
     dry_run=True の場合は計算のみ行い DB 書込はしない。
     expense_jpy は当月の完了トレード件数 × TRADE_FIXED_COST_USD × usd_jpy_rate で算出 (F-9)。
+
+    vendor_adapter が指定された場合、サブスク課金額 > 0 かつ subscription_protected=False の
+    ユーザーに対して charge_subscription() を呼び出す (課金ベンダー差込点)。
+    dry_run=True のとき vendor_adapter は呼ばれない。
     """
     next_month = _next_month_start(month_start)
     dt_from = datetime(month_start.year, month_start.month, 1, tzinfo=timezone.utc)
@@ -276,6 +286,8 @@ def finalize_month_core(
     total_fee = Decimal("0")
     total_sub = Decimal("0")
     total_takehome = Decimal("0")
+    vendor_charges_attempted = 0
+    vendor_charges_succeeded = 0
 
     for user in active_users:
         first_snap = db.scalar(
@@ -403,14 +415,68 @@ def finalize_month_core(
     if not dry_run:
         db.commit()
 
+        # --- 課金ベンダー差込点 (vendor_adapter が指定された場合のみ実行) ---
+        # subscription_amount_jpy > 0 かつ subscription_protected=False のユーザーに対し
+        # サブスク課金を実行する。DB への vendor_reference_id 書込後に再 commit。
+        if vendor_adapter is not None:
+            written_ids: list[int] = []
+            stmt_uncharged = select(FeeTransaction).where(
+                FeeTransaction.calculation_month == month_start,
+                FeeTransaction.subscription_amount_jpy > Decimal("0"),
+                FeeTransaction.subscription_protected.is_(False),
+                FeeTransaction.vendor_reference_id.is_(None),
+            )
+            pending_txs = db.execute(stmt_uncharged).scalars().all()
+            for fee_tx in pending_txs:
+                vendor_charges_attempted += 1
+                try:
+                    charge_req = ChargeRequest(
+                        user_id=fee_tx.user_id,
+                        fee_transaction_id=fee_tx.id,
+                        subscription_amount_jpy=Decimal(str(fee_tx.subscription_amount_jpy)),
+                        calculation_month=fee_tx.calculation_month,
+                        description=f"サブスク月額 {fee_tx.calculation_month}",
+                    )
+                    charge_res = vendor_adapter.charge_subscription(charge_req)
+                    if charge_res.success:
+                        fee_tx.vendor_reference_id = charge_res.vendor_reference_id
+                        fee_tx.charged_at = datetime.now(timezone.utc)
+                        vendor_charges_succeeded += 1
+                        written_ids.append(fee_tx.id)
+                    else:
+                        logger.warning(
+                            "vendor charge failed: user_id=%d fee_tx_id=%d err=%s",
+                            fee_tx.user_id,
+                            fee_tx.id,
+                            charge_res.error_message,
+                        )
+                except Exception as exc:  # noqa: BLE001
+                    logger.error(
+                        "vendor charge exception: user_id=%d fee_tx_id=%d exc=%s",
+                        fee_tx.user_id,
+                        fee_tx.id,
+                        exc,
+                    )
+            if written_ids:
+                db.commit()
+                logger.info(
+                    "finalize_month vendor charges: month=%s attempted=%d succeeded=%d ids=%s",
+                    month_start,
+                    vendor_charges_attempted,
+                    vendor_charges_succeeded,
+                    written_ids,
+                )
+
     logger.info(
         "finalize_month: month=%s processed=%d skipped_no_snap=%d skipped_finalized=%d"
-        " total_fee=%s dry_run=%s",
+        " total_fee=%s vendor_charges=%d/%d dry_run=%s",
         month_start,
         processed,
         skipped_no_snapshot,
         skipped_finalized,
         total_fee,
+        vendor_charges_succeeded,
+        vendor_charges_attempted,
         dry_run,
     )
 
@@ -495,6 +561,8 @@ def finalize_month_core(
         transfer_sent=transfer_sent,
         transfer_skipped=transfer_skipped,
         transfer_failed=transfer_failed,
+        vendor_charges_attempted=vendor_charges_attempted,
+        vendor_charges_succeeded=vendor_charges_succeeded,
     )
 
 
