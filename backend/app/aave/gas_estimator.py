@@ -15,13 +15,15 @@
 from __future__ import annotations
 
 import logging
+import os
 from decimal import Decimal
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ETH/USD フォールバック価格（API失敗時に使用する保守的な高め設定）
-ETH_USD_FALLBACK_PRICE = Decimal("4000.00")
+# ETH/USD フォールバック価格（API失敗時に使用。ENV: ETH_USD_FALLBACK_PRICE）
+# デフォルトは現実値付近の $2100。実勢価格が大きく乖離した場合は env を更新する。
+ETH_USD_FALLBACK_PRICE = Decimal(os.environ.get("ETH_USD_FALLBACK_PRICE", "2100.00"))
 
 # デフォルトフォールバックガス値（estimate_gas失敗時）
 DEFAULT_FALLBACK_GAS_APPROVE = 100000
