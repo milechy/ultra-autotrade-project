@@ -947,6 +947,10 @@ claude.ai が Step 0 をスキップして §9 を実行した場合、それは
 - cognitive_state injection 漏れ
 - _validate_model_config() startup hook 配線漏れ
 - aave_data_fetcher.py V2→V3 API 移行漏れ
+- factory が constructor 引数を供給せず属性未配線（make_aave_client が Web3AaveClient に token_addresses を渡さず build-tx が "Unknown asset"。複数生成経路で必須属性の供給有無を突き合わせる。#500）
+
+### 依存 / ライブラリバージョン
+- web3.py メジャー更新時の API drift（v6→v7 で `Contract.encodeABI()`→`encode_abi()`、`fn_name=`→位置引数。旧 API は `# type: ignore[attr-defined]` で mypy 検出を抑止していたため build-tx が runtime 500 になるまで気づかなかった）。依存更新 PR では camelCase web3 API（encodeABI/buildTransaction/rawTransaction 等）の残存を grep し、`# type: ignore[attr-defined]` を安易に付けない
 
 該当しそうなものがあれば、修正してから完了宣言する。同種が出たら個別修正でなく
 `scripts/launch_gate.sh` / CI gate に追加して再発防止する。

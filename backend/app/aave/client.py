@@ -1039,11 +1039,11 @@ class Web3AaveClient(AaveClientBase):
         pool_address = self._pool.address
         chain_id = self._w3.eth.chain_id
 
-        approve_data = token_contract.encodeABI(  # type: ignore[attr-defined]
-            fn_name="approve", args=[pool_address, amount_wei]
-        )
-        supply_data = self._pool.encodeABI(  # type: ignore[attr-defined]
-            fn_name="supply",
+        # web3.py v7: Contract.encodeABI() は廃止され encode_abi() に改名
+        # (fn_name= キーワードも abi_element_identifier 位置引数に変更)。
+        approve_data = token_contract.encode_abi("approve", args=[pool_address, amount_wei])
+        supply_data = self._pool.encode_abi(
+            "supply",
             args=[Web3.to_checksum_address(asset_address), amount_wei, checksum_wallet, 0],
         )
 
@@ -1096,8 +1096,9 @@ class Web3AaveClient(AaveClientBase):
         checksum_wallet = Web3.to_checksum_address(wallet_address)
         chain_id = self._w3.eth.chain_id
 
-        withdraw_data = self._pool.encodeABI(  # type: ignore[attr-defined]
-            fn_name="withdraw",
+        # web3.py v7: encodeABI → encode_abi（fn_name= → 位置引数）
+        withdraw_data = self._pool.encode_abi(
+            "withdraw",
             args=[Web3.to_checksum_address(asset_address), amount_wei, checksum_wallet],
         )
 
