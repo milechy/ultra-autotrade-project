@@ -748,7 +748,8 @@ def _mock_multichain_client(mock_web3, mock_rpc_provider_cls, chain_name):
     mock_pool = MagicMock()
     mock_pool.address = "0xPOOL"
     mock_pool.functions.decimals.return_value.call.return_value = 6
-    mock_pool.encodeABI.return_value = "0xdeadbeef"
+    # web3 v7: Contract.encode_abi (encodeABI は v7 で廃止)
+    mock_pool.encode_abi.return_value = "0xdeadbeef"
     mock_w3.eth.contract.return_value = mock_pool
 
     client = make_aave_client(client_type="web3", chain_name=chain_name)
@@ -847,3 +848,75 @@ def test_web3client_token_addresses_param_sets_attr(mock_web3, mock_rpc_provider
 
     assert hasattr(client, "token_addresses")
     assert client.token_addresses["USDC"] == _BASE_USDC.upper()
+
+
+# ==============================================================================
+# 回帰テスト: web3.py v7 API (encode_abi) — encodeABI は v7 で廃止
+# (2026-06-02 launch ブロッカー: build_deposit_txs/build_withdraw_tx が
+#  廃止 API encodeABI を使い 'Contract' object has no attribute 'encodeABI' で 500。
+#  #500 の mock は MagicMock が任意メソッドに応答するため drift を検出できなかった)
+# ==============================================================================
+
+_APPROVE_ABI = [
+    {
+        "inputs": [
+            {"name": "spender", "type": "address"},
+            {"name": "amount", "type": "uint256"},
+        ],
+        "name": "approve",
+        "outputs": [{"name": "", "type": "bool"}],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    }
+]
+
+
+def test_web3_v7_contract_api_pin():
+    """
+    版ピン: インストール済み web3 の Contract は encode_abi を持ち encodeABI を持たない。
+    web3 メジャー更新 / ダウングレードで API drift したら検出する。
+    """
+    from web3 import Web3
+
+    w3 = Web3()  # provider 不要（ABI encode はオフライン）
+    contract = w3.eth.contract(abi=_APPROVE_ABI, address="0x" + "1" * 40)
+
+    assert hasattr(contract, "encode_abi"), "web3 v7 の encode_abi が無い (API drift)"
+    assert not hasattr(contract, "encodeABI"), "encodeABI は v7 で廃止のはず"
+
+    # 位置引数 + args= で encode できること（fn_name= は v7 で廃止）
+    data = contract.encode_abi("approve", args=["0x" + "2" * 40, 1000])
+    assert data.startswith("0x")
+
+
+@patch("app.aave.rpc_provider.RPCProvider")
+@patch("app.aave.client.Web3")
+def test_build_deposit_txs_uses_encode_abi_v7_api(mock_web3, mock_rpc_provider_cls):
+    """
+    回帰: build_deposit_txs が v7 API encode_abi を呼び、廃止 API encodeABI を呼ばないこと。
+    (旧コードに戻ると encode_abi が呼ばれず encodeABI が呼ばれてこのテストが落ちる)
+    """
+    partner_wallet = "0x" + "d" * 40
+    with patch.dict(os.environ, {"AAVE_RPC_URL_BASE": "https://base.example"}):
+        client, mock_pool = _mock_multichain_client(mock_web3, mock_rpc_provider_cls, "base")
+        client.build_deposit_txs(
+            asset_symbol="USDC", amount=Decimal("1.0"), wallet_address=partner_wallet
+        )
+
+    assert mock_pool.encode_abi.called, "v7 API encode_abi が呼ばれていない"
+    assert not mock_pool.encodeABI.called, "廃止 API encodeABI を呼んでいる (v7 で 500)"
+
+
+@patch("app.aave.rpc_provider.RPCProvider")
+@patch("app.aave.client.Web3")
+def test_build_withdraw_tx_uses_encode_abi_v7_api(mock_web3, mock_rpc_provider_cls):
+    """回帰 (withdraw): build_withdraw_tx も v7 API encode_abi を使うこと。"""
+    partner_wallet = "0x" + "d" * 40
+    with patch.dict(os.environ, {"AAVE_RPC_URL_BASE": "https://base.example"}):
+        client, mock_pool = _mock_multichain_client(mock_web3, mock_rpc_provider_cls, "base")
+        client.build_withdraw_tx(
+            asset_symbol="USDC", amount=Decimal("1.0"), wallet_address=partner_wallet
+        )
+
+    assert mock_pool.encode_abi.called
+    assert not mock_pool.encodeABI.called
