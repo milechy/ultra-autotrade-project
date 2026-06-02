@@ -231,6 +231,16 @@ deploy_backend_zero_downtime() {
   log "backend-${inactive_slot} を起動..."
   ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d --no-deps "backend-${inactive_slot}"
 
+  # 2a. DB マイグレーション (swap 前に実行、失敗時は abort)
+  ALEMBIC_CONT="ultra-autotrade-backend-${inactive_slot}-production"
+  log "alembic upgrade head を実行 (コンテナ: ${ALEMBIC_CONT})..."
+  if ! docker exec "${ALEMBIC_CONT}" alembic upgrade head; then
+    err "alembic upgrade head 失敗。切替を中止し新コンテナを停止します"
+    ${DC} -f "${COMPOSE_FILE}" stop "backend-${inactive_slot}" 2>/dev/null || true
+    exit 1
+  fi
+  log "✅ alembic upgrade head 完了"
+
   # 3. 新コンテナのヘルスチェック (ホスト側ポート直打ち)
   if ! wait_healthy "http://127.0.0.1:${inactive_port}/health" "backend-${inactive_slot}"; then
     err "新コンテナのヘルスチェック失敗。切替を中止し新コンテナを停止します"
