@@ -4,8 +4,10 @@
 """Fee Model v10 SQLAlchemy ORM 定義。
 
 テーブル:
-- fee_configs      : v10 設定 (tier × risk_mode の手数料率マトリクス)
-- fee_transactions : 月次手数料計算結果
+- fee_configs         : v10 設定 (tier × risk_mode の手数料率マトリクス)
+- fee_transactions    : 月次手数料計算結果
+- referral_campaigns  : 紹介キャンペーン ウィンドウ管理 (パートナーごとの最新1件が有効)
+- uat_wallet_ledger   : UAT 収支台帳 (月次バッチで credit/debit を記録)
 
 DDL の真実の源: backend/alembic/sql/045_fee_v10_tables.sql
 """
@@ -37,6 +39,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 #: PostgreSQL では JSONB、それ以外 (SQLite テスト等) では JSON を使う型 alias。
+# (module-level で一度だけ定義 — 下の FeeConfigV10 でも参照するため上に移動)
+
 _JSONB_OR_JSON = JSONB().with_variant(JSON(), "sqlite")
 
 
@@ -66,7 +70,7 @@ class FeeConfigV10(Base):
         Numeric(6, 4), nullable=False, server_default=text("0")
     )
     affiliate_rate: Mapped[Decimal] = mapped_column(
-        Numeric(6, 4), nullable=False, server_default=text("0.30")
+        Numeric(6, 4), nullable=False, server_default=text("0.10")
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
     effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -217,4 +221,114 @@ class FeeTransaction(Base):
             f"<FeeTransaction(id={self.id}, user_id={self.user_id}, "
             f"month={self.calculation_month}, tier={self.tier}, "
             f"risk_mode={self.risk_mode}, total={self.fee_amount_jpy})>"
+        )
+
+
+class ReferralCampaign(Base):
+    """紹介キャンペーン ウィンドウ管理。
+
+    パートナーが新規紹介をするたびに 1 レコードを追加する。
+    同一パートナーの有効ウィンドウは最大 1 件 (新規紹介時に前のレコードの
+    ended_early_month を更新して閉じる)。
+
+    有効条件 (月 M に対して):
+        reward_start_month <= M <= reward_expires_month
+        AND (ended_early_month IS NULL OR ended_early_month >= M)
+    """
+
+    __tablename__ = "referral_campaigns"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer(), "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+    partner_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    referree_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    #: 報酬開始月 (紹介翌月の月初 date)。
+    reward_start_month: Mapped[date] = mapped_column(Date, nullable=False)
+    #: 報酬終了月 (reward_start_month + 11ヶ月、この月を含む)。
+    reward_expires_month: Mapped[date] = mapped_column(Date, nullable=False)
+    #: 新規紹介で早期終了した場合、終了した最終報酬月 (NULL = まだ有効)。
+    ended_early_month: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        server_default=text("NOW()"),
+    )
+
+    __table_args__ = (
+        Index(
+            "idx_rc_referree_month",
+            "referree_id",
+            "reward_start_month",
+            "reward_expires_month",
+        ),
+        Index("idx_rc_partner", "partner_id"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<ReferralCampaign(id={self.id}, partner={self.partner_id}, "
+            f"referree={self.referree_id}, "
+            f"start={self.reward_start_month}, expires={self.reward_expires_month})>"
+        )
+
+
+class UatWalletLedger(Base):
+    """UAT 収支台帳。
+
+    月次確定バッチで以下を記録:
+    - credit / reason='uat_monthly_income' : 手数料 + サブスク + yield_excess の合計
+    - debit  / reason='referral_campaign'  : 紹介キャンペーン報酬支出
+
+    UNIQUE (reference_fee_tx_id, entry_type, reason) により冪等性を保証。
+    """
+
+    __tablename__ = "uat_wallet_ledger"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer(), "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+    #: 'credit' or 'debit'
+    entry_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    amount_jpy: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    #: 'uat_monthly_income', 'referral_campaign', etc.
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: 紐づく fee_transaction (NULL の場合は手動エントリー等)。
+    reference_fee_tx_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger().with_variant(Integer(), "sqlite"),
+        ForeignKey("fee_transactions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    #: 対象月 (月初 date)。バッチ処理では calculation_month と一致。
+    month: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        server_default=text("NOW()"),
+    )
+
+    __table_args__ = (
+        CheckConstraint("entry_type IN ('credit', 'debit')", name="chk_uwl_entry_type"),
+        CheckConstraint("amount_jpy >= 0", name="chk_uwl_amount"),
+        Index("idx_uwl_month", "month"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<UatWalletLedger(id={self.id}, type={self.entry_type}, "
+            f"amount={self.amount_jpy}, reason={self.reason!r}, month={self.month})>"
         )

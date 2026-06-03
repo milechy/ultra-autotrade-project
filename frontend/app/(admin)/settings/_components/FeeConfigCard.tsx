@@ -118,7 +118,7 @@ export function FeeConfigCard() {
               </div>
             </div>
 
-            {/* 経費マークアップ / アフィリエイト */}
+            {/* 経費マークアップ / 紹介キャンペーン */}
             <div>
               <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-2">
                 その他レート
@@ -133,7 +133,7 @@ export function FeeConfigCard() {
                   </p>
                 </div>
                 <div className="rounded-lg bg-zinc-800/60 px-3 py-2">
-                  <p className="text-xs text-zinc-500">アフィリエイト報酬率</p>
+                  <p className="text-xs text-zinc-500">紹介キャンペーン報酬率</p>
                   <p className="text-sm font-medium text-zinc-100 mt-0.5">
                     {`${(Number(config.affiliate_rate) * 100).toFixed(1)}%`}
                   </p>

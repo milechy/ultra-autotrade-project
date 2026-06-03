@@ -7,6 +7,7 @@ partner ロール用に以下を提供する:
   - 紹介コードの取得 / 自動発行
   - 紹介経由で登録された配下ユーザー一覧
   - 配下ユーザーの取引履歴 (deposit / withdraw / borrow / repay のみ、wallet/tx は除外)
+  - 紹介キャンペーン ウィンドウ管理 (新規紹介時のウィンドウ開閉)
 """
 
 from __future__ import annotations
@@ -18,10 +19,10 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import func, select
 
 from app.auth.models import User
-from app.fees.models import FeeConfigV10, FeeTransaction
+from app.fees.models import FeeConfigV10, FeeTransaction, ReferralCampaign
 from app.transactions.models import Transaction
 
 from .code_generator import generate_referral_code
@@ -120,13 +121,77 @@ def mask_email(email: str) -> str:
     return f"{local[0]}***@{domain}"
 
 
+def handle_new_referral(db: Session, partner_id: int, referree_id: int) -> ReferralCampaign:
+    """新規紹介登録時に紹介キャンペーン ウィンドウを更新する。
+
+    1. 同一パートナーの既存アクティブ ウィンドウを今月で終了。
+    2. 新しい 12ヶ月ウィンドウを作成 (来月スタート)。
+
+    Args:
+        db: DB セッション (呼び出し元が commit を担当)。
+        partner_id: 紹介したパートナーの user id。
+        referree_id: 新規登録したユーザーの user id。
+
+    Returns:
+        作成した ReferralCampaign レコード。
+    """
+    today = date.today()
+    current_month = date(today.year, today.month, 1)
+
+    # 既存のアクティブ ウィンドウを今月で閉じる
+    existing_active = db.scalars(
+        select(ReferralCampaign).where(
+            ReferralCampaign.partner_id == partner_id,
+            ReferralCampaign.ended_early_month.is_(None),
+            ReferralCampaign.reward_expires_month >= current_month,
+        )
+    ).all()
+    for old_campaign in existing_active:
+        old_campaign.ended_early_month = current_month
+        logger.info(
+            "Closed referral campaign id=%d partner=%d (new referral in month=%s)",
+            old_campaign.id,
+            partner_id,
+            current_month,
+        )
+
+    # 新ウィンドウ: 来月スタート、12ヶ月間
+    reward_start_month = _add_months(current_month, 1)
+    reward_expires_month = _add_months(reward_start_month, 11)
+
+    campaign = ReferralCampaign(
+        partner_id=partner_id,
+        referree_id=referree_id,
+        reward_start_month=reward_start_month,
+        reward_expires_month=reward_expires_month,
+    )
+    db.add(campaign)
+    logger.info(
+        "Created referral campaign partner=%d referree=%d start=%s expires=%s",
+        partner_id,
+        referree_id,
+        reward_start_month,
+        reward_expires_month,
+    )
+    return campaign
+
+
+def _add_months(d: date, months: int) -> date:
+    """月初 date に n ヶ月を加算して月初 date を返す (日は常に 1 日)。"""
+    total = d.month - 1 + months
+    year = d.year + total // 12
+    month = total % 12 + 1
+    return date(year, month, 1)
+
+
 def get_referral_earnings(db: Session, partner_id: int) -> dict:
-    """アフィリエイター収益サマリーを返す。
+    """紹介キャンペーン収益サマリーを返す。
 
     - referral_count: referrer_id == partner_id のユーザー数
     - current_month_reward_jpy: 今月の affiliate_amount_jpy 合計
     - total_payout_jpy: finalized 済みの affiliate_amount_jpy 累計
-    - affiliate_rate: active FeeConfigV10 の affiliate_rate (デフォルト 0.30)
+    - campaign_rate: active FeeConfigV10 の affiliate_rate (デフォルト 0.10)
+    - campaign_expires_month: アクティブ ウィンドウの reward_expires_month (None = ウィンドウなし)
     """
     referral_count: int = (
         db.query(func.count(User.id)).filter(User.referrer_id == partner_id).scalar() or 0
@@ -161,11 +226,25 @@ def get_referral_earnings(db: Session, partner_id: int) -> dict:
         .order_by(FeeConfigV10.effective_from.desc())
         .first()
     )
-    affiliate_rate = active_config.affiliate_rate if active_config else Decimal("0.30")
+    campaign_rate = active_config.affiliate_rate if active_config else Decimal("0.10")
+
+    # アクティブ ウィンドウを探して期限月を返す
+    active_campaign = db.scalar(
+        select(ReferralCampaign).where(
+            ReferralCampaign.partner_id == partner_id,
+            ReferralCampaign.ended_early_month.is_(None),
+            ReferralCampaign.reward_expires_month >= current_month,
+            ReferralCampaign.reward_start_month <= current_month,
+        )
+    )
+    campaign_expires_month: str | None = (
+        str(active_campaign.reward_expires_month) if active_campaign else None
+    )
 
     return {
         "referral_count": referral_count,
         "current_month_reward_jpy": str(current_month_reward),
         "total_payout_jpy": str(total_payout),
-        "affiliate_rate": str(affiliate_rate),
+        "campaign_rate": str(campaign_rate),
+        "campaign_expires_month": campaign_expires_month,
     }

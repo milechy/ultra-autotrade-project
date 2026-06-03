@@ -66,13 +66,13 @@ def post_referral_code(
 @router.get(
     "/earnings",
     response_model=ReferralEarningsResponse,
-    summary="アフィリエイター収益サマリー (partner 専用)",
+    summary="紹介キャンペーン収益サマリー (partner 専用)",
 )
 def get_referral_earnings(
     current_user: User = Depends(require_partner_only),
     db: Session = Depends(get_db),
 ) -> ReferralEarningsResponse:
-    """紹介数・今月報酬・累計 payout を返す。"""
+    """紹介数・今月報酬・累計 payout・キャンペーン期限を返す。"""
     data = service.get_referral_earnings(db, current_user.id)
     return ReferralEarningsResponse(**data)
 
