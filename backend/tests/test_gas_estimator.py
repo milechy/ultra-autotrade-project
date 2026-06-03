@@ -7,8 +7,12 @@ from unittest.mock import MagicMock
 
 from app.aave.gas_estimator import (
     DEFAULT_FALLBACK_GAS_APPROVE,
+    DEFAULT_FALLBACK_GAS_SUPPLY,
+    DEFAULT_FALLBACK_GAS_WITHDRAW,
+    DEFAULT_GAS_PRICE_WEI,
     ETH_USD_FALLBACK_PRICE,
     GasEstimator,
+    estimate_static_gas_cost_usd,
 )
 
 
@@ -114,3 +118,47 @@ class TestIsProfitable:
             )
             is False
         )
+
+
+class TestEstimateStaticGasCostUsd:
+    def test_supply_uses_supply_fallback_gas(self) -> None:
+        """SUPPLY は DEFAULT_FALLBACK_GAS_SUPPLY を使うこと"""
+        eth_price = Decimal("2000.00")
+        cost = estimate_static_gas_cost_usd(
+            "SUPPLY", eth_usd_price=eth_price, gas_price_wei=Decimal("20000000000")
+        )
+        # 300000 * 20 Gwei = 0.006 ETH * $2000 = $12.00
+        expected = Decimal(str(DEFAULT_FALLBACK_GAS_SUPPLY)) * Decimal("20000000000") / Decimal("1e18") * eth_price
+        assert cost == expected
+
+    def test_withdraw_uses_withdraw_fallback_gas(self) -> None:
+        """WITHDRAW は DEFAULT_FALLBACK_GAS_WITHDRAW を使うこと"""
+        eth_price = Decimal("2000.00")
+        cost = estimate_static_gas_cost_usd(
+            "WITHDRAW", eth_usd_price=eth_price, gas_price_wei=Decimal("20000000000")
+        )
+        expected = Decimal(str(DEFAULT_FALLBACK_GAS_WITHDRAW)) * Decimal("20000000000") / Decimal("1e18") * eth_price
+        assert cost == expected
+
+    def test_uses_fallback_eth_price_when_none(self) -> None:
+        """eth_usd_price=None のとき ETH_USD_FALLBACK_PRICE を使うこと"""
+        cost_none = estimate_static_gas_cost_usd("SUPPLY", eth_usd_price=None)
+        cost_explicit = estimate_static_gas_cost_usd("SUPPLY", eth_usd_price=ETH_USD_FALLBACK_PRICE)
+        assert cost_none == cost_explicit
+
+    def test_uses_default_gas_price_when_none(self) -> None:
+        """gas_price_wei=None のとき DEFAULT_GAS_PRICE_WEI を使うこと"""
+        cost_none = estimate_static_gas_cost_usd("SUPPLY", gas_price_wei=None)
+        cost_explicit = estimate_static_gas_cost_usd("SUPPLY", gas_price_wei=DEFAULT_GAS_PRICE_WEI)
+        assert cost_none == cost_explicit
+
+    def test_returns_decimal(self) -> None:
+        """返り値が Decimal であること（float禁止）"""
+        cost = estimate_static_gas_cost_usd("SUPPLY")
+        assert isinstance(cost, Decimal)
+
+    def test_operation_case_insensitive(self) -> None:
+        """operation は大文字小文字を問わず動作すること"""
+        cost_upper = estimate_static_gas_cost_usd("SUPPLY")
+        cost_lower = estimate_static_gas_cost_usd("supply")
+        assert cost_upper == cost_lower
