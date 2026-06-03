@@ -443,9 +443,7 @@ def finalize_month_core(
         # --- UAT ウォレット台帳 記録 (冪等: 同月再実行でも重複しない) ---
         fee_txs_this_month = (
             db.execute(
-                select(FeeTransaction).where(
-                    FeeTransaction.calculation_month == month_start
-                )
+                select(FeeTransaction).where(FeeTransaction.calculation_month == month_start)
             )
             .scalars()
             .all()
