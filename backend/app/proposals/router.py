@@ -219,6 +219,18 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
     from app.ai.schemas import TradeAction  # noqa: PLC0415
     from app.transactions.models import Transaction  # noqa: PLC0415
 
+    from .execution_route import ExecutionRoute, RouteMismatchError, assert_route
+
+    # P0-2 誤執行ガード: Aave 自動実行は on-chain 経路専用。
+    # CEX 選択 proposal がこの経路に入った場合は即時 EMERGENCY アラート + 例外で停止する
+    # (呼び出し元 approve_proposal が 409 に変換し、手動介入必須)。
+    try:
+        assert_route(proposal, ExecutionRoute.ONCHAIN_AAVE)
+    except RouteMismatchError:
+        proposal.status = "failed"
+        proposal.error_message = "route mismatch: CEX proposal entered on-chain execution path"
+        raise
+
     op_map: dict[str, TradeAction] = {
         "SUPPLY": TradeAction.BUY,
         "WITHDRAW": TradeAction.SELL,
@@ -585,7 +597,16 @@ def approve_proposal(
     # AAVE_WALLET_PRIVATE_KEY が署名する経路はこのフラグで完全に無効化される。
     auto_execution_enabled = os.getenv("AUTO_EXECUTION_ENABLED", "false").lower() == "true"
     if auto_execution_enabled:
-        _execute_aave_for_proposal(proposal, db)
+        from .execution_route import RouteMismatchError  # noqa: PLC0415
+
+        try:
+            _execute_aave_for_proposal(proposal, db)
+        except RouteMismatchError as exc:
+            db.commit()  # status='failed' / error_message を永続化
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"誤執行検出: {exc} (手動介入必須)",
+            ) from exc
         db.commit()
         db.refresh(proposal)
     else:
@@ -799,6 +820,8 @@ def submit_partner_tx(
     """
     from app.transactions.models import Transaction  # noqa: PLC0415
 
+    from .execution_route import ExecutionRoute, RouteMismatchError, assert_route
+
     stmt = select(Proposal).where(Proposal.id == proposal_id)
     proposal = db.scalars(stmt).first()
     if proposal is None:
@@ -812,6 +835,17 @@ def submit_partner_tx(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot submit tx for proposal with status '{proposal.status}'",
         )
+
+    # P0-2 誤執行ガード: submit-tx は on-chain Aave 経路専用。
+    # CEX 選択 proposal が on-chain (basescan) tx で執行されようとした場合は
+    # 即時 EMERGENCY アラート + 409 で自動進行を止め、手動介入を必須化する。
+    try:
+        assert_route(proposal, ExecutionRoute.ONCHAIN_AAVE)
+    except RouteMismatchError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"誤執行検出: {exc} (手動介入必須)",
+        ) from exc
 
     # tx_hash 形式チェック (0x + 64 hex chars)
     import re  # noqa: PLC0415
@@ -926,7 +960,16 @@ def create_proposal(
     db: Session = Depends(get_db),
 ) -> ProposalResponse:
     """提案を作成する（内部呼び出し用）。"""
+    from .execution_route import DEFAULT_EXECUTION_ROUTE, ExecutionRoute  # noqa: PLC0415
+
     expires_at = request.expires_at or (datetime.now(timezone.utc) + timedelta(hours=72))
+    # P0-2: 執行経路を作成時に確定 (以後 immutable)。未指定時は on-chain Aave (後方互換)。
+    execution_route = request.execution_route or DEFAULT_EXECUTION_ROUTE
+    if execution_route not in ExecutionRoute.values():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid execution_route '{execution_route}'",
+        )
     proposal = Proposal(
         user_id=request.user_id,
         ai_decision_id=request.ai_decision_id,
@@ -938,6 +981,7 @@ def create_proposal(
         expected_hf_after=request.expected_hf_after,
         estimated_gas_usd=request.estimated_gas_usd,
         expires_at=expires_at,
+        execution_route=execution_route,
     )
     db.add(proposal)
     db.commit()
