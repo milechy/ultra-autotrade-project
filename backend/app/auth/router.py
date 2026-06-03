@@ -23,6 +23,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.referral import service as referral_service
 
 from .dependencies import require_active_user
 from .models import (
@@ -54,7 +55,6 @@ from .schemas import (
     WalletLinkResponse,
 )
 from .service import AuthService
-from app.referral import service as referral_service
 
 limiter = Limiter(key_func=get_remote_address)
 
