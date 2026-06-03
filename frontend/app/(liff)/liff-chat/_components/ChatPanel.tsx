@@ -283,8 +283,3 @@ export function ChatPanel({ onClose }: Props) {
               </button>
             ))}
           </div>
-        </div>
-      </div>
-    </>
-  )
-}
