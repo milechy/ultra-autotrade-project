@@ -101,7 +101,7 @@ export default function PartnerReferralPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-2xl font-bold">紹介プログラム</h1>
+      <h1 className="text-2xl font-bold">紹介キャンペーン</h1>
 
       {/* Earnings summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -130,7 +130,7 @@ export default function PartnerReferralPage() {
               今月の報酬
               {earnings && (
                 <span className="ml-1 text-xs font-normal">
-                  (サブスク{formatRate(earnings.affiliate_rate)})
+                  (サブスク{formatRate(earnings.campaign_rate)})
                 </span>
               )}
             </CardTitle>
@@ -163,6 +163,14 @@ export default function PartnerReferralPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* キャンペーン期限バナー */}
+      {!earningsLoading && earnings?.campaign_expires_month && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+          キャンペーン有効期限: <span className="font-medium">{earnings.campaign_expires_month.slice(0, 7)}</span> まで
+          （新規紹介をするとさらに1年延長されます）
+        </div>
+      )}
 
       {/* Referral code card */}
       <Card>

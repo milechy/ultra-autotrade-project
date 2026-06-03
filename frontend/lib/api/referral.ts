@@ -24,7 +24,8 @@ export interface ReferralEarnings {
   referral_count: number
   current_month_reward_jpy: string
   total_payout_jpy: string
-  affiliate_rate: string
+  campaign_rate: string
+  campaign_expires_month: string | null
 }
 
 export interface RegisterWithReferralPayload {

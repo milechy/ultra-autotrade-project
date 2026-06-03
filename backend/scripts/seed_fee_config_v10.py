@@ -79,7 +79,7 @@ def build_v10_default_config() -> dict[str, object]:
         # → {"conservative": 0.0, "balanced": 0.003, "aggressive": 0.01}
         "expense_markup_enabled": False,
         "expense_markup_rate": Decimal("0"),
-        "affiliate_rate": Decimal("0.30"),
+        "affiliate_rate": Decimal("0.10"),
         "is_active": True,
         "effective_from": V10_DEFAULT_EFFECTIVE_FROM,
     }
