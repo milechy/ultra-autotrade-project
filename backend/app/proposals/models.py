@@ -10,6 +10,8 @@
 #   expected_from / expected_to: non-custodial method2 submit-tx on-chain receipt 検証用 (2026-06-01)。
 #   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS expected_from VARCHAR(42);
 #   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS expected_to VARCHAR(42);
+#   expiry_reminder_sent_at: j0k1l2m3n4o5_add_proposals_expiry_reminder_sent.py で alembic 化 (2026-06-03).
+#   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS expiry_reminder_sent_at TIMESTAMPTZ;
 
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -62,6 +64,9 @@ class Proposal(Base):
     expected_to: Mapped[Optional[str]] = mapped_column(String(42), nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expiry_reminder_sent_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

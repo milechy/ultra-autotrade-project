@@ -169,3 +169,23 @@ def approval_timeout_notification(
         f"{operation} {asset} の提案が {timeout_minutes} 分以内に承認されず、キャンセルしました。"
     )
     return _build_payload(title, body, "info")
+
+
+def expiry_reminder_notification(
+    operation: str,
+    asset: str,
+    minutes_remaining: int,
+) -> NotificationPayload:
+    """期限切れ前リマインダー通知。
+
+    Args:
+        operation: "BUY" | "SELL" などの取引種別
+        asset: アセット名（例: "USDC"）
+        minutes_remaining: 期限まで残り分数
+    """
+    title = "⏳ 提案の期限が近づいています"
+    body = (
+        f"{operation} {asset} の提案が約 {minutes_remaining} 分後に期限切れになります。"
+        "アプリで確認・承認してください。"
+    )
+    return _build_payload(title, body, "warning")

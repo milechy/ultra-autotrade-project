@@ -20,13 +20,13 @@ from typing import Any, Callable, Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.aave.gas_estimator import estimate_static_gas_cost_usd
 from app.ai.judgment_log import get_judgment_logger
 from app.ai.models import AIDecision, AiDecisionFeature
 from app.ai.schemas import CrossValidationResult, RAGContext, TradeAction
 from app.ai.service import AIService
 from app.auth.constants import ExecutionPolicy
 from app.auth.models import InvestmentTier, User, normalize_tier
-from app.aave.gas_estimator import estimate_static_gas_cost_usd
 from app.automation.aave_data_fetcher import AaveMarketData, fetch_aave_market_data_safe
 from app.data_feeds.context import MarketContext, build_market_context
 from app.database import SessionLocal
