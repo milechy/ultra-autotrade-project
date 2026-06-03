@@ -81,6 +81,7 @@ export function ProposalCard({
 
   const isProcessing = status === 'approving' || status === 'confirming'
   const isDone = status === 'success' || status === 'failed'
+  const totalCostUSD = proposal.amountUSD + proposal.estimatedGas
 
   return (
     <Card className="w-full dark:bg-gray-900 border-border">
@@ -109,6 +110,11 @@ export function ProposalCard({
               <p className="text-sm text-muted-foreground">
                 ≈ ${proposal.amountUSD.toLocaleString('ja-JP', { maximumFractionDigits: 2 })}
               </p>
+              {proposal.estimatedGas > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  合計（ガス込み）: ${totalCostUSD.toLocaleString('ja-JP', { maximumFractionDigits: 2 })}
+                </p>
+              )}
             </div>
           </div>
         </div>
