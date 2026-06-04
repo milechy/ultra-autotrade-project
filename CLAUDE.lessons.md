@@ -1095,3 +1095,38 @@ deploy_staging.sh)が稼働中だった。ps の ELAPSED は MM:SS 表記、誤�
 4. 横断: money 操作は「誰の資産が・誰の署名で」を検証する原則を明文化
 
 **対応**: Asana 1215263804492320（方式2 non-custodial 改修）で実装中。6/1 `shadow=false` 切替は本改修 + staging `from`/`onBehalfOf=partner` 実証まで凍結。
+
+---
+
+## 2026-06-04 V3一般公開日 — alembic stamp 早期発行・一括 merge・banner DevTools 省略の三教訓
+
+### 本日の完了事項
+- **本番 non-custodial 証跡 #1**: 山本さん supply tx `0x5dfd…928d`（Base Mainnet、USDC $10、DoD 1-4 PASS）。`from=partner wallet`・`onBehalfOf=partner wallet`・サーバー鍵非出現を on-chain で確認。
+- **V3 一般公開**: LIFF degrade（#539）+ SessionExpiryBanner 根治（#542）。Safari プライベートでクリーン実証。main HEAD = `bf91204`、本日 merge = #530–#542。
+- **本番状態**: active=blue、`alembic_version=s9t0u1v2w3x4`（stamp 適用済）。
+
+### 教訓1: 一括「全 OPEN PR merge」は競合実装を流し込む
+
+**何が起きたか**: 複数 PR を一括 merge した際、`app/legal`（孤立・0件）と `app/tos`（正本・配線済み）の二重定義が main 入りし、`tos_consents` が二重 CREATE になった。CI の Lint 失敗で Test job が skip → schema 衝突が merge ゲートを通過。
+
+**再発防止**: PR は 1 本ずつ merge し、Lint PASS → Test PASS → merge の順を守る。required checks 化で物理的に強制（Asana 1215428893181908）。一括 merge は禁止。
+
+### 教訓2: narrow evidence で alembic stamp head するな（§Alembic 教訓）
+
+**何が起きたか**: `tos_consents` テーブルの存在だけを確認して `alembic_version` を `s9t0u1v2w3x4`（head）に stamp した。しかし `proposals.execution_route` / `ai_decision_outcomes.asset,protocol` の列は未適用のまま。stamp が「適用済み」の嘘を作り、deploy 毎に L0 で gap が露出（本日3回）。
+
+**正しい手順**: stamp 前に「migration ファイルの全 DDL ↔ 実 DB のカラム/制約/インデックス」を列単位で完全突合。テーブル存在 ≠ migration 適用。`pg_constraint` / `pg_indexes` まで確認してから stamp。
+
+**再発防止**: `deploy_production.sh` が `alembic upgrade head` を確実に実行するよう修正（Asana 1215423076968809・最優先）。stamp は実 schema = revision 定義の完全一致確認後のみ。
+
+### 教訓3: UX 不具合はコードを読む前に DevTools/実データから
+
+**何が起きたか**: SessionExpiryBanner 誤表示の修正を複数回外した（#541 で 3 箇所修正したが `lib/session/itp-guard.ts` の直接 `setItem` が残存）。コードを推測で読んで修正したため根本の write 経路を見落とした。
+
+**正しい手順**: `localStorage.getItem('ultra_last_seen')` の実値・書き込みタイミングを DevTools で確認 → 書き込み経路を全列挙 → 条件ガードを入口に置く。#542 で「`!hasActiveToken()` → no-op」の不変条件強制で根治。
+
+### 教訓4: 本番 deploy 後の確認は PWA SW キャッシュを避けた新規ブラウザで
+
+**何が起きたか**: Chrome incognito で deploy 後も修正が反映されて見えなかった（PWA service worker が旧 JS を返していた）。Safari プライベートブラウズ（SW キャッシュなし）で即消滅を確認。
+
+**再発防止**: deploy 後の動作確認は Safari プライベートまたは SW unregister 済みブラウザで実施。Chrome incognito は SW キャッシュを持つ場合がある。
