@@ -23,6 +23,7 @@ from app.knowledge.models import (  # noqa: F401, E402
     KnowledgeDocument,
     KnowledgeSource,
 )
+from app.legal.models import TosConsent  # noqa: F401, E402
 from app.portfolio.models import PortfolioHistory, PortfolioSnapshot  # noqa: F401, E402
 from app.proposals.models import Proposal  # noqa: F401, E402
 from app.transactions.models import Transaction  # noqa: F401, E402
