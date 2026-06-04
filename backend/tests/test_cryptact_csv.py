@@ -137,7 +137,15 @@ class TestCryptactCsvEndpoint:
         content = r.content.decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(content))
         assert reader.fieldnames == [
-            "Timestamp", "Action", "Source", "Base", "Volume", "Price", "Counter", "Fee", "FeeCcy"
+            "Timestamp",
+            "Action",
+            "Source",
+            "Base",
+            "Volume",
+            "Price",
+            "Counter",
+            "Fee",
+            "FeeCcy",
         ]
 
     def test_only_executed_proposals_included(self, client_with_proposals: TestClient) -> None:
@@ -161,7 +169,9 @@ class TestCryptactCsvEndpoint:
         content = r.content.decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(content))
         rows = list(reader)
-        supply_row = next(row for row in rows if row["Base"] == "USDC" and row["Action"] == "LENDING")
+        supply_row = next(
+            row for row in rows if row["Base"] == "USDC" and row["Action"] == "LENDING"
+        )
         assert supply_row["Action"] == "LENDING"
         assert supply_row["Source"] == "AAVE_V3"
         assert supply_row["Counter"] == "USD"

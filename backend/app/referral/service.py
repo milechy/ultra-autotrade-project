@@ -184,7 +184,7 @@ def _add_months(d: date, months: int) -> date:
     return date(year, month, 1)
 
 
-def get_referral_earnings(db: Session, partner_id: int) -> dict:
+def get_referral_earnings(db: Session, partner_id: int) -> dict[str, str | int | None]:
     """紹介キャンペーン収益サマリーを返す。
 
     - referral_count: referrer_id == partner_id のユーザー数
