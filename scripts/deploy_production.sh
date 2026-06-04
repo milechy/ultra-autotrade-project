@@ -636,6 +636,24 @@ else
   # green は full deploy 直後は不要なため停止しておく (RAM 節約)
   ${DC} -f "${COMPOSE_FILE}" stop backend-green || true
 
+  # DB マイグレーション (フルデプロイ: コンテナ起動後・トラフィック受け入れ前)
+  # Blue/Green の deploy_backend_zero_downtime() と対称な位置に配置。
+  # 2026-06-04 本番事故: alembic upgrade head 未実行により migration gap が L0 に 3 回露出。
+  log "postgres が ready になるまで待機 (最大 30s)..."
+  for _pg_i in $(seq 1 10); do
+    if docker exec "${POSTGRES_CONTAINER}" pg_isready -U ultra >/dev/null 2>&1; then
+      log "postgres ready"
+      break
+    fi
+    sleep 3
+  done
+  log "alembic upgrade head を実行 (フルデプロイ: コンテナ: ${BACKEND_BLUE_CONTAINER})..."
+  if ! docker exec "${BACKEND_BLUE_CONTAINER}" alembic upgrade head; then
+    err "alembic upgrade head 失敗。デプロイを中止します"
+    exit 1
+  fi
+  log "✅ alembic upgrade head 完了"
+
   wait_healthy "http://127.0.0.1:${BLUE_PORT}/health"     "backend-blue (direct)"   || on_failure
   wait_healthy "http://localhost:${NGINX_PORT}/health"    "nginx → backend"         || on_failure
   wait_healthy "http://localhost:3000"                    "frontend"                || on_failure
@@ -712,12 +730,29 @@ check_tunnel() {
   fi
 }
 
-# 検証 3: DB カラム drift 検出 (active slot のコンテナを参照)
+# 検証 3: DB migration drift 検出 (active slot のコンテナを参照)
 check_db_drift() {
-  log "=== DB カラム drift チェック ==="
+  log "=== DB migration drift チェック ==="
   local active_container
   active_container=$(active_backend_container)
   log "  active backend container: ${active_container}"
+
+  # 主判定: alembic check — DB が head revision と完全一致するか
+  # (テーブル/列の存在チェックでなく alembic_version と実 schema の突合)
+  if docker exec "${active_container}" alembic check >/dev/null 2>&1; then
+    log "✅ alembic check OK: DB は head revision に一致 (未適用 migration なし)"
+  else
+    local _alembic_current
+    _alembic_current=$(docker exec "${POSTGRES_CONTAINER}" \
+      psql -U ultra -d ultra_autotrade -t -c \
+      "SELECT version_num FROM alembic_version ORDER BY version_num LIMIT 1;" \
+      2>/dev/null | tr -d ' \n' || echo "unknown")
+    log "⚠️  WARNING: alembic check 失敗 — 未適用 migration あり (現 DB revision: ${_alembic_current})"
+    log "   → alembic upgrade head を実行してください"
+    log "   → ./scripts/deploy_production.sh --backend-only で再デプロイすると自動適用されます"
+  fi
+
+  # 補完チェック: users テーブルのカラム drift (alembic check を補完、モグラ叩き早期検知)
   local db_columns
   db_columns=$(docker exec "${POSTGRES_CONTAINER}" psql -U ultra -d ultra_autotrade -t -c \
     "SELECT string_agg(column_name, ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_name='users';" \
@@ -745,7 +780,7 @@ check_db_drift() {
     log "   ${diff}"
     log "   → ALTER TABLE users ADD COLUMN IF NOT EXISTS ... で追加してください"
   else
-    log "✅ DB カラム drift なし"
+    log "✅ users テーブルカラム drift なし"
   fi
 }
 
