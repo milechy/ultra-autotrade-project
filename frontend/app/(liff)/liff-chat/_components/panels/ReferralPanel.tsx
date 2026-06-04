@@ -97,9 +97,10 @@ export function ReferralPanel() {
     if (!code) return
     const shareText = buildShareText(code)
     try {
-      const { getLiff } = await import("@/lib/liff/init")
-      const liff = await getLiff()
-      if (liff.isApiAvailable("shareTargetPicker")) {
+      const { getLiff, isLiffConfigured } = await import("@/lib/liff/init")
+      // ブラウザ PWA モード（LIFF 未設定）は SDK を触らずクリップボードへ degrade。
+      const liff = isLiffConfigured() ? await getLiff() : null
+      if (liff && liff.isApiAvailable("shareTargetPicker")) {
         await liff.shareTargetPicker([{ type: "text", text: shareText }])
       } else {
         await navigator.clipboard.writeText(shareText)
