@@ -28,6 +28,35 @@ export interface ReferralEarnings {
   campaign_expires_month: string | null
 }
 
+/** LIFF チャット 紹介パネル用 */
+export interface ReferredUserDetail {
+  name: string
+  joined_at: string
+  status: string
+  reward_jpy: string
+}
+
+export interface ReferralInfo {
+  referral_count: number
+  current_month_reward_jpy: string
+  total_payout_jpy: string
+  campaign_rate: string
+  referral_code: string
+  referred_users: ReferredUserDetail[]
+}
+
+export async function getReferralInfo(token: string): Promise<ReferralInfo> {
+  return getJson<ReferralInfo>('/api/referral/earnings', {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
+export async function createReferralCode(token: string): Promise<ReferralCodeResponse> {
+  return postJson<ReferralCodeResponse>('/api/referral/code', {}, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
 export interface RegisterWithReferralPayload {
   email: string
   password: string
