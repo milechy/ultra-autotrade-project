@@ -5,6 +5,20 @@
 
 ---
 
+## PR #509 (Layer2 outcome labels): outcome_labeling_loop startup 追加 (2026-06-02)
+
+### 変更: ENABLE_OUTCOME_LABELING フラグで outcome_labeling_loop を条件起動
+- **対象凍結ファイル**: `backend/app/main.py`
+- **変更内容**:
+  - `ENABLE_OUTCOME_LABELING=1` の場合のみ `outcome_labeling_loop` を startup イベントで起動
+  - `OUTCOME_LABELING_INTERVAL_HOURS` 環境変数でポーリング間隔を制御（デフォルト 6h）
+  - 未設定時（`ENABLE_OUTCOME_LABELING` デフォルト `"0"`）は起動しない（安全デフォルト）
+- **理由**: Layer2 outcome label 収集バッチ（realized_yield / regret_score / is_positive_example）を staging 24h 検証できるようにするための配線。フラグ OFF のまま本番デプロイしても既存動作に影響なし。
+- **影響範囲**: startup シーケンスのみ。既存スケジューラー・エンドポイントへの影響なし。`ENABLE_OUTCOME_LABELING` 未設定時は何もしない。
+- **承認**: feat/layer2-outcome-labels → main の通常フロー経由（PR #509）
+
+---
+
 ## PR #373 (Stream 4): scheduler 二重起動防止 — Blue/Green color guard (2026-05-22)
 
 ### 変更: active color のみ ai_judgment_loop を起動
