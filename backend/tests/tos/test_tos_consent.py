@@ -30,7 +30,7 @@ from app.auth.models import User, UserRole  # noqa: E402
 from app.auth.service import AuthService  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app.main import create_app  # noqa: E402
-from app.tos.models import ToSConsent, UserAction  # noqa: E402, F401
+from app.tos.models import ToSConsent, ToSUserAction  # noqa: E402, F401
 from app.tos.service import compute_consent_hash, verify_consent_hash  # noqa: E402
 
 
@@ -138,8 +138,8 @@ def test_consent_persists_and_logs_user_action(client_and_user):
         assert verify_consent_hash(consents[0]) is True
 
         actions = (
-            db.query(UserAction)
-            .filter(UserAction.user_id == uid, UserAction.action_type == "tos_consent")
+            db.query(ToSUserAction)
+            .filter(ToSUserAction.user_id == uid, ToSUserAction.action_type == "tos_consent")
             .all()
         )
         assert len(actions) == 1
