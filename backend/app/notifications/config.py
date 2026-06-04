@@ -15,6 +15,10 @@
         - LINE: LINE Notify
         - SLACK: Slack Webhook
         - ALL: 全チャンネル
+    LINE_MIN_SEVERITY: LINENotificationSender の送信下限 severity
+        (info / warning / alert / emergency, デフォルト: alert)
+        UAT で AI proposal (severity=warning) を LINE 配信したい場合は
+        本番 .env に LINE_MIN_SEVERITY=warning を設定する。
     TWILIO_ACCOUNT_SID: Twilio Account SID (AC...)
     TWILIO_AUTH_TOKEN: Twilio Auth Token（ログ出力厳禁）
     TWILIO_FROM_NUMBER: Twilio 発信元電話番号 (+1...)
@@ -29,11 +33,14 @@ Phase 6 で導入。Twilio / エスカレーション設定は本 PR で追加�
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import Optional
 
-from .schemas import NotificationChannel
+from .schemas import NotificationChannel, NotificationSeverity
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -49,6 +56,8 @@ class NotificationSettings:
     default_channel: NotificationChannel = NotificationChannel.INTERNAL_LOG
     line_channel_access_token: str = ""
     line_user_id: str = ""
+    # LINE Messaging API 送信下限 severity (デフォルト ALERT で従来挙動を維持)
+    line_min_severity: NotificationSeverity = NotificationSeverity.ALERT
     # Twilio オンコール設定
     twilio_account_sid: Optional[str] = None
     twilio_auth_token: Optional[str] = None
@@ -116,6 +125,30 @@ def _parse_notification_channel(value: Optional[str]) -> NotificationChannel:
         return NotificationChannel.INTERNAL_LOG
 
 
+def _parse_severity(value: Optional[str], default: NotificationSeverity) -> NotificationSeverity:
+    """
+    文字列から NotificationSeverity を解析する。
+
+    Args:
+        value: severity 名（大文字小文字不問）
+        default: 不正値・未指定時のフォールバック
+
+    Returns:
+        NotificationSeverity: 解析結果（不正な場合は default）
+    """
+    if not value:
+        return default
+    try:
+        return NotificationSeverity(value.lower())
+    except ValueError:
+        logger.warning(
+            "LINE_MIN_SEVERITY: 不正な値 %r。default=%s を使用します。",
+            value,
+            default.value,
+        )
+        return default
+
+
 def load_notification_settings() -> NotificationSettings:
     """
     環境変数から通知設定を読み込む。
@@ -126,12 +159,14 @@ def load_notification_settings() -> NotificationSettings:
     Note:
         - トークン/URL が空文字の場合は None として扱う
         - 無効なチャンネル名の場合は INTERNAL_LOG がデフォルト
+        - LINE_MIN_SEVERITY が未設定・不正値の場合は ALERT がデフォルト
     """
     line_token = os.getenv("LINE_NOTIFY_TOKEN") or None
     slack_url = os.getenv("SLACK_WEBHOOK_URL") or None
     channel_str = os.getenv("NOTIFICATION_CHANNEL")
     line_channel_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN") or ""
     line_user_id = os.getenv("LINE_USER_ID") or ""
+    line_min_severity = _parse_severity(os.getenv("LINE_MIN_SEVERITY"), NotificationSeverity.ALERT)
     # Twilio
     twilio_account_sid = os.getenv("TWILIO_ACCOUNT_SID") or None
     twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN") or None
@@ -148,6 +183,7 @@ def load_notification_settings() -> NotificationSettings:
         default_channel=_parse_notification_channel(channel_str),
         line_channel_access_token=line_channel_access_token,
         line_user_id=line_user_id,
+        line_min_severity=line_min_severity,
         twilio_account_sid=twilio_account_sid,
         twilio_auth_token=twilio_auth_token,
         twilio_from_number=twilio_from_number,
