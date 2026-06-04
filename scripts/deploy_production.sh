@@ -40,6 +40,16 @@ POSTGRES_CONTAINER="ultra-autotrade-postgres-production"
 CLOUDFLARED_CONTAINER="ultra-autotrade-cloudflared-production"
 HEALTH_TIMEOUT=60
 
+# 本番イメージには alembic コンソールスクリプトが PATH に無い (システム python に
+# alembic パッケージは在るが alembic.__main__ も無いため `python -m alembic` も不可)。
+# コンテナ内で動く唯一の形 = console script の entry_point である alembic.config:main を
+# python で直接起動する。cwd=/app/backend (compose の working_dir) が alembic.ini と
+# env.py の `import app...` (alembic.ini: prepend_sys_path=.) を解決する。
+# 配列で保持し "${ARR[@]}" 展開で python -c の引数を単一 argv として安全に渡す。
+# (既存 idiom と同形: check_db_drift の model_columns 取得 `docker exec ... python -c ...`)
+ALEMBIC_UPGRADE_HEAD=(python -c "from alembic.config import main; main(argv=['upgrade', 'head'])")
+ALEMBIC_CHECK=(python -c "from alembic.config import main; main(argv=['check'])")
+
 # Blue/Green host-side ports (compose の定義と一致させること)
 BLUE_PORT=8010
 GREEN_PORT=8011
@@ -234,7 +244,7 @@ deploy_backend_zero_downtime() {
   # 2a. DB マイグレーション (swap 前に実行、失敗時は abort)
   ALEMBIC_CONT="ultra-autotrade-backend-${inactive_slot}-production"
   log "alembic upgrade head を実行 (コンテナ: ${ALEMBIC_CONT})..."
-  if ! docker exec "${ALEMBIC_CONT}" alembic upgrade head; then
+  if ! docker exec "${ALEMBIC_CONT}" "${ALEMBIC_UPGRADE_HEAD[@]}"; then
     err "alembic upgrade head 失敗。切替を中止し新コンテナを停止します"
     ${DC} -f "${COMPOSE_FILE}" stop "backend-${inactive_slot}" 2>/dev/null || true
     exit 1
@@ -603,18 +613,9 @@ else
   log "upstream.conf を blue に初期化..."
   write_upstream_conf "blue"
 
-  log "本番コンテナを停止・削除 (--remove-orphans 禁止: staging-new 道連れ防止)"
-  ${DC} -f "${COMPOSE_FILE}" down
-
-  # 本番コンテナ (*-production) と移行前の旧 *-staging 残留のみ強制削除。
-  # *-staging-new (真の staging 環境) は保護対象なので除外する。
-  docker ps -a --format '{{.Names}}' \
-    | grep -E '^ultra-autotrade-[a-z-]+-(production|staging)$' \
-    | xargs -r docker rm -f 2>/dev/null || true
-
-  log "未使用ボリュームを削除（DBボリュームは名前付きのため保護される）..."
-  docker volume prune -f 2>/dev/null || true
-
+  # ── 新イメージを down 前にビルド ──
+  # 下記「down 前 migration」を新 migration 入りの使い捨てコンテナで先行実行するため、
+  # 新イメージは down より前に確定している必要がある (旧コンテナは稼働継続のまま)。
   if ! "${NO_BUILD}"; then
     log "古いフロントエンドイメージを完全削除..."
     docker images --format "{{.Repository}} {{.ID}}" \
@@ -629,6 +630,39 @@ else
     log "古いビルドキャッシュを削除（1時間以上前のエントリ）..."
     docker builder prune --filter until=1h -f 2>/dev/null || true
   fi
+
+  # ── DB マイグレーション (down 前・旧コンテナ稼働中の先行実行) ──
+  # 旧 backend が旧コードのまま traffic を受けている間に、新 migration を使い捨てコンテナで
+  # 先行適用する。migration は additive 後方互換のため、旧コードは新列の増加に影響されない。
+  # 失敗時は down せず exit 1 → production は一切停止せず無傷のまま中断できる。
+  # network / image / env_file の解決は compose に委譲。--no-deps で稼働中 postgres を再起動しない。
+  # 2026-06-04 本番事故: alembic upgrade head 未実行により migration gap が L0 に 3 回露出。
+  log "postgres が ready になるまで待機 (最大 30s)..."
+  for _pg_i in $(seq 1 10); do
+    if docker exec "${POSTGRES_CONTAINER}" pg_isready -U ultra >/dev/null 2>&1; then
+      log "postgres ready"
+      break
+    fi
+    sleep 3
+  done
+  log "alembic upgrade head を実行 (フルデプロイ: 使い捨てコンテナ, down 前先行適用)..."
+  if ! ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" run --rm -T --no-deps backend-blue "${ALEMBIC_UPGRADE_HEAD[@]}"; then
+    err "alembic upgrade head 失敗。down せずデプロイを中止します (production 無傷)"
+    exit 1
+  fi
+  log "✅ alembic upgrade head 完了 (down 前先行適用)"
+
+  log "本番コンテナを停止・削除 (--remove-orphans 禁止: staging-new 道連れ防止)"
+  ${DC} -f "${COMPOSE_FILE}" down
+
+  # 本番コンテナ (*-production) と移行前の旧 *-staging 残留のみ強制削除。
+  # *-staging-new (真の staging 環境) は保護対象なので除外する。
+  docker ps -a --format '{{.Names}}' \
+    | grep -E '^ultra-autotrade-[a-z-]+-(production|staging)$' \
+    | xargs -r docker rm -f 2>/dev/null || true
+
+  log "未使用ボリュームを削除（DBボリュームは名前付きのため保護される）..."
+  docker volume prune -f 2>/dev/null || true
 
   log "全サービスを起動 (postgres → backend-blue → nginx → frontend → cloudflared)"
   # 注意: 初回フルデプロイ時は backend-blue のみ起動状態にし、green は手動で起動するまで停止。
@@ -712,12 +746,29 @@ check_tunnel() {
   fi
 }
 
-# 検証 3: DB カラム drift 検出 (active slot のコンテナを参照)
+# 検証 3: DB migration drift 検出 (active slot のコンテナを参照)
 check_db_drift() {
-  log "=== DB カラム drift チェック ==="
+  log "=== DB migration drift チェック ==="
   local active_container
   active_container=$(active_backend_container)
   log "  active backend container: ${active_container}"
+
+  # 主判定: alembic check — DB が head revision と完全一致するか
+  # (テーブル/列の存在チェックでなく alembic_version と実 schema の突合)
+  if docker exec "${active_container}" "${ALEMBIC_CHECK[@]}" >/dev/null 2>&1; then
+    log "✅ alembic check OK: DB は head revision に一致 (未適用 migration なし)"
+  else
+    local _alembic_current
+    _alembic_current=$(docker exec "${POSTGRES_CONTAINER}" \
+      psql -U ultra -d ultra_autotrade -t -c \
+      "SELECT version_num FROM alembic_version ORDER BY version_num LIMIT 1;" \
+      2>/dev/null | tr -d ' \n' || echo "unknown")
+    log "⚠️  WARNING: alembic check 失敗 — 未適用 migration あり (現 DB revision: ${_alembic_current})"
+    log "   → alembic upgrade head を実行してください"
+    log "   → ./scripts/deploy_production.sh --backend-only で再デプロイすると自動適用されます"
+  fi
+
+  # 補完チェック: users テーブルのカラム drift (alembic check を補完、モグラ叩き早期検知)
   local db_columns
   db_columns=$(docker exec "${POSTGRES_CONTAINER}" psql -U ultra -d ultra_autotrade -t -c \
     "SELECT string_agg(column_name, ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_name='users';" \
@@ -745,7 +796,7 @@ check_db_drift() {
     log "   ${diff}"
     log "   → ALTER TABLE users ADD COLUMN IF NOT EXISTS ... で追加してください"
   else
-    log "✅ DB カラム drift なし"
+    log "✅ users テーブルカラム drift なし"
   fi
 }
 
