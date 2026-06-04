@@ -1032,6 +1032,49 @@ docker exec ultra-autotrade-frontend-production sh -c \
 
 ---
 
+## 2026-05-26 staging soak 全 HOLD 三重故障 + 運用教訓
+
+### 真因は「症状」の3層下にあった — 実機確認を最初に
+staging soak 48h 全 HOLD の真因追跡で、仮説が3回更新された:
+「AI の HOLD bias(confidence 閾値)」→「Guard 2 の AND-condition clamp」→「Aave feed 未設定」
+→ 実真因「.env の Aave アドレスが Ethereum Sepolia 誤値 + RPC が死んだ Alchemy URL +
+client.py の is_connected() false positive」の三重故障。
+教訓: コードを読む前に、まず実機の .env / DB / ログを見る。dev VPS から本番 VPS の
+staging が見えない時は、人間に SELECT を依頼してでも実データを先に取る。
+推測の真因をコードで補強すると、もっともらしい誤答に到達する。
+
+### .env は「未設定」と推測せず grep で実値を見る
+「キーが未設定だから動かない」と推測したが、実際は誤値で既存だった
+(AAVE_POOL_ADDRESS に Ethereum Sepolia 0x6Ae4... が入っていた)。
+.env を扱う前に必ず grep -nE で実値・行番号を確認。awk 末尾追記の前に既存キー重複チェック必須。
+
+### Web3.is_connected() は public RPC で信頼するな
+web3.py の is_connected() は内部で web3_clientVersion を呼ぶ。Base 等の public RPC は
+これに非対応で false を返すが、eth.block_number / eth.chain_id / eth_call は正常動作する。
+RPC 疎通判定は is_connected() ではなく eth.chain_id か block_number で行う。
+
+### 秘密鍵をターミナル出力・チャットに出さない
+openssl rand の結果や .env の grep で秘密鍵が平文露出した。
+鍵生成は openssl rand -hex 32 | pbcopy(画面に出さずクリップボードへ)。
+.env の秘密値を確認する時は grep -c(件数)で済ませ、値を表示しない。
+一度露出した鍵は testnet でも rotate する。
+
+### Agent View はディレクトリ単位で別管理
+/home/uata から claude agents を開くと空ビューが出て、別ディレクトリで起動した
+agent を見失う。agent の確認は起動した worktree ディレクトリ(/opt/ultra-autotrade-worktrees/<branch>)
+から claude agents すること。
+
+### docker compose は staging で --env-file 必須
+docker compose ps / build / up すべてで --env-file .env.staging-new を付ける。
+省略すると COMPOSE_PROJECT_NAME が解決されず空応答 → 「コンテナ消失」と誤判定する。
+
+### 自動 deploy と手動操作の衝突に注意
+.deploy-staging.lock があったら rm する前に ps aux | grep deploy_staging で
+生きているプロセスを確認。10:45 起動の自動 staging deploy(git reset --hard +
+deploy_staging.sh)が稼働中だった。ps の ELAPSED は MM:SS 表記、誤読しない。
+
+---
+
 ## 2026-05-31 custodial 実装が5ゲート全漏れ — テストが実装と同じ前提を持つと欠陥を追認する
 
 **真因**: Aave 実行が最初から custodial 設計（サーバー共通鍵署名・サーバー wallet 資産・`onBehalfOf=サーバー`）。`client.py` 初出 commit `b1274b4`（5/27）時点で `AaveClient Protocol` が `deposit(asset, amount)` の 2 引数。`user.wallet_address` は監査ログのみで on-chain 未伝達。規約 ver03 / §17-5 / §20 の non-custodial と矛盾。`shadow=true` だったため実 tx が出ず顕在化せず、6/1 実 tx 解禁直前（5/31）にコード追跡で発覚。

@@ -4,10 +4,10 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { AuthProvider, useAuth } from '@/lib/auth'
+import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
 import { Toaster } from 'sonner'
 import { fetchAutomationStatus } from '@/lib/api/automation'
 import { PrivyRootClient } from '@/lib/wallet/PrivyRootClient'
-import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
 import { PrivySessionGuard } from '@/components/PrivySessionGuard'
 import type { AutomationStatus } from '@/lib/types'
 
@@ -75,6 +75,7 @@ export function UserProviders({ children }: { children: React.ReactNode }) {
   return (
     <PrivyRootClient>
       <AuthProvider>
+        <SessionExpiryBanner loginHref="/login" />
         <AutomationStatusProvider>
           <SessionExpiryBanner />
           {isPrivyConfigured && <PrivySessionGuard />}

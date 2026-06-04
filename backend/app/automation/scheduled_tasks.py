@@ -1144,6 +1144,61 @@ async def learning_loop(
             await asyncio.sleep(600)
 
 
+async def outcome_labeling_loop(
+    *,
+    interval_seconds: int = 21600,  # 6 時間
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """Layer 2 outcome label 収集バッチの定期実行ループ。
+
+    6 時間ごとに OutcomeLabelingService.run_batch() を実行し、
+    AI判定から 24h / 48h 後の realized_yield_delta / hf_min_after /
+    regret_score / is_positive_example を ai_decision_outcomes に INSERT する。
+
+    ENABLE_OUTCOME_LABELING=1 で main.py から起動される。
+    """
+    logger.info(
+        "Starting outcome labeling loop (interval: %ds)",
+        interval_seconds,
+    )
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+
+            logger.info("Running outcome labeling batch")
+
+            def _run_labeling() -> None:
+                from app.ai.outcome_labeling_service import OutcomeLabelingService  # noqa: PLC0415
+
+                with SessionLocal() as db:
+                    svc = OutcomeLabelingService(db)
+                    result = svc.run_batch()
+                    logger.info(
+                        "outcome_labeling_batch done: processed=%d errors=%d completed_at=%s",
+                        result.total_processed,
+                        result.total_errors,
+                        result.completed_at,
+                    )
+
+            await asyncio.to_thread(_run_labeling)
+            logger.info("Outcome labeling batch completed")
+
+        except asyncio.CancelledError:
+            logger.info("Outcome labeling loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in outcome labeling loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            await asyncio.sleep(600)
+
+
 async def compound_risk_monitor_loop(
     *,
     interval_seconds: int = COMPOUND_RISK_INTERVAL_SECONDS,
@@ -1239,6 +1294,7 @@ class ScheduledTaskManager:
         self._latency_monitor_task: Optional[asyncio.Task[None]] = None
         self._proposal_timeout_task: Optional[asyncio.Task[None]] = None
         self._learning_task: Optional[asyncio.Task[None]] = None
+        self._outcome_labeling_task: Optional[asyncio.Task[None]] = None
         self._compound_risk_task: Optional[asyncio.Task[None]] = None
         self._monthly_fee_batch_task: Optional[asyncio.Task[None]] = None
         self._monthly_line_report_task: Optional[asyncio.Task[None]] = None
@@ -1292,6 +1348,11 @@ class ScheduledTaskManager:
     def is_learning_running(self) -> bool:
         """AI学習サイクルタスクが動作中かどうか。"""
         return self._learning_task is not None and not self._learning_task.done()
+
+    @property
+    def is_outcome_labeling_running(self) -> bool:
+        """outcome label 収集タスクが動作中かどうか。"""
+        return self._outcome_labeling_task is not None and not self._outcome_labeling_task.done()
 
     @property
     def is_compound_risk_running(self) -> bool:
@@ -1985,6 +2046,44 @@ class ScheduledTaskManager:
         self._learning_task = None
         logger.info("AI learning task stopped")
 
+    async def start_outcome_labeling(
+        self,
+        *,
+        interval_seconds: int = 21600,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """outcome label 収集タスクを開始する。"""
+        if self.is_outcome_labeling_running:
+            raise RuntimeError("Outcome labeling already running")
+
+        logger.info("Starting outcome labeling task")
+        self._outcome_labeling_task = asyncio.create_task(
+            outcome_labeling_loop(interval_seconds=interval_seconds, on_error=on_error)
+        )
+        logger.info("Outcome labeling task started")
+
+    async def stop_outcome_labeling(self, timeout: float = 5.0) -> None:
+        """outcome label 収集タスクを停止する。"""
+        if not self.is_outcome_labeling_running:
+            logger.debug("Outcome labeling not running - nothing to stop")
+            return
+
+        logger.info("Stopping outcome labeling task")
+        assert self._outcome_labeling_task is not None  # noqa: S101
+        self._outcome_labeling_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._outcome_labeling_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Outcome labeling task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning("Outcome labeling task did not stop within %.1fs timeout", timeout)
+        except Exception as exc:
+            logger.error("Error while stopping outcome labeling task: %s", exc)
+
+        self._outcome_labeling_task = None
+        logger.info("Outcome labeling task stopped")
+
     async def start_compound_risk_monitor(
         self,
         *,
@@ -2064,6 +2163,7 @@ class ScheduledTaskManager:
             self.stop_latency_monitor(timeout=timeout),
             self.stop_proposal_timeout(timeout=timeout),
             self.stop_learning(timeout=timeout),
+            self.stop_outcome_labeling(timeout=timeout),
             self.stop_compound_risk_monitor(timeout=timeout),
             self.stop_monthly_fee_batch(timeout=timeout),
             self.stop_monthly_line_report(timeout=timeout),

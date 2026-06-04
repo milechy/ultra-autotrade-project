@@ -22,6 +22,9 @@ class ProposalCreate(BaseModel):
     fee_rate: Optional[Decimal] = None
     fee_amount: Optional[Decimal] = None
     expires_at: Optional[datetime] = None
+    # P0-2: 執行経路 (cex / onchain_aave)。未指定時は on-chain Aave (後方互換)。
+    # 作成時のみ指定可、以後 immutable。
+    execution_route: Optional[str] = None
 
 
 class ProposalResponse(BaseModel):
@@ -47,6 +50,10 @@ class ProposalResponse(BaseModel):
     tx_hash: Optional[str]
     expected_from: Optional[str] = None
     expected_to: Optional[str] = None
+    # P0-2: 執行経路 + CEX 経路の証跡 (on-chain 経路では NULL)。
+    execution_route: str = "onchain_aave"
+    cex_order_id: Optional[str] = None
+    cex_response: Optional[str] = None
     error_message: Optional[str] = None
     expires_at: datetime
     created_at: datetime

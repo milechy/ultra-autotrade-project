@@ -76,6 +76,11 @@ from app.protocols.risk.router import router as protocol_health_router
 from app.referral.router import router as referral_router
 from app.reports.router import router as reports_router
 from app.rss.router import router as rss_router
+from app.tos.models import (
+    ToSConsent,  # noqa: F401 — ensure table registered with Base.metadata
+    ToSUserAction,  # noqa: F401 — ensure table registered with Base.metadata
+)
+from app.tos.router import router as tos_router
 from app.transactions.router import admin_router as admin_transactions_router
 from app.transactions.router import router as transactions_router
 from app.users.models import (
@@ -274,6 +279,7 @@ def create_app() -> FastAPI:
     app.include_router(pendle_router)  # Pendle Finance (Phase 2)
     app.include_router(protocol_health_router)  # Protocol Health Monitor (Phase 2)
     app.include_router(referral_router)  # RAS Lane 2 (Referral / Partner Affiliate System)
+    app.include_router(tos_router)  # ToS active consent (MVP-P0-14)
     app.include_router(health_detail_router)  # /health/detail (admin, 5/14 DoD #6)
 
     # Register global error handlers (production safety)
@@ -456,6 +462,12 @@ def create_app() -> FastAPI:
             learning_interval = int(os.getenv("LEARNING_INTERVAL_HOURS", "6")) * 3600
             asyncio.create_task(learning_loop(interval_seconds=learning_interval))
             logger.info("AI learning background task started (interval=%ds)", learning_interval)
+            if os.getenv("ENABLE_OUTCOME_LABELING", "0") == "1":
+                from app.automation.scheduled_tasks import outcome_labeling_loop  # noqa: PLC0415
+
+                labeling_interval = int(os.getenv("OUTCOME_LABELING_INTERVAL_HOURS", "6")) * 3600
+                asyncio.create_task(outcome_labeling_loop(interval_seconds=labeling_interval))
+                logger.info("outcome_labeling_loop started (interval=%ds)", labeling_interval)
             mmt_enabled = os.getenv("MMT_API_ENABLED", "false").lower() in ("true", "1", "yes")
             if mmt_enabled:
                 mmt_interval = int(os.getenv("MMT_UPDATE_INTERVAL", "1800")) // 60
