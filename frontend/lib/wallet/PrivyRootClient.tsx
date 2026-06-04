@@ -34,7 +34,9 @@ export function PrivyRootClient({ children }: { children: ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
-        loginMethods: ['email', 'wallet'],
+        // 2026-05-26 Lane H: SNS (google/apple) を loginMethods に追加し、デモ参加者が
+        // 外部 wallet 不要で onboarding できるようにする。LINE は OAuth 設定別途必要 (別 Lane)。
+        loginMethods: ['email', 'google', 'apple', 'wallet'],
         appearance: {
           theme: 'dark',
           accentColor: '#6366f1',
@@ -42,7 +44,9 @@ export function PrivyRootClient({ children }: { children: ReactNode }) {
         supportedChains: [base, baseSepolia],
         defaultChain,
         embeddedWallets: {
-          ethereum: { createOnLogin: 'users-without-wallets' },
+          // 'all-users' = 既存 wallet 有無に関わらず全ユーザーに埋込ウォレット作成。
+          // メール/SNS ログイン経路では必須 (資金は入れない demo 前提)。
+          ethereum: { createOnLogin: 'all-users' },
         },
       }}
     >
