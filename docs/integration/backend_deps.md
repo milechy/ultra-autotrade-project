@@ -35,6 +35,17 @@
 
 ## backend/app/main.py
 
+### 変更 #12: ToS model import 名の変更 (UserAction → ToSUserAction) (PR #534 / 2026-06-04)
+- **コミット範囲**: `fix/main-ci-tos-i001`
+- **変更内容**: `from app.tos.models import (... UserAction ...)` の import を
+  `ToSUserAction` にリネーム (table も user_actions → tos_user_actions)。
+- **理由**: batch merge で ai/Hermes 版 user_actions (app/ai/models.py, MVP-P0-6) と
+  tos 版が同名テーブル衝突し pytest 全 fail。ai 版を source of truth として不変とし、
+  tos 側を tos_user_actions にリネーム。main.py は table 登録用 import 名の変更のみ
+  (registration の noqa F401 import、ロジック影響なし)。
+- **影響範囲**: import 名のみ。エンドポイント・起動シーケンス無変更。
+- **承認**: fix/main-ci-tos-i001 → main (PR #534)
+
 ### 変更 #3: /health エンドポイントに AI モデル設定を追加 (PR #95 / 2026-04-20)
 - **コミット範囲**: `408d3ad` (feature/remove-claude-model-hardcodes)
 - **変更内容**:
