@@ -21,7 +21,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { login as apiLogin, getMe, logout as apiLogout, walletConnect, type UserResponse, type TokenResponse } from "./api/auth";
 import { resolveAuthReady } from "./auth-state";
-import { recordLastSeen } from "./auth/session-monitor";
+import { hasActiveToken, recordLastSeen } from "./auth/session-monitor";
 
 const TOKEN_KEY = "ultra_auth_token";
 const TOKEN_EXPIRES_KEY = "ultra_auth_expires";
@@ -70,9 +70,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Restore token on initialization
   useEffect(() => {
-    // ITP wipe 検知用の last_seen を更新 (token の有無に関わらず常に記録)。
-    // 7日 ITP wipe で token が消えていても last_seen が残っていれば wipe を検知できる。
-    recordLastSeen();
+    // last_seen は「認証済みセッションの活動時刻」。認証済み (有効 token あり) の場合のみ更新する。
+    // 未認証 (初回 incognito 等) で記録すると never_seen が wiped に化け、一般ユーザーの
+    // 初回訪問で誤って「セッションが切れました」バナーが出てしまうため。
+    // 7日 ITP wipe / token 期限切れの検知 (#424) は、過去の認証セッションで記録済みの
+    // last_seen が残ることで従来どおり機能する。
+    if (hasActiveToken()) {
+      recordLastSeen();
+    }
 
     const storedToken = localStorage.getItem(TOKEN_KEY);
     const expiresStr = localStorage.getItem(TOKEN_EXPIRES_KEY);

@@ -102,15 +102,17 @@ test.describe('ITP 7日 wipe re-auth フロー (session-monitor)', () => {
     expect(result.neverSeen).toBe('never_seen')
   })
 
-  test('ページ訪問で last_seen が更新される', async ({ page }) => {
+  test('認証済みユーザーのページ訪問で last_seen が更新される', async ({ page }) => {
     const before = Date.now() - 2 * ONE_DAY_MS
     await seedStorage(page, {
       ultra_last_seen: String(before),
+      // last_seen は「認証済みセッションの活動時刻」。token がある場合のみ更新される。
+      ultra_auth_token: 'dummy.jwt.token',
+      ultra_auth_expires: String(Date.now() + 7 * ONE_DAY_MS),
     })
 
     await page.goto('/')
-    // useSessionMonitor がマウント時に recordLastSeen() を呼ぶ。
-    // 値が更新されているか確認 (少なくとも seed より大きい)。
+    // AuthProvider / useSessionMonitor がマウント時に (認証済みなので) recordLastSeen() を呼ぶ。
     await page.waitForFunction(
       (seed: number) => {
         const raw = window.localStorage.getItem('ultra_last_seen')
@@ -121,5 +123,30 @@ test.describe('ITP 7日 wipe re-auth フロー (session-monitor)', () => {
       before,
       { timeout: 5000 },
     )
+  })
+
+  test('未認証 (token 無し) の訪問では last_seen を記録しない (初回 incognito で wiped 誤検知を防ぐ)', async ({
+    page,
+  }) => {
+    // 真の初回相当: token も last_seen も無いクリーンな状態。
+    await seedStorage(page, {
+      ultra_auth_token: null,
+      ultra_auth_expires: null,
+      auth_token: null,
+      ultra_last_seen: null,
+    })
+
+    // /liff-chat は (liff) layout 配下で SessionExpiryBanner を mount する。
+    await page.goto('/liff-chat')
+
+    // useSessionMonitor が mount しても、未認証なので recordLastSeen() は呼ばれない。
+    // → last_seen は作られず never_seen のまま → バナーは出ない。
+    const banner = page.getByTestId('session-expiry-banner')
+    await expect(banner).toHaveCount(0)
+
+    const lastSeen = await page.evaluate(() =>
+      window.localStorage.getItem('ultra_last_seen'),
+    )
+    expect(lastSeen).toBeNull()
   })
 })
