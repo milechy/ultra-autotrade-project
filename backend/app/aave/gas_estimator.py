@@ -30,6 +30,39 @@ DEFAULT_FALLBACK_GAS_APPROVE = 100000
 DEFAULT_FALLBACK_GAS_SUPPLY = 300000
 DEFAULT_FALLBACK_GAS_WITHDRAW = 300000
 
+# フォールバックガス価格（wei単位、提案生成時など web3 なしの概算用。ENV: ETH_GAS_PRICE_GWEI_FALLBACK）
+DEFAULT_GAS_PRICE_WEI = Decimal(os.environ.get("ETH_GAS_PRICE_GWEI_FALLBACK", "30")) * Decimal(
+    "1000000000"
+)  # デフォルト 30 gwei
+
+
+def estimate_static_gas_cost_usd(
+    operation: str,
+    eth_usd_price: Decimal | None = None,
+    gas_price_wei: Decimal | None = None,
+) -> Decimal:
+    """Web3接続なしのフォールバックガス代見積もり（提案生成時用）。
+
+    実際のガス価格は実行時に変わるため、これはあくまで表示用概算値。
+    """
+    gas_units = (
+        DEFAULT_FALLBACK_GAS_WITHDRAW
+        if operation.upper() == "WITHDRAW"
+        else DEFAULT_FALLBACK_GAS_SUPPLY
+    )
+    price = eth_usd_price if eth_usd_price is not None else ETH_USD_FALLBACK_PRICE
+    g_price = gas_price_wei if gas_price_wei is not None else DEFAULT_GAS_PRICE_WEI
+    gas_cost_eth = Decimal(str(gas_units)) * g_price / Decimal("1000000000000000000")
+    cost_usd = gas_cost_eth * price
+    logger.debug(
+        "静的ガス概算(%s): %d units × %s wei = $%s USD",
+        operation,
+        gas_units,
+        g_price,
+        cost_usd,
+    )
+    return cost_usd
+
 
 class GasEstimator:
     """動的ガス見積もり + 上限キャップ"""
