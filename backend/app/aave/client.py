@@ -1266,3 +1266,73 @@ def make_multi_chain_clients(
             chain_name=chain.chain_name,
         )
     return result
+
+
+# ==============================================================================
+# build-tx 本人一致 検証 (P0-3 / Asana 1215364095372268)
+#
+# Privy Policy Engine は onBehalfOf == msg.sender の動的自己参照比較を未サポート
+# (value は静的リテラルのみ) のため、本人一致は build-tx 側固定 + 署名前 calldata
+# 再検証で担保する。以下はサーバーが生成済み calldata を実デコードして
+# onBehalfOf / to が本人 wallet であることを確認する純粋関数 (RPC 不要)。
+#
+# build_partner_tx エンドポイントが署名前 hook (補完層) として呼び、
+# 不一致なら未署名 tx をフロントに返さず reject する。
+# ==============================================================================
+
+
+class OnBehalfMismatchError(AaveClientError):
+    """生成済み calldata の onBehalfOf / to が本人 wallet と不一致のとき送出。"""
+
+
+def _decode_pool_calldata(calldata: str) -> "tuple[str, dict[str, Any]]":
+    """Aave V3 Pool の calldata を実デコードして (関数名, 引数 dict) を返す。
+
+    provider 不要 (ABI デコードはオフライン処理)。web3 未インストール時は
+    AaveClientError を送出する。
+    """
+    if Web3 is None:
+        raise AaveClientError("web3 package is required")
+    # provider 無し Web3 インスタンスでも decode_function_input は動作する
+    pool = Web3().eth.contract(abi=_POOL_ABI_MINIMAL)
+    func, params = pool.decode_function_input(calldata)
+    return func.fn_name, dict(params)
+
+
+def verify_supply_onbehalf(supply_calldata: str, expected_wallet: str) -> bool:
+    """supply calldata の onBehalfOf が expected_wallet と一致するか検証する。
+
+    一致時のみ True。関数が supply でない / onBehalfOf 不一致 / デコード不能なら
+    False (fail-closed)。比較は checksum 正規化して大文字小文字非依存。
+    expected_wallet の値の中身には依存しない (常に渡された本人 wallet と照合)。
+    """
+    try:
+        fn_name, params = _decode_pool_calldata(supply_calldata)
+    except Exception:
+        return False
+    if fn_name != "supply":
+        return False
+    on_behalf = params.get("onBehalfOf")
+    if not on_behalf:
+        return False
+    try:
+        return Web3.to_checksum_address(on_behalf) == Web3.to_checksum_address(expected_wallet)
+    except Exception:
+        return False
+
+
+def verify_withdraw_to(withdraw_calldata: str, expected_wallet: str) -> bool:
+    """withdraw calldata の to が expected_wallet と一致するか検証する (fail-closed)。"""
+    try:
+        fn_name, params = _decode_pool_calldata(withdraw_calldata)
+    except Exception:
+        return False
+    if fn_name != "withdraw":
+        return False
+    to_addr = params.get("to")
+    if not to_addr:
+        return False
+    try:
+        return Web3.to_checksum_address(to_addr) == Web3.to_checksum_address(expected_wallet)
+    except Exception:
+        return False

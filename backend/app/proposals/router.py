@@ -639,6 +639,7 @@ def build_partner_tx(
     approve_proposal の代わりにこのエンドポイントを呼び、フロントエンドで
     Privy sendTransaction() 経由でパートナー本人が署名・送信する。
     """
+    from app.aave.client import verify_supply_onbehalf, verify_withdraw_to  # noqa: PLC0415
     from app.aave.service import MultiChainAaveService  # noqa: PLC0415
 
     stmt = select(Proposal).where(Proposal.id == proposal_id)
@@ -683,30 +684,60 @@ def build_partner_tx(
                 amount=Decimal(str(proposal.amount_usd)),
                 wallet_address=wallet_address,
             )
-            return PartnerUnsignedTxs(
-                proposal_id=proposal_id,
-                operation=proposal.operation,
-                wallet_address=wallet_address,
-                approve_tx=UnsignedTx.model_validate(txs["approve_tx"]),
-                supply_tx=UnsignedTx.model_validate(txs["supply_tx"]),
-            )
         else:  # WITHDRAW
             txs = service._client.build_withdraw_tx(
                 asset_symbol=asset_symbol,
                 amount=Decimal(str(proposal.amount_usd)),
                 wallet_address=wallet_address,
             )
-            return PartnerUnsignedTxs(
-                proposal_id=proposal_id,
-                operation=proposal.operation,
-                wallet_address=wallet_address,
-                withdraw_tx=UnsignedTx.model_validate(txs["withdraw_tx"]),
-            )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"tx 構築失敗: {exc}",
         ) from exc
+
+    # 署名前 hook (補完層): サーバーが生成済み calldata を実デコードし、
+    # onBehalfOf (supply) / to (withdraw) が本人 wallet でなければ未署名 tx を
+    # 返さず reject する。build-tx 側固定 (主担保) の二重チェックであり、
+    # 万一 encode 経路に欠陥が混入しても他人宛て tx を組ませない。
+    # (P0-3 / Asana 1215364095372268)
+    if proposal.operation == "SUPPLY":
+        if not verify_supply_onbehalf(txs["supply_tx"]["data"], wallet_address):
+            logger.error(
+                "build-tx onBehalfOf 検証失敗: proposal=%s wallet=%s...%s",
+                proposal_id,
+                wallet_address[:6],
+                wallet_address[-4:],
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="onBehalfOf 検証失敗: supply tx の onBehalfOf が本人 wallet と不一致",
+            )
+        return PartnerUnsignedTxs(
+            proposal_id=proposal_id,
+            operation=proposal.operation,
+            wallet_address=wallet_address,
+            approve_tx=UnsignedTx.model_validate(txs["approve_tx"]),
+            supply_tx=UnsignedTx.model_validate(txs["supply_tx"]),
+        )
+    else:  # WITHDRAW
+        if not verify_withdraw_to(txs["withdraw_tx"]["data"], wallet_address):
+            logger.error(
+                "build-tx withdraw to 検証失敗: proposal=%s wallet=%s...%s",
+                proposal_id,
+                wallet_address[:6],
+                wallet_address[-4:],
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="to 検証失敗: withdraw tx の to が本人 wallet と不一致",
+            )
+        return PartnerUnsignedTxs(
+            proposal_id=proposal_id,
+            operation=proposal.operation,
+            wallet_address=wallet_address,
+            withdraw_tx=UnsignedTx.model_validate(txs["withdraw_tx"]),
+        )
 
 
 def _verify_on_chain_receipt(
