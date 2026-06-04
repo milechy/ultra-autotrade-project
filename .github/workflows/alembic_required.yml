@@ -1,0 +1,26 @@
+name: Alembic Migration Required
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/**/models.py'
+      - 'backend/app/models/**'
+      - 'backend/alembic/versions/**'
+  push:
+    branches: [main, dev]
+
+jobs:
+  check-alembic-required:
+    name: models 変更時 migration 必須化
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+
+      - name: Run alembic required check
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: |
+          bash scripts/ci/check_alembic_required.sh

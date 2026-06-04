@@ -170,6 +170,7 @@ class AaveService:
         amount: Decimal,
         asset_symbol: str | None = None,
         dry_run: bool = False,
+        wallet_address: str | None = None,
     ) -> AaveOperationResult:
         """
         BUY/SELL/HOLD に応じて Aave 上のポジションを調整するメイン処理。
@@ -178,8 +179,25 @@ class AaveService:
         :param amount: 希望するトレード金額（USD 相当）
         :param asset_symbol: 対象トークン。None の場合は設定値のデフォルトを使用。
         :param dry_run: True の場合は実際のトランザクションを送信しない。
+        :param wallet_address: 実行対象のウォレットアドレス。None の場合は
+            AAVE_WALLET_ADDRESS env (client.account.address) を使う後方互換動作。
+            渡された場合はマスク済みで監査ログに出力する (partner 別 wallet 監査用)。
         """
         token = asset_symbol or self._settings.default_asset_symbol
+        if wallet_address:
+            masked = f"{wallet_address[:6]}...{wallet_address[-4:]}"
+            logger.info(
+                "AaveService.execute_rebalance: action=%s amount=%s wallet=%s",
+                action,
+                amount,
+                masked,
+            )
+        else:
+            logger.info(
+                "AaveService.execute_rebalance: action=%s amount=%s wallet=<env fallback>",
+                action,
+                amount,
+            )
 
         # 1. state.json の stale チェック（最優先）
         if self._state_manager.is_stale():
@@ -336,9 +354,13 @@ class AaveService:
         # 実際の deposit / withdraw 呼び出し
         try:
             if operation is AaveOperationType.DEPOSIT:
-                tx_hash = self._client.deposit(token, normalized_amount)
+                tx_hash = self._client.deposit(
+                    token, normalized_amount, wallet_address=wallet_address or ""
+                )
             elif operation is AaveOperationType.WITHDRAW:
-                tx_hash = self._client.withdraw(token, normalized_amount)
+                tx_hash = self._client.withdraw(
+                    token, normalized_amount, wallet_address=wallet_address or ""
+                )
             else:
                 # ここに来ることは想定していないが、安全側で NOOP とする
                 logger.warning("Unexpected operation %s; treating as NOOP.", operation)
@@ -435,11 +457,14 @@ class MultiChainAaveService:
         amount: Decimal,
         asset_symbol: str | None = None,
         dry_run: bool = False,
+        wallet_address: str | None = None,
     ) -> AaveOperationResult:
         """
         指定チェーンでリバランスを実行する。
 
         :param chain_name: 対象チェーン名
+        :param wallet_address: 実行対象のウォレットアドレス。partner 別 wallet 監査用に
+            AaveService 側でマスク済みログ出力する。None の場合は env fallback。
         """
         service = self.get_service(chain_name)
         return service.execute_rebalance(
@@ -447,6 +472,7 @@ class MultiChainAaveService:
             amount=amount,
             asset_symbol=asset_symbol,
             dry_run=dry_run,
+            wallet_address=wallet_address,
         )
 
     def get_all_health_factors(self) -> dict[str, Optional[Decimal]]:

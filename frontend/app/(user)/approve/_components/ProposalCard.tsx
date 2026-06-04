@@ -20,6 +20,7 @@ export interface Proposal {
   estimatedGas: number
   slippage: number | null
   createdAt: string
+  expiresAt: string
 }
 
 export interface ProposalCardProps {
@@ -80,6 +81,7 @@ export function ProposalCard({
 
   const isProcessing = status === 'approving' || status === 'confirming'
   const isDone = status === 'success' || status === 'failed'
+  const totalCostUSD = proposal.amountUSD + proposal.estimatedGas
 
   return (
     <Card className="w-full dark:bg-gray-900 border-border">
@@ -108,6 +110,11 @@ export function ProposalCard({
               <p className="text-sm text-muted-foreground">
                 ≈ ${proposal.amountUSD.toLocaleString('ja-JP', { maximumFractionDigits: 2 })}
               </p>
+              {proposal.estimatedGas > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  合計（ガス込み）: ${totalCostUSD.toLocaleString('ja-JP', { maximumFractionDigits: 2 })}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -150,7 +157,7 @@ export function ProposalCard({
 
         {/* Action buttons */}
         {!isDone && (
-          <div className="flex gap-2 pt-1">
+          <div className="flex gap-2 pt-1" data-testid="proposal-action-buttons">
             <Button
               className="flex-1 bg-green-600 hover:bg-green-700 text-white"
               onClick={() => onApprove(proposal.id)}

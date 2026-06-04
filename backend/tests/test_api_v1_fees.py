@@ -909,3 +909,51 @@ class TestLegacyEndpointsRemoved:
         # aave/fee_router.py は F-8b 廃止予定だが F-13 スコープ外 → 404 でないこと
         r = client.get("/api/fees/calculate?aum_usd=1000")
         assert r.status_code != 404, "/api/fees/calculate (aave) should still be registered!"
+
+
+# ===========================================================================
+# F-S6: allowance-info エンドポイント
+# ===========================================================================
+
+
+class TestAllowanceInfo:
+    """GET /api/v1/fees/allowance-info のテスト。"""
+
+    def test_unauthenticated_returns_401(self, client: TestClient) -> None:
+        r = client.get("/api/v1/fees/allowance-info")
+        assert r.status_code == 401
+
+    def test_authenticated_returns_info_without_operator(self, client: TestClient) -> None:
+        token = _register_admin(client)
+        # OPERATOR_FEE_WALLET_ADDRESS 未設定時は configured=false で返る
+        os.environ.pop("OPERATOR_FEE_WALLET_ADDRESS", None)
+        r = client.get(
+            "/api/v1/fees/allowance-info",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["configured"] is False
+        assert body["operator_address"] == ""
+        assert "chain_id" in body
+        assert "usdc_address" in body
+        assert "data_provider_address" in body
+        assert "recommended_allowance_usdc" in body
+        # recommended は 6 decimal の Decimal str
+        assert Decimal(body["recommended_allowance_usdc"]) > 0
+
+    def test_authenticated_returns_info_with_operator(self, client: TestClient) -> None:
+        token = _register_admin(client)
+        test_address = "0xTestOperatorAddress1234567890123456789012"
+        os.environ["OPERATOR_FEE_WALLET_ADDRESS"] = test_address
+        try:
+            r = client.get(
+                "/api/v1/fees/allowance-info",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert r.status_code == 200
+            body = r.json()
+            assert body["configured"] is True
+            assert body["operator_address"] == test_address
+        finally:
+            os.environ.pop("OPERATOR_FEE_WALLET_ADDRESS", None)

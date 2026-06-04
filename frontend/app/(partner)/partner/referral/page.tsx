@@ -3,7 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Copy, Users } from 'lucide-react'
+import { Copy, TrendingUp, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,9 +12,21 @@ import { getStoredToken } from '@/lib/auth'
 import {
   postReferralCode,
   getReferralList,
+  getReferralEarnings,
   type ReferralCodeResponse,
   type ReferredUser,
+  type ReferralEarnings,
 } from '@/lib/api/referral'
+
+function formatJpy(value: string): string {
+  const n = Number(value)
+  return isNaN(n) ? '—' : `¥${n.toLocaleString('ja-JP', { maximumFractionDigits: 0 })}`
+}
+
+function formatRate(value: string): string {
+  const n = Number(value)
+  return isNaN(n) ? '—' : `${(n * 100).toFixed(0)}%`
+}
 
 export default function PartnerReferralPage() {
   const token = getStoredToken()
@@ -23,6 +35,8 @@ export default function PartnerReferralPage() {
   const [codeLoading, setCodeLoading] = useState(true)
   const [users, setUsers] = useState<ReferredUser[]>([])
   const [usersLoading, setUsersLoading] = useState(true)
+  const [earnings, setEarnings] = useState<ReferralEarnings | null>(null)
+  const [earningsLoading, setEarningsLoading] = useState(true)
 
   const loadCode = useCallback(async () => {
     if (!token) return
@@ -50,10 +64,24 @@ export default function PartnerReferralPage() {
     }
   }, [token])
 
+  const loadEarnings = useCallback(async () => {
+    if (!token) return
+    setEarningsLoading(true)
+    try {
+      const data = await getReferralEarnings(token)
+      setEarnings(data)
+    } catch {
+      setEarnings(null)
+    } finally {
+      setEarningsLoading(false)
+    }
+  }, [token])
+
   useEffect(() => {
     void loadCode()
     void loadUsers()
-  }, [loadCode, loadUsers])
+    void loadEarnings()
+  }, [loadCode, loadUsers, loadEarnings])
 
   const shareUrl = codeData
     ? (typeof window !== 'undefined'
@@ -73,7 +101,76 @@ export default function PartnerReferralPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-2xl font-bold">紹介プログラム</h1>
+      <h1 className="text-2xl font-bold">紹介キャンペーン</h1>
+
+      {/* Earnings summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <Users className="h-3.5 w-3.5" />
+              紹介数
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {earningsLoading ? (
+              <Skeleton className="h-7 w-16 rounded" />
+            ) : (
+              <p className="text-2xl font-bold">
+                {earnings ? `${earnings.referral_count}人` : '—'}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <TrendingUp className="h-3.5 w-3.5" />
+              今月の報酬
+              {earnings && (
+                <span className="ml-1 text-xs font-normal">
+                  (サブスク{formatRate(earnings.campaign_rate)})
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {earningsLoading ? (
+              <Skeleton className="h-7 w-24 rounded" />
+            ) : (
+              <p className="text-2xl font-bold">
+                {earnings ? formatJpy(earnings.current_month_reward_jpy) : '—'}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground">
+              累計 payout
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {earningsLoading ? (
+              <Skeleton className="h-7 w-24 rounded" />
+            ) : (
+              <p className="text-2xl font-bold">
+                {earnings ? formatJpy(earnings.total_payout_jpy) : '—'}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* キャンペーン期限バナー */}
+      {!earningsLoading && earnings?.campaign_expires_month && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+          キャンペーン有効期限: <span className="font-medium">{earnings.campaign_expires_month.slice(0, 7)}</span> まで
+          （新規紹介をするとさらに1年延長されます）
+        </div>
+      )}
 
       {/* Referral code card */}
       <Card>

@@ -106,3 +106,46 @@ export async function rejectProposal(
     { headers: authHeaders(token) }
   );
 }
+
+// --- 方式2: パートナー本人署名 (Privy) ---
+
+export interface UnsignedTx {
+  to: string;
+  data: string;
+  from: string;
+  chainId: number;
+  value: string;
+}
+
+export interface PartnerUnsignedTxs {
+  proposal_id: number;
+  operation: string;
+  wallet_address: string;
+  approve_tx?: UnsignedTx;
+  supply_tx?: UnsignedTx;
+  withdraw_tx?: UnsignedTx;
+}
+
+/** 未署名 tx データをバックエンドから取得する (サーバー鍵で署名しない)。 */
+export async function buildPartnerTx(
+  id: number,
+  token: string
+): Promise<PartnerUnsignedTxs> {
+  return await getJson<PartnerUnsignedTxs>(`/api/proposals/${id}/build-tx`, {
+    headers: authHeaders(token),
+  });
+}
+
+/** Privy で署名・送信した最終 tx_hash をバックエンドに報告する。 */
+export async function submitPartnerTx(
+  id: number,
+  txHash: string,
+  walletAddress: string,
+  token: string
+): Promise<AdminProposal> {
+  return await postJson<AdminProposal>(
+    `/api/proposals/${id}/submit-tx`,
+    { tx_hash: txHash, wallet_address: walletAddress },
+    { headers: authHeaders(token) }
+  );
+}

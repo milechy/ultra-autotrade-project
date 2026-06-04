@@ -45,7 +45,13 @@ from app.auth.dependencies import require_active_user, require_admin
 from app.auth.models import InvestmentTier, RiskMode, User
 from app.database import get_db
 from app.fees import FeeCalculationInput, FeeCalculator
-from app.fees.models import FeeConfigV10, FeeTransaction
+from app.fees.billing_adapter import BillingVendorAdapter, ChargeRequest
+from app.fees.fee_transfer_service import (
+    FeeTransferConfig,
+    FeeTransferService,
+    is_fee_transfer_enabled,
+)
+from app.fees.models import FeeConfigV10, FeeTransaction, ReferralCampaign, UatWalletLedger
 from app.portfolio.models import PortfolioSnapshot
 from app.transactions.models import Transaction
 
@@ -65,6 +71,17 @@ def _today_month_start() -> date:
 # ===========================================================================
 # Pydantic schemas
 # ===========================================================================
+
+
+class AllowanceInfoResponse(BaseModel):
+    """fee aToken allowance 承認に必要な情報。フロントエンドが approve tx を構築するために使用。"""
+
+    operator_address: str
+    usdc_address: str
+    data_provider_address: str
+    chain_id: int
+    recommended_allowance_usdc: str  # Decimal str (6 decimals), e.g. "10.000000"
+    configured: bool  # OPERATOR_FEE_WALLET_ADDRESS が設定済みか
 
 
 class FeeConfigResponse(BaseModel):
@@ -179,7 +196,7 @@ class UataIncomeResponse(BaseModel):
 
 
 class FinalizeMonthResponse(BaseModel):
-    """月次 finalize バッチの実行結果サマリ (F-7)。"""
+    """月次 finalize バッチの実行結果サマリ (F-7 + F-S6)。"""
 
     calculation_month: date
     usd_jpy_rate: str
@@ -190,6 +207,15 @@ class FinalizeMonthResponse(BaseModel):
     total_fee_jpy: str
     total_subscription_jpy: str
     total_user_takehome_jpy: str
+    # F-S6: on-chain transfer 統計
+    fee_transfer_enabled: bool = False
+    transfer_sent: int = 0
+    transfer_skipped: int = 0
+    transfer_failed: int = 0
+    #: vendor adapter 経由で課金を試みたユーザー数 (subscription_amount > 0)
+    vendor_charges_attempted: int = 0
+    #: vendor adapter が success=True を返したユーザー数
+    vendor_charges_succeeded: int = 0
 
 
 # ===========================================================================
@@ -227,6 +253,29 @@ def _next_month_start(d: date) -> date:
     return date(d.year, d.month + 1, 1)
 
 
+def _get_active_campaign_partner_id(db: Session, referree_id: int, month: date) -> int | None:
+    """指定月に有効な紹介キャンペーン ウィンドウのパートナー ID を返す。
+
+    有効条件:
+        reward_start_month <= month <= reward_expires_month
+        AND (ended_early_month IS NULL OR ended_early_month >= month)
+    """
+    from sqlalchemy import or_
+
+    campaign = db.scalar(
+        select(ReferralCampaign).where(
+            ReferralCampaign.referree_id == referree_id,
+            ReferralCampaign.reward_start_month <= month,
+            ReferralCampaign.reward_expires_month >= month,
+            or_(
+                ReferralCampaign.ended_early_month.is_(None),
+                ReferralCampaign.ended_early_month >= month,
+            ),
+        )
+    )
+    return campaign.partner_id if campaign else None
+
+
 def finalize_month_core(
     db: Session,
     config: FeeConfigV10,
@@ -234,6 +283,7 @@ def finalize_month_core(
     usd_jpy_rate: Decimal,
     *,
     dry_run: bool = False,
+    vendor_adapter: BillingVendorAdapter | None = None,
 ) -> FinalizeMonthResponse:
     """月次手数料バッチのコアロジック (API endpoint / 定期実行タスク 共通)。
 
@@ -241,6 +291,10 @@ def finalize_month_core(
     FeeCalculator で手数料を計算して fee_transactions に書き込む。
     dry_run=True の場合は計算のみ行い DB 書込はしない。
     expense_jpy は当月の完了トレード件数 × TRADE_FIXED_COST_USD × usd_jpy_rate で算出 (F-9)。
+
+    vendor_adapter が指定された場合、サブスク課金額 > 0 かつ subscription_protected=False の
+    ユーザーに対して charge_subscription() を呼び出す (課金ベンダー差込点)。
+    dry_run=True のとき vendor_adapter は呼ばれない。
     """
     next_month = _next_month_start(month_start)
     dt_from = datetime(month_start.year, month_start.month, 1, tzinfo=timezone.utc)
@@ -255,6 +309,8 @@ def finalize_month_core(
     total_fee = Decimal("0")
     total_sub = Decimal("0")
     total_takehome = Decimal("0")
+    vendor_charges_attempted = 0
+    vendor_charges_succeeded = 0
 
     for user in active_users:
         first_snap = db.scalar(
@@ -316,6 +372,8 @@ def finalize_month_core(
         )
         expense_jpy = (fixed_cost_usd * trade_count * usd_jpy_rate).quantize(Decimal("1"))
 
+        campaign_partner_id = _get_active_campaign_partner_id(db, user.id, month_start)
+
         payload = FeeCalculationInput(
             user_id=user.id,
             calculation_month=month_start,
@@ -324,7 +382,7 @@ def finalize_month_core(
             expense_jpy=expense_jpy,
             user_tier=user_tier,
             user_risk_mode=user_risk_mode,
-            affiliate_id=user.invited_by,
+            affiliate_id=campaign_partner_id,
             is_first_month=is_first_month,
         )
 
@@ -352,6 +410,7 @@ def finalize_month_core(
                         user_takehome_jpy=result.user_takehome_jpy,
                         affiliate_id=result.affiliate_id,
                         affiliate_amount_jpy=result.affiliate_amount_jpy,
+                        usd_jpy_rate=usd_jpy_rate,
                     )
                 )
             else:
@@ -371,6 +430,7 @@ def finalize_month_core(
                 existing.user_takehome_jpy = result.user_takehome_jpy
                 existing.affiliate_id = result.affiliate_id
                 existing.affiliate_amount_jpy = result.affiliate_amount_jpy
+                existing.usd_jpy_rate = usd_jpy_rate
 
         total_fee += result.fee_amount_jpy
         total_sub += result.subscription_amount_jpy
@@ -380,16 +440,203 @@ def finalize_month_core(
     if not dry_run:
         db.commit()
 
+        # --- UAT ウォレット台帳 記録 (冪等: 同月再実行でも重複しない) ---
+        fee_txs_this_month = (
+            db.execute(
+                select(FeeTransaction).where(
+                    FeeTransaction.calculation_month == month_start
+                )
+            )
+            .scalars()
+            .all()
+        )
+        wallet_entries_added = 0
+        for fee_tx in fee_txs_this_month:
+            uat_income = (
+                (fee_tx.subscription_amount_jpy or Decimal("0"))
+                + (fee_tx.fee_amount_jpy or Decimal("0"))
+                + (fee_tx.yield_excess_to_uata_jpy or Decimal("0"))
+            )
+            if uat_income > Decimal("0"):
+                already = db.scalar(
+                    select(UatWalletLedger).where(
+                        UatWalletLedger.reference_fee_tx_id == fee_tx.id,
+                        UatWalletLedger.entry_type == "credit",
+                        UatWalletLedger.reason == "uat_monthly_income",
+                    )
+                )
+                if already is None:
+                    db.add(
+                        UatWalletLedger(
+                            entry_type="credit",
+                            amount_jpy=uat_income,
+                            reason="uat_monthly_income",
+                            reference_fee_tx_id=fee_tx.id,
+                            month=month_start,
+                        )
+                    )
+                    wallet_entries_added += 1
+
+            affiliate_amt = fee_tx.affiliate_amount_jpy or Decimal("0")
+            if affiliate_amt > Decimal("0"):
+                already_debit = db.scalar(
+                    select(UatWalletLedger).where(
+                        UatWalletLedger.reference_fee_tx_id == fee_tx.id,
+                        UatWalletLedger.entry_type == "debit",
+                        UatWalletLedger.reason == "referral_campaign",
+                    )
+                )
+                if already_debit is None:
+                    db.add(
+                        UatWalletLedger(
+                            entry_type="debit",
+                            amount_jpy=affiliate_amt,
+                            reason="referral_campaign",
+                            reference_fee_tx_id=fee_tx.id,
+                            month=month_start,
+                        )
+                    )
+                    wallet_entries_added += 1
+
+        if wallet_entries_added:
+            db.commit()
+            logger.info(
+                "uat_wallet_ledger: month=%s entries_added=%d",
+                month_start,
+                wallet_entries_added,
+            )
+
+        # --- 課金ベンダー差込点 (vendor_adapter が指定された場合のみ実行) ---
+        # subscription_amount_jpy > 0 かつ subscription_protected=False のユーザーに対し
+        # サブスク課金を実行する。DB への vendor_reference_id 書込後に再 commit。
+        if vendor_adapter is not None:
+            written_ids: list[int] = []
+            stmt_uncharged = select(FeeTransaction).where(
+                FeeTransaction.calculation_month == month_start,
+                FeeTransaction.subscription_amount_jpy > Decimal("0"),
+                FeeTransaction.subscription_protected.is_(False),
+                FeeTransaction.vendor_reference_id.is_(None),
+            )
+            pending_txs = db.execute(stmt_uncharged).scalars().all()
+            for fee_tx in pending_txs:
+                vendor_charges_attempted += 1
+                try:
+                    charge_req = ChargeRequest(
+                        user_id=fee_tx.user_id,
+                        fee_transaction_id=fee_tx.id,
+                        subscription_amount_jpy=Decimal(str(fee_tx.subscription_amount_jpy)),
+                        calculation_month=fee_tx.calculation_month,
+                        description=f"サブスク月額 {fee_tx.calculation_month}",
+                    )
+                    charge_res = vendor_adapter.charge_subscription(charge_req)
+                    if charge_res.success:
+                        fee_tx.vendor_reference_id = charge_res.vendor_reference_id
+                        fee_tx.charged_at = datetime.now(timezone.utc)
+                        vendor_charges_succeeded += 1
+                        written_ids.append(fee_tx.id)
+                    else:
+                        logger.warning(
+                            "vendor charge failed: user_id=%d fee_tx_id=%d err=%s",
+                            fee_tx.user_id,
+                            fee_tx.id,
+                            charge_res.error_message,
+                        )
+                except Exception as exc:  # noqa: BLE001
+                    logger.error(
+                        "vendor charge exception: user_id=%d fee_tx_id=%d exc=%s",
+                        fee_tx.user_id,
+                        fee_tx.id,
+                        exc,
+                    )
+            if written_ids:
+                db.commit()
+                logger.info(
+                    "finalize_month vendor charges: month=%s attempted=%d succeeded=%d ids=%s",
+                    month_start,
+                    vendor_charges_attempted,
+                    vendor_charges_succeeded,
+                    written_ids,
+                )
+
     logger.info(
         "finalize_month: month=%s processed=%d skipped_no_snap=%d skipped_finalized=%d"
-        " total_fee=%s dry_run=%s",
+        " total_fee=%s vendor_charges=%d/%d dry_run=%s",
         month_start,
         processed,
         skipped_no_snapshot,
         skipped_finalized,
         total_fee,
+        vendor_charges_succeeded,
+        vendor_charges_attempted,
         dry_run,
     )
+
+    # --- F-S6: on-chain fee transfer (FEE_TRANSFER_ENABLED=true の場合のみ) ---
+    # FEE_TRANSFER_ENABLED=false (default) → DB 記録のみ、送金しない (現状維持)
+    # FEE_TRANSFER_ENABLED=true  → operator wallet が aToken.transferFrom を実行
+    # non-custodial §14a: operator wallet は自身の鍵 (OPERATOR_FEE_WALLET_KEY) を使用。
+    # ユーザーの秘密鍵は不要。ユーザーが事前に aToken の allowance を operator に付与。
+    transfer_sent = 0
+    transfer_skipped = 0
+    transfer_failed = 0
+    fee_transfer_enabled = is_fee_transfer_enabled()
+
+    if not dry_run and fee_transfer_enabled:
+        transfer_cfg = FeeTransferConfig.from_env()
+        transfer_svc = FeeTransferService(transfer_cfg)
+
+        fee_txs_to_transfer = (
+            db.execute(
+                select(FeeTransaction).where(
+                    FeeTransaction.calculation_month == month_start,
+                    FeeTransaction.finalized_at.is_(None),
+                    FeeTransaction.transfer_status.is_(None),
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        for fee_tx in fee_txs_to_transfer:
+            fee_user = db.get(User, fee_tx.user_id)
+            user_wallet = fee_user.wallet_address if fee_user else None
+            t_result = transfer_svc.transfer_fee(
+                user_id=fee_tx.user_id,
+                user_wallet=user_wallet or "",
+                fee_amount_jpy=fee_tx.fee_amount_jpy or Decimal("0"),
+                subscription_amount_jpy=fee_tx.subscription_amount_jpy or Decimal("0"),
+                yield_excess_jpy=fee_tx.yield_excess_to_uata_jpy or Decimal("0"),
+                usd_jpy_rate=usd_jpy_rate,
+            )
+            fee_tx.transfer_status = t_result.status
+            fee_tx.transfer_tx_hash = t_result.tx_hash
+            if t_result.status == "sent":
+                fee_tx.finalized_at = datetime.now(timezone.utc)
+                transfer_sent += 1
+                logger.info(
+                    "fee_transfer sent: user_id=%d tx=%s fee_usd=%s",
+                    fee_tx.user_id,
+                    t_result.tx_hash,
+                    t_result.fee_usd,
+                )
+            elif t_result.status in ("skipped", "low_fee"):
+                transfer_skipped += 1
+            else:
+                transfer_failed += 1
+                logger.warning(
+                    "fee_transfer %s: user_id=%d error=%s",
+                    t_result.status,
+                    fee_tx.user_id,
+                    t_result.error,
+                )
+
+        db.commit()
+        logger.info(
+            "fee_transfer phase done: sent=%d skipped=%d failed=%d",
+            transfer_sent,
+            transfer_skipped,
+            transfer_failed,
+        )
 
     return FinalizeMonthResponse(
         calculation_month=month_start,
@@ -401,6 +648,12 @@ def finalize_month_core(
         total_fee_jpy=str(total_fee),
         total_subscription_jpy=str(total_sub),
         total_user_takehome_jpy=str(total_takehome),
+        fee_transfer_enabled=fee_transfer_enabled,
+        transfer_sent=transfer_sent,
+        transfer_skipped=transfer_skipped,
+        transfer_failed=transfer_failed,
+        vendor_charges_attempted=vendor_charges_attempted,
+        vendor_charges_succeeded=vendor_charges_succeeded,
     )
 
 
@@ -666,4 +919,49 @@ def get_uata_income(
         yield_excess_total=_decimal_str(excess_d),
         affiliate_payout_total=_decimal_str(aff_d),
         uata_income_total=_decimal_str(uata),
+    )
+
+
+@router.get(
+    "/allowance-info",
+    response_model=AllowanceInfoResponse,
+    summary="fee aToken allowance 承認情報 (authenticated user)",
+)
+def get_allowance_info(
+    _user: User = Depends(require_active_user),
+) -> AllowanceInfoResponse:
+    """フロントエンドが aToken.approve(operator, amount) を構築するための情報を返す。
+
+    - operator_address: OPERATOR_FEE_WALLET_ADDRESS env var から取得
+    - usdc_address / data_provider_address: チェーン設定から取得
+    - recommended_allowance_usdc: 上限付き approve を推奨 (MaxUint256 禁止)
+      デフォルト 10 USDC (月額手数料の余裕を持つ上限)
+    - configured: operator アドレスが環境変数に設定されているか
+    """
+    from app.aave.chains import get_active_chains  # noqa: PLC0415
+
+    operator_address = os.getenv("OPERATOR_FEE_WALLET_ADDRESS", "")
+
+    active_chains = get_active_chains()
+    chain = active_chains[0] if active_chains else None
+    if chain is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="chain configuration unavailable",
+        )
+
+    usdc_address = chain.tokens.get("USDC", "")
+    data_provider = chain.data_provider_address or ""
+
+    # 上限付き approve 推奨額 (MaxUint256 禁止): 10 USDC
+    # 月額手数料の見積もりに余裕を持たせる。不足時はユーザーが再承認可能。
+    recommended = Decimal("10.000000")
+
+    return AllowanceInfoResponse(
+        operator_address=operator_address,
+        usdc_address=usdc_address,
+        data_provider_address=data_provider,
+        chain_id=chain.chain_id,
+        recommended_allowance_usdc=str(recommended),
+        configured=bool(operator_address),
     )

@@ -1,21 +1,24 @@
 # FeeConfig v10_default 本番投入 Runbook (F-4)
 
-> 最終更新: 2026-04-25
+> 最終更新: 2026-06-01
 > 関連: `docs/45_fee_model_v10_migration_plan.md` §3 / §4 F-4 行
 > Asana: F-4 (1214120401381545)
-> 実行タイミング: **F-16 本番リリース時** (本ドキュメントは設計のみ。F-4 では実行しない)
+> 実行タイミング: staging dry-run は随時可 / **F-16 本番リリース時**に本番実行
 > セット: F-1 (045 DDL) → F-4 (046 CHECK + seed) → F-16 (本番適用)
+> PR #483: `045_fee_v10_tables.sql` の CHECK 制約を `conservative/balanced/aggressive` に修正済み
 
 ---
 
 ## 0. 前提
+
+### 本番 (F-16 実行時)
 
 - F-1 マイグレーション (`045_fee_v10_tables.sql`) **本番適用済み**
 - F-4 マイグレーション (`046_fee_v10_check_constraint_alignment.sql`) **本番適用済み**
 - F-15 山本さんレビュー完了
 - 山本さんへの事前周知完了 (24h 前 DM)
 
-### staging-new 試験結果 (2026-04-25)
+### staging-new 状態 (2026-04-25 確認済み)
 
 | 項目 | 結果 |
 |------|------|
@@ -23,6 +26,173 @@
 | seed 相当 INSERT 投入 | ✅ `fee_configs` に v10_default レコード 1 行 |
 | CHECK 動作確認 (positive) | ✅ `risk_mode='conservative'` で INSERT 成功 |
 | CHECK 動作確認 (negative) | ✅ `risk_mode='LOW'` で chk_fee_tx_risk_mode 違反 |
+
+### PR #483 と seed 値の整合
+
+| 確認箇所 | 期待値 | 整合 |
+|----------|--------|------|
+| `045_fee_v10_tables.sql` CHECK (PR #483 修正後) | `('conservative','balanced','aggressive')` | ✅ |
+| `046_fee_v10_check_constraint_alignment.sql` CHECK | `('conservative','balanced','aggressive')` | ✅ |
+| `fees/models.py` `chk_fee_tx_risk_mode` CHECK | `('conservative','balanced','aggressive')` | ✅ |
+| `seed_fee_config_v10.py` `subscription_rates` キー | `conservative / balanced / aggressive` | ✅ |
+| `auth/models.py` `RiskMode` 内部値 | `conservative / balanced / aggressive` | ✅ |
+
+> **注**: staging-new は 045 (旧 CHECK = `LOW/MIDDLE/HIGH`) 適用済みのため、046 を先に適用してから seed を実行する。
+> 本番は PR #483 merge 後の 045 を初回適用するため、046 不要。
+
+---
+
+## S. Staging dry-run 手順 (本番 F-16 前の事前確認)
+
+> **実行場所**: 本番 VPS (77.42.46.155) — dev VPS から SSH 不可。人間が実行してください。
+> **コンテナ名**: `ultra-autotrade-backend-blue-staging-new` / `ultra-autotrade-postgres-staging-new`
+> **目的**: seed 値の整合を人間の目で確認してから本番投入の go/no-go を判断する。
+
+### S-1. 現状確認 (read-only, 5 分)
+
+```bash
+# S1-A. fee_configs の現状 (既に seed 済みの場合は v10_default が 1 行あるはず)
+docker exec ultra-autotrade-postgres-staging-new psql -U ultra -d ultra_autotrade -c "
+SELECT id, config_name, is_active, subscription_rates, effective_from
+FROM fee_configs;
+"
+
+# S1-B. CHECK 制約が 046 適用済みであることを確認
+docker exec ultra-autotrade-postgres-staging-new psql -U ultra -d ultra_autotrade -c "
+SELECT conname, pg_get_constraintdef(oid)
+FROM pg_constraint
+WHERE conname = 'chk_fee_tx_risk_mode';
+"
+# 期待: CHECK (risk_mode = ANY (ARRAY['conservative'::text, 'balanced'::text, 'aggressive'::text]))
+
+# S1-C. backend health check
+curl -sf http://127.0.0.1:8082/health | python3 -m json.tool
+# 期待: status=ok
+```
+
+### S-2. 046 migration 適用 (staging-new で 045 旧 CHECK を上書き)
+
+> staging-new は 045 (旧 CHECK = `LOW/MIDDLE/HIGH`) 適用済みのため 046 が必要。
+> S1-B で CHECK が既に `conservative/balanced/aggressive` なら **この手順はスキップ**。
+
+```bash
+# 046 SQL を直接適用
+docker exec -i ultra-autotrade-postgres-staging-new psql -U ultra -d ultra_autotrade \
+  < /opt/ultra-autotrade/backend/alembic/sql/046_fee_v10_check_constraint_alignment.sql
+# 期待: "ALTER TABLE" が出力される
+
+# 適用後確認
+docker exec ultra-autotrade-postgres-staging-new psql -U ultra -d ultra_autotrade -c "
+SELECT conname, pg_get_constraintdef(oid)
+FROM pg_constraint
+WHERE conname = 'chk_fee_tx_risk_mode';
+"
+# 期待: CHECK (...'conservative'...'balanced'...'aggressive'...)
+```
+
+### S-3. Dry-run 実行 (DB 書き込みなし)
+
+```bash
+# 投入予定データを確認する (実 INSERT なし)
+docker exec -w /app/backend ultra-autotrade-backend-blue-staging-new \
+  python scripts/seed_fee_config_v10.py --dry-run
+```
+
+**dry-run 出力期待値** (全フィールドを目視確認):
+
+```
+[DRY-RUN] Would insert: {
+  'config_name': 'v10_default',
+  'tier_thresholds_jpy': [1000000, 10000000],
+  'tier_fee_rates': [0.3, 0.25, 0.2],
+  'tier_monthly_yield_caps': [0.018, 0.023, 0.03],
+  'subscription_rates': {'conservative': 0.0, 'balanced': 0.003, 'aggressive': 0.01},
+  'expense_markup_enabled': False,
+  'expense_markup_rate': Decimal('0'),
+  'affiliate_rate': Decimal('0.30'),
+  'is_active': True,
+  'effective_from': datetime(2026, 5, 1, 0, 0, tzinfo=...)
+}
+```
+
+**チェックポイント**:
+- [ ] `subscription_rates` のキーが `conservative / balanced / aggressive` (大文字 `LOW/MIDDLE/HIGH` でないこと)
+- [ ] `subscription_rates` の値が `0.0 / 0.003 / 0.01`
+- [ ] `tier_fee_rates` が `[0.3, 0.25, 0.2]`
+- [ ] `effective_from` が過去日時 (投入直後から有効)
+- [ ] `is_active` が `True`
+
+### S-4. Staging 実投入 (dry-run 確認後)
+
+> **実行判断**: S-3 dry-run の全チェックポイント ✅ を確認してから実行する。
+> staging に既に `v10_default` が存在する場合は `[SKIP]` が出力される (冪等)。
+
+```bash
+# 実投入
+docker exec -w /app/backend ultra-autotrade-backend-blue-staging-new \
+  python scripts/seed_fee_config_v10.py
+# 期待: [OK] Inserted v10_default (id=N) または [SKIP] v10_default (...) already exists
+
+# 冪等性確認 (再実行 → skip)
+docker exec -w /app/backend ultra-autotrade-backend-blue-staging-new \
+  python scripts/seed_fee_config_v10.py
+# 期待: [SKIP] v10_default (id=N, active) already exists
+```
+
+### S-5. Staging 検証
+
+```bash
+# DB レコード確認
+docker exec ultra-autotrade-postgres-staging-new psql -U ultra -d ultra_autotrade -c "
+SELECT id, config_name, is_active, subscription_rates,
+       tier_thresholds_jpy, tier_fee_rates, tier_monthly_yield_caps,
+       affiliate_rate, effective_from
+FROM fee_configs
+WHERE config_name = 'v10_default';
+"
+```
+
+**期待値**:
+| カラム | 期待値 |
+|--------|--------|
+| config_name | `v10_default` |
+| is_active | `t` |
+| subscription_rates | `{"conservative": 0, "balanced": 0.003, "aggressive": 0.01}` |
+| tier_thresholds_jpy | `[1000000, 10000000]` |
+| tier_fee_rates | `[0.30, 0.25, 0.20]` |
+| tier_monthly_yield_caps | `[0.018, 0.023, 0.030]` |
+| affiliate_rate | `0.3000` |
+| effective_from | `2026-04-30 15:00:00+00` |
+
+```bash
+# CHECK 制約動作確認 — conservative (positive)
+docker exec ultra-autotrade-postgres-staging-new psql -U ultra -d ultra_autotrade -c "
+BEGIN;
+INSERT INTO fee_transactions (user_id, calculation_month, tier, risk_mode, deposit_amount_jpy)
+VALUES (1, '2026-05-01', 'LOWER', 'conservative', 0);
+ROLLBACK;
+"
+# 期待: INSERT 0 1 → ROLLBACK (成功)
+
+# CHECK 制約動作確認 — LOW (negative, 旧値が拒否されること)
+docker exec ultra-autotrade-postgres-staging-new psql -U ultra -d ultra_autotrade -c "
+BEGIN;
+INSERT INTO fee_transactions (user_id, calculation_month, tier, risk_mode, deposit_amount_jpy)
+VALUES (1, '2026-05-01', 'LOWER', 'LOW', 0);
+ROLLBACK;
+"
+# 期待: ERROR chk_fee_tx_risk_mode → ROLLBACK (正常拒否)
+```
+
+### S-6. Staging ロールバック (問題発覚時)
+
+```bash
+docker exec ultra-autotrade-postgres-staging-new psql -U ultra -d ultra_autotrade -c "
+BEGIN;
+DELETE FROM fee_configs WHERE config_name = 'v10_default';
+COMMIT;
+"
+```
 
 ---
 
@@ -211,4 +381,5 @@ EOF
 |--------|--------------|
 | F-5 (fee_calculator) | `subscription_rates` JSONB を読むときは F-3 内部値キー (`conservative` 等) を使う |
 | F-13 (v9 物理削除) | `seed_fee_config_v10.py` はそのまま残置 (fee_configs 自体は v10 で生き続ける) |
-| F-16 (本番リリース) | 本ドキュメント §1〜3 の手順を実行 |
+| F-16 (本番リリース) | 本ドキュメント §S で dry-run 確認 → §1〜3 の手順で本番実行 |
+| PR #483 | 045 の CHECK を `conservative/balanced/aggressive` に修正。staging-new は 046 で上書き済み。本番は 045 初回適用時から正しい CHECK が入る |

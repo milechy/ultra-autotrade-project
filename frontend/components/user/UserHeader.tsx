@@ -18,6 +18,7 @@ const adminNavItems = [
   { href: '/user/ai-feed', label: 'AI判定' },
   { href: '/user/approve', label: '取引承認' },
   { href: '/user/history', label: '取引履歴' },
+  { href: '/user/deposit', label: '入金' },
   { href: '/user/settings', label: '設定' },
   { href: '/user/grid', label: 'Grid Bot' },
   { href: '/user/copy-trading', label: 'Copy Trading' },

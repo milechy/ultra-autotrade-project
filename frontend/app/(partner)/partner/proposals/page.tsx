@@ -17,12 +17,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { useWallets } from '@privy-io/react-auth'
+import { ethers } from 'ethers'
 import { getStoredToken } from '@/lib/auth'
 import {
   fetchAdminProposalStats,
   listAdminProposals,
-  approveProposal,
   rejectProposal,
+  buildPartnerTx,
+  submitPartnerTx,
   type AdminProposal,
   type AdminProposalStats,
 } from '@/lib/api/admin-proposals'
@@ -59,8 +62,10 @@ export default function PartnerProposalsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [signingStep, setSigningStep] = useState<string | null>(null)
 
   const token = getStoredToken()
+  const { wallets } = useWallets()
 
   const loadData = useCallback(async () => {
     if (!token) return
@@ -85,16 +90,101 @@ export default function PartnerProposalsPage() {
     void loadData()
   }, [loadData])
 
+  /**
+   * 方式2: パートナー本人署名 (Privy)
+   * 1. build-tx でサーバーから未署名 tx を取得
+   * 2. Privy を通じてパートナーが approve → supply/withdraw を順に署名・送信
+   * 3. submit-tx で最終 tx_hash をバックエンドに報告
+   */
   const handleApprove = async (id: number) => {
     if (!token) return
+    // embedded wallet (Privy TEE) のみ使用。外部 wallet (MetaMask 等) は秘密鍵がサーバーに渡る
+    // 懸念があるため除外。walletClientType === 'privy' が Privy embedded wallet の識別子。
+    const wallet = wallets.find(w => w.walletClientType === 'privy') ?? null
+    if (!wallet) {
+      setError('Privy embedded wallet が見つかりません。Privy メールアドレスでログインしてください（MetaMask 等の外部 wallet は使用不可）。')
+      return
+    }
+
     setActionLoading(id)
+    setSigningStep(null)
+    setError(null)
+
     try {
-      await approveProposal(id, token)
+      // Step 1: 未署名 tx をサーバーから取得
+      setSigningStep('トランザクションを準備中...')
+      const txData = await buildPartnerTx(id, token)
+
+      // EIP-1193 プロバイダー取得 (Privy が署名ポップアップを表示)
+      const eip1193 = await wallet.getEthereumProvider()
+      const ethProvider = new ethers.BrowserProvider(eip1193 as ethers.Eip1193Provider)
+
+      let finalTxHash: string
+
+      if (txData.operation === 'SUPPLY' && txData.approve_tx && txData.supply_tx) {
+        // SUPPLY: approve → supply の順に署名・送信
+        setSigningStep('Step 1/2: USDC approve に署名してください...')
+        const approveTxHash = await eip1193.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            to: txData.approve_tx.to,
+            data: txData.approve_tx.data,
+            from: txData.approve_tx.from,
+            value: '0x0',
+          }],
+        }) as string
+
+        // approve の確認を待ってから supply を送信
+        setSigningStep('approve 確認中...')
+        const approveReceipt = await ethProvider.waitForTransaction(approveTxHash)
+        if (approveReceipt === null || approveReceipt.status === 0) {
+          throw new Error('approve トランザクションが revert しました。残高・ガス代を確認してください。')
+        }
+
+        setSigningStep('Step 2/2: Aave supply に署名してください...')
+        finalTxHash = await eip1193.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            to: txData.supply_tx.to,
+            data: txData.supply_tx.data,
+            from: txData.supply_tx.from,
+            value: '0x0',
+          }],
+        }) as string
+
+      } else if (txData.operation === 'WITHDRAW' && txData.withdraw_tx) {
+        // WITHDRAW: withdraw を署名・送信
+        setSigningStep('Aave withdraw に署名してください...')
+        finalTxHash = await eip1193.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            to: txData.withdraw_tx.to,
+            data: txData.withdraw_tx.data,
+            from: txData.withdraw_tx.from,
+            value: '0x0',
+          }],
+        }) as string
+
+      } else {
+        throw new Error(`未対応の operation: ${txData.operation}`)
+      }
+
+      // Step 3: tx_hash をバックエンドに報告
+      setSigningStep('完了を記録中...')
+      await submitPartnerTx(id, finalTxHash, txData.wallet_address, token)
       await loadData()
-    } catch {
-      setError('承認に失敗しました')
+
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      // ユーザーキャンセルは正常操作
+      if (msg.includes('User rejected') || msg.includes('user rejected')) {
+        setError('署名がキャンセルされました')
+      } else {
+        setError(`承認に失敗しました: ${msg}`)
+      }
     } finally {
       setActionLoading(null)
+      setSigningStep(null)
     }
   }
 
@@ -179,6 +269,13 @@ export default function PartnerProposalsPage() {
           </button>
         ))}
       </div>
+
+      {signingStep && (
+        <div style={{ padding: '10px 16px', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 6, color: '#1d4ed8', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Loader2 style={{ width: 16, height: 16, flexShrink: 0 }} className="animate-spin" />
+          {signingStep}
+        </div>
+      )}
 
       {error && (
         <div style={{ padding: '10px 16px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6, color: '#dc2626', marginBottom: 16 }}>

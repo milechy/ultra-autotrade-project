@@ -15,7 +15,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from .models import Invitation
+from .models import INVITATION_TYPE_INVITE, INVITATION_TYPE_OPEN, Invitation
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,7 @@ def create_invitation(
     code = _generate_unique_code(db)
     invitation = Invitation(
         code=code,
+        type=INVITATION_TYPE_INVITE,
         partner_id=partner_id,
         expires_at=expires_at,
         max_uses=max_uses,
@@ -61,6 +62,37 @@ def create_invitation(
     db.commit()
     db.refresh(invitation)
     logger.info("Created invitation: code=%s partner_id=%d", code, partner_id)
+    return invitation
+
+
+def create_open_invitation(
+    db: Session,
+    expires_at: datetime,
+    max_uses: int = 1,
+) -> Invitation:
+    """
+    open 登録用招待コードを作成する（partner 不要）。
+
+    Args:
+        db:         データベースセッション
+        expires_at: 有効期限
+        max_uses:   最大使用回数
+
+    Returns:
+        作成された Invitation (type='open', partner_id=None)
+    """
+    code = _generate_unique_code(db)
+    invitation = Invitation(
+        code=code,
+        type=INVITATION_TYPE_OPEN,
+        partner_id=None,
+        expires_at=expires_at,
+        max_uses=max_uses,
+    )
+    db.add(invitation)
+    db.commit()
+    db.refresh(invitation)
+    logger.info("Created open invitation: code=%s", code)
     return invitation
 
 

@@ -6,22 +6,107 @@
 
 ---
 
-## §17 原文 (変更不可)
+## §17 原文 (2026-05-28 改訂版)
 
 ```
 5/31 強行はしない。客観条件で判断:
-- L1-L6 14日連続緑
+- 両 partner (山本 user_id=11 + 橋口 user_id=18) 本運用 14日 (L1-L6 は監視継続だがローンチ判定軸として使わない)
 - staging で chaos test 3日連続失敗ゼロ
 - 本番 Tier S 操作の人間承認率 100% (auto-bypass ゼロ)
 - 山本さん UAT 完走 (proposals 全件 EXECUTED 判定基準満たす)
 - 森先生 法務確認 (BVI / non-custodial)
 ```
 
+> **改訂経緯 (2026-05-28)**: 旧原文の条件 1「L1-L6 14日連続緑」は数学的に 6/1 不達確定だったため、両 partner 本運用 14日に置換。**6/1 (Day 1) 両 partner 本運用起算 → 6/14 達成 → 6/15 full launch**。L1-L6 評価は継続するが、ローンチ判定軸ではない(§1.5 で監視枠として保持)。条件 2-5 は変更なし。Asana 1215186751757662。旧原文は §9 変更履歴に保存。
+
 ---
 
-## 1. L1-L6 14日連続緑
+## 1. ローンチ判定軸 — 両 partner (山本+橋口) 本運用 14日
 
-### 1.1「緑」の定義
+> **2026-05-28 改訂**: 旧「L1-L6 14日連続緑」をローンチ判定軸から外し、両 partner (山本 user_id=11 + 橋口 user_id=18) **本運用 14日観測** を新判定軸とする。L1-L6 詳細評価は §1.5「L1-L6 監視 (判定軸外、参考指標)」に移植して継続。
+
+### 1.1「両 partner 本運用 14日」の定義
+
+| 用語 | 定義 |
+|---|---|
+| 本運用 (Day 1 起算) | 両 partner (山本 user_id=11, 橋口 user_id=18) が production 環境で実 launch (Shadow Mode 並走でなく実 launch)。6/1 (Day 1) 起算予定 |
+| 「本運用 1日達成」 | その暦日 (JST 00:00-23:59) 内に両 partner それぞれ:<br/>① `ai_decisions` が生成されている (production AI 判定が稼働している)<br/>② proposals が active (ステータス変更フローを経て final 状態に到達 or 期限内継続) で「stale ≥ 24h」がゼロ<br/>③ `non_executed_active = 0` 又は当該 partner の `proposals.expires_at > NOW()` で進行中 |
+| 「14日達成」 | 上記「本運用 1日達成」が両 partner で連続 14 日継続 (= 6/1 起算で 6/14 達成) |
+| 既存 UAT 5条件 (条件 4) との関係 | 条件 4 は UAT 完走判定 (proposals 全件 EXECUTED)、本条件 1 は 14日継続観測。両者は別軸。条件 4 完走後に本条件 1 が起算可能になる構造ではなく、両者は並行観測 |
+
+### 1.2 判定 SQL (両 partner 本運用 1日達成チェック)
+
+```sql
+-- 両 partner それぞれが当該 JST 暦日内に ai_decisions を生成し、stale proposals がゼロかを確認
+WITH partners AS (
+  SELECT id, name FROM users WHERE id IN (11, 18) AND role = 'partner' AND is_active = TRUE
+),
+target_day AS (
+  -- ${TARGET_DATE} を引数で渡す。デフォルトは「昨日 JST」
+  SELECT (CURRENT_DATE - INTERVAL '1 day' AT TIME ZONE 'Asia/Tokyo')::date AS d
+),
+daily_ai_decisions AS (
+  SELECT p.id AS partner_id, COUNT(ad.id) AS ai_decision_count
+  FROM partners p
+  LEFT JOIN ai_decisions ad
+    ON ad.user_id = p.id
+   AND ad.created_at >= (SELECT d FROM target_day) AT TIME ZONE 'Asia/Tokyo'
+   AND ad.created_at <  (SELECT d FROM target_day) AT TIME ZONE 'Asia/Tokyo' + INTERVAL '1 day'
+  GROUP BY p.id
+),
+stale_proposals AS (
+  SELECT p.id AS partner_id, COUNT(pr.id) AS stale_count
+  FROM partners p
+  LEFT JOIN proposals pr
+    ON pr.user_id = p.id
+   AND pr.status NOT IN ('executed','expired','rejected')
+   AND pr.expires_at < NOW()
+  GROUP BY p.id
+)
+SELECT
+  p.name,
+  COALESCE(d.ai_decision_count, 0) AS ai_decision_count,
+  COALESCE(s.stale_count, 0) AS stale_proposals_count,
+  CASE
+    WHEN COALESCE(d.ai_decision_count, 0) >= 1
+     AND COALESCE(s.stale_count, 0) = 0
+    THEN '✅ 1日達成'
+    ELSE '❌ 未達 (ai_decisions=' || COALESCE(d.ai_decision_count, 0)::text
+         || ', stale=' || COALESCE(s.stale_count, 0)::text || ')'
+  END AS daily_status
+FROM partners p
+LEFT JOIN daily_ai_decisions d ON d.partner_id = p.id
+LEFT JOIN stale_proposals s ON s.partner_id = p.id
+ORDER BY p.id;
+```
+
+両 partner で「✅ 1日達成」が出た日のみ「本運用 1日達成」をカウント。連続 14 日で 14 日達成。
+
+### 1.3「両 partner 本運用 14日」カウント方法
+
+- **起算条件**: 両 partner の wallet 登録完了 + production 反映 + 本 PR (§17 改訂) merge + scheduler flag conflict 解消 (Asana 1215153474346999) が全て満たされた翌 JST 暦日 0:00 から起算
+- **streak リセット条件**:
+  - いずれかの partner で当該日 `ai_decision_count = 0` (production AI 判定が走っていない)
+  - いずれかの partner で当該日 `stale_proposals_count > 0` (stale ≥ 24h の proposals がある = 障害)
+  - production 障害発生 (`docs/postmortems/*.md` 該当日付に追加されたら streak リセット候補)
+- **集計タイミング**: 翌日 JST 00:30 (24 時間集計余裕後) に上記 SQL を batch 実行、結果を `launch_partner_uat_streak.log` (or 同等の summary) に追記
+
+### 1.4 現在値 (2026-05-28 時点)
+
+| 項目 | 現在値 | 判定 |
+|---|---|---|
+| 山本さん (id=11) wallet 登録 | `0x2064...cc66` 登録済 | ✅ |
+| 橋口さん (id=18) wallet 登録 | 2026-06-01 までに登録予定 | ⏳ |
+| scheduler flag conflict (Asana 1215153474346999) | production .env で ENABLE/DISABLE 両 set 競合中 | ❌ |
+| 両 partner 本運用 14日 streak | 0/14 日 (起算前、6/1 予定) | ❌ |
+
+> **6/1 launch 起算条件**: 上記 4 項目を全て解消 + 本 PR merge で 6/1 (Day 1) から streak カウント開始。
+
+### 1.5 L1-L6 監視 (判定軸外、参考指標)
+
+> **2026-05-28 改訂注記**: L1-L6 評価は **継続して監視**するが、ローンチ判定軸ではない(参考指標扱い)。Day 1 起算後の障害早期検出に使う。詳細仕様 (PASS/FAIL 判定式 / 14日連続緑カウント方法 / healthcheck_l1_l6.sh 整合版) は以下に保持。
+
+#### 1.5.1「緑」の定義 (旧 §1.1)
 
 | 用語 | 定義 |
 |---|---|
@@ -30,7 +115,7 @@
 | L6 WARN の扱い | L6 WARN は UAT 期間中「緑」判定に影響しない (FAIL でない限り許容) |
 | 5% 失敗許容の根拠 | nginx restart 等の一時 502 を吸収する設計余裕。連続 15 回以上の FAIL は即 Slack 通知 |
 
-### 1.2 L1-L6 PASS/FAIL 判定式 (healthcheck_l1_l6.sh 整合版)
+#### 1.5.2 L1-L6 PASS/FAIL 判定式 (旧 §1.2、healthcheck_l1_l6.sh 整合版)
 
 | チェック | PASS 条件 | FAIL 条件 | 備考 |
 |---|---|---|---|
@@ -47,7 +132,7 @@ overall = PASS  ← L1 PASS AND L2 PASS AND L3 PASS AND L4 PASS AND L5 PASS
 L6 WARN は overall=PASS に影響しない
 ```
 
-### 1.3「14日連続緑」カウント方法
+#### 1.5.3「14日連続緑」(参考、旧 §1.3) カウント方法
 
 **DB 側 (L3-L5)**: 下記 §5 のダッシュボード SQL で集計
 
@@ -88,7 +173,7 @@ for day_str in sorted(day_total.keys()):
 "
 ```
 
-### 1.4 現在値 (2026-05-18 時点)
+#### 1.5.4 L1-L6 現在値 (旧 §1.4、2026-05-18 時点、参考)
 
 | 項目 | 現在値 | 判定 |
 |---|---|---|
@@ -218,55 +303,63 @@ grep "Step 0 確認済" /opt/ultra-autotrade/logs/morning_protocol.log | wc -l
 
 ---
 
-## 4. 山本さん UAT 完走
+## 4. Partner UAT 完走
+
+> 2026-05-28 改訂: 2 partner 体制（山本+橋口）対応。SQL を `user_id=11` ハードコードから `role='partner' AND is_active=TRUE` 一般化（Asana 1215185448109917）。
+> 詳細閾値・partner 別内訳 SQL は `docs/uat_completion_criteria.md` 参照。
 
 ### 4.1 定義
 
-「山本さん UAT 完走」= 以下の**全条件**を満たす状態:
+「Partner UAT 完走」= 以下の**全条件**を満たす状態:
 
 | 条件 | 測定方法 |
 |---|---|
 | UAT シナリオ全ステップ実行完了 | Asana id=16 (A-4) タスクで閾値詳細化中 |
-| 山本さん (user_id=11) の全 proposals が `executed` or `expired` | `non_executed_active = 0` (下記 SQL) |
-| proposals が実際に生成・承認フローを経ている | `total_proposals ≥ 5` かつ `executed ≥ 1` |
-| 山本さんから小林さんへの明示的承認メッセージ受領 | DM 確認 (非自動化) |
+| 全 partner (`role='partner' AND is_active=TRUE`) の active な未完了 proposals が 0 | `non_executed_active = 0` (下記 SQL) |
+| partner 合算で proposals が実際に生成・承認フローを経ている | `total_proposals ≥ 5` かつ `executed ≥ 1` |
+| 各 partner から小林さんへの明示的承認メッセージ受領 | DM 確認 (非自動化) |
 
-> **注**: id=16 Lane で proposals 全件 EXECUTED の数値閾値を詳細化中。本ドキュメントでは枠組みのみ。
+> **注**: id=16 Lane で proposals 全件 EXECUTED の数値閾値を詳細化済 (`docs/uat_completion_criteria.md` PR #251 → Asana 1215185448109917 改訂)。本ドキュメントは枠組みのみ。
 
 ### 4.2 UAT 完走判定 SQL
 
 ```sql
--- 山本さん (user_id=11) UAT 状態確認
+-- Partner UAT 状態確認 (role='partner' AND is_active=TRUE で合算)
+WITH partners AS (
+  SELECT id FROM users WHERE role = 'partner' AND is_active = TRUE
+)
 SELECT
-  (SELECT COUNT(*) FROM proposals WHERE user_id = 11) AS total_proposals,
-  (SELECT COUNT(*) FROM proposals WHERE user_id = 11 AND status = 'executed') AS executed,
-  (SELECT COUNT(*) FROM proposals WHERE user_id = 11 AND status = 'expired') AS expired,
-  (SELECT COUNT(*) FROM proposals WHERE user_id = 11 AND status = 'rejected') AS rejected,
+  (SELECT COUNT(*) FROM proposals p JOIN partners ON partners.id = p.user_id) AS total_proposals,
+  (SELECT COUNT(*) FROM proposals p JOIN partners ON partners.id = p.user_id WHERE p.status = 'executed') AS executed,
+  (SELECT COUNT(*) FROM proposals p JOIN partners ON partners.id = p.user_id WHERE p.status = 'expired')  AS expired,
+  (SELECT COUNT(*) FROM proposals p JOIN partners ON partners.id = p.user_id WHERE p.status = 'rejected') AS rejected,
   (SELECT COUNT(*)
-   FROM proposals
-   WHERE user_id = 11
-     AND status NOT IN ('executed', 'expired', 'rejected')
-     AND expires_at > NOW()) AS non_executed_active,
-  -- UAT 完走候補判定: active な未完了 proposals が 0件かつ total >= 5
+     FROM proposals p
+     JOIN partners ON partners.id = p.user_id
+    WHERE p.status NOT IN ('executed', 'expired', 'rejected')
+      AND p.expires_at > NOW()) AS non_executed_active,
+  -- UAT 完走候補判定: active な未完了 proposals が 0件かつ partner 合算 total >= 5
   CASE
-    WHEN (SELECT COUNT(*) FROM proposals WHERE user_id = 11) < 5
+    WHEN (SELECT COUNT(*) FROM proposals p JOIN partners ON partners.id = p.user_id) < 5
       THEN 'WAITING (proposals 生成待ち)'
-    WHEN (SELECT COUNT(*) FROM proposals WHERE user_id = 11
-          AND status NOT IN ('executed','expired','rejected')
-          AND expires_at > NOW()) = 0
+    WHEN (SELECT COUNT(*) FROM proposals p JOIN partners ON partners.id = p.user_id
+          WHERE p.status NOT IN ('executed','expired','rejected')
+            AND p.expires_at > NOW()) = 0
       THEN 'CANDIDATE (最終承認 DM 待ち)'
     ELSE 'IN_PROGRESS'
   END AS uat_state;
 ```
 
-### 4.3 現在値 (2026-05-18 時点)
+partner 別内訳は `docs/uat_completion_criteria.md` § partner 別内訳 SQL を参照。
+
+### 4.3 現在値 (2026-05-28 改訂時点)
 
 | 項目 | 現在値 |
 |---|---|
-| UAT 進行段階 | ウォレット接続完了、proposals 生成待ち |
-| total_proposals (user_id=11) | 0件 (AI 判定 14件あるが proposals 生成に至っていない) |
+| UAT 進行段階 | 山本さん wallet `0x2064...cc66` 登録済、橋口さん 2026-06-01 までに wallet 登録予定。proposals 生成待ち |
+| total_proposals (partner 合算) | 旧値（2026-05-18, 山本さん単独）2件 expired のみ。本 PR マージ後に partner 合算で再計測 |
 | non_executed_active | 0件 (proposals 自体が未生成のため) |
-| 山本さん承認 DM | 未受領 |
+| partner 承認 DM | 未受領 |
 | 判定 | ❌ 未完走 (proposals 生成・承認フロー未到達) |
 
 ---
@@ -395,15 +488,16 @@ recent AS (
      WHERE recorded_at > NOW() - INTERVAL '24 hours')                        AS l6_zero_pct
 ),
 
--- 山本さん UAT 状態
+-- Partner UAT 状態 (2026-05-28: 2 partner 化 / role='partner' AND is_active=TRUE 一般化)
 uat AS (
   SELECT
     COUNT(*)                                                                   AS total,
-    COUNT(*) FILTER (WHERE status = 'executed')                               AS executed,
-    COUNT(*) FILTER (WHERE status NOT IN ('executed','expired','rejected')
-                     AND expires_at > NOW())                                   AS active_non_exec
-  FROM proposals
-  WHERE user_id = 11
+    COUNT(*) FILTER (WHERE p.status = 'executed')                              AS executed,
+    COUNT(*) FILTER (WHERE p.status NOT IN ('executed','expired','rejected')
+                     AND p.expires_at > NOW())                                 AS active_non_exec
+  FROM proposals p
+  JOIN users u ON u.id = p.user_id
+  WHERE u.role = 'partner' AND u.is_active = TRUE
 )
 
 SELECT '============================================' AS metric, '' AS value
@@ -459,7 +553,7 @@ UNION ALL SELECT '============================================', ''
 
 | 条件 | 現在値 | 判定 | ブロッカー / 次アクション |
 |---|---|---|---|
-| L1-L6 14日連続緑 | 0/14 日 | ❌ 未達 | L2 閾値 270min 修正 (id=29) → 修正後から連続緑カウント開始 |
+| 両 partner 本運用 14日 (2026-05-28 改訂 / 旧「L1-L6 14日連続緑」) | 0/14 日 (起算前) | ❌ 未達 | 6/1 (Day 1) 起算 → 6/14 達成 → 6/15 full launch。起算条件: 山本さん wallet 登録済、橋口さん wallet 6/1 までに登録 + scheduler flag conflict (Asana 1215153474346999) 解消 + 本 PR merge |
 | chaos test 3日連続 | 未実施 | ❌ 未計測 | id=10 タスク起動 |
 | Tier S 承認率 100% | 未計測 | ❌ 未計測 | gh CLI 計測 + Step 0 記録機能実装 |
 | 山本さん UAT 完走 | 進行中 | ❌ 未完走 | proposals 生成フロー到達待ち |
@@ -469,6 +563,8 @@ UNION ALL SELECT '============================================', ''
 ---
 
 ## 8. ローンチ判断フロー
+
+> **2026-05-28 改訂注記**: 旧フロー (L2 閾値 270min 修正 → L1-L6 14日連続緑) は条件 1 改訂で **判定軸ではなく参考指標** に移行 (§1.5)。新フローでは「両 partner wallet 登録 + scheduler flag conflict 解消 + 本 PR merge → 6/1 (Day 1) 起算 → 6/14 達成」が条件 1 の流れ。下記フロー図は旧版のままだが、6/1 launch を狙う実機は §1.3 を正本とする(本フロー図は次版 v2.2 で書き換え予定)。
 
 ```
 [現在 2026-05-18]
@@ -499,3 +595,15 @@ L1-L6 14日連続緑 積み上げ開始 (5/18 L2 修正後から)    chaos test 
 | 日付 | バージョン | 変更内容 |
 |---|---|---|
 | 2026-05-18 | v2.0 | 新規作成。§17 v5 原文を客観指標に落とし込み。healthcheck_l1_l6.sh (PR #247) と整合 |
+| 2026-05-28 | v2.1 | **§17 条件 1 改訂**: 旧「L1-L6 14日連続緑」→ 新「両 partner (山本+橋口) 本運用 14日」(Asana 1215186751757662 / Lane H 案採用 / userMemories #8 訂正済)。L1-L6 評価詳細は §1.5 に移植し参考指標として保持。§7 サマリー / §8 フロー注記更新。**6/1 (Day 1) 両 partner 本運用 launch → 6/14 達成 → 6/15 full launch**。旧 §17 原文は下記アーカイブに保存。 |
+
+### 9.1 旧 §17 原文アーカイブ (2026-05-18 〜 2026-05-28)
+
+```
+5/31 強行はしない。客観条件で判断:
+- L1-L6 14日連続緑                                                ← 2026-05-28 改訂で削除、新条件 1 に置換
+- staging で chaos test 3日連続失敗ゼロ
+- 本番 Tier S 操作の人間承認率 100% (auto-bypass ゼロ)
+- 山本さん UAT 完走 (proposals 全件 EXECUTED 判定基準満たす)
+- 森先生 法務確認 (BVI / non-custodial)
+```

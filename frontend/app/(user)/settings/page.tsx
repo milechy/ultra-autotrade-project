@@ -36,6 +36,8 @@ interface UserSettingsResponse {
   max_daily_trade_usd?: number
   is_active?: boolean
   user_mode?: string
+  line_monthly_opt_in?: boolean
+  email?: string
 }
 
 interface SettingsState {
@@ -47,6 +49,8 @@ interface SettingsState {
   notificationFrequency: NotificationFrequency
   language: Language
   userMode: string
+  lineMonthlyOptIn: boolean
+  isLineUser: boolean
 }
 
 const DEFAULT_SETTINGS: SettingsState = {
@@ -58,6 +62,8 @@ const DEFAULT_SETTINGS: SettingsState = {
   notificationFrequency: 'important',
   language: 'ja',
   userMode: 'managed',
+  lineMonthlyOptIn: false,
+  isLineUser: false,
 }
 
 export default function SettingsPage() {
@@ -100,6 +106,11 @@ export default function SettingsPage() {
           ...(data.max_single_trade_usd !== undefined && { maxSingleTradeUsd: data.max_single_trade_usd }),
           ...(data.max_daily_trade_usd !== undefined && { maxDailyTradeUsd: data.max_daily_trade_usd }),
           ...(data.user_mode !== undefined && { userMode: data.user_mode }),
+          ...(data.line_monthly_opt_in !== undefined && { lineMonthlyOptIn: data.line_monthly_opt_in }),
+          // LINE 認証ユーザー判定: email が line_*@line.local 形式
+          ...(data.email !== undefined && {
+            isLineUser: data.email.startsWith('line_') && data.email.endsWith('@line.local'),
+          }),
         }))
       })
       .catch(() => {/* keep defaults */})
@@ -119,12 +130,13 @@ export default function SettingsPage() {
     setSettings((prev) => ({ ...prev, [key]: value }))
 
     // Persist user settings to PUT /api/user/settings
-    if (token && (key === 'email' || key === 'notificationFrequency' || key === 'maxSingleTradeUsd' || key === 'maxDailyTradeUsd')) {
+    if (token && (key === 'email' || key === 'notificationFrequency' || key === 'maxSingleTradeUsd' || key === 'maxDailyTradeUsd' || key === 'lineMonthlyOptIn')) {
       const fieldMap: Partial<Record<keyof SettingsState, string>> = {
         email: 'notification_email',
         notificationFrequency: 'notification_frequency',
         maxSingleTradeUsd: 'max_single_trade_usd',
         maxDailyTradeUsd: 'max_daily_trade_usd',
+        lineMonthlyOptIn: 'line_monthly_opt_in',
       }
       const apiKey = fieldMap[key]
       if (apiKey) {
@@ -156,28 +168,32 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-4 px-4 py-4 pb-24 max-w-4xl mx-auto">
-        {/* 1. 運用モード — admin/partner のみ表示（viewer/tester は非表示） */}
+        {/* 1. 運用モード — admin/partner のみ表示（viewer/editor は非表示） */}
         {isPartner && (
-          <OperationModeCard
-            isRunning={settings.isRunning}
-            onToggle={handleToggleRunning}
-            disabled={isStopped}
-            userMode={settings.userMode}
-            onModeChange={(mode) => setSettings((prev) => ({ ...prev, userMode: mode }))}
-          />
+          <div data-testid="operation-mode-section">
+            <OperationModeCard
+              isRunning={settings.isRunning}
+              onToggle={handleToggleRunning}
+              disabled={isStopped}
+              userMode={settings.userMode}
+              onModeChange={(mode) => setSettings((prev) => ({ ...prev, userMode: mode }))}
+            />
+          </div>
         )}
 
-        {/* 2. リスク設定 — admin/partner のみ表示（viewer/tester は非表示） */}
+        {/* 2. リスク設定 — admin/partner のみ表示（viewer/editor は非表示） */}
         {isPartner && (
-          <RiskSettingsCard
-            riskMode={settings.riskMode}
-            onRiskModeChange={(mode) => set('riskMode', mode)}
-            maxSingleTradeUsd={settings.maxSingleTradeUsd}
-            onMaxSingleTradeUsdChange={(value) => set('maxSingleTradeUsd', value)}
-            maxDailyTradeUsd={settings.maxDailyTradeUsd}
-            onMaxDailyTradeUsdChange={(value) => set('maxDailyTradeUsd', value)}
-            allowedModes={allowedModes}
-          />
+          <div data-testid="risk-settings-section">
+            <RiskSettingsCard
+              riskMode={settings.riskMode}
+              onRiskModeChange={(mode) => set('riskMode', mode)}
+              maxSingleTradeUsd={settings.maxSingleTradeUsd}
+              onMaxSingleTradeUsdChange={(value) => set('maxSingleTradeUsd', value)}
+              maxDailyTradeUsd={settings.maxDailyTradeUsd}
+              onMaxDailyTradeUsdChange={(value) => set('maxDailyTradeUsd', value)}
+              allowedModes={allowedModes}
+            />
+          </div>
         )}
 
         {/* 3. 通知設定 — synced with PUT /api/user/settings */}
@@ -186,6 +202,9 @@ export default function SettingsPage() {
           onEmailChange={(value) => set('email', value)}
           frequency={settings.notificationFrequency}
           onFrequencyChange={(value) => set('notificationFrequency', value)}
+          lineMonthlyOptIn={settings.lineMonthlyOptIn}
+          onLineMonthlyOptInChange={(value) => set('lineMonthlyOptIn', value)}
+          isLineUser={settings.isLineUser}
         />
 
         {/* 4. 言語設定 */}

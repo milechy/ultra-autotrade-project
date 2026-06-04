@@ -85,7 +85,8 @@
     "allocationPnl": "損益",
     "noAllocation": "まだ資金が割り振られていません",
     "allocationActive": "運用中",
-    "allocationWithdrawn": "引き出し済み"
+    "allocationWithdrawn": "引き出し済み",
+    "pnlChart": "損益推移"
   },
   "Decisions": {
     "title": "AI判定履歴",
@@ -360,5 +361,40 @@
     "riskMedium": "中",
     "riskHigh": "高",
     "strategist": "ストラテジスト"
+  },
+  "Chat": {
+    "headerTitle": "UATa AI",
+    "headerSubtitle": "自動売買アシスタント",
+    "aiRunning": "稼働中",
+    "aiPaused": "一時停止",
+    "aiStopped": "停止中",
+    "noProposal": "提案を待っています...",
+    "pendingProposal": "新しい提案",
+    "approveBtn": "承認する",
+    "rejectBtn": "却下する",
+    "confirmSheetTitle": "この提案を承認しますか？",
+    "confirmSheetOperation": "操作",
+    "confirmSheetAmount": "金額",
+    "confirmSheetHF": "実行後 Health Factor",
+    "confirmSheetGas": "ガス概算",
+    "confirmSheetSignBtn": "署名して承認",
+    "confirmSheetCancel": "キャンセル",
+    "confirmSheetFallback": "ブラウザで承認する",
+    "rejectConfirmText": "本当に却下しますか？",
+    "rejectConfirmYes": "はい",
+    "rejectConfirmNo": "いいえ",
+    "systemApproved": "承認しました ✓",
+    "systemRejected": "却下しました",
+    "systemSigning": "署名中...",
+    "systemConfirming": "チェーンに記録中...",
+    "systemSignError": "署名に失敗しました",
+    "historyBtn": "履歴",
+    "operationSupply": "Supply (入金)",
+    "operationWithdraw": "Withdraw (出金)",
+    "confidence": "信頼度",
+    "expectedHF": "実行後 HF",
+    "gasEstimate": "ガス概算",
+    "viewDetail": "続きを見る",
+    "closeDetail": "閉じる"
   }
 }

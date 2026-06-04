@@ -12,8 +12,18 @@
 - ``JPY_QUANTIZE``           : 円未満切り捨て用 Decimal 単位
 - ``MarketFeeResult``        : トレードゲート判定結果 (§4)
 - ``calculate_fee_by_market``: §4 トレードゲート (予想利益 > 経費チェック)
+- ``BillingVendorAdapter``   : 課金ベンダー抽象プロトコル (F-7 vendor-agnostic)
+- ``ChargeRequest``          : 課金リクエスト dataclass
+- ``ChargeResult``           : 課金結果 dataclass
+- ``StubBillingAdapter``     : ベンダー未定期間スタブ (ログのみ)
 """
 
+from .billing_adapter import (
+    BillingVendorAdapter,
+    ChargeRequest,
+    ChargeResult,
+    StubBillingAdapter,
+)
 from .calculator import (
     JPY_QUANTIZE,
     FeeCalculationInput,
@@ -26,6 +36,10 @@ from .trade_gate import (
 )
 
 __all__ = [
+    "BillingVendorAdapter",
+    "ChargeRequest",
+    "ChargeResult",
+    "StubBillingAdapter",
     "JPY_QUANTIZE",
     "FeeCalculationInput",
     "FeeCalculationResult",

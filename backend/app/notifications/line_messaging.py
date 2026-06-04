@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -64,6 +65,161 @@ def build_alert_flex_bubble(title: str, body: str, severity: str, color: str) ->
                         "wrap": True,
                         "size": "sm",
                     }
+                ],
+            },
+        },
+    }
+
+
+def build_monthly_report_flex_bubble(
+    period: str,
+    net_profit_jpy: Decimal,
+    fee_amount_jpy: Decimal,
+    win_rate: float,
+    total_proposals: int,
+) -> dict[str, Any]:
+    """月次レポート用 Flex Message bubble を構築する。
+
+    Args:
+        period: 対象月 (例: "2026年5月")
+        net_profit_jpy: 純損益 (JPY)
+        fee_amount_jpy: 手数料合計 (JPY)
+        win_rate: 勝率 (0.0–100.0)
+        total_proposals: 提案回数
+
+    Returns:
+        LINE Flex Message 形式の dict
+    """
+    profit_color = "#00B900" if net_profit_jpy >= 0 else "#FF0000"
+    profit_sign = "+" if net_profit_jpy >= 0 else ""
+    profit_str = f"{profit_sign}¥{net_profit_jpy:,.0f}"
+    fee_str = f"¥{fee_amount_jpy:,.0f}"
+
+    return {
+        "type": "flex",
+        "altText": f"【月次レポート】{period}",
+        "contents": {
+            "type": "bubble",
+            "header": {
+                "type": "box",
+                "layout": "vertical",
+                "backgroundColor": "#1e40af",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "📊 月次レポート",
+                        "color": "#FFFFFF",
+                        "weight": "bold",
+                        "size": "md",
+                    },
+                    {
+                        "type": "text",
+                        "text": period,
+                        "color": "#CCDDFF",
+                        "size": "sm",
+                    },
+                ],
+            },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "純損益",
+                                "color": "#888888",
+                                "size": "sm",
+                                "flex": 2,
+                            },
+                            {
+                                "type": "text",
+                                "text": profit_str,
+                                "color": profit_color,
+                                "size": "sm",
+                                "weight": "bold",
+                                "align": "end",
+                                "flex": 3,
+                            },
+                        ],
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "手数料",
+                                "color": "#888888",
+                                "size": "sm",
+                                "flex": 2,
+                            },
+                            {
+                                "type": "text",
+                                "text": fee_str,
+                                "color": "#555555",
+                                "size": "sm",
+                                "align": "end",
+                                "flex": 3,
+                            },
+                        ],
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "勝率",
+                                "color": "#888888",
+                                "size": "sm",
+                                "flex": 2,
+                            },
+                            {
+                                "type": "text",
+                                "text": f"{win_rate:.1f}%",
+                                "color": "#333333",
+                                "size": "sm",
+                                "align": "end",
+                                "flex": 3,
+                            },
+                        ],
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "提案回数",
+                                "color": "#888888",
+                                "size": "sm",
+                                "flex": 2,
+                            },
+                            {
+                                "type": "text",
+                                "text": f"{total_proposals} 回",
+                                "color": "#333333",
+                                "size": "sm",
+                                "align": "end",
+                                "flex": 3,
+                            },
+                        ],
+                    },
+                    {
+                        "type": "separator",
+                    },
+                    {
+                        "type": "text",
+                        "text": "※ 詳細はアプリからご確認ください",
+                        "color": "#AAAAAA",
+                        "size": "xxs",
+                        "wrap": True,
+                    },
                 ],
             },
         },
@@ -129,6 +285,45 @@ class LINEFlexMessageSender:
                 "LINE Flex Message 送信失敗: error=%s, title=%s",
                 type(exc).__name__,
                 title[:40],
+            )
+            return False
+
+    def push_flex_message(self, flex_message: dict[str, Any]) -> bool:
+        """構築済み Flex Message dict を LINE Push API で送信する。
+
+        Args:
+            flex_message: build_*_flex_bubble() で構築した Flex Message dict
+
+        Returns:
+            送信成功なら True、失敗なら False
+        """
+        payload = {
+            "to": self._user_id,
+            "messages": [flex_message],
+        }
+        try:
+            response = httpx.post(
+                LINE_PUSH_API_URL,
+                json=payload,
+                headers=self._headers(),
+                timeout=self._timeout,
+            )
+            response.raise_for_status()
+            logger.info(
+                "LINE Flex Message (push) 送信完了: to=%s",
+                self._user_id[:8] + "...",
+            )
+            return True
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                "LINE Flex Message (push) 送信失敗(HTTP): status=%d",
+                exc.response.status_code,
+            )
+            return False
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "LINE Flex Message (push) 送信失敗: error=%s",
+                type(exc).__name__,
             )
             return False
 

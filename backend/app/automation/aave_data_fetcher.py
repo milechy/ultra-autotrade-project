@@ -128,12 +128,15 @@ def _fetch_health_factor() -> Optional[Decimal]:
     から導出した self.account.address をデフォルトで読む。production は単一ウォレット
     運用なので追加の wallet 引数は不要。
 
-    取得失敗 / Decimal("inf") (借入なし) の場合は None を返す。
+    返り値:
+    - Decimal("inf"): 借入なし（清算リスクゼロ）— indicator_agent が score+22 を付与
+    - None: 取得失敗（不明）
+    これら 2 状態を同じ None に潰さないことで判定精度を維持する。
     """
     try:
         client = get_default_aave_client()
         hf = client.get_health_factor()
-        if hf is None or hf == Decimal("inf"):
+        if hf is None:
             return None
         return hf
     except AaveClientError as exc:

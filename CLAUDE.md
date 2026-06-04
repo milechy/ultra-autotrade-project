@@ -839,3 +839,157 @@ claude.ai が Step 0 をスキップして §9 を実行した場合、それは
 - 並列レーン: chaos test script / approval_rate 計測 / 営業チーム運用 docs / 森先生 DM 草案 (詳細指示書は本日 16:00 までに別途起票)
 - 起算ブロッカー: P0-X2 山本さん UAT INSERT が 4日 overdue (条件4 UAT 14日観測の起点遅延)
 - HOLD bias v4: 2026-05-19 PR #302 merge 済 (memory 「staging 反映待ち」は陳腐化、要更新)
+
+---
+
+## ✅ 完了宣言の必須テンプレ
+
+タスクや PR で「完了」「OK」「動きました」と書く時は、以下を貼る。
+**1つでも欠けたら完了と書くことを禁ずる**。実機実行できない環境(prod / staging)
+の場合は、人間に貼ってもらうコマンドを明示し、貼付け前に「完了」と書かない
+(memory: prod-steps-not-done-until-verified)。
+
+### Backend / API 系
+- [ ] `git rev-parse HEAD`(対象 commit)
+- [ ] `alembic current`(staging / production 両方)
+- [ ] 該当 endpoint の curl 出力: HTTP code + body 1行
+- [ ] 該当 DB 行の SELECT 結果(1〜5行)
+- [ ] `scripts/launch_gate.sh --env=staging --only=Lx` 該当 L の PASS 出力
+
+### Frontend 系
+- [ ] git rev-parse HEAD
+- [ ] Network tab で 200 を返した URL + payload(スクリーンショット or curl 同等)
+- [ ] DOM に期待要素が表示された証跡(セレクタ + テキスト)
+- [ ] Playwright e2e の該当テスト PASS 出力
+
+### Config / Env / Migration 系
+- [ ] `git diff` の影響範囲
+- [ ] `bash scripts/check_env_separation.sh` PASS
+- [ ] `bash scripts/check_db_migration_gap.sh --env <target>` PASS
+- [ ] 配線確認: `grep -nE '<symbol>' backend/app/main.py`
+
+### Blockchain 系
+- [ ] tx hash + receipt の status=1
+- [ ] event log の確認(emit された event 名)
+- [ ] chain ID / RPC URL が想定通り
+
+### 禁止事項
+- 型チェック / lint / unit test pass「だけ」を根拠に完了と書かない
+- "実装完了しました、テストしてください" は完了ではない
+- 自分が書いた unit test のみで検証完了としない
+
+---
+
+## ✅ Codex Review セルフチェック(完了宣言前)
+
+過去 PR #154/#155/#157/#162 で Codex Review が Claude の「完了」を救出した実例から抽出。
+完了と書く前に Claude 自身がこのリストを通すこと。
+
+### 実行ロジック
+- [ ] dry_run=false が明示か(PR #157 例: process_news_loop で漏れていた)
+- [ ] 非 2xx は failure 扱いか(PR #157 例)
+- [ ] try/except で例外を握りつぶしていないか(silent failure)
+- [ ] 後方互換モードで 503 リグレッションが出ないか(PR #155)
+- [ ] ロールバック不能ステップが含まれていないか(PR #154)
+
+### 環境分離
+- [ ] staging-production クロスコンタミがないか(PR #154 / #155)
+- [ ] DATABASE_URL / AAVE_NETWORK / *_API_KEY / container_name / volume が分離されているか
+- [ ] APP_ENV が正しい値か(staging で APP_ENV=staging, prod で APP_ENV=production)
+- [ ] AAVE_NETWORK が staging=base_sepolia / production=base か
+
+### Migration / Schema
+- [ ] models 変更で alembic migration が生成されているか(PR #155 privy_did)
+- [ ] migration が staging / production に適用済みか
+- [ ] schema 削除/型変更が含まれる場合の sanitize step があるか(PR #162)
+- [ ] **CHECK 制約の enum 値が models.py と一致しているか** (models.py が唯一の真実源。migration 内で独自定義しない → 下記「CHECK制約ルール」参照)
+
+### 配線
+- [ ] 新規 class / router / scheduler / startup hook / endpoint が register / startup / crontab に登録済みか
+- [ ] AutoEvacuator / CompoundRiskAssessor のような安全装置の孤立コードがないか
+- [ ] PR #142 のような V2→V3 API 移行が他箇所にも反映されているか
+
+### Auth / RBAC
+- [ ] viewer に書き込み UI を露出していないか(PR #417 教訓)
+- [ ] auth ガードを意図せず外していないか(401 リグレッション)
+
+### 自己実行手順
+完了宣言前に Claude が口頭で:
+"Codex セルフチェック: <番号>. <項目> → PASS/該当なし" を全項目通す。
+1つでも該当 → 修正してから再チェック。
+
+---
+
+## 🗂 ドリフト再発カタログ(着手前に grep)
+
+3ヶ月の Asana 履歴で形を変えて再発しているドリフト/配線漏れの典型箇所。
+新規実装・変更前に以下に該当しないか確認すること。memory: project-recurring-drift-patterns
+
+### 環境 / Infra
+- DATABASE_URL の staging↔production 分離(2重定義 / 共有 / image 焼き込み)
+- container_name 衝突(production.yml vs staging.yml)
+- ultra-log-staging volume を production が使用
+- AAVE_NETWORK が base_sepolia のまま production 稼働
+- AAVE_RPC_URL_BASE_SEPOLIA が Ethereum Sepolia URL になっていた
+- OPENAI_API_KEY staging・production 共有
+- DISABLE スケジューラ flag の staging↔production 反転
+
+### Migration / Schema
+- production DB 未適用 alembic migration の手動適用漏れ
+- proposals.execution_attempts のような新規列が片方の env にしかない
+- models 変更時 alembic 必須化 CI が無いと検出されない
+- **CHECK 制約 enum 値を migration 内で独自定義した結果 models.py と乖離 → IntegrityError** (例: d4 migration が `'LOW','MIDDLE','HIGH'` を定義、models.py は `'conservative','balanced','aggressive'` → 本番 INSERT 即死。Asana 1215272519685583)
+
+### 配線 / 孤立コード
+- AutoEvacuator + CompoundRiskAssessor 安全装置が register されず
+- DummyClient staging guard 構造バグで write 経路全交換不能
+- process_news_loop で dry_run=false 明示漏れ
+- logging handler 欠落で app.* INFO ログ全 drop
+- GPT-4o secondary_confidence=0 全件
+- cognitive_state injection 漏れ
+- _validate_model_config() startup hook 配線漏れ
+- aave_data_fetcher.py V2→V3 API 移行漏れ
+- factory が constructor 引数を供給せず属性未配線（make_aave_client が Web3AaveClient に token_addresses を渡さず build-tx が "Unknown asset"。複数生成経路で必須属性の供給有無を突き合わせる。#500）
+
+### 依存 / ライブラリバージョン
+- web3.py メジャー更新時の API drift（v6→v7 で `Contract.encodeABI()`→`encode_abi()`、`fn_name=`→位置引数。旧 API は `# type: ignore[attr-defined]` で mypy 検出を抑止していたため build-tx が runtime 500 になるまで気づかなかった）。依存更新 PR では camelCase web3 API（encodeABI/buildTransaction/rawTransaction 等）の残存を grep し、`# type: ignore[attr-defined]` を安易に付けない
+
+該当しそうなものがあれば、修正してから完了宣言する。同種が出たら個別修正でなく
+`scripts/launch_gate.sh` / CI gate に追加して再発防止する。
+
+---
+
+## 📐 CHECK制約と migration の二重管理ルール (Asana 1215272519685583)
+
+### ルール: models.py が唯一の真実源
+
+```
+backend/app/<module>/models.py  ←  CHECK 制約 enum の正とする
+        ↓ 従う
+alembic/versions/*.py           ←  models.py の enum を読んで CHECK を書く
+```
+
+**やってはいけない:**
+```python
+# migration 内で独自 enum を定義 → models.py と乖離しやすい
+sa.CheckConstraint("tier IN ('LOW','MIDDLE','HIGH')", name="ck_tier")
+```
+
+**やるべきこと:**
+```python
+# migration は models.py の enum 値リストを文字通り使う
+# または CheckConstraint を設けず application-layer で制御する
+# (値変更時は migration + models.py を同時に更新する)
+```
+
+### 背景
+fee_transactions の d4 migration が `'LOW','MIDDLE','HIGH'` を CHECK 制約に定義、
+一方 `models.py` は `'conservative','balanced','aggressive'` を使用していた。
+production 適用後の INSERT が IntegrityError になり、production fee schema が壊れた。
+
+### 確認コマンド
+```bash
+# CHECK 制約 enum と models.py の enum が一致するか grep で突き合わせ
+grep -rn "CheckConstraint\|IN (" alembic/versions/ | grep -v "^Binary"
+grep -rn "class.*Enum\|values\s*=\s*\[" backend/app/*/models.py
+```

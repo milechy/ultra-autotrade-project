@@ -153,7 +153,10 @@ def upgrade() -> None:
         ),
         sa.Column("finalized_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint("tier IN ('LOWER', 'MIDDLE', 'UPPER')", name="chk_fee_tx_tier"),
-        sa.CheckConstraint("risk_mode IN ('LOW', 'MIDDLE', 'HIGH')", name="chk_fee_tx_risk_mode"),
+        sa.CheckConstraint(
+            "risk_mode IN ('conservative', 'balanced', 'aggressive')",
+            name="chk_fee_tx_risk_mode",
+        ),
         sa.UniqueConstraint("user_id", "calculation_month", name="uq_fee_tx_user_month"),
     )
     op.create_index(

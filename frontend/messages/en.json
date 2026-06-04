@@ -85,7 +85,8 @@
     "allocationPnl": "PnL",
     "noAllocation": "No funds allocated yet",
     "allocationActive": "Active",
-    "allocationWithdrawn": "Withdrawn"
+    "allocationWithdrawn": "Withdrawn",
+    "pnlChart": "P&L History"
   },
   "Decisions": {
     "title": "AI Decision History",

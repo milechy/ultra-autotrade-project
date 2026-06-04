@@ -4,6 +4,7 @@
 import { useLiff } from '@/hooks/useLiff'
 import { useLiffAutoReAuth } from '@/hooks/useLiffAutoReAuth'
 import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
+import { PrivyRootClient } from '@/lib/wallet/PrivyRootClient'
 
 export default function LiffLayout({ children }: { children: React.ReactNode }) {
   const { isInitialized, error } = useLiff()
@@ -37,9 +38,9 @@ export default function LiffLayout({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <>
+    <PrivyRootClient>
       <SessionExpiryBanner loginHref="/liff-login" />
       {children}
-    </>
+    </PrivyRootClient>
   )
 }

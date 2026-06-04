@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -204,3 +205,46 @@ class TestGetPendleHealth:
             response = _client.get("/api/protocols/health/pendle")
 
         assert response.status_code == 503
+
+
+class TestStagingGuardRegression:
+    """P0-1 DummyClient staging guard 回帰テスト。
+
+    staging 環境で LIDO_SANDBOX=true / PENDLE_SANDBOX=true を設定しても
+    /api/protocols/health/* が 200 を返すことを HTTP レベルで検証する。
+    (旧 guard: 'staging' in ('staging', 'production') → RuntimeError → 500
+     新 guard: 'staging' == 'production' → False → DummyClient 利用可能 → 200)
+    """
+
+    def test_lido_health_staging_with_sandbox_returns_200(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """APP_ENV=staging + LIDO_SANDBOX=true で /health/lido が 200 を返すこと。"""
+        monkeypatch.setenv("APP_ENV", "staging")
+        monkeypatch.setenv("LIDO_SANDBOX", "true")
+        monkeypatch.setenv("PENDLE_SANDBOX", "true")
+        staging_client = TestClient(_app, raise_server_exceptions=False)
+        resp = staging_client.get("/api/protocols/health/lido")
+        assert resp.status_code == 200
+
+    def test_pendle_health_staging_with_sandbox_returns_200(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """APP_ENV=staging + PENDLE_SANDBOX=true で /health/pendle が 200 を返すこと。"""
+        monkeypatch.setenv("APP_ENV", "staging")
+        monkeypatch.setenv("LIDO_SANDBOX", "true")
+        monkeypatch.setenv("PENDLE_SANDBOX", "true")
+        staging_client = TestClient(_app, raise_server_exceptions=False)
+        resp = staging_client.get("/api/protocols/health/pendle")
+        assert resp.status_code == 200
+
+    def test_lido_health_production_with_sandbox_returns_5xx(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """APP_ENV=production + LIDO_SANDBOX=true で /health/lido が 5xx を返すこと。"""
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setenv("LIDO_SANDBOX", "true")
+        monkeypatch.setenv("PENDLE_SANDBOX", "true")
+        prod_client = TestClient(_app, raise_server_exceptions=False)
+        resp = prod_client.get("/api/protocols/health/lido")
+        assert resp.status_code in (500, 503)

@@ -1,0 +1,12 @@
+============================= test session starts =============================
+platform linux -- Python 3.11.4, pytest-7.4.0, pluggy-1.3.0
+rootdir: /tmp/fixture
+collected 6 items
+
+tests/foo.py .....                                                        [ 83%]
+tests/bar.py s                                                            [100%]
+
+=========================== short test summary info ============================
+SKIPPED [1] tests/bar.py:20: optional
+
+======================= 5 passed, 1 skipped in 1.23s ===========================

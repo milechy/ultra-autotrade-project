@@ -87,7 +87,7 @@ CREATE TABLE fee_transactions (
   finalized_at TIMESTAMP WITH TIME ZONE NULL,
 
   CONSTRAINT chk_fee_tx_tier CHECK (tier IN ('LOWER', 'MIDDLE', 'UPPER')),
-  CONSTRAINT chk_fee_tx_risk_mode CHECK (risk_mode IN ('LOW', 'MIDDLE', 'HIGH')),
+  CONSTRAINT chk_fee_tx_risk_mode CHECK (risk_mode IN ('conservative', 'balanced', 'aggressive')),
   CONSTRAINT uq_fee_tx_user_month UNIQUE (user_id, calculation_month)
 );
 
@@ -105,7 +105,7 @@ COMMENT ON TABLE fee_transactions IS
 COMMENT ON COLUMN fee_transactions.tier IS
   'v10 投資ティア (LOWER / MIDDLE / UPPER)';
 COMMENT ON COLUMN fee_transactions.risk_mode IS
-  'v10 リスクモード (LOW / MIDDLE / HIGH)';
+  'v10 リスクモード (conservative / balanced / aggressive) — F-3 RiskMode enum 内部値';
 COMMENT ON COLUMN fee_transactions.subscription_protected IS
   'サブスク控除によりユーザー手取りが負にならないよう保護されたか';
 

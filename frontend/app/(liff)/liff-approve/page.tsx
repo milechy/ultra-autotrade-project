@@ -1,83 +1,140 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 // frontend/app/(liff)/liff-approve/page.tsx
-// LIFF内承認画面 — URL: /liff-approve
+// LIFF チャット型承認画面 — /liff-approve
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLiff } from "@/hooks/useLiff";
+import { ChatHeader } from "./_components/ChatHeader";
+import { ProposalBubble, type Proposal } from "./_components/ProposalBubble";
+import {
+  DecisionHistoryItem,
+  type DecisionHistoryEntry,
+} from "./_components/DecisionHistoryItem";
+import { SystemMessageRow } from "./_components/SystemMessageRow";
+import { SystemDateSeparator } from "./_components/SystemDateSeparator";
+import { ActionBar, type ActionBarState } from "./_components/ActionBar";
+import { ApproveConfirmSheet } from "./_components/ApproveConfirmSheet";
+import { ChatLoadingSkeleton } from "./_components/ChatLoadingSkeleton";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-type Decision = {
-  id: number;
-  query: string;
-  action: string;
-  confidence: number;
-  reason: string | null;
-  primary_provider: string;
-  agreed: boolean;
-  created_at: string;
-};
-
-type ApprovalStatus = "idle" | "approving" | "rejecting" | "done" | "error";
+type SystemMsg = { id: string; text: string };
 
 export default function LiffApprovePage() {
   const { isReady, isLoggedIn, error } = useLiff();
-  const [latest, setLatest] = useState<Decision | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus>("idle");
-
   const token =
     typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
 
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [history, setHistory] = useState<DecisionHistoryEntry[]>([]);
+  const [extraCount, setExtraCount] = useState(0);
+
+  const [actionState, setActionState] = useState<ActionBarState>("idle");
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [systemMsgs, setSystemMsgs] = useState<SystemMsg[]>([]);
+
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // ---------- data fetch ----------
   useEffect(() => {
     if (!isReady || !isLoggedIn || !token) return;
 
     setLoading(true);
     setFetchError(null);
 
-    fetch(`${API_BASE}/api/ai/decisions/latest`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json() as Promise<Decision>;
+    Promise.all([
+      fetch(`${API_BASE}/api/proposals/pending`, {
+        headers: { Authorization: `Bearer ${token}` },
       })
-      .then((data) => setLatest(data))
-      .catch((err: unknown) =>
-        setFetchError(
-          err instanceof Error ? err.message : "データ取得に失敗しました"
-        )
-      )
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.items?.length) {
+            setProposal(data.items[0] as Proposal);
+            setExtraCount(Math.max(0, (data.total ?? 1) - 1));
+          }
+        }),
+      fetch(`${API_BASE}/api/ai/decisions?limit=20`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (Array.isArray(data?.items)) {
+            setHistory(data.items as DecisionHistoryEntry[]);
+          } else if (Array.isArray(data)) {
+            setHistory(data as DecisionHistoryEntry[]);
+          }
+        }),
+    ])
+      .catch(() => setFetchError("データ取得に失敗しました"))
       .finally(() => setLoading(false));
   }, [isReady, isLoggedIn, token]);
 
-  function handleApprove() {
-    setApprovalStatus("approving");
-    // 承認アクション: 実装はバックエンドAPIに依存。現時点はUIフローのみ。
-    setTimeout(() => setApprovalStatus("done"), 800);
+  // scroll to bottom when proposal appears
+  useEffect(() => {
+    if (proposal) {
+      setTimeout(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    }
+  }, [proposal]);
+
+  // ---------- action handlers ----------
+  function addSystemMsg(text: string) {
+    const id = `sys-${Date.now()}`;
+    setSystemMsgs((prev) => [...prev, { id, text }]);
   }
 
-  function handleReject() {
-    setApprovalStatus("rejecting");
-    setTimeout(() => setApprovalStatus("done"), 800);
+  async function handleRejectConfirm() {
+    if (!proposal || !token) return;
+    setActionState("rejecting");
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/proposals/${proposal.id}/reject`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      addSystemMsg("却下しました");
+      setActionState("done");
+      setProposal(null);
+    } catch {
+      setActionState("idle");
+    }
   }
 
-  // --- Loading state ---
+  function handleApproved(_txHash: string) {
+    setSheetOpen(false);
+    addSystemMsg("承認しました ✓");
+    setActionState("done");
+    setProposal(null);
+  }
+
+  function toDateLabel(dateStr: string) {
+    return new Date(dateStr).toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  }
+
+  // ---------- early returns ----------
   if (!isReady) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-zinc-950">
+      <div className="flex items-center justify-center min-h-dvh bg-zinc-950">
         <p className="text-zinc-400 text-sm">読み込み中...</p>
       </div>
     );
   }
 
-  // --- LIFF error ---
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
+      <div className="flex items-center justify-center min-h-dvh bg-zinc-950 px-4">
         <p className="text-red-400 text-sm text-center">
           LIFF初期化エラー: {error}
         </p>
@@ -85,136 +142,125 @@ export default function LiffApprovePage() {
     );
   }
 
-  // --- Not logged in ---
   if (!isLoggedIn) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
+      <div className="flex items-center justify-center min-h-dvh bg-zinc-950 px-4">
         <p className="text-zinc-400 text-sm">LINEアプリから開いてください</p>
       </div>
     );
   }
 
-  // --- Auth token missing ---
   if (!token) {
+    if (typeof window !== "undefined") {
+      window.location.replace("/liff-login");
+    }
     return (
-      <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
-        <p className="text-zinc-400 text-sm">
-          認証が必要です。ログインしてください。
-        </p>
+      <div className="flex items-center justify-center min-h-dvh bg-zinc-950 px-4">
+        <p className="text-zinc-400 text-sm">再認証中...</p>
       </div>
     );
   }
 
-  // --- Done ---
-  if (approvalStatus === "done") {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
-        <div className="text-center space-y-2">
-          <p className="text-green-400 text-lg font-semibold">完了しました</p>
-          <button
-            onClick={() => setApprovalStatus("idle")}
-            className="text-zinc-400 text-sm underline"
-          >
-            戻る
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const actionColor =
-    latest?.action === "BUY"
-      ? "text-green-400"
-      : latest?.action === "SELL"
-        ? "text-red-400"
-        : "text-yellow-400";
+  const actionBarState: ActionBarState = proposal ? actionState : "empty";
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 px-4 py-6 max-w-md mx-auto">
-      <h1 className="text-xl font-bold mb-6 text-center">取引承認</h1>
+    <div className="w-[375px] mx-auto h-dvh bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden">
+      <ChatHeader token={token} />
 
-      {loading && (
-        <p className="text-zinc-400 text-sm text-center">
-          最新の判定を取得中...
-        </p>
-      )}
-
-      {fetchError && (
-        <p className="text-red-400 text-sm text-center">{fetchError}</p>
-      )}
-
-      {!loading && !fetchError && latest === null && (
-        <p className="text-zinc-400 text-sm text-center">
-          承認待ちの判定はありません
-        </p>
-      )}
-
-      {latest && (
-        <div className="space-y-4">
-          {/* Decision card */}
-          <div className="bg-zinc-900 rounded-lg p-4 space-y-3 border border-zinc-800">
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-400 text-xs">判定 #{latest.id}</span>
-              <span className="text-zinc-500 text-xs">
-                {new Date(latest.created_at).toLocaleString("ja-JP")}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className={`text-2xl font-bold ${actionColor}`}>
-                {latest.action}
-              </span>
-              <span className="text-zinc-400 text-sm">
-                信頼度: {latest.confidence}%
-              </span>
-            </div>
-
-            {latest.reason && (
-              <p className="text-zinc-300 text-sm leading-relaxed">
-                {latest.reason}
-              </p>
+      {/* scrollable chat area */}
+      <div className="flex-1 overflow-y-auto pt-14 pb-24">
+        {loading ? (
+          <ChatLoadingSkeleton />
+        ) : (
+          <>
+            {/* fetch error */}
+            {fetchError && (
+              <div className="px-3 py-2">
+                <SystemMessageRow message={fetchError} />
+                <div className="flex justify-center mt-1">
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="text-xs text-zinc-400 underline"
+                  >
+                    再試行
+                  </button>
+                </div>
+              </div>
             )}
 
-            <div className="text-zinc-500 text-xs">
-              AI: {latest.primary_provider} /{" "}
-              {latest.agreed ? "合意済み" : "単独判定"}
-            </div>
+            {/* decision history with date separators */}
+            {history.length > 0 && (
+              <>
+                {(() => {
+                  let lastDate = "";
+                  return history.map((item) => {
+                    const dateLabel = toDateLabel(item.created_at);
+                    const showSep = dateLabel !== lastDate;
+                    lastDate = dateLabel;
+                    return (
+                      <div key={item.id}>
+                        {showSep && (
+                          <SystemDateSeparator date={dateLabel} />
+                        )}
+                        <DecisionHistoryItem item={item} />
+                      </div>
+                    );
+                  });
+                })()}
+              </>
+            )}
 
-            <div className="bg-zinc-800 rounded p-3">
-              <p className="text-zinc-400 text-xs font-medium mb-1">クエリ</p>
-              <p className="text-zinc-300 text-sm break-words">
-                {latest.query}
-              </p>
-            </div>
-          </div>
+            {/* system messages (approve/reject results) */}
+            {systemMsgs.map((msg) => (
+              <SystemMessageRow key={msg.id} message={msg.text} />
+            ))}
 
-          {/* Action buttons */}
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <button
-              onClick={handleApprove}
-              disabled={
-                approvalStatus === "approving" ||
-                approvalStatus === "rejecting"
-              }
-              className="bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed
-                         text-white font-semibold py-3 rounded-lg transition-colors text-sm"
-            >
-              {approvalStatus === "approving" ? "処理中..." : "承認する"}
-            </button>
+            {/* pending proposal bubble */}
+            {proposal && (
+              <>
+                <SystemDateSeparator date={toDateLabel(proposal.created_at)} />
+                <ProposalBubble proposal={proposal} />
+                {extraCount > 0 && (
+                  <p className="text-xs text-zinc-500 text-center mt-1 mb-2">
+                    他に {extraCount} 件の提案があります →
+                  </p>
+                )}
+              </>
+            )}
 
-            <button
-              onClick={handleReject}
-              disabled={
-                approvalStatus === "approving" ||
-                approvalStatus === "rejecting"
-              }
-              className="bg-red-700 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed
-                         text-white font-semibold py-3 rounded-lg transition-colors text-sm"
-            >
-              {approvalStatus === "rejecting" ? "処理中..." : "却下する"}
-            </button>
-          </div>
-        </div>
+            {/* empty state */}
+            {!proposal &&
+              actionState !== "done" &&
+              !fetchError &&
+              !loading && (
+                <div className="flex flex-col items-center justify-center py-16 text-zinc-600">
+                  <p className="text-sm">提案を待っています...</p>
+                </div>
+              )}
+
+            <div ref={bottomRef} />
+          </>
+        )}
+      </div>
+
+      {/* fixed bottom action bar */}
+      <ActionBar
+        state={actionBarState}
+        onApprove={() => setSheetOpen(true)}
+        onRejectRequest={() => setActionState("reject-confirm")}
+        onRejectConfirm={handleRejectConfirm}
+        onRejectCancel={() => setActionState("idle")}
+      />
+
+      {/* approve confirm bottom sheet (Privy 署名フロー) */}
+      {proposal && (
+        <ApproveConfirmSheet
+          proposal={proposal}
+          token={token}
+          open={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          onApproved={handleApproved}
+        />
       )}
     </div>
   );

@@ -35,13 +35,19 @@ class FakeAaveClient:
     def get_health_factor(self) -> Decimal:
         return self.health_factor
 
-    def deposit(self, asset_symbol: str, amount: Decimal) -> str:
+    def deposit(self, asset_symbol: str, amount: Decimal, wallet_address: str = "") -> str:
         self.deposit_calls.append((asset_symbol, amount))
         return "tx-deposit"
 
-    def withdraw(self, asset_symbol: str, amount: Decimal) -> str:
+    def withdraw(self, asset_symbol: str, amount: Decimal, wallet_address: str = "") -> str:
         self.withdraw_calls.append((asset_symbol, amount))
         return "tx-withdraw"
+
+    def build_deposit_txs(self, asset_symbol: str, amount: Decimal, wallet_address: str) -> dict:
+        return {"approve_tx": {}, "supply_tx": {}}
+
+    def build_withdraw_tx(self, asset_symbol: str, amount: Decimal, wallet_address: str) -> dict:
+        return {"withdraw_tx": {}}
 
 
 class FakeStateManager:

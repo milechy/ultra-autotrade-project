@@ -69,23 +69,26 @@ jobs:
           ruff check . --output-format=json > /tmp/ruff.json 2>&1 || true
           ISSUES=$(python3 -c "import json; d=json.load(open('/tmp/ruff.json')); print(len(d))" 2>/dev/null || echo "0")
           echo "issues=$ISSUES" >> "$GITHUB_OUTPUT"
-          ruff check . 2>&1 | tee /tmp/ruff.txt || true
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          ruff check . > /tmp/ruff.txt 2>&1 && EXIT=0 || EXIT=$?
+          cat /tmp/ruff.txt
+          echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
 
       - name: Ruff format check
         id: ruff_fmt
         continue-on-error: true
         run: |
-          ruff format --check . 2>&1 | tee /tmp/ruff_fmt.txt
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          ruff format --check . > /tmp/ruff_fmt.txt 2>&1 && EXIT=0 || EXIT=$?
+          cat /tmp/ruff_fmt.txt
+          echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
 
       # ─── Mypy ────────────────────────────────────────────────────
       - name: Mypy
         id: mypy
         continue-on-error: true
         run: |
-          mypy app/ --config-file ../pyproject.toml 2>&1 | tee /tmp/mypy.txt
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          mypy app/ --config-file ../pyproject.toml > /tmp/mypy.txt 2>&1 && EXIT=0 || EXIT=$?
+          cat /tmp/mypy.txt
+          echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
 
       # ─── Pytest ──────────────────────────────────────────────────
       - name: Pytest
@@ -97,8 +100,9 @@ jobs:
             --cov-report=term-missing \
             --cov-report=json:/tmp/coverage.json \
             --cov-fail-under=80 \
-            -q 2>&1 | tee /tmp/pytest.txt
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+            -q > /tmp/pytest.txt 2>&1 && EXIT=0 || EXIT=$?
+          cat /tmp/pytest.txt
+          echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
 
       # ─── PR Comment ──────────────────────────────────────────────
       - name: Post results as PR comment

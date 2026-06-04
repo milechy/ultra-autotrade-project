@@ -8,7 +8,13 @@ import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
 import { Toaster } from 'sonner'
 import { fetchAutomationStatus } from '@/lib/api/automation'
 import { PrivyRootClient } from '@/lib/wallet/PrivyRootClient'
+import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
+import { PrivySessionGuard } from '@/components/PrivySessionGuard'
 import type { AutomationStatus } from '@/lib/types'
+
+const isPrivyConfigured =
+  !!process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
+  process.env.NEXT_PUBLIC_PRIVY_APP_ID !== 'clplaceholder000000000000000000000'
 
 type SystemStatus = 'NORMAL' | 'PAUSED' | 'HARD_STOP'
 
@@ -72,6 +78,8 @@ export function UserProviders({ children }: { children: React.ReactNode }) {
       <AuthProvider>
         <SessionExpiryBanner loginHref="/login" />
         <AutomationStatusProvider>
+          <SessionExpiryBanner />
+          {isPrivyConfigured && <PrivySessionGuard />}
           {children}
           <Toaster position="top-center" richColors />
         </AutomationStatusProvider>

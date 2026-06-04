@@ -142,29 +142,42 @@ class MultiAgentContext(BaseModel):
     #: Minimum confidence required for either core agent to qualify as directional.
     _DIRECTIONAL_THRESHOLD: int = 70
 
+    #: fed_stance values that drop the macro axis from the AND requirement.
+    #: ASYMMETRIC BY DESIGN — see method docstrings below for the rationale.
+    _BULLISH_RELAX_FED_STANCES: frozenset[str] = frozenset({"unknown", "neutral"})
+    _BEARISH_RELAX_FED_STANCES: frozenset[str] = frozenset({"unknown"})
+
     def indicator_and_macro_agree_bearish(self) -> bool:
         """Return True only when BOTH Indicator AND Macro agents are BEARISH >= threshold.
 
         Purpose: prevent a single continuously-BEARISH Macro Agent from triggering
-        repeated SELL signals (root cause of the SELL-spam issue on v4 prompts).
+        repeated SELL signals (root cause of the SELL-spam issue, #365, on v4
+        prompts).
 
         Evaluated by the Python rule engine BEFORE the LLM call so the guard is
         deterministic and cannot be overridden by the LLM's prompt interpretation.
 
-        fed_stance="unknown" branch (2026-05-26): when the FED signal is unavailable
-        (e.g. Perplexity Finance returned no usable data), the macro agent's
-        confidence floor of 25 would permanently block SELL. In that case drop the
-        macro axis from the AND requirement and qualify on Indicator alone. The
-        COMPOUND RISK guard (service.py Guard 1, evaluated before this method) is
-        the safety net that keeps SELL from running away in that mode. The
-        fed_stance="neutral" case is intentionally NOT relaxed — neutral means data
-        exists but the signal is non-directional, which is a meaningful HOLD vote.
+        fed_stance="unknown" branch (2026-05-26): when the FED signal is
+        unavailable (e.g. Perplexity Finance returned no usable data), the macro
+        agent's confidence floor of 25 would permanently block SELL. In that case
+        drop the macro axis from the AND requirement and qualify on Indicator
+        alone. The COMPOUND RISK guard (service.py Guard 1, evaluated before this
+        method) is the safety net that keeps SELL from running away in that mode.
+
+        fed_stance="neutral" is INTENTIONALLY NOT relaxed on the SELL side
+        (asymmetric vs. the BULLISH counterpart). Rationale: #365 root cause was a
+        single BEARISH agent firing repeated SELL. Permitting Indicator-only SELL
+        whenever the macro is merely "neutral" would reopen exactly that failure
+        mode — neutral macro is the common case and Indicator BEARISH conf>=70 is
+        easy to reach on a single low-HF read. Keeping the AND requirement on the
+        SELL path means a real, directional macro vote (hawkish + sufficient
+        confidence) is still required before any SELL can clear the guard.
         """
         ind = self.indicator_signal
         mac = self.macro_signal
         if ind is None or mac is None:
             return False
-        if mac.key_data.get("fed_stance") == "unknown":
+        if mac.key_data.get("fed_stance") in self._BEARISH_RELAX_FED_STANCES:
             return ind.bias == Bias.BEARISH and ind.confidence >= self._DIRECTIONAL_THRESHOLD
         return (
             ind.bias == Bias.BEARISH
@@ -176,17 +189,32 @@ class MultiAgentContext(BaseModel):
     def indicator_and_macro_agree_bullish(self) -> bool:
         """Return True only when BOTH Indicator AND Macro agents are BULLISH >= threshold.
 
-        Symmetric guard to prevent single-agent BULLISH from triggering BUY.
+        Symmetric AND guard to prevent single-agent BULLISH from triggering BUY,
+        with an ASYMMETRIC neutral relaxation (see below) so BUY entries are not
+        permanently blocked while the #365 SELL-spam guard is preserved.
 
-        See ``indicator_and_macro_agree_bearish`` for the fed_stance="unknown"
-        branch rationale; the same relaxation applies here so BUY is not
-        permanently blocked when FED data is unavailable.
+        fed_stance="unknown" branch: same rationale as the BEARISH counterpart —
+        when FED data is missing, the macro confidence floor of 25 makes AND
+        unreachable.
+
+        fed_stance="neutral" branch (T1-B, 2026-05-28): observed staging soak ran
+        100% HOLD because the macro feed reports "neutral" (data present, no
+        directional bias) far more often than "unknown", and the macro confidence
+        collapses to its 25 floor. With Indicator BULLISH conf>=70 already
+        achievable on favourable on-chain data (util<30, APY>5), the AND
+        requirement is the lone hard block on the BUY path. Dropping the macro
+        axis when fed=neutral lets favourable on-chain conditions clear the
+        guard. The asymmetric choice (BUY relaxed, SELL not) is deliberate:
+        permitting Indicator-only SELL on neutral macro reopens #365; Indicator-
+        only BUY does not, because BUY proposals are clamped to $50-$2000 per
+        user downstream and the COMPOUND RISK guard remains upstream of this
+        method.
         """
         ind = self.indicator_signal
         mac = self.macro_signal
         if ind is None or mac is None:
             return False
-        if mac.key_data.get("fed_stance") == "unknown":
+        if mac.key_data.get("fed_stance") in self._BULLISH_RELAX_FED_STANCES:
             return ind.bias == Bias.BULLISH and ind.confidence >= self._DIRECTIONAL_THRESHOLD
         return (
             ind.bias == Bias.BULLISH
@@ -202,11 +230,25 @@ class MultiAgentContext(BaseModel):
 def indicator_agent(ctx: MarketContext) -> AgentSignal:
     """Analyze Aave on-chain indicators (utilization, APY, HF).
 
-    Rules:
-    - HF < 1.6 → bearish (liquidation risk)
-    - HF 1.6-2.0 → neutral (safe but watch)
-    - HF > 2.0 → bullish (plenty of room)
-    - High utilization (>80%) → bearish (less liquidity, higher rates)
+    Scoring (2026-05-27 — neutral-stuck mitigation):
+      The original three-tier HF curve produced a -25 step-function at HF=2.0
+      (1.99 → -10, 2.00 → +15) and left the dominant "moderately healthy" case
+      (HF 1.7-1.99 / util 50-80% / APY 2-4%) at score=40 → NEUTRAL, blocking the
+      v4/v5 AND-condition (Indicator+Macro both ≥70% conf) and pinning soak HOLD
+      at ~100%.
+
+      Mitigation: replace the three-tier HF with a smoother five-band curve,
+      reward moderate utilization (ample liquidity) instead of only <50%, and
+      add a mild bearish nudge when supply APY collapses (yield compression).
+      This lets realistic-but-favourable data clear score≥65 and confidence≥70.
+
+    Rules (post-fix):
+    - HF < 1.6 → strongly bearish; HF 1.6-1.75 → bearish; 1.75-1.9 → mild cau-
+      tion; 1.9-2.1 → mild comfort; 2.1-2.5 → bullish; ≥2.5 → strongly bullish.
+    - Util >85% → bearish; 70-85% → mild caution; 30-70% → mild comfort;
+      <30% → bullish (ample liquidity).
+    - Supply APY >5% → bullish (attractive yield); <1% → mild bearish (yield
+      compression suggests over-supply / weak demand).
     """
     hf = ctx.health_factor
     util = ctx.aave_utilization_rate
@@ -222,27 +264,47 @@ def indicator_agent(ctx: MarketContext) -> AgentSignal:
         if hf_float < 1.6:
             score -= 40
             reasons.append(f"HF={hf} is critically low")
-        elif hf_float < 2.0:
-            score -= 10
+        elif hf_float < 1.75:
+            score -= 18
+            reasons.append(f"HF={hf} is thin — liquidation risk if price moves")
+        elif hf_float < 1.9:
+            score -= 6
             reasons.append(f"HF={hf} is acceptable but watch closely")
-        else:
-            score += 15
+        elif hf_float < 2.1:
+            score += 8
+            reasons.append(f"HF={hf} provides reasonable buffer")
+        elif hf_float < 2.5:
+            score += 16
             reasons.append(f"HF={hf} provides comfortable buffer")
+        else:
+            score += 22
+            reasons.append(f"HF={hf} provides ample buffer")
 
     if util is not None:
+        util_float = float(util)
         key_data["utilization_rate"] = str(util)
-        if float(util) > 80:
-            score -= 15
-            reasons.append(f"Utilization at {util}% — liquidity pressure")
-        elif float(util) < 50:
-            score += 10
+        if util_float > 85:
+            score -= 18
+            reasons.append(f"Utilization at {util}% — heavy liquidity pressure")
+        elif util_float > 70:
+            score -= 4
+            reasons.append(f"Utilization at {util}% — elevated, monitor")
+        elif util_float >= 30:
+            score += 6
             reasons.append(f"Utilization at {util}% — healthy liquidity")
+        else:
+            score += 12
+            reasons.append(f"Utilization at {util}% — ample liquidity")
 
     if supply_apy is not None:
+        apy_float = float(supply_apy)
         key_data["supply_apy"] = str(supply_apy)
-        if float(supply_apy) > 5:
+        if apy_float > 5:
             score += 10
             reasons.append(f"Supply APY at {supply_apy}% — attractive yield")
+        elif apy_float < 1:
+            score -= 6
+            reasons.append(f"Supply APY at {supply_apy}% — yield compressed, weak demand")
 
     if score >= 65:
         bias = Bias.BULLISH
@@ -431,6 +493,16 @@ def macro_agent(ctx: MarketContext) -> AgentSignal:
     elif fed == "hawkish":
         score -= 15
         reasons.append("FED hawkish — capital may flow to higher TradFi rates")
+    elif fed == "neutral":
+        # T1-C (2026-05-28): mild bullish lift on the BUY-side macro reading.
+        # fed=neutral is the dominant staging case and used to leave score
+        # untouched at 50 → confidence collapsed to the 25 floor. A small +5
+        # nudge keeps bias=NEUTRAL but pushes confidence enough that, combined
+        # with news=positive, Macro lands closer to directional. SELL path is
+        # not affected: a +5 on neutral makes a BEARISH outcome strictly
+        # harder, never easier — so #365 (SELL-spam) is not reopened by this.
+        score += 5
+        reasons.append("FED neutral — no immediate tightening, mildly supportive")
 
     if ctx.finance.key_indicators:
         key_data["indicators"] = ctx.finance.key_indicators[:3]

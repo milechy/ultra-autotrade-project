@@ -279,11 +279,21 @@ class AaveClient(Protocol):
     def get_health_factor(self) -> Optional[Decimal]:
         """現在のポジションのヘルスファクターを返す。"""
 
-    def deposit(self, asset_symbol: str, amount: Decimal) -> str:
+    def deposit(self, asset_symbol: str, amount: Decimal, wallet_address: str = "") -> str:
         """指定したトークンを Aave に deposit する。"""
 
-    def withdraw(self, asset_symbol: str, amount: Decimal) -> str:
+    def withdraw(self, asset_symbol: str, amount: Decimal, wallet_address: str = "") -> str:
         """指定したトークンを Aave から withdraw する。"""
+
+    def build_deposit_txs(
+        self, asset_symbol: str, amount: Decimal, wallet_address: str
+    ) -> "dict[str, Any]":
+        """パートナー署名用: 未署名の approve + supply トランザクションを返す。"""
+
+    def build_withdraw_tx(
+        self, asset_symbol: str, amount: Decimal, wallet_address: str
+    ) -> "dict[str, Any]":
+        """パートナー署名用: 未署名の withdraw トランザクションを返す。"""
 
     def get_account_data(self, wallet_address: str) -> "AccountData":
         """Aave V3 Pool のアカウントデータを取得する。"""
@@ -360,6 +370,45 @@ class DummyAaveClient(AaveClientBase):
             "dry_run": dry_run,
         }
 
+    def build_deposit_txs(
+        self,
+        asset_symbol: str,
+        amount: Decimal,
+        wallet_address: str,
+    ) -> "dict[str, Any]":
+        return {
+            "approve_tx": {
+                "to": "0xDUMMY",
+                "data": "0x",
+                "from": wallet_address,
+                "chainId": 84532,
+                "value": "0x0",
+            },
+            "supply_tx": {
+                "to": "0xDUMMY",
+                "data": "0x",
+                "from": wallet_address,
+                "chainId": 84532,
+                "value": "0x0",
+            },
+        }
+
+    def build_withdraw_tx(
+        self,
+        asset_symbol: str,
+        amount: Decimal,
+        wallet_address: str,
+    ) -> "dict[str, Any]":
+        return {
+            "withdraw_tx": {
+                "to": "0xDUMMY",
+                "data": "0x",
+                "from": wallet_address,
+                "chainId": 84532,
+                "value": "0x0",
+            }
+        }
+
 
 class Web3AaveClient(AaveClientBase):
     """
@@ -378,6 +427,7 @@ class Web3AaveClient(AaveClientBase):
         pool_address: Optional[str] = None,
         settings: Optional[AaveSettings] = None,
         flashbots_rpc_url: Optional[str] = None,
+        token_addresses: Optional[dict[str, str]] = None,
     ) -> None:
         # 2026-05-01: pool_address のデフォルトを Sepolia hardcode から None に変更。
         # 旧デフォルトは mainnet 切替後に silent regression (testnet pool に書き込み) を
@@ -465,6 +515,17 @@ class Web3AaveClient(AaveClientBase):
                 raise AaveClientError(
                     "eth-account package is required. Install with: pip install eth-account"
                 ) from exc
+
+        # マルチチェーン経路（settings 無し）での token_addresses 配線。
+        # make_aave_client(chain_name=...) が chains.py の chain_config.tokens を渡す。
+        # これが無いと build_deposit_txs / build_withdraw_tx が hasattr ガードで
+        # "Unknown asset" を投げ、non-custodial partner 署名フロー (build-tx) が
+        # 500 になる（2026-06-02 launch ブロッカー修正）。
+        # settings 経路が既に self.token_addresses を設定済みの場合は上書きしない。
+        if token_addresses and not hasattr(self, "token_addresses"):
+            self.token_addresses = {
+                symbol: Web3.to_checksum_address(addr) for symbol, addr in token_addresses.items()
+            }
 
         logger.info(
             "Web3AaveClient 初期化完了 (pool=%s...%s)",
@@ -597,10 +658,11 @@ class Web3AaveClient(AaveClientBase):
             if not asset_addr:
                 raise AaveClientError(f"Unknown asset: {asset_symbol}")
             asset_address = asset_addr
-            if hasattr(self, "account"):
-                wallet_address = self.account.address
-            else:
-                raise AaveClientError("No wallet configured")
+            if not wallet_address:
+                if hasattr(self, "account"):
+                    wallet_address = self.account.address
+                else:
+                    raise AaveClientError("No wallet configured")
 
         # 後方互換: asset_address が "0x" で始まらない場合は asset_symbol として扱う
         if asset_address and not asset_address.startswith("0x"):
@@ -611,10 +673,11 @@ class Web3AaveClient(AaveClientBase):
             if not asset_addr:
                 raise AaveClientError(f"Unknown asset: {_sym}")
             asset_address = asset_addr
-            if hasattr(self, "account"):
-                wallet_address = self.account.address
-            else:
-                raise AaveClientError("No wallet configured")
+            if not wallet_address:
+                if hasattr(self, "account"):
+                    wallet_address = self.account.address
+                else:
+                    raise AaveClientError("No wallet configured")
 
         # amount バリデーション
         if amount <= 0:
@@ -822,10 +885,11 @@ class Web3AaveClient(AaveClientBase):
             if not asset_addr:
                 raise AaveClientError(f"Unknown asset: {asset_symbol}")
             asset_address = asset_addr
-            if hasattr(self, "account"):
-                wallet_address = self.account.address
-            else:
-                raise AaveClientError("No wallet configured")
+            if not wallet_address:
+                if hasattr(self, "account"):
+                    wallet_address = self.account.address
+                else:
+                    raise AaveClientError("No wallet configured")
 
         # 後方互換: asset_address が "0x" で始まらない場合は asset_symbol として扱う
         if asset_address and not asset_address.startswith("0x"):
@@ -836,10 +900,11 @@ class Web3AaveClient(AaveClientBase):
             if not asset_addr:
                 raise AaveClientError(f"Unknown asset: {_sym}")
             asset_address = asset_addr
-            if hasattr(self, "account"):
-                wallet_address = self.account.address
-            else:
-                raise AaveClientError("No wallet configured")
+            if not wallet_address:
+                if hasattr(self, "account"):
+                    wallet_address = self.account.address
+                else:
+                    raise AaveClientError("No wallet configured")
 
         if amount <= 0:
             raise ValueError(f"withdraw amount must be positive, got {amount}")
@@ -935,6 +1000,118 @@ class Web3AaveClient(AaveClientBase):
         except Exception as exc:
             raise AaveClientError(f"withdraw 失敗: {exc}") from exc
 
+    def build_deposit_txs(
+        self,
+        asset_symbol: str,
+        amount: Decimal,
+        wallet_address: str,
+    ) -> "dict[str, Any]":
+        """
+        パートナー本人署名用: 未署名の approve + supply トランザクションを構築して返す。
+
+        サーバー鍵では署名しない。フロントエンドが Privy sendTransaction() で送信する。
+
+        Returns:
+            {
+                "approve_tx": {to, data, from, chainId, value},
+                "supply_tx": {to, data, from, chainId, value},
+            }
+        """
+        if Web3 is None:
+            raise AaveClientError("web3 package is required")
+        if not wallet_address:
+            raise AaveClientError("wallet_address は必須です (partner 署名)")
+
+        # asset_symbol → address 解決
+        if not hasattr(self, "token_addresses"):
+            raise AaveClientError(f"Unknown asset: {asset_symbol}")
+        asset_address = self.token_addresses.get(asset_symbol)
+        if not asset_address:
+            raise AaveClientError(f"Unknown asset: {asset_symbol}")
+
+        token_contract = self._w3.eth.contract(
+            address=Web3.to_checksum_address(asset_address),
+            abi=_ERC20_ABI_MINIMAL,
+        )
+        decimals = token_contract.functions.decimals().call()
+        amount_wei = self._to_wei(amount, decimals)
+        checksum_wallet = Web3.to_checksum_address(wallet_address)
+        pool_address = self._pool.address
+        chain_id = self._w3.eth.chain_id
+
+        # web3.py v7: Contract.encodeABI() は廃止され encode_abi() に改名
+        # (fn_name= キーワードも abi_element_identifier 位置引数に変更)。
+        approve_data = token_contract.encode_abi("approve", args=[pool_address, amount_wei])
+        supply_data = self._pool.encode_abi(
+            "supply",
+            args=[Web3.to_checksum_address(asset_address), amount_wei, checksum_wallet, 0],
+        )
+
+        return {
+            "approve_tx": {
+                "to": Web3.to_checksum_address(asset_address),
+                "data": approve_data,
+                "from": checksum_wallet,
+                "chainId": chain_id,
+                "value": "0x0",
+            },
+            "supply_tx": {
+                "to": str(pool_address),
+                "data": supply_data,
+                "from": checksum_wallet,
+                "chainId": chain_id,
+                "value": "0x0",
+            },
+        }
+
+    def build_withdraw_tx(
+        self,
+        asset_symbol: str,
+        amount: Decimal,
+        wallet_address: str,
+    ) -> "dict[str, Any]":
+        """
+        パートナー本人署名用: 未署名の withdraw トランザクションを構築して返す。
+
+        Returns:
+            {"withdraw_tx": {to, data, from, chainId, value}}
+        """
+        if Web3 is None:
+            raise AaveClientError("web3 package is required")
+        if not wallet_address:
+            raise AaveClientError("wallet_address は必須です (partner 署名)")
+
+        if not hasattr(self, "token_addresses"):
+            raise AaveClientError(f"Unknown asset: {asset_symbol}")
+        asset_address = self.token_addresses.get(asset_symbol)
+        if not asset_address:
+            raise AaveClientError(f"Unknown asset: {asset_symbol}")
+
+        token_contract = self._w3.eth.contract(
+            address=Web3.to_checksum_address(asset_address),
+            abi=_ERC20_ABI_MINIMAL,
+        )
+        decimals = token_contract.functions.decimals().call()
+        amount_wei = self._to_wei(amount, decimals)
+        checksum_wallet = Web3.to_checksum_address(wallet_address)
+        chain_id = self._w3.eth.chain_id
+
+        # web3.py v7: encodeABI → encode_abi（fn_name= → 位置引数）
+        withdraw_data = self._pool.encode_abi(
+            "withdraw",
+            args=[Web3.to_checksum_address(asset_address), amount_wei, checksum_wallet],
+        )
+
+        return {
+            "withdraw_tx": {
+                "to": str(self._pool.address),
+                "data": withdraw_data,
+                "from": checksum_wallet,
+                "chainId": chain_id,
+                "value": "0x0",
+            }
+        }
+
     # 後方互換: 旧 Web3AaveClient が持っていたユーティリティメソッド
     def _to_wei(self, amount: Decimal, decimals: int) -> int:
         """Decimal → Wei（最小単位）変換。"""
@@ -973,6 +1150,9 @@ def make_aave_client(
     if client_type == "dummy":
         return DummyAaveClient()
     if client_type == "web3":
+        # chain_config.tokens を client に配線するためのマップ（chain_name 経路のみ）。
+        # 未配線だと build_deposit_txs / build_withdraw_tx が "Unknown asset" を投げる。
+        token_addresses: Optional[dict[str, str]] = None
         if chain_name is not None:
             from .chains import get_chain_config, get_rpc_url_for_chain
 
@@ -984,6 +1164,7 @@ def make_aave_client(
                 if chain_config.flashbots_rpc_env_var is not None
                 else None
             )
+            token_addresses = chain_config.tokens
         if not rpc_url:
             raise ValueError("AAVE_CLIENT_TYPE=web3 の場合は AAVE_RPC_URL が必須です")
 
@@ -1001,11 +1182,21 @@ def make_aave_client(
         # pool_address 未指定 + network 既知 → network から解決
         if pool_address is None and network is not None and network in _network_pool:
             pool_address = _network_pool[network]
-        return Web3AaveClient(
+        client = Web3AaveClient(
             rpc_url=rpc_url,
             pool_address=pool_address,
             flashbots_rpc_url=flashbots_rpc_url,
+            token_addresses=token_addresses,
         )
+        # chain_name 経由時は chain config のトークンアドレスを注入する。
+        # Web3AaveClient.__init__ は settings=None の場合に token_addresses を設定しないため
+        # build_deposit_txs / build_withdraw_tx が "Unknown asset" で失敗する (method2 バグ修正)。
+        if token_addresses and not hasattr(client, "token_addresses"):
+            client.token_addresses = {
+                sym: Web3.to_checksum_address(addr)
+                for sym, addr in token_addresses.items()
+            }
+        return client
     raise ValueError(f"不明な AAVE_CLIENT_TYPE: {client_type!r} (dummy | web3)")
 
 

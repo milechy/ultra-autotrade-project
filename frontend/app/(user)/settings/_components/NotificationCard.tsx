@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { PushNotificationToggle } from '@/components/pwa'
@@ -17,6 +18,9 @@ interface NotificationCardProps {
   onEmailChange: (value: string) => void
   frequency: NotificationFrequency
   onFrequencyChange: (value: NotificationFrequency) => void
+  lineMonthlyOptIn: boolean
+  onLineMonthlyOptInChange: (value: boolean) => void
+  isLineUser: boolean
 }
 
 const frequencyOptions: { value: NotificationFrequency; label: string; description: string }[] = [
@@ -30,6 +34,9 @@ export function NotificationCard({
   onEmailChange,
   frequency,
   onFrequencyChange,
+  lineMonthlyOptIn,
+  onLineMonthlyOptInChange,
+  isLineUser,
 }: NotificationCardProps) {
   return (
     <Card className="bg-zinc-900 border-zinc-800">
@@ -59,6 +66,24 @@ export function NotificationCard({
         <div className="space-y-1.5">
           <PushNotificationToggle />
         </div>
+
+        {/* LINE 月次レポート通知 — LINE ログインユーザーのみ表示 */}
+        {isLineUser && (
+          <div className="flex items-center justify-between rounded-lg border border-zinc-700 bg-zinc-800/40 p-3">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium text-zinc-100">LINE 月次レポート</Label>
+              <p className="text-xs text-zinc-400">毎月1日に運用サマリーを LINE で受け取る</p>
+            </div>
+            <Switch
+              checked={lineMonthlyOptIn}
+              onCheckedChange={(checked) => {
+                onLineMonthlyOptInChange(checked)
+                toast(checked ? 'LINE 月次レポートを有効にしました' : 'LINE 月次レポートを無効にしました')
+              }}
+              aria-label="LINE月次レポート通知"
+            />
+          </div>
+        )}
 
         {/* 通知頻度 */}
         <div className="space-y-2">

@@ -95,8 +95,11 @@ def test_aave_data_safe_partial_success_health_factor_only():
     assert result["borrow_apy"] is None
 
 
-def test_aave_data_safe_inf_health_factor_returns_none():
-    """HF=inf (借入なし) の場合、health_factor は None になり Pool データは正常取得されること。
+def test_aave_data_safe_inf_health_factor_propagates():
+    """HF=inf (借入なし) の場合、health_factor は Decimal("inf") のまま伝播し Pool データも正常取得されること。
+
+    修正前は inf を None に潰していたが、「借入なし（清算リスクゼロ）」と
+    「取得失敗（不明）」を区別するため inf をそのまま返す。
 
     Pool: currentLiquidityRate=5% APR ray, currentVariableBorrowRate=8% APR ray
     aToken.totalSupply = 1,000,000 USDC (1e12 at 6 decimals)
@@ -122,7 +125,9 @@ def test_aave_data_safe_inf_health_factor_returns_none():
     ):
         result = fetch_aave_market_data_safe()
 
-    assert result["health_factor"] is None
+    assert result["health_factor"] == Decimal("inf"), (
+        "HF=inf (借入なし) は None ではなく Decimal('inf') を返すべき"
+    )
     assert result["utilization_rate"] is not None
     assert abs(result["utilization_rate"] - Decimal("85")) < Decimal("0.01")
     # 5% APR ray → 約 5.127% APY (連続複利近似)
@@ -131,6 +136,26 @@ def test_aave_data_safe_inf_health_factor_returns_none():
     # 8% APR ray → 約 8.328% APY
     assert result["borrow_apy"] is not None
     assert abs(result["borrow_apy"] - Decimal("8.328")) < Decimal("0.01")
+
+
+def test_aave_data_safe_none_health_factor_returns_none():
+    """get_health_factor() が None を返した場合 (取得失敗)、health_factor は None になること。
+
+    HF=inf (借入なし) と HF=None (取得失敗) を同じ None に潰さないことを確認する。
+    """
+    mock_client = MagicMock()
+    mock_client.get_health_factor.return_value = None
+    mock_client.w3.eth.contract.side_effect = Exception("skip")
+
+    with patch(
+        "app.automation.aave_data_fetcher.get_default_aave_client",
+        return_value=mock_client,
+    ):
+        result = fetch_aave_market_data_safe()
+
+    assert result["health_factor"] is None, (
+        "get_health_factor() が None を返した場合は None のまま返すべき"
+    )
 
 
 def test_aave_data_safe_calls_get_health_factor_no_args():

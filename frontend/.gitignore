@@ -25,6 +25,10 @@ yarn-error.log*
 # local env files
 .env*.local
 
+# E2E credentials (本物の値は /opt/ultra-autotrade/.env.e2e に置く、commit 禁止)
+# テンプレートは .env.e2e.example のみ commit する
+.env.e2e
+
 # vercel
 .vercel
 
