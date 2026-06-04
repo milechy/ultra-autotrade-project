@@ -378,7 +378,8 @@ def test_fee_usd_calculation(fee_jpy, sub_jpy, excess_jpy, rate, expected_usd):
 # Lane R: transfer_service / AllowanceService (EIP-2612 新インタフェース)
 # ===========================================================================
 
-from app.fees.transfer_service import FeeTransferResult, FeeTransferService as NewFeeTransferService  # noqa: E402
+from app.fees.transfer_service import FeeTransferResult  # noqa: E402
+from app.fees.transfer_service import FeeTransferService as NewFeeTransferService  # noqa: E402
 
 
 class TestFeeTransferServiceDisabled:
