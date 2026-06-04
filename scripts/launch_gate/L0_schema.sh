@@ -27,6 +27,12 @@ PROJECT_ROOT="$(gate_project_root)"
 GAP_SCRIPT="${PROJECT_ROOT}/scripts/check_db_migration_gap.sh"
 LABEL="L0 schema"
 
+# ENV_TARGET が明示設定された場合はその1環境のみ、未指定時は staging / production 両方
+if [[ -n "${ENV_TARGET:-}" ]]; then
+  run_envs=("${ENV_TARGET}")
+else
+  run_envs=(staging production)
+fi
 ENV_TARGET="${ENV_TARGET:-staging}"
 
 if [[ ! -x "${GAP_SCRIPT}" && ! -f "${GAP_SCRIPT}" ]]; then
@@ -36,22 +42,21 @@ fi
 
 # dev VPS からは prod DB に届かないので skip-with-instructions
 if is_dev_vps; then
-  cat <<EOF
-[INFO] L0 schema: dev VPS のため prod / staging DB に直接アクセスできません。
-       prod VPS (77.42.46.155) で以下を順に実行し、両方 exit 0 を確認してください:
-
-         bash ${GAP_SCRIPT} --env=staging
-         bash ${GAP_SCRIPT} --env=production
-
-       両方 0 でない場合は alembic head に gap あり → launch 不可。
-EOF
-  gate_record SKIP "${LABEL}" "dev VPS のため手動実行 (prod VPS で check_db_migration_gap.sh --env={staging,production})"
+  echo "[INFO] L0 schema: dev VPS のため DB に直接アクセスできません。"
+  echo "       prod VPS (77.42.46.155) で以下を実行し、exit 0 を確認してください:"
+  echo ""
+  for env in "${run_envs[@]}"; do
+    echo "         bash ${GAP_SCRIPT} --env=${env}"
+  done
+  echo ""
+  echo "       0 でない場合は alembic head に gap あり → launch 不可。"
+  gate_record SKIP "${LABEL}" "dev VPS のため手動実行 (prod VPS で check_db_migration_gap.sh --env={${run_envs[*]}})"
   exit 0
 fi
 
 # prod / staging 側 (本物の VPS) で実行された場合
 fail_envs=()
-for env in staging production; do
+for env in "${run_envs[@]}"; do
   echo "--- L0 schema: ${env} ---"
   if bash "${GAP_SCRIPT}" --env="${env}"; then
     echo "  [ok] ${env}"
@@ -62,7 +67,7 @@ for env in staging production; do
 done
 
 if [[ "${#fail_envs[@]}" -eq 0 ]]; then
-  gate_record PASS "${LABEL}" "staging / production alembic gap なし"
+  gate_record PASS "${LABEL}" "${run_envs[*]} alembic gap なし"
   exit 0
 fi
 

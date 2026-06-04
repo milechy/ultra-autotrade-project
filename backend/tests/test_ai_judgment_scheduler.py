@@ -243,6 +243,8 @@ def test_run_job_buy_creates_proposals(db_session):
         assert p.asset == "USDC"
         assert p.amount == Decimal("1000")
         assert p.amount_usd == Decimal("1000.00")
+        assert p.estimated_gas_usd is not None
+        assert p.estimated_gas_usd > Decimal("0")
 
 
 def test_run_job_saves_to_ai_decisions(db_session):
@@ -287,6 +289,8 @@ def test_run_job_sell_creates_withdraw_proposals(db_session):
     proposals = db_session.scalars(select(Proposal)).all()
     assert len(proposals) == 1
     assert proposals[0].operation == "WITHDRAW"
+    assert proposals[0].estimated_gas_usd is not None
+    assert proposals[0].estimated_gas_usd > Decimal("0")
 
 
 # ---------------------------------------------------------------------------

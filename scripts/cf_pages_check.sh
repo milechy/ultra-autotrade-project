@@ -8,7 +8,11 @@
 # Usage:
 #   scripts/cf_pages_check.sh --host app.ultra-auto-trade.com
 #   scripts/cf_pages_check.sh --host app.ultra-auto-trade.com --backend-health /health
+#   scripts/cf_pages_check.sh --host app.ultra-auto-trade.com --api-host api.ultra-auto-trade.com
 #   scripts/cf_pages_check.sh --host app.ultra-auto-trade.com --skip 6   # 6番をスキップ
+#
+# --api-host: フロントエンドと API バックエンドが別 host の場合に指定。
+#             省略時は --host の値を API チェック (3番 tunnel) にも使う。
 #
 # Exit code:
 #   0 = 全 7 項目 PASS
@@ -23,6 +27,7 @@
 set -uo pipefail
 
 HOST=""
+API_HOST=""             # 省略時は HOST を使用 (フロントと API が同 host の場合)
 BACKEND_HEALTH="/health"
 ASSET_PATH=""           # 空なら /_next/static の最初の js を自動検出
 BAD_PATH="/.env"
@@ -34,7 +39,8 @@ usage() {
 Usage: cf_pages_check.sh --host <host> [options]
 
 Options:
-  --host <host>             対象 host (必須、例: app.ultra-auto-trade.com)
+  --host <host>             フロントエンド host (必須、例: app.ultra-auto-trade.com)
+  --api-host <host>         バックエンド API host (3番 tunnel チェックに使用。省略時は --host と同じ)
   --backend-health <path>   3) tunnel reachable で叩く path (default: /health)
   --asset-path <path>       7) cache header チェック対象 (default: 自動検出)
   --bad-path <path>         2) WAF block 想定 path (default: /.env)
@@ -56,6 +62,7 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --host)            HOST="$2"; shift 2 ;;
+    --api-host)        API_HOST="$2"; shift 2 ;;
     --backend-health)  BACKEND_HEALTH="$2"; shift 2 ;;
     --asset-path)      ASSET_PATH="$2"; shift 2 ;;
     --bad-path)        BAD_PATH="$2"; shift 2 ;;
@@ -131,12 +138,13 @@ check_2_waf() {
 # ── 3) Tunnel reachable (/health 200) ───────────────
 check_3_tunnel() {
   if is_skipped 3; then set_result 3 SKIP "skipped"; return; fi
+  local target_host="${API_HOST:-$HOST}"
   local code
-  code=$(curl -sS -o /dev/null -m "$TIMEOUT" -w "%{http_code}" "https://${HOST}${BACKEND_HEALTH}" 2>/dev/null || echo 000)
+  code=$(curl -sS -o /dev/null -m "$TIMEOUT" -w "%{http_code}" "https://${target_host}${BACKEND_HEALTH}" 2>/dev/null || echo 000)
   if [[ "$code" == "200" ]]; then
-    set_result 3 PASS "${BACKEND_HEALTH} -> 200 (tunnel reachable)"
+    set_result 3 PASS "${target_host}${BACKEND_HEALTH} -> 200 (tunnel reachable)"
   else
-    set_result 3 FAIL "${BACKEND_HEALTH} -> ${code}"
+    set_result 3 FAIL "${target_host}${BACKEND_HEALTH} -> ${code}"
   fi
 }
 
@@ -210,9 +218,16 @@ check_7_cache() {
 }
 
 # ── 実行 ────────────────────────────────────────────
-echo "=========================================="
-echo "  CF Pages 7-item curl check — ${HOST}"
-echo "=========================================="
+if [[ -n "$API_HOST" ]]; then
+  echo "=========================================="
+  echo "  CF Pages 7-item curl check"
+  echo "  frontend: ${HOST}  api: ${API_HOST}"
+  echo "=========================================="
+else
+  echo "=========================================="
+  echo "  CF Pages 7-item curl check — ${HOST}"
+  echo "=========================================="
+fi
 
 check_1_tls
 check_2_waf

@@ -51,7 +51,7 @@ from app.fees.fee_transfer_service import (
     FeeTransferService,
     is_fee_transfer_enabled,
 )
-from app.fees.models import FeeConfigV10, FeeTransaction
+from app.fees.models import FeeConfigV10, FeeTransaction, ReferralCampaign, UatWalletLedger
 from app.portfolio.models import PortfolioSnapshot
 from app.transactions.models import Transaction
 
@@ -253,6 +253,29 @@ def _next_month_start(d: date) -> date:
     return date(d.year, d.month + 1, 1)
 
 
+def _get_active_campaign_partner_id(db: Session, referree_id: int, month: date) -> int | None:
+    """指定月に有効な紹介キャンペーン ウィンドウのパートナー ID を返す。
+
+    有効条件:
+        reward_start_month <= month <= reward_expires_month
+        AND (ended_early_month IS NULL OR ended_early_month >= month)
+    """
+    from sqlalchemy import or_
+
+    campaign = db.scalar(
+        select(ReferralCampaign).where(
+            ReferralCampaign.referree_id == referree_id,
+            ReferralCampaign.reward_start_month <= month,
+            ReferralCampaign.reward_expires_month >= month,
+            or_(
+                ReferralCampaign.ended_early_month.is_(None),
+                ReferralCampaign.ended_early_month >= month,
+            ),
+        )
+    )
+    return campaign.partner_id if campaign else None
+
+
 def finalize_month_core(
     db: Session,
     config: FeeConfigV10,
@@ -349,6 +372,8 @@ def finalize_month_core(
         )
         expense_jpy = (fixed_cost_usd * trade_count * usd_jpy_rate).quantize(Decimal("1"))
 
+        campaign_partner_id = _get_active_campaign_partner_id(db, user.id, month_start)
+
         payload = FeeCalculationInput(
             user_id=user.id,
             calculation_month=month_start,
@@ -357,7 +382,7 @@ def finalize_month_core(
             expense_jpy=expense_jpy,
             user_tier=user_tier,
             user_risk_mode=user_risk_mode,
-            affiliate_id=user.invited_by,
+            affiliate_id=campaign_partner_id,
             is_first_month=is_first_month,
         )
 
@@ -414,6 +439,72 @@ def finalize_month_core(
 
     if not dry_run:
         db.commit()
+
+        # --- UAT ウォレット台帳 記録 (冪等: 同月再実行でも重複しない) ---
+        fee_txs_this_month = (
+            db.execute(
+                select(FeeTransaction).where(
+                    FeeTransaction.calculation_month == month_start
+                )
+            )
+            .scalars()
+            .all()
+        )
+        wallet_entries_added = 0
+        for fee_tx in fee_txs_this_month:
+            uat_income = (
+                (fee_tx.subscription_amount_jpy or Decimal("0"))
+                + (fee_tx.fee_amount_jpy or Decimal("0"))
+                + (fee_tx.yield_excess_to_uata_jpy or Decimal("0"))
+            )
+            if uat_income > Decimal("0"):
+                already = db.scalar(
+                    select(UatWalletLedger).where(
+                        UatWalletLedger.reference_fee_tx_id == fee_tx.id,
+                        UatWalletLedger.entry_type == "credit",
+                        UatWalletLedger.reason == "uat_monthly_income",
+                    )
+                )
+                if already is None:
+                    db.add(
+                        UatWalletLedger(
+                            entry_type="credit",
+                            amount_jpy=uat_income,
+                            reason="uat_monthly_income",
+                            reference_fee_tx_id=fee_tx.id,
+                            month=month_start,
+                        )
+                    )
+                    wallet_entries_added += 1
+
+            affiliate_amt = fee_tx.affiliate_amount_jpy or Decimal("0")
+            if affiliate_amt > Decimal("0"):
+                already_debit = db.scalar(
+                    select(UatWalletLedger).where(
+                        UatWalletLedger.reference_fee_tx_id == fee_tx.id,
+                        UatWalletLedger.entry_type == "debit",
+                        UatWalletLedger.reason == "referral_campaign",
+                    )
+                )
+                if already_debit is None:
+                    db.add(
+                        UatWalletLedger(
+                            entry_type="debit",
+                            amount_jpy=affiliate_amt,
+                            reason="referral_campaign",
+                            reference_fee_tx_id=fee_tx.id,
+                            month=month_start,
+                        )
+                    )
+                    wallet_entries_added += 1
+
+        if wallet_entries_added:
+            db.commit()
+            logger.info(
+                "uat_wallet_ledger: month=%s entries_added=%d",
+                month_start,
+                wallet_entries_added,
+            )
 
         # --- 課金ベンダー差込点 (vendor_adapter が指定された場合のみ実行) ---
         # subscription_amount_jpy > 0 かつ subscription_protected=False のユーザーに対し

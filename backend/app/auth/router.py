@@ -54,6 +54,7 @@ from .schemas import (
     WalletLinkResponse,
 )
 from .service import AuthService
+from app.referral import service as referral_service
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -199,9 +200,10 @@ def register_with_referral(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    # Step 6: set referral fields
+    # Step 6: set referral fields + 紹介キャンペーン ウィンドウ作成
     user.referrer_id = referrer.id
     user.referred_consent_at = datetime.now(timezone.utc)
+    referral_service.handle_new_referral(db, partner_id=referrer.id, referree_id=user.id)
     db.commit()
     db.refresh(user)
 

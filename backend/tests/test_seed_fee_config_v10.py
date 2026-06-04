@@ -85,7 +85,7 @@ class TestBuildV10DefaultConfig:
 
     def test_affiliate_rate_is_decimal(self) -> None:
         config = build_v10_default_config()
-        assert config["affiliate_rate"] == Decimal("0.30")
+        assert config["affiliate_rate"] == Decimal("0.10")
         assert isinstance(config["affiliate_rate"], Decimal)
 
     def test_expense_markup_disabled_by_default(self) -> None:
@@ -220,4 +220,4 @@ class TestSeededRowMatchesSpec:
         seed(v10_db)
         row = v10_db.query(FeeConfigV10).one()
         # SQLite では NUMERIC が文字列として返ることがあるため Decimal 比較
-        assert Decimal(str(row.affiliate_rate)) == Decimal("0.30")
+        assert Decimal(str(row.affiliate_rate)) == Decimal("0.10")
