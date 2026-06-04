@@ -128,7 +128,12 @@ class TestEstimateStaticGasCostUsd:
             "SUPPLY", eth_usd_price=eth_price, gas_price_wei=Decimal("20000000000")
         )
         # 300000 * 20 Gwei = 0.006 ETH * $2000 = $12.00
-        expected = Decimal(str(DEFAULT_FALLBACK_GAS_SUPPLY)) * Decimal("20000000000") / Decimal("1e18") * eth_price
+        expected = (
+            Decimal(str(DEFAULT_FALLBACK_GAS_SUPPLY))
+            * Decimal("20000000000")
+            / Decimal("1e18")
+            * eth_price
+        )
         assert cost == expected
 
     def test_withdraw_uses_withdraw_fallback_gas(self) -> None:
@@ -137,7 +142,12 @@ class TestEstimateStaticGasCostUsd:
         cost = estimate_static_gas_cost_usd(
             "WITHDRAW", eth_usd_price=eth_price, gas_price_wei=Decimal("20000000000")
         )
-        expected = Decimal(str(DEFAULT_FALLBACK_GAS_WITHDRAW)) * Decimal("20000000000") / Decimal("1e18") * eth_price
+        expected = (
+            Decimal(str(DEFAULT_FALLBACK_GAS_WITHDRAW))
+            * Decimal("20000000000")
+            / Decimal("1e18")
+            * eth_price
+        )
         assert cost == expected
 
     def test_uses_fallback_eth_price_when_none(self) -> None:

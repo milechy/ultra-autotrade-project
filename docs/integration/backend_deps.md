@@ -5,6 +5,20 @@
 
 ---
 
+## PR #509 (Layer2 outcome labels): outcome_labeling_loop startup 追加 (2026-06-02)
+
+### 変更: ENABLE_OUTCOME_LABELING フラグで outcome_labeling_loop を条件起動
+- **対象凍結ファイル**: `backend/app/main.py`
+- **変更内容**:
+  - `ENABLE_OUTCOME_LABELING=1` の場合のみ `outcome_labeling_loop` を startup イベントで起動
+  - `OUTCOME_LABELING_INTERVAL_HOURS` 環境変数でポーリング間隔を制御（デフォルト 6h）
+  - 未設定時（`ENABLE_OUTCOME_LABELING` デフォルト `"0"`）は起動しない（安全デフォルト）
+- **理由**: Layer2 outcome label 収集バッチ（realized_yield / regret_score / is_positive_example）を staging 24h 検証できるようにするための配線。フラグ OFF のまま本番デプロイしても既存動作に影響なし。
+- **影響範囲**: startup シーケンスのみ。既存スケジューラー・エンドポイントへの影響なし。`ENABLE_OUTCOME_LABELING` 未設定時は何もしない。
+- **承認**: feat/layer2-outcome-labels → main の通常フロー経由（PR #509）
+
+---
+
 ## PR #373 (Stream 4): scheduler 二重起動防止 — Blue/Green color guard (2026-05-22)
 
 ### 変更: active color のみ ai_judgment_loop を起動
@@ -20,6 +34,17 @@
 ---
 
 ## backend/app/main.py
+
+### 変更 #12: ToS model import 名の変更 (UserAction → ToSUserAction) (PR #534 / 2026-06-04)
+- **コミット範囲**: `fix/main-ci-tos-i001`
+- **変更内容**: `from app.tos.models import (... UserAction ...)` の import を
+  `ToSUserAction` にリネーム (table も user_actions → tos_user_actions)。
+- **理由**: batch merge で ai/Hermes 版 user_actions (app/ai/models.py, MVP-P0-6) と
+  tos 版が同名テーブル衝突し pytest 全 fail。ai 版を source of truth として不変とし、
+  tos 側を tos_user_actions にリネーム。main.py は table 登録用 import 名の変更のみ
+  (registration の noqa F401 import、ロジック影響なし)。
+- **影響範囲**: import 名のみ。エンドポイント・起動シーケンス無変更。
+- **承認**: fix/main-ci-tos-i001 → main (PR #534)
 
 ### 変更 #3: /health エンドポイントに AI モデル設定を追加 (PR #95 / 2026-04-20)
 - **コミット範囲**: `408d3ad` (feature/remove-claude-model-hardcodes)
@@ -147,6 +172,18 @@
   2. staging: `docker compose -f docker-compose.staging.yml restart backend-blue`
   3. production (Phase E 後): `docker compose -f docker-compose.production.yml restart backend-blue`
 
+### 変更 #9: ToS consent router 登録 (PR #425 / 2026-06-04)
+- **コミット範囲**: worktree-lane-j-tos-consent
+- **変更内容**:
+  - `from app.tos.models import ToSConsent, UserAction` を追加 (Base.metadata 登録)
+  - `from app.tos.router import router as tos_router` を追加
+  - `app.include_router(tos_router)` を `referral_router` の直後に追加 (計 5 行追加のみ)
+- **理由**: MVP-P0-14 — ToS active consent エンドポイント群を FastAPI app に登録。
+  `app/tos/` 配下の router/models/service/schemas はこのブランチで新規追加。
+  main.py への変更は include_router 登録のみ（既存 router と同パターン）。
+- **影響範囲**: 新規 router 追加のみ。既存 endpoint への影響なし。
+- **承認**: worktree-lane-j-tos-consent → main (PR #425)
+
 ## backend/app/database.py
 
 変更なし（現時点）
@@ -156,6 +193,17 @@
 変更なし（現時点）
 
 ## backend/requirements.txt
+
+### 変更 #3: aiohttp<3.14 固定（vcrpy 非互換 / CI green 回復）(PR #529 / 2026-06-04)
+- **コミット範囲**: `a300118` (fix/main-ci-green)
+- **変更内容**: `aiohttp<3.14` を requirements.txt に追加
+- **理由**: aiohttp 3.14.0 で `AsyncStreamReaderMixin` が削除され、vcrpy<=8.1.1 の cassette 再生が
+  `ERROR` になり CI の `test_judge_with_rag_vcr` が2件 failing（upstream Issue #995 / PR #996 未リリース）。
+  aiohttp は web3/ccxt 経由の transitive **runtime** dep のため requirements.txt 側で pin し、
+  CI と prod で同一版（3.13.x）を保証。upstream が対応次第 (`vcrpy>8.1.1` + `aiohttp>=3.14`) に更新する。
+- **影響範囲**: aiohttp の upper cap 追加のみ。web3 (`>=3.7.4`) / ccxt (`>=3.10.11`) との両立を
+  `pip check` で確認済み。アプリケーションロジックへの影響なし。
+- **承認**: fix/main-ci-green → main (PR #529)
 
 ### 変更 #2: PyJWT[crypto] extra 追加（Privy ID Token 検証対応）(PR #155 / 2026-04-27)
 - **コミット範囲**: `c88dfd2` – `41f77d7` (feature/privy-did-storage)

@@ -63,12 +63,17 @@ def test_db():
 @pytest.fixture()
 def client(test_db) -> TestClient:
     override_get_db, _ = test_db
+    os.environ["INITIAL_ADMIN_EMAIL"] = _ADMIN_EMAIL  # 他テストの上書きを防ぐため fixture で再設定
     app = create_app()
     app.dependency_overrides[get_db] = override_get_db
     return TestClient(app)
 
 
 def _register_admin(client: TestClient) -> str:
+    # フルスイート実行時、他テスト (test_risk_mode.py / test_e2e_approve_flow.py 等) が
+    # fixture 実行時に INITIAL_ADMIN_EMAIL を上書きするため、register 直前に再セットする。
+    # これを怠ると /auth/register が email 不一致で 403 を返す (module-level の set では不足)。
+    os.environ["INITIAL_ADMIN_EMAIL"] = _ADMIN_EMAIL
     client.post(
         "/auth/register",
         json={"email": _ADMIN_EMAIL, "username": "admin_report", "password": _ADMIN_PASSWORD},

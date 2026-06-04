@@ -1,6 +1,6 @@
 # Ultra AutoTrade — 本番運用操作チェックリスト
 
-> 最終更新: 2026-05-19
+> 最終更新: 2026-05-29
 > 対象: production VPS (77.42.46.155) での運用操作全般
 > 朝プロトコル §9 Step 0 で `cat /mnt/project/production_operation_checklist.md` として参照される正本
 
@@ -188,8 +188,23 @@ du -sh /var/log/journal/ 2>/dev/null
 ❌ 禁止: その他の CI red 状態での merge
 ```
 
-**違反事例 (2026-05-21)**
-- #347 (F-13 InvestmentTier 削除, 3ディレクトリ跨ぎ) が red CI のまま merge → 残骸 PR が 2件発生 (#351 ruff fix / #355 pytest fix)、main 赤化で当日の他 PR merge ゲートをブロック
+**CI merge gate の正本: `ci.yml` の `Lint (ruff + mypy)` ジョブ**
+
+> `pr-lint-report.yml` (`Ruff + Mypy + Pytest → PR Comment` ジョブ) は **参考表示専用**。
+> このジョブを merge gate の根拠にしてはならない。
+>
+> 理由: `pr-lint-report.yml` の各ステップは `cmd 2>&1 | tee out; echo "exit_code=$?"` 形式で
+> パイプ末尾 `tee` の exit code (常に 0) を記録するため、前段コマンド (ruff / mypy / pytest)
+> が失敗しても「成功」として記録してしまう構造バグが存在した (2026-05-29 PR #469 で修正済)。
+> このバグが存在した期間、PR Lint Report が緑でも実際には違反がある状態が継続した。
+>
+> **正しい確認方法**: PR の `CI` ワークフロー内の `Lint (ruff + mypy)` ジョブが ✅ であること。
+> `PR Lint Report` の ✅ だけを見て merge してはならない。
+
+**違反事例**
+
+- **(2026-05-21)** #347 (F-13 InvestmentTier 削除, 3ディレクトリ跨ぎ) が red CI のまま merge → 残骸 PR が 2件発生 (#351 ruff fix / #355 pytest fix)、main 赤化で当日の他 PR merge ゲートをブロック
+- **(2026-05-29)** `pr-lint-report.yml` の tee/pipefail バグで PR Lint Report が常に緑を返す「嘘の緑」が発生。ruff format 違反を含む複数 PR (#458〜#468) が main に merge され、`Lint (ruff + mypy)` ジョブが #458 以降ずっと赤になった。PR #469 で3ファイル整形 + pipefail バグ修正により解消。#347 (2026-05-21) と同種のパターン。
 
 ---
 

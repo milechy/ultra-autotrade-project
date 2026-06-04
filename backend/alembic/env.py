@@ -25,6 +25,7 @@ from app.knowledge.models import (  # noqa: F401, E402
 )
 from app.portfolio.models import PortfolioHistory, PortfolioSnapshot  # noqa: F401, E402
 from app.proposals.models import Proposal  # noqa: F401, E402
+from app.tos.models import ToSConsent, ToSUserAction  # noqa: F401, E402
 from app.transactions.models import Transaction  # noqa: F401, E402
 from app.users.models import UserSettings  # noqa: F401, E402
 

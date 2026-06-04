@@ -21,7 +21,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { login as apiLogin, getMe, logout as apiLogout, walletConnect, type UserResponse, type TokenResponse } from "./api/auth";
 import { resolveAuthReady } from "./auth-state";
-import { updateLastSeen } from "./session/itp-guard";
+import { recordLastSeen } from "./auth/session-monitor";
 
 const TOKEN_KEY = "ultra_auth_token";
 const TOKEN_EXPIRES_KEY = "ultra_auth_expires";
@@ -70,6 +70,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Restore token on initialization
   useEffect(() => {
+    // ITP wipe 検知用の last_seen を更新 (token の有無に関わらず常に記録)。
+    // 7日 ITP wipe で token が消えていても last_seen が残っていれば wipe を検知できる。
+    recordLastSeen();
+
     const storedToken = localStorage.getItem(TOKEN_KEY);
     const expiresStr = localStorage.getItem(TOKEN_EXPIRES_KEY);
 
@@ -127,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Only save to localStorage on success
       localStorage.setItem(TOKEN_KEY, newToken);
       localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt));
-      updateLastSeen();
+      recordLastSeen();
       setToken(newToken);
       setUser(userInfo);
       return userInfo;
@@ -150,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userInfo = await getMe(newToken);
       localStorage.setItem(TOKEN_KEY, newToken);
       localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt));
-      updateLastSeen();
+      recordLastSeen();
       setToken(newToken);
       setUser(userInfo);
       return userInfo;

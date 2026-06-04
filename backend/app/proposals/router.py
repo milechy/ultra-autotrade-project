@@ -219,6 +219,18 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
     from app.ai.schemas import TradeAction  # noqa: PLC0415
     from app.transactions.models import Transaction  # noqa: PLC0415
 
+    from .execution_route import ExecutionRoute, RouteMismatchError, assert_route
+
+    # P0-2 誤執行ガード: Aave 自動実行は on-chain 経路専用。
+    # CEX 選択 proposal がこの経路に入った場合は即時 EMERGENCY アラート + 例外で停止する
+    # (呼び出し元 approve_proposal が 409 に変換し、手動介入必須)。
+    try:
+        assert_route(proposal, ExecutionRoute.ONCHAIN_AAVE)
+    except RouteMismatchError:
+        proposal.status = "failed"
+        proposal.error_message = "route mismatch: CEX proposal entered on-chain execution path"
+        raise
+
     op_map: dict[str, TradeAction] = {
         "SUPPLY": TradeAction.BUY,
         "WITHDRAW": TradeAction.SELL,
@@ -585,7 +597,16 @@ def approve_proposal(
     # AAVE_WALLET_PRIVATE_KEY が署名する経路はこのフラグで完全に無効化される。
     auto_execution_enabled = os.getenv("AUTO_EXECUTION_ENABLED", "false").lower() == "true"
     if auto_execution_enabled:
-        _execute_aave_for_proposal(proposal, db)
+        from .execution_route import RouteMismatchError  # noqa: PLC0415
+
+        try:
+            _execute_aave_for_proposal(proposal, db)
+        except RouteMismatchError as exc:
+            db.commit()  # status='failed' / error_message を永続化
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"誤執行検出: {exc} (手動介入必須)",
+            ) from exc
         db.commit()
         db.refresh(proposal)
     else:
@@ -639,6 +660,7 @@ def build_partner_tx(
     approve_proposal の代わりにこのエンドポイントを呼び、フロントエンドで
     Privy sendTransaction() 経由でパートナー本人が署名・送信する。
     """
+    from app.aave.client import verify_supply_onbehalf, verify_withdraw_to  # noqa: PLC0415
     from app.aave.service import MultiChainAaveService  # noqa: PLC0415
 
     stmt = select(Proposal).where(Proposal.id == proposal_id)
@@ -683,30 +705,60 @@ def build_partner_tx(
                 amount=Decimal(str(proposal.amount_usd)),
                 wallet_address=wallet_address,
             )
-            return PartnerUnsignedTxs(
-                proposal_id=proposal_id,
-                operation=proposal.operation,
-                wallet_address=wallet_address,
-                approve_tx=UnsignedTx.model_validate(txs["approve_tx"]),
-                supply_tx=UnsignedTx.model_validate(txs["supply_tx"]),
-            )
         else:  # WITHDRAW
             txs = service._client.build_withdraw_tx(
                 asset_symbol=asset_symbol,
                 amount=Decimal(str(proposal.amount_usd)),
                 wallet_address=wallet_address,
             )
-            return PartnerUnsignedTxs(
-                proposal_id=proposal_id,
-                operation=proposal.operation,
-                wallet_address=wallet_address,
-                withdraw_tx=UnsignedTx.model_validate(txs["withdraw_tx"]),
-            )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"tx 構築失敗: {exc}",
         ) from exc
+
+    # 署名前 hook (補完層): サーバーが生成済み calldata を実デコードし、
+    # onBehalfOf (supply) / to (withdraw) が本人 wallet でなければ未署名 tx を
+    # 返さず reject する。build-tx 側固定 (主担保) の二重チェックであり、
+    # 万一 encode 経路に欠陥が混入しても他人宛て tx を組ませない。
+    # (P0-3 / Asana 1215364095372268)
+    if proposal.operation == "SUPPLY":
+        if not verify_supply_onbehalf(txs["supply_tx"]["data"], wallet_address):
+            logger.error(
+                "build-tx onBehalfOf 検証失敗: proposal=%s wallet=%s...%s",
+                proposal_id,
+                wallet_address[:6],
+                wallet_address[-4:],
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="onBehalfOf 検証失敗: supply tx の onBehalfOf が本人 wallet と不一致",
+            )
+        return PartnerUnsignedTxs(
+            proposal_id=proposal_id,
+            operation=proposal.operation,
+            wallet_address=wallet_address,
+            approve_tx=UnsignedTx.model_validate(txs["approve_tx"]),
+            supply_tx=UnsignedTx.model_validate(txs["supply_tx"]),
+        )
+    else:  # WITHDRAW
+        if not verify_withdraw_to(txs["withdraw_tx"]["data"], wallet_address):
+            logger.error(
+                "build-tx withdraw to 検証失敗: proposal=%s wallet=%s...%s",
+                proposal_id,
+                wallet_address[:6],
+                wallet_address[-4:],
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="to 検証失敗: withdraw tx の to が本人 wallet と不一致",
+            )
+        return PartnerUnsignedTxs(
+            proposal_id=proposal_id,
+            operation=proposal.operation,
+            wallet_address=wallet_address,
+            withdraw_tx=UnsignedTx.model_validate(txs["withdraw_tx"]),
+        )
 
 
 def _verify_on_chain_receipt(
@@ -799,6 +851,8 @@ def submit_partner_tx(
     """
     from app.transactions.models import Transaction  # noqa: PLC0415
 
+    from .execution_route import ExecutionRoute, RouteMismatchError, assert_route
+
     stmt = select(Proposal).where(Proposal.id == proposal_id)
     proposal = db.scalars(stmt).first()
     if proposal is None:
@@ -812,6 +866,17 @@ def submit_partner_tx(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot submit tx for proposal with status '{proposal.status}'",
         )
+
+    # P0-2 誤執行ガード: submit-tx は on-chain Aave 経路専用。
+    # CEX 選択 proposal が on-chain (basescan) tx で執行されようとした場合は
+    # 即時 EMERGENCY アラート + 409 で自動進行を止め、手動介入を必須化する。
+    try:
+        assert_route(proposal, ExecutionRoute.ONCHAIN_AAVE)
+    except RouteMismatchError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"誤執行検出: {exc} (手動介入必須)",
+        ) from exc
 
     # tx_hash 形式チェック (0x + 64 hex chars)
     import re  # noqa: PLC0415
@@ -926,7 +991,16 @@ def create_proposal(
     db: Session = Depends(get_db),
 ) -> ProposalResponse:
     """提案を作成する（内部呼び出し用）。"""
+    from .execution_route import DEFAULT_EXECUTION_ROUTE, ExecutionRoute  # noqa: PLC0415
+
     expires_at = request.expires_at or (datetime.now(timezone.utc) + timedelta(hours=72))
+    # P0-2: 執行経路を作成時に確定 (以後 immutable)。未指定時は on-chain Aave (後方互換)。
+    execution_route = request.execution_route or DEFAULT_EXECUTION_ROUTE
+    if execution_route not in ExecutionRoute.values():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid execution_route '{execution_route}'",
+        )
     proposal = Proposal(
         user_id=request.user_id,
         ai_decision_id=request.ai_decision_id,
@@ -938,6 +1012,7 @@ def create_proposal(
         expected_hf_after=request.expected_hf_after,
         estimated_gas_usd=request.estimated_gas_usd,
         expires_at=expires_at,
+        execution_route=execution_route,
     )
     db.add(proposal)
     db.commit()

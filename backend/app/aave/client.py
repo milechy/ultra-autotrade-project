@@ -437,11 +437,11 @@ class Web3AaveClient(AaveClientBase):
             raise AaveClientError("web3 package is required. Install with: pip install web3")
 
         # 後方互換: settings から rpc_url/pool_address を取得することもできる
+        # wallet_private_key は read-only ユースケース (Indicator Agent / shadow mode) のため任意化。
+        # 署名 tx (supply/withdraw) は呼出時に fail-fast する。v4 §14「backend wallet 持たない」設計と整合。
         if settings is not None:
             if not settings.rpc_url:
                 raise AaveClientError("AAVE_RPC_URL is required for Web3AaveClient")
-            if not settings.wallet_private_key:
-                raise AaveClientError("AAVE_WALLET_PRIVATE_KEY is required for Web3AaveClient")
             if not settings.pool_address:
                 raise AaveClientError("AAVE_POOL_ADDRESS is required for Web3AaveClient")
             if not settings.usdc_address:
@@ -498,23 +498,31 @@ class Web3AaveClient(AaveClientBase):
             self._w3_tx = self._w3
 
         # 後方互換: settings が渡された場合はウォレット情報を保持
+        # wallet_private_key が未設定なら self.account は設定せず、read-only クライアントとして動作。
+        # supply/withdraw は呼出時に getattr(self, "account", None) 経由で fail-fast する。
         if settings is not None:
-            try:
-                from eth_account import Account
+            self.w3 = self._w3
+            self.pool = self._pool
+            self.settings = settings
+            # トークンアドレスマップ（後方互換）
+            if settings.usdc_address:
+                self.token_addresses = {
+                    "USDC": Web3.to_checksum_address(settings.usdc_address),
+                }
+            if settings.wallet_private_key:
+                try:
+                    from eth_account import Account
 
-                self.account = Account.from_key(settings.wallet_private_key)
-                self.w3 = self._w3
-                self.pool = self._pool
-                self.settings = settings
-                # トークンアドレスマップ（後方互換）
-                if settings.usdc_address:
-                    self.token_addresses = {
-                        "USDC": Web3.to_checksum_address(settings.usdc_address),
-                    }
-            except ImportError as exc:
-                raise AaveClientError(
-                    "eth-account package is required. Install with: pip install eth-account"
-                ) from exc
+                    self.account = Account.from_key(settings.wallet_private_key)
+                except ImportError as exc:
+                    raise AaveClientError(
+                        "eth-account package is required. Install with: pip install eth-account"
+                    ) from exc
+            else:
+                logger.info(
+                    "Web3AaveClient: wallet_private_key 未設定 → read-only モードで起動 "
+                    "(supply/withdraw は呼出時に fail-fast)"
+                )
 
         # マルチチェーン経路（settings 無し）での token_addresses 配線。
         # make_aave_client(chain_name=...) が chains.py の chain_config.tokens を渡す。
@@ -700,6 +708,13 @@ class Web3AaveClient(AaveClientBase):
                 "amount": str(amount),
                 "dry_run": True,
             }
+
+        # 署名 tx (非 dry_run) 経路では signer 必須。
+        # __init__ 時の wallet_private_key を任意化したため、ここで明示 fail-fast。
+        if not getattr(self, "account", None) and not private_key:
+            raise AaveClientError(
+                "AAVE_WALLET_PRIVATE_KEY (or private_key arg) is required for signed supply tx"
+            )
 
         try:
             # ERC-20 コントラクト取得
@@ -925,6 +940,13 @@ class Web3AaveClient(AaveClientBase):
                 "amount": str(amount),
                 "dry_run": True,
             }
+
+        # 署名 tx (非 dry_run) 経路では signer 必須。
+        # __init__ 時の wallet_private_key を任意化したため、ここで明示 fail-fast。
+        if not getattr(self, "account", None) and not private_key:
+            raise AaveClientError(
+                "AAVE_WALLET_PRIVATE_KEY (or private_key arg) is required for signed withdraw tx"
+            )
 
         try:
             # CRITICAL: HF check before withdrawal (docs/13_security_design.md rule 2)
@@ -1193,8 +1215,7 @@ def make_aave_client(
         # build_deposit_txs / build_withdraw_tx が "Unknown asset" で失敗する (method2 バグ修正)。
         if token_addresses and not hasattr(client, "token_addresses"):
             client.token_addresses = {
-                sym: Web3.to_checksum_address(addr)
-                for sym, addr in token_addresses.items()
+                sym: Web3.to_checksum_address(addr) for sym, addr in token_addresses.items()
             }
         return client
     raise ValueError(f"不明な AAVE_CLIENT_TYPE: {client_type!r} (dummy | web3)")
@@ -1267,3 +1288,73 @@ def make_multi_chain_clients(
             chain_name=chain.chain_name,
         )
     return result
+
+
+# ==============================================================================
+# build-tx 本人一致 検証 (P0-3 / Asana 1215364095372268)
+#
+# Privy Policy Engine は onBehalfOf == msg.sender の動的自己参照比較を未サポート
+# (value は静的リテラルのみ) のため、本人一致は build-tx 側固定 + 署名前 calldata
+# 再検証で担保する。以下はサーバーが生成済み calldata を実デコードして
+# onBehalfOf / to が本人 wallet であることを確認する純粋関数 (RPC 不要)。
+#
+# build_partner_tx エンドポイントが署名前 hook (補完層) として呼び、
+# 不一致なら未署名 tx をフロントに返さず reject する。
+# ==============================================================================
+
+
+class OnBehalfMismatchError(AaveClientError):
+    """生成済み calldata の onBehalfOf / to が本人 wallet と不一致のとき送出。"""
+
+
+def _decode_pool_calldata(calldata: str) -> "tuple[str, dict[str, Any]]":
+    """Aave V3 Pool の calldata を実デコードして (関数名, 引数 dict) を返す。
+
+    provider 不要 (ABI デコードはオフライン処理)。web3 未インストール時は
+    AaveClientError を送出する。
+    """
+    if Web3 is None:
+        raise AaveClientError("web3 package is required")
+    # provider 無し Web3 インスタンスでも decode_function_input は動作する
+    pool = Web3().eth.contract(abi=_POOL_ABI_MINIMAL)
+    func, params = pool.decode_function_input(calldata)
+    return func.fn_name, dict(params)
+
+
+def verify_supply_onbehalf(supply_calldata: str, expected_wallet: str) -> bool:
+    """supply calldata の onBehalfOf が expected_wallet と一致するか検証する。
+
+    一致時のみ True。関数が supply でない / onBehalfOf 不一致 / デコード不能なら
+    False (fail-closed)。比較は checksum 正規化して大文字小文字非依存。
+    expected_wallet の値の中身には依存しない (常に渡された本人 wallet と照合)。
+    """
+    try:
+        fn_name, params = _decode_pool_calldata(supply_calldata)
+    except Exception:
+        return False
+    if fn_name != "supply":
+        return False
+    on_behalf = params.get("onBehalfOf")
+    if not on_behalf:
+        return False
+    try:
+        return Web3.to_checksum_address(on_behalf) == Web3.to_checksum_address(expected_wallet)
+    except Exception:
+        return False
+
+
+def verify_withdraw_to(withdraw_calldata: str, expected_wallet: str) -> bool:
+    """withdraw calldata の to が expected_wallet と一致するか検証する (fail-closed)。"""
+    try:
+        fn_name, params = _decode_pool_calldata(withdraw_calldata)
+    except Exception:
+        return False
+    if fn_name != "withdraw":
+        return False
+    to_addr = params.get("to")
+    if not to_addr:
+        return False
+    try:
+        return Web3.to_checksum_address(to_addr) == Web3.to_checksum_address(expected_wallet)
+    except Exception:
+        return False

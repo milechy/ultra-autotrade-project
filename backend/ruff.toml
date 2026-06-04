@@ -27,4 +27,6 @@ known-first-party = ["app"]
 [lint.per-file-ignores]
 # テストファイルではassert, 仮パスワード, tmpファイル使用は許容する
 "tests/**/*.py" = ["S101", "S105", "S106", "S107", "S108"]
+# migration は定数のみで構成されたテンプレート SQL のため S608 (SQL injection) は false positive
+"alembic/versions/**/*.py" = ["S608"]
 

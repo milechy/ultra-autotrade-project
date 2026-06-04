@@ -41,10 +41,7 @@ def upgrade() -> None:
             "CREATE INDEX IF NOT EXISTS idx_rc_referree_month "
             "ON referral_campaigns (referree_id, reward_start_month, reward_expires_month)"
         )
-        op.execute(
-            "CREATE INDEX IF NOT EXISTS idx_rc_partner "
-            "ON referral_campaigns (partner_id)"
-        )
+        op.execute("CREATE INDEX IF NOT EXISTS idx_rc_partner ON referral_campaigns (partner_id)")
 
         op.execute("""
             CREATE TABLE IF NOT EXISTS uat_wallet_ledger (
@@ -64,10 +61,7 @@ def upgrade() -> None:
             "ON uat_wallet_ledger (reference_fee_tx_id, entry_type, reason) "
             "WHERE reference_fee_tx_id IS NOT NULL"
         )
-        op.execute(
-            "CREATE INDEX IF NOT EXISTS idx_uwl_month "
-            "ON uat_wallet_ledger (month)"
-        )
+        op.execute("CREATE INDEX IF NOT EXISTS idx_uwl_month ON uat_wallet_ledger (month)")
     else:
         # SQLite (テスト環境)
         op.create_table(

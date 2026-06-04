@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 from app.ai.feedback_models import AIFeedback, AIFeedbackCreate, AIFeedbackStats
 from app.ai.feedback_service import FeedbackService
 from app.ai.judgment_log import JudgmentRecord, get_judgment_logger
-from app.ai.models import AIDecision
+from app.ai.models import AIDecision, AiDecisionOutcome
 from app.automation.howl_review import evaluate_judgment
 
 logger = logging.getLogger(__name__)
@@ -63,6 +63,17 @@ class CognitiveUpdate:
 
 
 @dataclass
+class OutcomeLabelStats:
+    """ai_decision_outcomes の収益ラベル集計結果。"""
+
+    total_labeled: int = 0
+    positive_count: int = 0
+    negative_count: int = 0
+    positive_rate: Optional[float] = None
+    avg_regret_score: Optional[float] = None
+
+
+@dataclass
 class LearningCycleResult:
     """学習サイクル全体の結果。"""
 
@@ -70,6 +81,7 @@ class LearningCycleResult:
     auto_feedback_error: Optional[str] = None
     stats: Optional[AIFeedbackStats] = None
     cognitive_update: Optional[CognitiveUpdate] = None
+    outcome_label_stats: Optional[OutcomeLabelStats] = None
     completed_at: Optional[datetime] = None
 
 
@@ -132,11 +144,33 @@ class AILearningService:
         except Exception as exc:  # noqa: BLE001
             logger.warning("Step 3 (cognitive state update) failed: %s", exc)
 
-        # Step 4: 学習レポート生成（ログ出力）
+        # Step 4: outcome ラベル統計集計 (ai_decision_outcomes 参照)
+        try:
+            results.outcome_label_stats = self._aggregate_outcome_label_stats()
+            logger.info(
+                "Step 4 done: labeled=%d positive=%d negative=%d positive_rate=%s avg_regret=%s",
+                results.outcome_label_stats.total_labeled,
+                results.outcome_label_stats.positive_count,
+                results.outcome_label_stats.negative_count,
+                (
+                    f"{results.outcome_label_stats.positive_rate:.1%}"
+                    if results.outcome_label_stats.positive_rate is not None
+                    else "N/A"
+                ),
+                (
+                    f"{results.outcome_label_stats.avg_regret_score:.3f}"
+                    if results.outcome_label_stats.avg_regret_score is not None
+                    else "N/A"
+                ),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Step 4 (outcome label stats) failed: %s", exc)
+
+        # Step 5: 学習レポート生成（ログ出力）
         try:
             await self._generate_learning_report(results)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Step 4 (learning report) failed: %s", exc)
+            logger.warning("Step 5 (learning report) failed: %s", exc)
 
         results.completed_at = datetime.now(timezone.utc)
         return results
@@ -263,6 +297,40 @@ class AILearningService:
         update.updated = True
         return update
 
+    # ------------------------------------------------------------------
+    # Private: Step 4 — outcome label 統計集計
+    # ------------------------------------------------------------------
+
+    def _aggregate_outcome_label_stats(self) -> OutcomeLabelStats:
+        """ai_decision_outcomes の is_positive_example / regret_score を集計する。
+
+        直近 30 日・horizon_hours IS NOT NULL の行のみを対象とする。
+        """
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        stmt = select(
+            AiDecisionOutcome.is_positive_example,
+            AiDecisionOutcome.regret_score,
+        ).where(
+            AiDecisionOutcome.horizon_hours.isnot(None),
+            AiDecisionOutcome.created_at >= cutoff,
+        )
+        rows = list(self.db.execute(stmt).all())
+
+        stats = OutcomeLabelStats(total_labeled=len(rows))
+        positive_vals = [r.is_positive_example for r in rows if r.is_positive_example is not None]
+        regret_vals = [float(r.regret_score) for r in rows if r.regret_score is not None]
+
+        if positive_vals:
+            stats.positive_count = sum(1 for v in positive_vals if v)
+            stats.negative_count = sum(1 for v in positive_vals if not v)
+            stats.positive_rate = stats.positive_count / len(positive_vals)
+
+        if regret_vals:
+            stats.avg_regret_score = sum(regret_vals) / len(regret_vals)
+
+        return stats
+
     def _compute_action_accuracy(self) -> dict[str, float]:
         """AIDecision と AIFeedback を結合してアクション別正答率を計算する。"""
         stmt = (
@@ -281,7 +349,7 @@ class AILearningService:
         return {action: sum(vals) / len(vals) for action, vals in action_results.items() if vals}
 
     # ------------------------------------------------------------------
-    # Private: Step 4 — 学習レポート生成
+    # Private: Step 5 — 学習レポート生成
     # ------------------------------------------------------------------
 
     async def _generate_learning_report(self, results: LearningCycleResult) -> None:
@@ -289,6 +357,7 @@ class AILearningService:
         auto_fb = results.auto_feedback
         stats = results.stats
         cog = results.cognitive_update
+        ols = results.outcome_label_stats
 
         lines = ["=== AI Learning Cycle Report ==="]
 
@@ -318,5 +387,18 @@ class AILearningService:
             if cog.action_accuracy:
                 acc_str = ", ".join(f"{k}={v:.2f}" for k, v in sorted(cog.action_accuracy.items()))
                 lines.append(f"  ActionAccuracy: {acc_str}")
+
+        if ols:
+            pos_rate = f"{ols.positive_rate:.1%}" if ols.positive_rate is not None else "N/A"
+            avg_regret = (
+                f"{ols.avg_regret_score:.3f}" if ols.avg_regret_score is not None else "N/A"
+            )
+            lines.append(
+                f"  OutcomeLabels(30d): labeled={ols.total_labeled}, "
+                f"positive={ols.positive_count}, "
+                f"negative={ols.negative_count}, "
+                f"positive_rate={pos_rate}, "
+                f"avg_regret={avg_regret}"
+            )
 
         logger.info("\n".join(lines))

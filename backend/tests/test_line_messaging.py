@@ -13,7 +13,6 @@ from app.notifications.line_messaging import (
     build_monthly_report_flex_bubble,
 )
 
-
 # ── build_monthly_report_flex_bubble ──────────────────────────────────────────
 
 

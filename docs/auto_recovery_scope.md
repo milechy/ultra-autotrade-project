@@ -71,6 +71,59 @@ backend 自体が死んでいる場合はこのパターンに合致しないた
 
 ---
 
+## Phase 2 拡張提案 (P0-B-4 / 2026-05-25 追記)
+
+> 「1 人プロジェクト前提の自動復旧範囲最大化」(Asana B-4) を満たすための追加スコープ案。
+> 各 AR-N は **別 PR で個別に実装**する想定 (auto_recovery.sh は本番稼働中のため小さく追加)。
+
+### AR-5 (proposed): frontend コンテナ hang → `docker restart frontend`
+
+| 項目 | 内容 |
+|------|------|
+| **検知** | frontend `/api/health` (静的) または `/` GET が 60 秒以内に応答しない、かつ container は Up |
+| **原因** | Node.js GC スパイク / hot-reload 残骸 / ファイル descriptor 枯渇 |
+| **自動アクション** | `docker restart ultra-autotrade-frontend-production` |
+| **検証** | restart 後 90 秒以内に `/` 200 |
+| **クールダウン** | 1時間に3回まで |
+| **理由** | `restart: always` は **クラッシュ**は救うが **hang** は救わない |
+
+### AR-6 (proposed): promtail / loki スタックの自動復旧
+
+| 項目 | 内容 |
+|------|------|
+| **検知** | promtail が Loki に push 失敗を 10 分連続 (Loki down) |
+| **原因** | Loki OOM、disk 枯渇、index 破損 |
+| **自動アクション** | `docker restart ultra-autotrade-loki-production` (1 回のみ) → 失敗時 HR エスカレ |
+| **検証** | promtail metrics で push 成功 |
+| **クールダウン** | 1時間に1回 (慎重) |
+
+### AR-7 (proposed): postgres replication lag (将来)
+
+| 項目 | 内容 |
+|------|------|
+| **検知** | replica lag > 60s (SCALE-B3 PostgreSQL replica 導入後) |
+| **自動アクション** | replica restart は **しない** (HR エスカレ) — data 整合性優先 |
+| **理由** | プロトタイプ段階。実装は SCALE-B3 完了後 |
+
+### Runtime 配信 (本 PR で systemd template 追加)
+
+外部 cron / systemd timer から 5 分間隔で `auto_recovery.sh --check-all` を起動する。
+
+| ファイル | 役割 |
+|---|---|
+| `infra/systemd/ultra-autotrade-auto-recovery.timer` | 5 分間隔 trigger |
+| `infra/systemd/ultra-autotrade-auto-recovery.service` | one-shot 実行 unit。default `DRY_RUN=true` (観察期間用) |
+
+**本番反映 (人間タスク)**:
+```bash
+sudo cp infra/systemd/ultra-autotrade-auto-recovery.{timer,service} /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ultra-autotrade-auto-recovery.timer
+# 観察 1 週間後、DRY_RUN=false にする (/etc/default/ultra-autotrade-auto-recovery を作成)
+```
+
+---
+
 ## 自動復旧しない範囲 (HUMAN-REQUIRED)
 
 以下はいずれも「人間の判断が必要」または「自動アクションが状況を悪化させるリスクが高い」。
