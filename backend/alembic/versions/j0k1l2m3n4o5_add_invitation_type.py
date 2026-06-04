@@ -5,7 +5,7 @@ invitations テーブルへの変更（open registration mode 対応）:
   - partner_id を nullable 変更: open 登録時は partner 不要
 
 Revision ID: j0k1l2m3n4o5
-Revises: i9j0k1l2m3n4
+Revises: b3invtbl9k0z
 Create Date: 2026-06-01 00:00:00.000000
 
 既存 invitations レコードは type='invite' (server_default) で自動補完されるため後方互換。
@@ -17,7 +17,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "j0k1l2m3n4o5"
-down_revision = "i9j0k1l2m3n4"
+down_revision = "b3invtbl9k0z"
 branch_labels = None
 depends_on = None
 
