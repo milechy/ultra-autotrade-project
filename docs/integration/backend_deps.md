@@ -127,6 +127,18 @@
   2. staging: `docker compose -f docker-compose.staging.yml restart backend-blue`
   3. production (Phase E 後): `docker compose -f docker-compose.production.yml restart backend-blue`
 
+### 変更 #9: ToS consent router 登録 (PR #425 / 2026-06-04)
+- **コミット範囲**: worktree-lane-j-tos-consent
+- **変更内容**:
+  - `from app.tos.models import ToSConsent, UserAction` を追加 (Base.metadata 登録)
+  - `from app.tos.router import router as tos_router` を追加
+  - `app.include_router(tos_router)` を `referral_router` の直後に追加 (計 5 行追加のみ)
+- **理由**: MVP-P0-14 — ToS active consent エンドポイント群を FastAPI app に登録。
+  `app/tos/` 配下の router/models/service/schemas はこのブランチで新規追加。
+  main.py への変更は include_router 登録のみ（既存 router と同パターン）。
+- **影響範囲**: 新規 router 追加のみ。既存 endpoint への影響なし。
+- **承認**: worktree-lane-j-tos-consent → main (PR #425)
+
 ## backend/app/database.py
 
 変更なし（現時点）
