@@ -61,9 +61,13 @@ ENDPOINTS=(
 )
 
 # Base URL (env で override 可能)
+# production は Blue/Green 構成 (blue=8010, green=8011)。
+# deploy_production.sh が LAUNCH_GATE_BASE_URL=http://127.0.0.1:${active_port} を
+# 渡すため、ここの DEFAULT_BASE は production では参照されない想定。
+# 直接呼び出す場合は LAUNCH_GATE_BASE_URL を明示すること。
 case "${ENV_TARGET}" in
   staging)    DEFAULT_BASE="http://localhost:8000" ;;
-  production) DEFAULT_BASE="http://localhost:8001" ;;
+  production) DEFAULT_BASE="http://localhost:8010" ;;  # blue fallback; deploy経由なら LAUNCH_GATE_BASE_URL 優先
   *)          DEFAULT_BASE="http://localhost:8000" ;;
 esac
 BASE_URL="${LAUNCH_GATE_BASE_URL:-${DEFAULT_BASE}}"

@@ -428,7 +428,18 @@ if [[ "${SKIP_LAUNCH_GATE:-0}" == "1" || "${_SKIP_GATE}" == "1" ]]; then
 else
   if [[ -x "${SCRIPT_DIR}/launch_gate.sh" ]]; then
     log "Running launch_gate (set SKIP_LAUNCH_GATE=1 or --skip-gate to bypass)"
-    if ! "${SCRIPT_DIR}/launch_gate.sh" --env=production --skip=L3,L4; then
+    # L2 smoke の対象ポートを現 active slot から動的に決定する。
+    # launch_gate は deploy_backend_zero_downtime() より前に実行されるため、
+    # 現時点での active が正しい smoke 対象（deploy 前の正常確認）。
+    _active_slot_now="$(read_active_slot 2>/dev/null || echo 'blue')"
+    if [[ "${_active_slot_now}" == "blue" ]]; then
+      _smoke_port="${BLUE_PORT}"
+    else
+      _smoke_port="${GREEN_PORT}"
+    fi
+    log "L2 smoke 対象: backend-${_active_slot_now} (port ${_smoke_port})"
+    if ! LAUNCH_GATE_BASE_URL="http://127.0.0.1:${_smoke_port}" \
+         "${SCRIPT_DIR}/launch_gate.sh" --env=production --skip=L3,L4; then
       err "launch_gate failed. Aborting deploy."
       exit 1
     fi
