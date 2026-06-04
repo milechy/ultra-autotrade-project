@@ -157,6 +157,14 @@
 
 ## backend/requirements.txt
 
+### 変更 #3: aiohttp<3.14 固定（vcrpy 非互換 / CI green 回復）(PR #523 / 2026-06-04)
+- **コミット範囲**: fix/ruff-i001-lint-fix
+- **変更内容**: `aiohttp<3.14` を requirements.txt に追加
+- **理由**: aiohttp 3.14.0 で `AsyncStreamReaderMixin` が削除され vcrpy<=8.1.1 が壊れる
+  (upstream Issue #995 / PR #996 未リリース)。web3/ccxt 経由の transitive runtime dep を pin。
+- **影響範囲**: aiohttp の upper cap のみ。web3/ccxt との両立確認済み。
+- **承認**: fix/ruff-i001-lint-fix → main (PR #523)
+
 ### 変更 #2: PyJWT[crypto] extra 追加（Privy ID Token 検証対応）(PR #155 / 2026-04-27)
 - **コミット範囲**: `c88dfd2` – `41f77d7` (feature/privy-did-storage)
 - **変更内容**: `PyJWT>=2.9.0` → `PyJWT[crypto]>=2.9.0`
