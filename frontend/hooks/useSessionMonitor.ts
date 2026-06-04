@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   detectSessionState,
+  hasActiveToken,
   recordLastSeen,
   type SessionSnapshot,
 } from "@/lib/auth/session-monitor";
@@ -36,9 +37,15 @@ export function useSessionMonitor(): SessionSnapshot {
   }, []);
 
   useEffect(() => {
-    // マウント時に last_seen を更新し、即 state を再計算する。
-    // (last_seen 更新自体が detectSessionState の結果を fresh に倒すことに注意)
-    recordLastSeen();
+    // マウント時に「認証済みの場合のみ」last_seen を更新し、即 state を再計算する。
+    // last_seen は「認証済みセッションの活動時刻」を表す。未認証 (初回 incognito 等) で
+    // 記録すると never_seen が wiped に化け、一般ユーザーの初回訪問で誤って
+    // 「セッションが切れました」バナーが出てしまう (不適切な導線)。
+    // 認証済みユーザーの token 期限切れ/wipe 検知 (#424) は、過去の認証セッションで
+    // 記録済みの last_seen が残ることで従来どおり機能する。
+    if (hasActiveToken()) {
+      recordLastSeen();
+    }
     refresh();
 
     // 1 分ごとに再計算 (5/7 日境界跨ぎ検知用、軽量)
@@ -46,8 +53,10 @@ export function useSessionMonitor(): SessionSnapshot {
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        // 戻ってきたタイミングで last_seen を更新 + 即再計算
-        recordLastSeen();
+        // 戻ってきたタイミングで (認証済みのみ) last_seen を更新 + 即再計算
+        if (hasActiveToken()) {
+          recordLastSeen();
+        }
         refresh();
       }
     };
