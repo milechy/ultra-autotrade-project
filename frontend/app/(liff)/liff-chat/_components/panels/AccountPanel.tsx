@@ -161,6 +161,9 @@ export function AccountPanel() {
 
   // ログアウト
   const handleLogout = async () => {
+    const { getLiff, isLiffConfigured } = await import("@/lib/liff/init")
+    const liffMode = isLiffConfigured()
+
     // 1. Privy ログアウト
     try {
       await privyLogout()
@@ -168,13 +171,14 @@ export function AccountPanel() {
       // ignore
     }
 
-    // 2. LINE LIFF ログアウト
-    try {
-      const { getLiff } = await import("@/lib/liff/init")
-      const liff = await getLiff()
-      if (liff.isLoggedIn()) liff.logout()
-    } catch {
-      // ignore
+    // 2. LINE LIFF ログアウト（LIFF モードのみ。ブラウザ PWA モードでは skip）
+    if (liffMode) {
+      try {
+        const liff = await getLiff()
+        if (liff.isLoggedIn()) liff.logout()
+      } catch {
+        // ignore
+      }
     }
 
     // 3. トークンクリア
@@ -182,8 +186,8 @@ export function AccountPanel() {
       localStorage.removeItem("auth_token")
     }
 
-    // 4. /liff-login へリダイレクト
-    router.replace("/liff-login")
+    // 4. リダイレクト（LIFF モードは /liff-login、ブラウザは /login）
+    router.replace(liffMode ? "/liff-login" : "/login")
   }
 
   // アカウント削除申請

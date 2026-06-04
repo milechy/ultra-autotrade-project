@@ -21,6 +21,12 @@ export type LiffState = {
   profile: LiffProfile | null;
   idToken: string | null;
   error: string | null;
+  /**
+   * NEXT_PUBLIC_LIFF_ID が設定されているか。
+   * false = ブラウザ PWA モード（LIFF SDK は初期化されず、error は LIFF 未設定では立たない）。
+   * true  = LIFF モード（error は実際の liff.init 失敗時のみ立つ）。
+   */
+  liffConfigured: boolean;
 };
 
 export function useLiff(): LiffState {
@@ -32,6 +38,7 @@ export function useLiff(): LiffState {
     profile: null,
     idToken: null,
     error: null,
+    liffConfigured: true,
   });
 
   useEffect(() => {
@@ -39,7 +46,28 @@ export function useLiff(): LiffState {
 
     async function init() {
       try {
-        const { initLiff, getLiff } = await import("@/lib/liff/init");
+        const { initLiff, getLiff, isLiffConfigured } = await import(
+          "@/lib/liff/init"
+        );
+
+        // ブラウザ PWA モード: LIFF_ID 未設定なら SDK を読み込まず degrade。
+        // 画面はブラウザで描画され、LIFF 専用機能（profile/idToken 等）は無効。
+        if (!isLiffConfigured()) {
+          if (!cancelled) {
+            setState({
+              isReady: true,
+              isInitialized: true,
+              isLoggedIn: false,
+              isInClient: false,
+              profile: null,
+              idToken: null,
+              error: null,
+              liffConfigured: false,
+            });
+          }
+          return;
+        }
+
         await initLiff();
         const liff = await getLiff();
 
@@ -76,6 +104,7 @@ export function useLiff(): LiffState {
           },
           idToken,
           error: null,
+          liffConfigured: true,
         });
       } catch (err) {
         if (!cancelled) {
