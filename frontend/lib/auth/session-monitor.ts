@@ -105,9 +105,16 @@ export function hasActiveToken(): boolean {
  * 現在時刻を last_seen として記録する。
  * AuthProvider / LIFF layout のマウント時と、`visibilitychange` で呼び出すこと。
  *
- * @returns 書き込みに成功したか (Private モードでは false)
+ * 不変条件: last_seen は「認証済みセッションの活動時刻」のみを表す。
+ * 未認証 (有効な token なし) の場合は **書き込まない**。これにより
+ *   - 初回 incognito / 未ログイン訪問で ultra_last_seen が作られず never_seen を維持
+ *   - 「last_seen 有 + token 無」= 過去に認証済みだった証拠 = 真の wipe (#424) と確定
+ * を保証する。呼び出し側のガード漏れに対する最終防壁 (write primitive level)。
+ *
+ * @returns 書き込みに成功したか (未認証 / Private モードでは false)
  */
 export function recordLastSeen(now: number = Date.now()): boolean {
+  if (!hasActiveToken()) return false;
   return safeSetItem(LAST_SEEN_KEY, String(now));
 }
 
