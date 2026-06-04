@@ -2,6 +2,7 @@
 # backend/app/users/settings_schemas.py
 """ユーザー設定APIのスキーマ定義。"""
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -22,6 +23,8 @@ class UserSettingsResponse(BaseModel):
     user_mode: str
     execution_policy: str
     line_monthly_opt_in: bool = False
+    # 重要事項確認同意日時（User.terms_accepted_at を公開）
+    terms_agreed_at: Optional[datetime] = None
 
 
 class UserSettingsUpdate(BaseModel):
