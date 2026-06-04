@@ -11,6 +11,7 @@ Create Date: 2026-06-04
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "h8i9j0k1l2m3"
@@ -39,9 +40,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_tos_consents_user_id", "tos_consents", ["user_id"])
-    op.create_index(
-        "ix_tos_consents_consent_at", "tos_consents", [sa.text("consent_at DESC")]
-    )
+    op.create_index("ix_tos_consents_consent_at", "tos_consents", [sa.text("consent_at DESC")])
 
     op.create_table(
         "user_actions",
@@ -60,9 +59,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_user_actions_user_id", "user_actions", ["user_id"])
     op.create_index("ix_user_actions_action_type", "user_actions", ["action_type"])
-    op.create_index(
-        "ix_user_actions_created_at", "user_actions", [sa.text("created_at DESC")]
-    )
+    op.create_index("ix_user_actions_created_at", "user_actions", [sa.text("created_at DESC")])
 
 
 def downgrade() -> None:
