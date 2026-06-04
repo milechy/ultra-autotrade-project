@@ -5,8 +5,9 @@
 ToS 同意ログ ORM モデル定義 (MVP-P0-14 / GID 1215082217739006)。
 
 tos_consents: ユーザーの利用規約同意を改ざん検知可能な形で永続化する。
-user_actions: Hermes 学習データ用の汎用ユーザー行動ログ。
-              本モジュールでは consent action のみ記録する (他モジュールも追記可能)。
+tos_user_actions: ToS 同意の付随アクションログ (法的監査証跡)。
+              Hermes 学習用の汎用 user_actions (app/ai/models.py, MVP-P0-6) とは
+              別テーブル。法的監査証跡と学習特徴量は混在させない。
 
 手動マイグレーション SQL (Alembic 未使用 / 本番 DB に直接実行):
 
@@ -25,19 +26,19 @@ user_actions: Hermes 学習データ用の汎用ユーザー行動ログ。
     CREATE INDEX IF NOT EXISTS ix_tos_consents_consent_at
         ON tos_consents (consent_at DESC);
 
-    CREATE TABLE IF NOT EXISTS user_actions (
+    CREATE TABLE IF NOT EXISTS tos_user_actions (
         id          SERIAL PRIMARY KEY,
         user_id     INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         action_type VARCHAR(64)  NOT NULL,
         payload     TEXT         NULL,
         created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     );
-    CREATE INDEX IF NOT EXISTS ix_user_actions_user_id
-        ON user_actions (user_id);
-    CREATE INDEX IF NOT EXISTS ix_user_actions_action_type
-        ON user_actions (action_type);
-    CREATE INDEX IF NOT EXISTS ix_user_actions_created_at
-        ON user_actions (created_at DESC);
+    CREATE INDEX IF NOT EXISTS ix_tos_user_actions_user_id
+        ON tos_user_actions (user_id);
+    CREATE INDEX IF NOT EXISTS ix_tos_user_actions_action_type
+        ON tos_user_actions (action_type);
+    CREATE INDEX IF NOT EXISTS ix_tos_user_actions_created_at
+        ON tos_user_actions (created_at DESC);
 """
 
 from datetime import datetime, timezone
@@ -71,10 +72,14 @@ class ToSConsent(Base):
     is_demo_ack: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
-class UserAction(Base):
-    """ユーザー行動ログ (Hermes 学習データ用)。"""
+class ToSUserAction(Base):
+    """ToS 同意の付随アクションログ (法的監査証跡)。
 
-    __tablename__ = "user_actions"
+    NOTE: Hermes 学習用の汎用 user_actions テーブル (app/ai/models.py UserAction,
+    MVP-P0-6) とは別テーブル `tos_user_actions`。法的監査証跡と学習特徴量は混在させない。
+    """
+
+    __tablename__ = "tos_user_actions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(

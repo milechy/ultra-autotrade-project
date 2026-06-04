@@ -11,7 +11,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.tos.models import ToSConsent, UserAction
+from app.tos.models import ToSConsent, ToSUserAction
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ def record_consent(
         sort_keys=True,
         separators=(",", ":"),
     )
-    action = UserAction(
+    action = ToSUserAction(
         user_id=user_id,
         action_type="tos_consent",
         payload=payload,

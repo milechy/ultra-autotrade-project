@@ -78,7 +78,7 @@ from app.reports.router import router as reports_router
 from app.rss.router import router as rss_router
 from app.tos.models import (
     ToSConsent,  # noqa: F401 — ensure table registered with Base.metadata
-    UserAction,  # noqa: F401 — ensure table registered with Base.metadata
+    ToSUserAction,  # noqa: F401 — ensure table registered with Base.metadata
 )
 from app.tos.router import router as tos_router
 from app.transactions.router import admin_router as admin_transactions_router
