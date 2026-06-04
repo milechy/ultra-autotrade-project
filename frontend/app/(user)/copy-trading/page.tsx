@@ -2,6 +2,8 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+// PrivyProvider は (user)/layout.tsx の UserProviders 経由で供給される。
+// このページで <UserProviders> / <PrivyProvider> を再ラップすると prerender が失敗する (Asana #1215000484642381, 修正: a86a714)。
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
