@@ -257,6 +257,9 @@ jobs:
     continue-on-error: true
     timeout-minutes: 30
 
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+
     defaults:
       run:
         working-directory: frontend
@@ -269,6 +272,8 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+        env:
+          NODE_OPTIONS: '--max-old-space-size=3072'
 
       - name: Start mock backend (port 8000)
         run: |
@@ -284,9 +289,10 @@ jobs:
         run: npm run start &
         env:
           PORT: 3000
+          NODE_OPTIONS: '--max-old-space-size=512'
 
       - name: Wait for server
-        run: npx wait-on http://localhost:3000 http://localhost:8000/health --timeout 30000
+        run: npx wait-on http://localhost:3000 http://localhost:8000/health --timeout 60000
 
       - name: Run smoke tests
         run: npm run test:e2e:smoke -- --project='Mobile Chrome' --reporter=list
