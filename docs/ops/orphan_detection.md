@@ -21,3 +21,23 @@ UIテスト（/chrome）やpytestでは検出できない。2026-04-01に Stress
 - P0: 安全装置系の孤立 → 即修正（workflow.pyやscheduled_tasks.pyに配線）
 - P1: リスク管理系の孤立 → 1-2日以内に修正
 - P2: ユーティリティ系の孤立 → 将来使用予定なら許容、不要なら削除
+
+## 追加パターン: 部分配線欠陥（factory が constructor 引数を供給しない）
+2026-06-02: 「関数は呼ばれているが、生成 factory が必要な属性を供給しない」型の欠陥が
+launch ブロッカーになった。`make_aave_client(chain_name=...)`（マルチチェーン経路）が
+`Web3AaveClient` に `token_addresses` を渡さず（設定は `if settings is not None:` 経路のみ）、
+`build_deposit_txs` / `build_withdraw_tx` が `hasattr(self,"token_addresses")` ガードで
+`Unknown asset` を投げ、non-custodial partner build-tx が staging/production とも 500 だった。
+
+**なぜ5ゲートをすり抜けたか（1行）**: unit test は settings 経路 client か mock を使い
+マルチチェーン経路の token_addresses 欠落を一度も実行せず、E2E は build-tx 実経路に到達せず、
+孤立検出は「参照0件」のみ見て「constructor 引数の供給漏れ」を見ないため、全ゲートが runtime-only
+の配線欠陥を検出できなかった。
+
+**検出観点の追加（grep だけでは出ない）**:
+- 同一クラスに複数の生成経路（`make_*` factory / `settings` 経路 / 直接 new）がある場合、
+  **全経路が同じ必須属性（例: `token_addresses`）を設定するか**を突き合わせる。
+- `hasattr(self, "...")` ガードで分岐するメソッドは、その属性を**設定しない生成経路**が
+  存在しないか確認（設定箇所と生成箇所の数が一致するか）。
+- 重点: `backend/app/aave/client.py` の `make_aave_client` / `make_multi_chain_clients` /
+  `get_default_aave_client` が `Web3AaveClient` に同じ属性群を渡しているか。

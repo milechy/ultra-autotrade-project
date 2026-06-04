@@ -85,7 +85,7 @@ export default function PartnerUserDetailPage() {
         ) : (
           <>
             <KPICard
-              label="今日の運用総額"
+              label="今日の運用残高"
               value={fmtUsd(stats?.today_amount)}
               prefix="$"
               icon={DollarSign}

@@ -89,6 +89,26 @@
 - **影響範囲**: 新規 router 追加のみ。既存 endpoint への影響なし。tests/test_referral_router.py で既存 endpoint の404でないことを保証。
 - **承認**: feature/ras-l2-backend-api → main の通常フロー経由（PR #194）
 
+### 変更 #10: Lane P — monthly_line_report_loop 起動 (PR #499 / 2026-06-02)
+- **コミット範囲**: `0320042` (feat/lane-p-line-monthly)
+- **変更内容**:
+  - `from app.automation.scheduled_tasks import monthly_line_report_loop` を動的 import として `startup_scheduled_tasks` 内に追加
+  - `ENABLE_MONTHLY_LINE_REPORT=1` の場合のみ `asyncio.create_task(monthly_line_report_loop())` で起動
+  - 未設定時は起動しない (opt-in)。計 5 行追加のみ。既存ループ・エンドポイントへの影響なし
+- **理由**: Lane P (§18 通知導線) — `line_monthly_opt_in=True` かつ LINE 認証済みユーザーへ毎月1日 10:00 JST に月次損益 Flex Message を一括送信。LINE 審査前のロジック先行実装。
+- **影響範囲**: startup シーケンスのみ。`ENABLE_MONTHLY_LINE_REPORT` 未設定時は何もしない。既存エンドポイント・スケジューラーへの影響なし。
+- **承認**: feat/lane-p-line-monthly → main の通常フロー経由（PR #499）
+
+### 変更 #9: Partner wallet balance KPI — wallet_balance_router 登録 (PR #440 / 2026-05-28)
+- **コミット範囲**: `6713794` (feat/partner-wallet-balance-20260527)
+- **変更内容**:
+  - `from app.partner.wallet_balance_router import router as wallet_balance_router` を追加
+  - `app.include_router(wallet_balance_router, prefix="/api/partner", tags=["partner"])` を `allocation_router` の直後に追加
+  - 計 4 行追加のみ。既存 router・エンドポイント・ロジックへの変更なし
+- **理由**: Asana 1215185901145482 / partner ダッシュボード — partner 自身のウォレット残高 (USDC + ETH on Base mainnet) を `/api/partner/wallet-balance` で取得し、`PerformanceSummaryKPI.tsx` に表示する。既存 `partner_router` / `allocation_router` と同パターンの新規 router 登録。
+- **影響範囲**: 新規 router 追加のみ。既存 endpoint への影響なし。`backend/tests/partner/test_wallet_balance.py` で endpoint の存在と response shape を保証。
+- **承認**: feat/partner-wallet-balance-20260527 → main の通常フロー経由（PR #440）
+
 ### 変更 #8: P0-2 Safety wiring — compound_risk_monitor startup 登録 (PR #240 / 2026-05-15)
 - **コミット範囲**: `d6a4ed3` (feat/safety-wiring)
 - **変更内容**:

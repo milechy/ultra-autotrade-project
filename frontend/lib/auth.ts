@@ -21,6 +21,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { login as apiLogin, getMe, logout as apiLogout, walletConnect, type UserResponse, type TokenResponse } from "./api/auth";
 import { resolveAuthReady } from "./auth-state";
+import { updateLastSeen } from "./session/itp-guard";
 
 const TOKEN_KEY = "ultra_auth_token";
 const TOKEN_EXPIRES_KEY = "ultra_auth_expires";
@@ -37,6 +38,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isPartner: boolean;
+  isEditor: boolean;
+  isViewer: boolean;
   /**
    * 初期化時の getMe() が timeout / ネットワーク失敗した場合に設定される。
    * 画面上部にバナーを表示して再読み込みを促す用途。401/403 は認証期限切れと
@@ -124,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Only save to localStorage on success
       localStorage.setItem(TOKEN_KEY, newToken);
       localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt));
+      updateLastSeen();
       setToken(newToken);
       setUser(userInfo);
       return userInfo;
@@ -146,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userInfo = await getMe(newToken);
       localStorage.setItem(TOKEN_KEY, newToken);
       localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt));
+      updateLastSeen();
       setToken(newToken);
       setUser(userInfo);
       return userInfo;
@@ -190,6 +195,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!(user || token),
     isAdmin: user?.role === "admin",
     isPartner: (user?.role as string | undefined) === "partner" || user?.role === "admin",
+    isEditor: user?.role === "editor",
+    isViewer: user?.role === "viewer",
     authInitError,
     login,
     loginWithWallet,

@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { apiFetch, apiPost } from '@/lib/api/client'
 import { useAuth } from '@/lib/auth'
 import { EmptyStateWithAIStatus } from '@/components/approve/EmptyStateWithAIStatus'
+import { partitionProposals } from '@/lib/session/proposal-expiry'
 import { useWallet } from '@/hooks/useWallet'
 import { useAaveV3 } from '@/hooks/useAaveV3'
 import { getChainKey } from '@/lib/web3/config'
@@ -74,6 +75,7 @@ function mapToProposal(item: ProposalAPIResponse): Proposal {
     estimatedGas: item.estimated_gas_usd ? parseFloat(item.estimated_gas_usd) : 0,
     slippage: null,
     createdAt: item.created_at,
+    expiresAt: item.expires_at,
   }
 }
 
@@ -95,7 +97,7 @@ type ProposalState = {
 }
 
 export default function ApprovePage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { isAuthenticated, isLoading: authLoading, isPartner } = useAuth()
   const router = useRouter()
   const { isConnected, chainId } = useWallet()
   const { isReady, approve: approveToken, supply, withdraw, borrow, repay } = useAaveV3()
@@ -118,7 +120,9 @@ export default function ApprovePage() {
         apiFetch<ProposalListResponse>('/api/proposals/pending'),
         apiFetch<ProposalListResponse>('/api/proposals/history?limit=5'),
       ])
-      setProposals(pendingRes.items.map(mapToProposal))
+      const allPending = pendingRes.items.map(mapToProposal)
+      const { active } = partitionProposals(allPending)
+      setProposals(active)
       setRecentApprovals(historyRes.items.map(mapToRecentApproval))
     } catch {
       setError(t('fetchError'))
@@ -130,12 +134,14 @@ export default function ApprovePage() {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace('/login?redirect=/user/approve')
+    } else if (!authLoading && isAuthenticated && !isPartner) {
+      router.replace('/user/dashboard')
     }
-  }, [authLoading, isAuthenticated, router])
+  }, [authLoading, isAuthenticated, isPartner, router])
 
   useEffect(() => {
-    if (isAuthenticated) { fetchData() }
-  }, [fetchData, isAuthenticated])
+    if (isAuthenticated && isPartner) { fetchData() }
+  }, [fetchData, isAuthenticated, isPartner])
 
   const handleApprove = useCallback(async (id: string) => {
     const proposal = proposals.find((p) => p.id === id)

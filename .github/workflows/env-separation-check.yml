@@ -1,14 +1,9 @@
 name: Environment Separation Check
 
 on:
+  # 2026-05-27 LAUNCH-GATE-B: paths 限定撤廃。env drift は形を変えて
+  # 再発し続けるため、全 PR / push で常時実行する。
   pull_request:
-    paths:
-      - '.env.staging'
-      - '.env.production'
-      - 'backend/.env.staging.example'
-      - 'backend/.env.production.example'
-      - 'docker-compose*.yml'
-      - 'scripts/check_env_separation.sh'
   push:
     branches: [main, dev]
 

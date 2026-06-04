@@ -37,7 +37,8 @@ class TestFetchFinanceData:
 
     @pytest.mark.asyncio
     async def test_successful_response(self) -> None:
-        mock_response = MagicMock()
+        mock_response = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
         mock_response.json.return_value = {
             "choices": [
@@ -75,7 +76,8 @@ class TestFetchFinanceData:
     @pytest.mark.asyncio
     async def test_invalid_enum_values_default(self) -> None:
         """Invalid fed_stance/stablecoin_risk values fall back to defaults."""
-        mock_response = MagicMock()
+        mock_response = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
         mock_response.json.return_value = {
             "choices": [
@@ -104,7 +106,8 @@ class TestFetchFinanceData:
 
     @pytest.mark.asyncio
     async def test_malformed_json_fallback(self) -> None:
-        mock_response = MagicMock()
+        mock_response = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
         mock_response.json.return_value = {
             "choices": [{"message": {"content": "Macro conditions are stable overall."}}],

@@ -122,6 +122,34 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ===== Init: backend volume permissions =====
+  # 主目的: state.json (Asana 1215189630575554, 2026-05-28 soak 調査)。
+  # 名前付き volume `ultra-state` は作成時に root:root で初期化されるため
+  # Dockerfile の `USER appuser` (UID=10001) では state.json を書けず、
+  # `Failed to write state file /var/run/ultra/state.json: [Errno 13] Permission denied`
+  # を毎分発生させていた。root で chown 10001:10001 する。
+  #
+  # 副次対応: `ultra-log-staging` (production の log volume) も chown する。
+  # Dockerfile で appuser を UID 固定 (10001) に変更したため、旧 dynamic UID で
+  # chown 済みの既存 log volume 内ファイル所有者を新 UID に揃える必要がある。
+  #
+  # 毎回の `docker compose up` で実行されるが、idempotent で数百 ms で完了する。
+  backend-volume-init:
+    image: alpine:3.19
+    container_name: ultra-autotrade-backend-volume-init-production
+    command: ["chown", "-R", "10001:10001", "/var/run/ultra", "/var/log/ultra-autotrade"]
+    volumes:
+      - ultra-state:/var/run/ultra
+      - ultra-log-staging:/var/log/ultra-autotrade
+    restart: "no"
+    networks:
+      - production-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "1"
+
   # ===== Blue/Green Backend =====
   # 両者は build / env / volume が同一。container_name と公開ポートのみ異なる。
   # active 側のみ nginx の upstream.conf に登録される。
@@ -140,7 +168,6 @@ services:
     env_file:
       - .env.production
     environment:
-      REBALANCE_SHADOW_MODE: "false"
       DEPLOY_SLOT: "blue"
       # Stream 4 (2026-05-21): Blue/Green scheduler 二重起動防止。
       # BACKEND_COLOR はこのコンテナの固有色。ACTIVE_BACKEND_COLOR は .env.production から
@@ -168,6 +195,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      backend-volume-init:
+        condition: service_completed_successfully
     restart: always
     networks:
       - production-net
@@ -192,7 +221,6 @@ services:
     env_file:
       - .env.production
     environment:
-      REBALANCE_SHADOW_MODE: "false"
       DEPLOY_SLOT: "green"
       # Stream 4 (2026-05-21): Blue/Green scheduler 二重起動防止。
       BACKEND_COLOR: "green"
@@ -208,6 +236,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      backend-volume-init:
+        condition: service_completed_successfully
     restart: always
     networks:
       - production-net

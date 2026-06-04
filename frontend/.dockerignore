@@ -1,0 +1,44 @@
+# frontend/.dockerignore
+# 2026-05-27 作成 (Asana [chore] backend image env 焼き込み調査):
+#   frontend Dockerfile は `COPY . .` (build context: ./frontend) を実施。
+#   ルートの .dockerignore は適用されないため、frontend 単独で env file を
+#   除外する。NEXT_PUBLIC_* は docker-compose の build.args 経由で注入される
+#   ので、.env.* を image に含める必要はない。
+
+# 環境ファイル — secrets / 環境別設定を image に焼き込まない
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!.env.*.example
+!**/.env.example
+!**/.env.*.example
+
+# Node ビルド成果物 / 依存
+node_modules/
+.next/
+out/
+build/
+.turbo/
+
+# Git / CI
+.git/
+.gitignore
+
+# Test artifacts
+playwright-report/
+test-results/
+coverage/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

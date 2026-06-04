@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { apiFetch, apiPost } from '@/lib/api/client'
 import { useAuth } from '@/lib/auth'
 import { EmptyStateWithAIStatus } from '@/components/approve/EmptyStateWithAIStatus'
+import { partitionProposals } from '@/lib/session/proposal-expiry'
 import {
   ProposalCard,
   RecentApprovals,
@@ -50,6 +51,7 @@ function mapToProposal(item: ProposalAPIResponse): Proposal {
     estimatedGas: item.estimated_gas_usd ? parseFloat(item.estimated_gas_usd) : 0,
     slippage: null,
     createdAt: item.created_at,
+    expiresAt: item.expires_at,
   }
 }
 
@@ -89,7 +91,10 @@ export default function ApprovePage() {
         apiFetch<ProposalListResponse>('/api/proposals/pending'),
         apiFetch<ProposalListResponse>('/api/proposals/history?limit=5'),
       ])
-      setProposals(pendingRes.items.map(mapToProposal))
+      const allPending = pendingRes.items.map(mapToProposal)
+      // frontend 側でも期限切れをフィルタし、onProposalExpired hook を呼ぶ
+      const { active } = partitionProposals(allPending)
+      setProposals(active)
       setRecentApprovals(historyRes.items.map(mapToRecentApproval))
     } catch {
       setError('データを取得できません')

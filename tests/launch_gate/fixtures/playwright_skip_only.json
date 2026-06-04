@@ -1,0 +1,15 @@
+{
+  "config": {
+    "rootDir": "/tmp/fixture",
+    "version": "1.40.0"
+  },
+  "stats": {
+    "startTime": "2026-05-28T00:00:00.000Z",
+    "duration": 1234,
+    "expected": 0,
+    "skipped": 3,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "suites": []
+}

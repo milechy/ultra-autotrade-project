@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { WalletAddressMask } from '@/components/shared/WalletAddressMask'
 import { UserPositions } from './UserPositions'
-import { UserHFChart } from './UserHFChart'
+
+// recharts は SSR でクラッシュするため dynamic import + ssr: false が必須
+const UserHFChart = dynamic(
+  () => import('./UserHFChart').then((m) => m.UserHFChart),
+  { ssr: false },
+)
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

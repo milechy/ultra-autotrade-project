@@ -42,7 +42,13 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "g7h8i9j0k1l2"
-down_revision: Union[str, Sequence[str], None] = "f6a7b8c9d0e1"
+# 2026-05-25: down_revision を f6a7b8c9d0e1 → a7b8c9d0e1f2 に張り替え。
+# 旧設定では a7b8c9d0e1f2(execution_policy CHECK 制約)と本 migration が
+# 同一の f6a7b8c9d0e1(privy_did)を down_revision にしており、alembic heads が
+# 2 head に分岐 → `alembic upgrade head` が "Multiple head revisions" で停止していた。
+# 論理的にも CHECK 制約(a7)→ default 変更+backfill(g7)の順が自然なため、
+# g7 を a7 の後ろに付け替えて単線化する。
+down_revision: Union[str, Sequence[str], None] = "a7b8c9d0e1f2"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

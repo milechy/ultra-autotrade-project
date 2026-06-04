@@ -20,7 +20,7 @@
 
 | 環境 | compose ファイル | env ファイル | DB 名 | nginx active |
 |---|---|---|---|---|
-| production | `docker-compose.production.yml` | `.env.production` | `ultra_autotrade` | blue (port 8010) |
+| production | `docker-compose.production.yml` | `.env.production` | `ultra_autotrade` | `ACTIVE_BACKEND_COLOR` に依存 (blue=port 8010 / green=port 8011) |
 | staging | `docker-compose.staging.yml` | `.env.staging-new` | `ultra_autotrade_staging` | blue (port 8020、`docker/nginx/upstream.staging.conf` で `backend-blue:8000` に固定) |
 | local | `docker-compose.local.yml` | `.env.local` | (任意) | - |
 
@@ -53,7 +53,7 @@
 
 ### 1.3 scheduler は backend 内蔵
 
-`ultra-autotrade-scheduler-production` というコンテナは**存在しない**。AI 判定スケジューラーは `ultra-autotrade-backend-blue-production` (active 側) のプロセス内で動作する。
+`ultra-autotrade-scheduler-production` というコンテナは**存在しない**。AI 判定スケジューラーは `ultra-autotrade-backend-${ACTIVE_BACKEND_COLOR}-production` (active 側) のプロセス内で動作する。`ACTIVE_BACKEND_COLOR` の確認方法は §1.5 参照。
 
 `force-recreate` 対象は基本 backend (active 側) のみ。staging も同様。
 
@@ -65,6 +65,19 @@
 | staging | `ultra-autotrade-staging` |
 
 deploy 時の `docker compose up` には `-p <COMPOSE_PROJECT_NAME>` を明示するのが安全(container_name 衝突回避)。
+
+### 1.5 ACTIVE_BACKEND 変数（各 SSH セッション開始時に設定）
+
+production では deploy のたびに blue/green の active 側が切り替わる。以下を SSH 後すぐに実行してシェル変数をセットすること:
+
+```bash
+cd /opt/ultra-autotrade
+ACTIVE_COLOR=$(grep '^ACTIVE_BACKEND_COLOR=' .env.production | cut -d= -f2)
+ACTIVE_BACKEND="ultra-autotrade-backend-${ACTIVE_COLOR}-production"
+echo "Active: ${ACTIVE_BACKEND}"  # 例: ultra-autotrade-backend-blue-production
+```
+
+以降このランブック内のコマンド例に `${ACTIVE_BACKEND}` と記した箇所は上記変数を参照する。§6 (Blue/Green ロールバック手順) はコンテナを明示的に指定するため `backend-blue-production` / `backend-green-production` を直書きしている。
 
 ---
 
@@ -112,8 +125,9 @@ docker exec ultra-autotrade-postgres-production psql -U ultra -d ultra_autotrade
 ### 2.3 .env 展開検証
 
 ```bash
+# ACTIVE_BACKEND 変数が未設定の場合は §1.5 を参照してセットする
 # 現在 active な backend コンテナで実際の値を確認
-docker exec ultra-autotrade-backend-blue-production env | grep -E \
+docker exec ${ACTIVE_BACKEND} env | grep -E \
   '(AAVE_NETWORK|AAVE_RPC_URL|REBALANCE_SHADOW_MODE|AI_CROSS_VALIDATION_ENABLED|OPENAI_API_KEY|PRIVY_APP_ID|DATABASE_URL)' \
   | sed 's/=.*/=***/'  # 値はマスクしてログに残す
 
@@ -271,13 +285,13 @@ curl -fsS https://api.ultra-auto-trade.com/api/aave/chains/health \
 **不合格時の調査**:
 ```bash
 # scheduler_healthy=false / warnings に値あり
-docker logs --tail=100 ultra-autotrade-backend-blue-production 2>&1 | grep -E "ERROR|scheduler"
+docker logs --tail=100 ${ACTIVE_BACKEND} 2>&1 | grep -E "ERROR|scheduler"
 
 # Aave RPC 接続 / contract address 確認
-docker exec ultra-autotrade-backend-blue-production env | grep -E "AAVE_NETWORK|AAVE_RPC_URL"
+docker exec ${ACTIVE_BACKEND} env | grep -E "AAVE_NETWORK|AAVE_RPC_URL"
 
 # 内部 API 401 (INTERNAL_API_TOKEN 未設定インシデント、2026-04-03)
-docker logs --tail=200 ultra-autotrade-backend-blue-production 2>&1 | grep "401"
+docker logs --tail=200 ${ACTIVE_BACKEND} 2>&1 | grep "401"
 ```
 
 ### 4.2 認証フロー
@@ -337,10 +351,10 @@ curl -fsS -X POST https://api.ultra-auto-trade.com/auth/wallet/connect \
 **不合格時の調査**:
 ```bash
 # 401 連発 → JWT 検証エラー
-docker logs ultra-autotrade-backend-blue-production 2>&1 | grep -E "(jwt|InvalidToken|expired)"
+docker logs ${ACTIVE_BACKEND} 2>&1 | grep -E "(jwt|InvalidToken|expired)"
 
 # Privy 検証失敗
-docker exec ultra-autotrade-backend-blue-production env | grep PRIVY_APP_ID
+docker exec ${ACTIVE_BACKEND} env | grep PRIVY_APP_ID
 # .env と比較。PRIVY_APP_ID は production/staging で同値、PRIVY_APP_SECRET は別値の想定
 ```
 
@@ -391,7 +405,7 @@ docker exec ultra-autotrade-postgres-production psql -U ultra -d ultra_autotrade
 **不合格時の調査**:
 ```bash
 # wallet_address 未保存 → API エラー or DB 制約違反
-docker logs ultra-autotrade-backend-blue-production 2>&1 | grep -E "(wallet|connect)" | tail -20
+docker logs ${ACTIVE_BACKEND} 2>&1 | grep -E "(wallet|connect)" | tail -20
 
 # 既に他ユーザーで使われている (UNIQUE 制約)
 docker exec ultra-autotrade-postgres-production psql -U ultra -d ultra_autotrade \
@@ -457,10 +471,10 @@ ORDER BY created_at DESC LIMIT 10;"
 **不合格時の調査**:
 ```bash
 # scheduler が判定を出していない (HOLD のみ + 低信頼)
-docker logs ultra-autotrade-backend-blue-production 2>&1 | grep -E "ai_judgment|aave_utilization_fetch_failed|301 Moved"
+docker logs ${ACTIVE_BACKEND} 2>&1 | grep -E "ai_judgment|aave_utilization_fetch_failed|301 Moved"
 
 # Aave データ無し → indicator confidence < 30 になる
-docker exec ultra-autotrade-backend-blue-production python -c "
+docker exec ${ACTIVE_BACKEND} python -c "
 from app.automation.aave_data_fetcher import fetch_aave_market_data_safe
 import json
 print(json.dumps({k: str(v) for k,v in fetch_aave_market_data_safe().items()}, indent=2))
@@ -517,10 +531,10 @@ ORDER BY p.created_at DESC LIMIT 20;"
 **不合格時の調査**:
 ```bash
 # 承認失敗 → cooldown / HF / amount limit のいずれか
-docker logs ultra-autotrade-backend-blue-production 2>&1 | grep -E "(CooldownError|HFGuard|MaxTradeError)"
+docker logs ${ACTIVE_BACKEND} 2>&1 | grep -E "(CooldownError|HFGuard|MaxTradeError)"
 
 # tx 失敗 → web3 RPC エラー / nonce 競合
-docker logs ultra-autotrade-backend-blue-production 2>&1 | grep -E "(web3|nonce|revert)"
+docker logs ${ACTIVE_BACKEND} 2>&1 | grep -E "(web3|nonce|revert)"
 ```
 
 ### 4.6 ProposalCreate スキーマ (推測絶対禁止領域)
@@ -761,7 +775,7 @@ docker exec ultra-autotrade-postgres-production pg_dump -U ultra ultra_autotrade
   > /tmp/post_failed_migration_$(date +%Y%m%d_%H%M%S).sql
 
 # 2. backend を停止 (DB 接続を切る)
-docker stop ultra-autotrade-backend-blue-production
+docker stop ${ACTIVE_BACKEND}
 
 # 3. DB restore (deploy 前に取った backup を使用)
 gunzip -c /opt/ultra-autotrade/backups/backup_production_20260501_111758.sql.gz \
@@ -772,7 +786,7 @@ docker exec -i ultra-autotrade-postgres-production psql -U ultra -d ultra_autotr
   < /opt/ultra-autotrade/backups/backup_production_20260501_111758.sql
 
 # 4. backend を再起動
-docker start ultra-autotrade-backend-blue-production
+docker start ${ACTIVE_BACKEND}
 
 # 5. /health 確認
 curl -fsS https://api.ultra-auto-trade.com/health | python3 -m json.tool
@@ -825,7 +839,7 @@ FROM users WHERE id = 11;"
 
 **MetaMask + Aave 残高確認 (web3)**:
 ```bash
-docker exec ultra-autotrade-backend-blue-production python -c "
+docker exec ${ACTIVE_BACKEND} python -c "
 from app.aave.client import get_default_aave_client
 from web3 import Web3
 c = get_default_aave_client()
@@ -878,7 +892,7 @@ FROM proposals WHERE id = 45;"
 # 4. 失敗時の原因分布
 # - status=failed + error_message → web3 RPC エラー / nonce / revert
 # - status=approved のまま (executed にならない) → scheduler 未稼働
-docker logs --tail=200 ultra-autotrade-backend-blue-production 2>&1 \
+docker logs --tail=200 ${ACTIVE_BACKEND} 2>&1 \
   | grep -E "proposal_45|tx_hash|CooldownError|HFGuard"
 ```
 
@@ -911,7 +925,7 @@ ORDER BY p.created_at DESC LIMIT 20;"
 
 **C. 旧 V2 REST エラーが 0 件**:
 ```bash
-docker logs ultra-autotrade-backend-blue-production --since=24h 2>&1 \
+docker logs ${ACTIVE_BACKEND} --since=24h 2>&1 \
   | grep -E "(aave_utilization_fetch_failed|301 Moved Permanently|aave-api-v2.aave.com)" | wc -l
 # 期待: 0
 ```
@@ -919,7 +933,7 @@ docker logs ultra-autotrade-backend-blue-production --since=24h 2>&1 \
 **D. scheduler 健全性 + warning なし**:
 ```bash
 # 24h 中の WARN/ERROR 件数
-docker logs ultra-autotrade-backend-blue-production --since=24h 2>&1 \
+docker logs ${ACTIVE_BACKEND} --since=24h 2>&1 \
   | grep -cE "(ERROR|WARN|aave_chain_registry_miss|scheduler_last_error)"
 
 # /health の継続観察 (warnings 配列)

@@ -21,13 +21,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.ai.judgment_log import get_judgment_logger
-from app.ai.models import AIDecision
+from app.ai.models import AIDecision, AiDecisionFeature
 from app.ai.schemas import CrossValidationResult, RAGContext, TradeAction
 from app.ai.service import AIService
 from app.auth.constants import ExecutionPolicy
 from app.auth.models import InvestmentTier, User, normalize_tier
-from app.automation.aave_data_fetcher import fetch_aave_market_data_safe
-from app.data_feeds.context import build_market_context
+from app.aave.gas_estimator import estimate_static_gas_cost_usd
+from app.automation.aave_data_fetcher import AaveMarketData, fetch_aave_market_data_safe
+from app.data_feeds.context import MarketContext, build_market_context
 from app.database import SessionLocal
 from app.knowledge.schemas import KnowledgeSearchRequest
 from app.knowledge.service import KnowledgeService
@@ -173,6 +174,137 @@ def save_ai_decision(
     return decision
 
 
+def _build_agent_signals_json(market_ctx: Any) -> Optional[dict[str, Any]]:
+    """MarketContext から run_all_agents() を呼び、jsonb 用 dict を返す。
+
+    market_ctx が MarketContext でない場合 (degraded dict) は None を返す。
+    """
+    from app.ai.agents import run_all_agents  # noqa: PLC0415
+
+    if not isinstance(market_ctx, MarketContext):
+        return None
+    try:
+        agent_ctx = run_all_agents(market_ctx)
+        signals: dict[str, Any] = {}
+        for key, sig in (
+            ("indicator", agent_ctx.indicator_signal),
+            ("pattern", agent_ctx.pattern_signal),
+            ("risk", agent_ctx.risk_signal),
+            ("macro", agent_ctx.macro_signal),
+        ):
+            if sig is not None:
+                signals[key] = {
+                    "bias": sig.bias.value,
+                    "confidence": sig.confidence,
+                    "key_data": {k: str(v) for k, v in sig.key_data.items()},
+                }
+        return signals or None
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("_build_agent_signals_json failed: %s", exc)
+        return None
+
+
+def _build_raw_features_json(
+    aave_data: "AaveMarketData",
+    market_ctx: Any,
+) -> dict[str, Any]:
+    """fetch_aave_market_data_safe() の結果 + MarketContext から raw_features dict を返す。
+
+    RSI/MACD/volatility/gas は現コードに存在しないため含めない。
+    """
+    raw: dict[str, Any] = {
+        "utilization_rate": str(aave_data["utilization_rate"])
+        if aave_data["utilization_rate"] is not None
+        else None,
+        "supply_apy": str(aave_data["supply_apy"]) if aave_data["supply_apy"] is not None else None,
+        "borrow_apy": str(aave_data["borrow_apy"]) if aave_data["borrow_apy"] is not None else None,
+        "health_factor": str(aave_data["health_factor"])
+        if aave_data["health_factor"] is not None
+        else None,
+    }
+    if isinstance(market_ctx, MarketContext):
+        raw["geo_risk_score"] = market_ctx.geo_risk.geo_risk_score
+        raw["news_sentiment"] = market_ctx.news.sentiment
+        raw["fed_stance"] = market_ctx.finance.fed_stance
+        raw["stablecoin_risk"] = market_ctx.finance.stablecoin_risk
+    return raw
+
+
+def _generate_embedding(text: str) -> Optional[list[float]]:
+    """text-embedding-3-small で 1536 次元ベクトルを生成する (fail-open)。
+
+    OpenAI キーが未設定または API 呼び出し失敗時は None を返す。
+    """
+    try:
+        from openai import OpenAI  # noqa: PLC0415
+
+        from app.ai.config import get_ai_settings  # noqa: PLC0415
+
+        api_key = get_ai_settings().openai_api_key
+        if not api_key:
+            return None
+        client = OpenAI(api_key=api_key)
+        resp = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=text,
+            dimensions=1536,
+        )
+        return resp.data[0].embedding
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("embedding generation failed (fail-open): %s", exc)
+        return None
+
+
+def save_ai_decision_features(
+    db: Session,
+    decision: AIDecision,
+    result: CrossValidationResult,
+    aave_data: "AaveMarketData",
+    market_ctx: Any,
+) -> None:
+    """ai_decision_features に判定時の特徴量を INSERT する (fail-open)。
+
+    呼び出し元の db.commit() 前に呼ぶこと。INSERT 失敗は WARNING ログに留め、
+    判定結果の保存 (save_ai_decision) には影響させない。
+
+    Args:
+        db: SQLAlchemy セッション (flush 済み decision を持つ)。
+        decision: flush 済みの AIDecision (id が確定している)。
+        result: AI クロスバリデーション結果。
+        aave_data: fetch_aave_market_data_safe() の返り値。
+        market_ctx: build_market_context() の返り値、または degraded dict。
+    """
+    try:
+        agent_signals = _build_agent_signals_json(market_ctx)
+        raw_features = _build_raw_features_json(aave_data, market_ctx)
+        embed_text = result.final_reason or _DEFAULT_QUERY
+        embedding = _generate_embedding(embed_text)
+
+        feature = AiDecisionFeature(
+            ai_decision_id=decision.id,
+            agent_signals=agent_signals,
+            raw_features=raw_features,
+            judge_action=result.final_action.value,
+            confidence=result.final_confidence,
+            cross_verify=result.agreed,
+            embedding=embedding,
+        )
+        db.add(feature)
+        db.flush()
+        logger.info(
+            "ai_decision_features inserted: decision_id=%d action=%s confidence=%d",
+            decision.id,
+            result.final_action.value,
+            result.final_confidence,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "save_ai_decision_features failed (fail-open, decision_id=%d): %s",
+            decision.id,
+            exc,
+        )
+
+
 def _get_tier_interval_hours(tier: str) -> int:
     """ティアに応じた AI 判定間隔（時間）を返す。
 
@@ -315,6 +447,7 @@ def _create_proposals_for_users(
                     )
                     continue
 
+                estimated_gas_usd = estimate_static_gas_cost_usd(operation)
                 proposal = Proposal(
                     user_id=user.id,
                     ai_decision_id=decision.id,
@@ -326,6 +459,7 @@ def _create_proposals_for_users(
                     expires_at=expires_at,
                     fee_rate=market_fee.fee_rate,
                     fee_amount=market_fee.fee_amount,
+                    estimated_gas_usd=estimated_gas_usd,
                 )
                 db.add(proposal)
                 user.last_judgment_at = now
@@ -403,6 +537,13 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
         # cognitive_state は HOLD 連続抑制のため LLM プロンプトに渡す。
         context_degraded = False
         market_ctx: Any
+        # aave_data は ai_decision_features INSERT にも使うため None-safe に初期化しておく。
+        aave_data: AaveMarketData = {
+            "utilization_rate": None,
+            "supply_apy": None,
+            "borrow_apy": None,
+            "health_factor": None,
+        }
         try:
             aave_data = fetch_aave_market_data_safe()
             cognitive_state = get_judgment_logger().get_cognitive_state()
@@ -435,6 +576,9 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
 
         # DB 保存
         decision = save_ai_decision(db, result, _DEFAULT_QUERY, rag_context=rag_ctx)
+
+        # Hermes Phase 0: 判定時の特徴量を ai_decision_features に INSERT (fail-open)
+        save_ai_decision_features(db, decision, result, aave_data, market_ctx)
 
         # BUY / SELL 時は Proposal 作成
         proposals_created = 0

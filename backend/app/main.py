@@ -41,6 +41,7 @@ from app.ai.optimizer.router import router as ai_optimizer_router
 from app.ai.router import router as ai_router
 from app.api.alias_router import router as alias_router
 from app.api.automation_dashboard import router as automation_dashboard_router
+from app.api.v1.fee_transfer import router as fee_transfer_router
 from app.api.v1.fees import router as fees_v10_router
 from app.auth.router import router as auth_router
 from app.auth.service import AuthService
@@ -58,8 +59,6 @@ from app.error_handlers import register_error_handlers
 from app.exchange.router import router as exchange_router
 from app.health.detail_router import router as health_detail_router
 from app.hooks.router import router as hooks_router
-
-# from app.invitations.router import router as invitations_router  # Phase 2 物理削除予定
 from app.knowledge.router import router as knowledge_router
 from app.notifications.models import (
     NotificationLog,  # noqa: F401 — ensure table registered with Base.metadata
@@ -68,6 +67,7 @@ from app.notifications.router import api_router as notification_api_router
 from app.notifications.router import router as notification_router
 from app.partner.allocation_router import router as allocation_router
 from app.partner.router import router as partner_router
+from app.partner.wallet_balance_router import router as wallet_balance_router
 from app.portfolio.router import router as portfolio_router
 from app.proposals.router import router as proposals_router
 from app.protocols.lido.router import router as lido_router
@@ -88,6 +88,9 @@ from app.webhook.router import router as webhook_router
 logger = logging.getLogger(__name__)
 # Ensure app.* loggers output at INFO level regardless of root logger config
 logging.getLogger("app").setLevel(logging.INFO)
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s", force=True
+)
 
 
 def _is_inactive_color_skip() -> bool:
@@ -227,11 +230,13 @@ def create_app() -> FastAPI:
 
     # --- Router registration ---
     app.include_router(auth_router)  # Auth (Phase12)
-    # app.include_router(invitations_router)  # Phase 2 物理削除予定 (/partner/referral に置換)
     app.include_router(partner_router)  # Partner stats (Wave 2)
     app.include_router(
         allocation_router, prefix="/api/partner", tags=["partner-allocations"]
     )  # Fund allocations
+    app.include_router(
+        wallet_balance_router, prefix="/api/partner", tags=["partner"]
+    )  # Partner wallet balance (USDC + ETH on Base mainnet)
     app.include_router(users_router)  # Users (Phase12)
     app.include_router(ai_router, prefix="/api")  # AI (Phase2)
     app.include_router(octobot_router)  # OctoBot (Phase3)
@@ -253,6 +258,7 @@ def create_app() -> FastAPI:
     app.include_router(data_feeds_router)  # External data feeds (Phase 2)
     app.include_router(reports_router, prefix="/api/reports")  # Monthly reports
     app.include_router(fees_v10_router, prefix="/api/v1")  # Fee Model v10 API (/api/v1/fees/*)
+    app.include_router(fee_transfer_router, prefix="/api/v1")  # Fee Transfer & Allowance (Lane R)
     app.include_router(ai_decisions_router)  # AI Decisions API
     app.include_router(ai_feedback_router)  # AI Feedback API (Layer 4)
     app.include_router(ai_optimizer_router)  # AI Optimizer (Phase 2 / ENB)
@@ -309,6 +315,23 @@ def create_app() -> FastAPI:
 
         _validate_model_config()
         logger.info("AI model config validation passed")
+
+    # --- Aave Oracle staleness threshold env validation (fail-fast) ---
+    @app.on_event("startup")
+    async def startup_validate_oracle_staleness_env() -> None:
+        """Fail-fast: reject invalid AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS at boot.
+
+        Long-heartbeat feeds (Base Sepolia / Base mainnet USDC/USD ≈ 24h) must
+        configure this env to avoid spurious HOLD; default 3600s is unsafe there.
+        """
+        from app.aave.oracle_checker import validate_staleness_threshold_env  # noqa: PLC0415
+
+        threshold = validate_staleness_threshold_env()
+        logger.info(
+            "Aave oracle staleness threshold validated: %ds "
+            "(env=AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS)",
+            threshold,
+        )
 
     # --- Database initialization (Phase12) ---
     @app.on_event("startup")
@@ -569,6 +592,16 @@ def create_app() -> FastAPI:
                 logger.info("Monthly fee batch scheduled (rate=%s)", usd_jpy_rate)
             except BaseException as exc:
                 logger.error("Failed to start monthly fee batch: %s", exc)
+
+        # --- 月次 LINE レポート (opt-in: ENABLE_MONTHLY_LINE_REPORT=1) ---
+        if os.getenv("ENABLE_MONTHLY_LINE_REPORT", "0") == "1":
+            try:
+                await scheduled_manager.start_monthly_line_report(
+                    on_error=_make_scheduler_error_handler("monthly_line_report_loop"),
+                )
+                logger.info("Monthly LINE report scheduled")
+            except BaseException as exc:
+                logger.error("Failed to start monthly LINE report: %s", exc)
 
     @app.on_event("startup")
     async def startup_health_probes() -> None:

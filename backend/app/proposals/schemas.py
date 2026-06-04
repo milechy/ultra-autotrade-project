@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProposalCreate(BaseModel):
@@ -45,6 +45,8 @@ class ProposalResponse(BaseModel):
     rejected_at: Optional[datetime]
     executed_at: Optional[datetime]
     tx_hash: Optional[str]
+    expected_from: Optional[str] = None
+    expected_to: Optional[str] = None
     error_message: Optional[str] = None
     expires_at: datetime
     created_at: datetime
@@ -77,3 +79,33 @@ class AdminProposalStats(BaseModel):
     today_approved: int
     today_rejected: int
     expired: int
+
+
+class UnsignedTx(BaseModel):
+    """Privy経由でpartnerが署名する未署名トランザクション。"""
+
+    to: str
+    data: str
+    from_address: str = Field(alias="from")
+    chain_id: int = Field(alias="chainId")
+    value: str = "0x0"
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class PartnerUnsignedTxs(BaseModel):
+    """build-tx エンドポイントのレスポンス。"""
+
+    proposal_id: int
+    operation: str  # "SUPPLY" or "WITHDRAW"
+    wallet_address: str
+    approve_tx: Optional[UnsignedTx] = None  # SUPPLY のみ
+    supply_tx: Optional[UnsignedTx] = None  # SUPPLY のみ
+    withdraw_tx: Optional[UnsignedTx] = None  # WITHDRAW のみ
+
+
+class SubmitTxRequest(BaseModel):
+    """submit-tx エンドポイントのリクエスト。"""
+
+    tx_hash: str
+    wallet_address: str

@@ -130,6 +130,7 @@ export function EmergencyStopFloat() {
           className="fixed bottom-4 right-4 z-50 w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 active:bg-red-800 text-white shadow-lg flex items-center justify-center transition-colors disabled:opacity-60"
           disabled={isLoading}
           aria-label="緊急停止"
+          data-testid="emergency-stop-float"
         >
           {isLoading ? (
             <Loader2 className="h-6 w-6 animate-spin" />

@@ -23,7 +23,8 @@ class InvitationResponse(BaseModel):
 
     id: int
     code: str
-    partner_id: int
+    type: str = "invite"
+    partner_id: Optional[int] = None
     expires_at: datetime
     max_uses: int
     used_count: int
@@ -37,6 +38,7 @@ class InvitationValidateResponse(BaseModel):
     """招待コード検証レスポンス。"""
 
     valid: bool
+    type: Optional[str] = None
     partner_id: Optional[int] = None
     expires_at: Optional[datetime] = None
     uses_remaining: Optional[int] = None

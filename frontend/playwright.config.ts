@@ -16,7 +16,13 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1,
   workers: process.env.CI ? 1 : 3,
-  reporter: [['html', { open: 'never' }], ['list']],
+  // json reporter は scripts/launch_gate/L3_e2e.sh が
+  // passed / failed / skipped 件数を読むために必要 (§7 skip-only 防止判定)
+  reporter: [
+    ['html', { open: 'never' }],
+    ['list'],
+    ['json', { outputFile: 'playwright-results.json' }],
+  ],
   use: {
     baseURL: process.env.STAGING_URL || 'https://app.ultra-auto-trade.com',
     locale: 'ja-JP',

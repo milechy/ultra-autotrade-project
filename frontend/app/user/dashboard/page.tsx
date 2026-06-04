@@ -13,6 +13,7 @@ import {
   LatestDecision,
   SafetyScore,
   AiAccuracyCard,
+  PnlChart,
 } from './_components'
 import { useAuthFetch } from '@/hooks/useAuthFetch'
 
@@ -215,11 +216,18 @@ function RecentOpsCard() {
 }
 
 function ManagedDashboard() {
+  const t = useTranslations('Dashboard')
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
       {/* 資金割り振り — メインコンテンツ */}
       <section>
         <AllocationCard />
+      </section>
+
+      {/* 損益グラフ */}
+      <section>
+        <h2 className="text-sm font-semibold text-zinc-400 mb-3">{t('pnlChart')}</h2>
+        <PnlChart />
       </section>
 
       {/* 最近の自動運用 */}
@@ -261,6 +269,11 @@ function ActiveDashboard() {
       <section>
         <h2 className="text-sm font-semibold text-zinc-400 mb-3">{t('assetChart')}</h2>
         <AssetChart />
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold text-zinc-400 mb-3">{t('pnlChart')}</h2>
+        <PnlChart />
       </section>
 
       <section>

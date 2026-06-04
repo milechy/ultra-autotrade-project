@@ -2,9 +2,10 @@
 'use client'
 
 import { useLiff } from '@/hooks/useLiff'
+import { PrivyRootClient } from '@/lib/wallet/PrivyRootClient'
 
 export default function LiffLayout({ children }: { children: React.ReactNode }) {
-  const { isInitialized, isInClient, error } = useLiff()
+  const { isInitialized, error } = useLiff()
 
   if (error) {
     return (
@@ -22,5 +23,5 @@ export default function LiffLayout({ children }: { children: React.ReactNode }) 
     )
   }
 
-  return <>{children}</>
+  return <PrivyRootClient>{children}</PrivyRootClient>
 }

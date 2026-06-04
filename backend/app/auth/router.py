@@ -38,6 +38,7 @@ from .models import (
 from .privy_verifier import get_privy_verifier
 from .schemas import (
     LoginRequest,
+    OpenRegisterRequest,
     PasswordChangeRequest,
     RegisterRequest,
     RegisterResponse,
@@ -53,6 +54,7 @@ from .schemas import (
     WalletLinkResponse,
 )
 from .service import AuthService
+from app.referral import service as referral_service
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -198,9 +200,10 @@ def register_with_referral(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    # Step 6: set referral fields
+    # Step 6: set referral fields + 紹介キャンペーン ウィンドウ作成
     user.referrer_id = referrer.id
     user.referred_consent_at = datetime.now(timezone.utc)
+    referral_service.handle_new_referral(db, partner_id=referrer.id, referree_id=user.id)
     db.commit()
     db.refresh(user)
 
@@ -212,6 +215,75 @@ def register_with_referral(
     )
 
     # Step 7: JWT
+    token, expires_in = AuthService.create_access_token(user.id, user.email, user.role)
+    return RegisterResponse(
+        **UserResponse.model_validate(user).model_dump(),
+        access_token=token,
+        expires_in=expires_in,
+    )
+
+
+@router.post(
+    "/register-open",
+    response_model=RegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="一般登録（partner 招待不要）",
+)
+def register_open(
+    request: OpenRegisterRequest,
+    db: Session = Depends(get_db),
+) -> RegisterResponse:
+    """
+    一般登録（open registration mode）。
+
+    フロー:
+    1. 利用規約同意確認 (terms_consent == True)
+    2. [KYC ゲート接続点] — TODO: KYC 実装は別 Lane で追加予定
+       # kyc_service.check(request.email) → KYC 未通過なら 403 で弾く予定
+    3. Email/username 重複チェック
+    4. ユーザー作成 (role=viewer)
+    5. open 招待レコード作成（監査用・即使用済みマーク）
+    6. JWT 発行 → 201
+
+    利用規約はログイン後に GET /auth/terms/status で確認し、
+    POST /auth/terms/accept で正式同意する（バージョン管理済み）。
+    """
+    # terms_consent フィールドバリデーターで False は既に 422 にしているが
+    # 防御的に router 側でも確認する
+    if not request.terms_consent:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="利用規約への同意が必要です",
+        )
+
+    # [KYC ゲート接続点] ─────────────────────────────────────────────
+    # 実装予定: kyc_service.verify(request.email)
+    #   - PENDING  → 202 (KYC審査中) または 403 (要KYC完了)
+    #   - REJECTED → 403
+    #   - APPROVED → 通過
+    # ────────────────────────────────────────────────────────────────
+
+    from datetime import timedelta  # noqa: PLC0415
+
+    from app.invitations import service as invitation_service  # noqa: PLC0415
+
+    try:
+        user = AuthService.create_user(db, request, role=UserRole.VIEWER.value)
+    except ValueError as e:
+        detail = str(e)
+        if "already registered" in detail or "already taken" in detail:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+    # open 招待レコードを監査用に作成（登録完了時点で即使用済み）
+    open_inv = invitation_service.create_open_invitation(
+        db,
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=1),
+        max_uses=1,
+    )
+    invitation_service.increment_usage(db, open_inv, user_id=user.id)
+
+    logger.info("User registered via open registration: %s", user.email)
     token, expires_in = AuthService.create_access_token(user.id, user.email, user.role)
     return RegisterResponse(
         **UserResponse.model_validate(user).model_dump(),

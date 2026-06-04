@@ -5,10 +5,13 @@ Tests for Aave V3 oracle staleness and circuit breaker checks.
 
 from __future__ import annotations
 
+import os
 import sys
 from datetime import datetime, timezone
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 def _make_round_data(updated_at_ts: int, answer: int = 200000000000) -> tuple:  # type: ignore[type-arg]
@@ -263,3 +266,119 @@ class TestCheckSequencerUptime:
             )
         # fail-closed: RPC failure → block trades
         assert result is False
+
+
+class TestStalenessThresholdEnv:
+    """Tests for env-based AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS."""
+
+    def test_unset_env_returns_default(self) -> None:
+        from app.aave.oracle_checker import (
+            _DEFAULT_STALENESS_THRESHOLD_SECONDS,
+            get_staleness_threshold_from_env,
+        )
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS", None)
+            assert get_staleness_threshold_from_env() == _DEFAULT_STALENESS_THRESHOLD_SECONDS
+
+    def test_empty_env_returns_default(self) -> None:
+        from app.aave.oracle_checker import (
+            _DEFAULT_STALENESS_THRESHOLD_SECONDS,
+            get_staleness_threshold_from_env,
+        )
+
+        with patch.dict(os.environ, {"AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS": ""}):
+            assert get_staleness_threshold_from_env() == _DEFAULT_STALENESS_THRESHOLD_SECONDS
+
+    def test_valid_env_overrides_default(self) -> None:
+        from app.aave.oracle_checker import get_staleness_threshold_from_env
+
+        with patch.dict(os.environ, {"AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS": "90000"}):
+            assert get_staleness_threshold_from_env() == 90000
+
+    def test_non_integer_env_raises(self) -> None:
+        from app.aave.oracle_checker import get_staleness_threshold_from_env
+
+        with patch.dict(os.environ, {"AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS": "abc"}):
+            with pytest.raises(RuntimeError, match="Invalid integer"):
+                get_staleness_threshold_from_env()
+
+    def test_below_min_raises(self) -> None:
+        from app.aave.oracle_checker import get_staleness_threshold_from_env
+
+        with patch.dict(os.environ, {"AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS": "30"}):
+            with pytest.raises(RuntimeError, match="out of bounds"):
+                get_staleness_threshold_from_env()
+
+    def test_zero_raises(self) -> None:
+        from app.aave.oracle_checker import get_staleness_threshold_from_env
+
+        with patch.dict(os.environ, {"AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS": "0"}):
+            with pytest.raises(RuntimeError, match="out of bounds"):
+                get_staleness_threshold_from_env()
+
+    def test_negative_raises(self) -> None:
+        from app.aave.oracle_checker import get_staleness_threshold_from_env
+
+        with patch.dict(os.environ, {"AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS": "-1"}):
+            with pytest.raises(RuntimeError, match="out of bounds"):
+                get_staleness_threshold_from_env()
+
+    def test_above_max_raises(self) -> None:
+        from app.aave.oracle_checker import get_staleness_threshold_from_env
+
+        # 7 days + 1 second → exceeds upper bound
+        with patch.dict(os.environ, {"AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS": "604801"}):
+            with pytest.raises(RuntimeError, match="out of bounds"):
+                get_staleness_threshold_from_env()
+
+    def test_validate_returns_threshold(self) -> None:
+        from app.aave.oracle_checker import validate_staleness_threshold_env
+
+        with patch.dict(os.environ, {"AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS": "90000"}):
+            assert validate_staleness_threshold_env() == 90000
+
+    def test_check_oracle_staleness_uses_env_when_arg_omitted(self) -> None:
+        """When staleness_threshold_seconds is None, env value applies."""
+        from app.aave.oracle_checker import check_oracle_staleness
+
+        # Updated 80,000s ago: fresh under 90000s env, stale under default 3600
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        updated_ts = now_ts - 80000
+        mock_mod = _make_web3_mock(_make_round_data(updated_ts))
+
+        with (
+            patch.dict(os.environ, {"AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS": "90000"}),
+            patch.dict(sys.modules, {"web3": mock_mod}),
+        ):
+            result = check_oracle_staleness(
+                feed_address="0xFEED",
+                rpc_url="http://localhost:8545",
+                # staleness_threshold_seconds omitted → env applies
+            )
+
+        assert result is not None
+        assert result.is_stale is False
+        assert result.should_hold is False
+
+    def test_explicit_arg_overrides_env(self) -> None:
+        """Caller-provided staleness_threshold_seconds beats env."""
+        from app.aave.oracle_checker import check_oracle_staleness
+
+        # 80,000s ago: stale under explicit 3600, fresh under env 90000
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        updated_ts = now_ts - 80000
+        mock_mod = _make_web3_mock(_make_round_data(updated_ts))
+
+        with (
+            patch.dict(os.environ, {"AAVE_ORACLE_STALENESS_THRESHOLD_SECONDS": "90000"}),
+            patch.dict(sys.modules, {"web3": mock_mod}),
+        ):
+            result = check_oracle_staleness(
+                feed_address="0xFEED",
+                rpc_url="http://localhost:8545",
+                staleness_threshold_seconds=3600,  # explicit < env → explicit wins
+            )
+
+        assert result is not None
+        assert result.is_stale is True
