@@ -158,6 +158,7 @@ export default function LiffChatPage() {
         </button>
         <span className="text-[#4ade9a] font-bold text-xl tracking-wider">UAT</span>
         <button
+          onClick={() => setActivePanel("account")}
           className="text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
           aria-label="アカウント"
         >
