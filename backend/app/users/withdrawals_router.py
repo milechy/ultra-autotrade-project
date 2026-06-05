@@ -49,7 +49,7 @@ from collections import deque
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from threading import Lock
-from typing import Deque, Dict, List, Optional
+from typing import Deque, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field, field_validator
