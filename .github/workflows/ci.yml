@@ -285,7 +285,6 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.58.2-noble
     needs: [lint]
-    continue-on-error: true
     timeout-minutes: 30
 
     env:
@@ -301,34 +300,28 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Build frontend
-        run: npm run build
-        env:
-          NODE_OPTIONS: '--max-old-space-size=3072'
-
-      - name: Start mock backend (port 8000)
+      - name: Staging healthcheck (前段)
+        id: healthcheck
         run: |
-          node -e "
-          const http = require('http');
-          http.createServer((req, res) => {
-            res.writeHead(200, {'Content-Type': 'application/json'});
-            res.end(JSON.stringify({status: 'ok'}));
-          }).listen(8000, () => console.log('Mock backend on :8000'));
-          " &
-
-      - name: Start frontend server
-        run: npm run start &
+          if [ -z "$STAGING_URL" ]; then
+            echo "::warning::STAGING_URL 未設定 — e2e-smoke をスキップします (secrets 未登録)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            curl -sf --retry 3 --retry-delay 5 "$STAGING_URL" -o /dev/null || \
+              { echo "::error::staging ($STAGING_URL) unreachable — E2E smoke は staging down が原因"; exit 1; }
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
         env:
-          PORT: 3000
-          NODE_OPTIONS: '--max-old-space-size=512'
-
-      - name: Wait for server
-        run: npx wait-on http://localhost:3000 http://localhost:8000/health --timeout 60000
+          STAGING_URL: ${{ secrets.STAGING_URL }}
 
       - name: Run smoke tests
+        if: steps.healthcheck.outputs.skip == 'false'
         run: npm run test:e2e:smoke -- --project='Mobile Chrome' --reporter=list
         env:
-          STAGING_URL: http://localhost:3000
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          NEXT_PUBLIC_BACKEND_BASE_URL: ${{ secrets.STAGING_BACKEND_URL }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
 
       - name: Upload Playwright report
         if: always()

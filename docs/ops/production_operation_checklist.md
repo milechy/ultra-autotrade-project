@@ -1,6 +1,6 @@
 # Ultra AutoTrade — 本番運用操作チェックリスト
 
-> 最終更新: 2026-05-29
+> 最終更新: 2026-06-05
 > 対象: production VPS (77.42.46.155) での運用操作全般
 > 朝プロトコル §9 Step 0 で `cat /mnt/project/production_operation_checklist.md` として参照される正本
 
@@ -184,7 +184,10 @@ du -sh /var/log/journal/ 2>/dev/null
 
 ```
 ✅ CI 必須 pass: ruff lint/format, mypy, pytest (coverage 80%+), tsc --noEmit, npm run build
-⚠️  CI 無視可: E2E Smoke Tests (staging 依存 / night-mode は明示的に無視可)
+✅ CI 必須 pass: E2E Smoke Tests — merge gate (feat/gate1-e2e-staging PR #550 以降)
+   ⚠️  失敗時: まず「Staging healthcheck (前段)」ステップを確認すること
+              前段 healthcheck が失敗 → staging down が原因 (コードバグではない)
+              前段 healthcheck が成功 → smoke test 自体の失敗 → コード修正必須
 ❌ 禁止: その他の CI red 状態での merge
 ```
 
