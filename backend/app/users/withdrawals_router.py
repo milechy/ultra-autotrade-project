@@ -179,9 +179,7 @@ class WithdrawalCreate(BaseModel):
     def _validate_amount_upper(cls, v: Decimal) -> Decimal:
         max_amount = _withdrawal_max_usdc()
         if v > max_amount:
-            raise ValueError(
-                f"amount_usdc exceeds WITHDRAWAL_MAX_USDC ({max_amount})"
-            )
+            raise ValueError(f"amount_usdc exceeds WITHDRAWAL_MAX_USDC ({max_amount})")
         return v
 
 
@@ -265,9 +263,7 @@ def _verify_tx_via_rpc(tx_hash: str, expected_to: str, expected_amount: Decimal)
                 detail=f"tx {tx_hash} failed on chain (status={receipt_status})",
             )
         # TODO: logs decode して Transfer(from, to, value) の to/value を expected と一致確認
-        logger.info(
-            "[withdraw rpc_verify] tx=%s status=success (logs decode TODO)", tx_hash
-        )
+        logger.info("[withdraw rpc_verify] tx=%s status=success (logs decode TODO)", tx_hash)
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
