@@ -57,8 +57,12 @@ function Toggle({
       aria-checked={checked}
       role="switch"
       className={`relative w-11 h-6 rounded-full transition-colors focus:outline-none ${
-        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-      } ${checked ? "bg-[#1D9E75]" : "bg-zinc-700"}`}
+        disabled
+          ? "opacity-50 cursor-not-allowed bg-zinc-600"
+          : checked
+          ? "bg-[#1D9E75]"
+          : "bg-zinc-700"
+      }`}
     >
       <span
         className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
@@ -160,7 +164,7 @@ export function NotificationPanel() {
     setSettings(next)
     const token = getToken()
     try {
-      await fetch(`${API_BASE}/api/notifications/settings`, {
+      const res = await fetch(`${API_BASE}/api/notifications/settings`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -168,8 +172,9 @@ export function NotificationPanel() {
         },
         body: JSON.stringify(next),
       })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
     } catch {
-      // エラー時は状態を保持（楽観的更新）
+      // エラー時は楽観的更新状態を保持
     }
   }
 

@@ -272,6 +272,11 @@ class User(Base):
         DateTime(timezone=True), nullable=True, default=None
     )
     line_monthly_opt_in: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # notification_settings_json: チャネル/種別別通知設定 (JSON テキスト、NULL=デフォルト適用)
+    # ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_settings_json TEXT NULL;
+    notification_settings_json: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True, default=None
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"
