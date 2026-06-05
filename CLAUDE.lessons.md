@@ -1130,3 +1130,31 @@ deploy_staging.sh)が稼働中だった。ps の ELAPSED は MM:SS 表記、誤�
 **何が起きたか**: Chrome incognito で deploy 後も修正が反映されて見えなかった（PWA service worker が旧 JS を返していた）。Safari プライベートブラウズ（SW キャッシュなし）で即消滅を確認。
 
 **再発防止**: deploy 後の動作確認は Safari プライベートまたは SW unregister 済みブラウザで実施。Chrome incognito は SW キャッシュを持つ場合がある。
+
+---
+
+## 2026-06-05 staging E2E 実機検証 — verify_browser_partner_approval の環境知見
+
+### 教訓1: Alchemy RPC は staging コンテナ外 (VPS ホスト) から呼ぶ
+
+**何が起きたか**: `verify_browser_partner_approval.py` を backend コンテナ内から実行しようとすると `ALCHEMY_RPC_URL_BASE_SEPOLIA` が 403 を返した (おそらく origin / IP 制限)。VPS ホスト上 (コンテナ外) からは通る。
+
+**再発防止**: staging E2E スクリプトは backend コンテナ内ではなく VPS ホスト上の `backend/.venv/bin/python3` で実行する。代替 RPC `https://sepolia.base.org` でも代替可能。
+
+### 教訓2: staging API_BASE はホストから 127.0.0.1:8082、コンテナ内からは nginx 内部 IP
+
+**何が起きたか**: `API_BASE=http://127.0.0.1:8082` はコンテナ内では届かない。ホスト上からは nginx の外部ポート 8082 が正しい。コンテナ内から呼ぶ場合は `docker inspect` で nginx 内部 IP (例: 172.19.0.7:8080) を使う。
+
+**再発防止**: E2E スクリプトの `API_BASE` は実行場所 (ホスト/コンテナ) に合わせる。VPS ホスト上実行が最もシンプル。
+
+### 教訓3: staging の test wallet key は /tmp/ に生成され再起動・cleanup で消える
+
+**何が起きたか**: 前回 E2E 実行時に `/tmp/.lifecycle_partner_key_*` が `trap cleanup EXIT` で削除され、users 25/26 の wallet_address に対応する秘密鍵が VPS 上から消滅した。新規 E2E 実行時に wallet_address を新規 test wallet に更新して対処。
+
+**再発防止**: staging の test users (25/26 等) は wallet_address を「その都度新規 wallet に更新」する設計とする。永続的な key 保存が必要な場合は `/opt/ultra-autotrade/.test_keys/` 等に mode 600 で保管する。
+
+### 教訓4: staging サーバー ETH は faucet 補充要 (0.001 ETH 台まで消耗)
+
+**何が起きたか**: fund_partner_test_wallet.py (ETH_TO_SEND=0.02 ETH) を 2 回実行したことで AAVE_WALLET の Base Sepolia ETH が ~0.001 ETH まで減少した。
+
+**再発防止**: E2E 実行前に `AAVE_WALLET_ADDRESS` の Base Sepolia ETH 残高を確認する。0.05 ETH 未満なら faucet (https://www.alchemy.com/faucets/base-sepolia) で補充。
