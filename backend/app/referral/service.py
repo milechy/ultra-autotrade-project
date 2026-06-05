@@ -232,7 +232,9 @@ def get_referral_earnings(db: Session, partner_id: int) -> dict[str, str | int |
         .order_by(FeeConfigV10.effective_from.desc())
         .first()
     )
-    campaign_rate = active_config.affiliate_rate if active_config else Decimal("0.10")
+    # affiliate_rate の正本: 045_fee_v10_tables.sql DEFAULT 0.30 / seed_runbook 0.30
+    # calculator Step6: affiliate = subscription * affiliate_rate → 「サブスク料の30%」
+    campaign_rate = active_config.affiliate_rate if active_config else Decimal("0.30")
 
     # アクティブ ウィンドウを探して期限月を返す
     active_campaign = db.scalar(
@@ -324,7 +326,7 @@ def get_api_referral_info(db: Session, user: User) -> dict[str, object]:
         .order_by(FeeConfigV10.effective_from.desc())
         .first()
     )
-    campaign_rate = active_config.affiliate_rate if active_config else Decimal("0.10")
+    campaign_rate = active_config.affiliate_rate if active_config else Decimal("0.30")
 
     return {
         "referral_count": referral_count,
