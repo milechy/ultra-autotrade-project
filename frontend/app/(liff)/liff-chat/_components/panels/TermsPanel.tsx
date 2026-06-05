@@ -6,13 +6,13 @@ import { ExternalLink, FileText, Shield } from "lucide-react"
 export function TermsPanel() {
   const links = [
     {
-      href: "https://ultra-auto-trade.com/terms",
+      href: "https://app.ultra-auto-trade.com/terms",
       label: "利用規約",
       desc: "サービス利用条件・免責事項",
       icon: FileText,
     },
     {
-      href: "https://ultra-auto-trade.com/privacy",
+      href: "https://app.ultra-auto-trade.com/privacy",
       label: "プライバシーポリシー",
       desc: "個人情報の取り扱い",
       icon: Shield,
