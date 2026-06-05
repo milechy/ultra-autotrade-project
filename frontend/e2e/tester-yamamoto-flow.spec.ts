@@ -374,7 +374,7 @@ test.describe('tester viewer role — ダッシュボード表示と権限', () 
 test.describe('データ鮮度 — AI判定が最新であること', () => {
   test('Step 4: /api/ai/decisions/latest が 200 を返す (バックエンド接続確認)', async ({ page }) => {
     const baseUrl = process.env.BACKEND_URL ||
-      process.env.NEXT_PUBLIC_BACKEND_BASE_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
       'https://api.ultra-auto-trade.com'
 
     const response = await page.request.get(`${baseUrl}/ai/decisions/latest`, {

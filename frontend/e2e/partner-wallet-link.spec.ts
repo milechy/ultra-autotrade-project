@@ -284,7 +284,7 @@ test.describe('[F-17 Lane G] /auth/wallet/link 実 backend 疎通', () => {
     test.skip(!auth, 'partner.json なし — E2E_PARTNER_EMAIL / PASSWORD を設定して再実行')
 
     const backendUrl =
-      process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? 'https://api.ultra-auto-trade.com'
+      process.env.NEXT_PUBLIC_API_URL ?? 'https://api.ultra-auto-trade.com'
 
     const resp = await request.post(`${backendUrl}/auth/wallet/link`, {
       headers: {
@@ -316,7 +316,7 @@ test.describe('[F-17/8] /auth/wallet/link 200 — real viem signature', () => {
     test.skip(!auth, 'partner.json なし — E2E_PARTNER_EMAIL / PASSWORD を設定して再実行')
 
     const backendUrl =
-      process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? 'https://api.ultra-auto-trade.com'
+      process.env.NEXT_PUBLIC_API_URL ?? 'https://api.ultra-auto-trade.com'
 
     const payload = await signWalletLinkPayload()
     const expectedAddress = getTestAccount().address.toLowerCase()

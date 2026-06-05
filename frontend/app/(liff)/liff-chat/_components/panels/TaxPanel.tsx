@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react"
 import { FileDown, ChevronRight, Loader2, AlertCircle } from "lucide-react"
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? ""
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 function getToken(): string {
   if (typeof window === "undefined") return ""

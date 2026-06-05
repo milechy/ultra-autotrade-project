@@ -41,7 +41,7 @@ export default async function globalSetup(): Promise<void> {
   }
 
   const backendUrl =
-    process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? 'https://api.ultra-auto-trade.com'
+    process.env.NEXT_PUBLIC_API_URL ?? 'https://api.ultra-auto-trade.com'
 
   const cfHeaders: Record<string, string> =
     process.env.CF_ACCESS_CLIENT_ID && process.env.CF_ACCESS_CLIENT_SECRET

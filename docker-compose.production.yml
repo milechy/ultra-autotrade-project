@@ -296,7 +296,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api.ultra-auto-trade.com}
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://api.ultra-auto-trade.com}
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.ultra-auto-trade.com}
         NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:-}
@@ -316,7 +315,7 @@ services:
         # Next.js ビルド OOM 対策 (CLAUDE.md §2026-05-19 GID 1214828243363427)
         NODE_BUILD_MAX_OLD_SPACE_SIZE: ${NODE_BUILD_MAX_OLD_SPACE_SIZE:-4096}
     environment:
-      NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:-https://api.ultra-auto-trade.com}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.ultra-auto-trade.com}
       # SSR (Next.js サーバー側) は内部 nginx 経由で backend に到達する。
       # Blue/Green 切替時にも frontend の再起動なしでバックエンドが追従する。
       BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://nginx:8080}

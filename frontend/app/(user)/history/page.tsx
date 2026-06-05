@@ -77,7 +77,7 @@ const CURRENT_YEAR = new Date().getFullYear()
 
 async function downloadCryptactCsv(year: number | null): Promise<void> {
   const token = getStoredToken()
-  const base = (process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? '').replace(/\/$/, '')
+  const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const yearParam = year !== null ? `?year=${year}` : ''
   const url = `${base}/api/proposals/tax/cryptact-csv${yearParam}`
   const res = await fetch(url, {

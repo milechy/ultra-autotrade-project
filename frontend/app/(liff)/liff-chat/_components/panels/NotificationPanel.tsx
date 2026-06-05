@@ -130,7 +130,7 @@ export function NotificationPanel() {
   const [testSending, setTestSending] = useState(false)
   const [testMessage, setTestMessage] = useState<string | null>(null)
 
-  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? ""
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
   function getToken(): string {
     return typeof window !== "undefined" ? (localStorage.getItem("auth_token") ?? "") : ""

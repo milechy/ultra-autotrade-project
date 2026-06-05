@@ -23,7 +23,7 @@ interface CorpForm {
   month: number
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? ""
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 export function AccountPanel() {
   const router = useRouter()

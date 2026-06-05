@@ -10,7 +10,7 @@ import { CheckCircle, ChevronDown, ExternalLink } from "lucide-react"
 const getToken = () =>
   typeof window !== "undefined" ? (localStorage.getItem("auth_token") ?? "") : ""
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? ""
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 // 規約 ver03 — 2026-06 本番運用開始に合わせ改訂
 const ITEMS = [

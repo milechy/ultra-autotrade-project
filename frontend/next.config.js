@@ -4,7 +4,7 @@
 // API routes and server-only pages are excluded by the prebuild script
 // (scripts/cf-pages-prebuild.js) which runs before next build.
 const isCFPages = process.env.CF_PAGES === '1';
-const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
+const backendUrl = process.env.NEXT_PUBLIC_API_URL || '';
 const cspConnectSrc = [
   "'self'",
   backendUrl,

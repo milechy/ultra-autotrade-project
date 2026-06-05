@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react"
 import { ArrowDown, ArrowUp, ChevronLeft, Download, ExternalLink, Loader2 } from "lucide-react"
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? ""
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 interface Transaction {
   id: number

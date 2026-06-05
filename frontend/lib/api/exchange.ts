@@ -44,11 +44,11 @@ export type GridConfigRequest = {
 export async function fetchExchangeStatus(token: string): Promise<ExchangeStatusResponse> {
   const init = { headers: { Authorization: `Bearer ${token}` } };
   try {
-    // Use Next.js proxy route (works when NEXT_PUBLIC_BACKEND_BASE_URL is not set)
+    // Use Next.js proxy route (works when NEXT_PUBLIC_API_URL is not set)
     return await getJson<ExchangeStatusResponse>("/api/exchange/status", init);
   } catch (e: any) {
     if (e?.status === 404 || e?.status === 500) {
-      // Fallback: direct backend path (when NEXT_PUBLIC_BACKEND_BASE_URL is set)
+      // Fallback: direct backend path (when NEXT_PUBLIC_API_URL is set)
       return await getJson<ExchangeStatusResponse>("/exchange/status", init);
     }
     throw e;
