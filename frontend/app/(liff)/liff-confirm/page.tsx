@@ -6,28 +6,37 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { CheckCircle, ChevronDown, ExternalLink } from "lucide-react"
-import { getStoredToken } from "@/lib/auth"
+
+const getToken = () =>
+  typeof window !== "undefined" ? (localStorage.getItem("auth_token") ?? "") : ""
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? ""
 
+// 規約 ver03 — 2026-06 本番運用開始に合わせ改訂
 const ITEMS = [
   {
     id: "self_custody",
     title: "資産はユーザー自身が管理します",
     detail:
-      "本サービスはノンカストディアル型です。秘密鍵はユーザーが管理し、弊社はウォレットにアクセスできません。",
+      "本サービスはノンカストディアル型です。お客様のウォレット秘密鍵は弊社サーバーに保存されません。ウォレットおよびLINEアカウントの管理責任はお客様ご自身にあります。",
   },
   {
     id: "defi_risk",
     title: "DeFi運用にはリスクがあります",
     detail:
-      "スマートコントラクトのリスク、価格変動リスク、流動性リスクが存在します。投資は自己責任でお願いします。",
+      "スマートコントラクトのリスク、価格変動リスク、流動性リスク、清算リスクが存在します。元本を失う可能性があります。本サービスは投資助言ではなく、運用はすべて自己責任となります。",
   },
   {
     id: "user_responsibility",
     title: "アカウント管理は利用者自身の責任です",
     detail:
-      "ログイン情報の管理、不正アクセスへの対応はユーザーご自身の責任となります。弊社はアカウント損失に対して責任を負いません。",
+      "LINEアカウントの管理、不正アクセスへの対応はユーザーご自身の責任となります。弊社はアカウント損失・不正利用による損害に対して責任を負いません。",
+  },
+  {
+    id: "age_confirm",
+    title: "18歳以上であることを確認します",
+    detail:
+      "本サービスのご利用には18歳以上であることが必要です。18歳未満の方はご利用いただけません。",
   },
 ]
 
@@ -43,7 +52,7 @@ export default function LiffConfirmPage() {
 
   // terms_agreed_at チェック: 既に同意済みなら /liff-chat へリダイレクト
   useEffect(() => {
-    const token = getStoredToken()
+    const token = getToken()
     if (!token) {
       setLoading(false)
       return
@@ -53,8 +62,9 @@ export default function LiffConfirmPage() {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data: { terms_agreed_at?: string | null } | null) => {
-        if (data?.terms_agreed_at) {
+      .then((data: { terms_agreed_at?: string | null; terms_version?: string | null } | null) => {
+        // liff-v3 で同意済みの場合のみスキップ (旧バージョン同意者は再同意を求める)
+        if (data?.terms_agreed_at && data?.terms_version === "liff-v3") {
           router.replace("/liff-chat")
         } else {
           setLoading(false)
@@ -67,7 +77,7 @@ export default function LiffConfirmPage() {
     if (!allChecked || submitting) return
     setSubmitting(true)
 
-    const token = getStoredToken()
+    const token = getToken()
 
     try {
       const res = await fetch(`${API_BASE}/api/user/terms-agree`, {
@@ -101,9 +111,9 @@ export default function LiffConfirmPage() {
       <div className="bg-[#1a3d2e] px-4 py-5 flex-shrink-0">
         <h1 className="text-white font-bold text-lg">重要事項の確認</h1>
         <p className="text-zinc-300 text-sm mt-1">運用開始前に以下をご確認ください</p>
-        {/* ステップドット */}
+        {/* ステップドット (ver03: 4 items) */}
         <div className="flex gap-1.5 mt-3">
-          {[0, 1, 2].map((i) => (
+          {Array.from({ length: ITEMS.length }, (_, i) => i).map((i) => (
             <div
               key={i}
               className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -118,12 +128,12 @@ export default function LiffConfirmPage() {
       <div className="px-4 py-3 border-b border-zinc-800 flex-shrink-0">
         <div className="flex items-center justify-between text-sm mb-1.5">
           <span className="text-zinc-400">確認状況</span>
-          <span className="text-[#4ade9a] font-semibold">{checkedCount} / 3</span>
+          <span className="text-[#4ade9a] font-semibold">{checkedCount} / {ITEMS.length}</span>
         </div>
         <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
           <div
             className="h-full bg-[#1D9E75] rounded-full transition-all duration-500 ease-out"
-            style={{ width: `${(checkedCount / 3) * 100}%` }}
+            style={{ width: `${(checkedCount / ITEMS.length) * 100}%` }}
           />
         </div>
       </div>

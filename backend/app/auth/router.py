@@ -61,6 +61,9 @@ limiter = Limiter(key_func=get_remote_address)
 LOGIN_RATE_LIMIT = os.getenv("LOGIN_RATE_LIMIT", "5/minute")
 
 CURRENT_TERMS_VERSION = "2.0"
+# LIFF 固有の同意バージョン（liff-confirm 経由での同意）も accepted として扱う
+_LIFF_TERMS_VERSION = "liff-v3"
+_ACCEPTED_TERMS_VERSIONS = frozenset([CURRENT_TERMS_VERSION, _LIFF_TERMS_VERSION])
 
 logger = logging.getLogger(__name__)
 
@@ -396,12 +399,13 @@ def get_terms_status(
     user: User = Depends(require_active_user),
 ) -> TermsStatusResponse:
     """Check whether the current user has accepted the latest terms of service."""
+    accepted = user.terms_version in _ACCEPTED_TERMS_VERSIONS
     return TermsStatusResponse(
-        accepted=user.terms_version == CURRENT_TERMS_VERSION,
+        accepted=accepted,
         terms_version=user.terms_version,
         terms_accepted_at=user.terms_accepted_at,
         current_version=CURRENT_TERMS_VERSION,
-        needs_acceptance=user.terms_version != CURRENT_TERMS_VERSION,
+        needs_acceptance=not accepted,
     )
 
 
@@ -674,7 +678,7 @@ def wallet_connect(
         role=user.role,
     )
 
-    needs_terms_acceptance = user.terms_version != CURRENT_TERMS_VERSION
+    needs_terms_acceptance = user.terms_version not in _ACCEPTED_TERMS_VERSIONS
 
     logger.info(
         "Wallet connect: %s...%s (new=%s)",

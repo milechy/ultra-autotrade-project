@@ -6,7 +6,6 @@
 LINE idTokenを検証してユーザーを取得または作成する。
 """
 
-import datetime
 import logging
 import os
 import secrets
@@ -70,14 +69,13 @@ def get_or_create_line_user(db: Session, line_user_id: str, display_name: str) -
         return user
 
     # 新規ユーザー作成（パスワードなし — ランダムハッシュでログイン不可化）
+    # terms_accepted_at は liff-confirm での同意後に設定するため初期値 None
     user = User(
         email=pseudo_email,
         username=f"line_{line_user_id[:8]}",  # 先頭8文字
         hashed_password=secrets.token_hex(32),  # ランダム（ログイン不可パスワード）
         role=UserRole.VIEWER.value,
         is_active=True,
-        terms_version="2.0",
-        terms_accepted_at=datetime.datetime.now(datetime.timezone.utc),
     )
     db.add(user)
     db.commit()
