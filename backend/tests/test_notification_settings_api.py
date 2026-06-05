@@ -9,7 +9,6 @@ import json
 from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
