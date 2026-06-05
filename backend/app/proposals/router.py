@@ -176,6 +176,58 @@ def _notify_aave_failure(proposal_id: int, error_message: str, failed_at: dateti
         logger.exception("proposal %d: failed to send Slack notification", proposal_id)
 
 
+def _lookup_fee_rate_for_user(db: Session, user_id: int) -> Decimal:
+    """ユーザー tier に対応する fee_rate を fee_configs から取得する (fail-open)。
+
+    FeeConfigV10 が未設定 / DB エラーの場合は Decimal('0') を返し、呼び出し元を止めない。
+    fee_rate は月次バッチ (F-7) が手数料計算に使用するメタ情報として proposal に記録する。
+    """
+    from sqlalchemy import desc  # noqa: PLC0415
+
+    from app.auth.models import InvestmentTier, normalize_tier  # noqa: PLC0415
+    from app.fees.models import FeeConfigV10  # noqa: PLC0415
+
+    _TIER_INDEX = {
+        InvestmentTier.LOWER: 0,
+        InvestmentTier.MIDDLE: 1,
+        InvestmentTier.UPPER: 2,
+    }
+
+    try:
+        user = db.scalars(select(User).where(User.id == user_id)).first()
+        if user is None:
+            logger.warning("_lookup_fee_rate: user_id=%d not found — defaulting to 0", user_id)
+            return Decimal("0")
+
+        tier = normalize_tier(user.tier, user_id=user_id)
+
+        config = db.scalars(
+            select(FeeConfigV10)
+            .where(FeeConfigV10.is_active.is_(True))
+            .order_by(desc(FeeConfigV10.effective_from))
+            .limit(1)
+        ).first()
+
+        if config is None:
+            logger.warning("_lookup_fee_rate: active FeeConfigV10 not found — defaulting to 0")
+            return Decimal("0")
+
+        rates = config.tier_fee_rates
+        idx = _TIER_INDEX.get(tier, 0)
+        if idx >= len(rates):
+            logger.warning(
+                "_lookup_fee_rate: tier index %d out of range (len=%d) — defaulting to 0",
+                idx,
+                len(rates),
+            )
+            return Decimal("0")
+
+        return Decimal(str(rates[idx]))
+    except Exception:  # noqa: BLE001
+        logger.warning("_lookup_fee_rate: unexpected error — defaulting to 0", exc_info=True)
+        return Decimal("0")
+
+
 def _record_failed_transaction(
     proposal: Proposal, chain: str, error_message: str, db: Session
 ) -> None:
@@ -937,6 +989,10 @@ def submit_partner_tx(
     proposal.expected_from = partner_wallet
     proposal.expected_to = pool_address
     proposal.execution_attempts += 1
+    # fee_model_v10 配線: 実行時点の tier 別 fee_rate を記録する (fail-open)
+    # per-trade の fee_amount は月次バッチ (F-7) で計算するため 0 を設定する。
+    proposal.fee_rate = _lookup_fee_rate_for_user(db, proposal.user_id)
+    proposal.fee_amount = Decimal("0")
 
     tx = Transaction(
         user_id=proposal.user_id,
