@@ -5,14 +5,14 @@
 
 import { useState, useCallback } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { ethers } from "ethers";
 import { Loader2, Lock } from "lucide-react";
 import {
   TransactionStatus,
   type ProposalStatus,
 } from "@/app/user/approve/_components/TransactionStatus";
+import { buildPartnerTx, submitPartnerTx } from "@/lib/api/admin-proposals";
 import type { Proposal } from "./ProposalBubble";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type SigningStatus = "idle" | "signing" | "confirming" | "success" | "error";
 
@@ -72,6 +72,7 @@ export function ApproveConfirmSheet({
     setSigningStatus("signing");
 
     try {
+      // embedded wallet (Privy TEE) のみ使用。外部 wallet は秘密鍵管理の懸念で除外。
       const wallet = wallets.find((w) => w.walletClientType === "privy");
       if (!wallet) {
         await login();
@@ -79,43 +80,92 @@ export function ApproveConfirmSheet({
         return;
       }
 
-      // Step 1: 未署名 tx 取得
-      const buildRes = await fetch(
-        `${API_BASE}/api/proposals/${proposal.id}/build-tx`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!buildRes.ok) throw new Error(`build-tx: HTTP ${buildRes.status}`);
-      const { unsigned_tx } = (await buildRes.json()) as { unsigned_tx: object };
+      // Step 1: サーバーから未署名 tx を取得。
+      // build-tx は onBehalfOf / to == partner 本人 wallet をサーバー側で検証して返す (§14a)。
+      const txData = await buildPartnerTx(proposal.id, token);
 
-      // Step 2: Privy embedded wallet で署名 + 送信
       const eip1193 = await wallet.getEthereumProvider();
-      const txHash = (await eip1193.request({
-        method: "eth_sendTransaction",
-        params: [unsigned_tx],
-      })) as string;
+      const ethProvider = new ethers.BrowserProvider(
+        eip1193 as unknown as ethers.Eip1193Provider
+      );
+
+      let finalTxHash: string;
+
+      if (
+        txData.operation === "SUPPLY" &&
+        txData.approve_tx &&
+        txData.supply_tx
+      ) {
+        // SUPPLY: approve → supply の順に partner 本人が署名・送信。
+        const approveTxHash = (await eip1193.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: txData.approve_tx.to,
+              data: txData.approve_tx.data,
+              from: txData.approve_tx.from,
+              value: "0x0",
+            },
+          ],
+        })) as string;
+
+        // approve の確定を待ってから supply を送信する。
+        const approveReceipt =
+          await ethProvider.waitForTransaction(approveTxHash);
+        if (approveReceipt === null || approveReceipt.status === 0) {
+          throw new Error(
+            "approve トランザクションが revert しました。残高・ガス代を確認してください。"
+          );
+        }
+
+        setSigningStatus("confirming");
+        finalTxHash = (await eip1193.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: txData.supply_tx.to,
+              data: txData.supply_tx.data,
+              from: txData.supply_tx.from,
+              value: "0x0",
+            },
+          ],
+        })) as string;
+      } else if (txData.operation === "WITHDRAW" && txData.withdraw_tx) {
+        finalTxHash = (await eip1193.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: txData.withdraw_tx.to,
+              data: txData.withdraw_tx.data,
+              from: txData.withdraw_tx.from,
+              value: "0x0",
+            },
+          ],
+        })) as string;
+      } else {
+        throw new Error(`未対応の operation: ${txData.operation}`);
+      }
 
       setSigningStatus("confirming");
 
-      // Step 3: バックエンドに tx_hash を送信して approve 完了
-      const approveRes = await fetch(
-        `${API_BASE}/api/proposals/${proposal.id}/approve`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ tx_hash: txHash }),
-        }
+      // Step 3: submit-tx で最終 tx_hash を報告。
+      // サーバーが on-chain receipt を検証する (from == partner wallet / status == 1)。
+      // 旧実装は /approve に tx_hash を投げるだけで receipt 検証を飛ばしていた弱点を塞ぐ (§7)。
+      await submitPartnerTx(
+        proposal.id,
+        finalTxHash,
+        txData.wallet_address,
+        token
       );
-      if (!approveRes.ok) throw new Error(`approve: HTTP ${approveRes.status}`);
 
       setSigningStatus("success");
-      onApproved(txHash);
+      onApproved(finalTxHash);
     } catch (err) {
       setSigningStatus("error");
+      const msg =
+        err instanceof Error ? err.message : "署名処理に失敗しました";
       setError(
-        err instanceof Error ? err.message : "署名処理に失敗しました"
+        msg.includes("rejected") ? "署名がキャンセルされました" : msg
       );
     }
   }, [wallets, login, proposal.id, token, onApproved]);
