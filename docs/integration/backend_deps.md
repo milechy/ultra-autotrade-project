@@ -5,6 +5,19 @@
 
 ---
 
+## PR #556 (Lane C1): /api/referral/* referral_api_router 配線 (2026-06-05)
+
+### 変更: referral_api_router を main.py に include_router
+- **対象凍結ファイル**: `backend/app/main.py`
+- **変更内容**:
+  - `from app.referral.api_router import router as referral_api_router` を import 追加
+  - `app.include_router(referral_api_router)` を追加（Lane C1: /api/referral/* 全 active user 向け）
+- **理由**: Lane C1 の referral code 発行エンドポイント (`/api/referral/code`) を配線するため。既存の `referral_router`（RAS Lane 2）とは別エンドポイント群。
+- **影響範囲**: ルーター登録のみ。起動シーケンス・既存エンドポイントへの影響なし。
+- **承認**: feat/referral-code-ep → main の通常フロー経由（PR #556）
+
+---
+
 ## PR #509 (Layer2 outcome labels): outcome_labeling_loop startup 追加 (2026-06-02)
 
 ### 変更: ENABLE_OUTCOME_LABELING フラグで outcome_labeling_loop を条件起動
