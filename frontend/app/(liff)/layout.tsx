@@ -2,12 +2,21 @@
 'use client'
 
 import { useLiff } from '@/hooks/useLiff'
+import { useLiffAutoReAuth } from '@/hooks/useLiffAutoReAuth'
+import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
 import { PrivyRootClient } from '@/lib/wallet/PrivyRootClient'
 
 export default function LiffLayout({ children }: { children: React.ReactNode }) {
-  const { isInitialized, error } = useLiff()
+  const { isInitialized, error, liffConfigured } = useLiff()
+  // ITP wipe で auth_token が消えた場合に、LINE 側 idToken を使って
+  // 黙って /auth/line を叩き直し、ユーザー操作なしで session を復元する。
+  // liff-login 以外の LIFF ページに直接遷移しても復帰できる。
+  const reauth = useLiffAutoReAuth()
 
-  if (error) {
+  // error 画面は「LIFF モードかつ実際の liff.init 失敗時」のみ表示する。
+  // NEXT_PUBLIC_LIFF_ID 未設定（ブラウザ PWA モード）は error にせず、
+  // 下の通常描画にフォールスルーして children をブラウザで表示する（degrade）。
+  if (liffConfigured && error) {
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
         <p className="text-red-400">LIFF初期化エラー: {error}</p>
@@ -23,5 +32,18 @@ export default function LiffLayout({ children }: { children: React.ReactNode }) 
     )
   }
 
-  return <PrivyRootClient>{children}</PrivyRootClient>
+  if (reauth.state === 'reauthing') {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
+        <p className="text-zinc-400">セッションを復元しています...</p>
+      </div>
+    )
+  }
+
+  return (
+    <PrivyRootClient>
+      <SessionExpiryBanner loginHref="/liff-login" />
+      {children}
+    </PrivyRootClient>
+  )
 }

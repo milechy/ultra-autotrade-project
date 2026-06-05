@@ -37,7 +37,9 @@ export function useITPGuard(): ITPGuardResult {
   const [hoursUntilExpiry, setHoursUntilExpiry] = useState<number | null>(null)
 
   useEffect(() => {
-    updateLastSeen()
+    // 認証済みのみ last_seen を更新 (未認証で書くと初回 incognito で wiped 誤判定)。
+    // updateLastSeen 自体も内部で hasActiveToken ガード済 (二重防御)。
+    if (isAuthenticated) updateLastSeen()
 
     function refresh() {
       setSessionState(computeState(isAuthenticated))
@@ -48,7 +50,7 @@ export function useITPGuard(): ITPGuardResult {
 
     function onVisibilityChange() {
       if (document.visibilityState === 'visible') {
-        updateLastSeen()
+        if (isAuthenticated) updateLastSeen()
         refresh()
       }
     }

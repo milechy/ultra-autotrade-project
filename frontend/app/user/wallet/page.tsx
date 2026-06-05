@@ -7,6 +7,16 @@ const WalletContent = dynamic(
   { ssr: false }
 )
 
+// 2026-05-26 Lane H: メール / SNS ログイン経由の Privy 埋込ウォレットを demo 表示。
+// 既存 WalletContent (外部 wallet 経路) はそのまま残し、上に並べる。
+const PrivyEmbeddedWalletInfo = dynamic(
+  () =>
+    import('@/components/wallet/PrivyEmbeddedWalletInfo').then((m) => ({
+      default: m.PrivyEmbeddedWalletInfo,
+    })),
+  { ssr: false }
+)
+
 export default function WalletPage() {
   return (
     <main className="px-4 py-6 max-w-md mx-auto space-y-6">
@@ -16,6 +26,7 @@ export default function WalletPage() {
           Base メインネットに接続してください
         </p>
       </div>
+      <PrivyEmbeddedWalletInfo />
       <WalletContent />
     </main>
   )

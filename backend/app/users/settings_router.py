@@ -2,6 +2,8 @@
 # backend/app/users/settings_router.py
 """ユーザー設定API ルーター定義。"""
 
+import logging
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,15 +18,38 @@ from app.partner.allocation_schemas import MyAllocationResponse
 
 from .settings_schemas import UserSettingsResponse, UserSettingsUpdate
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/user", tags=["user-settings"])
+
+
+def _build_settings_response(user: User) -> UserSettingsResponse:
+    """User ORM オブジェクトから UserSettingsResponse を構築する。
+
+    terms_accepted_at → terms_agreed_at のフィールド名変換を行う。
+    """
+    return UserSettingsResponse(
+        id=user.id,
+        email=user.email,
+        username=user.username,
+        is_active=user.is_active,
+        notification_email=user.notification_email,
+        notification_frequency=user.notification_frequency,
+        max_single_trade_usd=user.max_single_trade_usd,
+        max_daily_trade_usd=user.max_daily_trade_usd,
+        user_mode=user.user_mode,
+        execution_policy=user.execution_policy,
+        line_monthly_opt_in=user.line_monthly_opt_in,
+        terms_agreed_at=user.terms_accepted_at,
+    )
 
 
 @router.get("/settings", response_model=UserSettingsResponse, summary="設定取得")
 def get_user_settings(
     current_user: User = Depends(require_active_user),
 ) -> UserSettingsResponse:
-    """現在のユーザー設定を返す。"""
-    return UserSettingsResponse.model_validate(current_user)
+    """現在のユーザー設定を返す。terms_agreed_at（= terms_accepted_at）を含む。"""
+    return _build_settings_response(current_user)
 
 
 @router.put("/settings", response_model=UserSettingsResponse, summary="設定更新")
@@ -89,7 +114,40 @@ def update_user_settings(
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
-    return UserSettingsResponse.model_validate(current_user)
+    return _build_settings_response(current_user)
+
+
+@router.post("/terms-agree", summary="重要事項同意記録")
+def agree_to_terms(
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """重要事項への同意を記録する（LIFF オンボーディング用）。
+
+    既に同意済みの場合はそのまま返す（冪等）。
+    terms_accepted_at カラムに現在時刻を書き込み、terms_version="liff-v1" を設定する。
+    """
+    if current_user.terms_accepted_at is not None:
+        return {
+            "terms_agreed_at": current_user.terms_accepted_at.isoformat(),
+            "already_agreed": True,
+        }
+
+    now = datetime.now(timezone.utc)
+    current_user.terms_accepted_at = now
+    current_user.terms_version = "liff-v1"
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    logger.info(
+        "User %s agreed to LIFF terms at %s",
+        current_user.email,
+        now.isoformat(),
+    )
+    return {
+        "terms_agreed_at": now.isoformat(),
+        "already_agreed": False,
+    }
 
 
 @router.get(

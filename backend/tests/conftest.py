@@ -16,7 +16,16 @@ from decimal import Decimal
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp.streams as _aiohttp_streams
 import pytest
+
+# aiohttp 3.10+ removed AsyncStreamReaderMixin; vcrpy still needs it.
+if not hasattr(_aiohttp_streams, "AsyncStreamReaderMixin"):
+
+    class _AsyncStreamReaderMixin:  # type: ignore[no-redef]
+        pass
+
+    _aiohttp_streams.AsyncStreamReaderMixin = _AsyncStreamReaderMixin  # type: ignore[attr-defined]
 
 
 def _ensure_project_root_in_sys_path() -> None:

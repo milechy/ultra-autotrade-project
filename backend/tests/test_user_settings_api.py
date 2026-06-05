@@ -214,3 +214,58 @@ class TestUserSettingsAPI:
         me_r = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
         assert me_r.status_code == 200
         assert me_r.json()["execution_policy"] == "require_approval"
+
+    def test_terms_agreed_at_null_by_default(self, client: TestClient) -> None:
+        """GET /api/user/settings で terms_agreed_at が初期状態では null であること。"""
+        token = register_and_login(client)
+        r = client.get("/api/user/settings", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        data = r.json()
+        assert "terms_agreed_at" in data
+        # 新規ユーザーは同意未完了
+        assert data["terms_agreed_at"] is None
+
+    def test_terms_agree_records_timestamp(self, client: TestClient) -> None:
+        """POST /api/user/terms-agree で terms_agreed_at が記録されること。"""
+        token = register_and_login(client)
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 同意前: terms_agreed_at is null
+        settings_before = client.get("/api/user/settings", headers=headers)
+        assert settings_before.json()["terms_agreed_at"] is None
+
+        # 同意
+        r = client.post("/api/user/terms-agree", headers=headers)
+        assert r.status_code == 200
+        data = r.json()
+        assert "terms_agreed_at" in data
+        assert data["terms_agreed_at"] is not None
+        assert data["already_agreed"] is False
+
+        # 同意後: settings に terms_agreed_at が反映されること
+        settings_after = client.get("/api/user/settings", headers=headers)
+        assert settings_after.json()["terms_agreed_at"] is not None
+
+    def test_terms_agree_idempotent(self, client: TestClient) -> None:
+        """POST /api/user/terms-agree は冪等で、再実行しても already_agreed=True が返ること。"""
+        token = register_and_login(client)
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 1回目
+        r1 = client.post("/api/user/terms-agree", headers=headers)
+        assert r1.status_code == 200
+        assert r1.json()["already_agreed"] is False
+
+        # 2回目: 冪等
+        r2 = client.post("/api/user/terms-agree", headers=headers)
+        assert r2.status_code == 200
+        assert r2.json()["already_agreed"] is True
+        # タイムスタンプは 1 回目と同じ（秒レベルで一致）
+        ts1 = r1.json()["terms_agreed_at"][:19]  # "YYYY-MM-DDTHH:MM:SS"
+        ts2 = r2.json()["terms_agreed_at"][:19]
+        assert ts1 == ts2
+
+    def test_terms_agree_requires_auth(self, client: TestClient) -> None:
+        """POST /api/user/terms-agree は認証必須であること。"""
+        r = client.post("/api/user/terms-agree")
+        assert r.status_code == 401

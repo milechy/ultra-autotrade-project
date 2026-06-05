@@ -79,10 +79,14 @@ class AiDecisionFeature(Base):
 
 
 class AiDecisionOutcome(Base):
-    """AI判定の実績アウトカムテーブル (Phase 1 バッチで後付け入力)。
+    """AI判定の実績アウトカムテーブル。
 
-    partner_approved のみ承認/却下エンドポイントから即時 INSERT される。
-    他列は Phase 1 まで NULL のまま (列定義のみ)。
+    行の種類:
+      1. partner_approved 行 (horizon_hours=NULL): 承認/却下エンドポイントから即時 INSERT
+      2. horizon=24h / 48h 行: outcome_labeling_batch が後付けで INSERT
+
+    asset / protocol は将来の複数資産・プロトコル対応のために最初から持つ。
+    既存行は migration で 'USDC' / 'aave_v3' にバックフィル済み。
     """
 
     __tablename__ = "ai_decision_outcomes"
@@ -104,6 +108,12 @@ class AiDecisionOutcome(Base):
         Numeric(precision=10, scale=4), nullable=True
     )
     is_positive_example: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    asset: Mapped[Optional[str]] = mapped_column(
+        String(10), nullable=True, default="USDC", server_default="USDC"
+    )
+    protocol: Mapped[Optional[str]] = mapped_column(
+        String(20), nullable=True, default="aave_v3", server_default="aave_v3"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

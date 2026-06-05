@@ -119,6 +119,123 @@ feature/*
 
 ---
 
+## gh api コマンド草案 (hkobayashi 確認後に実行)
+
+> **注意:** 以下コマンドは `admin:repo` 権限が必要。実行前に hkobayashi が確認・承認すること。
+> `required_status_checks` に指定するチェック名は `CI / {job_name}` 形式 (GitHub Actions の場合)。
+> 新ジョブは少なくとも 1 回 CI 実行後でないと GitHub 側にコンテキストが登録されない。
+
+### main ブランチ
+
+```bash
+gh api \
+  --method PUT \
+  -H "Accept: application/vnd.github+json" \
+  /repos/milechy/ultra-autotrade-project/branches/main/protection \
+  --input - << 'EOF'
+{
+  "required_status_checks": {
+    "strict": true,
+    "checks": [
+      {"context": "CI / Lint (ruff + mypy)",        "app_id": -1},
+      {"context": "CI / Test (pytest + coverage)",  "app_id": -1},
+      {"context": "CI / Security Check",            "app_id": -1},
+      {"context": "CI / Frontend (tsc + build)",    "app_id": -1}
+    ]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": {
+    "required_approving_review_count": 2,
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": false
+  },
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_conversation_resolution": true
+}
+EOF
+```
+
+### staging ブランチ
+
+```bash
+gh api \
+  --method PUT \
+  -H "Accept: application/vnd.github+json" \
+  /repos/milechy/ultra-autotrade-project/branches/staging/protection \
+  --input - << 'EOF'
+{
+  "required_status_checks": {
+    "strict": true,
+    "checks": [
+      {"context": "CI / Lint (ruff + mypy)",        "app_id": -1},
+      {"context": "CI / Test (pytest + coverage)",  "app_id": -1},
+      {"context": "CI / Security Check",            "app_id": -1},
+      {"context": "CI / Frontend (tsc + build)",    "app_id": -1}
+    ]
+  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": {
+    "required_approving_review_count": 1,
+    "dismiss_stale_reviews": false,
+    "require_code_owner_reviews": false
+  },
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_conversation_resolution": false
+}
+EOF
+```
+
+### dev ブランチ
+
+```bash
+gh api \
+  --method PUT \
+  -H "Accept: application/vnd.github+json" \
+  /repos/milechy/ultra-autotrade-project/branches/dev/protection \
+  --input - << 'EOF'
+{
+  "required_status_checks": {
+    "strict": true,
+    "checks": [
+      {"context": "CI / Lint (ruff + mypy)",       "app_id": -1},
+      {"context": "CI / Test (pytest + coverage)", "app_id": -1},
+      {"context": "CI / Frontend (tsc + build)",   "app_id": -1}
+    ]
+  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": {
+    "required_approving_review_count": 1,
+    "dismiss_stale_reviews": false,
+    "require_code_owner_reviews": false
+  },
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_conversation_resolution": false
+}
+EOF
+```
+
+### 設定確認コマンド
+
+```bash
+# 設定後の確認 (各ブランチ)
+gh api /repos/milechy/ultra-autotrade-project/branches/main/protection \
+  | python3 -m json.tool | grep -A30 required_status
+
+gh api /repos/milechy/ultra-autotrade-project/branches/dev/protection \
+  | python3 -m json.tool | grep -A30 required_status
+
+gh api /repos/milechy/ultra-autotrade-project/branches/staging/protection \
+  | python3 -m json.tool | grep -A30 required_status
+```
+
+---
+
 ## 緊急時の手順 (Break-glass)
 
 本番障害など緊急時に直接 main へ push が必要な場合:
