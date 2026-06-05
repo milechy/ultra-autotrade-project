@@ -242,13 +242,13 @@ def _verify_tx_via_rpc(tx_hash: str, expected_to: str, expected_amount: Decimal)
             "params": [tx_hash],
         }
         data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
+        req = urllib.request.Request(  # noqa: S310
             _base_rpc_url(),
             data=data,
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
             body = json.loads(resp.read().decode("utf-8"))
         receipt = body.get("result")
         if receipt is None:
