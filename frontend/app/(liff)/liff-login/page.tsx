@@ -24,9 +24,20 @@ export default function LiffLoginPage() {
       }),
     })
       .then((r) => r.json())
-      .then((data: { access_token?: string }) => {
+      .then((data: { access_token?: string; expires_in?: number }) => {
         if (data.access_token) {
+          // token key 橋渡し (GID 1215441139765963 で ultra_auth_token に一本化予定):
+          // LIFF read key (auth_token) と canonical key (ultra_auth_token) の両方へ
+          // 同一 JWT を書き込む。LINE 経路もこれで ultra_auth_token を満たすため、
+          // 一本化 PR は auth_token を一律に除去できる。
           localStorage.setItem("auth_token", data.access_token);
+          localStorage.setItem("ultra_auth_token", data.access_token);
+          if (data.expires_in) {
+            localStorage.setItem(
+              "ultra_auth_token_expires",
+              String(Date.now() + data.expires_in * 1000)
+            );
+          }
           // LIFFなのでLINEアプリ内で完結 — ウィンドウクローズorリダイレクト
           window.location.href = "/";
         }

@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { useLiff } from "@/hooks/useLiff";
+import { BrowserLoginPrompt } from "../_components/BrowserLoginPrompt";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const PAGE_SIZE = 20;
@@ -29,7 +30,7 @@ type DecisionListResponse = {
 };
 
 export default function LiffHistoryPage() {
-  const { isReady, isLoggedIn, liffConfigured, error } = useLiff();
+  const { isReady, error, liffConfigured } = useLiff();
   const [items, setItems] = useState<Decision[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -40,9 +41,8 @@ export default function LiffHistoryPage() {
     typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
 
   useEffect(() => {
-    // ブラウザ degrade モード（liffConfigured=false）では isLoggedIn が常に false のため
-    // JWT token の有無だけで続行する
-    if (!isReady || (liffConfigured && !isLoggedIn) || !token) return;
+    // 認証は JWT (token) の有無で判定する (ブラウザ degrade モードでも token があれば続行)。
+    if (!isReady || !token) return;
 
     setLoading(true);
     setFetchError(null);
@@ -69,7 +69,7 @@ export default function LiffHistoryPage() {
         )
       )
       .finally(() => setLoading(false));
-  }, [isReady, isLoggedIn, liffConfigured, token, offset]);
+  }, [isReady, token, offset]);
 
   // --- Loading state ---
   if (!isReady) {
@@ -80,8 +80,8 @@ export default function LiffHistoryPage() {
     );
   }
 
-  // --- LIFF error ---
-  if (error) {
+  // --- LIFF error (LIFF モードの実 init 失敗時のみ。ブラウザ degrade では立たない) ---
+  if (liffConfigured && error) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
         <p className="text-red-400 text-sm text-center">
@@ -91,25 +91,22 @@ export default function LiffHistoryPage() {
     );
   }
 
-  // --- Not logged in (LIFF モードかつ未ログイン。ブラウザ degrade モードは除外) ---
-  if (liffConfigured && !isLoggedIn) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
-        <p className="text-zinc-400 text-sm">LINEアプリから開いてください</p>
-      </div>
-    );
-  }
-
-  // --- Auth token missing (ITP によるセッション消去を含む) ---
+  // 黒画面の if(!isLoggedIn) ガードは (liff)/layout.tsx の中央集権 degrade ガードへ移譲済み。
+  // (#548 の liff-history 個別 degrade は本対策で supersede)
   if (!token) {
-    if (typeof window !== 'undefined') {
-      window.location.replace('/liff-login')
+    // LIFF モード: LINE idToken から JWT を発行するため liff-login へ (ITP セッション消去含む)。
+    if (liffConfigured) {
+      if (typeof window !== 'undefined') {
+        window.location.replace('/liff-login')
+      }
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
+          <p className="text-zinc-400 text-sm">再認証中...</p>
+        </div>
+      );
     }
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
-        <p className="text-zinc-400 text-sm">再認証中...</p>
-      </div>
-    );
+    // ブラウザ degrade モード: Privy wallet 署名で JWT を取得する。
+    return <BrowserLoginPrompt />;
   }
 
   const hasPrev = offset > 0;
