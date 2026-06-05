@@ -29,7 +29,7 @@ type DecisionListResponse = {
 };
 
 export default function LiffHistoryPage() {
-  const { isReady, isLoggedIn, error } = useLiff();
+  const { isReady, isLoggedIn, liffConfigured, error } = useLiff();
   const [items, setItems] = useState<Decision[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -40,7 +40,9 @@ export default function LiffHistoryPage() {
     typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
 
   useEffect(() => {
-    if (!isReady || !isLoggedIn || !token) return;
+    // ブラウザ degrade モード（liffConfigured=false）では isLoggedIn が常に false のため
+    // JWT token の有無だけで続行する
+    if (!isReady || (liffConfigured && !isLoggedIn) || !token) return;
 
     setLoading(true);
     setFetchError(null);
@@ -67,7 +69,7 @@ export default function LiffHistoryPage() {
         )
       )
       .finally(() => setLoading(false));
-  }, [isReady, isLoggedIn, token, offset]);
+  }, [isReady, isLoggedIn, liffConfigured, token, offset]);
 
   // --- Loading state ---
   if (!isReady) {
@@ -89,8 +91,8 @@ export default function LiffHistoryPage() {
     );
   }
 
-  // --- Not logged in ---
-  if (!isLoggedIn) {
+  // --- Not logged in (LIFF モードかつ未ログイン。ブラウザ degrade モードは除外) ---
+  if (liffConfigured && !isLoggedIn) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
         <p className="text-zinc-400 text-sm">LINEアプリから開いてください</p>
