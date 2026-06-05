@@ -25,6 +25,8 @@ class UserSettingsResponse(BaseModel):
     line_monthly_opt_in: bool = False
     # 重要事項確認同意日時（User.terms_accepted_at を公開）
     terms_agreed_at: Optional[datetime] = None
+    # 同意時の規約バージョン（フロントエンドの再同意判定に使用）
+    terms_version: Optional[str] = None
 
 
 class UserSettingsUpdate(BaseModel):

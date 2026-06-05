@@ -38,8 +38,8 @@ export default function LiffLoginPage() {
               String(Date.now() + data.expires_in * 1000)
             );
           }
-          // LIFFなのでLINEアプリ内で完結 — ウィンドウクローズorリダイレクト
-          window.location.href = "/";
+          // 重要事項確認 (liff-confirm) を経由してから liff-chat へ
+          window.location.href = "/liff-confirm";
         }
       })
       .catch(console.error);
