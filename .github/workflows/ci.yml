@@ -285,7 +285,6 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.58.2-noble
     needs: [lint]
-    continue-on-error: true
     timeout-minutes: 30
 
     env:
@@ -301,34 +300,13 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Build frontend
-        run: npm run build
-        env:
-          NODE_OPTIONS: '--max-old-space-size=3072'
-
-      - name: Start mock backend (port 8000)
-        run: |
-          node -e "
-          const http = require('http');
-          http.createServer((req, res) => {
-            res.writeHead(200, {'Content-Type': 'application/json'});
-            res.end(JSON.stringify({status: 'ok'}));
-          }).listen(8000, () => console.log('Mock backend on :8000'));
-          " &
-
-      - name: Start frontend server
-        run: npm run start &
-        env:
-          PORT: 3000
-          NODE_OPTIONS: '--max-old-space-size=512'
-
-      - name: Wait for server
-        run: npx wait-on http://localhost:3000 http://localhost:8000/health --timeout 60000
-
       - name: Run smoke tests
         run: npm run test:e2e:smoke -- --project='Mobile Chrome' --reporter=list
         env:
-          STAGING_URL: http://localhost:3000
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          NEXT_PUBLIC_BACKEND_BASE_URL: ${{ secrets.STAGING_BACKEND_URL }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
 
       - name: Upload Playwright report
         if: always()
