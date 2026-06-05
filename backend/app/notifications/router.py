@@ -5,14 +5,17 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, status
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, field_validator, model_validator
+from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_active_user, require_admin
 from app.auth.models import User
+from app.database import get_db
 
 from .line_messaging import LINEFlexMessageSender
 from .push import (
@@ -209,3 +212,88 @@ def get_subscription_count(
 ) -> dict[str, Any]:
     """登録済み subscription 数を返す。管理者のみ。"""
     return {"count": store.count()}
+
+
+# ---------------------------------------------------------------------------
+# 通知設定 (notification/settings)
+# ---------------------------------------------------------------------------
+
+
+class _NotificationPreferences(BaseModel):
+    ai_proposal: bool = True
+    execution_complete: bool = True
+    health_factor_warning: bool = True
+    emergency_stop: bool = True
+    monthly_report: bool = True
+    system_notice: bool = True
+
+    @field_validator("emergency_stop", mode="before")
+    @classmethod
+    def _force_emergency_stop(cls, v: object) -> bool:
+        # CLAUDE.md Security Rule #6: 緊急停止通知は無効化不可
+        return True
+
+
+class NotificationSettingsModel(BaseModel):
+    line_enabled: bool = True
+    push_enabled: bool = False
+    preferences: _NotificationPreferences = _NotificationPreferences()
+
+
+def _get_notification_settings(user: User) -> dict[str, Any]:
+    """ユーザーの通知設定を返す。未設定ならデフォルト。model_validate でキー補完 + emergency_stop 強制。"""
+    if user.notification_settings_json:
+        try:
+            stored = json.loads(user.notification_settings_json)
+            return NotificationSettingsModel.model_validate(stored).model_dump()
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return NotificationSettingsModel().model_dump()
+
+
+def _do_update_notification_settings(
+    body: NotificationSettingsModel,
+    current_user: User,
+    db: Session,
+) -> dict[str, Any]:
+    """通知設定を保存して返す。"""
+    current_user.notification_settings_json = body.model_dump_json()
+    db.add(current_user)
+    db.commit()
+    return body.model_dump()  # DB に書き込んだ値をそのまま返す; refresh 不要
+
+
+@router.get("/settings", status_code=status.HTTP_200_OK)
+def get_notification_settings_endpoint(
+    current_user: User = Depends(require_active_user),
+) -> dict[str, Any]:
+    """ユーザーの通知設定を返す。認証必須。"""
+    return _get_notification_settings(current_user)
+
+
+@router.put("/settings", status_code=status.HTTP_200_OK)
+def update_notification_settings_endpoint(
+    body: NotificationSettingsModel,
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """ユーザーの通知設定を更新する。認証必須。"""
+    return _do_update_notification_settings(body, current_user, db)
+
+
+@api_router.get("/settings", status_code=status.HTTP_200_OK)
+def api_get_notification_settings(
+    current_user: User = Depends(require_active_user),
+) -> dict[str, Any]:
+    """/api/notifications/settings GET エイリアス。"""
+    return _get_notification_settings(current_user)
+
+
+@api_router.put("/settings", status_code=status.HTTP_200_OK)
+def api_update_notification_settings(
+    body: NotificationSettingsModel,
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """/api/notifications/settings PUT エイリアス。"""
+    return _do_update_notification_settings(body, current_user, db)
