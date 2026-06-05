@@ -338,17 +338,27 @@ jobs:
           path: frontend/playwright-report/
 
   # ---------------------------------------------------------------------------
-  # e2e-smoke-gate: token / 404 / env-isolation 必須 gate (#550)
+  # e2e-smoke-gate: token / 404 / env-isolation 必須 gate (#550 / #552)
   #
   # e2e-smoke (上記) との違い:
-  #   - continue-on-error なし → failures があれば PR を block
+  #   - continue-on-error なし → failures / skip-only は PR を block
   #   - mock backend を起動しない → 実 staging backend を直叩き
   #   - 認証情報 (secrets) を注入 → global-setup が実 JWT を取得
   #   - フロントエンドビルド / 起動不要 (tests は Node.js fetch のみ)
   #
-  # credentials 未設定 (fork PR / secrets 未登録) の場合:
-  #   global-setup が E2E_AUTH_SKIPPED=1 を set → 全テストが graceful skip
-  #   → Playwright exit 0 (failures なし) → ジョブ pass (ただし実テストは未実行)
+  # §7 罠防止 — skip-green を FAIL に変える三重構造 (L3_e2e.sh と同等):
+  #   (1) pre-flight:    credentials / backend URL 未設定 → exit 1 (early FAIL)
+  #   (2) Playwright:    exit non-zero → job FAIL (continue-on-error なし)
+  #   (3) post-run verify (if:always): 0 passed (NO TESTS RAN) → exit 1 → FAIL
+  #       → global-setup が auth 失敗し E2E_AUTH_SKIPPED=1 を set したケースを捕捉
+  #
+  # ⚠️  初回 merge 直後は secrets 名の突合が済むまで本ジョブが赤になります (正常)。
+  #      Settings > Secrets > Actions に以下を登録してください:
+  #        E2E_BACKEND_URL      — staging backend URL
+  #        E2E_PARTNER_EMAIL    — staging partner account email
+  #        E2E_PARTNER_PASSWORD — staging partner account password
+  #        STAGING_URL          — staging frontend URL (env-isolation 検証用)
+  #        CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET (Cloudflare Access 使用時)
   # ---------------------------------------------------------------------------
   e2e-smoke-gate:
     name: E2E Smoke Gate (token/404/env-isolation) — real staging
@@ -371,6 +381,34 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      # §7 罠防止 (1/3): credentials / backend URL 未設定なら skip-green にしない
+      - name: Pre-flight — credentials & backend URL 確認
+        run: |
+          FAIL=0
+          if [[ -z "${E2E_PARTNER_EMAIL}" ]]; then
+            echo "::error::E2E_PARTNER_EMAIL が未設定 (secrets.E2E_PARTNER_EMAIL)"
+            FAIL=1
+          fi
+          if [[ -z "${E2E_PARTNER_PASSWORD}" ]]; then
+            echo "::error::E2E_PARTNER_PASSWORD が未設定 (secrets.E2E_PARTNER_PASSWORD)"
+            FAIL=1
+          fi
+          if [[ -z "${NEXT_PUBLIC_BACKEND_BASE_URL}" ]]; then
+            echo "::error::NEXT_PUBLIC_BACKEND_BASE_URL が未設定 (secrets.E2E_BACKEND_URL)"
+            FAIL=1
+          fi
+          if [[ "${FAIL}" -eq 1 ]]; then
+            echo "::error::e2e-smoke-gate は実 staging credentials 必須 gate です。"
+            echo "::notice::初回 merge 直後は secrets 名の突合が済むまで赤になります (正常)。"
+            exit 1
+          fi
+          echo "Pre-flight OK: credentials / backend URL 設定確認完了"
+        env:
+          E2E_PARTNER_EMAIL: ${{ secrets.E2E_PARTNER_EMAIL }}
+          E2E_PARTNER_PASSWORD: ${{ secrets.E2E_PARTNER_PASSWORD }}
+          NEXT_PUBLIC_BACKEND_BASE_URL: ${{ secrets.E2E_BACKEND_URL }}
+
+      # §7 罠防止 (2/3): Playwright exit non-zero → job FAIL (continue-on-error なし)
       - name: Run gate tests (token / 404 / env-isolation)
         run: |
           npx playwright test e2e/smoke/token-404-env.spec.ts \
@@ -383,3 +421,35 @@ jobs:
           E2E_PARTNER_PASSWORD: ${{ secrets.E2E_PARTNER_PASSWORD }}
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+
+      # §7 罠防止 (3/3): NO TESTS RAN (skip-only) は FAIL — L3_e2e.sh と同等
+      - name: Verify gate results — NO TESTS RAN は FAIL
+        if: always()
+        run: |
+          RESULTS="playwright-results.json"
+          if [[ ! -f "${RESULTS}" ]]; then
+            echo "::error::playwright-results.json が出力されませんでした"
+            exit 1
+          fi
+          if command -v jq >/dev/null 2>&1; then
+            PASSED=$(jq '.stats.expected // 0' "${RESULTS}")
+            FAILED=$(jq '.stats.unexpected // 0' "${RESULTS}")
+            SKIPPED=$(jq '.stats.skipped // 0' "${RESULTS}")
+          else
+            PASSED=$(python3 -c "import json; d=json.load(open('${RESULTS}')); print(d.get('stats',{}).get('expected',0))" 2>/dev/null || echo 0)
+            FAILED=$(python3 -c "import json; d=json.load(open('${RESULTS}')); print(d.get('stats',{}).get('unexpected',0))" 2>/dev/null || echo 0)
+            SKIPPED=$(python3 -c "import json; d=json.load(open('${RESULTS}')); print(d.get('stats',{}).get('skipped',0))" 2>/dev/null || echo 0)
+          fi
+          echo "passed: ${PASSED} / failed: ${FAILED} / skipped: ${SKIPPED}"
+          if [[ "${FAILED}" -gt 0 ]]; then
+            echo "::error::${FAILED} テストが失敗しました (詳細: ${RESULTS})"
+            exit 1
+          fi
+          if [[ "${PASSED}" -eq 0 ]]; then
+            echo "::error::NO TESTS RAN — 0 passed / ${SKIPPED} skipped"
+            echo "::error::global-setup が auth 失敗し E2E_AUTH_SKIPPED=1 を set した可能性。"
+            echo "::error::credentials (E2E_PARTNER_EMAIL / E2E_PARTNER_PASSWORD) と"
+            echo "::error::NEXT_PUBLIC_BACKEND_BASE_URL (secrets.E2E_BACKEND_URL) を確認してください。"
+            exit 1
+          fi
+          echo "gate PASS: ${PASSED} passed / ${SKIPPED} skipped / 0 failed"

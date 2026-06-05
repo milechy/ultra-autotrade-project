@@ -8,16 +8,19 @@
 // global-setup が /auth/login で取得した実 JWT を直接使い、
 // 実 staging backend を Node.js fetch で叩く。
 //
-// CI mock-backend 環境 (e2e-smoke ジョブ) での動作:
+// CI mock-backend 環境 (e2e-smoke ジョブ / continue-on-error: true) での動作:
 //   - 認証情報 (E2E_PARTNER_EMAIL / E2E_PARTNER_PASSWORD) 未設定
 //     → global-setup が E2E_AUTH_SKIPPED=1 を set
 //     → test.beforeEach で全テストが graceful skip
-//     → Playwright exit 0 (failures なし)
+//     → Playwright exit 0 (failures なし) — 既存 e2e-smoke の挙動を壊さない
 //
-// 実 staging backend ありの環境 (e2e-smoke-gate ジョブ) での動作:
-//   - 認証情報と NEXT_PUBLIC_BACKEND_BASE_URL を secrets から注入
-//     → global-setup が /auth/login で JWT 取得 → e2e/.auth/partner.json 書き出し
-//     → 3 テストが実際に run → すべて pass で初めて gate 通過
+// e2e-smoke-gate ジョブ (必須 gate / §7 三重防止) での動作:
+//   (1) pre-flight step: credentials / backend URL 未設定 → exit 1 → job FAIL
+//       (skip-green 禁止。初回 merge 直後は secrets 突合まで赤が正常)
+//   (2) global-setup が /auth/login → JWT 取得 → e2e/.auth/partner.json 書き出し
+//   (3) 3 テスト実行 → 全 pass で gate 通過
+//   (4) post-run verify (if:always): 0 passed (NO TESTS RAN) → exit 1 → job FAIL
+//       (global-setup が auth 失敗し E2E_AUTH_SKIPPED=1 を set したケースを捕捉)
 //
 // 実行方法:
 //   # 実 staging backend (credentials 必要)
