@@ -17,13 +17,14 @@ import { SystemDateSeparator } from "./_components/SystemDateSeparator";
 import { ActionBar, type ActionBarState } from "./_components/ActionBar";
 import { ApproveConfirmSheet } from "./_components/ApproveConfirmSheet";
 import { ChatLoadingSkeleton } from "./_components/ChatLoadingSkeleton";
+import { BrowserLoginPrompt } from "../_components/BrowserLoginPrompt";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type SystemMsg = { id: string; text: string };
 
 export default function LiffApprovePage() {
-  const { isReady, isLoggedIn, error } = useLiff();
+  const { isReady, error, liffConfigured } = useLiff();
   const token =
     typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
 
@@ -41,7 +42,9 @@ export default function LiffApprovePage() {
 
   // ---------- data fetch ----------
   useEffect(() => {
-    if (!isReady || !isLoggedIn || !token) return;
+    // 認証は JWT (token) の有無で判定する。ブラウザ degrade モードでは isLoggedIn は
+    // 常に false だが、token があれば取得を続行する (LINE 非依存)。
+    if (!isReady || !token) return;
 
     setLoading(true);
     setFetchError(null);
@@ -71,7 +74,7 @@ export default function LiffApprovePage() {
     ])
       .catch(() => setFetchError("データ取得に失敗しました"))
       .finally(() => setLoading(false));
-  }, [isReady, isLoggedIn, token]);
+  }, [isReady, token]);
 
   // scroll to bottom when proposal appears
   useEffect(() => {
@@ -132,7 +135,8 @@ export default function LiffApprovePage() {
     );
   }
 
-  if (error) {
+  // error 画面は LIFF モードの実 init 失敗時のみ。ブラウザ degrade では error は立たない。
+  if (liffConfigured && error) {
     return (
       <div className="flex items-center justify-center min-h-dvh bg-zinc-950 px-4">
         <p className="text-red-400 text-sm text-center">
@@ -142,23 +146,22 @@ export default function LiffApprovePage() {
     );
   }
 
-  if (!isLoggedIn) {
-    return (
-      <div className="flex items-center justify-center min-h-dvh bg-zinc-950 px-4">
-        <p className="text-zinc-400 text-sm">LINEアプリから開いてください</p>
-      </div>
-    );
-  }
-
+  // 黒画面の if(!isLoggedIn) ガードは (liff)/layout.tsx の中央集権 degrade ガードへ移譲済み。
+  // ここでは JWT (token) の有無だけを見る。
   if (!token) {
-    if (typeof window !== "undefined") {
-      window.location.replace("/liff-login");
+    // LIFF モード: LINE idToken から JWT を発行するため liff-login へ。
+    if (liffConfigured) {
+      if (typeof window !== "undefined") {
+        window.location.replace("/liff-login");
+      }
+      return (
+        <div className="flex items-center justify-center min-h-dvh bg-zinc-950 px-4">
+          <p className="text-zinc-400 text-sm">再認証中...</p>
+        </div>
+      );
     }
-    return (
-      <div className="flex items-center justify-center min-h-dvh bg-zinc-950 px-4">
-        <p className="text-zinc-400 text-sm">再認証中...</p>
-      </div>
-    );
+    // ブラウザ degrade モード: LINE 非依存で Privy wallet 署名により JWT を取得する。
+    return <BrowserLoginPrompt />;
   }
 
   const actionBarState: ActionBarState = proposal ? actionState : "empty";
