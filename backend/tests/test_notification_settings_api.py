@@ -99,9 +99,7 @@ class TestPutNotificationSettings:
         self.app.dependency_overrides[get_db] = lambda: db
 
     def _make_db(self, user: MagicMock) -> MagicMock:
-        db = MagicMock()
-        db.refresh.side_effect = lambda u: None
-        return db
+        return MagicMock()
 
     def test_saves_settings_to_user(self):
         user = _make_user(None)
@@ -128,6 +126,45 @@ class TestPutNotificationSettings:
         saved = json.loads(user.notification_settings_json)
         assert saved["line_enabled"] is False
         assert saved["preferences"]["monthly_report"] is False
+
+    def test_emergency_stop_forced_true(self):
+        """emergency_stop=False を送っても True に強制されること (Security Rule #6)。"""
+        user = _make_user(None)
+        db = self._make_db(user)
+        self._override_deps(user, db)
+
+        payload: dict[str, Any] = {
+            "line_enabled": True,
+            "push_enabled": False,
+            "preferences": {
+                "ai_proposal": True,
+                "execution_complete": True,
+                "health_factor_warning": True,
+                "emergency_stop": False,  # ← 無効化しようとしている
+                "monthly_report": True,
+                "system_notice": True,
+            },
+        }
+        res = self.client.put("/api/notifications/settings", json=payload)
+        assert res.status_code == 200
+        saved = json.loads(user.notification_settings_json)
+        assert saved["preferences"]["emergency_stop"] is True
+
+    def test_missing_preferences_key_filled_with_defaults(self):
+        """stored JSON に preferences キーが無くても GET でデフォルト補完されること。"""
+        stored = {"line_enabled": False, "push_enabled": False}
+        self._override_user(_make_user(json.dumps(stored)))
+        res = self.client.get("/notifications/settings")
+        assert res.status_code == 200
+        data = res.json()
+        assert "preferences" in data
+        assert data["preferences"]["emergency_stop"] is True
+        assert data["preferences"]["ai_proposal"] is True
+
+    def _override_user(self, user: MagicMock) -> None:
+        from app.auth.dependencies import require_active_user
+
+        self.app.dependency_overrides[require_active_user] = lambda: user
 
     def test_invalid_body_returns_422(self):
         user = _make_user(None)

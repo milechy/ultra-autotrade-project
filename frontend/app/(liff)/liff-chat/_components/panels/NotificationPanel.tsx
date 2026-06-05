@@ -58,7 +58,7 @@ function Toggle({
       role="switch"
       className={`relative w-11 h-6 rounded-full transition-colors focus:outline-none ${
         disabled
-          ? "opacity-50 cursor-not-allowed bg-zinc-600"
+          ? `opacity-50 cursor-not-allowed ${checked ? "bg-[#1D9E75]" : "bg-zinc-600"}`
           : checked
           ? "bg-[#1D9E75]"
           : "bg-zinc-700"
