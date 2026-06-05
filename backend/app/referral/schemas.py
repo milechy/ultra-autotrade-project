@@ -56,3 +56,26 @@ class ReferralEarningsResponse(BaseModel):
     total_payout_jpy: str
     campaign_rate: str  # e.g. "0.1000" (10%)
     campaign_expires_month: str | None  # "2027-01-01" 形式 or None
+
+
+class ReferredUserDetail(BaseModel):
+    """LIFF 紹介パネル用: 紹介済みユーザーのサマリー。"""
+
+    name: str
+    joined_at: datetime
+    status: str  # "運用中" | "登録済み"
+    reward_jpy: str  # ¥1,500 bonus は別タスク: 現在は常に "0"
+
+
+class ReferralInfoResponse(BaseModel):
+    """LIFF 紹介パネル用: /api/referral/earnings レスポンス。
+
+    frontend/lib/api/referral.ts の ReferralInfo インターフェースと一致させること。
+    """
+
+    referral_count: int
+    current_month_reward_jpy: str
+    total_payout_jpy: str
+    campaign_rate: str
+    referral_code: str
+    referred_users: list[ReferredUserDetail]

@@ -35,30 +35,36 @@ logger = logging.getLogger(__name__)
 # /referral/users/{id}/transactions が返す operation 値のホワイトリスト。
 _ALLOWED_TX_TYPES = ("deposit", "withdraw", "borrow", "repay")
 
+# get_api_referral_info で返す referred_users の status 値
+_STATUS_ACTIVE = "運用中"
+_STATUS_REGISTERED = "登録済み"
+
 
 def _share_base_url() -> str:
     """招待 URL の base host を環境変数から取得する。"""
     return os.getenv("PUBLIC_FRONTEND_URL", "https://app.ultra-auto-trade.com").rstrip("/")
 
 
-def get_or_create_code(db: Session, partner_user: User) -> str:
-    """partner の紹介コードを取得 (未発行なら自動発行)。
+def get_or_create_code(db: Session, user: User) -> str:
+    """ユーザーの紹介コードを取得 (未発行なら自動発行)。
+
+    partner / viewer を問わず全 active user に対して利用できる。
 
     Args:
         db: DB セッション。
-        partner_user: 紹介コードを発行する partner ユーザー。
+        user: 紹介コードを発行するユーザー。
 
     Returns:
-        partner に紐づく 8 桁紹介コード。
+        ユーザーに紐づく 8 桁紹介コード。
     """
-    if partner_user.referral_code:
-        return partner_user.referral_code
+    if user.referral_code:
+        return user.referral_code
 
     code = generate_referral_code(db)
-    partner_user.referral_code = code
+    user.referral_code = code
     db.commit()
-    db.refresh(partner_user)
-    logger.info("Issued referral_code partner_id=%d code=%s", partner_user.id, code)
+    db.refresh(user)
+    logger.info("Issued referral_code user_id=%d code=%s", user.id, code)
     return code
 
 
@@ -247,4 +253,84 @@ def get_referral_earnings(db: Session, partner_id: int) -> dict[str, str | int |
         "total_payout_jpy": str(total_payout),
         "campaign_rate": str(campaign_rate),
         "campaign_expires_month": campaign_expires_month,
+    }
+
+
+def get_api_referral_info(db: Session, user: User) -> dict[str, object]:
+    """LIFF 紹介パネル用: /api/referral/earnings のデータを組み立てる。
+
+    partner 専用の ``get_referral_earnings`` と異なり、全 active user が対象。
+    ``reward_jpy`` は ¥1,500 bonus 計算が別タスクのため常に "0"。
+
+    Args:
+        db: DB セッション。
+        user: リクエスト元の active user。
+
+    Returns:
+        ``ReferralInfoResponse`` に渡せる dict。
+    """
+    today = date.today()
+    current_month = date(today.year, today.month, 1)
+
+    referred = list_referred_users(db, user.id)
+    referral_count = len(referred)
+
+    ref_ids = [u.id for u in referred]
+    confirmed_user_ids: set[int] = (
+        {
+            row.user_id
+            for row in db.query(Transaction.user_id)
+            .filter(Transaction.user_id.in_(ref_ids), Transaction.status == "confirmed")
+            .distinct()
+            .all()
+        }
+        if ref_ids
+        else set()
+    )
+
+    referred_user_details = [
+        {
+            "name": ref_user.username,
+            "joined_at": ref_user.created_at,
+            "status": _STATUS_ACTIVE if ref_user.id in confirmed_user_ids else _STATUS_REGISTERED,
+            "reward_jpy": "0",
+        }
+        for ref_user in referred
+    ]
+
+    current_month_raw = (
+        db.query(func.sum(FeeTransaction.affiliate_amount_jpy))
+        .filter(
+            FeeTransaction.affiliate_id == user.id,
+            FeeTransaction.calculation_month == current_month,
+        )
+        .scalar()
+    )
+    current_month_reward = current_month_raw if current_month_raw is not None else Decimal("0")
+
+    total_payout_raw = (
+        db.query(func.sum(FeeTransaction.affiliate_amount_jpy))
+        .filter(
+            FeeTransaction.affiliate_id == user.id,
+            FeeTransaction.finalized_at.isnot(None),
+        )
+        .scalar()
+    )
+    total_payout = total_payout_raw if total_payout_raw is not None else Decimal("0")
+
+    active_config = (
+        db.query(FeeConfigV10)
+        .filter(FeeConfigV10.is_active.is_(True))
+        .order_by(FeeConfigV10.effective_from.desc())
+        .first()
+    )
+    campaign_rate = active_config.affiliate_rate if active_config else Decimal("0.10")
+
+    return {
+        "referral_count": referral_count,
+        "current_month_reward_jpy": str(current_month_reward),
+        "total_payout_jpy": str(total_payout),
+        "campaign_rate": str(campaign_rate),
+        "referral_code": user.referral_code or "",
+        "referred_users": referred_user_details,
     }

@@ -73,6 +73,7 @@ from app.proposals.router import router as proposals_router
 from app.protocols.lido.router import router as lido_router
 from app.protocols.pendle.router import router as pendle_router
 from app.protocols.risk.router import router as protocol_health_router
+from app.referral.api_router import router as referral_api_router
 from app.referral.router import router as referral_router
 from app.reports.router import router as reports_router
 from app.rss.router import router as rss_router
@@ -279,6 +280,7 @@ def create_app() -> FastAPI:
     app.include_router(pendle_router)  # Pendle Finance (Phase 2)
     app.include_router(protocol_health_router)  # Protocol Health Monitor (Phase 2)
     app.include_router(referral_router)  # RAS Lane 2 (Referral / Partner Affiliate System)
+    app.include_router(referral_api_router)  # Lane C1: /api/referral/* (全 active user)
     app.include_router(tos_router)  # ToS active consent (MVP-P0-14)
     app.include_router(health_detail_router)  # /health/detail (admin, 5/14 DoD #6)
 
