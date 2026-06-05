@@ -93,7 +93,7 @@ export default function LiffChatPage() {
       typeof window !== "undefined"
         ? (localStorage.getItem("auth_token") ?? "")
         : ""
-    const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? ""
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
     if (!token) return
 
     const headers = { Authorization: `Bearer ${token}` }

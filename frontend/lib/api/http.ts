@@ -8,12 +8,12 @@ export type HttpError = {
 
 /**
  * Resolution order:
- * 1) If NEXT_PUBLIC_BACKEND_BASE_URL is set, call backend directly from the browser.
+ * 1) If NEXT_PUBLIC_API_URL is set, call backend directly from the browser.
  *    (This may require CORS on the backend.)
  * 2) Otherwise call same-origin (/api/...) which is proxied by Next.js API routes to BACKEND_BASE_URL.
  */
 function getBaseUrl(): string {
-  const base = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
+  const base = process.env.NEXT_PUBLIC_API_URL;
   if (!base) return "";
   return base.replace(/\/$/, "");
 }

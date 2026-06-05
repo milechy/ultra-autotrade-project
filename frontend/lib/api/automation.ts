@@ -6,7 +6,7 @@ import type { AutomationStatus, DashboardSnapshot, AutomationReportSummary } fro
 // API paths match the actual backend routes.
 // - Local dev: /api/automation/* (new)
 // - Staging: /api/* (legacy)
-// If NEXT_PUBLIC_BACKEND_BASE_URL is set, requests go directly to the backend.
+// If NEXT_PUBLIC_API_URL is set, requests go directly to the backend.
 
 export async function fetchAutomationStatus(token?: string): Promise<AutomationStatus> {
   const init = token ? { headers: { Authorization: `Bearer ${token}` } } : undefined;

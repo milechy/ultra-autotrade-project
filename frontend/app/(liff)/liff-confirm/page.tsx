@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation"
 import { CheckCircle, ChevronDown, ExternalLink } from "lucide-react"
 import { getStoredToken } from "@/lib/auth"
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? ""
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 const ITEMS = [
   {

@@ -12,7 +12,7 @@
 //   (UI) TC-B: ボタン押下時に Privy login() が呼ばれる (Privy 接続前は POST が発火しない)
 //   (Backend integration) TC-G6: viem 実署名で POST /auth/wallet/link 200 → DB 反映
 //
-// staging-new での実行を想定 (NEXT_PUBLIC_BACKEND_BASE_URL=https://api.ultra-auto-trade.com)。
+// staging-new での実行を想定 (NEXT_PUBLIC_API_URL=https://api.ultra-auto-trade.com)。
 // partner.json (E2E_PARTNER_EMAIL/PASSWORD で生成) が前提。
 
 import { test, expect, Page } from '@playwright/test'
@@ -152,7 +152,7 @@ test.describe('[wallet-link backend] /auth/wallet/link 200 path with viem signat
     test.skip(!auth, 'partner.json なし — E2E_PARTNER_EMAIL / PASSWORD を設定して再実行')
 
     const backendUrl =
-      process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? 'https://api.ultra-auto-trade.com'
+      process.env.NEXT_PUBLIC_API_URL ?? 'https://api.ultra-auto-trade.com'
 
     const payload = await signWalletLinkPayload()
     const expectedAddress = getTestAccount().address.toLowerCase()

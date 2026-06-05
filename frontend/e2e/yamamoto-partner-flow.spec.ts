@@ -787,7 +787,7 @@ test.describe('Wallet badge 条件変更 — isAdmin || isPartner (Lane C)', () 
 // mock なし。E2E_PARTNER_EMAIL / PASSWORD で real auth。
 // PR #209 (BottomNav 紹介リンク) / PR #210 (Wallet badge 条件) 実ログイン確認。
 //
-// CF Access 回避: staging-new frontend は NEXT_PUBLIC_BACKEND_BASE_URL が
+// CF Access 回避: staging-new frontend は NEXT_PUBLIC_API_URL が
 //   https://api-staging.ultra-auto-trade.com (CF Access 保護) に焼き込まれているため、
 //   page.route で内部 backend に relay する。これは mock ではなく実 backend への中継。
 //   内部 URL: process.env.E2E_INTERNAL_BACKEND_URL (default: http://localhost:8082)

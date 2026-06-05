@@ -344,7 +344,7 @@ test.describe('TC-G: /api/invitations 廃止 + InviteModal partner 非表示', (
   }) => {
     const baseUrl = process.env.STAGING_URL || 'https://app.ultra-auto-trade.com'
     // backend への直接リクエスト (CF Access 非経由で十分)
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? 'https://api.ultra-auto-trade.com'
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.ultra-auto-trade.com'
     const res = await page.request.get(`${backendUrl}/api/invitations`)
     // invitations router は無効化済みのため 404 または 410 が期待される
     expect(res.status()).toBeGreaterThanOrEqual(400)

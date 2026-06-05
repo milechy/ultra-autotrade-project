@@ -232,7 +232,7 @@ test.describe('/settings/config — Admin Fee Config カード', () => {
 // 5. API — /api/v1/fees/* エンドポイント疎通確認 (バックエンド接続時)
 // ---------------------------------------------------------------------------
 test.describe('API — /api/v1/fees/* 疎通', () => {
-  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? 'https://api.ultra-auto-trade.com'
+  const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.ultra-auto-trade.com'
   // 5xx / Cloudflare 独自コード: インフラ障害なら pass-through
   const AUTH_CODES = [401, 403, 422]
   const INFRA_CODES = [502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527, 530]

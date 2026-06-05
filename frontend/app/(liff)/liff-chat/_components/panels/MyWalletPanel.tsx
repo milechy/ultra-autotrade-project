@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { Copy, QrCode, ExternalLink, ShieldCheck, Shield } from "lucide-react"
 import { useWallets } from "@privy-io/react-auth"
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? ""
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 export function MyWalletPanel() {
   const { wallets } = useWallets()

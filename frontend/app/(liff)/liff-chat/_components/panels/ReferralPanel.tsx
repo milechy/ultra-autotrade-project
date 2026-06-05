@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from "react"
 import { Copy, Mail, Share2, CheckCircle, Users, Gift, TrendingUp, ChevronRight } from "lucide-react"
 import { getReferralInfo, createReferralCode, type ReferralInfo } from "@/lib/api/referral"
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? ""
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 const SIGNUP_URL = process.env.NEXT_PUBLIC_LIFF_APP_URL ?? "https://ultra-auto-trade.com/register"
 
 function getToken(): string {
