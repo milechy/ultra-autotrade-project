@@ -5,6 +5,17 @@
 
 ---
 
+## PR #558 (fix/liff): referral_api_router 配線を含む (PR #556 スタック、2026-06-05)
+
+### 変更: referral_api_router を main.py に include_router (PR #556 からの継承)
+- **対象凍結ファイル**: `backend/app/main.py`
+- **変更内容**: PR #556 (feat/referral-code-ep) の変更を継承。`referral_api_router` の import + include_router が含まれる。
+- **理由**: 本 PR (fix/contract-url-app-prefix) は PR #556 ブランチ上に積まれたため、同変更を含む。liff 規約 URL の app. サブドメイン修正が主目的。
+- **影響範囲**: main.py 変更は PR #556 と同一内容。追加変更なし。
+- **承認**: feat/referral-code-ep → main の通常フロー経由（PR #556 / #558 連続マージ）
+
+---
+
 ## PR #509 (Layer2 outcome labels): outcome_labeling_loop startup 追加 (2026-06-02)
 
 ### 変更: ENABLE_OUTCOME_LABELING フラグで outcome_labeling_loop を条件起動
