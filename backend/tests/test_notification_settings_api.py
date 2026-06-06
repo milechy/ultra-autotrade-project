@@ -171,3 +171,38 @@ class TestPutNotificationSettings:
         self._override_deps(user, db)
         res = self.client.put("/api/notifications/settings", json={"line_enabled": "not_a_bool"})
         assert res.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# POST /api/notifications/push/test (liff-chat「テスト通知」ボタンのパス)
+# ---------------------------------------------------------------------------
+
+
+class TestTestPushAliasPaths:
+    """NotificationPanel の「テスト通知」ボタンは body 無しで
+    POST /api/notifications/push/test を叩く。frontend と完全一致のパス +
+    後方互換 /api/notifications/test-push が body 無しで 200 を返すこと。
+    VAPID 未設定 + LINE 未設定の既定環境では送信 0 件・200 を期待。"""
+
+    def setup_method(self):
+        self.app = _make_app()
+        self.client = TestClient(self.app)
+        from app.auth.dependencies import require_active_user
+
+        self.app.dependency_overrides[require_active_user] = lambda: _make_user(None)
+
+    def test_canonical_api_path_no_body_returns_200(self):
+        # frontend NotificationPanel.handleTestNotification が叩く正確なパス
+        res = self.client.post("/api/notifications/push/test")
+        assert res.status_code == 200, res.text
+        assert res.json()["status"] == "ok"
+
+    def test_legacy_test_push_path_no_body_returns_200(self):
+        res = self.client.post("/api/notifications/test-push")
+        assert res.status_code == 200, res.text
+        assert res.json()["status"] == "ok"
+
+    def test_non_api_push_test_path_no_body_returns_200(self):
+        res = self.client.post("/notifications/push/test")
+        assert res.status_code == 200, res.text
+        assert res.json()["status"] == "ok"
