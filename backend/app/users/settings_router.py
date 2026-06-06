@@ -114,6 +114,21 @@ def update_user_settings(
         current_user.execution_policy = request.execution_policy
     if request.line_monthly_opt_in is not None:
         current_user.line_monthly_opt_in = request.line_monthly_opt_in
+    if request.username is not None:
+        # スキーマ側で形式検証 + 小文字化済み。本人による表示名変更（role 制限なし）。
+        new_username = request.username
+        if new_username != current_user.username:
+            existing = (
+                db.query(User)
+                .filter(User.username == new_username, User.id != current_user.id)
+                .first()
+            )
+            if existing is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="このユーザー名は既に使用されています",
+                )
+            current_user.username = new_username
     db.add(current_user)
     db.commit()
     db.refresh(current_user)

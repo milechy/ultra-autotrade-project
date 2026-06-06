@@ -2,11 +2,12 @@
 # backend/app/users/settings_schemas.py
 """ユーザー設定APIのスキーマ定義。"""
 
+import re
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class UserSettingsResponse(BaseModel):
@@ -37,3 +38,20 @@ class UserSettingsUpdate(BaseModel):
     user_mode: Optional[str] = None
     execution_policy: Optional[str] = None
     line_monthly_opt_in: Optional[bool] = None
+    # ユーザー名（本人による表示名変更）。auth/schemas.py の登録時 validator と同一規則。
+    username: Optional[str] = Field(default=None, min_length=3, max_length=50)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("ユーザー名は空白のみにできません")
+        if not (v[0].isalpha() or v[0].isdigit()):
+            raise ValueError(
+                "ユーザー名は文字か数字で始まる必要があります (must start with a letter or number)"
+            )
+        if not re.match(r"^[\w\s\-]+$", v):
+            raise ValueError("ユーザー名には文字・数字・スペース・_・- のみ使用できます")
+        return v.lower()
