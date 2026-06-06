@@ -22,8 +22,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { login as apiLogin, getMe, logout as apiLogout, walletConnect, type UserResponse, type TokenResponse } from "./api/auth";
 import { resolveAuthReady } from "./auth-state";
 import { hasActiveToken, recordLastSeen } from "./auth/session-monitor";
+import { getAuthToken, setAuthToken, clearAuthToken } from "./auth/token-key";
 
-const TOKEN_KEY = "ultra_auth_token";
 const TOKEN_EXPIRES_KEY = "ultra_auth_expires";
 
 /** ethers.Signer の signMessage だけを使う duck-typed interface */
@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       recordLastSeen();
     }
 
-    const storedToken = localStorage.getItem(TOKEN_KEY);
+    const storedToken = getAuthToken();
     const expiresStr = localStorage.getItem(TOKEN_EXPIRES_KEY);
 
     if (storedToken && expiresStr) {
@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const clearAuth = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
+    clearAuthToken();
     localStorage.removeItem(TOKEN_EXPIRES_KEY);
     setToken(null);
     setUser(null);
@@ -134,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userInfo = await getMe(newToken);
 
       // Only save to localStorage on success
-      localStorage.setItem(TOKEN_KEY, newToken);
+      setAuthToken(newToken);
       localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt));
       recordLastSeen();
       setToken(newToken);
@@ -142,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return userInfo;
     } catch (error) {
       // Do not save token if getMe fails
-      localStorage.removeItem(TOKEN_KEY);
+      clearAuthToken();
       localStorage.removeItem(TOKEN_EXPIRES_KEY);
       throw error;
     }
@@ -157,14 +157,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const userInfo = await getMe(newToken);
-      localStorage.setItem(TOKEN_KEY, newToken);
+      setAuthToken(newToken);
       localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt));
       recordLastSeen();
       setToken(newToken);
       setUser(userInfo);
       return userInfo;
     } catch (error) {
-      localStorage.removeItem(TOKEN_KEY);
+      clearAuthToken();
       localStorage.removeItem(TOKEN_EXPIRES_KEY);
       throw error;
     }
@@ -283,6 +283,5 @@ export function useAuth(): AuthContextType {
  * Retrieve stored token directly (not SSR-compatible)
  */
 export function getStoredToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return getAuthToken();
 }

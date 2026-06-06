@@ -18,13 +18,16 @@
 //   3. last_seen が 5-7 日経過 → 期限切れバナー表示 (能動的に再ログイン誘導)
 //   4. last_seen 自体も無い → 通常の新規ユーザー扱い
 
+import { AUTH_TOKEN_KEY, LEGACY_AUTH_TOKEN_KEY } from "./token-key";
+
 const LAST_SEEN_KEY = "ultra_last_seen";
 
-// auth.ts と同じキーを再定義 (循環 import 回避のため)。
-// 値が変わったら本ファイルも更新すること。
-const PRIMARY_TOKEN_KEY = "ultra_auth_token";
+// auth token key は token-key.ts に一本化済み (Asana 1215441139765963)。
+// 正準キー (auth_token) を主、旧キー (ultra_auth_token) を expires-pair 付きの
+// 後方互換トークンとして扱う。expires キー自体は auth.ts と共有。
+const PRIMARY_TOKEN_KEY = AUTH_TOKEN_KEY;
 const PRIMARY_TOKEN_EXPIRES_KEY = "ultra_auth_expires";
-const LIFF_TOKEN_KEY = "auth_token";
+const LEGACY_TOKEN_KEY = LEGACY_AUTH_TOKEN_KEY;
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -79,12 +82,13 @@ function safeSetItem(key: string, value: string): boolean {
 }
 
 /**
- * いずれかの auth token (主トークン or LIFF トークン) が localStorage にあるかを返す。
- * 主トークンは `ultra_auth_expires` が過去だと「無い」扱い。
+ * いずれかの auth token (正準キー or 旧キー) が localStorage にあるかを返す。
+ * 旧キー (ultra_auth_token) は `ultra_auth_expires` が過去だと「無い」扱い。
+ * 正準キー (auth_token / LIFF 書き込み) は expires pair を持たないため存在のみで判定。
  */
 export function hasActiveToken(): boolean {
-  const primary = safeGetItem(PRIMARY_TOKEN_KEY);
-  if (primary) {
+  const legacy = safeGetItem(LEGACY_TOKEN_KEY);
+  if (legacy) {
     const expires = safeGetItem(PRIMARY_TOKEN_EXPIRES_KEY);
     if (expires) {
       const parsed = parseInt(expires, 10);
@@ -97,8 +101,8 @@ export function hasActiveToken(): boolean {
       return true;
     }
   }
-  const liff = safeGetItem(LIFF_TOKEN_KEY);
-  return Boolean(liff);
+  const primary = safeGetItem(PRIMARY_TOKEN_KEY);
+  return Boolean(primary);
 }
 
 /**
