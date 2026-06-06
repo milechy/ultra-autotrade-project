@@ -37,7 +37,7 @@ export function AppInfoCard() {
               <ExternalLink className="h-3.5 w-3.5 text-zinc-500" />
             </Link>
             <Link
-              href="/privacy"
+              href="/privacy-policy"
               className="flex items-center justify-between text-sm text-zinc-300 hover:text-zinc-100 transition-colors py-1"
             >
               <span>プライバシーポリシー</span>
