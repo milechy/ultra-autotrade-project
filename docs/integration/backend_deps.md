@@ -5,6 +5,20 @@
 
 ---
 
+## PR #563 (前提1): ENABLE_WITHDRAWALS flag で withdraw EP を default-off ガード (2026-06-06)
+
+### 変更: include_router(user_withdrawals_router) を ENABLE_WITHDRAWALS フラグで条件化
+- **対象凍結ファイル**: `backend/app/main.py`
+- **変更内容**:
+  - PR #560 で無条件配線された `app.include_router(user_withdrawals_router)` を
+    `if os.getenv("ENABLE_WITHDRAWALS", "false").lower() in ("1", "true", "yes"):` で囲む（既定 false）。
+  - import 行（副作用なし）は残し、include のみ条件化。通知 router(279/280) は無条件のまま不触。
+- **理由**: money を動かす `/api/users/withdrawals` が無条件配線だったため、backend deploy で通知/名前保存/TAX 等を出す際に withdraw 経路を構造的に開かないよう default-off で配線ガードする（Asana 1215466937993772 前提1）。「閉じる」= route 未登録 = 404（shadow 的な登録するが実行しない、ではない）。
+- **影響範囲**: ルーター登録の条件化のみ。withdraw ロジック・起動シーケンス・他エンドポイントへの影響なし。★#391 money gate（staging Sepolia 6 項目）を通すまで本番 `.env` で `ENABLE_WITHDRAWALS=true` にしないこと。
+- **承認**: feat/enable-withdrawals-flag-20260606 → main の通常フロー経由（PR #563）
+
+---
+
 ## PR #560 (P4): /api/users/withdrawals user_withdrawals_router 配線 (2026-06-06)
 
 ### 変更: user_withdrawals_router を main.py に include_router
