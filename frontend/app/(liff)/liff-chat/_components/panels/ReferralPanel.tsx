@@ -4,12 +4,17 @@
 import { useEffect, useState, useCallback } from "react"
 import { Copy, Mail, Share2, CheckCircle, Users, Gift, TrendingUp, ChevronRight } from "lucide-react"
 import { getReferralInfo, createReferralCode, type ReferralInfo } from "@/lib/api/referral"
+import { getAuthToken } from "@/lib/auth/token-key"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
+// SIGNUP URL: 専用の env/定数が無いため、sibling パネル (TermsPanel 等) と同じ
+// app.ultra-auto-trade.com 系ドメインへハードコードでフォールバックする。
+// NEXT_PUBLIC_LIFF_APP_URL が定義されればそちらを優先する。
 const SIGNUP_URL = process.env.NEXT_PUBLIC_LIFF_APP_URL ?? "https://app.ultra-auto-trade.com/register"
 
 function getToken(): string {
-  return typeof window !== "undefined" ? (localStorage.getItem("ultra_auth_token") ?? "") : ""
+  // 統一済み auth token getter (Asana 1215441139765963)。
+  // 正準キー auth_token を優先し、旧キー ultra_auth_token をフォールバック読み。
+  return getAuthToken() ?? ""
 }
 
 function buildShareText(code: string): string {
