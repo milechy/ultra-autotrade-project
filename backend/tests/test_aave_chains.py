@@ -54,6 +54,43 @@ class TestChainRegistry:
         assert config.pool_address == "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5"
         assert config.flashbots_rpc_env_var is None
 
+    def test_base_tokens_exact_set(self) -> None:
+        """Base トークンマップは Aave V3 実上場 15 銘柄のみ含む。"""
+        config = CHAIN_REGISTRY["base"]
+        expected = {
+            "WETH",
+            "cbETH",
+            "USDbC",
+            "wstETH",
+            "USDC",
+            "weETH",
+            "cbBTC",
+            "ezETH",
+            "GHO",
+            "wrsETH",
+            "LBTC",
+            "EURC",
+            "AAVE",
+            "tBTC",
+            "syrupUSDC",
+        }
+        assert set(config.tokens.keys()) == expected
+        assert len(config.tokens) == 15
+
+    def test_base_tokens_no_unsupported(self) -> None:
+        """Base Aave V3 に上場していない WBTC / USDT / DAI は含まない。"""
+        config = CHAIN_REGISTRY["base"]
+        for unsupported in ("WBTC", "USDT", "DAI"):
+            assert unsupported not in config.tokens, f"{unsupported} は Base Aave V3 非上場"
+
+    def test_base_tokens_cbbtc_address(self) -> None:
+        config = CHAIN_REGISTRY["base"]
+        assert config.tokens["cbBTC"] == "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"
+
+    def test_base_tokens_usdc_address(self) -> None:
+        config = CHAIN_REGISTRY["base"]
+        assert config.tokens["USDC"] == "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+
     def test_ethereum_config(self) -> None:
         config = CHAIN_REGISTRY["ethereum"]
         assert config.chain_id == 1
