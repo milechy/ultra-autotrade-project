@@ -274,7 +274,12 @@ def create_app() -> FastAPI:
     app.include_router(proposals_router)  # Proposals API
     app.include_router(portfolio_router)  # Portfolio History API
     app.include_router(user_settings_router)  # User Settings API
-    app.include_router(user_withdrawals_router)  # P4: user withdrawals (non-custodial)
+    # P4 withdraw EP は money を動かす経路のため default-off で配線ガードする。
+    # ENABLE_WITHDRAWALS=1/true のときのみ route 登録。未登録時 POST /api/users/withdrawals=404
+    # （shadow 的な「登録するが実行しない」ではなく route 自体を出さない）。
+    # ★#391 money gate (staging Sepolia 6項目) を通すまで本番 .env で true にしないこと。
+    if os.getenv("ENABLE_WITHDRAWALS", "false").lower() in ("1", "true", "yes"):
+        app.include_router(user_withdrawals_router)  # P4: user withdrawals (non-custodial)
     app.include_router(alias_router)  # API aliases (/api/safety-score etc.)
     app.include_router(notification_router)  # Notifications (Phase PWA)
     app.include_router(notification_api_router)  # Notifications /api/* alias (Phase PWA)
