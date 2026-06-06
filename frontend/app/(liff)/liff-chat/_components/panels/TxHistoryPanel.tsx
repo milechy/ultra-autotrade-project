@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react"
 import { ArrowDown, ArrowUp, ChevronLeft, Download, ExternalLink, Loader2 } from "lucide-react"
+import { getAuthToken } from "@/lib/auth/token-key"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
@@ -27,11 +28,6 @@ interface CoinSummary {
 }
 
 type FilterType = "all" | "SUPPLY" | "WITHDRAW" | "USDC" | "ETH"
-
-function getToken(): string {
-  if (typeof window === "undefined") return ""
-  return localStorage.getItem("auth_token") ?? ""
-}
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
@@ -170,15 +166,33 @@ export function TxHistoryPanel() {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterType>("all")
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
+  // 401 (認証切れ) を一般エラーと区別し、再ログイン導線を出すためのフラグ。
+  const [authExpired, setAuthExpired] = useState(false)
 
   useEffect(() => {
-    const token = getToken()
+    // token-key 統一: 正準/旧キーの両方を救済する getAuthToken を使う
+    // (旧キーで保存済みセッションの 401 取りこぼしを防ぐ)。
+    const token = getAuthToken()
     setLoading(true)
     setError(null)
+    setAuthExpired(false)
+
+    // token が無い状態で Bearer null を投げると確定 401 になるため、
+    // 先に fail-visible で再ログイン導線を出す (黒画面・無言失敗にしない)。
+    if (!token) {
+      setAuthExpired(true)
+      setLoading(false)
+      return
+    }
+
     fetch(`${API_BASE}/api/transactions?limit=50&offset=0`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => {
+        if (r.status === 401) {
+          setAuthExpired(true)
+          throw new Error("認証の有効期限が切れました")
+        }
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json() as Promise<Transaction[] | { items: Transaction[] }>
       })
@@ -193,7 +207,12 @@ export function TxHistoryPanel() {
   }, [])
 
   const handleCsvDownload = () => {
-    const token = getToken()
+    const token = getAuthToken()
+    if (!token) {
+      // 認証切れ: 黙ってダウンロードさせず再ログイン導線へ寄せる。
+      setAuthExpired(true)
+      return
+    }
     const url = `${API_BASE}/api/proposals/tax/cryptact-csv`
     const link = document.createElement("a")
     // トークンをクエリに渡す（シンプルな download リンク用）
@@ -230,6 +249,28 @@ export function TxHistoryPanel() {
       <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
         <Loader2 className="w-6 h-6 mb-3 text-zinc-600 animate-spin" />
         <p className="text-sm">読み込み中...</p>
+      </div>
+    )
+  }
+
+  // 認証切れ (401 / token 欠落): 黒画面・無言失敗にせず再ログイン導線を出す。
+  if (authExpired) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+        <p className="text-sm text-zinc-300 mb-1">ログインの有効期限が切れました</p>
+        <p className="text-xs text-zinc-500 mb-5">
+          取引履歴を表示するには、もう一度ログインしてください。
+        </p>
+        <button
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              window.location.href = "/liff-login"
+            }
+          }}
+          className="bg-[#1D9E75] hover:bg-[#178a66] text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+        >
+          再ログイン
+        </button>
       </div>
     )
   }

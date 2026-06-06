@@ -4,7 +4,9 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { ChevronLeft, History } from "lucide-react"
+import { getAuthToken } from "@/lib/auth/token-key"
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -101,17 +103,28 @@ export function ChatPanel({ onClose }: Props) {
   ])
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   // 新メッセージが追加されるたびに末尾へスクロール
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // 履歴画面へ遷移
+  // 履歴画面へ遷移 (#539 degrade 取りこぼし対策)
+  //
+  // 旧実装は window.location.href で /liff-history へハード遷移していたため、
+  // アプリ全体が再マウントされ useLiff が liffConfigured=true (初期値) から
+  // 再 init する。その init 解決前に (liff)/layout.tsx の中央 degrade ガードが
+  // 評価され、ブラウザ(非LIFF) や token 復元前のタイミングで
+  // 「LINEアプリから開いてください」黒画面・行き止まりが一瞬〜恒久的に出る取りこぼしがあった。
+  //
+  // ここでは Next.js client router によるソフト遷移に変える。アプリは再マウントされず、
+  // 既に解決済みの degrade 状態 (liffConfigured / isLoggedIn) と token がメモリに残るため、
+  // liff-history 側は #539 で実装済みの degrade 分岐 (BrowserLoginPrompt / 自動再認証) に
+  // 正しく入り、黒画面にならない。LIFF 実機では従来どおり履歴画面へ遷移する。
   const handleHistoryOpen = () => {
-    if (typeof window !== "undefined") {
-      window.location.href = "/liff-history"
-    }
+    onClose()
+    router.push("/liff-history")
   }
 
   // サジェストボタンタップ → ユーザーメッセージ追加 → AI 返答取得
@@ -134,10 +147,9 @@ export function ChatPanel({ onClose }: Props) {
     // 0.5 秒ディレイ（タイピングインジケーターを視覚的に見せる）
     await new Promise<void>((resolve) => setTimeout(resolve, 500))
 
-    const token =
-      typeof window !== "undefined"
-        ? (localStorage.getItem("auth_token") ?? "")
-        : ""
+    // token-key 統一: 正準/旧キーの両方を救済する getAuthToken を使う
+    // (旧キーで保存済みセッションでも chat API が 401 で取りこぼされないように)。
+    const token = getAuthToken() ?? ""
     const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
     let aiContent: string
