@@ -5,6 +5,19 @@
 
 ---
 
+## PR #560 (P4): /api/users/withdrawals user_withdrawals_router 配線 (2026-06-06)
+
+### 変更: user_withdrawals_router を main.py に include_router
+- **対象凍結ファイル**: `backend/app/main.py`
+- **変更内容**:
+  - `from app.users.withdrawals_router import router as user_withdrawals_router` を import 追加
+  - `app.include_router(user_withdrawals_router)` を追加（P4: 非カストディアル出金 `/api/users/withdrawals`）
+- **理由**: P4 非カストディアル出金 money gate（DoD GID 1215444094888771 / §14a）の出金記録エンドポイント `/api/users/withdrawals` を配線するため。partner wallet（Privy 鍵）が署名し、サーバー鍵を経由せず出金した事実を backend に記録する。
+- **影響範囲**: ルーター登録のみ。起動シーケンス・既存エンドポイントへの影響なし。
+- **承認**: feat/pr391-withdraw-money-gate → main の通常フロー経由（PR #560）
+
+---
+
 ## PR #556 (Lane C1): /api/referral/* referral_api_router 配線 (2026-06-05)
 
 ### 変更: referral_api_router を main.py に include_router
