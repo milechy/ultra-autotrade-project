@@ -329,9 +329,9 @@ class TestAffiliate:
         assert result.affiliate_id == 99
         assert result.affiliate_amount_jpy == Decimal("490")
         # 仕様の関係式 (takehome × rate) を明示的に確認
-        assert result.affiliate_amount_jpy == (
-            result.user_takehome_jpy * Decimal("0.10")
-        ).quantize(Decimal("1"))
+        assert result.affiliate_amount_jpy == (result.user_takehome_jpy * Decimal("0.10")).quantize(
+            Decimal("1")
+        )
 
     def test_affiliate_fires_when_subscription_zero(self, calculator: FeeCalculator) -> None:
         # conservative (sub=0) でも takehome>0 なら紹介報酬は発火する (新仕様)。
