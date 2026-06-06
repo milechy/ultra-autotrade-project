@@ -18,7 +18,7 @@ function getToken(): string {
 }
 
 function buildShareText(code: string): string {
-  return `【UATaのご紹介】\nAIが自動で資産運用してくれるサービスです。\n紹介コード「${code}」を使って登録すると特典があります。\n▼ アカウント開設はこちら\n${SIGNUP_URL}?ref=${code}`
+  return `【UATaのご紹介】\nAIが自動で資産運用してくれるサービスです。\n紹介コード「${code}」を使ってアカウント登録できます。\n▼ アカウント開設はこちら\n${SIGNUP_URL}?ref=${code}`
 }
 
 /** フォールバック用のスケルトンデータ（ローディング中 or エラー時） */
@@ -26,7 +26,7 @@ const EMPTY_INFO: ReferralInfo = {
   referral_count: 0,
   current_month_reward_jpy: "0",
   total_payout_jpy: "0",
-  campaign_rate: "30",
+  campaign_rate: "0.10",
   referral_code: "",
   referred_users: [],
 }
@@ -276,12 +276,12 @@ export function ReferralPanel() {
           />
           <HowItWorksStep
             step={2}
-            text="友達が登録・運用開始"
-            reward="¥1,500 もらえる"
+            text="友達が登録して資産運用を開始"
           />
           <HowItWorksStep
             step={3}
-            text="毎月サブスク料の 30% が加算"
+            text="紹介した友達の毎月の実受取利益（手数料控除後）の 10% を、翌月末にあなたへ自動でお支払い"
+            reward="紹介し続ける限り継続"
           />
         </div>
       </div>
