@@ -25,7 +25,8 @@ interface UserData {
   created_at?: string
   wallet_address?: string
   avatar_url?: string
-  // corporate fields (frontend-only state — not yet in backend schema)
+  // 法人決算月 (1-12)。backend /api/user/settings で永続化される。
+  corporate_fiscal_month?: number | null
 }
 
 // アバター画像のローカル保持キー（backend に avatar upload エンドポイントが
@@ -79,7 +80,13 @@ export function AccountPanel() {
     })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: UserData | null) => {
-        if (data) setUserData((prev) => ({ ...prev, ...data }))
+        if (data) {
+          setUserData((prev) => ({ ...prev, ...data }))
+          // 決算月は backend を正本とする（localStorage の同期復元より後に解決するため勝つ）。
+          if (typeof data.corporate_fiscal_month === "number") {
+            setCorpForm((p) => ({ ...p, month: data.corporate_fiscal_month as number }))
+          }
+        }
       })
       .catch(() => {})
 
@@ -181,15 +188,49 @@ export function AccountPanel() {
     }
   }
 
-  // 法人情報保存（フロントエンドのみ保持 — backend 未実装のためローカル保存）
-  const handleCorpSave = () => {
-    // 将来バックエンドが corporate_* フィールドを実装した時点で PUT /api/user/settings に送る
-    // 現時点は localStorage に保存してフロント内で表示するのみ
+  // 法人情報保存。決算月 (month) は backend に永続化し（TAX & REPORTS 法人モードの
+  // アンロック条件）、name/number/rep は backend に対応カラムが無いため localStorage 保持。
+  const handleCorpSave = async () => {
+    // name/number/rep は引き続きローカル保持
     try {
       localStorage.setItem("liff_corp_info", JSON.stringify(corpForm))
     } catch {
       // ignore
     }
+
+    // 決算月を backend に PUT（corporate_fiscal_month）。既存 settings の partial PUT を踏襲。
+    const token = getAuthToken() ?? ""
+    if (token && corpForm.month >= 1 && corpForm.month <= 12) {
+      try {
+        const res = await fetch(`${API_BASE}/api/user/settings`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ corporate_fiscal_month: corpForm.month }),
+        })
+        if (res.ok) {
+          const updated = (await res.json().catch(() => null)) as {
+            corporate_fiscal_month?: number | null
+          } | null
+          setUserData((prev) => ({
+            ...prev,
+            corporate_fiscal_month: updated?.corporate_fiscal_month ?? corpForm.month,
+          }))
+        } else if (res.status === 401) {
+          showToast("認証が切れています。再ログインしてください")
+          return
+        } else {
+          showToast("決算月の保存に失敗しました")
+          return
+        }
+      } catch {
+        showToast("通信エラーが発生しました")
+        return
+      }
+    }
+
     setCorpSaved(true)
     showToast("保存しました")
     setTimeout(() => setCorpSaved(false), 2000)

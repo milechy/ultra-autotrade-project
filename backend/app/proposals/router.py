@@ -520,6 +520,10 @@ _OPERATION_TO_CRYPTACT_ACTION: dict[str, str] = {
 @router.get("/tax/cryptact-csv", summary="Cryptact無料版フォーマットCSVダウンロード")
 def download_cryptact_csv(
     year: Optional[int] = Query(None, description="絞り込む年 (例: 2026)。省略時は全件"),
+    type: str = Query(
+        "individual",
+        description="出力モード: individual (個人=Cryptact) / corporate (法人=freee/弥生)",
+    ),
     current_user: User = Depends(require_viewer),
     db: Session = Depends(get_db),
 ) -> Response:
@@ -536,7 +540,21 @@ def download_cryptact_csv(
     - Counter: USD
     - Fee: 手数料 USD (fee_amount。NULL の場合は 0)
     - FeeCcy: USD
+
+    type=corporate (法人 freee/弥生) は corporate-CSV [4/4] で実装予定。
+    会計マッピング(勘定科目・税区分)の税理士承認が適用されるまでは、個人データを
+    法人フォーマットと偽って返さないよう 501 で明示的に拒否する (silent-wrong-data 防止)。
+    円建ての基礎データ源は月次 fee_transactions (net_profit_jpy 等) を用いる方針で確定済み。
     """
+    if type == "corporate":
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=(
+                "法人モード (freee/弥生 CSV) は準備中です。"
+                "税理士承認の仕訳マッピング適用後に提供されます。"
+            ),
+        )
+
     stmt = select(Proposal).where(
         Proposal.user_id == current_user.id,
         Proposal.status == "executed",

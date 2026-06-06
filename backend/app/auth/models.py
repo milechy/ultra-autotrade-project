@@ -35,6 +35,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_consent_at TIMESTAMP WITH TI
 
 -- Lane P: LINE 月次レポート通知 opt-in
 ALTER TABLE users ADD COLUMN IF NOT EXISTS line_monthly_opt_in BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- corporate-CSV [2/4]: 法人決算月 (1-12, NULL=個人)。TAX & REPORTS 法人モードのアンロック条件。
+ALTER TABLE users ADD COLUMN IF NOT EXISTS corporate_fiscal_month SMALLINT NULL;
 """
 
 import logging
@@ -43,7 +46,16 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    SmallInteger,
+    String,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.auth.constants import ExecutionPolicy
@@ -276,6 +288,12 @@ class User(Base):
     # ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_settings_json TEXT NULL;
     notification_settings_json: Mapped[Optional[str]] = mapped_column(
         String, nullable=True, default=None
+    )
+    # corporate_fiscal_month: 法人決算月 (1-12)。NULL=個人ユーザー(法人モード未設定)。
+    # TAX & REPORTS の法人モード (freee/弥生 CSV) のアンロック条件に使用する。
+    # ALTER TABLE users ADD COLUMN IF NOT EXISTS corporate_fiscal_month SMALLINT NULL;
+    corporate_fiscal_month: Mapped[Optional[int]] = mapped_column(
+        SmallInteger, nullable=True, default=None
     )
 
     def __repr__(self) -> str:

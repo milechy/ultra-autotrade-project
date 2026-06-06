@@ -128,6 +128,27 @@ class TestCryptactCsvEndpoint:
         assert r.status_code == 200
         assert "text/csv" in r.headers["content-type"]
 
+    def test_type_individual_explicit_still_csv(self, client_with_proposals: TestClient) -> None:
+        """type=individual を明示しても従来どおり CSV を返すこと（後方互換）。"""
+        token = _get_admin_token(client_with_proposals)
+        r = client_with_proposals.get(
+            "/api/proposals/tax/cryptact-csv?type=individual",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert "text/csv" in r.headers["content-type"]
+
+    def test_type_corporate_not_yet_implemented(self, client_with_proposals: TestClient) -> None:
+        """type=corporate は仕訳マッピング適用前は 501 で拒否し、個人データを返さないこと。"""
+        token = _get_admin_token(client_with_proposals)
+        r = client_with_proposals.get(
+            "/api/proposals/tax/cryptact-csv?type=corporate",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 501
+        # 個人 CSV を法人と偽って返していないこと
+        assert "text/csv" not in r.headers.get("content-type", "")
+
     def test_csv_header_row(self, client_with_proposals: TestClient) -> None:
         token = _get_admin_token(client_with_proposals)
         r = client_with_proposals.get(
