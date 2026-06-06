@@ -18,6 +18,28 @@ export interface RegisterRequest {
   password: string;
 }
 
+export interface OpenRegisterRequest {
+  email: string;
+  username: string;
+  password: string;
+  terms_consent: boolean;
+}
+
+/**
+ * 一般登録（open registration）レスポンス。
+ * backend RegisterResponse = UserResponse + access_token + expires_in に対応。
+ */
+export interface OpenRegisterResponse {
+  id: number;
+  email: string;
+  username: string;
+  role: string;
+  is_active: boolean;
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;
@@ -49,6 +71,19 @@ export interface PasswordChangeRequest {
  */
 export async function register(request: RegisterRequest): Promise<UserResponse> {
   return await postJson<UserResponse>("/auth/register", request);
+}
+
+/**
+ * 一般登録（partner 招待不要の自己申請 / POST /auth/register-open）。
+ *
+ * terms_consent === true が必須（backend 側で 422 になる）。成功時は
+ * RegisterResponse（ユーザー情報 + access_token + expires_in）を返す。
+ * フロント側の到達経路は isPublicRegistrationEnabled() フラグで gate する。
+ */
+export async function registerOpen(
+  request: OpenRegisterRequest
+): Promise<OpenRegisterResponse> {
+  return await postJson<OpenRegisterResponse>("/auth/register-open", request);
 }
 
 /**
