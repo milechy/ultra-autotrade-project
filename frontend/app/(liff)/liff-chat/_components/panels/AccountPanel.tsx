@@ -230,17 +230,21 @@ export function AccountPanel() {
         body: JSON.stringify({ username: next }),
       })
       if (res.ok) {
-        setUserData((prev) => ({ ...prev, username: next }))
+        // backend が永続化した実値を反映（validator で小文字化される場合がある）
+        const updated = (await res.json().catch(() => null)) as {
+          username?: string
+        } | null
+        setUserData((prev) => ({ ...prev, username: updated?.username ?? next }))
         setEditingName(false)
         showToast("名前を変更しました")
-      } else if (res.status === 404 || res.status === 405 || res.status === 422) {
-        // backend が username の更新に未対応の場合でもフロント表示は反映する
-        // TODO: backend が PUT /api/user/settings で username partial update を
-        //       受け付けるようになったら、この fallback を削除する
-        setUserData((prev) => ({ ...prev, username: next }))
-        setEditingName(false)
-        showToast("名前を変更しました")
+      } else if (res.status === 409) {
+        showToast("このユーザー名は既に使用されています")
+      } else if (res.status === 422) {
+        showToast("名前の形式が正しくありません（3〜50文字・先頭は英数字）")
+      } else if (res.status === 401) {
+        showToast("認証が切れています。再ログインしてください")
       } else {
+        // 偽装成功はしない（非永続をマスクしていた旧 fallback を撤廃）
         showToast("変更に失敗しました")
       }
     } catch {

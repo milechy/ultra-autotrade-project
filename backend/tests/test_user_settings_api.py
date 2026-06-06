@@ -118,6 +118,61 @@ class TestUserSettingsAPI:
         )
         assert r.status_code == 422
 
+    def test_update_username(self, client: TestClient) -> None:
+        token = register_and_login(client)
+        r = client.put(
+            "/api/user/settings",
+            json={"username": "newname"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["username"] == "newname"
+        # GET でも永続していること（リロード後に戻らない）
+        r2 = client.get("/api/user/settings", headers={"Authorization": f"Bearer {token}"})
+        assert r2.json()["username"] == "newname"
+
+    def test_update_username_conflict_returns_409(self, client: TestClient) -> None:
+        # register は bootstrap admin のみ。2人目は admin が POST /users で作る作法。
+        admin_token = register_and_login(client)  # username="testuser"（admin）
+        rc = client.post(
+            "/users",
+            json={
+                "email": "alice@example.com",
+                "username": "alice",
+                "password": "password123",
+                "role": "viewer",
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert rc.status_code in (200, 201), rc.text
+        # admin(testuser) が既存の alice へ改名 → 409
+        r = client.put(
+            "/api/user/settings",
+            json={"username": "alice"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert r.status_code == 409
+
+    def test_update_username_invalid_too_short(self, client: TestClient) -> None:
+        token = register_and_login(client)
+        r = client.put(
+            "/api/user/settings",
+            json={"username": "ab"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 422
+
+    def test_update_username_same_value_noop(self, client: TestClient) -> None:
+        # 自分と同じ名前への変更は衝突扱いにしない（409 にならず 200）
+        token = register_and_login(client)  # username="testuser"
+        r = client.put(
+            "/api/user/settings",
+            json={"username": "testuser"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["username"] == "testuser"
+
     def test_pause_user(self, client: TestClient) -> None:
         token = register_and_login(client)
         r = client.post("/api/user/pause", headers={"Authorization": f"Bearer {token}"})
