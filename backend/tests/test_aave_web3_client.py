@@ -826,7 +826,9 @@ def test_make_aave_client_base_wires_token_addresses(mock_web3, mock_rpc_provide
     assert client.token_addresses.get("USDC") == _BASE_USDC
     # chain_config.tokens の他トークンも配線される
     assert "WETH" in client.token_addresses
-    assert "WBTC" in client.token_addresses
+    # WBTC/USDT/DAI は Base Aave V3 非上場のため map から除外済み (chains.py 参照)。
+    # 除外自体の回帰は test_aave_chains.py が担保する。
+    assert "WBTC" not in client.token_addresses
 
 
 @patch("app.aave.rpc_provider.RPCProvider")
