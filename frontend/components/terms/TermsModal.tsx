@@ -3,6 +3,7 @@
 "use client";
 
 import { useState } from "react";
+import { getAuthToken } from "@/lib/auth/token-key";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 const CURRENT_VERSION = "2.0";
@@ -27,7 +28,7 @@ export default function TermsModal({ onAccepted }: TermsModalProps) {
     if (!allChecked) return;
     setSubmitting(true);
     setError(null);
-    const token = localStorage.getItem("ultra_auth_token") ?? "";
+    const token = getAuthToken() ?? "";
     try {
       const res = await fetch(`${API_BASE}/auth/terms/accept`, {
         method: "POST",
