@@ -6,6 +6,7 @@ import { useLiff } from '@/hooks/useLiff'
 import { useLiffAutoReAuth } from '@/hooks/useLiffAutoReAuth'
 import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
 import { PrivyRootClient } from '@/lib/wallet/PrivyRootClient'
+import { getAuthToken } from '@/lib/auth/token-key'
 
 // degrade ガードを適用しない経路。
 // - liff-login : ログイン導線そのもの (未ログインで来る前提)
@@ -53,8 +54,7 @@ export default function LiffLayout({ children }: { children: React.ReactNode }) 
   // ブラウザ PWA モード (liffConfigured=false) は isLoggedIn が常に false でもブロックせず、
   // children を通常描画して degrade させる (ブラウザ承認導線はページ側で JWT を取得する)。
   // この構造により、新規 LIFF ページは個別ガードを書かなくても自動で degrade 対応になる。
-  const token =
-    typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+  const token = getAuthToken()
   const isExempt = AUTH_GUARD_EXEMPT.includes(pathname ?? '')
   if (liffConfigured && !isLoggedIn && !token && !isExempt) {
     return (

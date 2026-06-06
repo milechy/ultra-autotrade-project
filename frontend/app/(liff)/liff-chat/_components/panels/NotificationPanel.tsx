@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react"
 import { MessageCircle, Bell, AlertTriangle, ShieldAlert, FileText, Info } from "lucide-react"
+import { getAuthToken } from "@/lib/auth/token-key"
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -49,6 +50,9 @@ function Toggle({
   onChange: (v: boolean) => void
   disabled?: boolean
 }) {
+  // track 色: ON は緑(#1D9E75)、OFF はグレー。disabled は opacity で薄める
+  // (track 自体の色は checked 状態を維持して「ON 固定」が一目で判る見た目にする)。
+  const trackColor = checked ? "bg-[#1D9E75]" : "bg-zinc-700"
   return (
     <button
       type="button"
@@ -56,17 +60,16 @@ function Toggle({
       disabled={disabled}
       aria-checked={checked}
       role="switch"
-      className={`relative w-11 h-6 rounded-full transition-colors focus:outline-none ${
-        disabled
-          ? `opacity-50 cursor-not-allowed ${checked ? "bg-[#1D9E75]" : "bg-zinc-600"}`
-          : checked
-          ? "bg-[#1D9E75]"
-          : "bg-zinc-700"
+      className={`relative inline-flex flex-shrink-0 w-11 h-6 rounded-full transition-colors focus:outline-none ${trackColor} ${
+        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
       }`}
     >
+      {/* ノブ: absolute だが left を明示しないと static 位置(右端)から
+          translate されて中間に潰れる。left-0.5 で左端基準に固定し、
+          ON は translate-x-5 で右へ、OFF は translate-x-0 で左端。 */}
       <span
-        className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-          checked ? "translate-x-5" : "translate-x-0.5"
+        className={`pointer-events-none absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+          checked ? "translate-x-5" : "translate-x-0"
         }`}
       />
     </button>
@@ -132,8 +135,10 @@ export function NotificationPanel() {
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
+  // token-key.ts の正準キー統一シム経由で取得 (通知設定 401 の連鎖防止)。
+  // getAuthToken は AUTH_TOKEN_KEY 優先 + 旧キーフォールバック。SSR/不可時は null → "" に丸める。
   function getToken(): string {
-    return typeof window !== "undefined" ? (localStorage.getItem("auth_token") ?? "") : ""
+    return getAuthToken() ?? ""
   }
 
   // 権限状態を取得
