@@ -109,7 +109,7 @@ docker exec -w /app/backend ultra-autotrade-backend-blue-staging-new \
   'subscription_rates': {'conservative': 0.0, 'balanced': 0.003, 'aggressive': 0.01},
   'expense_markup_enabled': False,
   'expense_markup_rate': Decimal('0'),
-  'affiliate_rate': Decimal('0.30'),
+  'affiliate_rate': Decimal('0.10'),
   'is_active': True,
   'effective_from': datetime(2026, 5, 1, 0, 0, tzinfo=...)
 }
@@ -161,7 +161,7 @@ WHERE config_name = 'v10_default';
 | tier_thresholds_jpy | `[1000000, 10000000]` |
 | tier_fee_rates | `[0.30, 0.25, 0.20]` |
 | tier_monthly_yield_caps | `[0.018, 0.023, 0.030]` |
-| affiliate_rate | `0.3000` |
+| affiliate_rate | `0.1000` |
 | effective_from | `2026-04-30 15:00:00+00` |
 
 ```bash
@@ -294,7 +294,7 @@ FROM fee_configs;
 | tier_thresholds_jpy | `[1000000, 10000000]` |
 | tier_fee_rates | `[0.30, 0.25, 0.20]` |
 | tier_monthly_yield_caps | `[0.018, 0.023, 0.030]` |
-| affiliate_rate | `0.30` |
+| affiliate_rate | `0.10` |
 | effective_from | `2026-04-30 15:00:00+00` (= 2026-05-01 00:00 JST) |
 
 ```bash
