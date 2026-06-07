@@ -166,13 +166,11 @@ def get_vapid_key() -> dict[str, Any]:
     return {"publicKey": config.public_key}
 
 
-@router.post("/push/test", status_code=status.HTTP_200_OK)
-def send_test_push(
-    req: TestPushRequest = TestPushRequest(),
-    store: InMemorySubscriptionStore = Depends(get_subscription_store),
-    _current_user: User = Depends(require_active_user),
+def _do_full_test_push(
+    req: TestPushRequest,
+    store: InMemorySubscriptionStore,
 ) -> dict[str, Any]:
-    """テスト通知を送信する。認証必須。"""
+    """Web Push + LINE のテスト通知を送信して結果を返す。"""
     from app.notifications.config import get_notification_settings
 
     result = _do_test_push(req.title, req.body, store)
@@ -193,16 +191,38 @@ def send_test_push(
     return result
 
 
-@api_router.post("/test-push", status_code=status.HTTP_200_OK)
-def api_test_push(
-    req: TestPushRequest,
+@router.post("/push/test", status_code=status.HTTP_200_OK)
+def send_test_push(
+    req: TestPushRequest = TestPushRequest(),
     store: InMemorySubscriptionStore = Depends(get_subscription_store),
     _current_user: User = Depends(require_active_user),
 ) -> dict[str, Any]:
-    """テスト通知を送信する（/api/notifications/test-push エイリアス）。認証必須。"""
-    result = _do_test_push(req.title, req.body, store)
-    result["status"] = "ok"
-    return result
+    """テスト通知を送信する。認証必須。"""
+    return _do_full_test_push(req, store)
+
+
+@api_router.post("/push/test", status_code=status.HTTP_200_OK)
+def api_test_push_canonical(
+    req: TestPushRequest = TestPushRequest(),
+    store: InMemorySubscriptionStore = Depends(get_subscription_store),
+    _current_user: User = Depends(require_active_user),
+) -> dict[str, Any]:
+    """テスト通知を送信する（/api/notifications/push/test エイリアス）。
+
+    liff-chat NotificationPanel の「テスト通知」ボタンはこのパスへ body 無しで
+    POST する。req を省略可能にし、Web Push + LINE の完全版ロジックを呼ぶ。認証必須。
+    """
+    return _do_full_test_push(req, store)
+
+
+@api_router.post("/test-push", status_code=status.HTTP_200_OK)
+def api_test_push(
+    req: TestPushRequest = TestPushRequest(),
+    store: InMemorySubscriptionStore = Depends(get_subscription_store),
+    _current_user: User = Depends(require_active_user),
+) -> dict[str, Any]:
+    """テスト通知を送信する（/api/notifications/test-push 後方互換エイリアス）。認証必須。"""
+    return _do_full_test_push(req, store)
 
 
 @router.get("/push/count", status_code=status.HTTP_200_OK)
