@@ -13,7 +13,7 @@ I/O / 外部 API / DB 接続は一切行わない。
     Step 3: サブスク保護 (net_profit < subscription なら全額 UATa, fee 0, takehome 0)
     Step 4: tier-based fee = max(0, net_profit - subscription) * fee_rate
     Step 5: monthly_yield_cap (provisional_takehome > cap_amount なら excess→UATa)
-    Step 6: affiliate = subscription * affiliate_rate (subscription>0 のみ)
+    Step 6: affiliate = user_takehome * affiliate_rate (紹介報酬, takehome>0 のみ)
 
 関連:
 - 入力源 ``FeeConfigV10`` (F-1 + F-4 seed)
@@ -216,18 +216,26 @@ class FeeCalculator:
                 f"step5 yield ok: provisional({provisional_takehome}) <= cap({cap_amount})"
             )
 
-        # === Step 6: affiliate ===
-        if payload.affiliate_id is not None and sub_amount > Decimal("0"):
-            affiliate_amount = self._round_jpy(sub_amount * self._affiliate_rate())
+        # === Step 6: affiliate (紹介報酬) ===
+        # 仕様 (Asana 1215467015333283 / 2026-06-06 確定): 紹介報酬は「最新紹介友達の
+        # 月次 user_takehome_jpy (手数料・サブスク控除後の実受取利益) × affiliate_rate(=10%)」。
+        # サブスク有無に依らず takehome>0 なら発生する (コンサバ運用=サブスク0でも対象)。
+        # affiliate_id は finalize_month が「当月有効な紹介ウィンドウ (シングルスロット・
+        # ローリング)」のパートナー id を渡す。subscription_protected の早期 return では
+        # user_takehome=0 のため affiliate も自動的に 0 になる。
+        if payload.affiliate_id is not None and user_takehome > Decimal("0"):
+            affiliate_amount = self._round_jpy(user_takehome * self._affiliate_rate())
             affiliate_id_out: int | None = payload.affiliate_id
             debug.append(
-                f"step6 affiliate: sub({sub_amount}) * rate({self._affiliate_rate()}) "
+                f"step6 affiliate: takehome({user_takehome}) * rate({self._affiliate_rate()}) "
                 f"= {affiliate_amount}"
             )
         else:
             affiliate_amount = Decimal("0")
             affiliate_id_out = None
-            debug.append(f"step6 affiliate skipped: id={payload.affiliate_id}, sub={sub_amount}")
+            debug.append(
+                f"step6 affiliate skipped: id={payload.affiliate_id}, takehome={user_takehome}"
+            )
 
         return FeeCalculationResult(
             user_id=payload.user_id,

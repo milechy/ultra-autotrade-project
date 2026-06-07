@@ -130,7 +130,7 @@ export default function PartnerReferralPage() {
               今月の報酬
               {earnings && (
                 <span className="ml-1 text-xs font-normal">
-                  (サブスク{formatRate(earnings.campaign_rate)})
+                  (紹介友達の実受取利益の{formatRate(earnings.campaign_rate)})
                 </span>
               )}
             </CardTitle>
