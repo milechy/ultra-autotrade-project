@@ -824,9 +824,12 @@ def test_make_aave_client_base_wires_token_addresses(mock_web3, mock_rpc_provide
 
     assert hasattr(client, "token_addresses"), "token_addresses 未配線 (Unknown asset の原因)"
     assert client.token_addresses.get("USDC") == _BASE_USDC
-    # chain_config.tokens の他トークンも配線される
+    # chain_config.tokens の他トークンも配線される。
+    # NOTE: WBTC は Base Aave V3 に非上場のため chains.py から除外済み
+    # (347f7af "remove unsupported tokens from Base chain map")。
+    # Base の BTC 資産は cbBTC なので、配線回帰の検証には cbBTC を使う。
     assert "WETH" in client.token_addresses
-    assert "WBTC" in client.token_addresses
+    assert "cbBTC" in client.token_addresses
 
 
 @patch("app.aave.rpc_provider.RPCProvider")
