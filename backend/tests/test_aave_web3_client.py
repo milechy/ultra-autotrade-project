@@ -830,6 +830,8 @@ def test_make_aave_client_base_wires_token_addresses(mock_web3, mock_rpc_provide
     # Base の BTC 資産は cbBTC なので、配線回帰の検証には cbBTC を使う。
     assert "WETH" in client.token_addresses
     assert "cbBTC" in client.token_addresses
+    # WBTC は除外済みなので配線されないことも明示 (PR#569 の回帰検証を統合)。
+    assert "WBTC" not in client.token_addresses
 
 
 @patch("app.aave.rpc_provider.RPCProvider")

@@ -324,3 +324,40 @@ class TestUserSettingsAPI:
         """POST /api/user/terms-agree は認証必須であること。"""
         r = client.post("/api/user/terms-agree")
         assert r.status_code == 401
+
+    # --- corporate-CSV [2/4]: corporate_fiscal_month ---
+
+    def test_corporate_fiscal_month_default_none(self, client: TestClient) -> None:
+        """新規ユーザーは corporate_fiscal_month が None（個人扱い）であること。"""
+        token = register_and_login(client)
+        r = client.get("/api/user/settings", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        assert r.json()["corporate_fiscal_month"] is None
+
+    def test_set_corporate_fiscal_month(self, client: TestClient) -> None:
+        """決算月を設定すると GET でも反映され、法人モードが解放されること。"""
+        token = register_and_login(client)
+        headers = {"Authorization": f"Bearer {token}"}
+        r = client.put(
+            "/api/user/settings",
+            json={"corporate_fiscal_month": 3},
+            headers=headers,
+        )
+        assert r.status_code == 200
+        assert r.json()["corporate_fiscal_month"] == 3
+        # GET でも永続化されていること
+        g = client.get("/api/user/settings", headers=headers)
+        assert g.json()["corporate_fiscal_month"] == 3
+
+    @pytest.mark.parametrize("bad", [0, 13, -1, 100])
+    def test_corporate_fiscal_month_out_of_range_rejected(
+        self, client: TestClient, bad: int
+    ) -> None:
+        """1〜12 の範囲外の決算月は 422 で拒否されること。"""
+        token = register_and_login(client)
+        r = client.put(
+            "/api/user/settings",
+            json={"corporate_fiscal_month": bad},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 422

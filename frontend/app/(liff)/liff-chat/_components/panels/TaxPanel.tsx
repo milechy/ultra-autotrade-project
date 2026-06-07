@@ -118,14 +118,7 @@ export function TaxPanel() {
       )}
 
       {activeTab === "法人" && settings?.corporate_fiscal_month && (
-        <CorporateTabContent
-          fiscalMonth={settings.corporate_fiscal_month}
-          selectedYear={selectedYear}
-          onYearChange={setSelectedYear}
-          currentYear={currentYear}
-          buildDownloadUrl={buildDownloadUrl}
-          downloadFile={downloadFile}
-        />
+        <CorporateTabContent fiscalMonth={settings.corporate_fiscal_month} />
       )}
 
       {/* 注意書き */}
@@ -245,21 +238,9 @@ function PersonalTabContent({
 
 interface CorporateTabContentProps {
   fiscalMonth: number
-  selectedYear: number
-  onYearChange: (year: number) => void
-  currentYear: number
-  buildDownloadUrl: (path: string) => string
-  downloadFile: (url: string, filename: string) => void
 }
 
-function CorporateTabContent({
-  fiscalMonth,
-  selectedYear,
-  onYearChange,
-  currentYear,
-  buildDownloadUrl,
-  downloadFile,
-}: CorporateTabContentProps) {
+function CorporateTabContent({ fiscalMonth }: CorporateTabContentProps) {
   return (
     <div className="space-y-3">
       {/* 決算月表示 */}
@@ -268,32 +249,18 @@ function CorporateTabContent({
         <span className="text-white text-sm font-semibold">{fiscalMonth}月</span>
       </div>
 
-      <YearSelector
-        selectedYear={selectedYear}
-        onYearChange={onYearChange}
-        currentYear={currentYear}
-      />
-
-      <DownloadButton
-        label="法人向け Cryptact CSV"
-        description="法人決算対応フォーマット"
-        onClick={() => {
-          const url = buildDownloadUrl(
-            `/api/proposals/tax/cryptact-csv?year=${selectedYear}&type=corporate`
-          )
-          downloadFile(url, `cryptact_corporate_${selectedYear}.csv`)
-        }}
-      />
-      <DownloadButton
-        label="取引一覧 CSV（法人用）"
-        description="全取引データのエクスポート"
-        onClick={() => {
-          const url = buildDownloadUrl(
-            `/api/transactions/export?year=${selectedYear}&type=corporate`
-          )
-          downloadFile(url, `transactions_corporate_${selectedYear}.csv`)
-        }}
-      />
+      {/* 準備中: freee/弥生 CSV は税理士承認の仕訳マッピング適用後に提供する。
+          個人データを法人フォーマットと偽って返さないため、ここでは DL を出さない。 */}
+      <div className="flex items-start gap-2 bg-zinc-800/60 border border-zinc-700 rounded-xl px-4 py-3 text-sm">
+        <AlertCircle className="w-4 h-4 text-[#1D9E75] flex-shrink-0 mt-0.5" />
+        <div className="text-zinc-300 leading-relaxed">
+          <p className="font-medium text-white mb-1">法人向け CSV は準備中です</p>
+          <p className="text-zinc-400 text-xs">
+            freee / 弥生 形式の仕訳 CSV は、税理士監修の会計マッピング適用後に提供します。
+            決算月の設定は保存済みです。
+          </p>
+        </div>
+      </div>
     </div>
   )
 }

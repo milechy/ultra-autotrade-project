@@ -28,6 +28,8 @@ class UserSettingsResponse(BaseModel):
     terms_agreed_at: Optional[datetime] = None
     # 同意時の規約バージョン（フロントエンドの再同意判定に使用）
     terms_version: Optional[str] = None
+    # 法人決算月 (1-12)。NULL=個人ユーザー。設定済みで TAX & REPORTS 法人モードを解放する。
+    corporate_fiscal_month: Optional[int] = None
 
 
 class UserSettingsUpdate(BaseModel):
@@ -38,8 +40,19 @@ class UserSettingsUpdate(BaseModel):
     user_mode: Optional[str] = None
     execution_policy: Optional[str] = None
     line_monthly_opt_in: Optional[bool] = None
+    # 法人決算月 (1-12)。設定すると TAX & REPORTS 法人モードが解放される。
+    corporate_fiscal_month: Optional[int] = None
     # ユーザー名（本人による表示名変更）。auth/schemas.py の登録時 validator と同一規則。
     username: Optional[str] = Field(default=None, min_length=3, max_length=50)
+
+    @field_validator("corporate_fiscal_month")
+    @classmethod
+    def validate_corporate_fiscal_month(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return v
+        if not (1 <= v <= 12):
+            raise ValueError("corporate_fiscal_month は 1〜12 の整数で指定してください")
+        return v
 
     @field_validator("username")
     @classmethod

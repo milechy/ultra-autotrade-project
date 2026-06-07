@@ -44,6 +44,7 @@ def _build_settings_response(user: User) -> UserSettingsResponse:
         line_monthly_opt_in=user.line_monthly_opt_in,
         terms_agreed_at=user.terms_accepted_at,
         terms_version=user.terms_version,
+        corporate_fiscal_month=user.corporate_fiscal_month,
     )
 
 
@@ -114,6 +115,9 @@ def update_user_settings(
         current_user.execution_policy = request.execution_policy
     if request.line_monthly_opt_in is not None:
         current_user.line_monthly_opt_in = request.line_monthly_opt_in
+    if request.corporate_fiscal_month is not None:
+        # スキーマ側で 1-12 を検証済み。設定すると TAX & REPORTS 法人モードが解放される。
+        current_user.corporate_fiscal_month = request.corporate_fiscal_month
     if request.username is not None:
         # スキーマ側で形式検証 + 小文字化済み。本人による表示名変更（role 制限なし）。
         new_username = request.username
