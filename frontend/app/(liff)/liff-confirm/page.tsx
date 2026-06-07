@@ -221,7 +221,7 @@ export default function LiffConfirmPage() {
             利用規約 <ExternalLink className="w-3 h-3" />
           </a>
           <a
-            href="https://app.ultra-auto-trade.com/privacy"
+            href="https://app.ultra-auto-trade.com/privacy-policy"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 hover:text-zinc-300"
