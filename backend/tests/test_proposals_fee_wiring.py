@@ -71,7 +71,7 @@ def _insert_fee_config(db: Session, *, is_active: bool = True) -> FeeConfigV10:
         subscription_rates={"conservative": 0.0, "balanced": 0.003, "aggressive": 0.01},
         expense_markup_enabled=False,
         expense_markup_rate=Decimal("0"),
-        affiliate_rate=Decimal("0.30"),
+        affiliate_rate=Decimal("0.10"),
         is_active=is_active,
         effective_from=datetime(2026, 5, 1, tzinfo=_JST),
     )

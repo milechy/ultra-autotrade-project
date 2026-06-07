@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { isPublicRegistrationEnabled } from "@/lib/flags";
 
 /**
  * リダイレクト先を検証し、安全なパスのみ許可する。
@@ -138,9 +139,18 @@ function LoginForm() {
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            初期設定が必要な場合は管理者にお問い合わせください。
-          </p>
+          {isPublicRegistrationEnabled() ? (
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              アカウントをお持ちでない方は
+              <a href="/signup" className="underline underline-offset-4 hover:text-primary ml-1">
+                新規登録
+              </a>
+            </p>
+          ) : (
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              初期設定が必要な場合は管理者にお問い合わせください。
+            </p>
+          )}
         </CardContent>
       </Card>
     </main>
