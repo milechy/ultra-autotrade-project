@@ -130,8 +130,8 @@ def mask_email(email: str) -> str:
 def handle_new_referral(db: Session, partner_id: int, referree_id: int) -> ReferralCampaign:
     """新規紹介登録時に紹介キャンペーン ウィンドウを更新する。
 
-    1. 同一パートナーの既存アクティブ ウィンドウを今月で終了。
-    2. 新しい 12ヶ月ウィンドウを作成 (来月スタート)。
+    1. 同一パートナーの既存アクティブ ウィンドウを今月で終了 (シングルスロット・ローリング)。
+    2. 新しいウィンドウを作成 (来月スタート、末 = 最後に紹介した月 + 13ヶ月)。
 
     Args:
         db: DB セッション (呼び出し元が commit を担当)。
@@ -161,9 +161,10 @@ def handle_new_referral(db: Session, partner_id: int, referree_id: int) -> Refer
             current_month,
         )
 
-    # 新ウィンドウ: 来月スタート、12ヶ月間
+    # 新ウィンドウ: 来月スタート、末 = 最後に紹介した月(current_month) + 13ヶ月。
+    # reward_start_month = current_month + 1、expires = start + 12 (= current_month + 13)。
     reward_start_month = _add_months(current_month, 1)
-    reward_expires_month = _add_months(reward_start_month, 11)
+    reward_expires_month = _add_months(reward_start_month, 12)
 
     campaign = ReferralCampaign(
         partner_id=partner_id,
@@ -232,9 +233,10 @@ def get_referral_earnings(db: Session, partner_id: int) -> dict[str, str | int |
         .order_by(FeeConfigV10.effective_from.desc())
         .first()
     )
-    # affiliate_rate の正本: 045_fee_v10_tables.sql DEFAULT 0.30 / seed_runbook 0.30
-    # calculator Step6: affiliate = subscription * affiliate_rate → 「サブスク料の30%」
-    campaign_rate = active_config.affiliate_rate if active_config else Decimal("0.30")
+    # affiliate_rate の正本 = 製品仕様 (Asana 1215467015333283 / 2026-06-06 確定):
+    # 紹介友達の月次 user_takehome_jpy の 10%。calculator Step6 が takehome×rate で算定する。
+    # active fee_config が無い場合の fallback は 0.10 (FeeConfigV10.affiliate_rate server_default と一致)。
+    campaign_rate = active_config.affiliate_rate if active_config else Decimal("0.10")
 
     # アクティブ ウィンドウを探して期限月を返す
     active_campaign = db.scalar(
@@ -262,7 +264,9 @@ def get_api_referral_info(db: Session, user: User) -> dict[str, object]:
     """LIFF 紹介パネル用: /api/referral/earnings のデータを組み立てる。
 
     partner 専用の ``get_referral_earnings`` と異なり、全 active user が対象。
-    ``reward_jpy`` は ¥1,500 bonus 計算が別タスクのため常に "0"。
+    紹介報酬は「紹介友達の実受取利益 × affiliate_rate(10%)」で、当月分は
+    ``current_month_reward_jpy`` / 累計は ``total_payout_jpy`` に集約する。
+    友達ごとの内訳 ``reward_jpy`` は未集計のため "0" を返す (集計は別タスク)。
 
     Args:
         db: DB セッション。
@@ -326,7 +330,7 @@ def get_api_referral_info(db: Session, user: User) -> dict[str, object]:
         .order_by(FeeConfigV10.effective_from.desc())
         .first()
     )
-    campaign_rate = active_config.affiliate_rate if active_config else Decimal("0.30")
+    campaign_rate = active_config.affiliate_rate if active_config else Decimal("0.10")
 
     return {
         "referral_count": referral_count,
