@@ -265,8 +265,8 @@ class TestFeeConfigEndpoint:
         assert body["tier_fee_rates"] == [0.30, 0.25, 0.20]
         assert body["subscription_rates"]["conservative"] == 0.0
         assert body["subscription_rates"]["balanced"] == 0.003
-        # Numeric(6,4) のため "0.3000" として返る
-        assert Decimal(body["affiliate_rate"]) == Decimal("0.30")
+        # Numeric(6,4) のため "0.1000" として返る (紹介報酬 = 紹介友達の実受取利益 × 10%)
+        assert Decimal(body["affiliate_rate"]) == Decimal("0.10")
         assert body["is_active"] is True
 
 

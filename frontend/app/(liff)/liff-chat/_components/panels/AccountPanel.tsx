@@ -1,10 +1,21 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { usePrivy } from "@privy-io/react-auth"
-import { Copy, LogOut, Trash2, Building2, ChevronDown, Check } from "lucide-react"
+import {
+  Copy,
+  LogOut,
+  Trash2,
+  Building2,
+  ChevronDown,
+  Check,
+  Pencil,
+  Camera,
+  X,
+} from "lucide-react"
+import { getAuthToken, clearAuthToken } from "@/lib/auth/token-key"
 
 interface UserData {
   id?: number
@@ -13,8 +24,14 @@ interface UserData {
   user_mode?: "managed" | "active" | "pro"
   created_at?: string
   wallet_address?: string
+  avatar_url?: string
   // corporate fields (frontend-only state — not yet in backend schema)
 }
+
+// アバター画像のローカル保持キー（backend に avatar upload エンドポイントが
+// 無いため、選択画像は localStorage に dataURL で退避しフロント内で表示する。
+// 将来 POST /api/user/avatar 等が実装されたら差し替える。下記 TODO 参照）
+const AVATAR_LS_KEY = "liff_avatar_data"
 
 interface CorpForm {
   name: string
@@ -33,8 +50,18 @@ export function AccountPanel() {
   const [corpForm, setCorpForm] = useState<CorpForm>({ name: "", number: "", rep: "", month: 0 })
   const [corpSaved, setCorpSaved] = useState(false)
   const [deleteSheet, setDeleteSheet] = useState(false)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
   const [toastMsg, setToastMsg] = useState("")
   const [copied, setCopied] = useState(false)
+
+  // ユーザー名インライン編集
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState("")
+  const [nameSaving, setNameSaving] = useState(false)
+
+  // アバター画像（localStorage 退避の dataURL。null = イニシャルアバター表示）
+  const [avatarData, setAvatarData] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const showToast = (msg: string) => {
     setToastMsg(msg)
@@ -43,8 +70,7 @@ export function AccountPanel() {
 
   // ユーザー設定を取得（/api/user/settings + /auth/me を併用）
   useEffect(() => {
-    const token =
-      typeof window !== "undefined" ? (localStorage.getItem("auth_token") ?? "") : ""
+    const token = getAuthToken() ?? ""
     if (!token) return
 
     // settings エンドポイント（user_mode 等）
@@ -91,6 +117,16 @@ export function AccountPanel() {
         const parsed = JSON.parse(saved) as CorpForm
         setCorpForm(parsed)
       }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  // アバター画像を localStorage から復元
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(AVATAR_LS_KEY)
+      if (saved) setAvatarData(saved)
     } catch {
       // ignore
     }
@@ -159,6 +195,114 @@ export function AccountPanel() {
     setTimeout(() => setCorpSaved(false), 2000)
   }
 
+  // ユーザー名編集を開始（現在の表示名を draft に展開）
+  const handleStartEditName = () => {
+    setNameDraft(userData?.username ?? getDisplayName())
+    setEditingName(true)
+  }
+
+  // ユーザー名を保存（PUT /api/user/settings — 既存 settings エンドポイントに
+  // 部分更新で username を送る。既存コードベースで user_mode 等の partial PUT が
+  // 確認済みのため同パターンを踏襲する）
+  const handleSaveName = async () => {
+    const next = nameDraft.trim()
+    if (!next) {
+      showToast("名前を入力してください")
+      return
+    }
+    if (next === (userData?.username ?? "")) {
+      setEditingName(false)
+      return
+    }
+    const token = getAuthToken() ?? ""
+    if (!token) {
+      showToast("再ログインしてください")
+      return
+    }
+    setNameSaving(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/user/settings`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username: next }),
+      })
+      if (res.ok) {
+        // backend が永続化した実値を反映（validator で小文字化される場合がある）
+        const updated = (await res.json().catch(() => null)) as {
+          username?: string
+        } | null
+        setUserData((prev) => ({ ...prev, username: updated?.username ?? next }))
+        setEditingName(false)
+        showToast("名前を変更しました")
+      } else if (res.status === 409) {
+        showToast("このユーザー名は既に使用されています")
+      } else if (res.status === 422) {
+        showToast("名前の形式が正しくありません（3〜50文字・先頭は英数字）")
+      } else if (res.status === 401) {
+        showToast("認証が切れています。再ログインしてください")
+      } else {
+        // 偽装成功はしない（非永続をマスクしていた旧 fallback を撤廃）
+        showToast("変更に失敗しました")
+      }
+    } catch {
+      showToast("通信エラーが発生しました")
+    } finally {
+      setNameSaving(false)
+    }
+  }
+
+  // アバター画像を選択（ファイル選択ダイアログを開く）
+  const handlePickAvatar = () => {
+    fileInputRef.current?.click()
+  }
+
+  // アバター画像ファイルを読み込み（dataURL 化して表示 + localStorage 退避）
+  // TODO: backend に画像アップロードエンドポイント（例 POST /api/user/avatar、
+  //       multipart/form-data）が無いため、現状は localStorage に dataURL 退避のみ。
+  //       実装後は FormData で POST し、返却された avatar_url を userData に反映する。
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = "" // 同じファイルを再選択できるようにリセット
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      showToast("画像を選択してください")
+      return
+    }
+    // 2MB 超は localStorage quota を圧迫するため拒否
+    if (file.size > 2 * 1024 * 1024) {
+      showToast("2MB 以下の画像を選択してください")
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === "string" ? reader.result : null
+      if (!dataUrl) return
+      setAvatarData(dataUrl)
+      try {
+        localStorage.setItem(AVATAR_LS_KEY, dataUrl)
+      } catch {
+        // quota 超過などは握り潰す（表示は維持）
+      }
+      showToast("アイコンを変更しました")
+    }
+    reader.onerror = () => showToast("画像を読み込めませんでした")
+    reader.readAsDataURL(file)
+  }
+
+  // アバター画像をクリア（イニシャルアバターへ戻す）
+  const handleClearAvatar = () => {
+    setAvatarData(null)
+    try {
+      localStorage.removeItem(AVATAR_LS_KEY)
+    } catch {
+      // ignore
+    }
+    showToast("アイコンをリセットしました")
+  }
+
   // ログアウト
   const handleLogout = async () => {
     const { getLiff, isLiffConfigured } = await import("@/lib/liff/init")
@@ -181,20 +325,22 @@ export function AccountPanel() {
       }
     }
 
-    // 3. トークンクリア
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("auth_token")
-    }
+    // 3. トークンクリア（正準キー + 旧キーの両方を消す）
+    clearAuthToken()
 
     // 4. リダイレクト（LIFF モードは /liff-login、ブラウザは /login）
     router.replace(liffMode ? "/liff-login" : "/login")
   }
 
   // アカウント削除申請
+  // TODO: backend に削除申請エンドポイントが未実装（grep で
+  //       /api/user/delete-request は存在せず）。現状は申請 stub として POST し、
+  //       404/405 は「サポートへ誘導」へ graceful fallback する。
+  //       backend 実装後（例 POST /api/user/delete-request、残高チェックは
+  //       サーバ側で行い 409 等を返す）に正式フローへ差し替える。
   const handleDeleteRequest = async () => {
-    const token =
-      typeof window !== "undefined" ? (localStorage.getItem("auth_token") ?? "") : ""
-
+    const token = getAuthToken() ?? ""
+    setDeleteSubmitting(true)
     try {
       const res = await fetch(`${API_BASE}/api/user/delete-request`, {
         method: "POST",
@@ -206,6 +352,9 @@ export function AccountPanel() {
       if (res.ok) {
         showToast("削除申請を受け付けました")
         setDeleteSheet(false)
+      } else if (res.status === 409) {
+        // 残高ありなどサーバ側拒否（将来仕様）
+        showToast("残高があるため申請できません")
       } else if (res.status === 404 || res.status === 405) {
         showToast("サポートへお問い合わせください")
         setDeleteSheet(false)
@@ -215,6 +364,8 @@ export function AccountPanel() {
     } catch {
       showToast("サポートへお問い合わせください")
       setDeleteSheet(false)
+    } finally {
+      setDeleteSubmitting(false)
     }
   }
 
@@ -225,14 +376,93 @@ export function AccountPanel() {
       {/* プロフィールカード */}
       <div className="bg-[#1a3d2e] rounded-2xl p-4">
         <div className="flex items-center gap-3">
-          {/* イニシャルアバター */}
-          <div className="w-14 h-14 rounded-full bg-[#1D9E75]/20 border border-[#1D9E75] flex items-center justify-center text-[#4ade9a] text-xl font-bold flex-shrink-0">
-            {getInitial()}
+          {/* アバター（画像 or イニシャル）＋ 変更ボタン */}
+          <div className="relative flex-shrink-0">
+            <button
+              type="button"
+              onClick={handlePickAvatar}
+              aria-label="アイコンを変更"
+              className="w-14 h-14 rounded-full overflow-hidden bg-[#1D9E75]/20 border border-[#1D9E75] flex items-center justify-center text-[#4ade9a] text-xl font-bold"
+            >
+              {avatarData ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatarData}
+                  alt="アバター"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                getInitial()
+              )}
+            </button>
+            <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#1D9E75] flex items-center justify-center pointer-events-none">
+              <Camera className="w-3 h-3 text-white" />
+            </span>
+            {/* 隠し file input（画像アップロード/選択） */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarChange}
+              className="hidden"
+              data-testid="avatar-file-input"
+            />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white font-semibold truncate">{getDisplayName()}</p>
+            {editingName ? (
+              <div className="flex items-center gap-2">
+                <input
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  autoFocus
+                  maxLength={40}
+                  placeholder="ユーザー名"
+                  aria-label="ユーザー名"
+                  className="flex-1 min-w-0 bg-zinc-800 text-white px-2.5 py-1.5 rounded-lg text-sm outline-none focus:ring-1 focus:ring-[#1D9E75]"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveName}
+                  disabled={nameSaving}
+                  aria-label="名前を保存"
+                  className="w-7 h-7 rounded-lg bg-[#1D9E75] flex items-center justify-center disabled:opacity-40"
+                >
+                  <Check className="w-4 h-4 text-white" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingName(false)}
+                  disabled={nameSaving}
+                  aria-label="編集をキャンセル"
+                  className="w-7 h-7 rounded-lg bg-zinc-800 flex items-center justify-center disabled:opacity-40"
+                >
+                  <X className="w-4 h-4 text-zinc-400" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <p className="text-white font-semibold truncate">{getDisplayName()}</p>
+                <button
+                  type="button"
+                  onClick={handleStartEditName}
+                  aria-label="ユーザー名を編集"
+                  className="flex-shrink-0 text-zinc-500 hover:text-[#4ade9a] transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
             {userData?.email && (
               <p className="text-zinc-300 text-sm truncate">{userData.email}</p>
+            )}
+            {avatarData && !editingName && (
+              <button
+                type="button"
+                onClick={handleClearAvatar}
+                className="text-zinc-500 hover:text-zinc-300 text-xs mt-1 transition-colors"
+              >
+                アイコンをリセット
+              </button>
             )}
             {/* ログイン方法バッジ（LIFF = LINE ログイン） */}
             <div className="flex flex-wrap gap-1 mt-1">
@@ -388,13 +618,15 @@ export function AccountPanel() {
             </p>
             <button
               onClick={handleDeleteRequest}
-              className="w-full py-3.5 bg-red-600/20 border border-red-600 text-red-400 rounded-xl font-medium mb-3"
+              disabled={deleteSubmitting}
+              className="w-full py-3.5 bg-red-600/20 border border-red-600 text-red-400 rounded-xl font-medium mb-3 disabled:opacity-50"
             >
-              削除を申請する
+              {deleteSubmitting ? "申請中…" : "削除を申請する"}
             </button>
             <button
               onClick={() => setDeleteSheet(false)}
-              className="w-full py-3.5 border border-zinc-700 text-zinc-400 rounded-xl font-medium"
+              disabled={deleteSubmitting}
+              className="w-full py-3.5 border border-zinc-700 text-zinc-400 rounded-xl font-medium disabled:opacity-50"
             >
               キャンセル
             </button>

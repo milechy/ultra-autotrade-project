@@ -11,7 +11,7 @@ values は v10 spec §1 と一致 (PR #125 で staging-new 投入確認済み):
 - tier_fee_rates:          [0.30, 0.25, 0.20]
 - tier_monthly_yield_caps: [0.018, 0.023, 0.030]
 - subscription_rates:      {"conservative": 0.0, "balanced": 0.003, "aggressive": 0.01}
-- affiliate_rate:          0.30
+- affiliate_rate:          0.10  (紹介報酬 = 紹介友達の実受取利益 × 10%, Asana 1215467015333283 / seed と一致)
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ def make_v10_default_config() -> FeeConfigV10:
         },
         expense_markup_enabled=False,
         expense_markup_rate=Decimal("0"),
-        affiliate_rate=Decimal("0.30"),
+        affiliate_rate=Decimal("0.10"),
         is_active=True,
         effective_from=datetime(2026, 5, 1, tzinfo=_JST),
     )

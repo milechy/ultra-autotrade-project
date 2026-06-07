@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react"
 import { Bot, MousePointer2 } from "lucide-react"
+import { getAuthToken } from "@/lib/auth/token-key"
 
 type UserMode = "managed" | "active"
 
@@ -44,12 +45,6 @@ const MODE_LABEL: Record<UserMode, string> = {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
-function getToken(): string {
-  return typeof window !== "undefined"
-    ? (localStorage.getItem("auth_token") ?? "")
-    : ""
-}
-
 export function OpModePanel() {
   const [currentMode, setCurrentMode] = useState<UserMode | null>(null)
   const [loading, setLoading] = useState(true)
@@ -57,7 +52,11 @@ export function OpModePanel() {
 
   // 初回ロード: GET /api/user/settings
   useEffect(() => {
-    const token = getToken()
+    const token = getAuthToken()
+    if (!token) {
+      setLoading(false)
+      return
+    }
     fetch(`${API_BASE}/api/user/settings`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -71,10 +70,15 @@ export function OpModePanel() {
       .finally(() => setLoading(false))
   }, [])
 
-  // モード切替
+  // モード切替（確認ステップ無しで即切替）
   async function handleSelect(newMode: UserMode) {
     if (newMode === currentMode) return
-    const token = getToken()
+    const token = getAuthToken()
+    if (!token) {
+      setToast("認証が切れています。再ログインしてください")
+      setTimeout(() => setToast(null), 2500)
+      return
+    }
     // 楽観的更新
     const prev = currentMode
     setCurrentMode(newMode)
@@ -99,10 +103,14 @@ export function OpModePanel() {
   }
 
   return (
-    <div className="space-y-4 relative">
+    <div className="space-y-4 relative" data-testid="opmode-panel">
       {/* トースト */}
       {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-xl bg-zinc-800 border border-zinc-700 text-white text-sm shadow-lg whitespace-nowrap">
+        <div
+          role="status"
+          data-testid="opmode-toast"
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-xl bg-zinc-800 border border-zinc-700 text-white text-sm shadow-lg whitespace-nowrap"
+        >
           {toast}
         </div>
       )}
@@ -110,7 +118,7 @@ export function OpModePanel() {
       {/* 現在のモード表示カード */}
       <div className="bg-[#1a3d2e] rounded-2xl px-4 py-4 flex items-center justify-between">
         <div>
-          <p className="text-xl font-bold text-white">
+          <p className="text-xl font-bold text-white" data-testid="opmode-current">
             {loading
               ? "読み込み中..."
               : currentMode
@@ -133,6 +141,8 @@ export function OpModePanel() {
             <button
               key={mode.id}
               type="button"
+              data-testid={`opmode-option-${mode.id}`}
+              aria-pressed={isSelected}
               onClick={() => handleSelect(mode.id)}
               className={[
                 "w-full text-left rounded-2xl border-2 p-4 transition-all",

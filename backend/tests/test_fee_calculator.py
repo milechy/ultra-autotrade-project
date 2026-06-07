@@ -307,11 +307,16 @@ class TestMonthlyYieldCap:
 
 
 class TestAffiliate:
-    """affiliate_id あり + sub > 0 で 30% 発動。"""
+    """紹介報酬 = 紹介友達の user_takehome × affiliate_rate(0.10)。
 
-    def test_affiliate_when_subscription_active(self, calculator: FeeCalculator) -> None:
-        # balanced, deposit 1000000 → sub = 3000
-        # affiliate = 3000 * 0.30 = 900
+    仕様 (Asana 1215467015333283 / 2026-06-06 確定): サブスク有無に依らず
+    takehome>0 なら発火し、takehome=0 (subscription_protected 等) では発火しない。
+    """
+
+    def test_affiliate_is_takehome_times_rate(self, calculator: FeeCalculator) -> None:
+        # balanced, deposit 1000000, gross 10000 →
+        # sub=3000, fee=(10000-3000)*0.30=2100, takehome=10000-3000-2100=4900
+        # affiliate = 4900 * 0.10 = 490
         result = calculator.calculate_monthly(
             _make_input(
                 deposit=Decimal("1000000"),
@@ -320,11 +325,17 @@ class TestAffiliate:
                 affiliate_id=99,
             )
         )
+        assert result.user_takehome_jpy == Decimal("4900")
         assert result.affiliate_id == 99
-        assert result.affiliate_amount_jpy == Decimal("900")
+        assert result.affiliate_amount_jpy == Decimal("490")
+        # 仕様の関係式 (takehome × rate) を明示的に確認
+        assert result.affiliate_amount_jpy == (result.user_takehome_jpy * Decimal("0.10")).quantize(
+            Decimal("1")
+        )
 
-    def test_affiliate_skipped_when_subscription_zero(self, calculator: FeeCalculator) -> None:
-        # conservative (sub=0) では affiliate 発動しない
+    def test_affiliate_fires_when_subscription_zero(self, calculator: FeeCalculator) -> None:
+        # conservative (sub=0) でも takehome>0 なら紹介報酬は発火する (新仕様)。
+        # net=10000, fee=10000*0.30=3000, takehome=7000, affiliate=7000*0.10=700
         result = calculator.calculate_monthly(
             _make_input(
                 deposit=Decimal("1000000"),
@@ -333,6 +344,23 @@ class TestAffiliate:
                 affiliate_id=99,
             )
         )
+        assert result.subscription_amount_jpy == Decimal("0")
+        assert result.user_takehome_jpy == Decimal("7000")
+        assert result.affiliate_id == 99
+        assert result.affiliate_amount_jpy == Decimal("700")
+
+    def test_affiliate_zero_when_takehome_zero(self, calculator: FeeCalculator) -> None:
+        # subscription_protected (net < sub) で takehome=0 → 紹介報酬も 0。
+        result = calculator.calculate_monthly(
+            _make_input(
+                deposit=Decimal("1000000"),
+                gross=Decimal("1000"),  # net=1000 < sub=3000 → 保護発動
+                risk=RiskMode.BALANCED,
+                affiliate_id=99,
+            )
+        )
+        assert result.subscription_protected is True
+        assert result.user_takehome_jpy == Decimal("0")
         assert result.affiliate_id is None
         assert result.affiliate_amount_jpy == Decimal("0")
 

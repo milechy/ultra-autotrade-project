@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import TermsModal from "./TermsModal";
+import { getAuthToken } from "@/lib/auth/token-key";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -13,7 +14,7 @@ export default function TermsGuard({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     const checkTerms = async () => {
-      const token = localStorage.getItem("ultra_auth_token") ?? "";
+      const token = getAuthToken() ?? "";
       if (!token) {
         setLoading(false);
         return;

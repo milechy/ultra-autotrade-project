@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { getAuthToken } from "@/lib/auth/token-key";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 const TOS_VERSION = "demo-1.0";
@@ -21,13 +22,17 @@ const SCROLL_TOLERANCE_PX = 16;
 export interface DemoConsentModalProps {
   /** 同意が完了したときに呼ばれる。親側でモーダルを閉じる用途。 */
   onAccepted: () => void;
-  /** 任意: localStorage の token key を上書きする (default: "ultra_auth_token") */
+  /**
+   * 任意: localStorage の token key を明示的に上書きする。
+   * 未指定時は token-key.ts の getAuthToken() 移行シム
+   * (auth_token → ultra_auth_token フォールバック) を使う。
+   */
   tokenKey?: string;
 }
 
 export default function DemoConsentModal({
   onAccepted,
-  tokenKey = "ultra_auth_token",
+  tokenKey,
 }: DemoConsentModalProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [hasReadAll, setHasReadAll] = useState(false);
@@ -60,7 +65,11 @@ export default function DemoConsentModal({
     setSubmitting(true);
     setError(null);
     const token =
-      (typeof window !== "undefined" && window.localStorage.getItem(tokenKey)) || "";
+      (tokenKey !== undefined
+        ? typeof window !== "undefined"
+          ? window.localStorage.getItem(tokenKey)
+          : null
+        : getAuthToken()) || "";
     try {
       const res = await fetch(`${API_BASE}/api/v1/tos/consent`, {
         method: "POST",

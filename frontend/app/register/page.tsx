@@ -8,6 +8,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, FormEvent, Suspense } from "react";
 import { apiFetch, apiPost } from "@/lib/api/client";
+import { setAuthToken } from "@/lib/auth/token-key";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -76,7 +77,7 @@ function RegisterForm() {
         invitation_code: code,
       });
       // 登録完了 → トークンを保存して自動ログイン
-      localStorage.setItem("ultra_auth_token", result.access_token);
+      setAuthToken(result.access_token);
       localStorage.setItem("ultra_auth_expires", String(Date.now() + result.expires_in * 1000));
       router.replace("/user/dashboard");
     } catch (err: unknown) {

@@ -38,7 +38,7 @@ CREATE TABLE fee_configs (
   subscription_rates JSONB NOT NULL,
   expense_markup_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   expense_markup_rate NUMERIC(6, 4) NOT NULL DEFAULT 0,
-  affiliate_rate NUMERIC(6, 4) NOT NULL DEFAULT 0.30,
+  affiliate_rate NUMERIC(6, 4) NOT NULL DEFAULT 0.10,  -- 紹介報酬=紹介友達の実受取利益×10% (Asana 1215467015333283)
   is_active BOOLEAN NOT NULL DEFAULT FALSE,
   effective_from TIMESTAMP WITH TIME ZONE NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
