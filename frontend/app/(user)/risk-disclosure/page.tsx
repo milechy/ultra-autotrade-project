@@ -1,12 +1,12 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useSmartBack } from '@/hooks/useSmartBack'
 
 export default function RiskDisclosurePage() {
-  const router = useRouter()
+  const goBack = useSmartBack()
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -15,7 +15,7 @@ export default function RiskDisclosurePage() {
           variant="ghost"
           size="sm"
           className="mb-6 text-zinc-400 hover:text-zinc-100"
-          onClick={() => router.push('/connect')}
+          onClick={goBack}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           戻る
