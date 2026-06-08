@@ -217,11 +217,11 @@ def get_referral_earnings(db: Session, partner_id: int) -> dict[str, str | int |
     )
     current_month_reward = current_month_raw if current_month_raw is not None else Decimal("0")
 
+    # finalized_at はオンチェーン送金時のみ。バッチ処理済み全件を集計する
     total_payout_raw = (
         db.query(func.sum(FeeTransaction.affiliate_amount_jpy))
         .filter(
             FeeTransaction.affiliate_id == partner_id,
-            FeeTransaction.finalized_at.isnot(None),
         )
         .scalar()
     )
@@ -314,11 +314,11 @@ def get_api_referral_info(db: Session, user: User) -> dict[str, object]:
     )
     current_month_reward = current_month_raw if current_month_raw is not None else Decimal("0")
 
+    # finalized_at はオンチェーン送金時のみ。バッチ処理済み全件を集計する
     total_payout_raw = (
         db.query(func.sum(FeeTransaction.affiliate_amount_jpy))
         .filter(
             FeeTransaction.affiliate_id == user.id,
-            FeeTransaction.finalized_at.isnot(None),
         )
         .scalar()
     )
