@@ -70,7 +70,7 @@ def get_or_create_code(db: Session, user: User) -> str:
 
 def build_share_url(referral_code: str) -> str:
     """紹介コードから招待 URL を組み立てる。"""
-    return f"{_share_base_url()}/register?ref={referral_code}"
+    return f"{_share_base_url()}/auth/register?ref={referral_code}"
 
 
 def list_referred_users(db: Session, partner_id: int) -> list[User]:

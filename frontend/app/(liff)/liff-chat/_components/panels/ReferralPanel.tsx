@@ -9,7 +9,7 @@ import { getAuthToken } from "@/lib/auth/token-key"
 // SIGNUP URL: 専用の env/定数が無いため、sibling パネル (TermsPanel 等) と同じ
 // app.ultra-auto-trade.com 系ドメインへハードコードでフォールバックする。
 // NEXT_PUBLIC_LIFF_APP_URL が定義されればそちらを優先する。
-const SIGNUP_URL = process.env.NEXT_PUBLIC_LIFF_APP_URL ?? "https://app.ultra-auto-trade.com/register"
+const SIGNUP_URL = process.env.NEXT_PUBLIC_LIFF_APP_URL ?? "https://app.ultra-auto-trade.com/auth/register"
 
 function getToken(): string {
   // 統一済み auth token getter (Asana 1215441139765963)。
