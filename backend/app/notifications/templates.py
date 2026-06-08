@@ -12,6 +12,12 @@ from typing import Any
 
 from .schemas import NotificationChannel, NotificationMessage, NotificationSeverity
 
+# action 文字列 → ユーザー向け日本語ラベル
+_ACTION_LABEL_JA: dict[str, str] = {
+    "BUY": "購入する",
+    "SELL": "売る",
+}
+
 # severity 文字列 → LINE Flex ヘッダー色
 _SEVERITY_COLOR: dict[str, str] = {
     "emergency": "#FF0000",
@@ -127,9 +133,10 @@ def ai_proposal_notification(
     confidence: int,
 ) -> NotificationPayload:
     """AI取引提案通知。"""
+    op_label = _ACTION_LABEL_JA.get(operation, operation)
     title = "💡 新しいAI取引提案"
     body = (
-        f"{operation} {amount} {asset}（信頼度: {confidence}%）。アプリで確認・承認してください。"
+        f"{op_label} {amount} {asset}（信頼度: {confidence}%）。アプリで確認・承認してください。"
     )
     return _build_payload(title, body, "warning")
 
@@ -141,8 +148,9 @@ def trade_executed_notification(
     tx_hash: str,
 ) -> NotificationPayload:
     """取引実行完了通知。"""
+    op_label = _ACTION_LABEL_JA.get(operation, operation)
     title = "✅ 取引実行完了"
-    body = f"{operation} {amount} {asset} が完了しました。Tx: {tx_hash[:10]}..."
+    body = f"{op_label} {amount} {asset} が完了しました。Tx: {tx_hash[:10]}..."
     return _build_payload(title, body, "info")
 
 
@@ -153,8 +161,9 @@ def trade_failed_notification(
     error: str,
 ) -> NotificationPayload:
     """取引失敗通知。"""
+    op_label = _ACTION_LABEL_JA.get(operation, operation)
     title = "❌ 取引失敗"
-    body = f"{operation} {amount} {asset} が失敗しました。エラー: {error[:100]}"
+    body = f"{op_label} {amount} {asset} が失敗しました。エラー: {error[:100]}"
     return _build_payload(title, body, "alert")
 
 
@@ -164,8 +173,9 @@ def approval_timeout_notification(
     timeout_minutes: int = 60,
 ) -> NotificationPayload:
     """承認タイムアウト通知。"""
+    op_label = _ACTION_LABEL_JA.get(operation, operation)
     title = "⏰ 承認タイムアウト"
     body = (
-        f"{operation} {asset} の提案が {timeout_minutes} 分以内に承認されず、キャンセルしました。"
+        f"{op_label} {asset} の提案が {timeout_minutes} 分以内に承認されず、キャンセルしました。"
     )
     return _build_payload(title, body, "info")
