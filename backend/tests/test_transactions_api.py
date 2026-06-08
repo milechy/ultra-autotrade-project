@@ -2,8 +2,11 @@
 # backend/tests/test_transactions_api.py
 """取引履歴APIのテスト。"""
 
+import csv
+import io
 import os
 import tempfile
+from datetime import datetime, timezone
 from typing import Generator
 
 import pytest
@@ -218,3 +221,111 @@ class TestTransactionsAPI:
         )
         assert r.status_code == 200
         assert all(item["chain"] == "arbitrum_one" for item in r.json()["items"])
+
+
+class TestTransactionsExportCSV:
+    """GET /api/transactions/export のテスト。"""
+
+    def _insert_executed_proposal(self, test_db, user_id: int, year: int = 2026) -> None:
+        """テスト用の実行済み提案を DB に直接挿入する。"""
+        from app.proposals.models import Proposal
+
+        _, engine = test_db
+        from sqlalchemy.orm import Session
+
+        with Session(engine) as session:
+            proposal = Proposal(
+                user_id=user_id,
+                operation="SUPPLY",
+                asset="USDC",
+                amount="500.000000000000000000",
+                amount_usd="500.00",
+                reason="test export",
+                status="executed",
+                fee_amount="5.00",
+                tx_hash="0xabcdef1234567890",
+                executed_at=datetime(year, 6, 15, 10, 30, 0, tzinfo=timezone.utc),
+            )
+            session.add(proposal)
+            session.commit()
+
+    def test_export_requires_auth(self, client: TestClient) -> None:
+        r = client.get("/api/transactions/export")
+        assert r.status_code == 401
+
+    def test_export_empty(self, client: TestClient) -> None:
+        token = get_admin_token(client)
+        r = client.get(
+            "/api/transactions/export",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert "text/csv" in r.headers["content-type"]
+        reader = csv.DictReader(io.StringIO(r.content.decode("utf-8-sig")))
+        rows = list(reader)
+        assert rows == []
+
+    def test_export_returns_csv_with_executed_proposals(
+        self, client: TestClient, test_db
+    ) -> None:
+        token = get_admin_token(client)
+        self._insert_executed_proposal(test_db, user_id=1)
+        r = client.get(
+            "/api/transactions/export",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert "text/csv" in r.headers["content-type"]
+        assert "attachment" in r.headers["content-disposition"]
+        reader = csv.DictReader(io.StringIO(r.content.decode("utf-8-sig")))
+        rows = list(reader)
+        assert len(rows) == 1
+        assert rows[0]["操作"] == "SUPPLY"
+        assert rows[0]["資産"] == "USDC"
+        assert rows[0]["手数料(USD)"] == "5.00"
+        assert rows[0]["TxHash"] == "0xabcdef1234567890"
+
+    def test_export_year_filter_matches(self, client: TestClient, test_db) -> None:
+        token = get_admin_token(client)
+        self._insert_executed_proposal(test_db, user_id=1, year=2026)
+        r = client.get(
+            "/api/transactions/export?year=2026",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        reader = csv.DictReader(io.StringIO(r.content.decode("utf-8-sig")))
+        assert len(list(reader)) == 1
+
+    def test_export_year_filter_no_match(self, client: TestClient, test_db) -> None:
+        token = get_admin_token(client)
+        self._insert_executed_proposal(test_db, user_id=1, year=2026)
+        r = client.get(
+            "/api/transactions/export?year=2025",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        reader = csv.DictReader(io.StringIO(r.content.decode("utf-8-sig")))
+        assert list(reader) == []
+
+    def test_export_filename_includes_year(self, client: TestClient) -> None:
+        token = get_admin_token(client)
+        r = client.get(
+            "/api/transactions/export?year=2026",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert 'filename="transactions_2026.csv"' in r.headers["content-disposition"]
+
+    def test_export_does_not_include_other_user_proposals(
+        self, client: TestClient, test_db
+    ) -> None:
+        token = get_admin_token(client)
+        # user_id=99 (別ユーザー) の proposal を挿入
+        self._insert_executed_proposal(test_db, user_id=99)
+        r = client.get(
+            "/api/transactions/export",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        reader = csv.DictReader(io.StringIO(r.content.decode("utf-8-sig")))
+        assert list(reader) == []

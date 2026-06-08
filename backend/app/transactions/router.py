@@ -2,17 +2,21 @@
 # backend/app/transactions/router.py
 """取引履歴API ルーター定義。"""
 
-from datetime import datetime
+import csv
+import io
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_active_user, require_admin, require_editor, require_viewer
 from app.auth.models import User
 from app.database import get_db
+from app.proposals.models import Proposal
 
 from .models import Transaction
 from .schemas import (
@@ -21,6 +25,8 @@ from .schemas import (
     TransactionResponse,
     TransactionStatsResponse,
 )
+
+_JST = ZoneInfo("Asia/Tokyo")
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 admin_router = APIRouter(prefix="/api/admin/transactions", tags=["admin-transactions"])
@@ -84,6 +90,58 @@ def list_transactions(
         total=total,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.get("/export", summary="取引一覧 CSV エクスポート")
+def export_transactions_csv(
+    year: Optional[int] = Query(None, description="絞り込む年 (例: 2026)。省略時は全件"),
+    current_user: User = Depends(require_viewer),
+    db: Session = Depends(get_db),
+) -> Response:
+    """実行済み提案 (status='executed') を CSV 形式でエクスポートする。
+
+    CSV カラム: 実行日時, 操作, 資産, 数量, USD金額, 手数料(USD), TxHash
+    - 実行日時: JST (UTC+9) 形式 YYYY/MM/DD HH:MM:SS
+    - 操作: SUPPLY / WITHDRAW / BORROW / REPAY
+    - 数量: トークン数量 (Decimal)
+    - USD金額: 実行時の USD 換算額
+    - 手数料(USD): fee_amount。NULL の場合は 0
+    """
+    stmt = select(Proposal).where(
+        Proposal.user_id == current_user.id,
+        Proposal.status == "executed",
+        Proposal.executed_at.is_not(None),
+    )
+    if year is not None:
+        stmt = stmt.where(func.extract("year", Proposal.executed_at) == year)
+    stmt = stmt.order_by(Proposal.executed_at.asc())
+    proposals = db.scalars(stmt).all()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["実行日時", "操作", "資産", "数量", "USD金額", "手数料(USD)", "TxHash"])
+
+    for p in proposals:
+        if p.executed_at is None:
+            continue
+        dt = p.executed_at
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        executed_jst = dt.astimezone(_JST)
+        timestamp = executed_jst.strftime("%Y/%m/%d %H:%M:%S")
+        fee = str(p.fee_amount) if p.fee_amount is not None else "0"
+        writer.writerow(
+            [timestamp, p.operation, p.asset, str(p.amount), str(p.amount_usd), fee, p.tx_hash or ""]
+        )
+
+    csv_bytes = buf.getvalue().encode("utf-8-sig")  # BOM付きUTF-8 (Excel対応)
+    year_suffix = f"_{year}" if year else ""
+    filename = f"transactions{year_suffix}.csv"
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
