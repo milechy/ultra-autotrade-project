@@ -167,12 +167,14 @@ export function UserHeader() {
             >
               <HelpCircle size={16} />
             </Link>
-            <button
-              onClick={handleLogout}
-              className="text-xs border rounded px-2 py-1 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              ログアウト
-            </button>
+            {(user || token) && (
+              <button
+                onClick={handleLogout}
+                className="text-xs border rounded px-2 py-1 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                ログアウト
+              </button>
+            )}
           </div>
         </div>
 
