@@ -3,9 +3,9 @@
 expire 前再通知 rail (MVP-P0-10 延長): proposals.expiry_reminder_sent_at カラムを追加。
 pending な proposal が expires_at の N 分前に通知済みかを追跡し、重複通知を防ぐ。
 
-Revision ID: j0k1l2m3n4o5
-Revises: i9j0k1l2m3n4
-Create Date: 2026-06-01 00:00:00.000000
+Revision ID: 6a2621bd89
+Revises: n4o5p6q7r8s9
+Create Date: 2026-06-03 00:00:00.000000
 
 """
 
@@ -15,8 +15,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision: str = "j0k1l2m3n4o5"
-down_revision: Union[str, Sequence[str], None] = "i9j0k1l2m3n4"
+revision: str = "6a2621bd89"
+down_revision: Union[str, Sequence[str], None] = "n4o5p6q7r8s9"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
