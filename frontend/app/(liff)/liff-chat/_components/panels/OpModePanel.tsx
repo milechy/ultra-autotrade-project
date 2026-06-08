@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react"
 import { Bot, MousePointer2 } from "lucide-react"
 import { getAuthToken } from "@/lib/auth/token-key"
+import { liffFetch } from "@/lib/liff/liff-fetch"
 
 type UserMode = "managed" | "active"
 
@@ -52,14 +53,7 @@ export function OpModePanel() {
 
   // 初回ロード: GET /api/user/settings
   useEffect(() => {
-    const token = getAuthToken()
-    if (!token) {
-      setLoading(false)
-      return
-    }
-    fetch(`${API_BASE}/api/user/settings`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    liffFetch("/api/user/settings")
       .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
       .then((data: { user_mode: UserMode }) => {
         setCurrentMode(data.user_mode)
