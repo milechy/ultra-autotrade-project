@@ -39,6 +39,7 @@ from app.ai.decisions_router import router as ai_decisions_router
 from app.ai.feedback_router import router as ai_feedback_router
 from app.ai.optimizer.router import router as ai_optimizer_router
 from app.ai.router import router as ai_router
+from app.api.admin_users import router as admin_users_router
 from app.api.alias_router import router as alias_router
 from app.api.automation_dashboard import router as automation_dashboard_router
 from app.api.v1.fee_transfer import router as fee_transfer_router
@@ -271,6 +272,7 @@ def create_app() -> FastAPI:
     app.include_router(ai_optimizer_router)  # AI Optimizer (Phase 2 / ENB)
     app.include_router(transactions_router)  # Transactions API
     app.include_router(admin_transactions_router)  # Admin Transactions API
+    app.include_router(admin_users_router)  # Admin Users API
     app.include_router(proposals_router)  # Proposals API
     app.include_router(portfolio_router)  # Portfolio History API
     app.include_router(user_settings_router)  # User Settings API
