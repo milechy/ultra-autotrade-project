@@ -2,108 +2,91 @@
 // Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Users, Search } from 'lucide-react'
 import AuthGuard from '@/components/AuthGuard'
 import { UserTable, UserDetailPanel } from './_components'
 import type { UserDetail } from './_components/UserDetailPanel'
+import { fetchAdminUsers, pauseAdminUser, resumeAdminUser } from '@/lib/api/admin-users'
+import type { AdminUserDetail } from '@/lib/api/admin-users'
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-// TODO: Replace with GET /api/admin/users
+// ─── Adapter ──────────────────────────────────────────────────────────────────
 
-const MOCK_USERS: UserDetail[] = [
-  {
-    id: 'user-001',
-    address: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD28',
-    registeredAt: '2026-03-01T00:00:00Z',
-    aum: 15000,
-    lastActivity: '2026-03-21T14:30:00Z',
-    riskMode: 'conservative' as const,
-    status: 'NORMAL' as const,
-    isPaused: false,
-    positions: [
-      { asset: 'USDC', supplied: 10000, borrowed: 0, usdValue: 10000 },
-      { asset: 'WETH', supplied: 2.5, borrowed: 0, usdValue: 5000 },
-    ],
-    healthFactor: 2.1,
-    hfHistory: Array.from({ length: 7 }, (_, i) => ({
-      date: new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10),
-      hf: 2.0 + Math.random() * 0.5,
+function toUserDetail(u: AdminUserDetail): UserDetail {
+  return {
+    id: u.id,
+    address: u.address,
+    registeredAt: u.registeredAt,
+    aum: u.aum,
+    lastActivity: u.lastActivity,
+    riskMode: u.riskMode,
+    status: u.status,
+    isPaused: u.isPaused,
+    positions: u.positions,
+    healthFactor: u.healthFactor,
+    hfHistory: u.hfHistory,
+    recentTrades: u.recentTrades.map((t) => ({
+      id: t.id,
+      type: t.type as 'SUPPLY' | 'WITHDRAW' | 'BORROW',
+      asset: t.asset,
+      amount: t.amount,
+      timestamp: t.timestamp,
     })),
-    recentTrades: Array.from({ length: 5 }, (_, i) => ({
-      id: `trade-${i}`,
-      type: (['SUPPLY', 'WITHDRAW', 'BORROW'] as const)[i % 3],
-      asset: 'USDC',
-      amount: 1000 + i * 100,
-      timestamp: new Date(Date.now() - i * 3600000).toISOString(),
+    recentDecisions: u.recentDecisions.map((d) => ({
+      id: d.id,
+      action: d.action as 'BUY' | 'SELL' | 'HOLD',
+      confidence: d.confidence,
+      timestamp: d.timestamp,
     })),
-    recentDecisions: Array.from({ length: 5 }, (_, i) => ({
-      id: `dec-${i}`,
-      action: (['BUY', 'SELL', 'HOLD'] as const)[i % 3],
-      confidence: 60 + i * 5,
-      timestamp: new Date(Date.now() - i * 7200000).toISOString(),
-    })),
-  },
-  {
-    id: 'user-002',
-    address: '0xAbcD1234EfGh5678IjKl9012MnOp3456QrSt7890',
-    registeredAt: '2026-03-10T00:00:00Z',
-    aum: 8500,
-    lastActivity: '2026-03-20T09:15:00Z',
-    riskMode: 'balanced' as const,
-    status: 'WARNING' as const,
-    isPaused: false,
-    positions: [{ asset: 'USDT', supplied: 8500, borrowed: 0, usdValue: 8500 }],
-    healthFactor: 1.9,
-    hfHistory: Array.from({ length: 7 }, (_, i) => ({
-      date: new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10),
-      hf: 1.8 + Math.random() * 0.3,
-    })),
-    recentTrades: [],
-    recentDecisions: [],
-  },
-  {
-    id: 'user-003',
-    address: '0x1111222233334444555566667777888899990000',
-    registeredAt: '2026-03-15T00:00:00Z',
-    aum: 3200,
-    lastActivity: '2026-03-19T22:00:00Z',
-    riskMode: 'aggressive' as const,
-    status: 'NORMAL' as const,
-    isPaused: true,
-    positions: [{ asset: 'WBTC', supplied: 0.1, borrowed: 0, usdValue: 3200 }],
-    healthFactor: 3.5,
-    hfHistory: Array.from({ length: 7 }, (_, i) => ({
-      date: new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10),
-      hf: 3.0 + Math.random() * 0.8,
-    })),
-    recentTrades: [],
-    recentDecisions: [],
-  },
-]
+  }
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<UserDetail[]>(MOCK_USERS)
+  const [users, setUsers] = useState<UserDetail[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Filter by wallet address partial match
+  useEffect(() => {
+    fetchAdminUsers()
+      .then((data) => {
+        setUsers(data.map(toUserDetail))
+        setLoading(false)
+      })
+      .catch((err) => {
+        setError(err?.message ?? 'データの取得に失敗しました')
+        setLoading(false)
+      })
+  }, [])
+
   const filteredUsers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return users
     return users.filter((u) => u.address.toLowerCase().includes(q))
   }, [users, searchQuery])
 
-  function handleTogglePause(userId: string, pause: boolean) {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, isPaused: pause } : u))
-    )
-    // Sync selectedUser state
-    setSelectedUser((prev) =>
-      prev && prev.id === userId ? { ...prev, isPaused: pause } : prev
-    )
+  async function handleTogglePause(userId: string, pause: boolean) {
+    try {
+      if (pause) {
+        await pauseAdminUser(userId)
+      } else {
+        await resumeAdminUser(userId)
+      }
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, isPaused: pause } : u))
+      )
+      setSelectedUser((prev) =>
+        prev && prev.id === userId ? { ...prev, isPaused: pause } : prev
+      )
+    } catch {
+      // エラー時は再取得してリセット
+      fetchAdminUsers()
+        .then((data) => setUsers(data.map(toUserDetail)))
+        .catch(() => {})
+    }
   }
 
   const totalAUM = users.reduce((sum, u) => sum + u.aum, 0)
@@ -122,13 +105,17 @@ export default function UsersPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-gray-100">ユーザー管理</h1>
-              <span className="inline-flex items-center rounded-full bg-blue-900/50 border border-blue-800 px-2.5 py-0.5 text-xs font-semibold text-blue-300">
-                {users.length}人
-              </span>
+              {!loading && (
+                <span className="inline-flex items-center rounded-full bg-blue-900/50 border border-blue-800 px-2.5 py-0.5 text-xs font-semibold text-blue-300">
+                  {users.length}人
+                </span>
+              )}
             </div>
-            <p className="text-xs text-gray-500 mt-0.5">
-              総AUM: ${totalAUM.toLocaleString('ja-JP')}
-            </p>
+            {!loading && (
+              <p className="text-xs text-gray-500 mt-0.5">
+                総AUM: ${totalAUM.toLocaleString('ja-JP')}
+              </p>
+            )}
           </div>
         </div>
 
@@ -145,21 +132,33 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Mock data banner */}
-      <div className="mb-4 rounded-lg border border-amber-800 bg-amber-950/50 px-4 py-2 text-xs text-amber-300">
-        準備中: ユーザー管理APIは現在実装中です。以下はサンプルデータです。
-      </div>
-
-      {/* ── User table ───────────────────────────────────────────────────── */}
-      {filteredUsers.length === 0 ? (
-        <EmptyState hasQuery={searchQuery.length > 0} />
-      ) : (
-        <UserTable users={filteredUsers} onSelectUser={setSelectedUser} />
+      {/* ── States ───────────────────────────────────────────────────────── */}
+      {loading && (
+        <div className="flex items-center justify-center rounded-xl border border-gray-800 bg-gray-900/50 py-16">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          <span className="ml-3 text-sm text-gray-400">読み込み中...</span>
+        </div>
       )}
 
-      <p className="mt-2 text-xs text-gray-600">
-        ※ 行をクリックするとユーザー詳細が表示されます。
-      </p>
+      {!loading && error && (
+        <div className="rounded-lg border border-red-800 bg-red-950/50 px-4 py-3 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      {/* ── User table ───────────────────────────────────────────────────── */}
+      {!loading && !error && (
+        <>
+          {filteredUsers.length === 0 ? (
+            <EmptyState hasQuery={searchQuery.length > 0} />
+          ) : (
+            <UserTable users={filteredUsers} onSelectUser={setSelectedUser} />
+          )}
+          <p className="mt-2 text-xs text-gray-600">
+            ※ 行をクリックするとユーザー詳細が表示されます。
+          </p>
+        </>
+      )}
 
       {/* ── Detail panel ─────────────────────────────────────────────────── */}
       <UserDetailPanel
