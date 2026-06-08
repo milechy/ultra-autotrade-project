@@ -103,3 +103,16 @@ class NotificationLogPage(BaseModel):
     total: int
     page: int
     per_page: int
+
+
+class LatestAiDecisionResponse(BaseModel):
+    """パートナー向け最新 AI 判定レスポンス（ai-activity エンドポイント用）。"""
+
+    id: int
+    action: str
+    confidence: int
+    agreed: bool
+    reason: Optional[str]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

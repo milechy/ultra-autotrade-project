@@ -6,6 +6,7 @@ GET /api/partner/stats                    — 配下ユーザー全体の KPI（
 GET /api/partner/users/{user_id}/stats    — 特定ユーザーの運用実績（require_partner）
 GET /api/partner/monthly                  — 月別運用実績集計（require_partner）
 GET /api/partner/notifications            — 自パートナー向け通知ログ（require_partner）
+GET /api/partner/ai-activity              — 最新 AI 判定1件（require_partner）
 """
 
 from typing import Optional
@@ -14,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session
 
+from app.ai.models import AIDecision
 from app.auth.dependencies import require_partner
 from app.auth.models import User
 from app.database import get_db
@@ -21,6 +23,7 @@ from app.notifications.models import NotificationLog
 
 from . import service
 from .schemas import (
+    LatestAiDecisionResponse,
     MonthlyStatsResponse,
     NotificationLogItem,
     NotificationLogPage,
@@ -173,3 +176,19 @@ def get_partner_notifications(
         page=page,
         per_page=per_page,
     )
+
+
+@router.get(
+    "/ai-activity",
+    response_model=LatestAiDecisionResponse,
+    summary="最新 AI 判定1件（パートナー向け）",
+)
+def get_ai_activity(
+    current_user: User = Depends(require_partner),
+    db: Session = Depends(get_db),
+) -> LatestAiDecisionResponse:
+    """ai_decisions テーブルから最新1件を返す。user_id IS NULL（システム判定）を優先。"""
+    decision = db.query(AIDecision).order_by(desc(AIDecision.created_at)).first()
+    if decision is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No AI decision found")
+    return LatestAiDecisionResponse.model_validate(decision)
