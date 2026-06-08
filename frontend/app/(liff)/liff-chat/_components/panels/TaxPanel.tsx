@@ -3,13 +3,9 @@
 
 import { useEffect, useState } from "react"
 import { FileDown, ChevronRight, Loader2, AlertCircle } from "lucide-react"
+import { getAuthToken } from "@/lib/auth/token-key"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
-
-function getToken(): string {
-  if (typeof window === "undefined") return ""
-  return localStorage.getItem("auth_token") ?? ""
-}
 
 interface UserSettings {
   corporate_fiscal_month?: number | null
@@ -23,7 +19,7 @@ export function TaxPanel() {
   const [selectedYear, setSelectedYear] = useState<number>(currentYear)
 
   useEffect(() => {
-    const token = getToken()
+    const token = getAuthToken()
     fetch(`${API_BASE}/api/user/settings`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -44,19 +40,29 @@ export function TaxPanel() {
 
   const hasCorpInfo = !!settings?.corporate_fiscal_month
 
-  function downloadFile(url: string, filename: string) {
+  async function downloadFile(url: string, filename: string) {
+    const token = getAuthToken()
+    const response = await fetch(url, {
+      headers: { Authorization: "Bearer " + (token ?? "") },
+    })
+    if (response.status === 401) {
+      window.location.href = "/liff-login"
+      return
+    }
+    if (!response.ok) {
+      throw new Error("Download failed: " + response.status)
+    }
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
     const link = document.createElement("a")
-    link.href = url
+    link.href = objectUrl
     link.download = filename
-    document.body.appendChild(link)
     link.click()
-    document.body.removeChild(link)
+    URL.revokeObjectURL(objectUrl)
   }
 
   function buildDownloadUrl(path: string): string {
-    const token = getToken()
-    const sep = path.includes("?") ? "&" : "?"
-    return `${API_BASE}${path}${sep}token=${encodeURIComponent(token)}`
+    return `${API_BASE}${path}`
   }
 
   if (loading) {
@@ -195,7 +201,7 @@ interface PersonalTabContentProps {
   onYearChange: (year: number) => void
   currentYear: number
   buildDownloadUrl: (path: string) => string
-  downloadFile: (url: string, filename: string) => void
+  downloadFile: (url: string, filename: string) => Promise<void>
 }
 
 function PersonalTabContent({
@@ -219,7 +225,7 @@ function PersonalTabContent({
           const url = buildDownloadUrl(
             `/api/proposals/tax/cryptact-csv?year=${selectedYear}`
           )
-          downloadFile(url, `cryptact_${selectedYear}.csv`)
+          void downloadFile(url, `cryptact_${selectedYear}.csv`)
         }}
       />
       <DownloadButton
@@ -229,7 +235,7 @@ function PersonalTabContent({
           const url = buildDownloadUrl(
             `/api/transactions/export?year=${selectedYear}`
           )
-          downloadFile(url, `transactions_${selectedYear}.csv`)
+          void downloadFile(url, `transactions_${selectedYear}.csv`)
         }}
       />
     </div>
