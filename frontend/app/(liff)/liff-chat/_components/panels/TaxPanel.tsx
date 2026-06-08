@@ -19,7 +19,7 @@ export function TaxPanel() {
   const [selectedYear, setSelectedYear] = useState<number>(currentYear)
 
   useEffect(() => {
-    const token = getToken()
+    const token = getAuthToken()
     fetch(`${API_BASE}/api/user/settings`, {
       headers: { Authorization: `Bearer ${token}` },
     })
