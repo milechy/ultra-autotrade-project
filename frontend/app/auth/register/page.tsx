@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import { registerWithReferral } from '@/lib/api/referral'
+import { setAuthToken } from "@/lib/auth/token-key"
 
 function getReferralCookie(): string {
   if (typeof document === 'undefined') return ''
@@ -56,7 +57,7 @@ function RegisterWithReferralForm() {
         referral_code: referralCode,
         referred_consent: true,
       })
-      localStorage.setItem('ultra_auth_token', result.access_token)
+      setAuthToken(result.access_token)
       localStorage.setItem('ultra_auth_expires', String(Date.now() + result.expires_in * 1000))
       // Clear referral cookie after successful registration
       document.cookie = 'referral_code=; max-age=0; path=/'
