@@ -222,3 +222,106 @@ class TestWalletLink:
             "privy_did" in response.json()["detail"].lower()
             or "match" in response.json()["detail"].lower()
         )
+
+
+def _make_admin(SessionLocal, *, email: str = "admin@example.com", username: str = "admin1") -> tuple[int, str]:
+    """Admin ユーザーを作成し、(user_id, jwt_token) を返す。"""
+    with SessionLocal() as session:
+        user = User(
+            email=email,
+            username=username,
+            hashed_password=AuthService.hash_password("test-password-123"),
+            role=UserRole.ADMIN.value,
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        token, _ = AuthService.create_access_token(
+            user_id=user.id, email=user.email, role=user.role
+        )
+        return user.id, token
+
+
+class TestWalletUnlink:
+    """DELETE /auth/wallet/{user_id} の 4 ケース。"""
+
+    # ── 200 ────────────────────────────────────────────────────────────────
+    def test_200_admin_unlinks_wallet(self, client: TestClient, test_db):
+        _, SessionLocal = test_db
+        _, admin_token = _make_admin(SessionLocal)
+        user_id, _ = _make_user(
+            SessionLocal,
+            email="target@example.com",
+            username="target1",
+            wallet_address=TEST_WALLET_ADDRESS,
+        )
+
+        response = client.delete(
+            f"/auth/wallet/{user_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+
+        assert response.status_code == 200, response.json()
+        data = response.json()
+        assert data["ok"] is True
+        assert data["user_id"] == user_id
+        assert data["unlinked_address"] == TEST_WALLET_ADDRESS.lower()
+
+        with SessionLocal() as session:
+            updated = session.query(User).filter(User.id == user_id).first()
+            assert updated is not None
+            assert updated.wallet_address is None
+
+    # ── 403 ────────────────────────────────────────────────────────────────
+    def test_403_non_admin_returns_forbidden(self, client: TestClient, test_db):
+        _, SessionLocal = test_db
+        target_id, _ = _make_user(
+            SessionLocal,
+            email="target2@example.com",
+            username="target2",
+            wallet_address=TEST_WALLET_ADDRESS,
+        )
+        _, viewer_token = _make_user(
+            SessionLocal,
+            email="viewer2@example.com",
+            username="viewer2",
+        )
+
+        response = client.delete(
+            f"/auth/wallet/{target_id}",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert response.status_code == 403, response.json()
+
+    # ── 404 ────────────────────────────────────────────────────────────────
+    def test_404_nonexistent_user(self, client: TestClient, test_db):
+        _, SessionLocal = test_db
+        _, admin_token = _make_admin(
+            SessionLocal, email="admin2@example.com", username="admin2"
+        )
+
+        response = client.delete(
+            "/auth/wallet/99999",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 404, response.json()
+        assert "not found" in response.json()["detail"].lower()
+
+    # ── 400 ────────────────────────────────────────────────────────────────
+    def test_400_wallet_already_null(self, client: TestClient, test_db):
+        _, SessionLocal = test_db
+        _, admin_token = _make_admin(
+            SessionLocal, email="admin3@example.com", username="admin3"
+        )
+        user_id, _ = _make_user(
+            SessionLocal,
+            email="nowallet@example.com",
+            username="nowallet1",
+        )
+
+        response = client.delete(
+            f"/auth/wallet/{user_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 400, response.json()
+        assert "not linked" in response.json()["detail"].lower()

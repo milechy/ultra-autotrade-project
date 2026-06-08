@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.referral import service as referral_service
 
-from .dependencies import require_active_user
+from .dependencies import require_active_user, require_admin
 from .models import (
     PHASE_1_ALLOWED_RISK_MODES,
     RISK_MODE_JP_LABELS,
@@ -773,6 +773,53 @@ def wallet_link(
         wallet_address=address_lower,
         linked_at=linked_at,
     )
+
+
+class WalletUnlinkResponse(BaseModel):
+    ok: bool
+    user_id: int
+    unlinked_address: str
+
+
+@router.delete(
+    "/wallet/{user_id}",
+    response_model=WalletUnlinkResponse,
+    summary="Admin: ユーザーのウォレットリンクを解除",
+)
+def wallet_unlink(
+    user_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> WalletUnlinkResponse:
+    """
+    Admin のみ実行可能。対象ユーザーの wallet_address を NULL にする。
+    解除後は /auth/wallet/link で別アドレスを再リンク可能。
+
+    レスポンス:
+    - 200: 解除成功
+    - 400: 既に wallet_address が未設定
+    - 403: Admin 以外 (require_admin が返す)
+    - 404: 対象ユーザーが存在しない
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
+
+    if user.wallet_address is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="wallet not linked")
+
+    unlinked_address = user.wallet_address
+    user.wallet_address = None
+    db.commit()
+
+    logger.info(
+        "Wallet unlinked by admin: admin_id=%d target_user_id=%d wallet=%s...%s",
+        admin.id,
+        user.id,
+        unlinked_address[:10],
+        unlinked_address[-4:],
+    )
+    return WalletUnlinkResponse(ok=True, user_id=user.id, unlinked_address=unlinked_address)
 
 
 # ── LINE LIFF認証 ────────────────────────────────────────────────────────────
