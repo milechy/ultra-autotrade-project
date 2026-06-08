@@ -469,6 +469,38 @@ class RebalanceService:
 
         return reasons
 
+    def _check_pool_liquidity(self, operations: list[ProposedOperation]) -> list[str]:
+        """WITHDRAW操作に対してプール利用率をライブチェックする。
+
+        utilization >= pool_utilization_block_pct の場合に rejection reason を返す。
+        RPC失敗時は fail-open（None → スキップ）。
+        """
+        reasons: list[str] = []
+        threshold = self._rb_settings.pool_utilization_block_pct
+        for op in operations:
+            if op.operation != AaveOperationType.WITHDRAW:
+                continue
+            utilization = self._client.get_pool_utilization(op.asset_symbol)
+            if utilization is None:
+                logger.warning(
+                    "_check_pool_liquidity: utilization fetch failed for %s; skipping check (fail-open)",
+                    op.asset_symbol,
+                )
+                continue
+            if utilization >= threshold:
+                reasons.append(
+                    f"Pool utilization for {op.asset_symbol} is {utilization:.1f}% "
+                    f"(>= {threshold}%); WITHDRAW blocked to protect pool liquidity"
+                )
+            else:
+                logger.debug(
+                    "_check_pool_liquidity: %s utilization=%.1f%% < threshold=%.1f%% OK",
+                    op.asset_symbol,
+                    float(utilization),
+                    float(threshold),
+                )
+        return reasons
+
     # ---- Public methods --------------------------------------------------
 
     def get_current_status(self) -> RebalanceStatusResponse:
@@ -770,6 +802,16 @@ class RebalanceService:
                 re_check_reasons,
             )
             raise RebalanceSafetyError(f"Safety constraints failed on re-check: {re_check_reasons}")
+
+        # 3b. Pool liquidity check (WITHDRAW のみ対象)
+        liquidity_reasons = self._check_pool_liquidity(list(proposal.operations))
+        if liquidity_reasons:
+            logger.warning(
+                "execute: pool liquidity check failed for proposal_id=%s: %s",
+                proposal_id,
+                liquidity_reasons,
+            )
+            raise RebalanceSafetyError(f"Pool liquidity check failed: {liquidity_reasons}")
 
         health_factor_before = current_hf
 

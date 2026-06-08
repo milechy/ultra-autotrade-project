@@ -43,6 +43,7 @@ class RebalanceSettings:
     confirmation_token_secret: str
     check_interval_seconds: int
     shadow_mode: bool
+    pool_utilization_block_pct: Decimal = Decimal("95")
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -178,6 +179,10 @@ def get_rebalance_settings() -> RebalanceSettings:
         "REBALANCE_SHADOW_MODE",
         default=True,  # 安全のためデフォルトは shadow (dry-run) モード
     )
+    pool_utilization_block_pct = _get_env_decimal(
+        "REBALANCE_POOL_UTILIZATION_BLOCK_PCT",
+        default="95",  # 95% 超でWITHDRAW停止（流動性枯渇防止）
+    )
 
     return RebalanceSettings(
         target_allocations=target_allocations,
@@ -189,4 +194,5 @@ def get_rebalance_settings() -> RebalanceSettings:
         confirmation_token_secret=confirmation_token_secret,
         check_interval_seconds=check_interval_seconds,
         shadow_mode=shadow_mode,
+        pool_utilization_block_pct=pool_utilization_block_pct,
     )

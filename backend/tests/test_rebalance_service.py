@@ -57,11 +57,13 @@ class FakeAaveClientWithPositions:
         total_collateral: Decimal = Decimal("10000"),
         positions: Optional[dict[str, Decimal]] = None,
         raise_on_get_account_data: Optional[Exception] = None,
+        pool_utilization: Optional[Decimal] = None,
     ) -> None:
         self.hf = health_factor
         self.total_collateral = total_collateral
         self.positions = positions or {"USDC": Decimal("7000"), "WETH": Decimal("3000")}
         self.raise_on_get_account_data = raise_on_get_account_data
+        self._pool_utilization = pool_utilization  # None = RPC失敗(fail-open)
 
         self.deposit_calls: list[dict] = []
         self.withdraw_calls: list[dict] = []
@@ -70,6 +72,9 @@ class FakeAaveClientWithPositions:
 
     def get_health_factor(self, wallet_address: str = "") -> Decimal:
         return self.hf
+
+    def get_pool_utilization(self, asset_symbol: str) -> Optional[Decimal]:
+        return self._pool_utilization
 
     def get_account_data(self, wallet_address: str) -> AccountData:
         if self.raise_on_get_account_data is not None:
@@ -196,6 +201,7 @@ def _make_rebalance_settings(
     confirmation_token_ttl_seconds: int = 300,
     confirmation_token_secret: str = "test-secret-key-for-tests",
     shadow_mode: bool = True,
+    pool_utilization_block_pct: str = "95",
 ) -> RebalanceSettings:
     return RebalanceSettings(
         target_allocations=target_allocations
@@ -211,6 +217,7 @@ def _make_rebalance_settings(
         confirmation_token_secret=confirmation_token_secret,
         check_interval_seconds=14400,
         shadow_mode=shadow_mode,
+        pool_utilization_block_pct=Decimal(pool_utilization_block_pct),
     )
 
 
@@ -252,12 +259,15 @@ def _make_service(
     min_health_factor_post: str = "1.8",
     cooldown_seconds: int = 3600,
     raise_on_get_account_data: Optional[Exception] = None,
+    pool_utilization: Optional[Decimal] = Decimal("50"),
+    pool_utilization_block_pct: str = "95",
 ) -> tuple[RebalanceService, FakeAaveClientWithPositions, FakeAaveService]:
     """テスト用の RebalanceService インスタンスを生成するヘルパー。"""
     fake_client = FakeAaveClientWithPositions(
         health_factor=health_factor,
         total_collateral=total_collateral,
         raise_on_get_account_data=raise_on_get_account_data,
+        pool_utilization=pool_utilization,
     )
     fake_aave_service = FakeAaveService(results=aave_service_results)
     state_manager = FakeStateManager(
@@ -274,6 +284,7 @@ def _make_service(
         max_rebalance_pct=max_rebalance_pct,
         min_health_factor_post=min_health_factor_post,
         cooldown_seconds=cooldown_seconds,
+        pool_utilization_block_pct=pool_utilization_block_pct,
     )
     aave_cfg = aave_settings or _make_aave_settings()
 
@@ -1085,3 +1096,94 @@ class TestTokenVerification:
 
         with pytest.raises(RebalanceTokenError, match="Invalid token format"):
             _verify_confirmation_token("nodot_token_here", "some-id", "secret")
+
+
+class TestPoolLiquidityCheck:
+    """_check_pool_liquidity / execute() のプール利用率チェックのテスト。"""
+
+    def _inject_withdraw_proposal(self, service: RebalanceService) -> tuple[str, str]:
+        """WITHDRAW操作を含む proposal を直接 _pending_proposals に注入してIDとtokenを返す。
+
+        simulate() は risk_mode チェックを含むため、ここでは直接注入してバイパスする。
+        """
+        import uuid
+        from datetime import timezone
+
+        from app.aave.rebalance_schemas import AssetAllocation, ProposedOperation, RebalanceProposal
+        from app.aave.rebalance_service import _make_confirmation_token
+
+        proposal_id = str(uuid.uuid4())
+        exp_ts = (datetime.now(timezone.utc) + timedelta(seconds=300)).timestamp()
+        secret = service._rb_settings.confirmation_token_secret  # noqa: SLF001
+        token = _make_confirmation_token(proposal_id, exp_ts, secret)
+
+        proposal = RebalanceProposal(
+            proposal_id=proposal_id,
+            created_at=datetime.now(timezone.utc),
+            health_factor_before=Decimal("2.5"),
+            total_value_usd=Decimal("10000"),
+            allocations=[
+                AssetAllocation(
+                    asset_symbol="USDC",
+                    current_amount_usd=Decimal("7000"),
+                    current_pct=Decimal("70"),
+                    target_pct=Decimal("60"),
+                    deviation_pct=Decimal("10"),
+                )
+            ],
+            operations=[
+                ProposedOperation(
+                    asset_symbol="USDC",
+                    operation=AaveOperationType.WITHDRAW,
+                    amount_usd=Decimal("500"),
+                    reason="test withdraw",
+                )
+            ],
+            estimated_health_factor_after=Decimal("2.3"),
+            max_single_trade_pct=Decimal("10"),
+            confirmation_token=token,
+            is_executable=True,
+            rejection_reasons=[],
+        )
+        service._pending_proposals[proposal_id] = proposal  # noqa: SLF001
+        return proposal_id, token
+
+    def test_execute_blocks_when_utilization_at_threshold(self) -> None:
+        """利用率が閾値(95%)以上のとき execute が RebalanceSafetyError を raise すること。"""
+        service, _, _ = _make_service(
+            pool_utilization=Decimal("95"),
+            pool_utilization_block_pct="95",
+        )
+        proposal_id, token = self._inject_withdraw_proposal(service)
+        with pytest.raises(RebalanceSafetyError, match="Pool liquidity check failed"):
+            service.execute(proposal_id=proposal_id, confirmation_token=token)
+
+    def test_execute_blocks_when_utilization_above_threshold(self) -> None:
+        """利用率が閾値(95%)超のとき execute が RebalanceSafetyError を raise すること。"""
+        service, _, _ = _make_service(
+            pool_utilization=Decimal("98.5"),
+            pool_utilization_block_pct="95",
+        )
+        proposal_id, token = self._inject_withdraw_proposal(service)
+        with pytest.raises(RebalanceSafetyError, match="Pool liquidity check failed"):
+            service.execute(proposal_id=proposal_id, confirmation_token=token)
+
+    def test_execute_allows_when_utilization_below_threshold(self) -> None:
+        """利用率が閾値(95%)未満のとき execute が正常に通過すること。"""
+        service, _, _ = _make_service(
+            pool_utilization=Decimal("94"),
+            pool_utilization_block_pct="95",
+        )
+        proposal_id, token = self._inject_withdraw_proposal(service)
+        result = service.execute(proposal_id=proposal_id, confirmation_token=token)
+        assert result is not None
+
+    def test_execute_allows_when_utilization_fetch_fails(self) -> None:
+        """RPC失敗(utilization=None)のとき fail-open で execute が通過すること。"""
+        service, _, _ = _make_service(
+            pool_utilization=None,  # RPC失敗をシミュレート
+            pool_utilization_block_pct="95",
+        )
+        proposal_id, token = self._inject_withdraw_proposal(service)
+        result = service.execute(proposal_id=proposal_id, confirmation_token=token)
+        assert result is not None
