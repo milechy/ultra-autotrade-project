@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
 import { Toaster } from 'sonner'
@@ -37,6 +38,25 @@ function toSystemStatus(s: AutomationStatus): SystemStatus {
   if (s.emergency_reason) return 'HARD_STOP'
   if (s.is_trading_paused) return 'PAUSED'
   return 'NORMAL'
+}
+
+function UserGuard({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login')
+    }
+  }, [isLoading, isAuthenticated, router])
+
+  if (isLoading) {
+    return <div style={{ padding: 40, textAlign: 'center' }}>読み込み中...</div>
+  }
+  if (!isAuthenticated) {
+    return null
+  }
+  return <>{children}</>
 }
 
 export function AutomationStatusProvider({ children }: { children: React.ReactNode }) {
@@ -76,12 +96,14 @@ export function UserProviders({ children }: { children: React.ReactNode }) {
     <PrivyRootClient>
       <AuthProvider>
         <SessionExpiryBanner loginHref="/login" />
-        <AutomationStatusProvider>
-          <SessionExpiryBanner />
-          {isPrivyConfigured && <PrivySessionGuard />}
-          {children}
-          <Toaster position="top-center" richColors />
-        </AutomationStatusProvider>
+        <UserGuard>
+          <AutomationStatusProvider>
+            <SessionExpiryBanner />
+            {isPrivyConfigured && <PrivySessionGuard />}
+            {children}
+            <Toaster position="top-center" richColors />
+          </AutomationStatusProvider>
+        </UserGuard>
       </AuthProvider>
     </PrivyRootClient>
   )
