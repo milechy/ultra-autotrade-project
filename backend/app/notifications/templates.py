@@ -135,9 +135,7 @@ def ai_proposal_notification(
     """AI取引提案通知。"""
     op_label = _ACTION_LABEL_JA.get(operation, operation)
     title = "💡 新しいAI取引提案"
-    body = (
-        f"{op_label} {amount} {asset}（信頼度: {confidence}%）。アプリで確認・承認してください。"
-    )
+    body = f"{op_label} {amount} {asset}（信頼度: {confidence}%）。アプリで確認・承認してください。"
     return _build_payload(title, body, "warning")
 
 
@@ -175,7 +173,5 @@ def approval_timeout_notification(
     """承認タイムアウト通知。"""
     op_label = _ACTION_LABEL_JA.get(operation, operation)
     title = "⏰ 承認タイムアウト"
-    body = (
-        f"{op_label} {asset} の提案が {timeout_minutes} 分以内に承認されず、キャンセルしました。"
-    )
+    body = f"{op_label} {asset} の提案が {timeout_minutes} 分以内に承認されず、キャンセルしました。"
     return _build_payload(title, body, "info")
