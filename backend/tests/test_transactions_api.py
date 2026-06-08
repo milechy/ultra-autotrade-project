@@ -245,6 +245,7 @@ class TestTransactionsExportCSV:
                 fee_amount="5.00",
                 tx_hash="0xabcdef1234567890",
                 executed_at=datetime(year, 6, 15, 10, 30, 0, tzinfo=timezone.utc),
+                expires_at=datetime(year, 6, 15, 11, 30, 0, tzinfo=timezone.utc),
             )
             session.add(proposal)
             session.commit()
