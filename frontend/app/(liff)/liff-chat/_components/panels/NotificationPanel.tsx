@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react"
 import { MessageCircle, Bell, AlertTriangle, ShieldAlert, FileText, Info } from "lucide-react"
 import { getAuthToken } from "@/lib/auth/token-key"
+import { liffFetch } from "@/lib/liff/liff-fetch"
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -150,10 +151,7 @@ export function NotificationPanel() {
 
   // 設定を取得
   useEffect(() => {
-    const token = getToken()
-    fetch(`${API_BASE}/api/notifications/settings`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    liffFetch("/api/notifications/settings")
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json() as Promise<NotificationSettings>
@@ -162,7 +160,7 @@ export function NotificationPanel() {
       .catch(() => {
         // API が存在しない場合はデフォルト状態を保持
       })
-  }, [API_BASE])
+  }, [])
 
   // 設定を保存
   async function saveSettings(next: NotificationSettings) {

@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react"
 import { getAuthToken, clearAuthToken } from "@/lib/auth/token-key"
+import { liffFetch } from "@/lib/liff/liff-fetch"
 
 interface UserData {
   id?: number
@@ -71,13 +72,8 @@ export function AccountPanel() {
 
   // ユーザー設定を取得（/api/user/settings + /auth/me を併用）
   useEffect(() => {
-    const token = getAuthToken() ?? ""
-    if (!token) return
-
     // settings エンドポイント（user_mode 等）
-    fetch(`${API_BASE}/api/user/settings`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    liffFetch("/api/user/settings")
       .then((r) => (r.ok ? r.json() : null))
       .then((data: UserData | null) => {
         if (data) {
@@ -91,9 +87,7 @@ export function AccountPanel() {
       .catch(() => {})
 
     // auth/me エンドポイント（created_at, wallet_address）
-    fetch(`${API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    liffFetch("/auth/me")
       .then((r) => (r.ok ? r.json() : null))
       .then(
         (
