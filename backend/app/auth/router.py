@@ -159,8 +159,10 @@ def register(
     status_code=status.HTTP_201_CREATED,
     summary="Referral-based user registration (invitation-only signup)",
 )
+@limiter.limit(LOGIN_RATE_LIMIT)
 def register_with_referral(
-    request: RegisterWithReferralRequest,
+    request: Request,
+    body: RegisterWithReferralRequest,
     db: Session = Depends(get_db),
 ) -> RegisterResponse:
     """
@@ -176,7 +178,7 @@ def register_with_referral(
     7. issue JWT → 201
     """
     # Step 2: DB lookup
-    referrer = db.query(User).filter(User.referral_code == request.referral_code).first()
+    referrer = db.query(User).filter(User.referral_code == body.referral_code).first()
     if referrer is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -184,14 +186,14 @@ def register_with_referral(
         )
 
     # Step 3: consent check
-    if not request.referred_consent:
+    if not body.referred_consent:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="referral consent required",
         )
 
     # Step 4: email duplicate
-    if AuthService.get_user_by_email(db, request.email):
+    if AuthService.get_user_by_email(db, body.email):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="email already registered",
@@ -199,7 +201,7 @@ def register_with_referral(
 
     # Step 5: create user (role=viewer, fixed)
     try:
-        user = AuthService.create_user(db, request, role=UserRole.VIEWER.value)
+        user = AuthService.create_user(db, body, role=UserRole.VIEWER.value)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -214,7 +216,7 @@ def register_with_referral(
         "User registered via referral: %s (referrer_id=%d, code=%s)",
         user.email,
         referrer.id,
-        request.referral_code,
+        body.referral_code,
     )
 
     # Step 7: JWT
@@ -232,8 +234,10 @@ def register_with_referral(
     status_code=status.HTTP_201_CREATED,
     summary="一般登録（partner 招待不要）",
 )
+@limiter.limit(LOGIN_RATE_LIMIT)
 def register_open(
-    request: OpenRegisterRequest,
+    request: Request,
+    body: OpenRegisterRequest,
     db: Session = Depends(get_db),
 ) -> RegisterResponse:
     """
@@ -251,9 +255,12 @@ def register_open(
     利用規約はログイン後に GET /auth/terms/status で確認し、
     POST /auth/terms/accept で正式同意する（バージョン管理済み）。
     """
+    if os.getenv("ENABLE_OPEN_REGISTRATION", "false").lower() not in ("1", "true", "yes"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
     # terms_consent フィールドバリデーターで False は既に 422 にしているが
     # 防御的に router 側でも確認する
-    if not request.terms_consent:
+    if not body.terms_consent:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="利用規約への同意が必要です",
@@ -271,12 +278,18 @@ def register_open(
     from app.invitations import service as invitation_service  # noqa: PLC0415
 
     try:
-        user = AuthService.create_user(db, request, role=UserRole.VIEWER.value)
+        user = AuthService.create_user(db, body, role=UserRole.VIEWER.value)
     except ValueError as e:
         detail = str(e)
         if "already registered" in detail or "already taken" in detail:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+    user.terms_version = _LIFF_TERMS_VERSION
+    user.terms_accepted_at = datetime.now(timezone.utc)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
 
     # open 招待レコードを監査用に作成（登録完了時点で即使用済み）
     open_inv = invitation_service.create_open_invitation(
