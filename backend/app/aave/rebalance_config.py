@@ -43,7 +43,7 @@ class RebalanceSettings:
     confirmation_token_secret: str
     check_interval_seconds: int
     shadow_mode: bool
-    pool_utilization_block_pct: Decimal
+    pool_utilization_block_pct: Decimal = Decimal("95")
 
 
 def _get_env_int(name: str, default: int) -> int:
