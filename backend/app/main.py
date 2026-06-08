@@ -626,6 +626,16 @@ def create_app() -> FastAPI:
             except BaseException as exc:
                 logger.error("Failed to start monthly LINE report: %s", exc)
 
+        # --- 期限切れリマインダー (opt-in: ENABLE_EXPIRY_REMINDER=1) ---
+        if os.getenv("ENABLE_EXPIRY_REMINDER", "0") == "1":
+            try:
+                await scheduled_manager.start_expiry_reminder(
+                    on_error=_make_scheduler_error_handler("proposal_expiry_reminder_loop"),
+                )
+                logger.info("Proposal expiry reminder scheduled")
+            except BaseException as exc:
+                logger.error("Failed to start expiry reminder: %s", exc)
+
     @app.on_event("startup")
     async def startup_health_probes() -> None:
         """Start background probes for /health/detail (OpenAI / Perplexity / Aave safety)."""

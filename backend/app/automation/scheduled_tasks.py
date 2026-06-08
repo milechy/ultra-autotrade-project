@@ -824,6 +824,135 @@ async def proposal_timeout_loop(
             await asyncio.sleep(600)
 
 
+async def proposal_expiry_reminder_loop(
+    *,
+    interval_seconds: int = 300,
+    reminder_before_minutes: int = 30,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """
+    期限切れ前 Proposal に対してリマインダー通知を送る定期ループ。
+
+    ``reminder_before_minutes`` 分以内に期限切れを迎える pending かつ
+    まだ通知未送信 (expiry_reminder_sent_at is None) の Proposal を検出し、
+    LINE 通知を送信後 expiry_reminder_sent_at を更新する。
+
+    Args:
+        interval_seconds: チェック間隔（秒）。デフォルト 300 秒（5 分）
+        reminder_before_minutes: 期限の何分前から通知するか。デフォルト 30 分
+        on_error: エラー発生時のコールバック
+
+    Note:
+        - このコルーチンは無限ループで動作する
+        - 停止は asyncio.CancelledError で行う
+        - エラー発生時もループは継続（fail-safe）
+    """
+    logger.info(
+        "Starting proposal expiry reminder loop (interval: %ds, window: %dmin)",
+        interval_seconds,
+        reminder_before_minutes,
+    )
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+
+            def _run_expiry_reminder() -> None:
+                from datetime import datetime, timedelta, timezone  # noqa: PLC0415
+
+                from app.database import SessionLocal  # noqa: PLC0415
+
+                db = SessionLocal()
+                try:
+                    from app.notifications.factory import get_notification_service  # noqa: PLC0415
+                    from app.notifications.templates import (  # noqa: PLC0415
+                        expiry_reminder_notification,
+                    )
+                    from app.proposals.models import Proposal  # noqa: PLC0415
+
+                    now = datetime.now(timezone.utc)
+                    window_end = now + timedelta(minutes=reminder_before_minutes)
+
+                    candidates = (
+                        db.query(Proposal)
+                        .filter(
+                            Proposal.status == "pending",
+                            Proposal.expires_at <= window_end,
+                            Proposal.expires_at > now,
+                            Proposal.expiry_reminder_sent_at.is_(None),
+                        )
+                        .all()
+                    )
+
+                    notified_count = 0
+                    for proposal in candidates:
+                        try:
+                            minutes_left = max(
+                                1,
+                                int((proposal.expires_at - now).total_seconds() // 60),
+                            )
+                            payload = expiry_reminder_notification(
+                                operation=proposal.operation,
+                                asset=proposal.asset,
+                                minutes_remaining=minutes_left,
+                            )
+                            msg = payload.notification_message
+                            msg = msg.model_copy(update={"user_id": proposal.user_id})
+
+                            try:
+                                svc = get_notification_service()
+                                svc.send(msg)
+                            except Exception as _svc_exc:
+                                logger.debug(
+                                    "Expiry reminder notification failed for proposal %d: %s",
+                                    proposal.id,
+                                    _svc_exc,
+                                )
+
+                            proposal.expiry_reminder_sent_at = now
+                            db.flush()
+                            notified_count += 1
+                            logger.info(
+                                "Expiry reminder sent for proposal %d (op=%s, asset=%s, %dmin left)",
+                                proposal.id,
+                                proposal.operation,
+                                proposal.asset,
+                                minutes_left,
+                            )
+                        except Exception as _item_exc:
+                            logger.warning(
+                                "Failed to process expiry reminder for proposal %d: %s",
+                                proposal.id,
+                                _item_exc,
+                            )
+
+                    if notified_count:
+                        db.commit()
+                        logger.info("Expiry reminders sent for %d proposals", notified_count)
+
+                except Exception as _db_exc:
+                    db.rollback()
+                    logger.warning("Proposal expiry reminder check DB error: %s", _db_exc)
+                finally:
+                    db.close()
+
+            await asyncio.to_thread(_run_expiry_reminder)
+
+        except asyncio.CancelledError:
+            logger.info("Proposal expiry reminder loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in proposal expiry reminder loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            await asyncio.sleep(600)
+
+
 async def health_check_loop(
     *,
     interval_seconds: int = 300,
@@ -1298,6 +1427,7 @@ class ScheduledTaskManager:
         self._compound_risk_task: Optional[asyncio.Task[None]] = None
         self._monthly_fee_batch_task: Optional[asyncio.Task[None]] = None
         self._monthly_line_report_task: Optional[asyncio.Task[None]] = None
+        self._expiry_reminder_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -1370,6 +1500,11 @@ class ScheduledTaskManager:
         return (
             self._monthly_line_report_task is not None and not self._monthly_line_report_task.done()
         )
+
+    @property
+    def is_expiry_reminder_running(self) -> bool:
+        """期限切れリマインダータスクが動作中かどうか。"""
+        return self._expiry_reminder_task is not None and not self._expiry_reminder_task.done()
 
     async def start_monthly_line_report(
         self,
@@ -2143,6 +2278,51 @@ class ScheduledTaskManager:
         self._compound_risk_task = None
         logger.info("Compound risk monitor task stopped")
 
+    async def start_expiry_reminder(
+        self,
+        *,
+        interval_seconds: int = 300,
+        reminder_before_minutes: int = 30,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """期限切れリマインダータスクを開始する。"""
+        if self.is_expiry_reminder_running:
+            raise RuntimeError("Expiry reminder already running")
+
+        logger.info("Starting proposal expiry reminder task")
+        self._expiry_reminder_task = asyncio.create_task(
+            proposal_expiry_reminder_loop(
+                interval_seconds=interval_seconds,
+                reminder_before_minutes=reminder_before_minutes,
+                on_error=on_error,
+            )
+        )
+        logger.info("Proposal expiry reminder task started")
+
+    async def stop_expiry_reminder(self, timeout: float = 5.0) -> None:
+        """期限切れリマインダータスクを停止する。"""
+        if not self.is_expiry_reminder_running:
+            logger.debug("Expiry reminder not running - nothing to stop")
+            return
+
+        logger.info("Stopping proposal expiry reminder task")
+        assert self._expiry_reminder_task is not None  # noqa: S101
+        self._expiry_reminder_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._expiry_reminder_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Proposal expiry reminder task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Proposal expiry reminder task did not stop within %.1fs timeout", timeout
+            )
+        except Exception as exc:
+            logger.error("Error while stopping proposal expiry reminder task: %s", exc)
+
+        self._expiry_reminder_task = None
+        logger.info("Proposal expiry reminder task stopped")
+
     async def stop_all(self, timeout: float = 5.0) -> None:
         """
         全てのスケジュールタスクを停止する。
@@ -2167,6 +2347,7 @@ class ScheduledTaskManager:
             self.stop_compound_risk_monitor(timeout=timeout),
             self.stop_monthly_fee_batch(timeout=timeout),
             self.stop_monthly_line_report(timeout=timeout),
+            self.stop_expiry_reminder(timeout=timeout),
             return_exceptions=True,
         )
 
