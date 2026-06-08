@@ -116,7 +116,7 @@ def _run_reminder_sync(proposals: list[Any], before_minutes: int = 30) -> tuple[
             try:
                 svc = get_notification_service()
                 svc.send(msg)
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001, S110
                 pass
 
             proposal.expiry_reminder_sent_at = now
