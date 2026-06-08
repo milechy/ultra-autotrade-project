@@ -64,7 +64,10 @@ def test_db() -> Generator:
 
 
 @pytest.fixture()
-def client(test_db) -> TestClient:
+def client(test_db, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    # /auth/register-open は ENABLE_OPEN_REGISTRATION が default-off（未設定時 404）。
+    # API テストは有効化された経路を検証するためフラグを立てる（test 後 monkeypatch が自動復元）。
+    monkeypatch.setenv("ENABLE_OPEN_REGISTRATION", "1")
     override_get_db, _ = test_db
     app = create_app()
     app.dependency_overrides[get_db] = override_get_db
