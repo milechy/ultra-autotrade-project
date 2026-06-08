@@ -224,7 +224,9 @@ class TestWalletLink:
         )
 
 
-def _make_admin(SessionLocal, *, email: str = "admin@example.com", username: str = "admin1") -> tuple[int, str]:
+def _make_admin(
+    SessionLocal, *, email: str = "admin@example.com", username: str = "admin1"
+) -> tuple[int, str]:
     """Admin ユーザーを作成し、(user_id, jwt_token) を返す。"""
     with SessionLocal() as session:
         user = User(
@@ -296,9 +298,7 @@ class TestWalletUnlink:
     # ── 404 ────────────────────────────────────────────────────────────────
     def test_404_nonexistent_user(self, client: TestClient, test_db):
         _, SessionLocal = test_db
-        _, admin_token = _make_admin(
-            SessionLocal, email="admin2@example.com", username="admin2"
-        )
+        _, admin_token = _make_admin(SessionLocal, email="admin2@example.com", username="admin2")
 
         response = client.delete(
             "/auth/wallet/99999",
@@ -310,9 +310,7 @@ class TestWalletUnlink:
     # ── 400 ────────────────────────────────────────────────────────────────
     def test_400_wallet_already_null(self, client: TestClient, test_db):
         _, SessionLocal = test_db
-        _, admin_token = _make_admin(
-            SessionLocal, email="admin3@example.com", username="admin3"
-        )
+        _, admin_token = _make_admin(SessionLocal, email="admin3@example.com", username="admin3")
         user_id, _ = _make_user(
             SessionLocal,
             email="nowallet@example.com",
