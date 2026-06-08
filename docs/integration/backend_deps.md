@@ -5,6 +5,19 @@
 
 ---
 
+## PR #581 (admin users API): admin_users_router 配線 (2026-06-08)
+
+### 変更: admin_users_router を main.py に include_router
+- **対象凍結ファイル**: `backend/app/main.py`
+- **変更内容**:
+  - `from app.api.admin_users import router as admin_users_router` を import 追加
+  - `app.include_router(admin_users_router)` を追加（`/admin/users` モック → 実 API 配線、`GET /api/admin/users`）
+- **理由**: フロントエンド `/admin/users` のモックを実 API に置き換えるため、admin 向けユーザー一覧/操作エンドポイントを配線する。
+- **影響範囲**: ルーター登録のみ。起動シーケンス・既存エンドポイントへの影響なし。エンドポイントは `require_admin` で RBAC ガード済み。
+- **承認**: feature/admin-users-api-wiring-20260608 → main の通常フロー経由（PR #581）
+
+---
+
 ## PR #563 (前提1): ENABLE_WITHDRAWALS flag で withdraw EP を default-off ガード (2026-06-06)
 
 ### 変更: include_router(user_withdrawals_router) を ENABLE_WITHDRAWALS フラグで条件化

@@ -236,7 +236,7 @@ def pause_user(
     user_id: int,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
-) -> dict:
+) -> dict[str, Any]:
     """指定ユーザーの自動取引を停止する（is_active = False）。"""
     user = db.query(User).filter(User.id == user_id, User.role == UserRole.VIEWER.value).first()
     if user is None:
@@ -252,7 +252,7 @@ def resume_user(
     user_id: int,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
-) -> dict:
+) -> dict[str, Any]:
     """指定ユーザーの自動取引を再開する（is_active = True）。"""
     user = db.query(User).filter(User.id == user_id, User.role == UserRole.VIEWER.value).first()
     if user is None:
