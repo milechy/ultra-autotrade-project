@@ -188,11 +188,7 @@ def get_ai_activity(
     db: Session = Depends(get_db),
 ) -> LatestAiDecisionResponse:
     """ai_decisions テーブルから最新1件を返す。user_id IS NULL（システム判定）を優先。"""
-    decision = (
-        db.query(AIDecision)
-        .order_by(desc(AIDecision.created_at))
-        .first()
-    )
+    decision = db.query(AIDecision).order_by(desc(AIDecision.created_at)).first()
     if decision is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No AI decision found")
     return LatestAiDecisionResponse.model_validate(decision)

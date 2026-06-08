@@ -65,6 +65,7 @@ def client(
 
     with factory() as db:
         from app.auth.service import AuthService
+
         admin = User(
             username="ai_activity_admin",
             email=_ADMIN_EMAIL,
@@ -105,7 +106,9 @@ def _insert_decision(factory: SessionFactory, **kwargs: object) -> None:
         db.commit()
 
 
-def test_ai_activity_returns_latest(client: TestClient, test_db: tuple[SessionFactory, object]) -> None:
+def test_ai_activity_returns_latest(
+    client: TestClient, test_db: tuple[SessionFactory, object]
+) -> None:
     """最新判定が返ること。"""
     factory, _ = test_db
     _insert_decision(factory, action="BUY", confidence=80, agreed=False)
