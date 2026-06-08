@@ -265,9 +265,7 @@ class TestTransactionsExportCSV:
         rows = list(reader)
         assert rows == []
 
-    def test_export_returns_csv_with_executed_proposals(
-        self, client: TestClient, test_db
-    ) -> None:
+    def test_export_returns_csv_with_executed_proposals(self, client: TestClient, test_db) -> None:
         token = get_admin_token(client)
         self._insert_executed_proposal(test_db, user_id=1)
         r = client.get(

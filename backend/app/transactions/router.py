@@ -132,7 +132,15 @@ def export_transactions_csv(
         timestamp = executed_jst.strftime("%Y/%m/%d %H:%M:%S")
         fee = str(p.fee_amount) if p.fee_amount is not None else "0"
         writer.writerow(
-            [timestamp, p.operation, p.asset, str(p.amount), str(p.amount_usd), fee, p.tx_hash or ""]
+            [
+                timestamp,
+                p.operation,
+                p.asset,
+                str(p.amount),
+                str(p.amount_usd),
+                fee,
+                p.tx_hash or "",
+            ]
         )
 
     csv_bytes = buf.getvalue().encode("utf-8-sig")  # BOM付きUTF-8 (Excel対応)
