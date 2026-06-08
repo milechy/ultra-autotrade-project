@@ -19,6 +19,7 @@ import {
 import { getStoredToken, useAuth } from '@/lib/auth'
 import PerformanceSummaryKPI from './_components/PerformanceSummaryKPI'
 import { AiTransparencyCard } from '@/components/transparency/AiTransparencyCard'
+import { AiActivityCard } from '@/components/partner/AiActivityCard'
 import AllocationTable from './_components/AllocationTable'
 import type { MonthlyData } from './_components/MonthlyChartRecharts'
 
@@ -193,6 +194,9 @@ export default function PartnerDashboardPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
       <h1 className="text-2xl font-bold">パートナーダッシュボード</h1>
+
+      {/* AI アクティビティ — 最新判定サマリー（常設・60秒ポーリング） */}
+      <AiActivityCard />
 
       {/* Performance Summary KPI (allocation-based) */}
       <section>
