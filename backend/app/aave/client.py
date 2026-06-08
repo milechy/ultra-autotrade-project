@@ -82,6 +82,50 @@ _POOL_ABI_MINIMAL = [
         "stateMutability": "nonpayable",
         "type": "function",
     },
+    {
+        "name": "getReserveData",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [{"name": "asset", "type": "address"}],
+        "outputs": [
+            {
+                "name": "",
+                "type": "tuple",
+                "components": [
+                    {
+                        "name": "configuration",
+                        "type": "tuple",
+                        "components": [{"name": "data", "type": "uint256"}],
+                    },
+                    {"name": "liquidityIndex", "type": "uint128"},
+                    {"name": "currentLiquidityRate", "type": "uint128"},
+                    {"name": "variableBorrowIndex", "type": "uint128"},
+                    {"name": "currentVariableBorrowRate", "type": "uint128"},
+                    {"name": "currentStableBorrowRate", "type": "uint128"},
+                    {"name": "lastUpdateTimestamp", "type": "uint40"},
+                    {"name": "id", "type": "uint16"},
+                    {"name": "aTokenAddress", "type": "address"},
+                    {"name": "stableDebtTokenAddress", "type": "address"},
+                    {"name": "variableDebtTokenAddress", "type": "address"},
+                    {"name": "interestRateStrategyAddress", "type": "address"},
+                    {"name": "accruedToTreasury", "type": "uint128"},
+                    {"name": "unbacked", "type": "uint128"},
+                    {"name": "isolationModeTotalDebt", "type": "uint128"},
+                ],
+            }
+        ],
+    },
+]
+
+# ERC-20 totalSupply ABI（利用率計算用）
+_ERC20_TOTAL_SUPPLY_ABI = [
+    {
+        "name": "totalSupply",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"name": "", "type": "uint256"}],
+    }
 ]
 
 # ERC-20 ABI（approve + decimals — 最小限）
@@ -258,6 +302,13 @@ class AaveClientBase(ABC):
     @abstractmethod
     def get_account_data(self, wallet_address: str) -> AccountData: ...
 
+    def get_pool_utilization(self, asset_symbol: str) -> Optional[Decimal]:
+        """プール利用率 (0-100) を返す。取得不可の場合は None。
+
+        サブクラスがオーバーライドしない場合は None を返す（fail-open）。
+        """
+        return None
+
 
 class AaveClientError(Exception):
     """Aave クライアントの基底例外。"""
@@ -297,6 +348,9 @@ class AaveClient(Protocol):
 
     def get_account_data(self, wallet_address: str) -> "AccountData":
         """Aave V3 Pool のアカウントデータを取得する。"""
+
+    def get_pool_utilization(self, asset_symbol: str) -> Optional[Decimal]:
+        """プール利用率 (0-100) を返す。取得不可の場合は None。"""
 
 
 class DummyAaveClient(AaveClientBase):
@@ -1133,6 +1187,67 @@ class Web3AaveClient(AaveClientBase):
                 "value": "0x0",
             }
         }
+
+    def get_pool_utilization(self, asset_symbol: str) -> Optional[Decimal]:
+        """Aave V3 プールの現在利用率 (0-100) を返す。
+
+        getReserveData → aToken.totalSupply / vDebtToken.totalSupply で計算。
+        RPC失敗・アドレス未設定の場合は None を返す（fail-open）。
+        """
+        if Web3 is None:
+            return None
+        if not hasattr(self, "token_addresses"):
+            logger.warning("get_pool_utilization: token_addresses not set; skipping check")
+            return None
+        asset_addr = self.token_addresses.get(asset_symbol)
+        if not asset_addr:
+            logger.warning(
+                "get_pool_utilization: unknown asset_symbol=%s; skipping check", asset_symbol
+            )
+            return None
+        try:
+            reserve_data = self._pool.functions.getReserveData(
+                Web3.to_checksum_address(asset_addr)
+            ).call()
+            atoken_addr: str = reserve_data[8]
+            sdebt_addr: str = reserve_data[9]
+            vdebt_addr: str = reserve_data[10]
+
+            atoken_contract = self._w3.eth.contract(
+                address=Web3.to_checksum_address(atoken_addr),
+                abi=_ERC20_TOTAL_SUPPLY_ABI,
+            )
+            atoken_total = int(atoken_contract.functions.totalSupply().call())
+
+            vdebt_contract = self._w3.eth.contract(
+                address=Web3.to_checksum_address(vdebt_addr),
+                abi=_ERC20_TOTAL_SUPPLY_ABI,
+            )
+            vdebt_total = int(vdebt_contract.functions.totalSupply().call())
+
+            # V3.3+ でstable debt は廃止済み。ゼロアドレスの場合はcallしない
+            if int(sdebt_addr, 16) == 0:
+                sdebt_total = 0
+            else:
+                sdebt_contract = self._w3.eth.contract(
+                    address=Web3.to_checksum_address(sdebt_addr),
+                    abi=_ERC20_TOTAL_SUPPLY_ABI,
+                )
+                sdebt_total = int(sdebt_contract.functions.totalSupply().call())
+
+            total_debt = vdebt_total + sdebt_total
+            if atoken_total <= 0:
+                return Decimal("0")
+            utilization_pct = Decimal(total_debt) / Decimal(atoken_total) * Decimal(100)
+            logger.debug(
+                "get_pool_utilization: %s utilization=%.2f%%",
+                asset_symbol,
+                float(utilization_pct),
+            )
+            return utilization_pct
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("get_pool_utilization: RPC failed for %s: %s", asset_symbol, exc)
+            return None
 
     # 後方互換: 旧 Web3AaveClient が持っていたユーティリティメソッド
     def _to_wei(self, amount: Decimal, decimals: int) -> int:
