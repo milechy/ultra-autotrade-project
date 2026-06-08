@@ -106,8 +106,8 @@
     "disagreed": "不一致",
     "noDecisions": "AI判定履歴がありません",
     "filterAll": "すべて",
-    "filterBuy": "BUY",
-    "filterSell": "SELL",
+    "filterBuy": "購入する",
+    "filterSell": "売る",
     "filterHold": "HOLD",
     "fetchError": "データを取得できません"
   },
@@ -240,8 +240,8 @@
     "aiDecisions": {
       "title": "AI判定モニター",
       "totalDecisions": "総判定数",
-      "buyCount": "BUY",
-      "sellCount": "SELL",
+      "buyCount": "購入する",
+      "sellCount": "売る",
       "holdCount": "HOLD",
       "avgConfidence": "平均確信度",
       "action": "判定",
