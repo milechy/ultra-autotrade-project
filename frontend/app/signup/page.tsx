@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle } from 'lucide-react'
 import { registerOpen } from '@/lib/api/auth'
 import { isPublicRegistrationEnabled } from '@/lib/flags'
+import { setAuthToken } from "@/lib/auth/token-key"
 
 function SignupForm() {
   const router = useRouter()
@@ -42,7 +43,7 @@ function SignupForm() {
         password,
         terms_consent: true,
       })
-      localStorage.setItem('ultra_auth_token', result.access_token)
+      setAuthToken(result.access_token)
       localStorage.setItem('ultra_auth_expires', String(Date.now() + result.expires_in * 1000))
       router.replace('/user/dashboard')
     } catch (err: unknown) {
