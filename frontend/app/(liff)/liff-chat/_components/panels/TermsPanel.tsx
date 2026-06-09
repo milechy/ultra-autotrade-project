@@ -8,7 +8,13 @@ import { ExternalLink, FileText, Shield } from "lucide-react"
 // /liff-approve (パートナートップ) に戻ってしまうため、target=_blank の
 // 素の <a> ではなく liff.openWindow({external:true}) を優先して使用する。
 // liff が無い (通常ブラウザ等) 場合は window.open へフォールバック。
-function openExternal(url: string) {
+//
+// path は同一オリジン相対 ("/terms" 等) で保持し、openExternal で
+// window.location.origin を前置して絶対 URL 化する。prod ドメインを
+// ハードコードすると staging で開いても本番 (app.ultra-auto-trade.com) に
+// 飛んでしまうため (環境跨ぎバグ)、必ず現在のオリジン基準で解決する。
+function openExternal(path: string) {
+  const url = typeof window !== "undefined" ? `${window.location.origin}${path}` : path
   if (
     typeof window !== "undefined" &&
     (window as Window & { liff?: { openWindow: (opts: { url: string; external: boolean }) => void } }).liff
@@ -22,7 +28,7 @@ function openExternal(url: string) {
 export function TermsPanel() {
   const links = [
     {
-      href: "https://app.ultra-auto-trade.com/terms",
+      href: "/terms",
       label: "利用規約",
       desc: "サービス利用条件・免責事項",
       icon: FileText,
@@ -30,7 +36,7 @@ export function TermsPanel() {
     {
       // 実ルートは /privacy-policy (frontend/app/(user)/privacy-policy/page.tsx)。
       // 旧 href ".../privacy" は 404 のため修正。
-      href: "https://app.ultra-auto-trade.com/privacy-policy",
+      href: "/privacy-policy",
       label: "プライバシーポリシー",
       desc: "個人情報の取り扱い",
       icon: Shield,
