@@ -213,7 +213,7 @@ export default function LiffConfirmPage() {
       <div className="px-4 pb-8 pt-4 border-t border-zinc-800 flex-shrink-0 space-y-3">
         <div className="flex gap-4 justify-center text-xs text-zinc-500">
           <a
-            href="https://app.ultra-auto-trade.com/terms"
+            href="/terms"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 hover:text-zinc-300"
@@ -221,7 +221,7 @@ export default function LiffConfirmPage() {
             利用規約 <ExternalLink className="w-3 h-3" />
           </a>
           <a
-            href="https://app.ultra-auto-trade.com/privacy-policy"
+            href="/privacy-policy"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 hover:text-zinc-300"
