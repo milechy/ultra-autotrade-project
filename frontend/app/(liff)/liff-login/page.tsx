@@ -5,11 +5,13 @@
 
 import { useEffect } from "react";
 import { useLiff } from "@/hooks/useLiff";
+import { BrowserLoginPrompt } from "../_components/BrowserLoginPrompt";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function LiffLoginPage() {
-  const { isReady, isLoggedIn, profile, idToken, error } = useLiff();
+  const { isReady, isLoggedIn, profile, idToken, error, liffConfigured } =
+    useLiff();
 
   useEffect(() => {
     if (!isReady || !isLoggedIn || !idToken || !profile) return;
@@ -50,6 +52,22 @@ export default function LiffLoginPage() {
       <div className="flex items-center justify-center min-h-screen">
         <p className="text-muted-foreground">Loading...</p>
       </div>
+    );
+  }
+
+  // ブラウザ PWA モード (NEXT_PUBLIC_LIFF_ID 未設定 = liffConfigured=false / v3 の本番形態)。
+  // LINE 文脈が無いため idToken ログインは不可。代わりに Privy passwordless の
+  // BrowserLoginPrompt を出す。これにより liffFetch 401 / TaxPanel / TxHistoryPanel /
+  // SessionExpiryBanner 等から /liff-login へ送られたユーザーが、行き止まり
+  // (「LINEアプリから開いてください」) ではなく実際にログインできる入口に着地する。
+  // LINE モード (liffConfigured=true / v4) では従来どおり下の idToken 経路を使う。
+  if (!liffConfigured) {
+    return (
+      <BrowserLoginPrompt
+        onSuccess={() => {
+          window.location.href = "/liff-confirm";
+        }}
+      />
     );
   }
 
