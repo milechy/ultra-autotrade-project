@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react"
 import { AlertTriangle, Loader2 } from "lucide-react"
 import { useFundWallet, useWallets } from "@privy-io/react-auth"
 import { base } from "viem/chains"
-import { apiFetch, apiPost } from "@/lib/api/client"
+import { liffFetch } from "@/lib/liff/liff-fetch"
 
 // ---- 型定義 ---------------------------------------------------------------
 
@@ -116,9 +116,18 @@ export function DepositPanel() {
   const fetchBalance = useCallback(async () => {
     setBalanceLoading(true)
     try {
-      const res = await apiFetch<UserSettingsResponse>("/api/user/settings")
-      setBalance(res.balance != null ? Number(res.balance) : null)
-      setWalletAddress(res.wallet_address ?? null)
+      // (liff) パネルは liffFetch を使う。apiFetch は (user) 側 AuthProvider が
+      // resolve する authReadyPromise を待つが、(liff) ツリーには AuthProvider が
+      // 無く永久 pending → リクエストがハングして残高スピナーが止まらない
+      // (Asana 1215524979521648)。兄弟パネルと同じ liffFetch に統一する。
+      const res = await liffFetch("/api/user/settings")
+      if (res.ok) {
+        const data = (await res.json()) as UserSettingsResponse
+        setBalance(data.balance != null ? Number(data.balance) : null)
+        setWalletAddress(data.wallet_address ?? null)
+      } else {
+        setBalance(null)
+      }
     } catch {
       setBalance(null)
     } finally {
@@ -204,9 +213,14 @@ export function DepositPanel() {
     setConfirmBusy(true)
     setConfirmError(null)
     try {
-      await apiPost<{ status: string }>("/api/transactions/withdraw", {
-        amount_usdc: withdrawNum,
+      const res = await liffFetch("/api/transactions/withdraw", {
+        method: "POST",
+        body: JSON.stringify({ amount_usdc: withdrawNum }),
       })
+      if (!res.ok) {
+        const detail = (await res.json().catch(() => null)) as { detail?: string } | null
+        throw new Error(detail?.detail ?? "出金処理に失敗しました")
+      }
       setConfirmOpen(false)
       setSuccessMsg("出金リクエストを送信しました。反映まで少々お待ちください。")
       setWithdrawAmount("")
