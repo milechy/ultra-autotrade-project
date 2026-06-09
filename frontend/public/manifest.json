@@ -2,7 +2,7 @@
   "name": "Ultra AutoTrade",
   "short_name": "UAT",
   "description": "Automated DeFi trading platform",
-  "start_url": "/",
+  "start_url": "/liff-login",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
