@@ -86,6 +86,7 @@ export default function LiffChatPage() {
   const [graphOpen, setGraphOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
   const [unreadCount] = useState(0)
+  const [reasonOpen, setReasonOpen] = useState(false)
 
   // ── データ取得
   useEffect(() => {
@@ -252,11 +253,18 @@ export default function LiffChatPage() {
             </div>
           )}
 
-          {/* HOLD 時: なぜ HOLD？リンク */}
-          {!isBuy && !isSell && (
-            <button className="mt-2 text-zinc-500 text-xs underline">
-              なぜHOLD？
-            </button>
+          {/* なぜ{action}？理由トグル（BUY/SELL/HOLD 共通） */}
+          <button
+            onClick={() => setReasonOpen((v) => !v)}
+            className="mt-2 text-zinc-500 text-xs underline"
+            aria-expanded={reasonOpen}
+          >
+            なぜ{action}？
+          </button>
+          {reasonOpen && (
+            <p className="mt-2 text-zinc-400 text-xs leading-relaxed whitespace-pre-wrap">
+              {aiJudgment?.reason ?? "理由データがありません"}
+            </p>
           )}
         </div>
 
