@@ -802,6 +802,7 @@ claude.ai が Step 0 をスキップして §9 を実行した場合、それは
 ### UI / フロントエンド
 - [ ] 全テキストが日本語（英語ハードコード禁止。ja.jsonにキーがあればそちらを使用）
 - [ ] admin / partner / viewer(tester) の権限分離（role === "admin" で操作系の表示/非表示）
+- [ ] 認証状態で表示が変わる要素（ログアウト/削除/設定等の操作系）は未ログイン時に必ずガード（`{(authenticated || token) && …}`）。新コンポーネントは既存コンポーネントの認証ガードをポートする（例: UserHeader 5c42868 の logout gate を AccountPanel に踏襲。ポート漏れ＝未ログインで「ログアウト」表示の再発要因）
 - [ ] ダミー/ハードコードデータがないこと（value={5.2} のような固定値禁止。データ未取得時は「データなし」表示）
 - [ ] Decimal型（バックエンドからの文字列）→ Number() ラップしてから .toFixed() 等を呼ぶ
 - [ ] recharts → 別ファイルに分離 + dynamic(() => import('./XxxRecharts'), { ssr: false })
