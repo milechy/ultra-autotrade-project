@@ -46,6 +46,46 @@ async function openAccountPanel(page: Page): Promise<boolean> {
   return true
 }
 
+// /api/user/settings と /auth/me を 200 で固定する。これにより
+//   - liffFetch の 401→/liff-login リダイレクトを抑止
+//   - 重要事項同意ゲート（terms_version="liff-v3" 一致で accepted）の /liff-confirm リダイレクト抑止
+// が成立し、認証あり/なしのどちらでも AccountPanel を決定的に開ける。
+async function mockUserApis(page: Page): Promise<void> {
+  const settingsBody = JSON.stringify({
+    user_mode: 'managed',
+    terms_version: 'liff-v3',
+    corporate_fiscal_month: null,
+    created_at: '2026-01-01T00:00:00Z',
+    email: 'e2e@example.com',
+    wallet_address: '0x0000000000000000000000000000000000000000',
+  })
+  await page.route('**/api/user/settings*', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: settingsBody }),
+  )
+  await page.route('**/auth/me*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        email: 'e2e@example.com',
+        created_at: '2026-01-01T00:00:00Z',
+        wallet_address: '0x0000000000000000000000000000000000000000',
+      }),
+    }),
+  )
+}
+
+// backend JWT を localStorage に seed し、AccountPanel を「ログイン済み」状態にする。
+async function seedAuthToken(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    try {
+      window.localStorage.setItem('auth_token', 'e2e-fake-jwt')
+    } catch {
+      /* localStorage 不可環境は無視 */
+    }
+  })
+}
+
 test.describe('liff-chat AccountPanel', () => {
   test('アカウントパネルが開きプロフィール/運用情報が表示される', async ({ page }) => {
     const opened = await openAccountPanel(page)
@@ -90,6 +130,9 @@ test.describe('liff-chat AccountPanel', () => {
   })
 
   test('アカウント削除フロー（ボトムシート文言 + 申請/キャンセル）', async ({ page }) => {
+    // 削除は認証済みのみ表示されるため、ログイン状態を seed して開く
+    await mockUserApis(page)
+    await seedAuthToken(page)
     const opened = await openAccountPanel(page)
     test.skip(!opened, 'AccountPanel に到達できない環境')
 
@@ -116,10 +159,27 @@ test.describe('liff-chat AccountPanel', () => {
     await expect(page.getByText('アカウントを削除しますか？')).toBeHidden()
   })
 
-  test('ログアウトボタンが存在する（既存挙動を壊していない）', async ({ page }) => {
+  test('認証済みではログアウト/削除が表示される', async ({ page }) => {
+    await mockUserApis(page)
+    await seedAuthToken(page)
     const opened = await openAccountPanel(page)
     test.skip(!opened, 'AccountPanel に到達できない環境')
 
     await expect(page.getByRole('button', { name: 'ログアウト' })).toBeVisible()
+    await expect(page.getByText('アカウントを削除', { exact: true })).toBeVisible()
+  })
+
+  // 回帰防止: 未ログイン時に「ログアウト」/「アカウント削除」が表示されない
+  // （staging browser PWA degrade で未認証でも表示されたバグ。UserHeader 5c42868 ガードの
+  //  AccountPanel へのポート。Asana 1215522469898102）。
+  test('未認証ではログアウト/削除が表示されない（回帰防止）', async ({ page }) => {
+    // token を seed しない（未ログイン）。API は 200 固定でリダイレクトを抑止し、
+    // パネル自体は開ける状態にしたうえで操作系が出ないことを検証する。
+    await mockUserApis(page)
+    const opened = await openAccountPanel(page)
+    test.skip(!opened, 'AccountPanel に到達できない環境')
+
+    await expect(page.getByRole('button', { name: 'ログアウト' })).toHaveCount(0)
+    await expect(page.getByText('アカウントを削除', { exact: true })).toHaveCount(0)
   })
 })

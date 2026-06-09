@@ -46,7 +46,13 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 export function AccountPanel() {
   const router = useRouter()
-  const { logout: privyLogout } = usePrivy()
+  const { logout: privyLogout, authenticated } = usePrivy()
+  // 認証状態。未ログイン時に「ログアウト」/「アカウント削除」等の操作系を出さないためのガード。
+  // backend JWT (getAuthToken) か Privy authenticated のどちらかがあれば「ログイン済み」とみなす
+  // (UserHeader.tsx の {(user||token)&&…} ガード = commit 5c42868 を LIFF v3 にポート)。
+  // token は localStorage 依存で SSR 不可のため、hydration mismatch を避けて useEffect で取得する。
+  const [hasToken, setHasToken] = useState(false)
+  const isAuthed = authenticated || hasToken
   const [userData, setUserData] = useState<UserData | null>(null)
   const [corpExpanded, setCorpExpanded] = useState(false)
   const [corpForm, setCorpForm] = useState<CorpForm>({ name: "", number: "", rep: "", month: 0 })
@@ -69,6 +75,11 @@ export function AccountPanel() {
     setToastMsg(msg)
     setTimeout(() => setToastMsg(""), 2000)
   }
+
+  // backend JWT の有無を client 側で確定（SSR では localStorage 不可）
+  useEffect(() => {
+    setHasToken(!!getAuthToken())
+  }, [])
 
   // ユーザー設定を取得（/api/user/settings + /auth/me を併用）
   useEffect(() => {
@@ -615,25 +626,30 @@ export function AccountPanel() {
         )}
       </div>
 
-      {/* ログアウトボタン */}
-      <button
-        onClick={handleLogout}
-        className="flex items-center gap-3 w-full px-4 py-4 bg-zinc-900 rounded-xl hover:bg-zinc-800 transition-colors"
-      >
-        <LogOut className="w-5 h-5 text-red-400" />
-        <span className="text-red-400 font-medium">ログアウト</span>
-      </button>
+      {/* ログアウト / 削除は認証済みのみ表示（未ログイン時の誤表示を防ぐ） */}
+      {isAuthed && (
+        <>
+          {/* ログアウトボタン */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-4 py-4 bg-zinc-900 rounded-xl hover:bg-zinc-800 transition-colors"
+          >
+            <LogOut className="w-5 h-5 text-red-400" />
+            <span className="text-red-400 font-medium">ログアウト</span>
+          </button>
 
-      {/* アカウント削除ボタン */}
-      <div className="flex justify-center pb-2">
-        <button
-          onClick={() => setDeleteSheet(true)}
-          className="flex items-center gap-2 px-4 py-2 text-zinc-600 hover:text-zinc-400 transition-colors"
-        >
-          <Trash2 className="w-4 h-4" />
-          <span className="text-xs">アカウントを削除</span>
-        </button>
-      </div>
+          {/* アカウント削除ボタン */}
+          <div className="flex justify-center pb-2">
+            <button
+              onClick={() => setDeleteSheet(true)}
+              className="flex items-center gap-2 px-4 py-2 text-zinc-600 hover:text-zinc-400 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="text-xs">アカウントを削除</span>
+            </button>
+          </div>
+        </>
+      )}
 
       {/* 削除確認ボトムシート */}
       {deleteSheet && (

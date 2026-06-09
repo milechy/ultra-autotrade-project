@@ -1158,3 +1158,16 @@ deploy_staging.sh)が稼働中だった。ps の ELAPSED は MM:SS 表記、誤�
 **何が起きたか**: fund_partner_test_wallet.py (ETH_TO_SEND=0.02 ETH) を 2 回実行したことで AAVE_WALLET の Base Sepolia ETH が ~0.001 ETH まで減少した。
 
 **再発防止**: E2E 実行前に `AAVE_WALLET_ADDRESS` の Base Sepolia ETH 残高を確認する。0.05 ETH 未満なら faucet (https://www.alchemy.com/faucets/base-sepolia) で補充。
+
+---
+
+## 2026-06-09 認証ガードの「新コンポーネントへのポート漏れ」(未ログインでログアウト表示の再発)
+
+**何が起きたか**: staging UI テストで LIFF v3 `/liff-chat` → ハンバーガー →「アカウント」を未ログイン状態で開くと「ログアウト」ボタンが表示された。同種バグは旧 Web UI で過去に修正済み (commit `5c42868`「未ログイン時にログアウトボタンが表示されるバグを修正」/ `frontend/components/user/UserHeader.tsx` を `{(user || token) && (…ログアウト…)}` でガード、main マージ済み)。しかし新規実装した LIFF v3 `AccountPanel.tsx` (Phase3, `9ca996d`) に同ガードがポートされておらず、618-625 行目でログアウトボタンを**無条件描画**していた (usePrivy() から logout のみ destructure、authenticated 未参照)。
+
+**なぜ未ログインで描画されたか**: staging はブラウザ PWA degrade モード (`NEXT_PUBLIC_LIFF_ID` 未設定)。`(liff)/layout.tsx` の中央 degrade ガードは `liffConfigured && !isLoggedIn && !token` の時のみブロックするため、degrade (`liffConfigured=false`) では意図的に素通しし children を描画する。AccountPanel 側にガードが無いとログアウトが露出する。`liffFetch` の 401→`/liff-login` リダイレクトは API 応答後のため、ボタンが先に見える。
+
+**再発防止ルール**:
+- 認証状態で表示が変わる要素 (ログアウト/削除/設定等の操作系) は、未ログイン時の表示を**コンポーネント自身で必ずガード**する。中央レイアウトの degrade ガードは「素通し」設計なので、これに依存しない。
+- **既存コンポーネントにあるガードは新コンポーネントへ必ずポートする**。「同じ画面・同じ部品の作り直し」時はバグ修正コミット (例 `5c42868`) を `git log -- <旧ファイル>` で確認し踏襲する。
+- CLAUDE.md §標準チェックリスト(UI) に同趣旨の項目を追加済み (毎実装でチェック)。
