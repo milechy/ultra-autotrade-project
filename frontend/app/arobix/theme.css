@@ -1,0 +1,134 @@
+/*
+ * Arobix — central design tokens
+ * ------------------------------------------------------------
+ * 「柔らかく上品で親しみやすいプレミアムフィンテック」テイストの
+ * カラー / グラデーション / 角丸 / 影 を 1 箇所に集約。
+ * すべての arobix 配下コンポーネントはこのトークンを参照する。
+ * 本番画面へ移植する場合は、この :root ブロックを styles/globals.css へ
+ * 取り込むだけで同じパレットを再利用できる。
+ */
+
+.arobix-root {
+  /* ---- グラデーション（紫 → ピンク → 暖色イエロー）---- */
+  --gradient-from: #b9a4f2; /* lavender / 紫寄り */
+  --gradient-via: #ecaccd;  /* soft pink            */
+  --gradient-to: #fbd9a0;   /* warm amber / 暖色黄  */
+  --gradient-main: linear-gradient(
+    135deg,
+    var(--gradient-from) 0%,
+    var(--gradient-via) 52%,
+    var(--gradient-to) 100%
+  );
+  /* ダッシュボードヘッダー用に少しだけ角度違いの柔らかい版 */
+  --gradient-header: linear-gradient(
+    160deg,
+    var(--gradient-from) 0%,
+    var(--gradient-via) 58%,
+    var(--gradient-to) 105%
+  );
+
+  /* ---- カード ---- */
+  --card-warm: #f5ecdd;      /* メイン: 暖かいクリーム〜ベージュ */
+  --card-warm-soft: #fbf4e9; /* さらに淡い暖色             */
+  --card-pink: #f9dce1;      /* サブ: 柔らかいピンク         */
+  --card-pink-deep: #f4c6d0; /* ピンクのアクセント濃いめ      */
+  --card-surface: #ffffff;   /* 白カード（リスト等）          */
+
+  /* ---- アクセント ---- */
+  --accent-purple: #6e56cf;
+  --accent-pink: #e8739e;
+  --accent-yellow: #f4b740;
+
+  /* ---- テキスト ---- */
+  --text-primary: #1c1a27;   /* 濃いスレート〜黒に近い */
+  --text-secondary: #736f7e; /* サブテキスト          */
+  --text-on-dark: #fbf7f0;   /* ダーク面の白文字       */
+  --text-on-grad: #2a2440;   /* グラデ上の濃色文字     */
+
+  /* ---- ボタン（ダーク・高級感）---- */
+  --button-primary-bg: #1b1a23;
+  --button-primary-fg: #fbf7f0;
+  --button-soft-bg: rgba(27, 26, 35, 0.06);
+
+  /* ---- ボトムナビ（ダーク + 白アイコン）---- */
+  --nav-bg: #1b1a23;
+  --nav-fg: rgba(255, 255, 255, 0.55);
+  --nav-active: #fbd9a0;
+
+  /* ---- 背景 ---- */
+  --bg-app: #f7f2ea; /* 全体: 温かいオフホワイト */
+
+  /* ---- 角丸 ---- */
+  --radius-card: 28px;
+  --radius-card-sm: 20px;
+  --radius-btn: 18px;
+  --radius-pill: 999px;
+
+  /* ---- 影（軽く浮き上がる）---- */
+  --shadow-card: 0 14px 34px -16px rgba(60, 40, 90, 0.28);
+  --shadow-soft: 0 8px 20px -12px rgba(60, 40, 90, 0.22);
+  --shadow-btn: 0 12px 24px -10px rgba(27, 26, 35, 0.45);
+}
+
+/* ============================================================
+ * ユーティリティクラス（Tailwind JIT に依存せず確実に描画）
+ * ============================================================ */
+
+/* 背景 */
+.ax-bg-app { background: var(--bg-app); }
+.ax-gradient { background: var(--gradient-main); }
+.ax-gradient-header { background: var(--gradient-header); }
+
+/* カード面 */
+.ax-card-warm { background: var(--card-warm); }
+.ax-card-warm-soft { background: var(--card-warm-soft); }
+.ax-card-pink { background: var(--card-pink); }
+.ax-card-pink-deep { background: var(--card-pink-deep); }
+.ax-card-surface { background: var(--card-surface); }
+
+/* テキスト */
+.ax-text-primary { color: var(--text-primary); }
+.ax-text-secondary { color: var(--text-secondary); }
+.ax-text-on-dark { color: var(--text-on-dark); }
+.ax-text-on-grad { color: var(--text-on-grad); }
+.ax-accent-purple { color: var(--accent-purple); }
+.ax-accent-pink { color: var(--accent-pink); }
+.ax-accent-yellow { color: var(--accent-yellow); }
+
+/* 角丸 */
+.ax-r-card { border-radius: var(--radius-card); }
+.ax-r-card-sm { border-radius: var(--radius-card-sm); }
+.ax-r-btn { border-radius: var(--radius-btn); }
+.ax-r-pill { border-radius: var(--radius-pill); }
+
+/* 影 */
+.ax-shadow-card { box-shadow: var(--shadow-card); }
+.ax-shadow-soft { box-shadow: var(--shadow-soft); }
+
+/* ボタン */
+.ax-btn-primary {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-fg);
+  border-radius: var(--radius-btn);
+  box-shadow: var(--shadow-btn);
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.ax-btn-primary:active { transform: scale(0.98); opacity: 0.92; }
+
+.ax-btn-soft {
+  background: var(--button-soft-bg);
+  color: var(--text-primary);
+  border-radius: var(--radius-btn);
+  transition: background 0.12s ease;
+}
+.ax-btn-soft:active { background: rgba(27, 26, 35, 0.12); }
+
+/* 端末フレーム（プレビュー用・大画面で中央寄せ） */
+.ax-phone {
+  width: 100%;
+  max-width: 420px;
+  margin-inline: auto;
+  min-height: 100dvh;
+  position: relative;
+  background: var(--bg-app);
+}
