@@ -1,12 +1,16 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # backend/tests/test_viewer_no_autoexec_guard.py
-"""P3-2: viewer ロール + auto_execute 組み合わせ拒否ガードのテスト。
+"""viewer ロール + auto_execute の許可テスト。
 
-GID 1214993061793196 (P0) 対応。
-- viewer + auto_execute → 拒否 (400)
-- admin/partner + auto_execute → 許可
-- viewer + require_approval / proposal_only → 許可
-- 既存ユーザーを viewer に降格する際に auto_execute のままなら拒否 (400)
+旧 P3-2 (GID 1214993061793196) では viewer + auto_execute を拒否していたが、
+LIFF 運用モード画面でエンドユーザー（viewer）が自分で「完全おまかせ(managed =
+auto_execute)/アクティブ(active)」を切り替えられるようにする方針変更に伴い、
+viewer + auto_execute 拒否ガードは撤廃した。
+
+現仕様:
+- viewer も user_mode 変更（auto_execute を含む）を本人セルフサービスで実行可能
+- viewer/admin/partner いずれの作成も成功
+- auto_execute を持つユーザーを viewer に降格しても許可される
 """
 
 import os
@@ -94,71 +98,22 @@ def _login(client: TestClient, email: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# _validate_viewer_no_autoexec 単体テスト（service layer）
-# ---------------------------------------------------------------------------
-
-
-class TestValidateViewerNoAutoexec:
-    """AuthService._validate_viewer_no_autoexec の直接テスト。"""
-
-    def test_viewer_auto_execute_raises(self) -> None:
-        """viewer + auto_execute → ValueError。"""
-        from app.auth.service import AuthService
-
-        with pytest.raises(ValueError, match="auto_execute"):
-            AuthService._validate_viewer_no_autoexec("viewer", "auto_execute")
-
-    def test_viewer_require_approval_ok(self) -> None:
-        """viewer + require_approval → 正常。"""
-        from app.auth.service import AuthService
-
-        AuthService._validate_viewer_no_autoexec("viewer", "require_approval")  # no raise
-
-    def test_viewer_proposal_only_ok(self) -> None:
-        """viewer + proposal_only → 正常。"""
-        from app.auth.service import AuthService
-
-        AuthService._validate_viewer_no_autoexec("viewer", "proposal_only")  # no raise
-
-    def test_admin_auto_execute_ok(self) -> None:
-        """admin + auto_execute → 正常。"""
-        from app.auth.service import AuthService
-
-        AuthService._validate_viewer_no_autoexec("admin", "auto_execute")  # no raise
-
-    def test_partner_auto_execute_ok(self) -> None:
-        """partner + auto_execute → 正常。"""
-        from app.auth.service import AuthService
-
-        AuthService._validate_viewer_no_autoexec("partner", "auto_execute")  # no raise
-
-    def test_editor_auto_execute_ok(self) -> None:
-        """editor + auto_execute → 正常。"""
-        from app.auth.service import AuthService
-
-        AuthService._validate_viewer_no_autoexec("editor", "auto_execute")  # no raise
-
-
-# ---------------------------------------------------------------------------
 # API integration tests: ユーザー作成
 # ---------------------------------------------------------------------------
 
 
-class TestCreateUserGuard:
+class TestCreateUser:
     def test_create_viewer_gets_require_approval_default(self, client: TestClient) -> None:
-        """viewer ユーザー作成時、デフォルトで require_approval になること。"""
+        """viewer ユーザー作成時、デフォルトで require_approval になること。
+
+        既定値は安全側の require_approval のまま（auto_execute はユーザーが
+        運用モード画面で能動的に「完全おまかせ」を選んだ場合のみ）。
+        """
         admin_token = _register_admin(client)
         r = _create_user(client, admin_token, "viewer_create@example.com", "viewer")
         assert r.status_code in (200, 201), f"Expected 200/201, got {r.status_code}: {r.text}"
-        # DB デフォルト (require_approval) が適用される
         data = r.json()
-        assert (
-            data["execution_policy"]
-            in (
-                "require_approval",
-                "auto_execute",  # DB側のdefaultが古い環境では auto_execute の可能性もあるが P3-1 後は require_approval
-            )
-        )
+        assert data["execution_policy"] in ("require_approval", "auto_execute")
 
     def test_create_admin_succeeds(self, client: TestClient) -> None:
         """admin ユーザー作成は常に成功すること。"""
@@ -174,21 +129,43 @@ class TestCreateUserGuard:
 
 
 # ---------------------------------------------------------------------------
-# API integration tests: ユーザーロール更新（降格ガード）
+# API integration tests: viewer の auto_execute セルフサービス
 # ---------------------------------------------------------------------------
 
 
-class TestUpdateUserRoleGuard:
-    def test_demote_admin_with_auto_execute_to_viewer_rejected(self, client: TestClient) -> None:
-        """auto_execute を持つ admin を viewer に降格しようとすると 400 になること。"""
+class TestViewerAutoExecuteAllowed:
+    def test_viewer_can_set_managed_auto_execute(self, client: TestClient) -> None:
+        """viewer が運用モードを managed（= auto_execute）に切り替えられること。"""
+        admin_token = _register_admin(client)
+        r = _create_user(client, admin_token, "viewer_autoexec@example.com", "viewer")
+        assert r.status_code in (200, 201)
+
+        token = _login(client, "viewer_autoexec@example.com")
+        r = client.put(
+            "/api/user/settings",
+            json={"user_mode": "managed"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data["user_mode"] == "managed"
+        assert data["execution_policy"] == "auto_execute"
+
+
+# ---------------------------------------------------------------------------
+# API integration tests: ユーザーロール更新（降格は auto_execute でも許可）
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateUserRole:
+    def test_demote_admin_with_auto_execute_to_viewer_allowed(self, client: TestClient) -> None:
+        """auto_execute を持つ admin を viewer に降格しても許可されること（ガード撤廃後）。"""
         admin_token = _register_admin(client)
 
-        # 新しい admin ユーザーを作成（admin は auto_execute がデフォルト設定可能）
         r = _create_user(client, admin_token, "admin_to_demote@example.com", "admin")
         assert r.status_code in (200, 201)
         user_id = r.json()["id"]
 
-        # admin の execution_policy を auto_execute に設定
         target_token = _login(client, "admin_to_demote@example.com")
         r = client.put(
             "/api/user/settings",
@@ -198,16 +175,16 @@ class TestUpdateUserRoleGuard:
         assert r.status_code == 200
         assert r.json()["execution_policy"] == "auto_execute"
 
-        # admin → viewer に降格を試みる → 400 になるべき
+        # admin → viewer に降格 → 許可される
         r = client.put(
             f"/users/{user_id}",
             json={"role": "viewer"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        assert r.status_code == 400, (
-            f"Expected 400 (viewer+auto_execute guard), got {r.status_code}: {r.text}"
+        assert r.status_code == 200, (
+            f"Expected 200 (guard removed), got {r.status_code}: {r.text}"
         )
-        assert "auto_execute" in r.json()["detail"].lower()
+        assert r.json()["role"] == "viewer"
 
     def test_demote_admin_with_require_approval_to_viewer_allowed(self, client: TestClient) -> None:
         """require_approval を持つ admin を viewer に降格すると成功すること。"""
@@ -217,7 +194,6 @@ class TestUpdateUserRoleGuard:
         assert r.status_code in (200, 201)
         user_id = r.json()["id"]
 
-        # execution_policy を require_approval に設定してから降格
         target_token = _login(client, "admin_to_demote2@example.com")
         r = client.put(
             "/api/user/settings",
@@ -227,7 +203,6 @@ class TestUpdateUserRoleGuard:
         assert r.status_code == 200
         assert r.json()["execution_policy"] == "require_approval"
 
-        # admin → viewer に降格 → 成功
         r = client.put(
             f"/users/{user_id}",
             json={"role": "viewer"},
@@ -246,7 +221,6 @@ class TestUpdateUserRoleGuard:
         assert r.status_code in (200, 201)
         user_id = r.json()["id"]
 
-        # email のみ更新（role 変更なし）
         r = client.put(
             f"/users/{user_id}",
             json={"email": "viewer_noupdate_new@example.com"},
@@ -254,15 +228,14 @@ class TestUpdateUserRoleGuard:
         )
         assert r.status_code == 200
 
-    def test_update_partner_to_viewer_with_auto_execute_rejected(self, client: TestClient) -> None:
-        """auto_execute を持つ partner を viewer に降格しようとすると 400 になること。"""
+    def test_update_partner_to_viewer_with_auto_execute_allowed(self, client: TestClient) -> None:
+        """auto_execute を持つ partner を viewer に降格しても許可されること（ガード撤廃後）。"""
         admin_token = _register_admin(client)
 
         r = _create_user(client, admin_token, "partner_to_viewer@example.com", "partner")
         assert r.status_code in (200, 201)
         user_id = r.json()["id"]
 
-        # partner の execution_policy を auto_execute に設定
         target_token = _login(client, "partner_to_viewer@example.com")
         r = client.put(
             "/api/user/settings",
@@ -272,13 +245,12 @@ class TestUpdateUserRoleGuard:
         assert r.status_code == 200
         assert r.json()["execution_policy"] == "auto_execute"
 
-        # partner → viewer に降格を試みる → 400
         r = client.put(
             f"/users/{user_id}",
             json={"role": "viewer"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        assert r.status_code == 400, (
-            f"Expected 400 (viewer+auto_execute guard), got {r.status_code}: {r.text}"
+        assert r.status_code == 200, (
+            f"Expected 200 (guard removed), got {r.status_code}: {r.text}"
         )
-        assert "auto_execute" in r.json()["detail"].lower()
+        assert r.json()["role"] == "viewer"
