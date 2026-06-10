@@ -6,7 +6,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { HelpCircle, ShieldAlert, ShieldOff } from 'lucide-react'
-import { useAccount } from 'wagmi'
+import { useWallet } from '@/hooks/useWallet'
+import { getChainDisplayName } from '@/lib/web3/config'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -46,7 +47,8 @@ export function UserHeader() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout, token, isAdmin, isPartner } = useAuth()
-  const { address, chain } = useAccount()
+  // injected / Privy embedded を統合した単一情報源（useWallet）から取得。
+  const { address, chainId } = useWallet()
   const { isStopped, refreshStatus } = useAutomationStatus()
   const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false)
   const [showResumeConfirm, setShowResumeConfirm] = useState(false)
@@ -127,12 +129,12 @@ export function UserHeader() {
                   variant="outline"
                   className={cn(
                     'text-xs hidden sm:flex',
-                    chain?.id === 84532
+                    chainId === 84532
                       ? 'border-yellow-500/50 text-yellow-400'
                       : 'border-red-500/50 text-red-400'
                   )}
                 >
-                  {chain?.name ?? 'Unknown'}
+                  {getChainDisplayName(chainId) ?? 'Unknown'}
                 </Badge>
               </>
             )}

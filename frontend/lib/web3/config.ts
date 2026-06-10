@@ -117,3 +117,17 @@ export function getChainKey(chainId: number): SupportedChainKey | null {
   if (chainId === 1) return 'mainnet'
   return null
 }
+
+// chainId(数値) → 表示名。wagmi の Chain.name に依存していた箇所を useWallet(chainId 数値)
+// 経由に移行するための共通ヘルパー。未知チェーンは `Chain <id>` を返す。
+export function getChainDisplayName(chainId: number | null | undefined): string | undefined {
+  if (chainId == null) return undefined
+  const names: Record<number, string> = {
+    1: 'Ethereum',
+    8453: 'Base',
+    84532: 'Base Sepolia',
+    42161: 'Arbitrum One',
+    10: 'Optimism',
+  }
+  return names[chainId] ?? `Chain ${chainId}`
+}

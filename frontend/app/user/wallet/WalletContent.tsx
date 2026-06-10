@@ -3,20 +3,23 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import Link from 'next/link'
-import { useAccount, useBalance, useDisconnect } from 'wagmi'
+import { useBalance } from 'wagmi'
 import { formatUnits } from 'viem'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { useWallet } from '@/hooks/useWallet'
+import { getChainDisplayName } from '@/lib/web3/config'
 
 export function WalletContent() {
-  const { address, isConnected, chain } = useAccount()
-  const { data: balance } = useBalance({ address })
-  const { disconnect } = useDisconnect()
-  const defaultChainId = parseInt(process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID || '8453', 10)
-  const ALLOWED_CHAIN_IDS = [defaultChainId]
-  const isCorrectChain = chain?.id != null && ALLOWED_CHAIN_IDS.includes(chain.id)
+  // injected / Privy embedded を統合した単一情報源（useWallet）から取得。
+  const { address, isConnected, chainId, isCorrectChain, disconnect } = useWallet()
+  const { data: balance } = useBalance({
+    address: address ? (address as `0x${string}`) : undefined,
+    chainId: chainId ?? undefined,
+  })
+  const chainName = getChainDisplayName(chainId)
 
   if (!isConnected) {
     return (
@@ -52,7 +55,7 @@ export function WalletContent() {
             label="アドレス"
             value={address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '—'}
           />
-          <InfoRow label="チェーン" value={chain?.name ?? '—'} />
+          <InfoRow label="チェーン" value={chainName ?? '—'} />
           <InfoRow
             label="残高"
             value={
@@ -69,7 +72,7 @@ export function WalletContent() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>ネットワークが違います</AlertTitle>
           <AlertDescription>
-            Base メインネットに切り替えてください。現在: {chain?.name ?? '不明'}
+            Base メインネットに切り替えてください。現在: {chainName ?? '不明'}
           </AlertDescription>
         </Alert>
       )}
