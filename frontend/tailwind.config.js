@@ -69,11 +69,20 @@ module.exports = {
           "90%": { opacity: "1" },
           "100%": { transform: "translateY(800px)", opacity: "0" },
         },
+        // UAT ロゴの光沢: 0→33%(=1.5s)で光が左→右に走り、残り(=3s)は待機。
+        // 開始位置と終了位置はどちらも光沢バンドが文字外＝単色なので loop 折返しの段差は出ない。
+        "logo-shine": {
+          "0%": { backgroundPosition: "0% 0" },
+          "33%": { backgroundPosition: "100% 0" },
+          "100%": { backgroundPosition: "100% 0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "scan-line": "scan-line 2s ease-in-out forwards",
+        // sweep 1.5s + wait 3s = 4.5s 周期で無限ループ
+        "logo-shine": "logo-shine 4.5s ease-in-out infinite",
       },
     },
   },
