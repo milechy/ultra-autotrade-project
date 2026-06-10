@@ -92,12 +92,9 @@ def update_user_settings(
                 detail="max_daily_trade_usd must be positive",
             )
         current_user.max_daily_trade_usd = request.max_daily_trade_usd
-    if request.user_mode is not None or request.execution_policy is not None:
-        if current_user.role not in (UserRole.ADMIN.value, UserRole.PARTNER.value):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="execution policy change is not allowed for this role",
-            )
+    # user_mode は本人によるセルフサービス変更（role 制限なし）。
+    # LIFF 運用モード画面でエンドユーザー（viewer）が自分の運用モードを
+    # 「完全おまかせ(managed)/アクティブ(active)」で切り替えられるようにする。
     if request.user_mode is not None:
         if request.user_mode not in _USER_MODE_TO_POLICY:
             raise HTTPException(
@@ -106,7 +103,13 @@ def update_user_settings(
             )
         current_user.user_mode = request.user_mode
         current_user.execution_policy = _USER_MODE_TO_POLICY[request.user_mode]
+    # execution_policy の直接指定は admin/partner のみ（低レベル操作のため温存）。
     if request.execution_policy is not None:
+        if current_user.role not in (UserRole.ADMIN.value, UserRole.PARTNER.value):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="execution policy change is not allowed for this role",
+            )
         if request.execution_policy not in ExecutionPolicy.values():
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

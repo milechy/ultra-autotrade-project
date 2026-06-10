@@ -117,18 +117,35 @@ def test_partner_can_revert_to_active(client: TestClient) -> None:
     assert r.json()["execution_policy"] == "require_approval"
 
 
-def test_viewer_cannot_update_user_mode(client: TestClient) -> None:
-    """viewerロールは user_mode 変更が 403 になること。"""
+def test_viewer_can_update_user_mode(client: TestClient) -> None:
+    """viewerロールも user_mode を本人セルフサービスで変更できること。
+
+    LIFF 運用モード画面でエンドユーザー（viewer）が「完全おまかせ(managed)/
+    アクティブ(active)」を自分で切り替えられる必要があるため、user_mode 変更は
+    role 制限なし。execution_policy も user_mode に追従して更新される。
+    """
     admin_token = _register_admin(client)
     token = _create_user_with_role(client, admin_token, "viewer_mode@example.com", "viewer")
 
+    # active へ切替
+    r = client.put(
+        "/api/user/settings",
+        json={"user_mode": "active"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["user_mode"] == "active"
+    assert data["execution_policy"] == "require_approval"
+
+    # managed（完全おまかせ = auto_execute）へも切替可能
     r = client.put(
         "/api/user/settings",
         json={"user_mode": "managed"},
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert r.status_code == 403
-    assert "execution policy" in r.json()["detail"].lower()
+    assert r.status_code == 200, r.text
+    assert r.json()["execution_policy"] == "auto_execute"
 
 
 def test_viewer_cannot_update_execution_policy_directly(client: TestClient) -> None:
