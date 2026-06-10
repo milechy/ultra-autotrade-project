@@ -157,7 +157,13 @@ export default function LiffChatPage() {
         >
           <Menu className="w-6 h-6" />
         </button>
-        <span className="text-[#4ade9a] font-bold text-xl tracking-wider">UAT</span>
+        <span
+          className="font-bold text-xl tracking-wider bg-clip-text text-transparent
+                     bg-[length:300%_100%] animate-logo-shine motion-reduce:animate-none
+                     bg-[linear-gradient(100deg,#4ade9a_0%,#4ade9a_45%,#ffffff_50%,#4ade9a_55%,#4ade9a_100%)]"
+        >
+          UAT
+        </span>
         <button
           onClick={() => setActivePanel("account")}
           className="text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
