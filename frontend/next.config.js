@@ -67,10 +67,13 @@ const nextConfig = {
     };
     // Privy の optional な Solana / Farcaster 依存をスタブ（未使用）
     // porto は package.json から削除済み。wagmi/connectors 内部参照をスタブ化
+    // @stripe/crypto は react-auth 3.29 の FiatOnrampScreen(Stripe Bridge onramp)用の
+    // optional peer dep。日本は Deposit address 方式で Stripe Bridge は未使用のためスタブ化。
     config.resolve.alias = {
       ...config.resolve.alias,
       '@solana/wallet-adapter-react': false,
       '@farcaster/miniapp-sdk': false,
+      '@stripe/crypto': false,
       'porto': false,
       'porto/internal': false,
     };
