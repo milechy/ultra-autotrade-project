@@ -3,10 +3,12 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState, useCallback } from 'react'
-import { useAccount, useReadContract } from 'wagmi'
+import { useReadContract } from 'wagmi'
 import { useFundWallet } from '@privy-io/react-auth'
 import { base, baseSepolia } from 'wagmi/chains'
 import { formatUnits } from 'viem'
+import { useWallet } from '@/hooks/useWallet'
+import { getChainDisplayName } from '@/lib/web3/config'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -35,17 +37,20 @@ function getChainForPrivy(chainId: number | undefined) {
 }
 
 export function DepositContent() {
-  const { address, isConnected, chain } = useAccount()
+  // injected / Privy embedded を統合した単一情報源（useWallet）から取得。
+  const { address, isConnected, chainId } = useWallet()
   const [isFunding, setIsFunding] = useState(false)
   const [fundError, setFundError] = useState<string | null>(null)
 
-  const usdcAddress = chain?.id != null ? USDC_BY_CHAIN[chain.id] : undefined
+  const chainName = getChainDisplayName(chainId)
+  const usdcAddress = chainId != null ? USDC_BY_CHAIN[chainId] : undefined
 
   const { data: usdcBalanceRaw, refetch: refetchBalance, isLoading: balanceLoading } = useReadContract({
     address: usdcAddress,
     abi: ERC20_ABI,
     functionName: 'balanceOf',
-    args: address ? [address] : undefined,
+    args: address ? [address as `0x${string}`] : undefined,
+    chainId: chainId ?? undefined,
     query: { enabled: !!address && !!usdcAddress },
   })
 
@@ -70,7 +75,7 @@ export function DepositContent() {
       await fundWallet({
         address,
         options: {
-          chain: getChainForPrivy(chain?.id),
+          chain: getChainForPrivy(chainId ?? undefined),
           amount: DEFAULT_ONRAMP_AMOUNT,
           asset: 'USDC',
         },
@@ -83,7 +88,7 @@ export function DepositContent() {
       setIsFunding(false)
       void refetchBalance()
     }
-  }, [address, chain, fundWallet, refetchBalance])
+  }, [address, chainId, fundWallet, refetchBalance])
 
   if (!isConnected || !address) {
     return (
@@ -114,7 +119,7 @@ export function DepositContent() {
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">ネットワーク</span>
             <Badge variant="outline" className="text-xs">
-              {chain?.name ?? '不明'}
+              {chainName ?? '不明'}
             </Badge>
           </div>
           <div className="flex items-center justify-between text-sm">
@@ -185,7 +190,7 @@ export function DepositContent() {
           <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground space-y-1">
             <p>・入金先: あなた自身のウォレット（ノンカストディアル）</p>
             <p>・推奨金額: ${DEPOSIT_GATE_USD} USDC 以上</p>
-            <p>・着金チェーン: {chain?.name ?? 'Base'}（別ネットワークの USDC も自動変換）</p>
+            <p>・着金チェーン: {chainName ?? 'Base'}（別ネットワークの USDC も自動変換）</p>
           </div>
           <Button
             className="w-full"
