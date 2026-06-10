@@ -1,7 +1,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useCallback } from "react"
 import {
   Copy,
   QrCode,
@@ -13,10 +13,9 @@ import {
   RefreshCw,
   Loader2,
 } from "lucide-react"
-import { usePrivy, useWallets } from "@privy-io/react-auth"
-import { getAuthToken } from "@/lib/auth/token-key"
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
+import { usePrivy } from "@privy-io/react-auth"
+import { useWallet } from "@/hooks/useWallet"
+import { useLinkedWalletAddress } from "@/hooks/useLinkedWalletAddress"
 
 // アドレス解決の状態。
 //  - loading : Privy 初期化中 / API 取得中
@@ -27,80 +26,38 @@ type FetchState = "loading" | "ready" | "empty" | "error"
 
 export function MyWalletPanel() {
   const { ready: privyReady, login } = usePrivy()
-  const { wallets } = useWallets()
-  const [address, setAddress] = useState<string | null>(null)
-  const [fetchState, setFetchState] = useState<FetchState>("loading")
+
+  // live wallet（injected / Privy embedded）は useWallet に集約済み。
+  // settings 画面など他の消費者と同一の単一情報源を共有する。
+  const { address: liveAddress } = useWallet()
+
+  // live wallet が取れないときだけ、バックエンド記録アドレスをフォールバック取得。
+  // （別デバイスで連携済み等。表示専用で署名はできない。）
+  const linked = useLinkedWalletAddress(privyReady && !liveAddress)
+
+  const address = liveAddress ?? linked.address
+
+  // 表示状態を派生。Privy 初期化前は loading を維持（永久固まり回避）。
+  const fetchState: FetchState = !privyReady
+    ? "loading"
+    : address
+      ? "ready"
+      : linked.state === "loading" || linked.state === "idle"
+        ? "loading"
+        : linked.state === "error"
+          ? "error"
+          : "empty"
+
   const [qrExpanded, setQrExpanded] = useState(false)
   const [toastMsg, setToastMsg] = useState("")
 
-  // Privy embedded wallet アドレスを取得、なければ API から取得する。
-  // token key は '@/lib/auth/token-key' の getAuthToken に統一
-  // （旧 'ultra_auth_token' 直読みは撤廃 — key 不整合による永久ローディングの根本原因）。
-  const resolveAddress = useCallback(async () => {
-    // Privy 初期化が終わるまでは loading 表示を維持（永久固まり回避のため privyReady を見る）
-    if (!privyReady) {
-      setFetchState("loading")
-      return
-    }
-
-    setFetchState("loading")
-
-    // 1) Privy embedded wallet を最優先
-    const privyWallet = wallets.find((w) => w.walletClientType === "privy")
-    if (privyWallet?.address) {
-      setAddress(privyWallet.address)
-      setFetchState("ready")
-      return
-    }
-
-    // 2) Privy ウォレットが無い場合は API から取得
-    const token = getAuthToken()
-    if (!token) {
-      // 認証トークンが無い = 未接続扱い（空状態 UI を表示）
-      setAddress(null)
-      setFetchState("empty")
-      return
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/api/user/settings`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) {
-        // 非2xx は fail-visible。永久ローディングにせずエラー表示へ。
-        setFetchState("error")
-        return
-      }
-      const data = (await res.json()) as {
-        wallet_address?: string | null
-      } | null
-      if (data?.wallet_address) {
-        setAddress(data.wallet_address)
-        setFetchState("ready")
-      } else {
-        // 認証済みだがウォレット未接続
-        setAddress(null)
-        setFetchState("empty")
-      }
-    } catch {
-      // ネットワーク失敗等は fail-visible（リトライ可能）
-      setFetchState("error")
-    }
-  }, [privyReady, wallets])
-
-  useEffect(() => {
-    void resolveAddress()
-  }, [resolveAddress])
-
   // 「ウォレットに接続する」: Privy login をトリガ。
-  // login 後は authenticated/wallets が更新され、useEffect が再解決する。
+  // login 後は useWallet().address が更新され再描画される。
   const handleConnect = useCallback(async () => {
     try {
-      setFetchState("loading")
       await login()
-      // login 解決後の wallets 反映は useWallets の更新 → useEffect 再実行に委ねる
     } catch {
-      setFetchState("error")
+      // 失敗時は接続誘導 UI のまま（Privy 側がモーダルでエラー提示）
     }
   }, [login])
 
@@ -175,7 +132,7 @@ export function MyWalletPanel() {
               </p>
             </div>
             <button
-              onClick={() => void resolveAddress()}
+              onClick={() => linked.refetch()}
               className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl
                          bg-zinc-800/60 hover:bg-zinc-700/60 active:bg-zinc-600/60
                          transition-colors text-xs text-zinc-200"
@@ -209,7 +166,7 @@ export function MyWalletPanel() {
             </button>
             {/* Privy 初期化前など login が使えない場合のフォールバック再試行 */}
             <button
-              onClick={() => void resolveAddress()}
+              onClick={() => linked.refetch()}
               className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl
                          bg-zinc-800/40 hover:bg-zinc-700/50 active:bg-zinc-600/50
                          transition-colors text-xs text-zinc-400"
