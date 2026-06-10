@@ -181,9 +181,7 @@ class TestUpdateUserRole:
             json={"role": "viewer"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        assert r.status_code == 200, (
-            f"Expected 200 (guard removed), got {r.status_code}: {r.text}"
-        )
+        assert r.status_code == 200, f"Expected 200 (guard removed), got {r.status_code}: {r.text}"
         assert r.json()["role"] == "viewer"
 
     def test_demote_admin_with_require_approval_to_viewer_allowed(self, client: TestClient) -> None:
@@ -250,7 +248,5 @@ class TestUpdateUserRole:
             json={"role": "viewer"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        assert r.status_code == 200, (
-            f"Expected 200 (guard removed), got {r.status_code}: {r.text}"
-        )
+        assert r.status_code == 200, f"Expected 200 (guard removed), got {r.status_code}: {r.text}"
         assert r.json()["role"] == "viewer"
