@@ -179,13 +179,13 @@ export function DepositContent() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            クレジットカードや銀行振込でUSDCを直接あなたのウォレットに入金できます。
+            取引所（例: SBI VCトレード）やお持ちのウォレットから USDC を送金して入金できます。
             資産はサーバーには預けられず、あなたのウォレットに直接届きます。
           </p>
           <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground space-y-1">
             <p>・入金先: あなた自身のウォレット（ノンカストディアル）</p>
             <p>・推奨金額: ${DEPOSIT_GATE_USD} USDC 以上</p>
-            <p>・対応チェーン: {chain?.name ?? 'Base'}</p>
+            <p>・着金チェーン: {chain?.name ?? 'Base'}（別ネットワークの USDC も自動変換）</p>
           </div>
           <Button
             className="w-full"
@@ -201,7 +201,7 @@ export function DepositContent() {
             ) : (
               <>
                 <ArrowDownToLine className="mr-2 h-4 w-4" />
-                入金する（Privy）
+                入金アドレスを表示
               </>
             )}
           </Button>
@@ -217,8 +217,8 @@ export function DepositContent() {
       </Card>
 
       <p className="text-center text-xs text-muted-foreground px-4">
-        入金はPrivyの安全なオンランプ経由で処理されます。
-        手数料はProviderにより異なります。
+        入金はPrivyの入金アドレス経由で処理され、別チェーンの USDC は自動でブリッジされます。
+        ネットワーク・ブリッジ手数料がかかる場合があります。
       </p>
     </div>
   )

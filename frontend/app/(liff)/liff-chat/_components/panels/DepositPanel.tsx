@@ -15,7 +15,6 @@ interface UserSettingsResponse {
 }
 
 type Tab = "deposit" | "withdraw"
-type PaymentMethod = "card" | "apple" | "google"
 
 // 入金用 JPY → USDC 変換レート（固定近似値）
 const JPY_PER_USDC = 155
@@ -96,7 +95,6 @@ export function DepositPanel() {
 
   // 入金フォーム
   const [depositAmount, setDepositAmount] = useState("")
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
 
   // 出金フォーム
   const [withdrawAmount, setWithdrawAmount] = useState("")
@@ -163,10 +161,10 @@ export function DepositPanel() {
   const estimatedUsdc = depositNum > 0 ? (depositNum / JPY_PER_USDC).toFixed(2) : "0"
 
   const depositRows = [
-    { label: "金額", value: `¥${depositNum.toLocaleString("ja-JP")}` },
+    { label: "入金目安額", value: `¥${depositNum.toLocaleString("ja-JP")}` },
     { label: "概算 USDC", value: `≈ $${estimatedUsdc} USDC` },
-    { label: "支払い方法", value: paymentMethod === "card" ? "クレジット/デビット" : paymentMethod === "apple" ? "Apple Pay" : "Google Pay" },
-    { label: "ネットワーク", value: "Base Mainnet" },
+    { label: "入金方法", value: "取引所・ウォレットから送金" },
+    { label: "着金先ネットワーク", value: "Base Mainnet（自動変換）" },
   ]
 
   const handleDepositConfirm = useCallback(async () => {
@@ -186,7 +184,7 @@ export function DepositPanel() {
         },
       })
       setConfirmOpen(false)
-      setSuccessMsg("入金フローを開始しました。完了後に残高が更新されます。")
+      setSuccessMsg("入金用アドレスを表示しました。送金の着金後に残高が反映されます。")
       void fetchBalance()
     } catch (e) {
       if (e instanceof Error && e.message.toLowerCase().includes("exit")) {
@@ -322,38 +320,18 @@ export function DepositPanel() {
             ))}
           </div>
 
-          {/* 支払い方法 */}
-          <div>
-            <label className="block text-xs text-zinc-400 mb-2">支払い方法</label>
-            <div className="space-y-2">
-              {(
-                [
-                  { id: "card" as PaymentMethod, label: "クレジット/デビット" },
-                  { id: "apple" as PaymentMethod, label: "Apple Pay" },
-                  { id: "google" as PaymentMethod, label: "Google Pay" },
-                ] as { id: PaymentMethod; label: string }[]
-              ).map(({ id, label }) => (
-                <label
-                  key={id}
-                  className={[
-                    "flex items-center gap-3 px-3 py-3 rounded-xl border cursor-pointer transition-colors",
-                    paymentMethod === id
-                      ? "border-[#1D9E75] bg-[#1a3d2e]"
-                      : "border-zinc-700 bg-zinc-800",
-                  ].join(" ")}
-                >
-                  <input
-                    type="radio"
-                    name="payment"
-                    value={id}
-                    checked={paymentMethod === id}
-                    onChange={() => setPaymentMethod(id)}
-                    className="accent-[#1D9E75]"
-                  />
-                  <span className="text-sm text-zinc-200">{label}</span>
-                </label>
-              ))}
-            </div>
+          {/* 入金方法の案内（Privy Deposit address） */}
+          <div className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 space-y-2">
+            <p className="text-xs font-medium text-zinc-300">入金方法</p>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              「入金する」を押すと入金用アドレスが表示されます。取引所（例: SBI VCトレード）や
+              お持ちのウォレットから USDC を送金してください。
+            </p>
+            <ul className="text-xs text-zinc-500 leading-relaxed space-y-0.5 list-disc list-inside">
+              <li>Ethereum など別ネットワークの USDC も自動で Base に変換されて着金します</li>
+              <li>少額すぎると送金できない場合があります（目安: 数十ドル以上）</li>
+              <li>入力した金額は送金額の目安です（実際の送金額はご自身で指定します）</li>
+            </ul>
           </div>
 
           {/* 入金ボタン */}
