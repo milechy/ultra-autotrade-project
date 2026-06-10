@@ -269,3 +269,15 @@ class TestCryptactCsvEndpoint:
         reader = csv.DictReader(io.StringIO(content))
         rows = list(reader)
         assert rows == []
+
+    def test_token_query_param_auth(self, client_with_proposals: TestClient) -> None:
+        """?token= クエリパラメータでの認証が動作すること（ブラウザDL用）。"""
+        token = _get_admin_token(client_with_proposals)
+        r = client_with_proposals.get(f"/api/proposals/tax/cryptact-csv?token={token}")
+        assert r.status_code == 200
+        assert "text/csv" in r.headers["content-type"]
+
+    def test_no_token_returns_401(self, client: TestClient) -> None:
+        """ヘッダーもクエリパラメータもなければ 401 を返すこと。"""
+        r = client.get("/api/proposals/tax/cryptact-csv")
+        assert r.status_code == 401

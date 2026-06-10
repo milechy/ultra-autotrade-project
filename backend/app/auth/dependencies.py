@@ -9,7 +9,7 @@ FastAPI の Depends で使用する認証関連の依存関数。
 
 from typing import Optional
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -25,16 +25,18 @@ security = HTTPBearer(auto_error=False)
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db),
+    query_token: Optional[str] = Query(None, alias="token", include_in_schema=False),
 ) -> User:
     """
     現在のユーザーを取得する。
 
-    Authorization ヘッダーから Bearer トークンを取得し、
-    トークンをデコードしてユーザーを特定する。
+    Authorization: Bearer ヘッダーを優先し、なければ ?token= クエリパラメータを
+    フォールバックとして受け付ける（ファイルダウンロード用）。
 
     Args:
-        credentials: Bearer トークン
+        credentials: Bearer トークン (Authorization ヘッダー)
         db: データベースセッション
+        query_token: ?token= クエリパラメータ (ファイルDL時フォールバック)
 
     Returns:
         認証済みユーザー
@@ -42,15 +44,18 @@ async def get_current_user(
     Raises:
         HTTPException: 認証失敗時
     """
-    if credentials is None:
+    if credentials is not None:
+        raw_token = credentials.credentials
+    elif query_token is not None:
+        raw_token = query_token
+    else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = credentials.credentials
-    payload = AuthService.decode_token(token)
+    payload = AuthService.decode_token(raw_token)
 
     if payload is None:
         raise HTTPException(
