@@ -19,6 +19,7 @@ from app.protocols.base import (
     TransactionResult,
 )
 
+from .cache import PendleMarketCache
 from .config import PendleConfig
 from .schemas import (
     PendleMarketInfo,
@@ -420,9 +421,18 @@ class PendleRouterV4Client:
         "sepolia": 421614,  # Arbitrum Sepolia
     }
 
-    def __init__(self, config: PendleConfig) -> None:
+    def __init__(
+        self,
+        config: PendleConfig,
+        market_cache: PendleMarketCache | None = None,
+    ) -> None:
         self._config = config
         self._chain_id = self._CHAIN_ID_MAP.get(config.chain, 42161)
+        # market address キャッシュ（外部注入可能 / テスト容易性のため）
+        # config を注入し、満期フィルタ（min_days_to_maturity）を有効化する
+        self._market_cache = market_cache or PendleMarketCache(
+            chain_id=self._chain_id, config=config
+        )
         logger.info(
             "PendleRouterV4Client initialized (chain=%s, chain_id=%d, router=%s)",
             config.chain,
@@ -572,6 +582,25 @@ class PendleRouterV4Client:
             ):
                 return False, None, "router address mismatch"
         return True, to_addr, ""
+
+    async def resolve_market_address(self, underlying_asset: str) -> str | None:
+        """underlying_asset シンボルから market address を動的解決する。
+
+        キャッシュヒット時はキャッシュを返す。
+        キャッシュミス時は Pendle /markets エンドポイントを呼び出す。
+        API 失敗時は None を返す（fail-open 設計）。
+
+        Args:
+            underlying_asset: 原資産シンボル（例: "stETH", "wstETH"）
+
+        Returns:
+            market address 文字列、または None（失敗時 / 見つからない時）
+        """
+        return await self._market_cache.get_market_address(underlying_asset)
+
+    def get_market_cache(self) -> PendleMarketCache:
+        """market address キャッシュインスタンスを返す（メトリクス参照用）。"""
+        return self._market_cache
 
     async def buy_yt(
         self,
