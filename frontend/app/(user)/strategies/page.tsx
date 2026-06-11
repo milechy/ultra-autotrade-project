@@ -13,6 +13,7 @@ import {
   type ProtocolHealth,
   type PendleMarketInfo,
   type LidoAprResponse,
+  type RiskLevel,
 } from '@/lib/api/protocols'
 
 interface StrategyData {
@@ -27,7 +28,20 @@ interface StrategyData {
   status: 'active' | 'phase2'
   phase: string
   isOperational: boolean | null
-  riskLevelApi: string | null
+}
+
+// API の risk_level 値 (low/medium/high/critical) を表示用ラベルと色クラスに変換する
+function riskLevelToDisplay(level: RiskLevel): { label: string; color: string } {
+  switch (level) {
+    case 'low':
+      return { label: '低', color: 'bg-green-500/20 text-green-400 border-green-500/30' }
+    case 'medium':
+      return { label: '中', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' }
+    case 'high':
+      return { label: '高', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' }
+    case 'critical':
+      return { label: '最高', color: 'bg-red-500/20 text-red-400 border-red-500/30' }
+  }
 }
 
 function buildStrategies(
@@ -54,6 +68,22 @@ function buildStrategies(
     pendleApyRange = `${impliedApy}%（現在の想定利回り）`
   }
 
+  // API の risk_level が取得できた場合はその値を優先し、未取得時は静的フォールバックを使用する
+  const aaveRisk = healthMap['aave']?.risk_level
+  const aaveDisplay = aaveRisk
+    ? riskLevelToDisplay(aaveRisk)
+    : { label: '低', color: 'bg-green-500/20 text-green-400 border-green-500/30' }
+
+  const lidoRisk = lidoHealth?.risk_level
+  const lidoDisplay = lidoRisk
+    ? riskLevelToDisplay(lidoRisk)
+    : { label: '中', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' }
+
+  const pendleRisk = pendleHealth?.risk_level
+  const pendleDisplay = pendleRisk
+    ? riskLevelToDisplay(pendleRisk)
+    : { label: '中〜高', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' }
+
   return [
     {
       id: 'aave-v3-usdc',
@@ -63,12 +93,11 @@ function buildStrategies(
       description:
         'USDCをAave V3プロトコルに供給し、安定した貸出利息を獲得します。ヘルスファクター監視と自動リバランスで安全に運用します。',
       apyRange: '3〜5%',
-      riskLevel: '低',
-      riskColor: 'bg-green-500/20 text-green-400 border-green-500/30',
+      riskLevel: aaveDisplay.label,
+      riskColor: aaveDisplay.color,
       status: 'active',
       phase: 'Phase 1',
       isOperational: healthMap['aave']?.is_operational ?? null,
-      riskLevelApi: healthMap['aave']?.risk_level ?? null,
     },
     {
       id: 'lido-steth',
@@ -78,12 +107,11 @@ function buildStrategies(
       description:
         'ETHをLidoプロトコルでリキッドステーキングし、stETHとして保有します。バリデーター報酬を受け取りながら流動性を維持できます。',
       apyRange: lidoApyRange,
-      riskLevel: '中',
-      riskColor: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      riskLevel: lidoDisplay.label,
+      riskColor: lidoDisplay.color,
       status: 'phase2',
       phase: 'Phase 2',
       isOperational: lidoHealth?.is_operational ?? null,
-      riskLevelApi: lidoHealth?.risk_level ?? null,
     },
     {
       id: 'pendle-pt-yt',
@@ -93,12 +121,11 @@ function buildStrategies(
       description:
         'Pendleプロトコルでトークン化された利回りを売買します。元本トークン（PT）と利回りトークン（YT）を活用した高度なイールド最適化戦略です。',
       apyRange: pendleApyRange,
-      riskLevel: '中〜高',
-      riskColor: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+      riskLevel: pendleDisplay.label,
+      riskColor: pendleDisplay.color,
       status: 'phase2',
       phase: 'Phase 2',
       isOperational: pendleHealth?.is_operational ?? null,
-      riskLevelApi: pendleHealth?.risk_level ?? null,
     },
   ]
 }
