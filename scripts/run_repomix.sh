@@ -31,7 +31,9 @@ echo " config: repomix.config.json"
 echo "========================================="
 
 # --include で対象を絞る（config の ignore はそのまま効く）
-npx -y repomix@latest --config repomix.config.json --include "${TARGET}/**"
+# バージョン固定（サプライチェーン対策 / 監査 MINOR-1）。更新時はここを上げる。
+REPOMIX_VERSION="${REPOMIX_VERSION:-1.14.1}"
+npx -y "repomix@${REPOMIX_VERSION}" --config repomix.config.json --include "${TARGET}/**"
 
 if [[ -f "$OUTPUT_FILE" ]]; then
   echo ""

@@ -43,8 +43,12 @@ ensure_skillspector() {
     export PATH="$HOME/.local/bin:$PATH"
   fi
   if [[ ! -d "$SKILLSPECTOR_DIR/.git" ]]; then
-    git clone --depth 1 https://github.com/NVIDIA/skillspector.git "$SKILLSPECTOR_DIR"
+    # SKILLSPECTOR_REF を指定すればタグ/SHA 固定可（サプライチェーン対策 / 監査 MINOR-2）
+    git clone --depth 1 ${SKILLSPECTOR_REF:+--branch "$SKILLSPECTOR_REF"} \
+      https://github.com/NVIDIA/skillspector.git "$SKILLSPECTOR_DIR"
   fi
+  # 入れ替わり検知のため取得した commit を記録（監査 MINOR-2）
+  echo "skillspector commit: $(git -C "$SKILLSPECTOR_DIR" rev-parse HEAD)"
   ( cd "$SKILLSPECTOR_DIR" && uv venv .venv && . .venv/bin/activate && make install )
   # make install 後、venv 内の skillspector を使う
   export PATH="$SKILLSPECTOR_DIR/.venv/bin:$PATH"

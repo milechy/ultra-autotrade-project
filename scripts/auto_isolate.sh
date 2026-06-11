@@ -65,8 +65,10 @@ case "$cmd" in
       git branch "$q_branch"
       git stash branch "$q_branch" >/dev/null 2>&1 || {
         # stash branch が使えない場合は隔離ブランチに pop
-        git checkout "$q_branch" -q && git stash pop >/dev/null 2>&1 || true
-        git add -A && git commit -q -m "quarantine: $reason" || true
+        # 監査 MINOR-4: silent failure 排除
+        if ! git checkout "$q_branch" -q; then echo "🛑 checkout $q_branch 失敗" >&2; exit 1; fi
+        if ! git stash pop >/dev/null 2>&1; then echo "🛑 stash pop 失敗 — 変更は stash に残存" >&2; git checkout "$CUR_BRANCH" -q; exit 1; fi
+        git add -A && git commit -q -m "quarantine: $reason"
         git checkout "$CUR_BRANCH" -q
       }
       echo "✓ 変更を隔離ブランチ $q_branch に退避（元ブランチはクリーン）"
