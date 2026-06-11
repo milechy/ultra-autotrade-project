@@ -420,7 +420,10 @@ class PendleRouterV4Client:
         self._config = config
         self._chain_id = self._CHAIN_ID_MAP.get(config.chain, 42161)
         # market address キャッシュ（外部注入可能 / テスト容易性のため）
-        self._market_cache = market_cache or PendleMarketCache(chain_id=self._chain_id)
+        # config を注入し、満期フィルタ（min_days_to_maturity）を有効化する
+        self._market_cache = market_cache or PendleMarketCache(
+            chain_id=self._chain_id, config=config
+        )
         logger.info(
             "PendleRouterV4Client initialized (chain=%s, chain_id=%d, router=%s)",
             config.chain,
