@@ -24,6 +24,7 @@ from .schemas import (
     PendleMarketInfo,
     RouterV4AddLiquidityRequest,
     RouterV4AddLiquidityResult,
+    RouterV4Approval,
     RouterV4SwapRequest,
     RouterV4SwapResult,
 )
@@ -452,6 +453,79 @@ class PendleRouterV4Client:
         factor = Decimal(10) ** decimals
         return Decimal(str(wei)) / factor
 
+    def _check_guards(
+        self,
+        amount_in: Decimal,
+        portfolio_value_usd: Decimal | None = None,
+    ) -> RouterV4SwapResult | None:
+        """二段ガード + 10%上限チェック。
+
+        問題があれば RouterV4SwapResult(success=False) を返す。問題なければ None を返す。
+        """
+        # Q1 一段目: オンチェーン書き込み無効ガード
+        if not self._config.enable_onchain_write:
+            return RouterV4SwapResult(
+                success=False,
+                error="on-chain write disabled (PENDLE_ENABLE_ONCHAIN_WRITE=false)",
+            )
+        # Q2: 単一トレード上限（10%）チェック
+        if portfolio_value_usd is not None:
+            limit = portfolio_value_usd * self._config.max_single_trade_pct
+            if amount_in > limit:
+                return RouterV4SwapResult(
+                    success=False,
+                    error=(
+                        f"exceeds max single trade ({self._config.max_single_trade_pct * 100:.0f}%): "
+                        f"amount_in={amount_in}, limit={limit}"
+                    ),
+                )
+        else:
+            logger.warning(
+                "PendleRouterV4Client: portfolio_value_usd が未指定のため 10%上限チェックをスキップ"
+            )
+        return None
+
+    def _check_guards_liq(
+        self,
+        amount_in: Decimal,
+        portfolio_value_usd: Decimal | None = None,
+    ) -> RouterV4AddLiquidityResult | None:
+        """二段ガード + 10%上限チェック（add_liquidity 用）。
+
+        問題があれば RouterV4AddLiquidityResult(success=False) を返す。問題なければ None を返す。
+        """
+        if not self._config.enable_onchain_write:
+            return RouterV4AddLiquidityResult(
+                success=False,
+                error="on-chain write disabled (PENDLE_ENABLE_ONCHAIN_WRITE=false)",
+            )
+        if portfolio_value_usd is not None:
+            limit = portfolio_value_usd * self._config.max_single_trade_pct
+            if amount_in > limit:
+                return RouterV4AddLiquidityResult(
+                    success=False,
+                    error=(
+                        f"exceeds max single trade ({self._config.max_single_trade_pct * 100:.0f}%): "
+                        f"amount_in={amount_in}, limit={limit}"
+                    ),
+                )
+        else:
+            logger.warning(
+                "PendleRouterV4Client: portfolio_value_usd が未指定のため 10%上限チェックをスキップ"
+            )
+        return None
+
+    def _extract_approvals(self, sdk_response: dict[str, Any]) -> list[RouterV4Approval] | None:
+        """SDK レスポンスから approvals を抽出する。"""
+        raw_approvals = sdk_response.get("data", {}).get("approvals", [])
+        if not raw_approvals:
+            return None
+        result: list[RouterV4Approval] = []
+        for item in raw_approvals:
+            if isinstance(item, dict) and "spender" in item and "token" in item:
+                result.append(RouterV4Approval(spender=item["spender"], token=item["token"]))
+        return result if result else None
+
     async def buy_yt(
         self,
         market_address: str,
@@ -459,6 +533,8 @@ class PendleRouterV4Client:
         amount_in: Decimal,
         receiver: str,
         slippage: Decimal | None = None,
+        dry_run: bool = True,
+        portfolio_value_usd: Decimal | None = None,
     ) -> RouterV4SwapResult:
         """YT を購入する（token_in → YT swap）。
 
@@ -468,10 +544,15 @@ class PendleRouterV4Client:
             amount_in: 入力量（Decimal）
             receiver: YT 受取アドレス
             slippage: スリッページ（デフォルト 0.5% = 0.005）
+            dry_run: True の場合 calldata 生成のみで tx 送信なし（デフォルト True）
+            portfolio_value_usd: ポートフォリオ総額（10%上限チェック用。None でスキップ）
 
         Returns:
             RouterV4SwapResult
         """
+        guard = self._check_guards(amount_in, portfolio_value_usd)
+        if guard is not None:
+            return guard
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
         req = RouterV4SwapRequest(
             market_address=market_address,
@@ -481,7 +562,7 @@ class PendleRouterV4Client:
             slippage=effective_slippage,
             receiver=receiver,
         )
-        return await self._execute_swap(req, "swapExactTokenForYt")
+        return await self._execute_swap(req, "swapExactTokenForYt", dry_run=dry_run)
 
     async def sell_yt(
         self,
@@ -490,6 +571,8 @@ class PendleRouterV4Client:
         yt_amount_in: Decimal,
         receiver: str,
         slippage: Decimal | None = None,
+        dry_run: bool = True,
+        portfolio_value_usd: Decimal | None = None,
     ) -> RouterV4SwapResult:
         """YT を売却する（YT → token_out swap）。
 
@@ -499,10 +582,15 @@ class PendleRouterV4Client:
             yt_amount_in: 売却する YT 量（Decimal）
             receiver: 受取アドレス
             slippage: スリッページ（デフォルト 0.5% = 0.005）
+            dry_run: True の場合 calldata 生成のみで tx 送信なし（デフォルト True）
+            portfolio_value_usd: ポートフォリオ総額（10%上限チェック用。None でスキップ）
 
         Returns:
             RouterV4SwapResult
         """
+        guard = self._check_guards(yt_amount_in, portfolio_value_usd)
+        if guard is not None:
+            return guard
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
         req = RouterV4SwapRequest(
             market_address=market_address,
@@ -512,7 +600,7 @@ class PendleRouterV4Client:
             slippage=effective_slippage,
             receiver=receiver,
         )
-        return await self._execute_swap(req, "swapExactYtForToken")
+        return await self._execute_swap(req, "swapExactYtForToken", dry_run=dry_run)
 
     async def buy_pt(
         self,
@@ -521,6 +609,8 @@ class PendleRouterV4Client:
         amount_in: Decimal,
         receiver: str,
         slippage: Decimal | None = None,
+        dry_run: bool = True,
+        portfolio_value_usd: Decimal | None = None,
     ) -> RouterV4SwapResult:
         """PT を購入する（token_in → PT swap）。
 
@@ -530,10 +620,15 @@ class PendleRouterV4Client:
             amount_in: 入力量（Decimal）
             receiver: PT 受取アドレス
             slippage: スリッページ（デフォルト 0.5% = 0.005）
+            dry_run: True の場合 calldata 生成のみで tx 送信なし（デフォルト True）
+            portfolio_value_usd: ポートフォリオ総額（10%上限チェック用。None でスキップ）
 
         Returns:
             RouterV4SwapResult
         """
+        guard = self._check_guards(amount_in, portfolio_value_usd)
+        if guard is not None:
+            return guard
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
         req = RouterV4SwapRequest(
             market_address=market_address,
@@ -543,7 +638,7 @@ class PendleRouterV4Client:
             slippage=effective_slippage,
             receiver=receiver,
         )
-        return await self._execute_swap(req, "swapExactTokenForPt")
+        return await self._execute_swap(req, "swapExactTokenForPt", dry_run=dry_run)
 
     async def sell_pt(
         self,
@@ -552,6 +647,8 @@ class PendleRouterV4Client:
         pt_amount_in: Decimal,
         receiver: str,
         slippage: Decimal | None = None,
+        dry_run: bool = True,
+        portfolio_value_usd: Decimal | None = None,
     ) -> RouterV4SwapResult:
         """PT を売却する（PT → token_out swap）。
 
@@ -561,10 +658,15 @@ class PendleRouterV4Client:
             pt_amount_in: 売却する PT 量（Decimal）
             receiver: 受取アドレス
             slippage: スリッページ（デフォルト 0.5% = 0.005）
+            dry_run: True の場合 calldata 生成のみで tx 送信なし（デフォルト True）
+            portfolio_value_usd: ポートフォリオ総額（10%上限チェック用。None でスキップ）
 
         Returns:
             RouterV4SwapResult
         """
+        guard = self._check_guards(pt_amount_in, portfolio_value_usd)
+        if guard is not None:
+            return guard
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
         req = RouterV4SwapRequest(
             market_address=market_address,
@@ -574,18 +676,24 @@ class PendleRouterV4Client:
             slippage=effective_slippage,
             receiver=receiver,
         )
-        return await self._execute_swap(req, "swapExactPtForToken")
+        return await self._execute_swap(req, "swapExactPtForToken", dry_run=dry_run)
 
     async def _execute_swap(
-        self, req: RouterV4SwapRequest, sdk_endpoint: str
+        self,
+        req: RouterV4SwapRequest,
+        sdk_endpoint: str,
+        dry_run: bool = True,
     ) -> RouterV4SwapResult:
-        """SDK を呼び出して swap calldata を取得し、tx を送信する。
+        """SDK を呼び出して swap calldata を取得する。
 
+        dry_run=True の場合、calldata 生成のみで tx 送信はしない（現実装では常に送信しないが、
+        将来の署名実装に備えて分岐を明示）。
         外部 HTTP 失敗は例外を握りつぶさず RouterV4SwapResult(success=False) を返す。
 
         Args:
             req: swap リクエスト
             sdk_endpoint: SDK エンドポイント名
+            dry_run: True の場合 calldata 生成のみ（デフォルト True）
 
         Returns:
             RouterV4SwapResult
@@ -604,10 +712,11 @@ class PendleRouterV4Client:
             }
 
             logger.info(
-                "PendleRouterV4Client._execute_swap: endpoint=%s, market=%s, amountIn=%s",
+                "PendleRouterV4Client._execute_swap: endpoint=%s, market=%s, amountIn=%s, dry_run=%s",
                 sdk_endpoint,
                 req.market_address[:10] + "...",
                 req.amount_in,
+                dry_run,
             )
 
             sdk_response = await self._call_sdk(sdk_endpoint, params)
@@ -615,12 +724,15 @@ class PendleRouterV4Client:
             calldata: str = sdk_response.get("data", {}).get("tx", {}).get("data", "")
             out_amount_raw = sdk_response.get("data", {}).get("amountOut", "0")
             amount_out = self._wei_to_decimal(int(str(out_amount_raw)))
+            approvals = self._extract_approvals(sdk_response)
 
+            # dry_run=True の場合は calldata 取得のみ。tx 送信は行わない（sign_transaction/send_raw_transaction 禁止）
             return RouterV4SwapResult(
                 success=True,
-                tx_hash=None,  # tx 送信は Phase 2 以降（現フェーズは calldata 取得のみ）
+                tx_hash=None,  # dry_run 中は tx_hash なし。将来の署名実装でも P1 境界を守る
                 amount_out=amount_out,
                 calldata=calldata,
+                approvals=approvals,
             )
 
         except httpx.HTTPStatusError as exc:
@@ -649,6 +761,8 @@ class PendleRouterV4Client:
         amount_in: Decimal,
         receiver: str,
         slippage: Decimal | None = None,
+        dry_run: bool = True,
+        portfolio_value_usd: Decimal | None = None,
     ) -> RouterV4AddLiquidityResult:
         """マーケットに流動性を追加する（token_in → LP）。
 
@@ -658,10 +772,16 @@ class PendleRouterV4Client:
             amount_in: 入力量（Decimal）
             receiver: LP 受取アドレス
             slippage: スリッページ（デフォルト 0.5% = 0.005）
+            dry_run: True の場合 calldata 生成のみで tx 送信なし（デフォルト True）
+            portfolio_value_usd: ポートフォリオ総額（10%上限チェック用。None でスキップ）
 
         Returns:
             RouterV4AddLiquidityResult
         """
+        guard_liq = self._check_guards_liq(amount_in, portfolio_value_usd)
+        if guard_liq is not None:
+            return guard_liq
+
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
         req = RouterV4AddLiquidityRequest(
             market_address=market_address,
@@ -683,10 +803,11 @@ class PendleRouterV4Client:
             }
 
             logger.info(
-                "PendleRouterV4Client.add_liquidity: market=%s, tokenIn=%s, amountIn=%s",
+                "PendleRouterV4Client.add_liquidity: market=%s, tokenIn=%s, amountIn=%s, dry_run=%s",
                 req.market_address[:10] + "...",
                 req.token_in[:10] + "..." if len(req.token_in) > 10 else req.token_in,
                 req.amount_in,
+                dry_run,
             )
 
             sdk_response = await self._call_sdk("addLiquiditySingleToken", params)
@@ -694,12 +815,14 @@ class PendleRouterV4Client:
             calldata = sdk_response.get("data", {}).get("tx", {}).get("data", "")
             lp_amount_raw = sdk_response.get("data", {}).get("amountLpOut", "0")
             lp_amount = self._wei_to_decimal(int(str(lp_amount_raw)))
+            approvals = self._extract_approvals(sdk_response)
 
             return RouterV4AddLiquidityResult(
                 success=True,
-                tx_hash=None,  # tx 送信は Phase 2 以降
+                tx_hash=None,  # dry_run 中は tx_hash なし
                 lp_amount=lp_amount,
                 calldata=calldata,
+                approvals=approvals,
             )
 
         except httpx.HTTPStatusError as exc:
@@ -715,6 +838,15 @@ class PendleRouterV4Client:
         except Exception as exc:
             logger.warning("PendleRouterV4Client.add_liquidity 失敗: error=%s", exc)
             return RouterV4AddLiquidityResult(success=False, error=str(exc))
+
+
+def get_pendle_router_v4_client(config: PendleConfig) -> PendleRouterV4Client:
+    """設定から PendleRouterV4Client を生成して返す。
+
+    service 層から到達可能な単一エントリポイント。
+    automation には配線しない。main.py 変更禁止のため router.py で使用する。
+    """
+    return PendleRouterV4Client(config)
 
 
 def get_pendle_client(config: PendleConfig) -> AbstractPendleClient:

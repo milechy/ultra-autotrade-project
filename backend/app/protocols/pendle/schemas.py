@@ -129,6 +129,13 @@ class RouterV4SwapRequest(BaseModel):
         return Decimal(str(v))
 
 
+class RouterV4Approval(BaseModel):
+    """RouterV4 SDK から返される approve 情報。"""
+
+    spender: str = Field(..., description="スペンダーアドレス（通常 Router）")
+    token: str = Field(..., description="承認が必要なトークンアドレス")
+
+
 class RouterV4SwapResult(BaseModel):
     """RouterV4 swap 結果。"""
 
@@ -137,6 +144,8 @@ class RouterV4SwapResult(BaseModel):
     amount_out: Optional[Decimal] = None
     calldata: Optional[str] = None
     error: Optional[str] = None
+    # SDK レスポンスの approvals（spender=Router, token）。approve tx 送信はしない
+    approvals: Optional[list[RouterV4Approval]] = None
 
 
 class RouterV4AddLiquidityRequest(BaseModel):
@@ -167,3 +176,5 @@ class RouterV4AddLiquidityResult(BaseModel):
     lp_amount: Optional[Decimal] = None
     calldata: Optional[str] = None
     error: Optional[str] = None
+    # SDK レスポンスの approvals（spender=Router, token）。approve tx 送信はしない
+    approvals: Optional[list[RouterV4Approval]] = None

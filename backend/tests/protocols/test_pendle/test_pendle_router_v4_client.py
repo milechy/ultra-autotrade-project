@@ -39,6 +39,8 @@ _MOCK_ADD_LIQ_RESPONSE: dict = {
 @pytest.fixture
 def router_client() -> PendleRouterV4Client:
     config = PendleConfig(sandbox=False)
+    # テスト用に enable_onchain_write=True（ガードを通過させる）
+    config.enable_onchain_write = True
     return PendleRouterV4Client(config)
 
 
