@@ -12,9 +12,12 @@ from fastapi.testclient import TestClient
 from app.protocols.lido.router import router
 from app.protocols.lido.schemas import (
     LidoAprResponse,
+    LidoClaimResponse,
     LidoStakeResponse,
     LidoStatus,
+    LidoWithdrawalStatusResponse,
     LidoWithdrawResponse,
+    WithdrawalStatus,
 )
 
 _app = FastAPI()
@@ -257,3 +260,161 @@ class TestGetLidoApr:
             response = _client.get("/api/protocols/lido/apr")
 
         assert response.status_code == 503
+
+
+def _make_claim_response(dry_run: bool = True) -> LidoClaimResponse:
+    return LidoClaimResponse(
+        operation="CLAIM",
+        request_ids=[1, 2],
+        tx_hash=None if dry_run else "0x" + "ef" * 32,
+        dry_run=dry_run,
+        claimed_eth=None,
+    )
+
+
+def _make_withdrawal_status_response() -> LidoWithdrawalStatusResponse:
+    import time
+
+    return LidoWithdrawalStatusResponse(
+        request_ids=[1, 2],
+        statuses=[
+            WithdrawalStatus(
+                request_id=1,
+                amount_of_steth=Decimal("1.0"),
+                amount_of_shares=Decimal("1.0"),
+                owner="0x0000000000000000000000000000000000000001",
+                timestamp=int(time.time()) - 86400,
+                is_finalized=True,
+                is_claimed=False,
+            ),
+            WithdrawalStatus(
+                request_id=2,
+                amount_of_steth=Decimal("0.5"),
+                amount_of_shares=Decimal("0.5"),
+                owner="0x0000000000000000000000000000000000000001",
+                timestamp=int(time.time()) - 86400,
+                is_finalized=True,
+                is_claimed=False,
+            ),
+        ],
+    )
+
+
+class TestClaimWithdrawal:
+    """POST /api/protocols/lido/claim のテスト（checkpoint hints 方式 / 複数形）。"""
+
+    def test_claim_dry_run_returns_200(self) -> None:
+        """dry_run claim で 200 を返すこと。"""
+        with patch("app.protocols.lido.router._get_service") as mock_get_svc:
+            mock_service = AsyncMock()
+            mock_service.claim.return_value = _make_claim_response(dry_run=True)
+            mock_get_svc.return_value = mock_service
+
+            response = _client.post(
+                "/api/protocols/lido/claim",
+                json={"request_ids": [1, 2], "dry_run": True},
+            )
+
+        assert response.status_code == 200
+
+    def test_claim_response_has_operation_field(self) -> None:
+        """レスポンスに operation='CLAIM' が含まれること。"""
+        with patch("app.protocols.lido.router._get_service") as mock_get_svc:
+            mock_service = AsyncMock()
+            mock_service.claim.return_value = _make_claim_response(dry_run=True)
+            mock_get_svc.return_value = mock_service
+
+            response = _client.post(
+                "/api/protocols/lido/claim",
+                json={"request_ids": [1, 2], "dry_run": True},
+            )
+
+        data = response.json()
+        assert data["operation"] == "CLAIM"
+        assert data["dry_run"] is True
+        assert data["request_ids"] == [1, 2]
+
+    def test_claim_runtime_error_returns_422(self) -> None:
+        """RuntimeError 発生時に 422 を返すこと。"""
+        with patch("app.protocols.lido.router._get_service") as mock_get_svc:
+            mock_service = AsyncMock()
+            mock_service.claim.side_effect = RuntimeError("クレーム失敗")
+            mock_get_svc.return_value = mock_service
+
+            response = _client.post(
+                "/api/protocols/lido/claim",
+                json={"request_ids": [1], "dry_run": False},
+            )
+
+        assert response.status_code == 422
+
+    def test_claim_unexpected_exception_returns_503(self) -> None:
+        """予期しない例外発生時に 503 を返すこと。"""
+        with patch("app.protocols.lido.router._get_service") as mock_get_svc:
+            mock_service = AsyncMock()
+            mock_service.claim.side_effect = Exception("予期せぬエラー")
+            mock_get_svc.return_value = mock_service
+
+            response = _client.post(
+                "/api/protocols/lido/claim",
+                json={"request_ids": [1], "dry_run": True},
+            )
+
+        assert response.status_code == 503
+
+
+class TestGetWithdrawalStatus:
+    """GET /api/protocols/lido/withdrawal-status のテスト。"""
+
+    def test_withdrawal_status_returns_200(self) -> None:
+        """正常時に 200 を返すこと。"""
+        with patch("app.protocols.lido.router._get_service") as mock_get_svc:
+            mock_service = AsyncMock()
+            mock_service.get_withdrawal_status.return_value = _make_withdrawal_status_response()
+            mock_get_svc.return_value = mock_service
+
+            response = _client.get(
+                "/api/protocols/lido/withdrawal-status",
+                params={"request_ids": "1,2"},
+            )
+
+        assert response.status_code == 200
+
+    def test_withdrawal_status_response_fields(self) -> None:
+        """レスポンスに request_ids と statuses が含まれること。"""
+        with patch("app.protocols.lido.router._get_service") as mock_get_svc:
+            mock_service = AsyncMock()
+            mock_service.get_withdrawal_status.return_value = _make_withdrawal_status_response()
+            mock_get_svc.return_value = mock_service
+
+            response = _client.get(
+                "/api/protocols/lido/withdrawal-status",
+                params={"request_ids": "1,2"},
+            )
+
+        data = response.json()
+        assert "request_ids" in data
+        assert "statuses" in data
+        assert len(data["statuses"]) == 2
+
+    def test_withdrawal_status_runtime_error_returns_503(self) -> None:
+        """RuntimeError 発生時に 503 を返すこと。"""
+        with patch("app.protocols.lido.router._get_service") as mock_get_svc:
+            mock_service = AsyncMock()
+            mock_service.get_withdrawal_status.side_effect = RuntimeError("RPC エラー")
+            mock_get_svc.return_value = mock_service
+
+            response = _client.get(
+                "/api/protocols/lido/withdrawal-status",
+                params={"request_ids": "1"},
+            )
+
+        assert response.status_code == 503
+
+    def test_withdrawal_status_invalid_ids_returns_422(self) -> None:
+        """非数値の request_ids は 422 を返すこと。"""
+        response = _client.get(
+            "/api/protocols/lido/withdrawal-status",
+            params={"request_ids": "abc,xyz"},
+        )
+        assert response.status_code == 422

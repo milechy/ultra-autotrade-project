@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from .client import get_lido_client
 from .config import get_lido_config
@@ -21,6 +21,7 @@ from .schemas import (
     LidoStakeResponse,
     LidoStatus,
     LidoWithdrawalRequestsResponse,
+    LidoWithdrawalStatusResponse,
     LidoWithdrawRequest,
     LidoWithdrawResponse,
 )
@@ -91,10 +92,11 @@ async def get_lido_apr() -> LidoAprResponse:
 
 @router.post("/claim", response_model=LidoClaimResponse)
 async def claim_withdrawal(request: LidoClaimRequest) -> LidoClaimResponse:
-    """引き出しクレーム実行。dry_run=True（デフォルト）でシミュレーション。
+    """引き出しクレーム実行（checkpoint hints 方式）。dry_run=True（デフォルト）でシミュレーション。
 
     Lido WithdrawalQueue の finalized 済みリクエストに対してクレームを実行する。
     待機期間（1〜5日）が完了してから呼ぶこと。
+    複数の request_ids を一括クレームできる。
     """
     service = _get_service()
     try:
@@ -103,6 +105,34 @@ async def claim_withdrawal(request: LidoClaimRequest) -> LidoClaimResponse:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Lido claim 失敗")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get("/withdrawal-status", response_model=LidoWithdrawalStatusResponse)
+async def get_withdrawal_status(
+    request_ids: str = Query(
+        ..., description="カンマ区切りの withdrawal request ID 一覧 (例: 1,2,3)"
+    ),
+) -> LidoWithdrawalStatusResponse:
+    """withdrawal request のステータス一覧を取得する。
+
+    request_ids パラメータにカンマ区切りの ID 一覧を渡す。
+    例: GET /api/protocols/lido/withdrawal-status?request_ids=1,2,3
+    """
+    service = _get_service()
+    try:
+        parsed_ids = [int(rid.strip()) for rid in request_ids.split(",") if rid.strip()]
+        if not parsed_ids:
+            raise HTTPException(status_code=422, detail="request_ids は空にできません")
+        return await service.get_withdrawal_status(parsed_ids)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"request_ids のパース失敗: {exc}") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Lido withdrawal-status 取得失敗")
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
