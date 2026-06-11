@@ -158,49 +158,30 @@ def test_wallet_address_is_propagated_to_execute_rebalance(
     )
 
 
-def test_null_wallet_falls_back_and_emits_slack_warning(client: TestClient, test_db: tuple) -> None:
-    """user.wallet_address が NULL の場合、execute_rebalance に None が渡り Slack 警告が出ること。"""
+def test_null_wallet_is_blocked_by_layer1_guard(client: TestClient, test_db: tuple) -> None:
+    """user.wallet_address が NULL の場合、Layer 1 guard が執行をブロックして status='failed' になること。"""
     _override, SessionLocal = test_db
     token = _admin_token(client)
     proposal_id = _create_proposal(client, token)
     _set_admin_wallet(SessionLocal, None)
 
-    fake_result = AaveOperationResult(
-        operation=AaveOperationType.DEPOSIT,
-        status=AaveOperationStatus.SUCCESS,
-        asset_symbol="USDC",
-        amount=Decimal("1000.00"),
-        tx_hash="0xfallback_hash",
-    )
-
     with (
         patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
         patch(
             "app.aave.service.MultiChainAaveService.execute_rebalance",
-            return_value=fake_result,
         ) as mock_execute,
-        patch("app.notifications.factory.get_notification_service") as mock_get_service,
     ):
-        mock_service = mock_get_service.return_value
         r = client.post(
             f"/api/proposals/{proposal_id}/approve",
             headers={"Authorization": f"Bearer {token}"},
         )
 
     assert r.status_code == 200
-    assert r.json()["status"] == "executed"
-
-    kwargs = mock_execute.call_args.kwargs
-    assert kwargs.get("wallet_address") is None, (
-        f"wallet_address should be None for fallback. kwargs={kwargs}"
-    )
-
-    # Slack 警告 (wallet fallback) が送られたこと
-    assert mock_service.send.called
-    sent_message = mock_service.send.call_args.args[0]
-    assert f"#{proposal_id}" in sent_message.title
-    assert "wallet" in sent_message.title.lower() or "fallback" in sent_message.title.lower()
-    assert "user.wallet_address is NULL" in sent_message.body
+    assert r.json()["status"] == "failed"
+    # Layer 1 guard で止まるため execute_rebalance は呼ばれない
+    mock_execute.assert_not_called()
+    # エラーメッセージに "execution blocked" が含まれること
+    assert "execution blocked" in (r.json().get("error_message") or "")
 
 
 def test_two_users_propagate_their_own_wallets(client: TestClient, test_db: tuple) -> None:

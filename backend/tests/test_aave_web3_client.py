@@ -705,26 +705,24 @@ def test_deposit_supply_uses_partner_wallet_as_on_behalf_of(
 
 @patch("app.aave.rpc_provider.RPCProvider")
 @patch("app.aave.client.Web3")
-def test_deposit_without_wallet_address_falls_back_to_server_wallet(
+def test_deposit_without_wallet_address_raises_error(
     mock_web3, mock_rpc_provider_cls, mock_settings
 ):
     """
-    wallet_address 未指定時は後方互換でサーバーウォレットにフォールバックすること。
+    wallet_address 未指定時は AaveClientError を raise すること (NULL wallet guard Layer 3)。
 
-    non-custodial 移行後は本来呼ばれないが、既存の custodial フローが壊れていないことを確認。
+    non-custodial 移行後は execute 経路でのデフォルト fallback を禁止。
+    wallet_address は呼び出し元が明示的に渡す必要がある。
     """
-    client, mock_pool, server_account = _make_mocked_web3_client(
+    from app.aave.client import AaveClientError
+
+    client, _mock_pool, _server_account = _make_mocked_web3_client(
         mock_web3, mock_rpc_provider_cls, mock_settings
     )
 
-    # wallet_address を渡さない (backward-compat パス)
-    result = client.deposit(asset_address="USDC", amount=Decimal("1.0"))
-    assert result is not None
-
-    supply_call_args = mock_pool.functions.supply.call_args
-    on_behalf_of = supply_call_args.args[2]
-    # サーバーウォレットが使われること
-    assert on_behalf_of == server_account.address
+    # wallet_address を渡さない → Layer 3 guard が AaveClientError を raise する
+    with pytest.raises(AaveClientError, match="wallet_address is required for on-chain deposit"):
+        client.deposit(asset_address="USDC", amount=Decimal("1.0"))
 
 
 @patch("app.aave.rpc_provider.RPCProvider")

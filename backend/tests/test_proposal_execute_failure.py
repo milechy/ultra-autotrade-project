@@ -71,14 +71,31 @@ def client(test_db: tuple) -> TestClient:
     return TestClient(app)
 
 
-def _admin_token(client: TestClient) -> str:
+def _admin_token(client: TestClient, session_local: object = None) -> str:
+    from sqlalchemy.orm import Session
+
     email = os.environ.get("INITIAL_ADMIN_EMAIL", "terms_admin@example.com")
     client.post(
         "/auth/register",
         json={"email": email, "username": "admin", "password": "adminpassword123"},
     )
     r = client.post("/auth/login", json={"email": email, "password": "adminpassword123"})
-    return r.json()["access_token"]
+    token = r.json()["access_token"]
+
+    # NULL wallet guard: テスト用 admin に wallet_address を設定して実行が通るようにする
+    if session_local is not None:
+        from app.auth.models import User
+
+        db: Session = session_local()
+        try:
+            admin = db.query(User).filter(User.email == email).first()
+            if admin and not admin.wallet_address:
+                admin.wallet_address = "0xTestAdminWallet0000000000000000000000000"
+                db.commit()
+        finally:
+            db.close()
+
+    return token
 
 
 def _create_proposal(client: TestClient, token: str) -> int:
@@ -94,7 +111,7 @@ def _create_proposal(client: TestClient, token: str) -> int:
 def test_aave_execution_success_marks_proposal_executed(client: TestClient, test_db: tuple) -> None:
     """Aave 実行成功 → proposal.status='executed', transaction(status='completed') 記録。"""
     _override, SessionLocal = test_db
-    token = _admin_token(client)
+    token = _admin_token(client, SessionLocal)
     proposal_id = _create_proposal(client, token)
 
     fake_result = AaveOperationResult(
@@ -144,7 +161,7 @@ def test_aave_execution_success_marks_proposal_executed(client: TestClient, test
 def test_aave_execution_failure_marks_proposal_failed(client: TestClient, test_db: tuple) -> None:
     """Aave 実行失敗 → proposal.status='failed', error_message 記録, transaction(status='failed') 記録。"""
     _override, SessionLocal = test_db
-    token = _admin_token(client)
+    token = _admin_token(client, SessionLocal)
     proposal_id = _create_proposal(client, token)
 
     boom = RuntimeError("RPC connection refused")
@@ -191,9 +208,12 @@ def test_aave_execution_failure_marks_proposal_failed(client: TestClient, test_d
         db.close()
 
 
-def test_aave_execution_failure_sends_slack_notification(client: TestClient) -> None:
+def test_aave_execution_failure_sends_slack_notification(
+    client: TestClient, test_db: tuple
+) -> None:
     """Aave 実行失敗時に通知サービスの send() が呼ばれることを検証（mock）。"""
-    token = _admin_token(client)
+    _override, SessionLocal = test_db
+    token = _admin_token(client, SessionLocal)
     proposal_id = _create_proposal(client, token)
 
     boom = RuntimeError("web3 provider unreachable")

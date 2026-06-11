@@ -321,27 +321,27 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
         _record_failed_transaction(proposal, chain, error_message, db)
         return
 
-    # --- partner 別 wallet 伝播 (2026-05-28 Lane 13) ---
-    # proposal owner の wallet_address を取得し、Aave 実行時に伝播する。
-    # NULL の場合は env AAVE_WALLET_ADDRESS fallback + Slack 警告 (partner 別資金分離の前提が破れる)。
-    user = db.scalars(select(User).where(User.id == proposal.user_id)).first()
-    user_wallet: str | None = user.wallet_address if user is not None else None
-    if user_wallet:
-        masked_wallet = f"{user_wallet[:6]}...{user_wallet[-4:]}"
-        logger.info(
-            "proposal %d: executing as user_id=%d wallet=%s",
-            proposal.id,
-            proposal.user_id,
-            masked_wallet,
-        )
-    else:
-        logger.warning(
-            "proposal %d: user_id=%d wallet_address is NULL — "
-            "falling back to AAVE_WALLET_ADDRESS env (partner separation broken)",
-            proposal.id,
-            proposal.user_id,
-        )
-        _notify_missing_wallet(proposal.id, proposal.user_id)
+    # proposal.user_id から wallet_address を解決して partner 別に伝播させる
+    _user = db.get(UserModel, proposal.user_id)
+    _wallet_address = (_user.wallet_address or "") if _user else ""
+    logger.info(
+        "proposal %d: user_id=%d wallet=%s",
+        proposal.id,
+        proposal.user_id,
+        _wallet_address[:6] + "..." if len(_wallet_address) > 6 else _wallet_address or "(none)",
+    )
+
+    # NULL wallet guard (Layer 1): wallet 未設定 partner は執行を拒否してデフォルト wallet 汚染を防ぐ
+    if not _wallet_address:
+        _error_msg = f"user {proposal.user_id} has no wallet_address configured — execution blocked"
+        logger.error("proposal %d: %s", proposal.id, _error_msg)
+        _blocked_at = datetime.now(timezone.utc)
+        proposal.status = "failed"
+        proposal.error_message = _error_msg
+        proposal.executed_at = _blocked_at
+        _record_failed_transaction(proposal, chain, _error_msg, db)
+        _notify_aave_failure(proposal.id, _error_msg, _blocked_at)
+        return
 
     try:
         multi_service = MultiChainAaveService()
@@ -351,7 +351,7 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
             amount=Decimal(str(proposal.amount_usd)),
             asset_symbol=proposal.asset,
             dry_run=False,
-            wallet_address=user_wallet,
+            wallet_address=_wallet_address,
         )
 
         # 成功: attempt カウントも記録（診断用）

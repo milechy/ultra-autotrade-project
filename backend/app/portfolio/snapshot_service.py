@@ -184,11 +184,13 @@ def record_portfolio_snapshot(db: Optional[Session] = None) -> dict[str, Any]:
             if not testers:
                 continue
 
-            wallet_addr = _get_wallet_address(partner)
+            # NULL wallet ガード: partner は wallet_address 明示設定のみ使用。
+            # env AAVE_WALLET_ADDRESS へのフォールバックは partner ウォレット汚染防止のため禁止。
+            wallet_addr = partner.wallet_address or ""
             if not wallet_addr:
                 logger.warning(
-                    "portfolio_snapshot: partner_id=%d has no wallet_address and"
-                    " AAVE_WALLET_ADDRESS is unset; skipping",
+                    "portfolio_snapshot: partner_id=%d has no wallet_address; skipping"
+                    " (env fallback disabled for partner loop)",
                     partner_id,
                 )
                 partners_skipped += 1

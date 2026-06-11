@@ -343,10 +343,13 @@ class TestRecordPortfolioSnapshot:
         assert Decimal(str(snap2.total_supply_usd)) == Decimal("4000.000000")
         assert Decimal(str(snap2.total_borrow_usd)) == Decimal("500.000000")
 
-    def test_partner_env_fallback_when_no_wallet(
+    def test_partner_no_wallet_is_skipped_not_env_fallback(
         self, db_session: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """partner.wallet_address が None のとき AAVE_WALLET_ADDRESS env でフォールバックする。"""
+        """partner.wallet_address が None のとき env AAVE_WALLET_ADDRESS にフォールバックせずスキップする。
+
+        NULL wallet ガード: partner ループでは env fallback を使わない (ウォレット汚染防止)。
+        """
         monkeypatch.setenv("AAVE_WALLET_ADDRESS", "0xENV_FALLBACK")
         partner = _make_user(db_session, uid=10, role="partner", wallet=None)
         _make_user(db_session, uid=11, invited_by=partner.id)
@@ -360,8 +363,10 @@ class TestRecordPortfolioSnapshot:
         ):
             result = record_portfolio_snapshot(db_session)
 
-        assert result["snapshots_created"] == 1
-        mock_client.get_account_data.assert_called_once_with("0xENV_FALLBACK")
+        # partner は wallet 未設定のためスキップ (env fallback 禁止)
+        assert result["snapshots_created"] == 0
+        assert result["partners_skipped"] == 1
+        mock_client.get_account_data.assert_not_called()
 
     def test_partner_skipped_when_no_wallet_and_no_env(
         self, db_session: Session, monkeypatch: pytest.MonkeyPatch
