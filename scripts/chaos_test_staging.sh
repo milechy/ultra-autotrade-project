@@ -2,7 +2,10 @@
 # scripts/chaos_test_staging.sh
 #
 # Ultra AutoTrade Chaos Test — staging 自動復旧検証
-# ローンチ条件2: コンテナ kill → 5分以内自動復旧を確認
+# ローンチ条件2: コンテナの main プロセスを host から SIGKILL (クラッシュ再現)
+#   → restart:always による 5分以内自動復旧を確認
+# 注意: `docker kill` は使わない (Docker が意図的停止扱いし restart:always が発火しないため。
+#   2026-06-11 実機確認)。root か sudo で実行すること (host PID への kill -9 が必要)。
 #
 # 対象: staging 環境のみ（production は絶対に触らない）
 # 実行場所: 本番 Hetzner VPS (77.42.46.155) または dev VPS
@@ -127,10 +130,14 @@ _wait_for_recovery() {
     status=$(docker inspect --format='{{.State.Status}}' "$container" 2>/dev/null) || status="unknown"
 
     if [[ "$status" == "running" ]]; then
-      # health エンドポイントも確認
-      local http_code
-      http_code=$(_check_health "$health_url")
-      if [[ "$http_code" == "200" ]]; then
+      # 該当コンテナ自身の healthcheck を確認する。
+      # 旧実装は全コンテナを単一 nginx URL (8082) で判定していたため、nginx/backend を
+      # kill した瞬間に health が落ち、以降の全コンテナ判定が連鎖 FAIL していた
+      # (2026-06-11 実機確認)。healthcheck 未定義のコンテナは running で復旧とみなす。
+      # end-to-end の nginx health は最後に _final_health_check でまとめて確認する。
+      local health
+      health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container" 2>/dev/null) || health="none"
+      if [[ "$health" == "healthy" || "$health" == "none" ]]; then
         echo "$elapsed"
         return 0
       fi
@@ -174,14 +181,28 @@ _test_container() {
     return 0
   fi
 
-  # コンテナを kill
-  log_info "docker kill $container ..."
-  docker kill "$container" > /dev/null 2>&1 || {
-    log_warn "kill 失敗: $container (スキップ)"
+  # コンテナの main プロセスを host から SIGKILL してクラッシュを再現する。
+  # 重要: `docker kill` は Docker が「意図的停止」と扱うため restart:always が
+  # 発火しない (2026-06-11 実機確認: docker kill → RestartCount=0 で復帰せず)。
+  # 本番のクラッシュ (OOM/panic) は host kill -9 と同経路で、restart:always が発火する
+  # (実機確認: host kill -9 → RestartCount 0→1 で自動復帰)。
+  local cpid
+  cpid=$(docker inspect -f '{{.State.Pid}}' "$container" 2>/dev/null) || cpid=""
+  if [[ -z "$cpid" || "$cpid" == "0" ]]; then
+    log_warn "host PID 取得失敗: $container (スキップ)"
     eval "$result_var=skip"
     return 0
-  }
-  log_info "kill 完了。自動復旧を待機..."
+  fi
+  log_info "プロセスクラッシュ再現: host kill -9 PID=$cpid ($container) ..."
+  if ! kill -9 "$cpid" 2>/dev/null; then
+    # 非 root の場合は sudo で再試行 (root 実行推奨)
+    sudo kill -9 "$cpid" 2>/dev/null || {
+      log_warn "kill 失敗 (権限不足の可能性): $container — root か sudo で実行してください"
+      eval "$result_var=skip"
+      return 0
+    }
+  fi
+  log_info "クラッシュ再現完了。自動復旧を待機..."
 
   # 復旧待機
   local recovery_sec
