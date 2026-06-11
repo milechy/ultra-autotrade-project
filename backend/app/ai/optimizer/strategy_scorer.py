@@ -358,7 +358,13 @@ class StrategyScorer:
     async def get_all_candidates_async(self) -> list[StrategyCandidate]:
         """全5プロトコルの候補を取得する（adapter から実データ取得・非同期版）。
 
-        adapter が注入されていれば実データ優先。なければダミー定数。
+        adapter が注入されていれば Lido/Pendle は実データ優先。なければダミー定数。
+
+        注意（M3 非対称・暫定）: Aave は本メソッドでも score_aave()（同期・ダミー APY
+        AAVE_USDC_APY=4.5）を継続使用する。Aave 実 APY 取得 adapter は未実装のため、
+        adapter 注入時は Aave だけダミー / Lido・Pendle だけ実 APY という非対称が生じる。
+        Aave 側の実 APY 化は next-PR（router docstring TODO 参照）で対応する。
+        本メソッド自体も現状 router の sync compare() からは未配線。
         """
         candidates = [
             self.score_aave(),

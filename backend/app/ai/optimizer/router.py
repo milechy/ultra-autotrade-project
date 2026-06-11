@@ -4,6 +4,16 @@
 
 OptimizerRequest を受け取り、戦略比較 + ポートフォリオ配分推奨を返す。
 main.py への登録は Tier S として別 PR で実施する。
+
+risk_mode は comparator.compare(risk_mode=...) 経由で StrategyScorer に伝播し、
+ランキング（risk_penalty 重み）へ反映される（レビュー M1 対応済）。
+
+TODO(next-PR): SignalAdapter（Pendle/Lido 実 client）を comparator/router で
+注入し get_all_candidates_async 経路へ live 化する。本 PR では adapter は
+score_*_async / get_all_candidates_async 経由でのみ利用され、router の sync
+compare() 経路（get_all_candidates）からは未配線。async 化 + Aave 側の実 APY 化
+（M3: 現状 Aave のみダミー APY のため Lido/Pendle と非対称）はリスクが大きいため
+別 PR とする。Asana GID 1215620587799245 のフォローアップで実施。
 """
 
 from __future__ import annotations

@@ -226,3 +226,30 @@ class TestRecommendEndpoint:
             risk_mode="balanced",
             holding_days=90,
         )
+
+
+class TestRecommendRiskModeLive:
+    """live 経路（実 comparator）で risk_mode がランキングへ効くことの検証（レビュー M1）。
+
+    モックを使わず実 StrategyComparator を通し、conservative と aggressive で
+    pendle_yt（最高リスク）の net_benefit が変わることを HTTP レスポンスで担保する。
+    """
+
+    @staticmethod
+    def _yt_net_benefit(payload: dict[str, object], risk_mode: str) -> Decimal:
+        body = {
+            "investment_usd": "10000",
+            "risk_mode": risk_mode,
+            "holding_days": 30,
+        }
+        response = _client.post("/api/ai/optimizer/recommend", json=body)
+        assert response.status_code == 200, response.text
+        candidates = response.json()["comparison"]["candidates"]
+        yt = next(c for c in candidates if c["protocol"] == "pendle_yt")
+        return Decimal(str(yt["expected_net_benefit"]))
+
+    def test_conservative_yields_lower_net_benefit_than_aggressive(self) -> None:
+        """conservative（高リスクペナルティ）は aggressive より YT の net_benefit が小さいこと。"""
+        conservative = self._yt_net_benefit({}, "conservative")
+        aggressive = self._yt_net_benefit({}, "aggressive")
+        assert conservative < aggressive
