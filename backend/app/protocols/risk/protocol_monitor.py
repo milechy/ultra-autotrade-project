@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -17,12 +18,22 @@ logger = logging.getLogger(__name__)
 class ProtocolMonitor:
     """各プロトコルのヘルス状態を監視するクラス。"""
 
-    def __init__(self, lido_client: Any = None, pendle_client: Any = None) -> None:
+    def __init__(
+        self,
+        lido_client: Any = None,
+        pendle_client: Any = None,
+        monitoring_service: Any = None,
+        aave_client: Any = None,
+    ) -> None:
         """初期化。
 
         Args:
             lido_client: Lido クライアント（None の場合はデフォルト設定から生成）
             pendle_client: Pendle クライアント（None の場合はデフォルト設定から生成）
+            monitoring_service: MonitoringService（None の場合は check_aave_health
+                初回呼出時に app.automation.state.get_monitoring_service() で遅延解決）
+            aave_client: Aave クライアント（None の場合は check_aave_health
+                初回呼出時に app.aave.client.get_default_aave_client() で遅延解決）
         """
         if lido_client is None:
             from app.protocols.lido.client import get_lido_client
@@ -37,23 +48,94 @@ class ProtocolMonitor:
 
         self._lido_client = lido_client
         self._pendle_client = pendle_client
+        # Aave 依存は import 時の副作用 (web3 / 環境変数) を避けるため遅延解決する
+        self._monitoring_service = monitoring_service
+        self._aave_client = aave_client
 
     async def check_aave_health(self) -> ProtocolHealth:
         """Aave V3 ヘルスチェック。
 
-        PoC 実装: 健全なダミーステータスを返す。
-        本番では MonitoringService から HF データを取得する。
-        TVL 推定: $10B、is_operational=True、risk=LOW
+        MonitoringService の最新 Health Factor (HF) と Aave クライアントの
+        アカウントデータから判定する。HF が未観測 (None) の場合は
+        AccountData.health_factor をフォールバックとして使用する。
+
+        リスク判定閾値（出典: docs/08_automation_rules.md — 閾値を変更する場合は
+        本 docstring とドキュメント側の二重管理に注意し、同時に更新すること）:
+        - HF が None または inf（ポジションなし）→ LOW
+        - HF < 1.6（緊急停止水準）→ CRITICAL + アラート
+        - HF < 1.8（警告水準）→ HIGH + アラート
+        - それ以外 → LOW
+
+        TVL は AccountData.total_collateral_usd（運用ポジションの担保 USD）を
+        採用する。プロトコル全体 TVL ではなく、自ポジションのエクスポージャー
+        を表す値である点に注意。tvl_change_24h_pct は履歴データを保持しない
+        ため Decimal("0") 固定とする。
+
+        is_operational は MonitoringService.is_trading_allowed()（緊急停止
+        フラグの OR ロジック）を反映する。
+
+        fail-open: 依存サービスの例外時は raise せず CRITICAL /
+        tvl_usd=Decimal("0") / is_operational=False / 日本語アラートで返す
+        （check_lido_health のエラーハンドリングと同型）。
         """
         logger.info("check_aave_health: Aave ヘルスチェック実行")
+        alerts: list[str] = []
+
+        try:
+            if self._monitoring_service is None:
+                from app.automation.state import get_monitoring_service
+
+                self._monitoring_service = get_monitoring_service()
+            if self._aave_client is None:
+                from app.aave.client import get_default_aave_client
+
+                self._aave_client = get_default_aave_client()
+
+            status = self._monitoring_service.get_status()
+            hf = status.last_health_factor
+
+            # get_account_data は同期 (web3 RPC) のため event loop をブロックしない
+            account = await asyncio.to_thread(self._aave_client.get_account_data, "")
+            tvl = account.total_collateral_usd
+
+            if hf is None:
+                hf = account.health_factor
+
+            risk_level = RiskLevel.LOW
+            if hf is None or hf == Decimal("inf"):
+                risk_level = RiskLevel.LOW
+            elif hf < Decimal("1.6"):
+                risk_level = RiskLevel.CRITICAL
+                alerts.append(
+                    f"ヘルスファクターが緊急停止水準（1.6）を下回っています（HF: {float(hf):.2f}）"
+                )
+            elif hf < Decimal("1.8"):
+                risk_level = RiskLevel.HIGH
+                alerts.append(
+                    f"ヘルスファクターが警告水準（1.8）を下回っています（HF: {float(hf):.2f}）"
+                )
+
+            is_operational = bool(self._monitoring_service.is_trading_allowed())
+        except Exception as exc:
+            logger.exception("Aave ヘルスチェック失敗")
+            return ProtocolHealth(
+                protocol="aave",
+                risk_level=RiskLevel.CRITICAL,
+                tvl_usd=Decimal("0"),
+                tvl_change_24h_pct=Decimal("0"),
+                is_operational=False,
+                last_checked=datetime.now(tz=timezone.utc),
+                alerts=[f"Aave ヘルスチェックエラー: {exc}"],
+            )
+
         return ProtocolHealth(
             protocol="aave",
-            risk_level=RiskLevel.LOW,
-            tvl_usd=Decimal("10000000000"),  # $10B 推定
+            risk_level=risk_level,
+            tvl_usd=tvl,
             tvl_change_24h_pct=Decimal("0"),
-            is_operational=True,
+            is_operational=is_operational,
             last_checked=datetime.now(tz=timezone.utc),
-            alerts=[],
+            alerts=alerts,
         )
 
     async def check_lido_health(self) -> ProtocolHealth:
