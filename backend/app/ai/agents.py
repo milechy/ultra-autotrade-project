@@ -46,6 +46,8 @@ def validate_agent_weights(weights: dict[str, Decimal]) -> None:
 
     Requirements (fail-closed — raise ValueError on violation):
     - keys must be exactly {risk, indicator, macro, pattern}
+    - every weight must be within [0, 1] (a negative weight would flip the
+      agent's direction and break the score ∈ [-1, +1] invariant)
     - sum of weights must be within 1.0 ± 0.01 (Decimal arithmetic)
     """
     keys = set(weights.keys())
@@ -54,6 +56,9 @@ def validate_agent_weights(weights: dict[str, Decimal]) -> None:
             f"agent weights keys must be exactly {sorted(_CONSENSUS_AGENT_KEYS)}, "
             f"got {sorted(keys)}"
         )
+    for key, weight in weights.items():
+        if weight < Decimal("0") or weight > Decimal("1"):
+            raise ValueError(f"agent weight {key!r} must be in range [0, 1], got {weight}")
     total = sum(weights.values(), Decimal("0"))
     if abs(total - Decimal("1.0")) > _WEIGHT_SUM_TOLERANCE:
         raise ValueError(f"agent weights must sum to 1.0 ± 0.01, got {total}")

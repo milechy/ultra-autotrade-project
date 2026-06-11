@@ -94,7 +94,9 @@ class TestWeightedDirectionalScore:
     def test_weighted_score_risk_dominant(self) -> None:
         """Risk BEARISH 80 alone: score = -0.32, agreeing_count = 1 → HOLD.
 
-        Single-agent runaway suppression (docs/52 §4.4 / R2).
+        R2(c): Risk 単独 BEARISH 80 は |score|=0.32 < threshold 0.40 で HOLD
+        (閾値分岐での HOLD 到達。§4.4 降格ガード自体の検証は
+        test_single_agent_runaway_demotion を参照)。
         """
         ctx = _make_ctx(
             indicator=(Bias.NEUTRAL, 50),
@@ -179,6 +181,26 @@ class TestEvaluate4AxisConsensus:
         verdict = ctx.evaluate_4axis_consensus()
         assert verdict.action == TradeAction.HOLD
         assert verdict.score == Decimal("-0.190")
+
+    def test_single_agent_runaway_demotion(self) -> None:
+        """§4.4 降格ガード: 閾値を超えても agreeing_count < 2 なら HOLD に降格。
+
+        risk=BULLISH 100 + 他 3 軸 NEUTRAL 90:
+        score = 0.40×1.00 = 0.40 (>= +0.40)、conf = 40+22.5+18+13.5 = 94 (>= 65)
+        → 閾値分岐は BUY だが agreeing_count = 1 → HOLD 降格 (#365 再発防止の核心)。
+        """
+        ctx = _make_ctx(
+            indicator=(Bias.NEUTRAL, 90),
+            pattern=(Bias.NEUTRAL, 90),
+            risk=(Bias.BULLISH, 100),
+            macro=(Bias.NEUTRAL, 90),
+        )
+        verdict = ctx.evaluate_4axis_consensus()
+        assert verdict.score == Decimal("0.40")
+        assert verdict.weighted_confidence == 94
+        assert verdict.agreeing_count == 1
+        assert verdict.action == TradeAction.HOLD
+        assert "Demoted" in verdict.reasoning
 
     def test_missing_signal_counts_as_zero(self) -> None:
         """A missing axis contributes (direction=0, conf=0) without re-normalizing."""
@@ -287,6 +309,20 @@ class TestWeightValidation:
             ctx.weighted_directional_score(bad_weights)
         with pytest.raises(ValueError, match="sum"):
             ctx.evaluate_4axis_consensus(weights=bad_weights)
+
+    def test_weight_validation_rejects_negative_weight(self) -> None:
+        """負の重みは合計が 1.0 でも拒否 (direction 反転 / score 不変条件破壊防止)。"""
+        negative_weights = {
+            "risk": Decimal("1.5"),
+            "indicator": Decimal("-0.5"),
+            "macro": Decimal("0"),
+            "pattern": Decimal("0"),
+        }
+        with pytest.raises(ValueError, match="range"):
+            validate_agent_weights(negative_weights)
+        ctx = _make_ctx(risk=(Bias.BULLISH, 80))
+        with pytest.raises(ValueError, match="range"):
+            ctx.weighted_directional_score(negative_weights)
 
     def test_weight_validation_rejects_wrong_keys(self) -> None:
         """Key set must be exactly {risk, indicator, macro, pattern}."""
