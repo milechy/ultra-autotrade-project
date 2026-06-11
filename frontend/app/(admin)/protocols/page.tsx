@@ -5,99 +5,118 @@
 import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw } from 'lucide-react'
 import AuthGuard from '@/components/AuthGuard'
+import {
+  fetchProtocolsHealth,
+  type ProtocolHealth,
+  type RiskLevel,
+} from '@/lib/api/protocols'
 
-// ── Types ──────────────────────────────────────────────────────────────────
+// ── Static protocol metadata (表示順 / 表示名 / フェーズ) ──────────────────
+// risk_level / tvl_usd / is_operational / alerts は API から取得する。
+// ダミーの数値は一切持たない（CLAUDE.md チェックリスト: ハードコードデータ禁止）。
 
-type HealthStatus = 'normal' | 'warning' | 'critical'
-
-interface AaveHealth {
-  health_factor: number
-  supply_apy: number
-  utilization_rate: number
-  is_paused: boolean
-  is_frozen: boolean
-  status: HealthStatus
+interface ProtocolMeta {
+  protocol: string // API の protocol キー (aave / lido / pendle)
+  name: string
+  phase: string
 }
 
-interface LidoHealth {
-  peg_ratio: number
-  staking_apy: number
-  status: HealthStatus
-}
-
-interface PendleHealth {
-  pt_rate: number
-  yt_rate: number
-  next_maturity: string
-  status: HealthStatus
-}
-
-interface ProtocolHealthData {
-  aave: AaveHealth
-  lido: LidoHealth
-  pendle: PendleHealth
-  fetched_at: string
-}
-
-// ── Mock Data ──────────────────────────────────────────────────────────────
-
-const MOCK_DATA: ProtocolHealthData = {
-  aave: {
-    health_factor: 1.95,
-    supply_apy: 4.2,
-    utilization_rate: 72.5,
-    is_paused: false,
-    is_frozen: false,
-    status: 'normal',
-  },
-  lido: {
-    peg_ratio: 99.87,
-    staking_apy: 3.8,
-    status: 'normal',
-  },
-  pendle: {
-    pt_rate: 95.3,
-    yt_rate: 4.7,
-    next_maturity: '2026-06-30',
-    status: 'warning',
-  },
-  fetched_at: new Date().toISOString(),
-}
+const PROTOCOL_META: ProtocolMeta[] = [
+  { protocol: 'aave', name: 'Aave V3', phase: 'Phase 1 · 稼働中' },
+  { protocol: 'lido', name: 'Lido stETH', phase: 'Phase 2 · Coming Soon' },
+  { protocol: 'pendle', name: 'Pendle PT/YT', phase: 'Phase 2 · Coming Soon' },
+]
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function statusBorderClass(status: HealthStatus): string {
-  if (status === 'normal') return 'border-green-500/30 bg-green-500/5'
-  if (status === 'warning') return 'border-yellow-500/30 bg-yellow-500/5'
-  return 'border-red-500/30 bg-red-500/5'
+// risk_level (low/medium/high/critical) → 色・ラベルの既存 UI 慣習踏襲
+// LOW=緑 / MEDIUM=黄 / HIGH=橙 / CRITICAL=赤
+function riskBorderClass(risk: RiskLevel | null): string {
+  switch (risk) {
+    case 'low':
+      return 'border-green-500/30 bg-green-500/5'
+    case 'medium':
+      return 'border-yellow-500/30 bg-yellow-500/5'
+    case 'high':
+      return 'border-orange-500/30 bg-orange-500/5'
+    case 'critical':
+      return 'border-red-500/30 bg-red-500/5'
+    default:
+      return 'border-zinc-700/40 bg-zinc-800/20'
+  }
 }
 
-function statusDotClass(status: HealthStatus): string {
-  if (status === 'normal') return 'bg-green-400'
-  if (status === 'warning') return 'bg-yellow-400'
-  return 'bg-red-400'
+function riskDotClass(risk: RiskLevel | null): string {
+  switch (risk) {
+    case 'low':
+      return 'bg-green-400'
+    case 'medium':
+      return 'bg-yellow-400'
+    case 'high':
+      return 'bg-orange-400'
+    case 'critical':
+      return 'bg-red-400'
+    default:
+      return 'bg-zinc-500'
+  }
 }
 
-function statusLabel(status: HealthStatus): string {
-  if (status === 'normal') return '正常'
-  if (status === 'warning') return '警告'
-  return '異常'
+function riskTextClass(risk: RiskLevel | null): string {
+  switch (risk) {
+    case 'low':
+      return 'text-green-400'
+    case 'medium':
+      return 'text-yellow-400'
+    case 'high':
+      return 'text-orange-400'
+    case 'critical':
+      return 'text-red-400'
+    default:
+      return 'text-zinc-400'
+  }
 }
 
-function statusTextClass(status: HealthStatus): string {
-  if (status === 'normal') return 'text-green-400'
-  if (status === 'warning') return 'text-yellow-400'
-  return 'text-red-400'
+function riskLabel(risk: RiskLevel | null): string {
+  switch (risk) {
+    case 'low':
+      return 'リスク: 低'
+    case 'medium':
+      return 'リスク: 中'
+    case 'high':
+      return 'リスク: 高'
+    case 'critical':
+      return 'リスク: 危険'
+    default:
+      return 'データなし'
+  }
 }
 
-function hfTextClass(hf: number): string {
-  if (hf >= 1.8) return 'text-green-400'
-  if (hf >= 1.6) return 'text-yellow-400'
-  return 'text-red-400'
+// tvl_usd は Decimal 文字列。Number() でラップし、"0" / 空 / NaN は「データなし」。
+function formatTvl(tvlUsd: string | undefined): string {
+  if (tvlUsd === undefined || tvlUsd === '') return 'データなし'
+  const n = Number(tvlUsd)
+  if (!Number.isFinite(n) || n === 0) return 'データなし'
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(2)}K`
+  return `$${n.toFixed(0)}`
 }
 
-function formatTime(isoStr: string): string {
-  return new Date(isoStr).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo' })
+// tvl_change_24h_pct (Decimal 文字列) を符号付きで整形。取得不能時は「データなし」。
+function formatTvlChange(pct: string | undefined): { text: string; cls: string } {
+  if (pct === undefined || pct === '') return { text: 'データなし', cls: 'text-zinc-500' }
+  const n = Number(pct)
+  if (!Number.isFinite(n)) return { text: 'データなし', cls: 'text-zinc-500' }
+  const sign = n > 0 ? '+' : ''
+  const cls = n > 0 ? 'text-green-400' : n < 0 ? 'text-red-400' : 'text-zinc-300'
+  return { text: `${sign}${n.toFixed(2)}%`, cls }
+}
+
+function formatTime(isoStr: string | undefined): string {
+  if (!isoStr) return '—'
+  const d = new Date(isoStr)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo' })
 }
 
 // ── Stat Row ──────────────────────────────────────────────────────────────
@@ -116,11 +135,11 @@ function StatRow({ label, value }: { label: string; value: React.ReactNode }) {
 function ProtocolCardHeader({
   name,
   phase,
-  status,
+  risk,
 }: {
   name: string
   phase: string
-  status: HealthStatus
+  risk: RiskLevel | null
 }) {
   return (
     <div className="flex items-center justify-between mb-4">
@@ -129,84 +148,83 @@ function ProtocolCardHeader({
         <span className="text-xs text-zinc-500">{phase}</span>
       </div>
       <div className="flex items-center gap-2">
-        <span className={`inline-flex h-2 w-2 rounded-full ${statusDotClass(status)}`} />
-        <span className={`text-xs font-medium ${statusTextClass(status)}`}>
-          {statusLabel(status)}
-        </span>
+        <span className={`inline-flex h-2 w-2 rounded-full ${riskDotClass(risk)}`} />
+        <span className={`text-xs font-medium ${riskTextClass(risk)}`}>{riskLabel(risk)}</span>
       </div>
     </div>
   )
 }
 
-// ── Protocol Cards ─────────────────────────────────────────────────────────
+// ── Operational Badge ──────────────────────────────────────────────────────
 
-function AaveCard({ data }: { data: AaveHealth }) {
+function OperationalBadge({ isOperational }: { isOperational: boolean | null }) {
+  if (isOperational === null) {
+    return (
+      <span className="inline-flex items-center rounded-full border border-zinc-600/40 bg-zinc-700/20 px-2 py-0.5 text-xs font-semibold text-zinc-400">
+        データなし
+      </span>
+    )
+  }
   return (
-    <div className={`rounded-xl border p-5 ${statusBorderClass(data.status)}`}>
-      <ProtocolCardHeader name="Aave V3" phase="Phase 1 · 稼働中" status={data.status} />
-      <StatRow
-        label="ヘルスファクター"
-        value={<span className={hfTextClass(data.health_factor)}>{data.health_factor.toFixed(2)}</span>}
-      />
-      <StatRow label="供給APY" value={`${data.supply_apy.toFixed(2)}%`} />
-      <StatRow label="利用率" value={`${data.utilization_rate.toFixed(1)}%`} />
-      <StatRow
-        label="一時停止"
-        value={
-          <span
-            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${
-              data.is_paused
-                ? 'border-red-500/30 bg-red-500/20 text-red-400'
-                : 'border-green-500/30 bg-green-500/20 text-green-400'
-            }`}
-          >
-            {data.is_paused ? '停止中' : '正常'}
-          </span>
-        }
-      />
-      <StatRow
-        label="凍結"
-        value={
-          <span
-            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${
-              data.is_frozen
-                ? 'border-red-500/30 bg-red-500/20 text-red-400'
-                : 'border-green-500/30 bg-green-500/20 text-green-400'
-            }`}
-          >
-            {data.is_frozen ? '凍結中' : '正常'}
-          </span>
-        }
-      />
-    </div>
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${
+        isOperational
+          ? 'border-green-500/30 bg-green-500/20 text-green-400'
+          : 'border-red-500/30 bg-red-500/20 text-red-400'
+      }`}
+    >
+      {isOperational ? '稼働中' : '停止中'}
+    </span>
   )
 }
 
-function LidoCard({ data }: { data: LidoHealth }) {
-  const pegOk = data.peg_ratio >= 99.5
-  return (
-    <div className={`rounded-xl border p-5 ${statusBorderClass(data.status)}`}>
-      <ProtocolCardHeader name="Lido stETH" phase="Phase 2 · Coming Soon" status={data.status} />
-      <StatRow
-        label="stETH/ETH ペグ率"
-        value={
-          <span className={pegOk ? 'text-green-400' : 'text-yellow-400'}>
-            {data.peg_ratio.toFixed(2)}%
-          </span>
-        }
-      />
-      <StatRow label="ステーキングAPY" value={`${data.staking_apy.toFixed(2)}%`} />
-    </div>
-  )
-}
+// ── Protocol Card ──────────────────────────────────────────────────────────
 
-function PendleCard({ data }: { data: PendleHealth }) {
+function ProtocolCard({ meta, health }: { meta: ProtocolMeta; health: ProtocolHealth | null }) {
+  const risk = health?.risk_level ?? null
+  const change = formatTvlChange(health?.tvl_change_24h_pct)
+  const alerts = health?.alerts ?? []
+
   return (
-    <div className={`rounded-xl border p-5 ${statusBorderClass(data.status)}`}>
-      <ProtocolCardHeader name="Pendle PT/YT" phase="Phase 2 · Coming Soon" status={data.status} />
-      <StatRow label="PTレート" value={`${data.pt_rate.toFixed(2)}%`} />
-      <StatRow label="YTレート" value={`${data.yt_rate.toFixed(2)}%`} />
-      <StatRow label="次回満期" value={data.next_maturity} />
+    <div className={`rounded-xl border p-5 ${riskBorderClass(risk)}`}>
+      <ProtocolCardHeader name={meta.name} phase={meta.phase} risk={risk} />
+
+      <StatRow label="稼働状況" value={<OperationalBadge isOperational={health?.is_operational ?? null} />} />
+      <StatRow
+        label="TVL"
+        value={<span className="text-zinc-200">{formatTvl(health?.tvl_usd)}</span>}
+      />
+      <StatRow
+        label="24時間 TVL 変化"
+        value={<span className={change.cls}>{change.text}</span>}
+      />
+      <StatRow
+        label="リスクレベル"
+        value={<span className={riskTextClass(risk)}>{riskLabel(risk)}</span>}
+      />
+
+      {/* アラート一覧（日本語、API 由来）。なければ「アラートなし」 */}
+      <div className="mt-3">
+        <p className="text-xs font-medium text-zinc-500 mb-1.5">アラート</p>
+        {alerts.length === 0 ? (
+          <p className="text-xs text-zinc-600">アラートなし</p>
+        ) : (
+          <ul className="space-y-1">
+            {alerts.map((alert, i) => (
+              <li
+                key={i}
+                className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1"
+              >
+                {alert}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <p className="mt-3 text-[11px] text-zinc-600">
+        最終チェック: {formatTime(health?.last_checked)}
+      </p>
     </div>
   )
 }
@@ -214,20 +232,25 @@ function PendleCard({ data }: { data: PendleHealth }) {
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function ProtocolsPage() {
-  const [data, setData] = useState<ProtocolHealthData>(MOCK_DATA)
+  // protocol キー → ProtocolHealth の map
+  const [healthMap, setHealthMap] = useState<Record<string, ProtocolHealth>>({})
   const [lastUpdated, setLastUpdated] = useState<string>('')
-  const [isMock, setIsMock] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   const fetchHealth = useCallback(async () => {
     try {
-      const res = await fetch('/api/protocols/health')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json() as ProtocolHealthData
-      setData(json)
-      setIsMock(false)
+      const list = await fetchProtocolsHealth()
+      const map: Record<string, ProtocolHealth> = {}
+      for (const item of list) {
+        map[item.protocol] = item
+      }
+      setHealthMap(map)
+      setLoadError(false)
     } catch {
-      setData({ ...MOCK_DATA, fetched_at: new Date().toISOString() })
-      setIsMock(true)
+      // 取得失敗時はモックを表示しない（CLAUDE.md チェックリスト: 黙示モック禁止）。
+      // 既存データはクリアし「データ取得失敗」を明示する。
+      setHealthMap({})
+      setLoadError(true)
     }
     setLastUpdated(new Date().toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo' }))
   }, [])
@@ -240,68 +263,73 @@ export default function ProtocolsPage() {
 
   return (
     <AuthGuard adminOnly>
-    <div style={{ padding: '1.5rem', maxWidth: 960, margin: '0 auto' }}>
-      {/* Page Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>プロトコルヘルスモニター</h1>
-          <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: 14 }}>
-            各プロトコルのリアルタイム稼働状況を監視します（30秒自動更新）
-          </p>
+      <div style={{ padding: '1.5rem', maxWidth: 960, margin: '0 auto' }}>
+        {/* Page Header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+            marginBottom: 24,
+          }}
+        >
+          <div>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>プロトコルヘルスモニター</h1>
+            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: 14 }}>
+              各プロトコルのリアルタイム稼働状況を監視します（30秒自動更新）
+            </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            {lastUpdated && (
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>最終更新: {lastUpdated}</span>
+            )}
+            <button
+              onClick={fetchHealth}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '7px 14px',
+                borderRadius: 8,
+                border: '1px solid #e5e7eb',
+                background: '#fff',
+                cursor: 'pointer',
+                fontSize: 13,
+                color: '#374151',
+              }}
+            >
+              <RefreshCw size={14} />
+              更新
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          {lastUpdated && (
-            <span style={{ fontSize: 12, color: '#9ca3af' }}>
-              最終更新: {lastUpdated}
-            </span>
-          )}
-          <button
-            onClick={fetchHealth}
+
+        {/* データ取得失敗の通知（モックは表示しない） */}
+        {loadError && (
+          <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '7px 14px',
+              marginBottom: 16,
+              padding: '10px 16px',
               borderRadius: 8,
-              border: '1px solid #e5e7eb',
-              background: '#fff',
-              cursor: 'pointer',
+              background: '#fef2f2',
+              border: '1px solid #fca5a5',
               fontSize: 13,
-              color: '#374151',
+              color: '#991b1b',
             }}
           >
-            <RefreshCw size={14} />
-            更新
-          </button>
+            プロトコルヘルス情報の取得に失敗しました（GET /api/protocols/health）。再読み込みしてください。
+          </div>
+        )}
+
+        {/* Protocol cards grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {PROTOCOL_META.map((meta) => (
+            <ProtocolCard key={meta.protocol} meta={meta} health={healthMap[meta.protocol] ?? null} />
+          ))}
         </div>
       </div>
-
-      {/* Mock data notice */}
-      {isMock && (
-        <div style={{
-          marginBottom: 16,
-          padding: '10px 16px',
-          borderRadius: 8,
-          background: '#fffbeb',
-          border: '1px solid #fcd34d',
-          fontSize: 13,
-          color: '#92400e',
-        }}>
-          APIが未実装のため、モックデータを表示しています（GET /api/protocols/health）
-        </div>
-      )}
-
-      {/* Protocol cards grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <AaveCard data={data.aave} />
-        <LidoCard data={data.lido} />
-        <PendleCard data={data.pendle} />
-      </div>
-
-      <p style={{ marginTop: 16, fontSize: 12, color: '#9ca3af' }}>
-        データ取得時刻: {data.fetched_at ? formatTime(data.fetched_at) : '—'}
-      </p>
-    </div>
     </AuthGuard>
   )
 }
