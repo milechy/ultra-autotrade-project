@@ -47,6 +47,22 @@ class StrategyComparator:
         self._scorer = scorer or StrategyScorer()
         self._calculator = calculator or ExpectedNetBenefitCalculator()
 
+    def _scorer_for_risk_mode(self, risk_mode: str) -> StrategyScorer:
+        """要求された risk_mode に対応する StrategyScorer を返す。
+
+        既定スコアラーの risk_mode と一致すればそのまま再利用する。
+        異なる場合は、注入済み adapter を引き継いだまま risk_mode 違いの
+        スコアラーを新規生成する（risk_mode はリクエストごとに変わるため、
+        __init__ 固定では live 経路で反映されない問題への対策 / レビュー M1）。
+        """
+        if getattr(self._scorer, "_risk_mode", None) == risk_mode:
+            return self._scorer
+        return StrategyScorer(
+            pendle_adapter=getattr(self._scorer, "_pendle_adapter", None),
+            lido_adapter=getattr(self._scorer, "_lido_adapter", None),
+            risk_mode=risk_mode,
+        )
+
     def compare(
         self,
         investment_usd: Decimal,
@@ -55,14 +71,19 @@ class StrategyComparator:
     ) -> StrategyComparison:
         """全プロトコルを比較して推奨を生成する。
 
-        1. スコアラーから全候補を取得
+        1. スコアラーから全候補を取得（risk_mode をランキングへ反映）
         2. 各候補のネット利益を計算
         3. ランク付け
         4. idle_benefit（機会コスト = 0、何もしない場合の収益はゼロ）
         5. 推奨 = ランク 1 の結果
         6. comparison_timestamp = ISO 形式の UTC 文字列
+
+        risk_mode は呼び出しごとに変わり得るため、既定スコアラーの risk_mode と
+        異なる場合は、注入済み adapter を引き継いだまま risk_mode 違いの
+        StrategyScorer を生成し直す（M1: risk_mode が live 経路で scorer に届く）。
         """
-        candidates = self._scorer.get_all_candidates()
+        scorer = self._scorer_for_risk_mode(risk_mode)
+        candidates = scorer.get_all_candidates()
         ranked_results = self._calculator.rank_strategies(candidates, investment_usd, holding_days)
 
         # 何もしない場合の機会コスト = 0（現金は利回りなし）
