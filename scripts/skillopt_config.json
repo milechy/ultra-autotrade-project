@@ -1,0 +1,33 @@
+{
+  "_comment": "SkillOpt (microsoft/SkillOpt, MIT) でエージェント定義を最適化するための設定。scripts/run_skillopt.py が読む。原本は絶対に上書きせず *.optimized.md に出力する（人間が diff 確認後に手動反映）。",
+  "backend": "claude",
+  "model": "claude-sonnet-4-6",
+  "output_suffix": ".optimized.md",
+  "targets": [
+    {
+      "path": ".claude/agents/Planner.md",
+      "role": "上流: タスク分解・Tier判定・高リスク検出",
+      "validation_tasks": "scripts/skillopt_validation/planner_tasks.jsonl"
+    },
+    {
+      "path": ".claude/agents/Generator.md",
+      "role": "中流: コード実装・リファクタ",
+      "validation_tasks": "scripts/skillopt_validation/generator_tasks.jsonl"
+    },
+    {
+      "path": ".claude/agents/Evaluator.md",
+      "role": "下流: セキュリティ・lint・RBACレビュー",
+      "validation_tasks": "scripts/skillopt_validation/evaluator_tasks.jsonl"
+    },
+    {
+      "path": ".claude/agents/Tester.md",
+      "role": "検証: verify.sh + E2E実機検証",
+      "validation_tasks": "scripts/skillopt_validation/tester_tasks.jsonl"
+    }
+  ],
+  "safety": {
+    "never_overwrite_originals": true,
+    "require_human_approval_before_apply": true,
+    "note": "原本 .claude/agents/*.md の上書きは Tier S 相当。run_skillopt.py は最適化結果を *.optimized.md にのみ書き出す。反映は人間が diff 確認後に手動で行う。"
+  }
+}

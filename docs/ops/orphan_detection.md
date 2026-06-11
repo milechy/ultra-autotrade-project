@@ -22,6 +22,35 @@ UIテスト（/chrome）やpytestでは検出できない。2026-04-01に Stress
 - P1: リスク管理系の孤立 → 1-2日以内に修正
 - P2: ユーティリティ系の孤立 → 将来使用予定なら許容、不要なら削除
 
+## 前処理: repomix でコードベースを 1 ファイルに圧縮（2026-06-11 追加）
+
+孤立コード検出は「各 module の public クラス/関数を grep で参照確認」する作業のため、
+対象コードを Claude に一括で渡せると効率が上がる。`scripts/run_repomix.sh` で
+リポジトリ（または特定サブツリー）を単一の XML ファイルにパックできる。
+
+```bash
+./scripts/run_repomix.sh backend            # backend/ 全体
+./scripts/run_repomix.sh backend/app/aave   # 特定サブツリー（推奨）
+./scripts/run_repomix.sh .                  # リポジトリ全体
+```
+
+- 出力: `repomix-output.xml`（リポジトリ root / `.gitignore` 済み）
+- 設定: `repomix.config.json`（除外 `.env*` / `*.key` / `*.pem` / `node_modules` /
+  `__pycache__` / `.venv` / `migrations/versions` / `*.lock` 等）
+- `enableSecurityCheck: true` により secretlint が機密混入ファイルを**出力から自動除外**する
+  （2026-06-11 実測: backend/ パック時に 2 ファイルが除外された）
+
+**トークン量の注意（2026-06-11 実測）**: `backend/` 全体は **544 ファイル / 約 136 万トークン**
+（o200k_base 換算）で、単一の Claude コンテキスト（200K）を大きく超える。孤立コード検出で
+repomix を使う場合は **サブツリー単位**（`backend/app/aave` / `automation` / `protocols` / `ai`）で
+パックするのが現実的。リポジトリ全体を一度に食わせる用途には向かない。
+
+手順（サブツリー単位の Gate 5）:
+1. `./scripts/run_repomix.sh backend/app/<module>` で当該 module をパック
+2. 生成された `repomix-output.xml` を Claude に渡す
+3. 上記「実行方法（Claude Code プロンプト）」の検出プロンプトを実行
+4. 重点: `backend/app/aave/`, `automation/`, `protocols/`, `ai/`
+
 ## 追加パターン: 部分配線欠陥（factory が constructor 引数を供給しない）
 2026-06-02: 「関数は呼ばれているが、生成 factory が必要な属性を供給しない」型の欠陥が
 launch ブロッカーになった。`make_aave_client(chain_name=...)`（マルチチェーン経路）が

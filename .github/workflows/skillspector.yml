@@ -1,0 +1,53 @@
+name: SkillSpector (agent/skill security scan)
+
+# .claude/agents/*.md と .claude/skills/**/SKILL.md に対し、NVIDIA SkillSpector で
+# プロンプトインジェクション・権限昇格・データ流出パターンを検出する。
+# 金融システムとして、外部由来のエージェント/スキル定義の導入審査を自動化する。
+#
+# トリガー: agents / skills 定義が変更された PR のみ（ci.yml 本体には触れない独立 workflow）
+
+on:
+  pull_request:
+    paths:
+      - '.claude/agents/**'
+      - '.claude/skills/**'
+      - 'scripts/run_skillspector.sh'
+  push:
+    branches: [main, dev]
+    paths:
+      - '.claude/agents/**'
+      - '.claude/skills/**'
+
+permissions:
+  contents: read
+
+jobs:
+  skillspector-scan:
+    name: agent/skill セキュリティスキャン
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install jq
+        run: sudo apt-get update -y && sudo apt-get install -y jq
+
+      - name: Run SkillSpector (HIGH/CRITICAL で fail)
+        env:
+          SKILLSPECTOR_DIR: ${{ runner.temp }}/skillspector
+          REPORT_DIR: ${{ runner.temp }}/skillspector-reports
+          # severity 閾値はここで調整可能（初回 CI 実行後に実出力を見て要チューニング）
+          FAIL_SEVERITIES: "HIGH CRITICAL"
+        run: |
+          bash scripts/run_skillspector.sh --ci
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: skillspector-reports
+          path: ${{ runner.temp }}/skillspector-reports/
+          if-no-files-found: ignore
