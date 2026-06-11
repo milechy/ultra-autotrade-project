@@ -9,6 +9,8 @@ from abc import abstractmethod
 from decimal import Decimal
 from typing import Any
 
+import httpx
+
 from app.protocols.base import (
     BaseProtocolClient,
     ProtocolHealthMetrics,
@@ -17,12 +19,7 @@ from app.protocols.base import (
 )
 
 from .config import LidoConfig
-from .schemas import (
-    ClaimWithdrawalResult,
-    TxResult,
-    WithdrawalRequestResult,
-    WithdrawalStatus,
-)
+from .schemas import ClaimWithdrawalResult, TxResult, WithdrawalRequestResult, WithdrawalStatus
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +72,7 @@ _STETH_ABI: list[dict[str, Any]] = [
     },
 ]
 
-# Lido WithdrawalQueueERC721 ABI（requestWithdrawals / claimWithdrawals / getWithdrawalStatus）
+# Lido WithdrawalQueueERC721 ABI（requestWithdrawals / claimWithdrawals(hints方式) / view）
 _WITHDRAWAL_QUEUE_ABI: list[dict[str, Any]] = [
     {
         "name": "requestWithdrawals",
@@ -98,6 +95,31 @@ _WITHDRAWAL_QUEUE_ABI: list[dict[str, Any]] = [
         "outputs": [],
     },
     {
+        "name": "findCheckpointHints",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [
+            {"name": "_requestIds", "type": "uint256[]"},
+            {"name": "_firstIndex", "type": "uint256"},
+            {"name": "_lastIndex", "type": "uint256"},
+        ],
+        "outputs": [{"name": "hintIds", "type": "uint256[]"}],
+    },
+    {
+        "name": "getLastCheckpointIndex",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"name": "", "type": "uint256"}],
+    },
+    {
+        "name": "getWithdrawalRequests",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [{"name": "_owner", "type": "address"}],
+        "outputs": [{"name": "requestsIds", "type": "uint256[]"}],
+    },
+    {
         "name": "getWithdrawalStatus",
         "type": "function",
         "stateMutability": "view",
@@ -117,24 +139,6 @@ _WITHDRAWAL_QUEUE_ABI: list[dict[str, Any]] = [
             }
         ],
     },
-    {
-        "name": "findCheckpointHints",
-        "type": "function",
-        "stateMutability": "view",
-        "inputs": [
-            {"name": "_requestIds", "type": "uint256[]"},
-            {"name": "_firstIndex", "type": "uint256"},
-            {"name": "_lastIndex", "type": "uint256"},
-        ],
-        "outputs": [{"name": "hintIds", "type": "uint256[]"}],
-    },
-    {
-        "name": "getLastCheckpointIndex",
-        "type": "function",
-        "stateMutability": "view",
-        "inputs": [],
-        "outputs": [{"name": "", "type": "uint256"}],
-    },
 ]
 
 _WEI_PER_ETH = Decimal("1000000000000000000")
@@ -142,6 +146,8 @@ _WEI_PER_ETH = Decimal("1000000000000000000")
 
 class AbstractLidoClient(BaseProtocolClient):
     """Lido クライアントの抽象基底クラス。"""
+
+    _config: LidoConfig
 
     # --- BaseProtocolClient 実装 ---
 
@@ -194,14 +200,35 @@ class AbstractLidoClient(BaseProtocolClient):
         )
 
     async def get_position(self) -> ProtocolPosition:
-        """ポジション情報を返す（PoC: デフォルトアドレスの残高）。"""
-        balance = Decimal("0")
-        return ProtocolPosition(
+        """ポジション情報を返す（設定ウォレットの stETH 残高）。
+
+        value_usd は balance と同値の近似（stETH≈ETH 近似、USD 換算は将来課題）。
+        wallet_address 未設定・残高取得失敗時は zero position を返す（fail-open）。
+        """
+        zero_position = ProtocolPosition(
             protocol_name=self.get_protocol_name(),
             asset="stETH",
-            balance=balance,
-            value_usd=balance,
+            balance=Decimal("0"),
+            value_usd=Decimal("0"),
         )
+        wallet_address = self._config.wallet_address
+        if not wallet_address:
+            logger.warning("get_position: wallet_address 未設定のため zero position を返します")
+            return zero_position
+        try:
+            balance = await self.get_steth_balance(wallet_address)
+            return ProtocolPosition(
+                protocol_name=self.get_protocol_name(),
+                asset="stETH",
+                balance=balance,
+                value_usd=balance,
+            )
+        except Exception as exc:
+            logger.warning(
+                "get_position: 残高取得失敗のため zero position を返します (fail-open): %s",
+                exc,
+            )
+            return zero_position
 
     async def get_health_metrics(self) -> ProtocolHealthMetrics:
         """ヘルスメトリクスを返す。"""
@@ -261,8 +288,8 @@ class AbstractLidoClient(BaseProtocolClient):
         ...
 
     @abstractmethod
-    async def claim_withdrawal(self, request_ids: list[int]) -> ClaimWithdrawalResult:
-        """finalized した withdrawal request をクレームし ETH を受け取る。
+    async def claim_withdrawals(self, request_ids: list[int]) -> ClaimWithdrawalResult:
+        """finalized した withdrawal request をクレームし ETH を受け取る（checkpoint hints 方式）。
 
         Args:
             request_ids: クレームする withdrawal request ID のリスト。
@@ -283,6 +310,11 @@ class AbstractLidoClient(BaseProtocolClient):
         Returns:
             list[WithdrawalStatus]: 各リクエストのステータス一覧。
         """
+        ...
+
+    @abstractmethod
+    async def get_withdrawal_requests(self, address: str) -> list[int]:
+        """指定アドレスの未クレーム引き出しリクエスト ID 一覧を返す。"""
         ...
 
 
@@ -364,7 +396,7 @@ class LidoClient(AbstractLidoClient):
         """stETH 引き出しリクエストを WithdrawalQueue に送信する。
 
         引き出しフロー:
-        1. stETH.approve(withdrawalQueueAddress, total_amount_wei)
+        1. stETH.approve(withdrawalQueueAddress, sum(amounts_wei)) + receipt 待ち
         2. WithdrawalQueueERC721.requestWithdrawals(amounts_wei, owner)
 
         Args:
@@ -394,7 +426,7 @@ class LidoClient(AbstractLidoClient):
             queue_address = Web3.to_checksum_address(self._config.withdrawal_queue_address)
             gas_price = self._w3.eth.gas_price
 
-            # Step 1: stETH.approve(withdrawalQueueAddress, total_amount_wei)
+            # Step 1: stETH.approve(withdrawalQueueAddress, total_amount_wei) + receipt 待ち
             nonce = self._w3.eth.get_transaction_count(account.address)
             approve_tx = self._contract.functions.approve(
                 queue_address, total_amount_wei
@@ -411,7 +443,7 @@ class LidoClient(AbstractLidoClient):
             )
             approve_tx_hash = self._w3.eth.send_raw_transaction(signed_approve.raw_transaction)
             self._w3.eth.wait_for_transaction_receipt(approve_tx_hash, timeout=120)
-            logger.info("stETH approve 送信完了: total_amount_wei=%d", total_amount_wei)
+            logger.info("stETH approve 完了: total_amount_wei=%d", total_amount_wei)
 
             # Step 2: WithdrawalQueue.requestWithdrawals(amounts_wei, owner)
             queue_contract = self._w3.eth.contract(address=queue_address, abi=_WITHDRAWAL_QUEUE_ABI)
@@ -433,8 +465,6 @@ class LidoClient(AbstractLidoClient):
             receipt = self._w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
 
             if receipt["status"] == 1:
-                # decode requestIds from logs (WithdrawalRequested events)
-                # PoC: request ID は解析せずログのみ記録
                 logger.info(
                     "引き出しリクエスト成功: amounts=%s, tx=%s",
                     amounts_wei,
@@ -443,7 +473,7 @@ class LidoClient(AbstractLidoClient):
                 return WithdrawalRequestResult(
                     tx_hash=tx_hash.hex(),
                     success=True,
-                    request_ids=[],  # event decodeは別途実装
+                    request_ids=[],  # event decode は別途実装
                 )
             return WithdrawalRequestResult(
                 tx_hash=tx_hash.hex(),
@@ -454,8 +484,13 @@ class LidoClient(AbstractLidoClient):
             logger.exception("request_withdrawals 失敗: amounts_wei=%s", amounts_wei)
             return WithdrawalRequestResult(success=False, error=str(exc))
 
-    async def claim_withdrawal(self, request_ids: list[int]) -> ClaimWithdrawalResult:
-        """finalized した withdrawal request をクレームし ETH を受け取る。
+    async def claim_withdrawals(self, request_ids: list[int]) -> ClaimWithdrawalResult:
+        """finalized した withdrawal request をクレームし ETH を受け取る（checkpoint hints 方式）。
+
+        フロー:
+        1. getLastCheckpointIndex()
+        2. findCheckpointHints(request_ids, 1, lastCheckpointIndex)
+        3. claimWithdrawals(request_ids, hints)
 
         Args:
             request_ids: クレームする withdrawal request ID のリスト。
@@ -484,12 +519,13 @@ class LidoClient(AbstractLidoClient):
             queue_contract = self._w3.eth.contract(address=queue_address, abi=_WITHDRAWAL_QUEUE_ABI)
             gas_price = self._w3.eth.gas_price
 
-            # checkpointHints を取得（claimWithdrawals に必要）
+            # Step 1: checkpoint hints を取得
             last_checkpoint_index: int = queue_contract.functions.getLastCheckpointIndex().call()
             hints: list[int] = queue_contract.functions.findCheckpointHints(
                 request_ids, 1, last_checkpoint_index
             ).call()
 
+            # Step 2: claimWithdrawals(request_ids, hints)
             nonce = self._w3.eth.get_transaction_count(account.address)
             claim_tx = queue_contract.functions.claimWithdrawals(
                 request_ids, hints
@@ -522,7 +558,7 @@ class LidoClient(AbstractLidoClient):
                 error="claim 失敗（status=0）",
             )
         except Exception as exc:
-            logger.exception("claim_withdrawal 失敗: request_ids=%s", request_ids)
+            logger.exception("claim_withdrawals 失敗: request_ids=%s", request_ids)
             return ClaimWithdrawalResult(success=False, error=str(exc))
 
     async def get_withdrawal_status(self, request_ids: list[int]) -> list[WithdrawalStatus]:
@@ -577,16 +613,35 @@ class LidoClient(AbstractLidoClient):
             logger.exception("get_steth_balance 失敗: address=%s", address[:10])
             raise RuntimeError(f"stETH 残高取得失敗: {exc}") from exc
 
-    async def get_staking_apr(self) -> Decimal:
-        """Lido staking APR を推定する（オンチェーンデータから計算）。
+    async def _fetch_apr_data(self) -> dict[str, Any]:
+        """Lido 公式 API から stETH APR（SMA）データを取得する。"""
+        url = f"{self._config.api_base_url}/v1/protocol/steth/apr/sma"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            data: dict[str, Any] = response.json()
+            return data
 
-        PoC 実装: testnet では固定値を返す。
-        本番では Lido API または イベントログから計算する。
+    async def get_staking_apr(self) -> Decimal:
+        """Lido 公式 API から実 staking APR（%）を取得する。
+
+        API 失敗・異常値（0 < apr <= 50 を外れる）の場合は参考値 3.5% に
+        フォールバックし、例外は呼び出し元へ送出しない（fail-open 設計）。
         """
-        self._ensure_initialized()
-        # testnet / PoC: 推定値を返す（Lido mainnet APR の参考値 ~3.5%）
-        logger.info("get_staking_apr: testnet のため推定値 3.5%% を返します")
-        return Decimal("3.5")
+        try:
+            data = await self._fetch_apr_data()
+            apr = Decimal(str(data["data"]["smaApr"]))
+            if Decimal("0") < apr <= Decimal("50"):
+                return apr
+            logger.warning(
+                "get_staking_apr: 異常値 %s のためフォールバック値 3.5%% を返します", apr
+            )
+            return Decimal("3.5")
+        except Exception as exc:
+            logger.warning(
+                "get_staking_apr: API 取得失敗のためフォールバック値 3.5%% を返します: %s", exc
+            )
+            return Decimal("3.5")
 
     async def get_steth_eth_ratio(self) -> Decimal:
         """stETH/ETH レートを取得（getTotalPooledEther / getTotalShares）。"""
@@ -600,6 +655,22 @@ class LidoClient(AbstractLidoClient):
         except Exception as exc:
             logger.exception("get_steth_eth_ratio 失敗")
             raise RuntimeError(f"stETH/ETH レート取得失敗: {exc}") from exc
+
+    async def get_withdrawal_requests(self, address: str) -> list[int]:
+        """指定アドレスの未クレーム引き出しリクエスト ID 一覧を返す（view）。"""
+        self._ensure_initialized()
+        try:
+            from web3 import Web3  # noqa: PLC0415
+
+            queue_address = Web3.to_checksum_address(self._config.withdrawal_queue_address)
+            queue_contract = self._w3.eth.contract(address=queue_address, abi=_WITHDRAWAL_QUEUE_ABI)
+            request_ids: list[int] = queue_contract.functions.getWithdrawalRequests(
+                Web3.to_checksum_address(address)
+            ).call()
+            return request_ids
+        except Exception as exc:
+            logger.exception("get_withdrawal_requests 失敗: address=%s", address[:10])
+            raise RuntimeError(f"引き出しリクエスト一覧取得失敗: {exc}") from exc
 
 
 class DummyLidoClient(AbstractLidoClient):
@@ -640,7 +711,7 @@ class DummyLidoClient(AbstractLidoClient):
                 success=False,
                 error="amounts_wei は空にできません",
             )
-        # ダミー request_ids（インデックス+1 を使用）
+        # ダミー request_ids（インデックス+1000 を使用）
         dummy_ids = list(range(1000, 1000 + len(amounts_wei)))
         return WithdrawalRequestResult(
             tx_hash="0x" + "cd" * 32,
@@ -648,10 +719,10 @@ class DummyLidoClient(AbstractLidoClient):
             request_ids=dummy_ids,
         )
 
-    async def claim_withdrawal(self, request_ids: list[int]) -> ClaimWithdrawalResult:
-        """withdrawal claim のシミュレーション。"""
+    async def claim_withdrawals(self, request_ids: list[int]) -> ClaimWithdrawalResult:
+        """withdrawal claim のシミュレーション（実 on-chain write なし）。"""
         logger.info(
-            "DummyLidoClient.claim_withdrawal: request_ids=%s（シミュレーション）", request_ids
+            "DummyLidoClient.claim_withdrawals: request_ids=%s（シミュレーション）", request_ids
         )
         if not request_ids:
             return ClaimWithdrawalResult(
@@ -684,6 +755,14 @@ class DummyLidoClient(AbstractLidoClient):
             )
             for req_id in request_ids
         ]
+
+    async def get_withdrawal_requests(self, address: str) -> list[int]:
+        """固定の requestId 一覧を返すスタブ。"""
+        logger.info(
+            "DummyLidoClient.get_withdrawal_requests: address=%s（シミュレーション）",
+            address[:10] if address else "N/A",
+        )
+        return [1, 2, 3]
 
 
 def get_lido_client(config: LidoConfig) -> AbstractLidoClient:

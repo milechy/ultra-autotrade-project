@@ -1,17 +1,12 @@
-"""DummyLidoClient のユニットテスト。"""
+"""DummyLidoClient / LidoClient のユニットテスト。"""
 
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from app.protocols.lido.client import DummyLidoClient, LidoClient, get_lido_client
 from app.protocols.lido.config import LidoConfig
-from app.protocols.lido.schemas import (
-    ClaimWithdrawalResult,
-    WithdrawalRequestResult,
-    WithdrawalStatus,
-)
 
 
 @pytest.fixture
@@ -86,124 +81,6 @@ class TestDummyLidoClient:
         result = await dummy_client.withdraw(Decimal("0.1"), "ETH")
         assert result.success is True
 
-    # --- request_withdrawals ---
-
-    @pytest.mark.asyncio
-    async def test_request_withdrawals_returns_success(self, dummy_client: DummyLidoClient) -> None:
-        """request_withdrawals が成功を返すこと。"""
-        amounts_wei = [500_000_000_000_000_000]  # 0.5 ETH
-        result = await dummy_client.request_withdrawals(amounts_wei)
-        assert isinstance(result, WithdrawalRequestResult)
-        assert result.success is True
-        assert result.tx_hash is not None
-        assert result.tx_hash.startswith("0x")
-        assert result.error is None
-
-    @pytest.mark.asyncio
-    async def test_request_withdrawals_returns_request_ids(
-        self, dummy_client: DummyLidoClient
-    ) -> None:
-        """request_withdrawals が request_ids を返すこと。"""
-        amounts_wei = [100_000_000_000_000_000, 200_000_000_000_000_000]
-        result = await dummy_client.request_withdrawals(amounts_wei)
-        assert result.success is True
-        assert len(result.request_ids) == len(amounts_wei)
-
-    @pytest.mark.asyncio
-    async def test_request_withdrawals_empty_amounts_fails(
-        self, dummy_client: DummyLidoClient
-    ) -> None:
-        """amounts_wei が空のとき失敗を返すこと。"""
-        result = await dummy_client.request_withdrawals([])
-        assert result.success is False
-        assert result.error is not None
-
-    # --- claim_withdrawal ---
-
-    @pytest.mark.asyncio
-    async def test_claim_withdrawal_returns_success(self, dummy_client: DummyLidoClient) -> None:
-        """claim_withdrawal が成功を返すこと。"""
-        result = await dummy_client.claim_withdrawal([1001, 1002])
-        assert isinstance(result, ClaimWithdrawalResult)
-        assert result.success is True
-        assert result.tx_hash is not None
-        assert result.tx_hash.startswith("0x")
-        assert result.error is None
-
-    @pytest.mark.asyncio
-    async def test_claim_withdrawal_preserves_request_ids(
-        self, dummy_client: DummyLidoClient
-    ) -> None:
-        """claim_withdrawal が claimed_request_ids を返すこと。"""
-        request_ids = [1001, 1002, 1003]
-        result = await dummy_client.claim_withdrawal(request_ids)
-        assert result.claimed_request_ids == request_ids
-
-    @pytest.mark.asyncio
-    async def test_claim_withdrawal_empty_ids_fails(self, dummy_client: DummyLidoClient) -> None:
-        """request_ids が空のとき失敗を返すこと。"""
-        result = await dummy_client.claim_withdrawal([])
-        assert result.success is False
-        assert result.error is not None
-
-    # --- get_withdrawal_status ---
-
-    @pytest.mark.asyncio
-    async def test_get_withdrawal_status_returns_list(self, dummy_client: DummyLidoClient) -> None:
-        """get_withdrawal_status がリストを返すこと。"""
-        statuses = await dummy_client.get_withdrawal_status([1001, 1002])
-        assert isinstance(statuses, list)
-        assert len(statuses) == 2
-
-    @pytest.mark.asyncio
-    async def test_get_withdrawal_status_correct_fields(
-        self, dummy_client: DummyLidoClient
-    ) -> None:
-        """get_withdrawal_status の各フィールドが正しい型であること。"""
-        statuses = await dummy_client.get_withdrawal_status([1001])
-        status = statuses[0]
-        assert isinstance(status, WithdrawalStatus)
-        assert status.request_id == 1001
-        assert isinstance(status.amount_of_steth, Decimal)
-        assert isinstance(status.amount_of_shares, Decimal)
-        assert isinstance(status.is_finalized, bool)
-        assert isinstance(status.is_claimed, bool)
-        assert isinstance(status.timestamp, int)
-
-    @pytest.mark.asyncio
-    async def test_get_withdrawal_status_no_float(self, dummy_client: DummyLidoClient) -> None:
-        """withdrawal status の金額フィールドが Decimal であること（float 禁止）。"""
-        statuses = await dummy_client.get_withdrawal_status([1001])
-        status = statuses[0]
-        assert type(status.amount_of_steth) is Decimal
-        assert type(status.amount_of_shares) is Decimal
-
-    @pytest.mark.asyncio
-    async def test_get_withdrawal_status_dummy_is_finalized(
-        self, dummy_client: DummyLidoClient
-    ) -> None:
-        """DummyLidoClient の withdrawal status は is_finalized=True を返すこと。"""
-        statuses = await dummy_client.get_withdrawal_status([1001])
-        assert statuses[0].is_finalized is True
-
-    # --- withdraw (AbstractLidoClient 経由) ---
-
-    @pytest.mark.asyncio
-    async def test_withdraw_delegates_to_request_withdrawals(
-        self, dummy_client: DummyLidoClient
-    ) -> None:
-        """AbstractLidoClient.withdraw() が request_withdrawals() に委譲すること。"""
-        result = await dummy_client.withdraw(Decimal("1.0"), "stETH")
-        assert result.success is True
-        assert result.tx_hash is not None
-
-    @pytest.mark.asyncio
-    async def test_withdraw_invalid_asset_fails(self, dummy_client: DummyLidoClient) -> None:
-        """無効なアセットで withdraw は失敗を返すこと。"""
-        result = await dummy_client.withdraw(Decimal("1.0"), "USDC")
-        assert result.success is False
-        assert result.error is not None
-
 
 class TestGetLidoClient:
     def test_sandbox_returns_dummy_client(self) -> None:
@@ -238,590 +115,114 @@ class TestGetLidoClient:
         assert isinstance(client, DummyLidoClient)
 
 
-class TestLidoClientStakeEth:
-    """LidoClient.stake_eth のモックテスト（チェーン接続なし）。"""
+_TEST_WALLET = "0x0000000000000000000000000000000000000001"
+
+
+@pytest.fixture
+def real_client() -> LidoClient:
+    return LidoClient(LidoConfig(sandbox=False))
+
+
+class TestLidoClientApr:
+    """LidoClient.get_staking_apr の Lido API 実装テスト（HTTP は mock）。"""
 
     @pytest.mark.asyncio
-    async def test_stake_eth_no_private_key_fails(self) -> None:
-        """秘密鍵未設定で stake_eth は失敗を返すこと。"""
-        config = LidoConfig(sandbox=False, wallet_private_key="")
-        client = LidoClient(config)
-        client._initialized = True
-        client._w3 = None
-        client._contract = None
-
-        result = await client.stake_eth(100_000_000_000_000_000)
-        assert result.success is False
-        assert "LIDO_WALLET_PRIVATE_KEY" in (result.error or "")
-
-    @pytest.mark.asyncio
-    async def test_stake_eth_success_with_mock(self) -> None:
-        """web3 モックで stake_eth 成功パスをテスト。"""
-
-        config = LidoConfig(sandbox=False, wallet_private_key="0x" + "aa" * 32)
-        client = LidoClient(config)
-
-        mock_account = MagicMock()
-        mock_account.address = "0x0000000000000000000000000000000000000001"
-
-        mock_receipt = {"status": 1}
-        fake_tx_hash_obj = MagicMock()
-        fake_tx_hash_obj.hex.return_value = "0x" + "ab" * 32
-
-        mock_contract_fn = MagicMock()
-        mock_contract_fn.build_transaction.return_value = {}
-
-        mock_steth_contract = MagicMock()
-        mock_steth_contract.functions.submit.return_value = mock_contract_fn
-
-        mock_w3 = MagicMock()
-        mock_w3.eth.account.from_key.return_value = mock_account
-        mock_w3.eth.get_transaction_count.return_value = 0
-        mock_w3.eth.gas_price = 20_000_000_000
-        mock_w3.eth.account.sign_transaction.return_value.raw_transaction = b"\x00"
-        mock_w3.eth.send_raw_transaction.return_value = fake_tx_hash_obj
-        mock_w3.eth.wait_for_transaction_receipt.return_value = mock_receipt
-
-        client._w3 = mock_w3
-        client._contract = mock_steth_contract
-        client._initialized = True
-
-        with patch(
-            "web3.Web3.to_checksum_address",
-            return_value="0x0000000000000000000000000000000000000000",
+    async def test_apr_returns_real_value_from_api(self, real_client: LidoClient) -> None:
+        """API 成功時に実値が Decimal で返ること。"""
+        with patch.object(
+            real_client,
+            "_fetch_apr_data",
+            new=AsyncMock(return_value={"data": {"smaApr": 2.9}}),
         ):
-            result = await client.stake_eth(100_000_000_000_000_000)
-
-        assert result.success is True
-        assert result.tx_hash is not None
-
-    @pytest.mark.asyncio
-    async def test_stake_eth_tx_status_zero_fails(self) -> None:
-        """tx status=0 のとき stake_eth は失敗を返すこと。"""
-
-        config = LidoConfig(sandbox=False, wallet_private_key="0x" + "aa" * 32)
-        client = LidoClient(config)
-
-        mock_account = MagicMock()
-        mock_account.address = "0x0000000000000000000000000000000000000001"
-
-        mock_receipt = {"status": 0}
-        fake_tx_hash_obj = MagicMock()
-        fake_tx_hash_obj.hex.return_value = "0x" + "ab" * 32
-
-        mock_contract_fn = MagicMock()
-        mock_contract_fn.build_transaction.return_value = {}
-
-        mock_steth_contract = MagicMock()
-        mock_steth_contract.functions.submit.return_value = mock_contract_fn
-
-        mock_w3 = MagicMock()
-        mock_w3.eth.account.from_key.return_value = mock_account
-        mock_w3.eth.get_transaction_count.return_value = 0
-        mock_w3.eth.gas_price = 20_000_000_000
-        mock_w3.eth.account.sign_transaction.return_value.raw_transaction = b"\x00"
-        mock_w3.eth.send_raw_transaction.return_value = fake_tx_hash_obj
-        mock_w3.eth.wait_for_transaction_receipt.return_value = mock_receipt
-
-        client._w3 = mock_w3
-        client._contract = mock_steth_contract
-        client._initialized = True
-
-        with patch(
-            "web3.Web3.to_checksum_address",
-            return_value="0x0000000000000000000000000000000000000000",
-        ):
-            result = await client.stake_eth(100_000_000_000_000_000)
-
-        assert result.success is False
-        assert result.error is not None
-
-
-class TestLidoClientRequestWithdrawals:
-    """LidoClient.request_withdrawals のモックテスト（チェーン接続なし）。"""
-
-    @pytest.fixture
-    def real_config(self) -> LidoConfig:
-        return LidoConfig(
-            sandbox=False,
-            wallet_private_key="0x" + "aa" * 32,
-        )
-
-    @pytest.mark.asyncio
-    async def test_request_withdrawals_no_private_key_fails(self) -> None:
-        """秘密鍵未設定で request_withdrawals は失敗を返すこと。"""
-        config = LidoConfig(sandbox=False, wallet_private_key="")
-        client = LidoClient(config)
-        client._initialized = True  # _ensure_initialized をスキップ
-        client._w3 = None
-        client._contract = None
-
-        result = await client.request_withdrawals([100_000_000_000_000_000])
-        assert result.success is False
-        assert "LIDO_WALLET_PRIVATE_KEY" in (result.error or "")
-
-    @pytest.mark.asyncio
-    async def test_request_withdrawals_empty_amounts_fails(self) -> None:
-        """amounts_wei が空で request_withdrawals は失敗を返すこと。"""
-        config = LidoConfig(sandbox=False, wallet_private_key="0x" + "aa" * 32)
-        client = LidoClient(config)
-        client._initialized = True
-        client._w3 = None
-        client._contract = None
-
-        result = await client.request_withdrawals([])
-        assert result.success is False
-        assert result.error is not None
-
-    @pytest.mark.asyncio
-    async def test_request_withdrawals_web3_exception_returns_failure(self) -> None:
-        """web3 呼び出しで例外が出たとき失敗を返すこと。"""
-
-        config = LidoConfig(sandbox=False, wallet_private_key="0x" + "aa" * 32)
-        client = LidoClient(config)
-
-        mock_w3 = MagicMock()
-        mock_w3.eth.account.from_key.side_effect = ValueError("invalid key")
-        client._w3 = mock_w3
-        client._contract = MagicMock()
-        client._initialized = True
-
-        # Web3 は遅延 import されるため、_w3 への side_effect で例外を発生させる
-        result = await client.request_withdrawals([100_000_000_000_000_000])
-
-        assert result.success is False
-        assert result.error is not None
-
-    @pytest.mark.asyncio
-    async def test_request_withdrawals_success_with_mock(self) -> None:
-        """web3 モックで request_withdrawals 成功パスをテスト。"""
-
-        config = LidoConfig(sandbox=False, wallet_private_key="0x" + "aa" * 32)
-        client = LidoClient(config)
-
-        mock_account = MagicMock()
-        mock_account.address = "0x0000000000000000000000000000000000000001"
-
-        approve_receipt = {"status": 1}
-        withdraw_receipt = {"status": 1}
-        fake_tx_hash_obj = MagicMock()
-        fake_tx_hash_obj.hex.return_value = "0x" + "cd" * 32
-
-        mock_approve_fn = MagicMock()
-        mock_approve_fn.build_transaction.return_value = {}
-
-        mock_withdraw_fn = MagicMock()
-        mock_withdraw_fn.build_transaction.return_value = {}
-
-        mock_steth_contract = MagicMock()
-        mock_steth_contract.functions.approve.return_value = mock_approve_fn
-
-        mock_queue_contract = MagicMock()
-        mock_queue_contract.functions.requestWithdrawals.return_value = mock_withdraw_fn
-
-        mock_w3 = MagicMock()
-        mock_w3.eth.account.from_key.return_value = mock_account
-        mock_w3.eth.get_transaction_count.return_value = 10
-        mock_w3.eth.gas_price = 20_000_000_000
-        mock_w3.eth.account.sign_transaction.return_value.raw_transaction = b"\x00"
-        mock_w3.eth.send_raw_transaction.return_value = fake_tx_hash_obj
-        mock_w3.eth.wait_for_transaction_receipt.side_effect = [
-            approve_receipt,
-            withdraw_receipt,
-        ]
-        mock_w3.eth.contract.return_value = mock_queue_contract
-
-        client._w3 = mock_w3
-        client._contract = mock_steth_contract
-        client._initialized = True
-
-        with patch(
-            "web3.Web3.to_checksum_address",
-            return_value="0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
-        ):
-            result = await client.request_withdrawals([500_000_000_000_000_000])
-
-        assert result.success is True
-        assert result.tx_hash is not None
-
-    @pytest.mark.asyncio
-    async def test_request_withdrawals_tx_status_zero_fails(self) -> None:
-        """tx status=0 のとき request_withdrawals は失敗を返すこと。"""
-
-        config = LidoConfig(sandbox=False, wallet_private_key="0x" + "aa" * 32)
-        client = LidoClient(config)
-
-        mock_account = MagicMock()
-        mock_account.address = "0x0000000000000000000000000000000000000001"
-
-        approve_receipt = {"status": 1}
-        withdraw_receipt = {"status": 0}  # 失敗
-        fake_tx_hash_obj = MagicMock()
-        fake_tx_hash_obj.hex.return_value = "0x" + "cd" * 32
-
-        mock_approve_fn = MagicMock()
-        mock_approve_fn.build_transaction.return_value = {}
-
-        mock_withdraw_fn = MagicMock()
-        mock_withdraw_fn.build_transaction.return_value = {}
-
-        mock_steth_contract = MagicMock()
-        mock_steth_contract.functions.approve.return_value = mock_approve_fn
-
-        mock_queue_contract = MagicMock()
-        mock_queue_contract.functions.requestWithdrawals.return_value = mock_withdraw_fn
-
-        mock_w3 = MagicMock()
-        mock_w3.eth.account.from_key.return_value = mock_account
-        mock_w3.eth.get_transaction_count.return_value = 10
-        mock_w3.eth.gas_price = 20_000_000_000
-        mock_w3.eth.account.sign_transaction.return_value.raw_transaction = b"\x00"
-        mock_w3.eth.send_raw_transaction.return_value = fake_tx_hash_obj
-        mock_w3.eth.wait_for_transaction_receipt.side_effect = [
-            approve_receipt,
-            withdraw_receipt,
-        ]
-        mock_w3.eth.contract.return_value = mock_queue_contract
-
-        client._w3 = mock_w3
-        client._contract = mock_steth_contract
-        client._initialized = True
-
-        with patch(
-            "web3.Web3.to_checksum_address",
-            return_value="0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
-        ):
-            result = await client.request_withdrawals([500_000_000_000_000_000])
-
-        assert result.success is False
-        assert result.error is not None
-
-
-class TestLidoClientClaimWithdrawal:
-    """LidoClient.claim_withdrawal のモックテスト（チェーン接続なし）。"""
-
-    @pytest.mark.asyncio
-    async def test_claim_withdrawal_no_private_key_fails(self) -> None:
-        """秘密鍵未設定で claim_withdrawal は失敗を返すこと。"""
-        config = LidoConfig(sandbox=False, wallet_private_key="")
-        client = LidoClient(config)
-        client._initialized = True
-        client._w3 = None
-        client._contract = None
-
-        result = await client.claim_withdrawal([1001])
-        assert result.success is False
-        assert "LIDO_WALLET_PRIVATE_KEY" in (result.error or "")
-
-    @pytest.mark.asyncio
-    async def test_claim_withdrawal_empty_ids_fails(self) -> None:
-        """request_ids が空で claim_withdrawal は失敗を返すこと。"""
-        config = LidoConfig(sandbox=False, wallet_private_key="0x" + "aa" * 32)
-        client = LidoClient(config)
-        client._initialized = True
-        client._w3 = None
-        client._contract = None
-
-        result = await client.claim_withdrawal([])
-        assert result.success is False
-        assert result.error is not None
-
-    @pytest.mark.asyncio
-    async def test_claim_withdrawal_web3_exception_returns_failure(self) -> None:
-        """web3 呼び出しで例外が出たとき失敗を返すこと。"""
-
-        config = LidoConfig(sandbox=False, wallet_private_key="0x" + "aa" * 32)
-        client = LidoClient(config)
-
-        mock_w3 = MagicMock()
-        mock_w3.eth.account.from_key.side_effect = ValueError("invalid key")
-        client._w3 = mock_w3
-        client._contract = MagicMock()
-        client._initialized = True
-
-        # Web3 は遅延 import されるため、_w3 への side_effect で例外を発生させる
-        result = await client.claim_withdrawal([1001])
-
-        assert result.success is False
-        assert result.error is not None
-
-    @pytest.mark.asyncio
-    async def test_claim_withdrawal_success_with_mock(self) -> None:
-        """web3 モックで claim_withdrawal 成功パスをテスト。"""
-
-        config = LidoConfig(sandbox=False, wallet_private_key="0x" + "aa" * 32)
-        client = LidoClient(config)
-
-        mock_account = MagicMock()
-        mock_account.address = "0x0000000000000000000000000000000000000001"
-
-        claim_receipt = {"status": 1}
-        fake_tx_hash_obj = MagicMock()
-        fake_tx_hash_obj.hex.return_value = "0x" + "ef" * 32
-
-        mock_claim_fn = MagicMock()
-        mock_claim_fn.build_transaction.return_value = {}
-
-        mock_queue_contract = MagicMock()
-        mock_queue_contract.functions.getLastCheckpointIndex.return_value.call.return_value = 100
-        mock_queue_contract.functions.findCheckpointHints.return_value.call.return_value = [50]
-        mock_queue_contract.functions.claimWithdrawals.return_value = mock_claim_fn
-
-        mock_w3 = MagicMock()
-        mock_w3.eth.account.from_key.return_value = mock_account
-        mock_w3.eth.get_transaction_count.return_value = 5
-        mock_w3.eth.gas_price = 20_000_000_000
-        mock_w3.eth.account.sign_transaction.return_value.raw_transaction = b"\x00"
-        mock_w3.eth.send_raw_transaction.return_value = fake_tx_hash_obj
-        mock_w3.eth.wait_for_transaction_receipt.return_value = claim_receipt
-        mock_w3.eth.contract.return_value = mock_queue_contract
-
-        client._w3 = mock_w3
-        client._contract = MagicMock()
-        client._initialized = True
-
-        with patch(
-            "web3.Web3.to_checksum_address",
-            return_value="0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
-        ):
-            result = await client.claim_withdrawal([1001])
-
-        assert result.success is True
-        assert result.tx_hash is not None
-        assert result.claimed_request_ids == [1001]
-
-    @pytest.mark.asyncio
-    async def test_claim_withdrawal_tx_status_zero_fails(self) -> None:
-        """tx status=0 のとき claim_withdrawal は失敗を返すこと。"""
-
-        config = LidoConfig(sandbox=False, wallet_private_key="0x" + "aa" * 32)
-        client = LidoClient(config)
-
-        mock_account = MagicMock()
-        mock_account.address = "0x0000000000000000000000000000000000000001"
-
-        claim_receipt = {"status": 0}  # 失敗
-        fake_tx_hash_obj = MagicMock()
-        fake_tx_hash_obj.hex.return_value = "0x" + "ef" * 32
-
-        mock_claim_fn = MagicMock()
-        mock_claim_fn.build_transaction.return_value = {}
-
-        mock_queue_contract = MagicMock()
-        mock_queue_contract.functions.getLastCheckpointIndex.return_value.call.return_value = 100
-        mock_queue_contract.functions.findCheckpointHints.return_value.call.return_value = [50]
-        mock_queue_contract.functions.claimWithdrawals.return_value = mock_claim_fn
-
-        mock_w3 = MagicMock()
-        mock_w3.eth.account.from_key.return_value = mock_account
-        mock_w3.eth.get_transaction_count.return_value = 5
-        mock_w3.eth.gas_price = 20_000_000_000
-        mock_w3.eth.account.sign_transaction.return_value.raw_transaction = b"\x00"
-        mock_w3.eth.send_raw_transaction.return_value = fake_tx_hash_obj
-        mock_w3.eth.wait_for_transaction_receipt.return_value = claim_receipt
-        mock_w3.eth.contract.return_value = mock_queue_contract
-
-        client._w3 = mock_w3
-        client._contract = MagicMock()
-        client._initialized = True
-
-        with patch(
-            "web3.Web3.to_checksum_address",
-            return_value="0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
-        ):
-            result = await client.claim_withdrawal([1001])
-
-        assert result.success is False
-        assert result.error is not None
-
-
-class TestLidoClientGetWithdrawalStatus:
-    """LidoClient.get_withdrawal_status のモックテスト（チェーン接続なし）。"""
-
-    @pytest.mark.asyncio
-    async def test_get_withdrawal_status_parses_response(self) -> None:
-        """get_withdrawal_status がコントラクトレスポンスを正しくパースすること。"""
-        import time  # noqa: PLC0415
-
-        config = LidoConfig(sandbox=False)
-        client = LidoClient(config)
-
-        now = int(time.time())
-        mock_raw_statuses = [
-            (
-                500_000_000_000_000_000,  # amountOfStETH (0.5 ETH in Wei)
-                490_000_000_000_000_000,  # amountOfShares
-                "0x0000000000000000000000000000000000000001",  # owner
-                now - 3600,  # timestamp
-                True,  # isFinalized
-                False,  # isClaimed
-            )
-        ]
-
-        mock_queue_contract = MagicMock()
-        mock_queue_contract.functions.getWithdrawalStatus.return_value.call.return_value = (
-            mock_raw_statuses
-        )
-
-        mock_w3 = MagicMock()
-        mock_w3.eth.contract.return_value = mock_queue_contract
-        client._w3 = mock_w3
-        client._contract = MagicMock()
-        client._initialized = True
-
-        # Web3 は遅延 import。web3.Web3.to_checksum_address を patch する
-        with patch(
-            "web3.Web3.to_checksum_address",
-            return_value="0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
-        ):
-            statuses = await client.get_withdrawal_status([1001])
-
-        assert len(statuses) == 1
-        status = statuses[0]
-        assert status.request_id == 1001
-        assert type(status.amount_of_steth) is Decimal
-        assert status.amount_of_steth == Decimal("500000000000000000") / Decimal(
-            "1000000000000000000"
-        )
-        assert status.is_finalized is True
-        assert status.is_claimed is False
-
-    @pytest.mark.asyncio
-    async def test_get_withdrawal_status_raises_on_web3_error(self) -> None:
-        """web3 呼び出しで例外が出たとき RuntimeError を raise すること。"""
-
-        config = LidoConfig(sandbox=False)
-        client = LidoClient(config)
-
-        mock_queue_contract = MagicMock()
-        mock_queue_contract.functions.getWithdrawalStatus.side_effect = RuntimeError("RPC error")
-
-        mock_w3 = MagicMock()
-        mock_w3.eth.contract.return_value = mock_queue_contract
-        client._w3 = mock_w3
-        client._contract = MagicMock()
-        client._initialized = True
-
-        with (
-            patch("web3.Web3.to_checksum_address", return_value="0xAddress"),
-            pytest.raises(RuntimeError, match="withdrawal ステータス取得失敗"),
-        ):
-            await client.get_withdrawal_status([1001])
-
-
-class TestLidoClientReadMethods:
-    """LidoClient の読み取り専用メソッドのモックテスト。"""
-
-    @pytest.mark.asyncio
-    async def test_get_steth_balance_success(self) -> None:
-        """get_steth_balance が Decimal を返すこと。"""
-
-        config = LidoConfig(sandbox=False)
-        client = LidoClient(config)
-
-        mock_steth_contract = MagicMock()
-        mock_steth_contract.functions.balanceOf.return_value.call.return_value = (
-            1_500_000_000_000_000_000  # 1.5 ETH in Wei
-        )
-
-        client._contract = mock_steth_contract
-        client._initialized = True
-        client._w3 = MagicMock()
-
-        with patch("web3.Web3.to_checksum_address", return_value="0xAddress"):
-            balance = await client.get_steth_balance("0x0000000000000000000000000000000000000001")
-
-        assert type(balance) is Decimal
-        assert balance == Decimal("1500000000000000000") / Decimal("1000000000000000000")
-
-    @pytest.mark.asyncio
-    async def test_get_steth_balance_raises_on_error(self) -> None:
-        """web3 エラー時に get_steth_balance は RuntimeError を raise すること。"""
-
-        config = LidoConfig(sandbox=False)
-        client = LidoClient(config)
-
-        mock_steth_contract = MagicMock()
-        mock_steth_contract.functions.balanceOf.side_effect = RuntimeError("RPC error")
-
-        client._contract = mock_steth_contract
-        client._initialized = True
-        client._w3 = MagicMock()
-
-        with (
-            patch("web3.Web3.to_checksum_address", return_value="0xAddress"),
-            pytest.raises(RuntimeError, match="stETH 残高取得失敗"),
-        ):
-            await client.get_steth_balance("0xAddress")
-
-    @pytest.mark.asyncio
-    async def test_get_staking_apr_returns_35(self) -> None:
-        """get_staking_apr が testnet で 3.5 を返すこと。"""
-
-        config = LidoConfig(sandbox=False)
-        client = LidoClient(config)
-        client._initialized = True
-        client._w3 = MagicMock()
-        client._contract = MagicMock()
-
-        apr = await client.get_staking_apr()
+            apr = await real_client.get_staking_apr()
+        assert apr == Decimal("2.9")
         assert type(apr) is Decimal
+
+    @pytest.mark.asyncio
+    async def test_apr_api_failure_falls_back_to_35(self, real_client: LidoClient) -> None:
+        """API 失敗時にフォールバック値 3.5 が返ること。"""
+        with patch.object(
+            real_client,
+            "_fetch_apr_data",
+            new=AsyncMock(side_effect=Exception("connection error")),
+        ):
+            apr = await real_client.get_staking_apr()
         assert apr == Decimal("3.5")
 
     @pytest.mark.asyncio
-    async def test_get_steth_eth_ratio_success(self) -> None:
-        """get_steth_eth_ratio が正しい比率を返すこと。"""
-
-        config = LidoConfig(sandbox=False)
-        client = LidoClient(config)
-
-        mock_steth_contract = MagicMock()
-        mock_steth_contract.functions.getTotalPooledEther.return_value.call.return_value = (
-            1_050_000_000_000_000_000
-        )
-        mock_steth_contract.functions.getTotalShares.return_value.call.return_value = (
-            1_000_000_000_000_000_000
-        )
-
-        client._contract = mock_steth_contract
-        client._initialized = True
-        client._w3 = MagicMock()
-
-        ratio = await client.get_steth_eth_ratio()
-        assert type(ratio) is Decimal
-        assert ratio == Decimal("1050000000000000000") / Decimal("1000000000000000000")
+    async def test_apr_abnormal_value_falls_back_to_35(self, real_client: LidoClient) -> None:
+        """異常値（smaApr=999 > 50）はフォールバック値 3.5 が返ること。"""
+        with patch.object(
+            real_client,
+            "_fetch_apr_data",
+            new=AsyncMock(return_value={"data": {"smaApr": 999}}),
+        ):
+            apr = await real_client.get_staking_apr()
+        assert apr == Decimal("3.5")
 
     @pytest.mark.asyncio
-    async def test_get_steth_eth_ratio_zero_shares_returns_one(self) -> None:
-        """total_shares が 0 のとき get_steth_eth_ratio は 1 を返すこと。"""
-
-        config = LidoConfig(sandbox=False)
-        client = LidoClient(config)
-
-        mock_steth_contract = MagicMock()
-        mock_steth_contract.functions.getTotalPooledEther.return_value.call.return_value = 0
-        mock_steth_contract.functions.getTotalShares.return_value.call.return_value = 0
-
-        client._contract = mock_steth_contract
-        client._initialized = True
-        client._w3 = MagicMock()
-
-        ratio = await client.get_steth_eth_ratio()
-        assert ratio == Decimal("1")
+    async def test_apr_never_raises_on_malformed_response(self, real_client: LidoClient) -> None:
+        """レスポンス構造が壊れていても例外が漏洩しないこと（fail-open）。"""
+        with patch.object(
+            real_client,
+            "_fetch_apr_data",
+            new=AsyncMock(return_value={}),
+        ):
+            apr = await real_client.get_staking_apr()  # KeyError が漏洩しないこと
+        assert apr == Decimal("3.5")
 
     @pytest.mark.asyncio
-    async def test_get_steth_eth_ratio_raises_on_error(self) -> None:
-        """web3 エラー時に get_steth_eth_ratio は RuntimeError を raise すること。"""
+    async def test_apr_fail_open_with_unreachable_url(self) -> None:
+        """到達不能な API URL でもフォールバック値 3.5 が返ること（実証）。"""
+        client = LidoClient(LidoConfig(sandbox=False, api_base_url="http://127.0.0.1:1"))
+        apr = await client.get_staking_apr()
+        assert apr == Decimal("3.5")
 
-        config = LidoConfig(sandbox=False)
-        client = LidoClient(config)
 
-        mock_steth_contract = MagicMock()
-        mock_steth_contract.functions.getTotalPooledEther.side_effect = RuntimeError("RPC error")
+class TestGetPosition:
+    """AbstractLidoClient.get_position のテスト。"""
 
-        client._contract = mock_steth_contract
-        client._initialized = True
-        client._w3 = MagicMock()
+    @pytest.mark.asyncio
+    async def test_dummy_client_position_returns_balance(self) -> None:
+        """DummyLidoClient は stub 残高 1.0 を position に反映すること。"""
+        client = DummyLidoClient(LidoConfig(sandbox=True, wallet_address=_TEST_WALLET))
+        position = await client.get_position()
+        assert position.protocol_name == "lido"
+        assert position.asset == "stETH"
+        assert position.balance == Decimal("1.0")
+        assert position.value_usd == Decimal("1.0")
 
-        with pytest.raises(RuntimeError, match="stETH/ETH レート取得失敗"):
-            await client.get_steth_eth_ratio()
+    @pytest.mark.asyncio
+    async def test_lido_client_position_reflects_real_balance(self) -> None:
+        """LidoClient は get_steth_balance の実値を position に反映すること。"""
+        client = LidoClient(LidoConfig(sandbox=False, wallet_address=_TEST_WALLET))
+        with patch.object(
+            client,
+            "get_steth_balance",
+            new=AsyncMock(return_value=Decimal("2.5")),
+        ):
+            position = await client.get_position()
+        assert position.balance == Decimal("2.5")
+        assert position.value_usd == Decimal("2.5")
+        assert type(position.balance) is Decimal
+
+    @pytest.mark.asyncio
+    async def test_empty_wallet_address_returns_zero_position(self) -> None:
+        """wallet_address 未設定の場合 zero position を返すこと。"""
+        client = DummyLidoClient(LidoConfig(sandbox=True, wallet_address=""))
+        position = await client.get_position()
+        assert position.balance == Decimal("0")
+        assert position.value_usd == Decimal("0")
+
+    @pytest.mark.asyncio
+    async def test_balance_failure_returns_zero_position(self) -> None:
+        """get_steth_balance 例外時に fail-open で zero position を返すこと。"""
+        client = LidoClient(LidoConfig(sandbox=False, wallet_address=_TEST_WALLET))
+        with patch.object(
+            client,
+            "get_steth_balance",
+            new=AsyncMock(side_effect=RuntimeError("stETH 残高取得失敗")),
+        ):
+            position = await client.get_position()
+        assert position.balance == Decimal("0")
+        assert position.value_usd == Decimal("0")

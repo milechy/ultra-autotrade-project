@@ -115,6 +115,41 @@ class ClaimWithdrawalResult(BaseModel):
     error: Optional[str] = None
 
 
+class LidoClaimRequest(BaseModel):
+    """引き出しクレームリクエスト（finalized 済みリクエストに対して実行）。"""
+
+    request_ids: list[int] = Field(
+        ..., min_length=1, description="クレームする引き出しリクエスト ID 一覧"
+    )
+    dry_run: bool = Field(True, description="True の場合シミュレーションのみ（デフォルト）")
+
+
+class LidoClaimResponse(BaseModel):
+    """引き出しクレーム結果。"""
+
+    operation: str = Field("CLAIM", description="操作タイプ")
+    request_ids: list[int]
+    tx_hash: Optional[str] = None
+    dry_run: bool
+    claimed_eth: Optional[Decimal] = Field(
+        None, description="クレームした ETH 量の概算（dry_run 時は None）"
+    )
+
+
+class LidoWithdrawalStatusResponse(BaseModel):
+    """withdrawal request ステータス一覧レスポンス。"""
+
+    request_ids: list[int]
+    statuses: list[WithdrawalStatus]
+
+
+class LidoWithdrawalRequestsResponse(BaseModel):
+    """引き出しリクエスト一覧レスポンス。"""
+
+    address: str
+    request_ids: list[int]
+
+
 class CompoundYieldEstimate(BaseModel):
     """複合利回り推定値。"""
 

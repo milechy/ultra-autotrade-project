@@ -117,3 +117,9 @@ frontend/e2e/uat-pre-check-*.spec.ts.bak*
 # Phase A screenshots (5/15)
 frontend/e2e/screenshots/uat-pre-check/
 frontend/e2e/screenshots/yamamoto-partner/
+
+# repomix output (Gate 5 前処理 / scripts/run_repomix.sh)
+repomix-output.xml
+
+# SkillOpt 最適化出力（原本上書き防止 / 監査 MINOR-3）
+**/*.optimized.md
