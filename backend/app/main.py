@@ -333,6 +333,18 @@ def create_app() -> FastAPI:
         _validate_model_config()
         logger.info("AI model config validation passed")
 
+    # --- 4-axis consensus weight validation (fail-fast / fail-closed) ---
+    @app.on_event("startup")
+    async def startup_validate_consensus_weights() -> None:
+        """Fail-fast: reject invalid 4-axis consensus weights before any task starts."""
+        from app.ai.agents import (  # noqa: PLC0415
+            MultiAgentContext,
+            validate_agent_weights,
+        )
+
+        validate_agent_weights(MultiAgentContext.DEFAULT_WEIGHTS)
+        logger.info("4-axis consensus weight validation passed")
+
     # --- Aave Oracle staleness threshold env validation (fail-fast) ---
     @app.on_event("startup")
     async def startup_validate_oracle_staleness_env() -> None:
