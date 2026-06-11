@@ -2,9 +2,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { AlertTriangle, Loader2 } from "lucide-react"
-import { useFundWallet, useWallets } from "@privy-io/react-auth"
-import { base } from "viem/chains"
+import { AlertTriangle, Copy, Check, Loader2 } from "lucide-react"
 import { liffFetch } from "@/lib/liff/liff-fetch"
 
 // ---- 型定義 ---------------------------------------------------------------
@@ -16,13 +14,13 @@ interface UserSettingsResponse {
 
 type Tab = "deposit" | "withdraw"
 
-// 入金用 JPY → USDC 変換レート（固定近似値）
+// 入金目安表示用 JPY → USDC 変換レート（固定近似値）
 const JPY_PER_USDC = 155
 
 // 出金ネットワーク手数料概算 (USDC)
 const WITHDRAW_FEE = 0.08
 
-// ---- 確認シート ------------------------------------------------------------
+// ---- 確認シート（出金専用） -------------------------------------------------
 
 interface ConfirmSheetProps {
   open: boolean
@@ -88,26 +86,26 @@ function ConfirmSheet({ open, title, rows, onConfirm, onCancel, busy, error }: C
 export function DepositPanel() {
   const [tab, setTab] = useState<Tab>("deposit")
 
-  // 残高
+  // 残高・ウォレット
   const [balance, setBalance] = useState<number | null>(null)
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [balanceLoading, setBalanceLoading] = useState(true)
 
-  // 入金フォーム
+  // 入金フォーム（金額は送金目安の表示用）
   const [depositAmount, setDepositAmount] = useState("")
+  // 入金用アドレスを表示中か
+  const [showDepositAddress, setShowDepositAddress] = useState(false)
+  // アドレスコピー状態
+  const [copied, setCopied] = useState(false)
 
   // 出金フォーム
   const [withdrawAmount, setWithdrawAmount] = useState("")
 
-  // 確認シート
+  // 確認シート（出金専用）
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [confirmError, setConfirmError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
-
-  // Privy
-  const { fundWallet } = useFundWallet()
-  const { wallets } = useWallets()
 
   // ---- 残高取得 ------------------------------------------------------------
 
@@ -145,6 +143,7 @@ export function DepositPanel() {
 
   const withdrawNum = parseFloat(withdrawAmount) || 0
   const receiveAmount = Math.max(0, withdrawNum - WITHDRAW_FEE)
+  const depositNum = parseFloat(depositAmount) || 0
 
   // ---- タブ切替 ------------------------------------------------------------
 
@@ -153,50 +152,22 @@ export function DepositPanel() {
     setConfirmOpen(false)
     setConfirmError(null)
     setSuccessMsg(null)
+    setShowDepositAddress(false)
+    setCopied(false)
   }
 
-  // ---- 入金確認シート -------------------------------------------------------
+  // ---- 入金用アドレスのコピー -----------------------------------------------
 
-  const depositNum = parseFloat(depositAmount) || 0
-  const estimatedUsdc = depositNum > 0 ? (depositNum / JPY_PER_USDC).toFixed(2) : "0"
-
-  const depositRows = [
-    { label: "入金目安額", value: `¥${depositNum.toLocaleString("ja-JP")}` },
-    { label: "概算 USDC", value: `≈ $${estimatedUsdc} USDC` },
-    { label: "入金方法", value: "取引所・ウォレットから送金" },
-    { label: "着金先ネットワーク", value: "Base Mainnet（自動変換）" },
-  ]
-
-  const handleDepositConfirm = useCallback(async () => {
-    setConfirmBusy(true)
-    setConfirmError(null)
+  const handleCopyAddress = useCallback(async () => {
+    if (!walletAddress) return
     try {
-      // Privy useFundWallet でオンランプ起動
-      const wallet = wallets.find((w) => w.walletClientType === "privy")
-      const address = wallet?.address ?? walletAddress ?? ""
-      if (!address) throw new Error("ウォレットアドレスが見つかりません")
-      await fundWallet({
-        address,
-        options: {
-          chain: base,
-          asset: "USDC",
-          amount: estimatedUsdc,
-        },
-      })
-      setConfirmOpen(false)
-      setSuccessMsg("入金用アドレスを表示しました。送金の着金後に残高が反映されます。")
-      void fetchBalance()
-    } catch (e) {
-      if (e instanceof Error && e.message.toLowerCase().includes("exit")) {
-        // ユーザーが途中でキャンセル — エラー扱いしない
-        setConfirmOpen(false)
-      } else {
-        setConfirmError(e instanceof Error ? e.message : "入金処理に失敗しました")
-      }
-    } finally {
-      setConfirmBusy(false)
+      await navigator.clipboard.writeText(walletAddress)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // clipboard 非対応環境では無視（アドレスは画面に表示済み）
     }
-  }, [wallets, walletAddress, fundWallet, estimatedUsdc, fetchBalance])
+  }, [walletAddress])
 
   // ---- 出金確認シート -------------------------------------------------------
 
@@ -283,9 +254,9 @@ export function DepositPanel() {
       {/* ====== 入金タブ ====== */}
       {tab === "deposit" && (
         <div className="space-y-4">
-          {/* 金額入力 */}
+          {/* 金額入力（送金額の目安） */}
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">金額を入力（円）</label>
+            <label className="block text-xs text-zinc-400 mb-1">金額を入力（円・目安）</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">¥</span>
               <input
@@ -320,7 +291,7 @@ export function DepositPanel() {
             ))}
           </div>
 
-          {/* 入金方法の案内（Privy Deposit address） */}
+          {/* 入金方法の案内 */}
           <div className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 space-y-2">
             <p className="text-xs font-medium text-zinc-300">入金方法</p>
             <p className="text-xs text-zinc-400 leading-relaxed">
@@ -334,20 +305,57 @@ export function DepositPanel() {
             </ul>
           </div>
 
-          {/* 入金ボタン */}
-          <button
-            disabled={!depositAmount || depositNum <= 0}
-            onClick={() => {
-              setConfirmError(null)
-              setSuccessMsg(null)
-              setConfirmOpen(true)
-            }}
-            className="w-full bg-[#1D9E75] hover:bg-[#1a8f6a]
-                       disabled:opacity-40 disabled:cursor-not-allowed
-                       text-white font-semibold py-3 rounded-xl transition-colors"
-          >
-            入金する
-          </button>
+          {/* 入金用アドレス表示（入金するボタン押下後） */}
+          {showDepositAddress && (
+            walletAddress ? (
+              <div className="bg-[#1a3d2e] border border-[#1D9E75] rounded-xl px-4 py-4 space-y-3">
+                <p className="text-xs text-zinc-400">入金用アドレス（Base Mainnet）</p>
+                <p className="text-xs font-mono text-zinc-100 break-all leading-relaxed">
+                  {walletAddress}
+                </p>
+                <button
+                  onClick={() => { void handleCopyAddress() }}
+                  className="flex items-center gap-2 w-full justify-center bg-[#1D9E75] hover:bg-[#1a8f6a]
+                             text-white font-semibold py-3 rounded-xl transition-colors"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      コピーしました
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      アドレスをコピー
+                    </>
+                  )}
+                </button>
+                <p className="text-xs text-zinc-500">
+                  このアドレスに USDC を送金してください。着金後、自動で Aave 運用に反映されます。
+                </p>
+              </div>
+            ) : (
+              <div className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-4">
+                <p className="text-sm text-zinc-400 text-center">
+                  ウォレットアドレスが登録されていません
+                </p>
+              </div>
+            )
+          )}
+
+          {/* 入金ボタン（アドレス表示をトグル） */}
+          {!showDepositAddress && (
+            <button
+              onClick={() => {
+                setSuccessMsg(null)
+                setShowDepositAddress(true)
+              }}
+              className="w-full bg-[#1D9E75] hover:bg-[#1a8f6a]
+                         text-white font-semibold py-3 rounded-xl transition-colors"
+            >
+              入金する
+            </button>
+          )}
         </div>
       )}
 
@@ -446,12 +454,12 @@ export function DepositPanel() {
         </div>
       )}
 
-      {/* 確認シート */}
+      {/* 確認シート（出金専用） */}
       <ConfirmSheet
         open={confirmOpen}
-        title={tab === "deposit" ? "入金内容の確認" : "出金内容の確認"}
-        rows={tab === "deposit" ? depositRows : withdrawRows}
-        onConfirm={tab === "deposit" ? handleDepositConfirm : handleWithdrawConfirm}
+        title="出金内容の確認"
+        rows={withdrawRows}
+        onConfirm={handleWithdrawConfirm}
         onCancel={() => setConfirmOpen(false)}
         busy={confirmBusy}
         error={confirmError}
