@@ -119,7 +119,12 @@ _wait_for_recovery() {
   local elapsed=0
   local interval=5
 
-  log_info "復旧待機中... (最大 ${MAX_RECOVERY_SEC}秒)"
+  # 重要: 本関数の戻り値は `recovery_sec=$(_wait_for_recovery ...)` で
+  # コマンド置換キャプチャされる。ログ・進捗は必ず stderr (>&2) に出し、
+  # stdout には最終的な数値 (復旧秒 or -1) のみを出すこと。stdout に混ぜると
+  # 戻り値が汚染され `[[ "$recovery_sec" -ge 0 ]]` が算術エラーで誤判定する
+  # (2026-06-11 実機: 即復帰したのに全 timeout 誤報告した真因)。
+  log_info "復旧待機中... (最大 ${MAX_RECOVERY_SEC}秒)" >&2
 
   while [[ $elapsed -lt $MAX_RECOVERY_SEC ]]; do
     sleep "$interval"
@@ -138,16 +143,16 @@ _wait_for_recovery() {
       local health
       health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container" 2>/dev/null) || health="none"
       if [[ "$health" == "healthy" || "$health" == "none" ]]; then
-        echo "$elapsed"
+        echo "$elapsed"   # ← stdout: 戻り値 (復旧秒)
         return 0
       fi
     fi
 
-    echo -ne "\r  ${elapsed}秒経過... (container: ${status})"
+    echo -ne "\r  ${elapsed}秒経過... (container: ${status})" >&2
   done
 
-  echo ""
-  echo "-1"  # タイムアウト
+  echo "" >&2
+  echo "-1"   # ← stdout: 戻り値 (タイムアウト)
   return 1
 }
 
