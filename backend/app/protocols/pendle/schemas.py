@@ -103,3 +103,67 @@ class CompoundResult(BaseModel):
     final_position: str
     total_expected_apy: Decimal
     dry_run: bool
+
+
+# --- RouterV4 スキーマ ---
+
+
+class RouterV4SwapRequest(BaseModel):
+    """RouterV4 swap リクエスト（buy/sell YT または PT）。"""
+
+    market_address: str = Field(..., description="対象マーケットアドレス")
+    token_in: str = Field(..., description="入力トークンアドレス")
+    token_out: str = Field(..., description="出力トークンアドレス")
+    amount_in: Decimal = Field(..., gt=Decimal("0"), description="入力量")
+    slippage: Decimal = Field(default=Decimal("0.005"), description="スリッページ（0.005 = 0.5%）")
+    receiver: str = Field(..., description="受取アドレス")
+
+    @field_validator("amount_in", mode="before")
+    @classmethod
+    def validate_amount_in(cls, v: object) -> Decimal:
+        return Decimal(str(v))
+
+    @field_validator("slippage", mode="before")
+    @classmethod
+    def validate_slippage(cls, v: object) -> Decimal:
+        return Decimal(str(v))
+
+
+class RouterV4SwapResult(BaseModel):
+    """RouterV4 swap 結果。"""
+
+    success: bool
+    tx_hash: Optional[str] = None
+    amount_out: Optional[Decimal] = None
+    calldata: Optional[str] = None
+    error: Optional[str] = None
+
+
+class RouterV4AddLiquidityRequest(BaseModel):
+    """RouterV4 add_liquidity リクエスト。"""
+
+    market_address: str = Field(..., description="対象マーケットアドレス")
+    token_in: str = Field(..., description="入力トークンアドレス")
+    amount_in: Decimal = Field(..., gt=Decimal("0"), description="入力量")
+    slippage: Decimal = Field(default=Decimal("0.005"), description="スリッページ（0.005 = 0.5%）")
+    receiver: str = Field(..., description="受取アドレス")
+
+    @field_validator("amount_in", mode="before")
+    @classmethod
+    def validate_amount_in(cls, v: object) -> Decimal:
+        return Decimal(str(v))
+
+    @field_validator("slippage", mode="before")
+    @classmethod
+    def validate_slippage(cls, v: object) -> Decimal:
+        return Decimal(str(v))
+
+
+class RouterV4AddLiquidityResult(BaseModel):
+    """RouterV4 add_liquidity 結果。"""
+
+    success: bool
+    tx_hash: Optional[str] = None
+    lp_amount: Optional[Decimal] = None
+    calldata: Optional[str] = None
+    error: Optional[str] = None
