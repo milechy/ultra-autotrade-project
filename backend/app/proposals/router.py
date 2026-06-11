@@ -333,9 +333,7 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
 
     # NULL wallet guard (Layer 1): wallet 未設定 partner は執行を拒否してデフォルト wallet 汚染を防ぐ
     if not _wallet_address:
-        _error_msg = (
-            f"user {proposal.user_id} has no wallet_address configured — execution blocked"
-        )
+        _error_msg = f"user {proposal.user_id} has no wallet_address configured — execution blocked"
         logger.error("proposal %d: %s", proposal.id, _error_msg)
         _blocked_at = datetime.now(timezone.utc)
         proposal.status = "failed"

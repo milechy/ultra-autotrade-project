@@ -297,9 +297,11 @@ class AaveService:
             )
 
         # ヘルスファクター取得（失敗してもエラーにはせず、None として扱う）
+        # wallet_address=None（env fallback 経路）のときは "" を渡す。
+        # get_health_factor 実装は "" を self.account.address に解決する。
         before_hf: Optional[Decimal]
         try:
-            before_hf = self._client.get_health_factor(wallet_address)
+            before_hf = self._client.get_health_factor(wallet_address or "")
         except AaveClientError as exc:
             logger.error("Failed to fetch health factor: %s", exc)
             before_hf = None

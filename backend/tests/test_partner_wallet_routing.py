@@ -442,12 +442,9 @@ class TestNullWalletBlocking:
 
 
 class TestSnapshotNullWalletSkip:
-    def test_partner_without_wallet_is_skipped_not_env_fallback(
-        self, db_session: Session
-    ) -> None:
+    def test_partner_without_wallet_is_skipped_not_env_fallback(self, db_session: Session) -> None:
         """wallet_address 未設定 partner → env AAVE_WALLET_ADDRESS でテスターの snapshot を取らない。"""
         import os
-
         from unittest.mock import patch
 
         partner = _make_partner(db_session, uid=99, wallet="")
@@ -477,12 +474,4 @@ class TestSnapshotNullWalletSkip:
         snap = db_session.query(PortfolioSnapshot).filter_by(user_id=991).first()
         assert snap is None
 
-        # get_account_data が呼ばれた場合、YAMAMOTO_WALLET で partner_id=99 の分は呼ばれない
-        # (admin fallback で呼ばれる可能性はあるが、それは partner ルーティングとは別)
-        partner_wallet_calls = [
-            call.args[0]
-            for call in mock_client.get_account_data.call_args_list
-            if call.args and call.args[0] == YAMAMOTO_WALLET
-        ]
-        # partner のテスターに対して YAMAMOTO_WALLET で snapshot が作られていないことが主目的
-        assert snap is None  # 上で既に確認済み、念押し
+        # partner のテスターに対して YAMAMOTO_WALLET で snapshot が作られていないことが主目的（上で確認済み）
