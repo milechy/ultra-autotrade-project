@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
+from app.aave.client import AccountData
 from app.protocols.pendle.schemas import PendleMarketInfo
 from app.protocols.risk.auto_evacuate import AutoEvacuator
 from app.protocols.risk.compound_risk import CompoundRiskAssessor
@@ -45,9 +46,45 @@ def mock_pendle_client() -> AsyncMock:
 
 
 @pytest.fixture
-def protocol_monitor(mock_lido_client: AsyncMock, mock_pendle_client: AsyncMock) -> ProtocolMonitor:
+def mock_monitoring_service() -> MagicMock:
+    """MonitoringService のモック。HF=2.5（健全）、トレード許可状態。"""
+    service = MagicMock()
+    service.get_status.return_value.last_health_factor = Decimal("2.5")
+    service.is_trading_allowed.return_value = True
+    return service
+
+
+@pytest.fixture
+def mock_aave_client() -> Mock:
+    """Aave クライアントのモック。担保 $50,000、HF=2.5。
+
+    get_account_data は同期メソッドのため AsyncMock ではなく Mock を使用する
+    （check_aave_health 側で asyncio.to_thread 経由で呼ばれる）。
+    """
+    client = Mock()
+    client.get_account_data.return_value = AccountData(
+        total_collateral_usd=Decimal("50000"),
+        total_debt_usd=Decimal("10000"),
+        available_borrows_usd=Decimal("20000"),
+        health_factor=Decimal("2.5"),
+    )
+    return client
+
+
+@pytest.fixture
+def protocol_monitor(
+    mock_lido_client: AsyncMock,
+    mock_pendle_client: AsyncMock,
+    mock_monitoring_service: MagicMock,
+    mock_aave_client: Mock,
+) -> ProtocolMonitor:
     """ProtocolMonitor インスタンス（モッククライアント使用）。"""
-    return ProtocolMonitor(lido_client=mock_lido_client, pendle_client=mock_pendle_client)
+    return ProtocolMonitor(
+        lido_client=mock_lido_client,
+        pendle_client=mock_pendle_client,
+        monitoring_service=mock_monitoring_service,
+        aave_client=mock_aave_client,
+    )
 
 
 @pytest.fixture
