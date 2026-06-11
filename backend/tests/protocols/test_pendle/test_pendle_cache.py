@@ -7,7 +7,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -17,6 +19,16 @@ import pytest
 from app.protocols.pendle.cache import CacheEntry, CacheMetrics, PendleMarketCache
 from app.protocols.pendle.client import PendleRouterV4Client
 from app.protocols.pendle.config import PendleConfig
+
+
+def _iso_expiry(days_from_now: float) -> str:
+    """現在から days_from_now 日後の ISO 8601 expiry 文字列（末尾 Z）を返す。
+
+    実 API 形状 ``"2026-06-25T00:00:00.000Z"`` に合わせる。
+    """
+    dt = datetime.now(timezone.utc) + timedelta(days=days_from_now)
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
 
 # ---------------------------------------------------------------------------
 # CacheEntry テスト
@@ -104,19 +116,30 @@ class TestCacheMetrics:
 # PendleMarketCache テスト
 # ---------------------------------------------------------------------------
 
+# 実 API 形状（VERIFIED 2026-06-12 curl /markets/active）に合わせたモック:
+# - トップキーは "markets"（"results" ではない）
+# - シンボルは "name" フィールド（underlyingAsset は address 文字列のため .symbol なし）
+# - "expiry" は ISO 8601 文字列。満期フィルタを通すため十分先の日付を設定
+# - address は Web3.is_address を満たす有効な 20byte hex
 MOCK_MARKETS_RESPONSE: dict[str, Any] = {
-    "results": [
+    "markets": [
         {
+            "name": "stETH",
             "address": "0x1234567890abcdef1234567890abcdef12345678",
-            "underlyingAsset": {"symbol": "stETH"},
+            "expiry": _iso_expiry(365),
+            "underlyingAsset": "42161-0x1111111111111111111111111111111111111111",
         },
         {
+            "name": "wstETH",
             "address": "0xabcdef1234567890abcdef1234567890abcdef12",
-            "underlyingAsset": {"symbol": "wstETH"},
+            "expiry": _iso_expiry(365),
+            "underlyingAsset": "42161-0x2222222222222222222222222222222222222222",
         },
         {
+            "name": "USDC",
             "address": "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-            "underlyingAsset": {"symbol": "USDC"},
+            "expiry": _iso_expiry(365),
+            "underlyingAsset": "42161-0x3333333333333333333333333333333333333333",
         },
     ]
 }
@@ -166,7 +189,10 @@ class TestPendleMarketCache:
 
             result = await cache.get_market_address("stETH")
 
-        assert result == "0x1234567890abcdef1234567890abcdef12345678"
+        # 返却 address は checksum 正規化されている（[C3]）
+        from web3 import Web3  # noqa: PLC0415
+
+        assert result == Web3.to_checksum_address("0x1234567890abcdef1234567890abcdef12345678")
 
     @pytest.mark.asyncio
     async def test_cache_hit_does_not_call_api(self, cache: PendleMarketCache) -> None:
@@ -399,6 +425,217 @@ class TestPendleMarketCache:
         metrics = cache.get_metrics()
         assert metrics.hits == 0
         assert metrics.misses == 0
+
+    @pytest.mark.asyncio
+    async def test_uses_active_endpoint(self, cache: PendleMarketCache) -> None:
+        """[C2] /markets/active エンドポイントを呼び出す。"""
+        mock_resp = _make_mock_response(MOCK_MARKETS_RESPONSE)
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_resp)
+            mock_client_cls.return_value = mock_client
+
+            await cache.get_all_markets()
+
+            called_url = mock_client.get.call_args.args[0]
+        assert called_url.endswith("/42161/markets/active")
+
+    @pytest.mark.asyncio
+    async def test_returns_checksummed_address(self, cache: PendleMarketCache) -> None:
+        """[C3] 返却 address は checksum 正規化される。"""
+        from web3 import Web3  # noqa: PLC0415
+
+        mock_resp = _make_mock_response(MOCK_MARKETS_RESPONSE)
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_resp)
+            mock_client_cls.return_value = mock_client
+
+            result = await cache.get_market_address("wstETH")
+
+        assert result == Web3.to_checksum_address("0xabcdef1234567890abcdef1234567890abcdef12")
+        # checksum なので大文字を含む（全小文字ではない）
+        assert result is not None and result != result.lower()
+
+    @pytest.mark.asyncio
+    async def test_expired_market_excluded_returns_none(self, cache: PendleMarketCache) -> None:
+        """[C1] min_days_to_maturity 未満の market は除外し None（fail-closed）。"""
+        # 残 3 日 < デフォルト 7 日 → 除外
+        near_expiry_response: dict[str, Any] = {
+            "markets": [
+                {
+                    "name": "stETH",
+                    "address": "0x1234567890abcdef1234567890abcdef12345678",
+                    "expiry": _iso_expiry(3),
+                    "underlyingAsset": "42161-0x1111111111111111111111111111111111111111",
+                },
+            ]
+        }
+        mock_resp = _make_mock_response(near_expiry_response)
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_resp)
+            mock_client_cls.return_value = mock_client
+
+            result = await cache.get_market_address("stETH")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_maturity_threshold_from_config(self) -> None:
+        """[C1] config.min_days_to_maturity が満期フィルタに反映される。"""
+        config = PendleConfig()
+        config.min_days_to_maturity = 30  # 30 日に引き上げ
+        cache = PendleMarketCache(chain_id=42161, config=config)
+
+        # 残 10 日 < 30 日 → 除外
+        response: dict[str, Any] = {
+            "markets": [
+                {
+                    "name": "stETH",
+                    "address": "0x1234567890abcdef1234567890abcdef12345678",
+                    "expiry": _iso_expiry(10),
+                    "underlyingAsset": "42161-0x1111111111111111111111111111111111111111",
+                },
+            ]
+        }
+        mock_resp = _make_mock_response(response)
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_resp)
+            mock_client_cls.return_value = mock_client
+
+            result = await cache.get_market_address("stETH")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_invalid_address_excluded_returns_none(self, cache: PendleMarketCache) -> None:
+        """[C3] Web3.is_address を満たさない address は除外する。"""
+        bad_address_response: dict[str, Any] = {
+            "markets": [
+                {
+                    "name": "stETH",
+                    "address": "0xNOT_A_VALID_ADDRESS",
+                    "expiry": _iso_expiry(365),
+                    "underlyingAsset": "42161-0x1111111111111111111111111111111111111111",
+                },
+            ]
+        }
+        mock_resp = _make_mock_response(bad_address_response)
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_resp)
+            mock_client_cls.return_value = mock_client
+
+            result = await cache.get_market_address("stETH")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_unparseable_expiry_excluded(self, cache: PendleMarketCache) -> None:
+        """[C1] expiry がパース不能な market は除外する（fail-closed）。"""
+        bad_expiry_response: dict[str, Any] = {
+            "markets": [
+                {
+                    "name": "stETH",
+                    "address": "0x1234567890abcdef1234567890abcdef12345678",
+                    "expiry": "not-a-date",
+                    "underlyingAsset": "42161-0x1111111111111111111111111111111111111111",
+                },
+            ]
+        }
+        mock_resp = _make_mock_response(bad_expiry_response)
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_resp)
+            mock_client_cls.return_value = mock_client
+
+            result = await cache.get_market_address("stETH")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_deterministic_selection_furthest_maturity(
+        self, cache: PendleMarketCache
+    ) -> None:
+        """[M3] 同一シンボル複数 market では最も満期が遠いものを選択する。"""
+        from web3 import Web3  # noqa: PLC0415
+
+        near = "0x1111111111111111111111111111111111111111"
+        far = "0x2222222222222222222222222222222222222222"
+        multi_response: dict[str, Any] = {
+            "markets": [
+                {
+                    "name": "stETH",
+                    "address": near,
+                    "expiry": _iso_expiry(30),
+                    "underlyingAsset": "42161-0xaaaa",
+                },
+                {
+                    "name": "stETH",
+                    "address": far,
+                    "expiry": _iso_expiry(180),
+                    "underlyingAsset": "42161-0xaaaa",
+                },
+            ]
+        }
+        mock_resp = _make_mock_response(multi_response)
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_resp)
+            mock_client_cls.return_value = mock_client
+
+            result = await cache.get_market_address("stETH")
+
+        assert result == Web3.to_checksum_address(far)
+
+    @pytest.mark.asyncio
+    async def test_concurrent_miss_fetches_once(self, cache: PendleMarketCache) -> None:
+        """[M2] 同一キーへの並行 miss で fetch は 1 回のみ（double-checked locking）。"""
+        mock_resp = _make_mock_response(MOCK_MARKETS_RESPONSE)
+
+        get_call_count = 0
+
+        async def _slow_get(*args: Any, **kwargs: Any) -> MagicMock:
+            nonlocal get_call_count
+            get_call_count += 1
+            # 並行 coroutine がロック待ちに入る隙を作る
+            await asyncio.sleep(0.05)
+            return mock_resp
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(side_effect=_slow_get)
+            mock_client_cls.return_value = mock_client
+
+            # 10 本の並行アクセスを同一キーで発火
+            results = await asyncio.gather(*[cache.get_market_address("stETH") for _ in range(10)])
+
+        # 全結果が一致し、HTTP fetch は 1 回のみ
+        assert all(r == results[0] for r in results)
+        assert results[0] is not None
+        assert get_call_count == 1
+        # miss は 1 回、残り 9 回は post-lock HIT
+        metrics = cache.get_metrics()
+        assert metrics.misses == 1
+        assert metrics.hits == 9
 
 
 # ---------------------------------------------------------------------------
