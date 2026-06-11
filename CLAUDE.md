@@ -921,6 +921,29 @@ claude.ai が Step 0 をスキップして §9 を実行した場合、それは
 
 ---
 
+## 📐 Pendle / AI Optimizer 開発ルール (EPIC-3/4, 2026-06-11)
+
+### Pendle RouterV4 (hosted SDK)
+- calldata は Pendle hosted SDK (`/sdk/api/v1`) が生成。web3.py での abi encode 不要、SDK レスポンスの calldata をそのまま tx に載せる。
+- Pendle は2系統 API: `/core/v1`(PendleWebClient=market情報) と `/sdk/api/v1`(RouterV4=calldata)。混同禁止。
+- Router 正式アドレス `0x888888888889758F76e7103c6CbF23ABbF58F946` はクラス定数で保持（env 上書きに依存しない）。slippage デフォルト `Decimal("0.005")`。
+
+### Pendle market dynamic lookup + cache
+- `/markets` から解決、TTL 300秒キャッシュ（`time.monotonic()` ベース＝金融計算でないので float 許容）。
+- cache miss / API 失敗時は None 返却（fail-open）。キャッシュキーは大文字小文字不問。
+- cache は `PendleRouterV4Client.__init__` 注入方式（既存シグネチャを変えない）。
+
+### AI Optimizer シグナル統合 (weight 調整)
+- optimizer は `backend/app/ai/optimizer/`（`protocols/optimizer/` ではない）。
+- 実データ取得は Adapter 注入方式（`PendleSignalAdapter` / `LidoSignalAdapter`）。SignalAggregator は作らない。
+- adapter は client=None/例外時にダミー定数へ fail-open フォールバック（optimizer 全体を落とさない）。
+- adapter が呼ぶ client メソッドは read-only な APY/価格取得のみ（秘密鍵を要するメソッドは呼ばない）。メソッド名は実在を必ず grep 確認（鉄則9）。
+- risk_mode weight: conservative ×1.5 / balanced ×1.0 / aggressive ×0.7 を全プロトコルの risk_penalty に一貫適用。未知 risk_mode は balanced 相当。
+
+> 詳細技術ガイド: `docs/34_phase2_protocols_guide.md`
+
+---
+
 ## 🗂 ドリフト再発カタログ(着手前に grep)
 
 3ヶ月の Asana 履歴で形を変えて再発しているドリフト/配線漏れの典型箇所。
@@ -951,6 +974,7 @@ claude.ai が Step 0 をスキップして §9 を実行した場合、それは
 - _validate_model_config() startup hook 配線漏れ
 - aave_data_fetcher.py V2→V3 API 移行漏れ
 - factory が constructor 引数を供給せず属性未配線（make_aave_client が Web3AaveClient に token_addresses を渡さず build-tx が "Unknown asset"。複数生成経路で必須属性の供給有無を突き合わせる。#500）
+- Asana タスク notes の「触るファイル」パスが実態と乖離（optimizer は `protocols/optimizer/` でなく `ai/optimizer/`、`signal_aggregator.py` は不在で実際は StrategyScorer）。実装着手前に必ず実パスを grep 確認（鉄則9）。2026-06-11 EPIC-4
 
 ### 依存 / ライブラリバージョン
 - web3.py メジャー更新時の API drift（v6→v7 で `Contract.encodeABI()`→`encode_abi()`、`fn_name=`→位置引数。旧 API は `# type: ignore[attr-defined]` で mypy 検出を抑止していたため build-tx が runtime 500 になるまで気づかなかった）。依存更新 PR では camelCase web3 API（encodeABI/buildTransaction/rawTransaction 等）の残存を grep し、`# type: ignore[attr-defined]` を安易に付けない
