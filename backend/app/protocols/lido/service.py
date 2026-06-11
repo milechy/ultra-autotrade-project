@@ -11,9 +11,13 @@ from .client import AbstractLidoClient
 from .config import LidoConfig
 from .schemas import (
     LidoAprResponse,
+    LidoClaimRequest,
+    LidoClaimResponse,
     LidoStakeRequest,
     LidoStakeResponse,
     LidoStatus,
+    LidoWithdrawalRequestsResponse,
+    LidoWithdrawalStatusResponse,
     LidoWithdrawRequest,
     LidoWithdrawResponse,
 )
@@ -21,6 +25,14 @@ from .schemas import (
 logger = logging.getLogger(__name__)
 
 _WEI_PER_ETH = Decimal("1000000000000000000")
+
+
+class ClaimNotReadyError(Exception):
+    """claim 前 precheck で finalize 未完 / claim 済みが検出された場合に送出する。
+
+    fail-closed 設計（レビュー C2-(b)）: この例外が出た場合は実 tx を一切送信しない。
+    router 側で 409 にマップする。
+    """
 
 
 class LidoService:
@@ -118,6 +130,89 @@ class LidoService:
             amount_steth=request.amount_steth,
             tx_hash=result.tx_hash,
             dry_run=False,
+        )
+
+    async def claim(self, request: LidoClaimRequest) -> LidoClaimResponse:
+        """引き出しクレーム実行（finalized 済みリクエストに対して呼ぶ）。
+
+        checkpoint hints 方式: getLastCheckpointIndex → findCheckpointHints → claimWithdrawals。
+        claimed_eth は get_withdrawal_status の amount_of_steth 合算から概算する（dry_run 時は None）。
+        """
+        if request.dry_run:
+            logger.info("LidoService.claim dry_run: request_ids=%s", request.request_ids)
+            return LidoClaimResponse(
+                operation="CLAIM",
+                request_ids=request.request_ids,
+                tx_hash=None,
+                dry_run=True,
+                claimed_eth=None,
+            )
+
+        # --- claim 前 precheck（fail-closed / レビュー C2-(b)） ---
+        # 実 tx 送信前に getWithdrawalStatus で全 request が
+        # is_finalized && not is_claimed であることを確認する。
+        # 1件でも満たさなければ ClaimNotReadyError を送出し、tx は一切送らない。
+        statuses = await self._client.get_withdrawal_status(request.request_ids)
+        status_by_id = {s.request_id: s for s in statuses}
+
+        not_ready: list[str] = []
+        for rid in request.request_ids:
+            status = status_by_id.get(rid)
+            if status is None:
+                not_ready.append(f"request_id={rid}: ステータス取得不可（未知のID）")
+            elif status.is_claimed:
+                not_ready.append(f"request_id={rid}: クレーム済み")
+            elif not status.is_finalized:
+                not_ready.append(f"request_id={rid}: 未 finalize（待機期間中）")
+
+        if not_ready:
+            detail = "; ".join(not_ready)
+            logger.warning("claim precheck 失敗（tx 未送信）: %s", detail)
+            raise ClaimNotReadyError(f"claim 不可（finalize 未完 または claim 済み）: {detail}")
+
+        # claimed_eth の概算: precheck で取得済みステータスから amountOfStETH を合算
+        claimed_eth: Decimal | None = sum(
+            (status_by_id[rid].amount_of_steth for rid in request.request_ids),
+            Decimal("0"),
+        )
+
+        result = await self._client.claim_withdrawals(request.request_ids)
+        if not result.success:
+            logger.error(
+                "claim_withdrawals 失敗: request_ids=%s, error=%s",
+                request.request_ids,
+                result.error,
+            )
+            raise RuntimeError(f"Lido クレーム失敗: {result.error}")
+
+        logger.info(
+            "claim 成功: request_ids=%s, tx=%s, claimed_eth=%s",
+            request.request_ids,
+            result.tx_hash,
+            claimed_eth,
+        )
+        return LidoClaimResponse(
+            operation="CLAIM",
+            request_ids=request.request_ids,
+            tx_hash=result.tx_hash,
+            dry_run=False,
+            claimed_eth=claimed_eth,
+        )
+
+    async def get_withdrawal_status(self, request_ids: list[int]) -> LidoWithdrawalStatusResponse:
+        """withdrawal request のステータス一覧を返す。"""
+        statuses = await self._client.get_withdrawal_status(request_ids)
+        return LidoWithdrawalStatusResponse(
+            request_ids=request_ids,
+            statuses=statuses,
+        )
+
+    async def get_withdrawal_requests(self, address: str) -> LidoWithdrawalRequestsResponse:
+        """指定アドレスの未クレーム引き出しリクエスト ID 一覧を返す。"""
+        request_ids = await self._client.get_withdrawal_requests(address)
+        return LidoWithdrawalRequestsResponse(
+            address=address,
+            request_ids=request_ids,
         )
 
     async def get_status(self) -> LidoStatus:
