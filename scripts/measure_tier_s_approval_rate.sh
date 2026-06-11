@@ -96,7 +96,7 @@ GENERATED_AT="$(date -u +%FT%TZ)"
 
 # Tier S ファイルパターン (実パス準拠 ERE。CLAUDE.md「Tier S」一覧と対応)
 # NOTE: pyproject.toml は repo root に実在するため (backend/)? で両方を許容する
-TIER_S_PATTERN='^(backend/app/main\.py|backend/requirements\.txt|(backend/)?pyproject\.toml|frontend/package(-lock)?\.json|\.github/workflows/ci\.yml|docker-compose\.(production|staging)\.yml|docker/nginx/upstream\.(production|staging)\.conf|backend/alembic/versions/.*\.py|backend/app/database\.py|backend/app/automation/(scheduled_tasks|monitoring_service|workflow)\.py|CLAUDE\.md)$'
+TIER_S_PATTERN='^(backend/app/main\.py|backend/requirements\.txt|(backend/)?pyproject\.toml|frontend/package(-lock)?\.json|\.github/workflows/ci\.yml|docker-compose\.(production|staging)\.yml|docker/nginx/upstream\.(production|staging)\.conf|backend/alembic/versions/.*\.py|backend/app/database\.py|backend/app/automation/(scheduled_tasks|monitoring_service|workflow)\.py|CLAUDE(\.lessons)?\.md)$'
 
 # =============================================================================
 # --dry-run: 実行予定コマンドの表示のみ (ネットワークアクセスなし)
@@ -183,12 +183,15 @@ for cand in "${DP_CANDIDATES[@]+"${DP_CANDIDATES[@]}"}"; do
   fi
 done
 
-if [[ "$DIRECT_PUSH_COUNT" -eq 0 ]]; then
-  B_STATUS="PASS"
-  B_SUMMARY="main 直 push 0 件 (候補 ${#DP_CANDIDATES[@]} 件は全て PR 紐付き)"
-else
+if [[ "$DIRECT_PUSH_COUNT" -gt 0 ]]; then
   B_STATUS="FAIL"
   B_SUMMARY="main 直 push ${DIRECT_PUSH_COUNT} 件 (候補 ${#DP_CANDIDATES[@]} 件中)"
+elif [[ "$DP_UNKNOWN_COUNT" -gt 0 ]]; then
+  B_STATUS="FAIL"
+  B_SUMMARY="[FAIL] main 直 push 判定不能 ${DP_UNKNOWN_COUNT} 件 (gh api 失敗 / PR 紐付き確認不可 — fail-closed)"
+else
+  B_STATUS="PASS"
+  B_SUMMARY="main 直 push 0 件 (候補 ${#DP_CANDIDATES[@]} 件は全て PR 紐付き)"
 fi
 
 # =============================================================================
