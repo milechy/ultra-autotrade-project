@@ -15,9 +15,12 @@ from .client import get_lido_client
 from .config import get_lido_config
 from .schemas import (
     LidoAprResponse,
+    LidoClaimRequest,
+    LidoClaimResponse,
     LidoStakeRequest,
     LidoStakeResponse,
     LidoStatus,
+    LidoWithdrawalRequestsResponse,
     LidoWithdrawRequest,
     LidoWithdrawResponse,
 )
@@ -83,4 +86,32 @@ async def get_lido_apr() -> LidoAprResponse:
         return await service.get_apr()
     except Exception as exc:
         logger.exception("Lido APR 取得失敗")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/claim", response_model=LidoClaimResponse)
+async def claim_withdrawal(request: LidoClaimRequest) -> LidoClaimResponse:
+    """引き出しクレーム実行。dry_run=True（デフォルト）でシミュレーション。
+
+    Lido WithdrawalQueue の finalized 済みリクエストに対してクレームを実行する。
+    待機期間（1〜5日）が完了してから呼ぶこと。
+    """
+    service = _get_service()
+    try:
+        return await service.claim(request)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Lido claim 失敗")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get("/withdrawal-requests", response_model=LidoWithdrawalRequestsResponse)
+async def get_withdrawal_requests(address: str) -> LidoWithdrawalRequestsResponse:
+    """指定アドレスの未クレーム引き出しリクエスト ID 一覧を返す。"""
+    service = _get_service()
+    try:
+        return await service.get_withdrawal_requests(address)
+    except Exception as exc:
+        logger.exception("Lido withdrawal-requests 取得失敗")
         raise HTTPException(status_code=503, detail=str(exc)) from exc

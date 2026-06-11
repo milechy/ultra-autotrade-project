@@ -8,8 +8,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.protocols.base import TransactionResult
 from app.protocols.lido.config import LidoConfig
-from app.protocols.lido.schemas import LidoWithdrawRequest, TxResult
+from app.protocols.lido.schemas import LidoWithdrawRequest
 from app.protocols.lido.service import LidoService
 
 
@@ -25,9 +26,10 @@ class TestLidoServiceWithdrawRealExecution:
     async def test_real_withdraw_succeeds(self, config: LidoConfig) -> None:
         """dry_run=False で withdraw が正常に実行されること。"""
         mock_client = AsyncMock()
-        mock_client.withdraw.return_value = TxResult(
+        mock_client.withdraw.return_value = TransactionResult(
             tx_hash="0x" + "cc" * 32,
             success=True,
+            amount=Decimal("0.5"),
         )
         svc = LidoService(client=mock_client, config=config)
         req = LidoWithdrawRequest(amount_steth=Decimal("0.5"), dry_run=False)
@@ -44,7 +46,9 @@ class TestLidoServiceWithdrawRealExecution:
     async def test_real_withdraw_failure_raises_runtime_error(self, config: LidoConfig) -> None:
         """withdraw 失敗時に RuntimeError を発生させること。"""
         mock_client = AsyncMock()
-        mock_client.withdraw.return_value = TxResult(success=False, error="引き出しキュー満杯")
+        mock_client.withdraw.return_value = TransactionResult(
+            success=False, tx_hash=None, amount=Decimal("0.5"), error="引き出しキュー満杯"
+        )
         svc = LidoService(client=mock_client, config=config)
         req = LidoWithdrawRequest(amount_steth=Decimal("0.5"), dry_run=False)
 
@@ -55,7 +59,9 @@ class TestLidoServiceWithdrawRealExecution:
     async def test_real_withdraw_passes_correct_asset(self, config: LidoConfig) -> None:
         """withdraw が 'stETH' アセットを渡すこと。"""
         mock_client = AsyncMock()
-        mock_client.withdraw.return_value = TxResult(tx_hash="0x" + "dd" * 32, success=True)
+        mock_client.withdraw.return_value = TransactionResult(
+            tx_hash="0x" + "dd" * 32, success=True, amount=Decimal("1.0")
+        )
         svc = LidoService(client=mock_client, config=config)
         req = LidoWithdrawRequest(amount_steth=Decimal("1.0"), dry_run=False)
 
@@ -70,7 +76,9 @@ class TestLidoServiceWithdrawRealExecution:
         """withdraw の tx_hash がレスポンスに含まれること。"""
         expected_tx = "0x" + "ff" * 32
         mock_client = AsyncMock()
-        mock_client.withdraw.return_value = TxResult(tx_hash=expected_tx, success=True)
+        mock_client.withdraw.return_value = TransactionResult(
+            tx_hash=expected_tx, success=True, amount=Decimal("0.5")
+        )
         svc = LidoService(client=mock_client, config=config)
         req = LidoWithdrawRequest(amount_steth=Decimal("0.5"), dry_run=False)
 

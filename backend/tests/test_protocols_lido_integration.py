@@ -172,3 +172,95 @@ class TestLidoWithdraw:
     def test_withdraw_rejects_zero(self, client: TestClient) -> None:
         res = client.post("/api/protocols/lido/withdraw", json={"amount_steth": "0"})
         assert res.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# POST /api/protocols/lido/claim
+# ---------------------------------------------------------------------------
+
+
+class TestLidoClaim:
+    def test_claim_dry_run_default_true(self, client: TestClient) -> None:
+        """request_id のみ送った場合 dry_run=True がデフォルトであること。"""
+        res = client.post("/api/protocols/lido/claim", json={"request_id": 1})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["dry_run"] is True
+
+    def test_claim_dry_run_no_tx_hash(self, client: TestClient) -> None:
+        """dry_run=True の場合 tx_hash=None であること。"""
+        data = client.post(
+            "/api/protocols/lido/claim", json={"request_id": 1, "dry_run": True}
+        ).json()
+        assert data["tx_hash"] is None
+
+    def test_claim_operation_type(self, client: TestClient) -> None:
+        """operation フィールドが 'CLAIM' であること。"""
+        data = client.post("/api/protocols/lido/claim", json={"request_id": 1}).json()
+        assert data["operation"] == "CLAIM"
+
+    def test_claim_request_id_preserved(self, client: TestClient) -> None:
+        """リクエストの request_id がレスポンスに保持されること。"""
+        data = client.post("/api/protocols/lido/claim", json={"request_id": 42}).json()
+        assert data["request_id"] == 42
+
+    def test_claim_dry_run_false_returns_tx_hash(self, client: TestClient) -> None:
+        """dry_run=False（DummyClient）で tx_hash が返ること。"""
+        data = client.post(
+            "/api/protocols/lido/claim", json={"request_id": 1, "dry_run": False}
+        ).json()
+        assert data["dry_run"] is False
+        assert data["tx_hash"] is not None
+        assert str(data["tx_hash"]).startswith("0x")
+
+    def test_claim_rejects_zero_request_id(self, client: TestClient) -> None:
+        """request_id=0 は 422 を返すこと。"""
+        res = client.post("/api/protocols/lido/claim", json={"request_id": 0})
+        assert res.status_code == 422
+
+    def test_claim_rejects_negative_request_id(self, client: TestClient) -> None:
+        """request_id=-1 は 422 を返すこと。"""
+        res = client.post("/api/protocols/lido/claim", json={"request_id": -1})
+        assert res.status_code == 422
+
+    def test_claim_missing_request_id_is_422(self, client: TestClient) -> None:
+        """request_id 未指定は 422 を返すこと。"""
+        res = client.post("/api/protocols/lido/claim", json={})
+        assert res.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# GET /api/protocols/lido/withdrawal-requests
+# ---------------------------------------------------------------------------
+
+
+class TestLidoWithdrawalRequests:
+    def test_withdrawal_requests_returns_200(self, client: TestClient) -> None:
+        """address クエリパラメータ付きで 200 が返ること。"""
+        res = client.get(
+            "/api/protocols/lido/withdrawal-requests",
+            params={"address": "0x" + "aa" * 20},
+        )
+        assert res.status_code == 200
+
+    def test_withdrawal_requests_fields_present(self, client: TestClient) -> None:
+        """address と request_ids フィールドが存在すること。"""
+        data = client.get(
+            "/api/protocols/lido/withdrawal-requests",
+            params={"address": "0x" + "aa" * 20},
+        ).json()
+        assert "address" in data
+        assert "request_ids" in data
+
+    def test_withdrawal_requests_returns_list(self, client: TestClient) -> None:
+        """request_ids がリストであること（DummyClient は固定値を返す）。"""
+        data = client.get(
+            "/api/protocols/lido/withdrawal-requests",
+            params={"address": "0x" + "aa" * 20},
+        ).json()
+        assert isinstance(data["request_ids"], list)
+
+    def test_withdrawal_requests_missing_address_is_422(self, client: TestClient) -> None:
+        """address パラメータ未指定は 422 を返すこと。"""
+        res = client.get("/api/protocols/lido/withdrawal-requests")
+        assert res.status_code == 422

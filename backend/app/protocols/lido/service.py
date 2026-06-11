@@ -11,9 +11,12 @@ from .client import AbstractLidoClient
 from .config import LidoConfig
 from .schemas import (
     LidoAprResponse,
+    LidoClaimRequest,
+    LidoClaimResponse,
     LidoStakeRequest,
     LidoStakeResponse,
     LidoStatus,
+    LidoWithdrawalRequestsResponse,
     LidoWithdrawRequest,
     LidoWithdrawResponse,
 )
@@ -118,6 +121,44 @@ class LidoService:
             amount_steth=request.amount_steth,
             tx_hash=result.tx_hash,
             dry_run=False,
+        )
+
+    async def claim(self, request: LidoClaimRequest) -> LidoClaimResponse:
+        """引き出しクレーム実行（finalized 済みリクエストに対して呼ぶ）。"""
+        if request.dry_run:
+            logger.info("LidoService.claim dry_run: request_id=%d", request.request_id)
+            return LidoClaimResponse(
+                operation="CLAIM",
+                request_id=request.request_id,
+                tx_hash=None,
+                dry_run=True,
+                claimed_eth=None,
+            )
+
+        result = await self._client.claim_withdrawal(request.request_id)
+        if not result.success:
+            logger.error(
+                "claim_withdrawal 失敗: request_id=%d, error=%s",
+                request.request_id,
+                result.error,
+            )
+            raise RuntimeError(f"Lido クレーム失敗: {result.error}")
+
+        logger.info("claim 成功: request_id=%d, tx=%s", request.request_id, result.tx_hash)
+        return LidoClaimResponse(
+            operation="CLAIM",
+            request_id=request.request_id,
+            tx_hash=result.tx_hash,
+            dry_run=False,
+            claimed_eth=None,
+        )
+
+    async def get_withdrawal_requests(self, address: str) -> LidoWithdrawalRequestsResponse:
+        """指定アドレスの未クレーム引き出しリクエスト ID 一覧を返す。"""
+        request_ids = await self._client.get_withdrawal_requests(address)
+        return LidoWithdrawalRequestsResponse(
+            address=address,
+            request_ids=request_ids,
         )
 
     async def get_status(self) -> LidoStatus:

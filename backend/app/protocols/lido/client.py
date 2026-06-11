@@ -72,7 +72,7 @@ _STETH_ABI: list[dict[str, Any]] = [
     },
 ]
 
-# Lido WithdrawalQueueERC721 ABI（最小限: requestWithdrawals）
+# Lido WithdrawalQueueERC721 ABI（最小限: requestWithdrawals / claimWithdrawal / view）
 _WITHDRAWAL_QUEUE_ABI: list[dict[str, Any]] = [
     {
         "name": "requestWithdrawals",
@@ -83,6 +83,40 @@ _WITHDRAWAL_QUEUE_ABI: list[dict[str, Any]] = [
             {"name": "_owner", "type": "address"},
         ],
         "outputs": [{"name": "requestIds", "type": "uint256[]"}],
+    },
+    {
+        "name": "claimWithdrawal",
+        "type": "function",
+        "stateMutability": "nonpayable",
+        "inputs": [{"name": "_requestId", "type": "uint256"}],
+        "outputs": [],
+    },
+    {
+        "name": "getWithdrawalRequests",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [{"name": "_owner", "type": "address"}],
+        "outputs": [{"name": "requestsIds", "type": "uint256[]"}],
+    },
+    {
+        "name": "getWithdrawalStatus",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [{"name": "_requestIds", "type": "uint256[]"}],
+        "outputs": [
+            {
+                "name": "statuses",
+                "type": "tuple[]",
+                "components": [
+                    {"name": "amountOfStETH", "type": "uint256"},
+                    {"name": "amountOfShares", "type": "uint256"},
+                    {"name": "owner", "type": "address"},
+                    {"name": "timestamp", "type": "uint256"},
+                    {"name": "isFinalized", "type": "bool"},
+                    {"name": "isClaimed", "type": "bool"},
+                ],
+            }
+        ],
     },
 ]
 
@@ -208,6 +242,16 @@ class AbstractLidoClient(BaseProtocolClient):
     @abstractmethod
     async def get_steth_eth_ratio(self) -> Decimal:
         """stETH/ETH レート（1.0=完全ペグ）。"""
+        ...
+
+    @abstractmethod
+    async def claim_withdrawal(self, request_id: int) -> TransactionResult:
+        """WithdrawalQueue クレーム実行（待機完了後に呼ぶ）。"""
+        ...
+
+    @abstractmethod
+    async def get_withdrawal_requests(self, address: str) -> list[int]:
+        """指定アドレスの未クレーム引き出しリクエスト ID 一覧を返す。"""
         ...
 
 
@@ -431,6 +475,81 @@ class LidoClient(AbstractLidoClient):
             logger.exception("get_steth_eth_ratio 失敗")
             raise RuntimeError(f"stETH/ETH レート取得失敗: {exc}") from exc
 
+    async def claim_withdrawal(self, request_id: int) -> TransactionResult:
+        """WithdrawalQueue のクレーム実行（requestId 指定）。
+
+        引き出しリクエストが finalized 済みであることが前提。
+        失敗時は TransactionResult(success=False, ...) を返す（fail-open）。
+        """
+        self._ensure_initialized()
+        try:
+            from web3 import Web3  # noqa: PLC0415
+
+            if not self._config.wallet_private_key:
+                return TransactionResult(
+                    success=False,
+                    tx_hash=None,
+                    amount=Decimal("0"),
+                    error="LIDO_WALLET_PRIVATE_KEY が未設定",
+                )
+
+            account = self._w3.eth.account.from_key(self._config.wallet_private_key)
+            queue_address = Web3.to_checksum_address(self._config.withdrawal_queue_address)
+            queue_contract = self._w3.eth.contract(address=queue_address, abi=_WITHDRAWAL_QUEUE_ABI)
+
+            nonce = self._w3.eth.get_transaction_count(account.address)
+            gas_price = self._w3.eth.gas_price
+
+            tx = queue_contract.functions.claimWithdrawal(request_id).build_transaction(
+                {
+                    "from": account.address,
+                    "nonce": nonce,
+                    "gasPrice": gas_price,
+                    "gas": 200_000,
+                }
+            )
+            signed = self._w3.eth.account.sign_transaction(tx, self._config.wallet_private_key)
+            tx_hash = self._w3.eth.send_raw_transaction(signed.raw_transaction)
+            receipt = self._w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
+
+            if receipt["status"] == 1:
+                logger.info(
+                    "claim_withdrawal 成功: request_id=%d, tx=%s", request_id, tx_hash.hex()
+                )
+                return TransactionResult(
+                    success=True,
+                    tx_hash=tx_hash.hex(),
+                    amount=Decimal("0"),
+                    error=None,
+                )
+            return TransactionResult(
+                success=False,
+                tx_hash=tx_hash.hex(),
+                amount=Decimal("0"),
+                error="クレームトランザクション失敗（status=0）",
+            )
+        except Exception as exc:
+            logger.exception("claim_withdrawal 失敗: request_id=%d", request_id)
+            return TransactionResult(
+                success=False, tx_hash=None, amount=Decimal("0"), error=str(exc)
+            )
+
+    async def get_withdrawal_requests(self, address: str) -> list[int]:
+        """指定アドレスの未クレーム引き出しリクエスト ID 一覧を返す（view）。"""
+        self._ensure_initialized()
+        try:
+            from web3 import Web3  # noqa: PLC0415
+
+            queue_address = Web3.to_checksum_address(self._config.withdrawal_queue_address)
+            queue_contract = self._w3.eth.contract(address=queue_address, abi=_WITHDRAWAL_QUEUE_ABI)
+            request_ids: list[int] = queue_contract.functions.getWithdrawalRequests(
+                Web3.to_checksum_address(address)
+            ).call()
+            return request_ids
+        except Exception as exc:
+            logger.exception("get_withdrawal_requests 失敗: address=%s", address[:10])
+            raise RuntimeError(f"引き出しリクエスト一覧取得失敗: {exc}") from exc
+
 
 class DummyLidoClient(AbstractLidoClient):
     """テスト・サンドボックス用 Lido スタブクライアント。"""
@@ -469,6 +588,26 @@ class DummyLidoClient(AbstractLidoClient):
     async def get_steth_eth_ratio(self) -> Decimal:
         """完全ペグ（1.0）を返すスタブ。"""
         return Decimal("1.0")
+
+    async def claim_withdrawal(self, request_id: int) -> TransactionResult:
+        """クレームのシミュレーション（実 on-chain write なし）。"""
+        logger.info(
+            "DummyLidoClient.claim_withdrawal: request_id=%d（シミュレーション）", request_id
+        )
+        return TransactionResult(
+            success=True,
+            tx_hash="0x" + "ef" * 32,
+            amount=Decimal("0"),
+            error=None,
+        )
+
+    async def get_withdrawal_requests(self, address: str) -> list[int]:
+        """固定の requestId 一覧を返すスタブ。"""
+        logger.info(
+            "DummyLidoClient.get_withdrawal_requests: address=%s（シミュレーション）",
+            address[:10] if address else "N/A",
+        )
+        return [1, 2, 3]
 
 
 def get_lido_client(config: LidoConfig) -> AbstractLidoClient:
