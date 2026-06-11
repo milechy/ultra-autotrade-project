@@ -27,6 +27,14 @@ logger = logging.getLogger(__name__)
 _WEI_PER_ETH = Decimal("1000000000000000000")
 
 
+class ClaimNotReadyError(Exception):
+    """claim 前 precheck で finalize 未完 / claim 済みが検出された場合に送出する。
+
+    fail-closed 設計（レビュー C2-(b)）: この例外が出た場合は実 tx を一切送信しない。
+    router 側で 409 にマップする。
+    """
+
+
 class LidoService:
     """Lido ステーキングのビジネスロジック。"""
 
@@ -140,13 +148,33 @@ class LidoService:
                 claimed_eth=None,
             )
 
-        # claimed_eth の概算: クレーム前にステータスを取得して amountOfStETH を合算
-        claimed_eth: Decimal | None = None
-        try:
-            statuses = await self._client.get_withdrawal_status(request.request_ids)
-            claimed_eth = sum((s.amount_of_steth for s in statuses), Decimal("0"))
-        except Exception as exc:
-            logger.warning("claimed_eth 概算取得失敗（無視して続行）: %s", exc)
+        # --- claim 前 precheck（fail-closed / レビュー C2-(b)） ---
+        # 実 tx 送信前に getWithdrawalStatus で全 request が
+        # is_finalized && not is_claimed であることを確認する。
+        # 1件でも満たさなければ ClaimNotReadyError を送出し、tx は一切送らない。
+        statuses = await self._client.get_withdrawal_status(request.request_ids)
+        status_by_id = {s.request_id: s for s in statuses}
+
+        not_ready: list[str] = []
+        for rid in request.request_ids:
+            status = status_by_id.get(rid)
+            if status is None:
+                not_ready.append(f"request_id={rid}: ステータス取得不可（未知のID）")
+            elif status.is_claimed:
+                not_ready.append(f"request_id={rid}: クレーム済み")
+            elif not status.is_finalized:
+                not_ready.append(f"request_id={rid}: 未 finalize（待機期間中）")
+
+        if not_ready:
+            detail = "; ".join(not_ready)
+            logger.warning("claim precheck 失敗（tx 未送信）: %s", detail)
+            raise ClaimNotReadyError(f"claim 不可（finalize 未完 または claim 済み）: {detail}")
+
+        # claimed_eth の概算: precheck で取得済みステータスから amountOfStETH を合算
+        claimed_eth: Decimal | None = sum(
+            (status_by_id[rid].amount_of_steth for rid in request.request_ids),
+            Decimal("0"),
+        )
 
         result = await self._client.claim_withdrawals(request.request_ids)
         if not result.success:

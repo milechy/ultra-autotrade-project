@@ -6,9 +6,12 @@ from __future__ import annotations
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.auth.dependencies import require_admin
+from app.auth.models import User, UserRole
 from app.protocols.lido.router import router
 from app.protocols.lido.schemas import (
     LidoAprResponse,
@@ -23,6 +26,22 @@ from app.protocols.lido.schemas import (
 _app = FastAPI()
 _app.include_router(router)
 _client = TestClient(_app)
+
+
+def _fake_admin() -> User:
+    """テスト用 admin ユーザー（require_admin override 用）。"""
+    return User(id=1, email="admin@example.com", role=UserRole.ADMIN.value, is_active=True)
+
+
+@pytest.fixture(autouse=True)
+def _override_admin_auth() -> object:
+    """既定では admin 認証済みとして扱う（write エンドポイント正常系テスト用）。
+
+    非 admin / 未認証の挙動を確認するテストは override を外して 401/403 を検証する。
+    """
+    _app.dependency_overrides[require_admin] = _fake_admin
+    yield
+    _app.dependency_overrides.clear()
 
 
 def _make_lido_status() -> LidoStatus:
@@ -418,3 +437,68 @@ class TestGetWithdrawalStatus:
             params={"request_ids": "abc,xyz"},
         )
         assert response.status_code == 422
+
+
+class TestWriteEndpointsRequireAdmin:
+    """write 系エンドポイント（stake / withdraw / claim）の admin RBAC 検証（レビュー C2-(a)）。"""
+
+    def test_stake_unauthenticated_returns_401(self) -> None:
+        """未認証で stake を呼ぶと 401 を返すこと。"""
+        _app.dependency_overrides.clear()  # autouse override を外す
+        response = _client.post(
+            "/api/protocols/lido/stake",
+            json={"amount_eth": "0.1", "dry_run": True},
+        )
+        assert response.status_code == 401
+
+    def test_withdraw_unauthenticated_returns_401(self) -> None:
+        """未認証で withdraw を呼ぶと 401 を返すこと。"""
+        _app.dependency_overrides.clear()
+        response = _client.post(
+            "/api/protocols/lido/withdraw",
+            json={"amount_steth": "0.5", "dry_run": True},
+        )
+        assert response.status_code == 401
+
+    def test_claim_unauthenticated_returns_401(self) -> None:
+        """未認証で claim を呼ぶと 401 を返すこと（無認証 write 経路の塞ぎ込み）。"""
+        _app.dependency_overrides.clear()
+        response = _client.post(
+            "/api/protocols/lido/claim",
+            json={"request_ids": [1], "dry_run": False},
+        )
+        assert response.status_code == 401
+
+    def test_status_view_endpoint_no_auth_required(self) -> None:
+        """view 系（status）は認証不要のままであること（C2 は write のみ対象）。"""
+        _app.dependency_overrides.clear()
+        with patch("app.protocols.lido.router._get_service") as mock_get_svc:
+            mock_service = AsyncMock()
+            mock_service.get_status.return_value = _make_lido_status()
+            mock_get_svc.return_value = mock_service
+
+            response = _client.get("/api/protocols/lido/status")
+
+        assert response.status_code == 200
+
+
+class TestClaimPrecheckHttp:
+    """claim precheck の HTTP マッピング（ClaimNotReadyError → 409 / レビュー C2-(b)）。"""
+
+    def test_claim_not_ready_returns_409(self) -> None:
+        """finalize 未完 / claim 済みは 409 を返すこと（tx 未送信）。"""
+        from app.protocols.lido.service import ClaimNotReadyError
+
+        with patch("app.protocols.lido.router._get_service") as mock_get_svc:
+            mock_service = AsyncMock()
+            mock_service.claim.side_effect = ClaimNotReadyError(
+                "claim 不可（finalize 未完 または claim 済み）: request_id=1: 未 finalize"
+            )
+            mock_get_svc.return_value = mock_service
+
+            response = _client.post(
+                "/api/protocols/lido/claim",
+                json={"request_ids": [1], "dry_run": False},
+            )
+
+        assert response.status_code == 409

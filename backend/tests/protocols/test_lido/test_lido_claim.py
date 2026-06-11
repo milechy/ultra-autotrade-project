@@ -137,7 +137,17 @@ class TestLidoServiceClaim:
     async def test_claim_real_failure_raises_runtime_error(self, config: LidoConfig) -> None:
         """claim 失敗時に RuntimeError を発生させること。"""
         mock_client = AsyncMock()
-        mock_client.get_withdrawal_status.return_value = []
+        mock_client.get_withdrawal_status.return_value = [
+            WithdrawalStatus(
+                request_id=10,
+                amount_of_steth=Decimal("1.0"),
+                amount_of_shares=Decimal("1.0"),
+                owner="0x1234",
+                timestamp=1000,
+                is_finalized=True,
+                is_claimed=False,
+            ),
+        ]
         mock_client.claim_withdrawals.return_value = ClaimWithdrawalResult(
             success=False,
             tx_hash=None,
@@ -153,7 +163,26 @@ class TestLidoServiceClaim:
     async def test_claim_real_passes_request_ids(self, config: LidoConfig) -> None:
         """claim が正しい request_ids を client.claim_withdrawals に渡すこと。"""
         mock_client = AsyncMock()
-        mock_client.get_withdrawal_status.return_value = []
+        mock_client.get_withdrawal_status.return_value = [
+            WithdrawalStatus(
+                request_id=99,
+                amount_of_steth=Decimal("1.0"),
+                amount_of_shares=Decimal("1.0"),
+                owner="0x1234",
+                timestamp=1000,
+                is_finalized=True,
+                is_claimed=False,
+            ),
+            WithdrawalStatus(
+                request_id=100,
+                amount_of_steth=Decimal("1.0"),
+                amount_of_shares=Decimal("1.0"),
+                owner="0x1234",
+                timestamp=1000,
+                is_finalized=True,
+                is_claimed=False,
+            ),
+        ]
         mock_client.claim_withdrawals.return_value = ClaimWithdrawalResult(
             success=True, tx_hash="0x" + "00" * 32, claimed_request_ids=[99, 100]
         )
@@ -174,6 +203,132 @@ class TestLidoServiceClaim:
         response = await svc.claim(req)
 
         assert response.claimed_eth is None
+
+
+# ---------------------------------------------------------------------------
+# LidoService.claim — claim 前 precheck（fail-closed / レビュー C2-(b)）
+# ---------------------------------------------------------------------------
+
+
+def _status(
+    request_id: int,
+    *,
+    is_finalized: bool,
+    is_claimed: bool,
+    amount: str = "1.0",
+) -> WithdrawalStatus:
+    return WithdrawalStatus(
+        request_id=request_id,
+        amount_of_steth=Decimal(amount),
+        amount_of_shares=Decimal(amount),
+        owner="0x1234",
+        timestamp=1000,
+        is_finalized=is_finalized,
+        is_claimed=is_claimed,
+    )
+
+
+class TestLidoServiceClaimPrecheck:
+    """claim 前 finalization precheck（fail-closed）のテスト。"""
+
+    @pytest.mark.asyncio
+    async def test_claim_not_finalized_raises_and_no_tx(self, config: LidoConfig) -> None:
+        """未 finalize の request は ClaimNotReadyError + tx 未送信。"""
+        from app.protocols.lido.service import ClaimNotReadyError
+
+        mock_client = AsyncMock()
+        mock_client.get_withdrawal_status.return_value = [
+            _status(7, is_finalized=False, is_claimed=False),
+        ]
+        svc = LidoService(client=mock_client, config=config)
+        req = LidoClaimRequest(request_ids=[7], dry_run=False)
+
+        with pytest.raises(ClaimNotReadyError, match="finalize"):
+            await svc.claim(req)
+
+        mock_client.claim_withdrawals.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_claim_already_claimed_raises_and_no_tx(self, config: LidoConfig) -> None:
+        """claim 済みの request は ClaimNotReadyError + tx 未送信。"""
+        from app.protocols.lido.service import ClaimNotReadyError
+
+        mock_client = AsyncMock()
+        mock_client.get_withdrawal_status.return_value = [
+            _status(8, is_finalized=True, is_claimed=True),
+        ]
+        svc = LidoService(client=mock_client, config=config)
+        req = LidoClaimRequest(request_ids=[8], dry_run=False)
+
+        with pytest.raises(ClaimNotReadyError, match="claim 済み"):
+            await svc.claim(req)
+
+        mock_client.claim_withdrawals.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_claim_unknown_id_raises_and_no_tx(self, config: LidoConfig) -> None:
+        """ステータス取得不可（未知ID）は ClaimNotReadyError + tx 未送信。"""
+        from app.protocols.lido.service import ClaimNotReadyError
+
+        mock_client = AsyncMock()
+        mock_client.get_withdrawal_status.return_value = []
+        svc = LidoService(client=mock_client, config=config)
+        req = LidoClaimRequest(request_ids=[99], dry_run=False)
+
+        with pytest.raises(ClaimNotReadyError, match="未知のID"):
+            await svc.claim(req)
+
+        mock_client.claim_withdrawals.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_claim_partial_not_ready_blocks_entire_batch(self, config: LidoConfig) -> None:
+        """1件でも未 ready なら batch 全体を拒否し tx 未送信。"""
+        from app.protocols.lido.service import ClaimNotReadyError
+
+        mock_client = AsyncMock()
+        mock_client.get_withdrawal_status.return_value = [
+            _status(1, is_finalized=True, is_claimed=False),
+            _status(2, is_finalized=False, is_claimed=False),
+        ]
+        svc = LidoService(client=mock_client, config=config)
+        req = LidoClaimRequest(request_ids=[1, 2], dry_run=False)
+
+        with pytest.raises(ClaimNotReadyError):
+            await svc.claim(req)
+
+        mock_client.claim_withdrawals.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_claim_all_ready_proceeds_to_tx(self, config: LidoConfig) -> None:
+        """全件 finalized && not claimed なら tx を送信する。"""
+        mock_client = AsyncMock()
+        mock_client.get_withdrawal_status.return_value = [
+            _status(1, is_finalized=True, is_claimed=False),
+            _status(2, is_finalized=True, is_claimed=False),
+        ]
+        mock_client.claim_withdrawals.return_value = ClaimWithdrawalResult(
+            success=True, tx_hash="0x" + "ab" * 32, claimed_request_ids=[1, 2]
+        )
+        svc = LidoService(client=mock_client, config=config)
+        req = LidoClaimRequest(request_ids=[1, 2], dry_run=False)
+
+        response = await svc.claim(req)
+
+        assert response.tx_hash == "0x" + "ab" * 32
+        mock_client.claim_withdrawals.assert_awaited_once_with([1, 2])
+
+    @pytest.mark.asyncio
+    async def test_claim_dry_run_skips_precheck(self, config: LidoConfig) -> None:
+        """dry_run=True は precheck も tx もスキップする。"""
+        mock_client = AsyncMock()
+        svc = LidoService(client=mock_client, config=config)
+        req = LidoClaimRequest(request_ids=[1], dry_run=True)
+
+        response = await svc.claim(req)
+
+        assert response.dry_run is True
+        mock_client.get_withdrawal_status.assert_not_called()
+        mock_client.claim_withdrawals.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
