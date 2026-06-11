@@ -476,7 +476,7 @@ class PendleRouterV4Client:
         req = RouterV4SwapRequest(
             market_address=market_address,
             token_in=token_in,
-            token_out="YT",
+            token_out="YT",  # noqa: S106 — トークン種別リテラル (パスワードではない)
             amount_in=amount_in,
             slippage=effective_slippage,
             receiver=receiver,
@@ -506,7 +506,7 @@ class PendleRouterV4Client:
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
         req = RouterV4SwapRequest(
             market_address=market_address,
-            token_in="YT",
+            token_in="YT",  # noqa: S106 — トークン種別リテラル (パスワードではない)
             token_out=token_out,
             amount_in=yt_amount_in,
             slippage=effective_slippage,
@@ -538,7 +538,7 @@ class PendleRouterV4Client:
         req = RouterV4SwapRequest(
             market_address=market_address,
             token_in=token_in,
-            token_out="PT",
+            token_out="PT",  # noqa: S106 — トークン種別リテラル (パスワードではない)
             amount_in=amount_in,
             slippage=effective_slippage,
             receiver=receiver,
@@ -568,7 +568,7 @@ class PendleRouterV4Client:
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
         req = RouterV4SwapRequest(
             market_address=market_address,
-            token_in="PT",
+            token_in="PT",  # noqa: S106 — トークン種別リテラル (パスワードではない)
             token_out=token_out,
             amount_in=pt_amount_in,
             slippage=effective_slippage,
