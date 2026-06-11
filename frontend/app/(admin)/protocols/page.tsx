@@ -10,6 +10,7 @@ import {
   type ProtocolHealth,
   type RiskLevel,
 } from '@/lib/api/protocols'
+import PendlePositionCard from '@/components/pendle/PendlePositionCard'
 
 // ── Static protocol metadata (表示順 / 表示名 / フェーズ) ──────────────────
 // risk_level / tvl_usd / is_operational / alerts は API から取得する。
@@ -328,6 +329,14 @@ export default function ProtocolsPage() {
           {PROTOCOL_META.map((meta) => (
             <ProtocolCard key={meta.protocol} meta={meta} health={healthMap[meta.protocol] ?? null} />
           ))}
+        </div>
+
+        {/* Pendle PT/YT ポジション詳細セクション (#624 統合) */}
+        <div style={{ marginTop: 24 }}>
+          <h2 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600 }}>
+            Pendle ポジション詳細
+          </h2>
+          <PendlePositionCard />
         </div>
       </div>
     </AuthGuard>
