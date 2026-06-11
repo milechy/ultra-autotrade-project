@@ -9,6 +9,7 @@
 """
 
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from typing import List, Optional
 
@@ -236,3 +237,61 @@ class SentimentHistoryResponse(BaseModel):
     current_label: SentimentLabel = Field(..., description="現在のセンチメントラベル")
     is_mock: bool = Field(False, description="モックデータを返しているか")
     hours: int = Field(24, description="取得期間（時間）")
+
+
+# ---------------------------------------------------------------------------
+# 4軸 weighted 合議スキーマ（docs/52 Phase 1 追加分）
+# ---------------------------------------------------------------------------
+
+
+class AgentContribution(BaseModel):
+    """4軸 weighted 合議における 1 agent の寄与内訳。
+
+    docs/52_decision_layer_4axis_consensus_design.md §4.6 の
+    `per_agent_contribution` 1 エントリに対応する。
+    """
+
+    direction: int = Field(
+        ...,
+        ge=-1,
+        le=1,
+        description="方向値（BULLISH=+1 / NEUTRAL=0 / BEARISH=-1）。signal 欠落時は 0。",
+    )
+    confidence: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="agent の信頼度（0〜100）。signal 欠落時は 0。",
+    )
+    weight: Decimal = Field(..., description="この agent に割り当てられた重み（合計 1.0）。")
+    contribution: Decimal = Field(
+        ...,
+        description="weighted directional score への寄与 = weight × direction × (confidence/100)。",
+    )
+
+
+class DeterministicVerdict(BaseModel):
+    """4軸 weighted 合議による決定論レイヤーの判定結果。
+
+    docs/52_decision_layer_4axis_consensus_design.md §4.4 / §4.7 に対応する。
+    """
+
+    action: TradeAction = Field(..., description="決定論レイヤーの判定（BUY / SELL / HOLD）。")
+    score: Decimal = Field(..., description="weighted directional score（-1.0〜+1.0）。")
+    weighted_confidence: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="重み付き信頼度（0〜100、ROUND_HALF_UP で整数化）。",
+    )
+    agreeing_count: int = Field(
+        ...,
+        ge=0,
+        le=4,
+        description="score と同方向 かつ confidence>=50 の agent 数（単一暴走抑止用）。",
+    )
+    per_agent_contribution: dict[str, AgentContribution] = Field(
+        ...,
+        description="agent 名（risk/indicator/macro/pattern）→ 寄与内訳。4 軸全て格納。",
+    )
+    reasoning: str = Field(..., description="人間可読の判定サマリ（score/conf/閾値/降格有無）。")

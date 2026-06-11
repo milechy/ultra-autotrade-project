@@ -19,15 +19,44 @@ No side effects, no state, easily testable.
 """
 
 import logging
+from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
-from typing import Optional
+from typing import ClassVar, Optional
 
 from pydantic import BaseModel, Field
 
 from app.ai.judgment_log import CognitiveState
+from app.ai.schemas import AgentContribution, DeterministicVerdict, TradeAction
 from app.data_feeds.context import MarketContext
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# 4-axis weighted consensus helpers (docs/52 Phase 1)
+# ============================================================
+_CONSENSUS_AGENT_KEYS: frozenset[str] = frozenset({"risk", "indicator", "macro", "pattern"})
+
+#: Allowed deviation of the weight sum from 1.0 (docs/52 §4.2: 1.0 ± 0.01).
+_WEIGHT_SUM_TOLERANCE: Decimal = Decimal("0.01")
+
+
+def validate_agent_weights(weights: dict[str, Decimal]) -> None:
+    """Validate a 4-axis consensus weight mapping (docs/52 §4.2).
+
+    Requirements (fail-closed — raise ValueError on violation):
+    - keys must be exactly {risk, indicator, macro, pattern}
+    - sum of weights must be within 1.0 ± 0.01 (Decimal arithmetic)
+    """
+    keys = set(weights.keys())
+    if keys != _CONSENSUS_AGENT_KEYS:
+        raise ValueError(
+            f"agent weights keys must be exactly {sorted(_CONSENSUS_AGENT_KEYS)}, "
+            f"got {sorted(keys)}"
+        )
+    total = sum(weights.values(), Decimal("0"))
+    if abs(total - Decimal("1.0")) > _WEIGHT_SUM_TOLERANCE:
+        raise ValueError(f"agent weights must sum to 1.0 ± 0.01, got {total}")
 
 
 # ============================================================
@@ -62,6 +91,14 @@ class MultiAgentContext(BaseModel):
     risk_signal: Optional[AgentSignal] = None
     macro_signal: Optional[AgentSignal] = None
     cognitive_state: Optional[CognitiveState] = None
+
+    #: Default 4-axis consensus weights (docs/52 §4.2 — aligned with v4/v5 prompts).
+    DEFAULT_WEIGHTS: ClassVar[dict[str, Decimal]] = {
+        "risk": Decimal("0.40"),
+        "indicator": Decimal("0.25"),
+        "macro": Decimal("0.20"),
+        "pattern": Decimal("0.15"),
+    }
 
     def to_decision_prompt(self) -> str:
         """Format all agent signals for the Decision Agent LLM prompt."""
@@ -222,6 +259,180 @@ class MultiAgentContext(BaseModel):
             and mac.bias == Bias.BULLISH
             and mac.confidence >= self._DIRECTIONAL_THRESHOLD
         )
+
+    # ------------------------------------------------------------------
+    # 4-axis weighted consensus (docs/52 Phase 1 — NOT wired into
+    # service.py yet; shadow/A-B wiring happens in later PRs)
+    # ------------------------------------------------------------------
+
+    def _direction_and_confidence(self, agent_key: str) -> tuple[int, int]:
+        """Return (direction, confidence) for one consensus axis.
+
+        Direction mapping (docs/52 §4.1): BULLISH=+1 / NEUTRAL=0 / BEARISH=-1.
+        A missing signal contributes (0, 0) — its weight is consumed but not
+        re-normalized, so missing axes pull the score toward HOLD (fail-safe).
+        """
+        signal: Optional[AgentSignal] = {
+            "risk": self.risk_signal,
+            "indicator": self.indicator_signal,
+            "macro": self.macro_signal,
+            "pattern": self.pattern_signal,
+        }[agent_key]
+        if signal is None:
+            return 0, 0
+        direction = {Bias.BULLISH: 1, Bias.NEUTRAL: 0, Bias.BEARISH: -1}[signal.bias]
+        return direction, signal.confidence
+
+    def weighted_directional_score(
+        self,
+        weights: Optional[dict[str, Decimal]] = None,
+    ) -> Decimal:
+        """Weighted directional score in [-1, +1] (docs/52 §4.3).
+
+        score = Σ_i  w_i × direction_i × (confidence_i / 100)
+
+        All arithmetic is Decimal (CLAUDE.md §Financial calculations).
+        """
+        resolved = self.DEFAULT_WEIGHTS if weights is None else weights
+        validate_agent_weights(resolved)
+
+        score = Decimal("0")
+        for key in ("risk", "indicator", "macro", "pattern"):
+            direction, confidence = self._direction_and_confidence(key)
+            score += resolved[key] * direction * (Decimal(confidence) / Decimal(100))
+        return score
+
+    def weighted_confidence(
+        self,
+        weights: Optional[dict[str, Decimal]] = None,
+    ) -> int:
+        """Weighted confidence in [0, 100] (docs/52 §4.3).
+
+        weighted_conf = round_half_up( Σ_i  w_i × confidence_i )
+
+        ROUND_HALF_UP is explicit — Python's built-in round() uses banker's
+        rounding (round-half-even), which would turn 69.5 into 70 but 70.5
+        into 70 and break the design's arithmetic examples.
+        """
+        resolved = self.DEFAULT_WEIGHTS if weights is None else weights
+        validate_agent_weights(resolved)
+
+        total = Decimal("0")
+        for key in ("risk", "indicator", "macro", "pattern"):
+            _, confidence = self._direction_and_confidence(key)
+            total += resolved[key] * Decimal(confidence)
+        return int(total.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+    def evaluate_4axis_consensus(
+        self,
+        *,
+        weights: Optional[dict[str, Decimal]] = None,
+        score_threshold: Decimal = Decimal("0.40"),
+        conf_threshold: int = 65,
+    ) -> DeterministicVerdict:
+        """4-axis weighted deterministic verdict (docs/52 §4.4).
+
+        - score >= +score_threshold and conf >= conf_threshold → BUY
+        - score <= -score_threshold and conf >= conf_threshold → SELL
+        - otherwise → HOLD
+        - single-agent runaway guard: a BUY/SELL verdict with fewer than 2
+          agents agreeing with the score direction (conf >= 50) is demoted
+          to HOLD (docs/52 §4.4, SELL-spam #365 recurrence prevention).
+
+        agreeing_count is always computed (even for HOLD verdicts) so shadow
+        logs stay comparable across actions.
+        """
+        resolved = self.DEFAULT_WEIGHTS if weights is None else weights
+        validate_agent_weights(resolved)
+
+        score = self.weighted_directional_score(resolved)
+        conf = self.weighted_confidence(resolved)
+
+        contributions: dict[str, AgentContribution] = {}
+        agreeing_count = 0
+        for key in ("risk", "indicator", "macro", "pattern"):
+            direction, confidence = self._direction_and_confidence(key)
+            contributions[key] = AgentContribution(
+                direction=direction,
+                confidence=confidence,
+                weight=resolved[key],
+                contribution=resolved[key] * direction * (Decimal(confidence) / Decimal(100)),
+            )
+            # sign(direction × score) > 0 — the agent points the same way
+            # as the aggregate score and is individually confident enough.
+            if direction * score > 0 and confidence >= 50:
+                agreeing_count += 1
+
+        if score >= score_threshold and conf >= conf_threshold:
+            action = TradeAction.BUY
+        elif score <= -score_threshold and conf >= conf_threshold:
+            action = TradeAction.SELL
+        else:
+            action = TradeAction.HOLD
+
+        demoted = False
+        if action in (TradeAction.BUY, TradeAction.SELL) and agreeing_count < 2:
+            action = TradeAction.HOLD
+            demoted = True
+
+        reasoning = (
+            f"4-axis consensus: score={score} (threshold=±{score_threshold}), "
+            f"weighted_confidence={conf} (threshold={conf_threshold}), "
+            f"agreeing_count={agreeing_count} → {action.value}"
+        )
+        if demoted:
+            reasoning += ". Demoted to HOLD: single-agent runaway guard (agreeing_count < 2)"
+
+        return DeterministicVerdict(
+            action=action,
+            score=score,
+            weighted_confidence=conf,
+            agreeing_count=agreeing_count,
+            per_agent_contribution=contributions,
+            reasoning=reasoning,
+        )
+
+
+def resolve_llm_and_deterministic(
+    llm_action: TradeAction,
+    llm_confidence: int,
+    det: DeterministicVerdict,
+) -> tuple[TradeAction, int, bool]:
+    """Reconcile the LLM action with the deterministic verdict (docs/52 §4.5).
+
+    Pure module-level function — NOT wired into service.py yet (Phase 1).
+
+    Reconciliation table:
+    - LLM=HOLD → HOLD (existing behaviour preserved; no veto)
+    - LLM matches deterministic (BUY/BUY or SELL/SELL) → adopt (no veto)
+    - LLM=BUY|SELL, deterministic=HOLD → HOLD (deterministic veto)
+    - LLM=BUY vs deterministic=SELL (or inverse) → HOLD + warning (conflict)
+
+    final_confidence = min(llm_confidence, det.weighted_confidence); on veto
+    or conflict it is additionally capped at 50.
+
+    Returns:
+        (final_action, final_confidence, veto_applied)
+    """
+    det_conf = det.weighted_confidence
+
+    if llm_action == TradeAction.HOLD:
+        return TradeAction.HOLD, min(llm_confidence, det_conf), False
+
+    if llm_action == det.action:
+        return llm_action, min(llm_confidence, det_conf), False
+
+    if det.action == TradeAction.HOLD:
+        # Deterministic veto: LLM wants to trade but the 4-axis verdict is HOLD.
+        return TradeAction.HOLD, min(llm_confidence, det_conf, 50), True
+
+    # Directional conflict (BUY vs SELL) — force HOLD on the safe side.
+    logger.warning(
+        "4-axis consensus conflict: llm_action=%s vs deterministic=%s — forcing HOLD",
+        llm_action.value,
+        det.action.value,
+    )
+    return TradeAction.HOLD, min(llm_confidence, det_conf, 50), True
 
 
 # ============================================================
