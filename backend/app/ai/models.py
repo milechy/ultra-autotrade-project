@@ -72,6 +72,9 @@ class AiDecisionFeature(Base):
     embedding: Mapped[Optional[List[float]]] = mapped_column(
         _embedding_column_type(), nullable=True
     )
+    # ALTER TABLE ai_decision_features ADD COLUMN IF NOT EXISTS deterministic_breakdown JSONB;
+    # 4軸 Shadow consensus の決定論的内訳 (各軸スコア/重み)。NULL許容 (後続 PR-3 で書込配線)。
+    deterministic_breakdown: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
