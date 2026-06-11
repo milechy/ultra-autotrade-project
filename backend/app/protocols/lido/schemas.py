@@ -85,6 +85,36 @@ class LidoWithdrawResponse(BaseModel):
     )
 
 
+class WithdrawalRequestResult(BaseModel):
+    """withdrawal queue へのリクエスト送信結果。"""
+
+    tx_hash: Optional[str] = None
+    success: bool
+    request_ids: list[int] = Field(default_factory=list, description="払い出しリクエストNFT ID一覧")
+    error: Optional[str] = None
+
+
+class WithdrawalStatus(BaseModel):
+    """withdrawal request の状態。"""
+
+    request_id: int
+    amount_of_steth: Decimal = Field(..., description="引き出し対象 stETH 量（ETH単位）")
+    amount_of_shares: Decimal = Field(..., description="対応するシェア量（ETH単位）")
+    owner: str = Field(..., description="オーナーアドレス")
+    timestamp: int = Field(..., description="リクエスト作成タイムスタンプ (Unix秒)")
+    is_finalized: bool = Field(..., description="最終確定済みか")
+    is_claimed: bool = Field(..., description="クレーム済みか")
+
+
+class ClaimWithdrawalResult(BaseModel):
+    """withdrawal claim 実行結果。"""
+
+    tx_hash: Optional[str] = None
+    success: bool
+    claimed_request_ids: list[int] = Field(default_factory=list)
+    error: Optional[str] = None
+
+
 class CompoundYieldEstimate(BaseModel):
     """複合利回り推定値。"""
 
