@@ -71,6 +71,17 @@
 複数タスクの並列は「タスク間」で行う（Tier B 同士・触るファイル非衝突のもののみ）。
 最大 2 タスクを同時に走らせ、各タスク内は直列。
 
+> **[重要] 新規 agent 定義の登録タイミング（2026-06-11 公式 docs 確認 + 実地検証）**
+> `code.claude.com/docs/en/sub-agents` によれば `/agents` コマンド経由で作成した subagent は
+> 「available immediately」。一方、**セッション実行中に Write/Edit で作成した `.claude/agents/*.md` は
+> その場では `subagent_type` として認識されない**（agent レジストリはセッション起動時にロードされる）。
+> 本パイプライン初回構築で `Agent(subagent_type='Planner')` が `Agent type 'Planner' not found` に
+> なったのはこのため。**対処**: (a) 定義作成後にセッション再起動、または (b) `/agents` で再読込。
+> 再起動までの間は、メインセッションが各ロールの規律（Planner→Generator→Evaluator→Tester の
+> 手順・出力フォーマット）を自分で実演してパイプラインを回せる（初回構築は実際この方式で
+> repomix / human-review-gate / Trellis / skillspector / open-code-review / SkillOpt を完走した）。
+> frontmatter は `name` / `description` / `tools` / `model` が有効（公式仕様準拠）。
+
 ### モード B: Agent Teams + worktree（3+ タスク並列 / コンフリクト物理回避）
 
 Tier B タスクが 3 本以上あり、触るファイルが完全分離している場合のみ。
