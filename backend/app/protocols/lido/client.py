@@ -9,6 +9,8 @@ from abc import abstractmethod
 from decimal import Decimal
 from typing import Any
 
+import httpx
+
 from app.protocols.base import (
     BaseProtocolClient,
     ProtocolHealthMetrics,
@@ -90,6 +92,8 @@ _WEI_PER_ETH = Decimal("1000000000000000000")
 class AbstractLidoClient(BaseProtocolClient):
     """Lido クライアントの抽象基底クラス。"""
 
+    _config: LidoConfig
+
     # --- BaseProtocolClient 実装 ---
 
     def get_protocol_name(self) -> str:
@@ -132,14 +136,35 @@ class AbstractLidoClient(BaseProtocolClient):
         )
 
     async def get_position(self) -> ProtocolPosition:
-        """ポジション情報を返す（PoC: デフォルトアドレスの残高）。"""
-        balance = Decimal("0")
-        return ProtocolPosition(
+        """ポジション情報を返す（設定ウォレットの stETH 残高）。
+
+        value_usd は balance と同値の近似（stETH≈ETH 近似、USD 換算は将来課題）。
+        wallet_address 未設定・残高取得失敗時は zero position を返す（fail-open）。
+        """
+        zero_position = ProtocolPosition(
             protocol_name=self.get_protocol_name(),
             asset="stETH",
-            balance=balance,
-            value_usd=balance,
+            balance=Decimal("0"),
+            value_usd=Decimal("0"),
         )
+        wallet_address = self._config.wallet_address
+        if not wallet_address:
+            logger.warning("get_position: wallet_address 未設定のため zero position を返します")
+            return zero_position
+        try:
+            balance = await self.get_steth_balance(wallet_address)
+            return ProtocolPosition(
+                protocol_name=self.get_protocol_name(),
+                asset="stETH",
+                balance=balance,
+                value_usd=balance,
+            )
+        except Exception as exc:
+            logger.warning(
+                "get_position: 残高取得失敗のため zero position を返します (fail-open): %s",
+                exc,
+            )
+            return zero_position
 
     async def get_health_metrics(self) -> ProtocolHealthMetrics:
         """ヘルスメトリクスを返す。"""
@@ -363,16 +388,35 @@ class LidoClient(AbstractLidoClient):
             logger.exception("get_steth_balance 失敗: address=%s", address[:10])
             raise RuntimeError(f"stETH 残高取得失敗: {exc}") from exc
 
-    async def get_staking_apr(self) -> Decimal:
-        """Lido staking APR を推定する（オンチェーンデータから計算）。
+    async def _fetch_apr_data(self) -> dict[str, Any]:
+        """Lido 公式 API から stETH APR（SMA）データを取得する。"""
+        url = f"{self._config.api_base_url}/v1/protocol/steth/apr/sma"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            data: dict[str, Any] = response.json()
+            return data
 
-        PoC 実装: testnet では固定値を返す。
-        本番では Lido API または イベントログから計算する。
+    async def get_staking_apr(self) -> Decimal:
+        """Lido 公式 API から実 staking APR（%）を取得する。
+
+        API 失敗・異常値（0 < apr <= 50 を外れる）の場合は参考値 3.5% に
+        フォールバックし、例外は呼び出し元へ送出しない（fail-open 設計）。
         """
-        self._ensure_initialized()
-        # testnet / PoC: 推定値を返す（Lido mainnet APR の参考値 ~3.5%）
-        logger.info("get_staking_apr: testnet のため推定値 3.5%% を返します")
-        return Decimal("3.5")
+        try:
+            data = await self._fetch_apr_data()
+            apr = Decimal(str(data["data"]["smaApr"]))
+            if Decimal("0") < apr <= Decimal("50"):
+                return apr
+            logger.warning(
+                "get_staking_apr: 異常値 %s のためフォールバック値 3.5%% を返します", apr
+            )
+            return Decimal("3.5")
+        except Exception as exc:
+            logger.warning(
+                "get_staking_apr: API 取得失敗のためフォールバック値 3.5%% を返します: %s", exc
+            )
+            return Decimal("3.5")
 
     async def get_steth_eth_ratio(self) -> Decimal:
         """stETH/ETH レートを取得（getTotalPooledEther / getTotalShares）。"""

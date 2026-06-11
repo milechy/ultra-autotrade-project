@@ -1,6 +1,7 @@
-"""DummyLidoClient のユニットテスト。"""
+"""DummyLidoClient / LidoClient のユニットテスト。"""
 
 from decimal import Decimal
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -112,3 +113,116 @@ class TestGetLidoClient:
         config = LidoConfig(sandbox=True)
         client = get_lido_client(config)
         assert isinstance(client, DummyLidoClient)
+
+
+_TEST_WALLET = "0x0000000000000000000000000000000000000001"
+
+
+@pytest.fixture
+def real_client() -> LidoClient:
+    return LidoClient(LidoConfig(sandbox=False))
+
+
+class TestLidoClientApr:
+    """LidoClient.get_staking_apr の Lido API 実装テスト（HTTP は mock）。"""
+
+    @pytest.mark.asyncio
+    async def test_apr_returns_real_value_from_api(self, real_client: LidoClient) -> None:
+        """API 成功時に実値が Decimal で返ること。"""
+        with patch.object(
+            real_client,
+            "_fetch_apr_data",
+            new=AsyncMock(return_value={"data": {"smaApr": 2.9}}),
+        ):
+            apr = await real_client.get_staking_apr()
+        assert apr == Decimal("2.9")
+        assert type(apr) is Decimal
+
+    @pytest.mark.asyncio
+    async def test_apr_api_failure_falls_back_to_35(self, real_client: LidoClient) -> None:
+        """API 失敗時にフォールバック値 3.5 が返ること。"""
+        with patch.object(
+            real_client,
+            "_fetch_apr_data",
+            new=AsyncMock(side_effect=Exception("connection error")),
+        ):
+            apr = await real_client.get_staking_apr()
+        assert apr == Decimal("3.5")
+
+    @pytest.mark.asyncio
+    async def test_apr_abnormal_value_falls_back_to_35(self, real_client: LidoClient) -> None:
+        """異常値（smaApr=999 > 50）はフォールバック値 3.5 が返ること。"""
+        with patch.object(
+            real_client,
+            "_fetch_apr_data",
+            new=AsyncMock(return_value={"data": {"smaApr": 999}}),
+        ):
+            apr = await real_client.get_staking_apr()
+        assert apr == Decimal("3.5")
+
+    @pytest.mark.asyncio
+    async def test_apr_never_raises_on_malformed_response(self, real_client: LidoClient) -> None:
+        """レスポンス構造が壊れていても例外が漏洩しないこと（fail-open）。"""
+        with patch.object(
+            real_client,
+            "_fetch_apr_data",
+            new=AsyncMock(return_value={}),
+        ):
+            apr = await real_client.get_staking_apr()  # KeyError が漏洩しないこと
+        assert apr == Decimal("3.5")
+
+    @pytest.mark.asyncio
+    async def test_apr_fail_open_with_unreachable_url(self) -> None:
+        """到達不能な API URL でもフォールバック値 3.5 が返ること（実証）。"""
+        client = LidoClient(LidoConfig(sandbox=False, api_base_url="http://127.0.0.1:1"))
+        apr = await client.get_staking_apr()
+        assert apr == Decimal("3.5")
+
+
+class TestGetPosition:
+    """AbstractLidoClient.get_position のテスト。"""
+
+    @pytest.mark.asyncio
+    async def test_dummy_client_position_returns_balance(self) -> None:
+        """DummyLidoClient は stub 残高 1.0 を position に反映すること。"""
+        client = DummyLidoClient(LidoConfig(sandbox=True, wallet_address=_TEST_WALLET))
+        position = await client.get_position()
+        assert position.protocol_name == "lido"
+        assert position.asset == "stETH"
+        assert position.balance == Decimal("1.0")
+        assert position.value_usd == Decimal("1.0")
+
+    @pytest.mark.asyncio
+    async def test_lido_client_position_reflects_real_balance(self) -> None:
+        """LidoClient は get_steth_balance の実値を position に反映すること。"""
+        client = LidoClient(LidoConfig(sandbox=False, wallet_address=_TEST_WALLET))
+        with patch.object(
+            client,
+            "get_steth_balance",
+            new=AsyncMock(return_value=Decimal("2.5")),
+        ):
+            position = await client.get_position()
+        assert position.balance == Decimal("2.5")
+        assert position.value_usd == Decimal("2.5")
+        assert type(position.balance) is Decimal
+
+    @pytest.mark.asyncio
+    async def test_empty_wallet_address_returns_zero_position(self) -> None:
+        """wallet_address 未設定の場合 zero position を返すこと。"""
+        client = DummyLidoClient(LidoConfig(sandbox=True, wallet_address=""))
+        position = await client.get_position()
+        assert position.balance == Decimal("0")
+        assert position.value_usd == Decimal("0")
+
+    @pytest.mark.asyncio
+    async def test_balance_failure_returns_zero_position(self) -> None:
+        """get_steth_balance 例外時に fail-open で zero position を返すこと。"""
+        client = LidoClient(LidoConfig(sandbox=False, wallet_address=_TEST_WALLET))
+        with patch.object(
+            client,
+            "get_steth_balance",
+            new=AsyncMock(side_effect=RuntimeError("stETH 残高取得失敗")),
+        ):
+            position = await client.get_position()
+        assert position.balance == Decimal("0")
+        assert position.value_usd == Decimal("0")

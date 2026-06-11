@@ -33,6 +33,10 @@ class LidoConfig:
         )
     )
     chain: str = field(default_factory=lambda: os.getenv("LIDO_CHAIN", "holesky"))
+    # Lido 公式 API ベース URL（staking APR 取得用）
+    api_base_url: str = field(
+        default_factory=lambda: os.getenv("LIDO_API_URL", "https://eth-api.lido.fi")
+    )
     wallet_address: str = field(default_factory=lambda: os.getenv("LIDO_WALLET_ADDRESS", ""))
     wallet_private_key: str = field(
         default_factory=lambda: os.getenv("LIDO_WALLET_PRIVATE_KEY", "")
