@@ -115,7 +115,12 @@ class RouterV4SwapRequest(BaseModel):
     token_in: str = Field(..., description="入力トークンアドレス")
     token_out: str = Field(..., description="出力トークンアドレス")
     amount_in: Decimal = Field(..., gt=Decimal("0"), description="入力量")
-    slippage: Decimal = Field(default=Decimal("0.005"), description="スリッページ（0.005 = 0.5%）")
+    slippage: Decimal = Field(
+        default=Decimal("0.005"),
+        gt=Decimal("0"),
+        le=Decimal("0.05"),
+        description="スリッページ（0.005 = 0.5%）。0 < slippage <= 0.05（5%）",
+    )
     receiver: str = Field(..., description="受取アドレス")
 
     @field_validator("amount_in", mode="before")
@@ -130,10 +135,11 @@ class RouterV4SwapRequest(BaseModel):
 
 
 class RouterV4Approval(BaseModel):
-    """RouterV4 SDK から返される approve 情報。"""
+    """RouterV4 SDK が要求する ERC20 approval（Phase 2 への橋渡し用に保持）。"""
 
-    spender: str = Field(..., description="スペンダーアドレス（通常 Router）")
-    token: str = Field(..., description="承認が必要なトークンアドレス")
+    token: Optional[str] = Field(default=None, description="approve 対象トークンアドレス")
+    spender: Optional[str] = Field(default=None, description="spender（Router であるべき）")
+    amount: Optional[str] = Field(default=None, description="approve 量（生値）")
 
 
 class RouterV4SwapResult(BaseModel):
@@ -143,9 +149,10 @@ class RouterV4SwapResult(BaseModel):
     tx_hash: Optional[str] = None
     amount_out: Optional[Decimal] = None
     calldata: Optional[str] = None
+    # SDK が返した tx.to（Router 照合済み）。Phase 2 の tx 送信先として保持。
+    to: Optional[str] = None
+    approvals: list[RouterV4Approval] = Field(default_factory=list)
     error: Optional[str] = None
-    # SDK レスポンスの approvals（spender=Router, token）。approve tx 送信はしない
-    approvals: Optional[list[RouterV4Approval]] = None
 
 
 class RouterV4AddLiquidityRequest(BaseModel):
@@ -154,7 +161,12 @@ class RouterV4AddLiquidityRequest(BaseModel):
     market_address: str = Field(..., description="対象マーケットアドレス")
     token_in: str = Field(..., description="入力トークンアドレス")
     amount_in: Decimal = Field(..., gt=Decimal("0"), description="入力量")
-    slippage: Decimal = Field(default=Decimal("0.005"), description="スリッページ（0.005 = 0.5%）")
+    slippage: Decimal = Field(
+        default=Decimal("0.005"),
+        gt=Decimal("0"),
+        le=Decimal("0.05"),
+        description="スリッページ（0.005 = 0.5%）。0 < slippage <= 0.05（5%）",
+    )
     receiver: str = Field(..., description="受取アドレス")
 
     @field_validator("amount_in", mode="before")
@@ -175,6 +187,7 @@ class RouterV4AddLiquidityResult(BaseModel):
     tx_hash: Optional[str] = None
     lp_amount: Optional[Decimal] = None
     calldata: Optional[str] = None
+    # SDK が返した tx.to（Router 照合済み）。Phase 2 の tx 送信先として保持。
+    to: Optional[str] = None
+    approvals: list[RouterV4Approval] = Field(default_factory=list)
     error: Optional[str] = None
-    # SDK レスポンスの approvals（spender=Router, token）。approve tx 送信はしない
-    approvals: Optional[list[RouterV4Approval]] = None

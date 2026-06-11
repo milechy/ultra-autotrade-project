@@ -14,21 +14,24 @@ MARKET = "0x" + "aa" * 20
 TOKEN_IN = "0x" + "bb" * 20
 TOKEN_OUT = "0x" + "cc" * 20
 RECEIVER = "0x" + "dd" * 20
+ROUTER = "0x888888888889758F76e7103c6CbF23ABbF58F946"
 
-# SDK が返すモックレスポンス（swap 系）
+# SDK が返すモックレスポンス（swap 系）。tx.to は Router アドレス（C2 照合をパスする）。
 _MOCK_SWAP_RESPONSE: dict = {
     "data": {
         "tx": {
+            "to": ROUTER,
             "data": "0xdeadbeef",
         },
         "amountOut": str(int(Decimal("0.95") * Decimal(10**18))),
     }
 }
 
-# SDK が返すモックレスポンス（add_liquidity 系）
+# SDK が返すモックレスポンス（add_liquidity 系）。
 _MOCK_ADD_LIQ_RESPONSE: dict = {
     "data": {
         "tx": {
+            "to": ROUTER,
             "data": "0xcafebabe",
         },
         "amountLpOut": str(int(Decimal("0.98") * Decimal(10**18))),

@@ -56,8 +56,9 @@ class PendleConfig:
     min_days_to_maturity: int = 7
     # implied APY 警告閾値（この値を超えると警告ログを出力）
     max_implied_apy_pct: Decimal = field(default_factory=lambda: Decimal("100.0"))
-    # オンチェーン書き込み有効フラグ（Q1 一段目ガード。デフォルト false）
-    # PENDLE_ENABLE_ONCHAIN_WRITE=true を明示しない限りオンチェーン操作を拒否する
+    # オンチェーン書き込み許可フラグ（Phase 2 の tx 送信を二段ガードする土台）。
+    # default false。tx 送信は本フラグ True かつ wallet_private_key が揃った場合のみ許可。
+    # Phase 1（本実装）は calldata 取得までで、本フラグ True でも tx は送信しない。
     enable_onchain_write: bool = field(
         default_factory=lambda: os.getenv("PENDLE_ENABLE_ONCHAIN_WRITE", "false").lower() == "true"
     )
@@ -65,6 +66,23 @@ class PendleConfig:
     max_single_trade_pct: Decimal = field(
         default_factory=lambda: _get_env_decimal("PENDLE_MAX_SINGLE_TRADE_PCT", "0.10")
     )
+
+    def token_decimals(self, token: str) -> int:
+        """トークン識別子から decimals を解決する。
+
+        非18桁トークン（USDC/USDT=6、WBTC=8）の桁ズレ事故を防ぐためのマップ。
+        シンボル（大文字小文字無視）で照合し、未知トークンは 18 を返す。
+        """
+        return _TOKEN_DECIMALS.get(token.upper(), 18)
+
+
+# トークンシンボル → decimals マップ。
+# 非18桁トークンの送金額桁ズレ（USDC で 10^12 倍ズレ）を防ぐ。
+_TOKEN_DECIMALS: dict[str, int] = {
+    "USDC": 6,
+    "USDT": 6,
+    "WBTC": 8,
+}
 
 
 def get_pendle_config() -> PendleConfig:

@@ -30,19 +30,21 @@ TOKEN_IN = "0x" + "bb" * 20
 TOKEN_OUT = "0x" + "cc" * 20
 RECEIVER = "0x" + "dd" * 20
 
+_ROUTER_ADDRESS = "0x888888888889758F76e7103c6CbF23ABbF58F946"
+
 _MOCK_SWAP_RESPONSE: dict = {
     "data": {
-        "tx": {"data": "0xdeadbeef"},
+        "tx": {"to": _ROUTER_ADDRESS, "data": "0xdeadbeef"},
         "amountOut": str(int(Decimal("0.95") * Decimal(10**18))),
-        "approvals": [{"spender": "0x888888888889758F76e7103c6CbF23ABbF58F946", "token": TOKEN_IN}],
+        "approvals": [{"spender": _ROUTER_ADDRESS, "token": TOKEN_IN}],
     }
 }
 
 _MOCK_ADD_LIQ_RESPONSE: dict = {
     "data": {
-        "tx": {"data": "0xcafebabe"},
+        "tx": {"to": _ROUTER_ADDRESS, "data": "0xcafebabe"},
         "amountLpOut": str(int(Decimal("0.98") * Decimal(10**18))),
-        "approvals": [{"spender": "0x888888888889758F76e7103c6CbF23ABbF58F946", "token": TOKEN_IN}],
+        "approvals": [{"spender": _ROUTER_ADDRESS, "token": TOKEN_IN}],
     }
 }
 
@@ -329,11 +331,13 @@ class TestApprovalsExtraction:
         assert len(result.approvals) == 1
 
     @pytest.mark.asyncio
-    async def test_approvals_none_when_empty(self, enabled_client: PendleRouterV4Client) -> None:
-        """SDK レスポンスに approvals がない場合は None が返ること。"""
+    async def test_approvals_empty_when_not_in_response(
+        self, enabled_client: PendleRouterV4Client
+    ) -> None:
+        """SDK レスポンスに approvals がない場合は空リストが返ること。"""
         response_no_approvals: dict = {
             "data": {
-                "tx": {"data": "0xdeadbeef"},
+                "tx": {"to": _ROUTER_ADDRESS, "data": "0xdeadbeef"},
                 "amountOut": str(int(Decimal("0.95") * Decimal(10**18))),
             }
         }
@@ -341,7 +345,8 @@ class TestApprovalsExtraction:
             enabled_client, "_call_sdk", new=AsyncMock(return_value=response_no_approvals)
         ):
             result = await enabled_client.buy_yt(MARKET, TOKEN_IN, Decimal("1.0"), RECEIVER)
-        assert result.approvals is None
+        assert result.approvals is not None
+        assert len(result.approvals) == 0
 
     @pytest.mark.asyncio
     async def test_approvals_not_sent_as_tx(self, enabled_client: PendleRouterV4Client) -> None:
