@@ -5,6 +5,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw } from 'lucide-react'
 import AuthGuard from '@/components/AuthGuard'
+import PendlePositionCard from '@/components/pendle/PendlePositionCard'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -296,6 +297,14 @@ export default function ProtocolsPage() {
         <AaveCard data={data.aave} />
         <LidoCard data={data.lido} />
         <PendleCard data={data.pendle} />
+      </div>
+
+      {/* Pendle PT/YT ポジション詳細セクション */}
+      <div style={{ marginTop: 24 }}>
+        <h2 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600 }}>
+          Pendle ポジション詳細
+        </h2>
+        <PendlePositionCard />
       </div>
 
       <p style={{ marginTop: 16, fontSize: 12, color: '#9ca3af' }}>
