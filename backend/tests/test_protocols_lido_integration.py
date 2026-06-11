@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 from decimal import Decimal
+from typing import Generator
 
 import pytest
 from fastapi import FastAPI
@@ -20,18 +21,35 @@ os.environ.setdefault("APP_ENV", "development")
 os.environ.setdefault("LIDO_SANDBOX", "true")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-lido-integration")
 
+from app.auth.dependencies import require_admin  # noqa: E402
+from app.auth.models import User, UserRole  # noqa: E402
 from app.protocols.lido.router import router as lido_router  # noqa: E402
 
+_app = FastAPI()
+_app.include_router(lido_router)
 
-def _make_app() -> FastAPI:
-    app = FastAPI()
-    app.include_router(lido_router)
-    return app
+
+def _fake_admin() -> User:
+    """テスト用 admin ユーザー（require_admin override 用）。"""
+    return User(id=1, email="admin@example.com", role=UserRole.ADMIN.value, is_active=True)
 
 
 @pytest.fixture(scope="module")
 def client() -> TestClient:
-    return TestClient(_make_app())
+    return TestClient(_app)
+
+
+@pytest.fixture(autouse=True)
+def _override_admin_auth() -> Generator[None, None, None]:
+    """既定では admin 認証済みとして扱う（write エンドポイント正常系テスト用）。
+
+    ef5bb42f で追加された require_admin に対応し、DummyClient 統合テストが
+    401 で落ちないようにする。無認証 401 の確認は test_lido_router.py の
+    TestWriteEndpointsRequireAdmin が担う。
+    """
+    _app.dependency_overrides[require_admin] = _fake_admin
+    yield
+    _app.dependency_overrides.clear()
 
 
 # ---------------------------------------------------------------------------
