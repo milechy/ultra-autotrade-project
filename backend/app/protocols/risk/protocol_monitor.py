@@ -107,16 +107,17 @@ class ProtocolMonitor:
             elif hf < Decimal("1.6"):
                 risk_level = RiskLevel.CRITICAL
                 alerts.append(
-                    f"ヘルスファクターが緊急停止水準（1.6）を下回っています（HF: {float(hf):.2f}）"
+                    f"ヘルスファクターが緊急停止水準（1.6）を下回っています（HF: {hf:.2f}）"
                 )
             elif hf < Decimal("1.8"):
                 risk_level = RiskLevel.HIGH
-                alerts.append(
-                    f"ヘルスファクターが警告水準（1.8）を下回っています（HF: {float(hf):.2f}）"
-                )
+                alerts.append(f"ヘルスファクターが警告水準（1.8）を下回っています（HF: {hf:.2f}）")
 
             is_operational = bool(self._monitoring_service.is_trading_allowed())
-        except Exception as exc:
+        except Exception:
+            # 例外詳細 (AaveClientError 等) は RPC URL (APIキー埋め込み形式) を内包し得る。
+            # alerts は無認証 GET /api/protocols/health で外部露出されるため (Security Rule 8)、
+            # 固定文言のみを返し、詳細はサーバーログ (logger.exception) に限定する。
             logger.exception("Aave ヘルスチェック失敗")
             return ProtocolHealth(
                 protocol="aave",
@@ -125,7 +126,7 @@ class ProtocolMonitor:
                 tvl_change_24h_pct=Decimal("0"),
                 is_operational=False,
                 last_checked=datetime.now(tz=timezone.utc),
-                alerts=[f"Aave ヘルスチェックエラー: {exc}"],
+                alerts=["Aave ヘルスチェックエラー（詳細はログ参照）"],
             )
 
         return ProtocolHealth(

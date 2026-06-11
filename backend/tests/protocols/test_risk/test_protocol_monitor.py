@@ -112,6 +112,41 @@ class TestCheckAaveHealth:
         assert "緊急停止水準" in result.alerts[0]
 
     @pytest.mark.asyncio
+    async def test_aave_health_boundary_hf_exactly_1_6_is_high(
+        self,
+        mock_lido_client: AsyncMock,
+        mock_pendle_client: AsyncMock,
+        mock_monitoring_service: MagicMock,
+        mock_aave_client: Mock,
+    ) -> None:
+        """HF=1.6 ちょうど（< 1.6 ではない）のとき CRITICAL ではなく HIGH。"""
+        mock_monitoring_service.get_status.return_value.last_health_factor = Decimal("1.6")
+        monitor = _build_aave_monitor(
+            mock_lido_client, mock_pendle_client, mock_monitoring_service, mock_aave_client
+        )
+        result = await monitor.check_aave_health()
+        assert result.risk_level == RiskLevel.HIGH
+        assert len(result.alerts) == 1
+        assert "警告水準" in result.alerts[0]
+
+    @pytest.mark.asyncio
+    async def test_aave_health_boundary_hf_exactly_1_8_is_low(
+        self,
+        mock_lido_client: AsyncMock,
+        mock_pendle_client: AsyncMock,
+        mock_monitoring_service: MagicMock,
+        mock_aave_client: Mock,
+    ) -> None:
+        """HF=1.8 ちょうど（< 1.8 ではない）のとき HIGH ではなく LOW + アラートなし。"""
+        mock_monitoring_service.get_status.return_value.last_health_factor = Decimal("1.8")
+        monitor = _build_aave_monitor(
+            mock_lido_client, mock_pendle_client, mock_monitoring_service, mock_aave_client
+        )
+        result = await monitor.check_aave_health()
+        assert result.risk_level == RiskLevel.LOW
+        assert result.alerts == []
+
+    @pytest.mark.asyncio
     async def test_aave_health_low_risk_hf_none_and_inf(
         self,
         mock_lido_client: AsyncMock,
@@ -165,7 +200,9 @@ class TestCheckAaveHealth:
         mock_aave_client: Mock,
     ) -> None:
         """monitoring 例外時は raise せず CRITICAL / is_operational=False を返す。"""
-        mock_monitoring_service.get_status.side_effect = RuntimeError("monitoring down")
+        mock_monitoring_service.get_status.side_effect = RuntimeError(
+            "https://rpc.example/v2/secret-api-key"
+        )
         monitor = _build_aave_monitor(
             mock_lido_client, mock_pendle_client, mock_monitoring_service, mock_aave_client
         )
@@ -173,8 +210,10 @@ class TestCheckAaveHealth:
         assert result.risk_level == RiskLevel.CRITICAL
         assert result.is_operational is False
         assert result.tvl_usd == Decimal("0")
-        assert len(result.alerts) == 1
-        assert "Aave ヘルスチェックエラー" in result.alerts[0]
+        # Security Rule 8: alerts は無認証 API で外部露出されるため固定文言のみ。
+        # 例外詳細 (RPC URL / APIキー等) が漏れていないことを検証する。
+        assert result.alerts == ["Aave ヘルスチェックエラー（詳細はログ参照）"]
+        assert "secret-api-key" not in result.alerts[0]
 
     @pytest.mark.asyncio
     async def test_aave_health_fail_open_on_aave_client_error(
