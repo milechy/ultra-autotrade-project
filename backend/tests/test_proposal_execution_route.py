@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session, sessionmaker
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-exec-route")
 os.environ.setdefault("INITIAL_ADMIN_EMAIL", "exec_route_admin@example.com")
 
+from app.auth.models import User as UserModel  # noqa: E402
 from app.database import Base  # noqa: E402
 from app.proposals.execution_route import (  # noqa: E402
     DEFAULT_EXECUTION_ROUTE,
@@ -53,6 +54,21 @@ def db_session() -> Generator[Session, None, None]:
         db.close()
     Base.metadata.drop_all(bind=engine)
     os.unlink(path)
+
+
+def _make_user_with_wallet(db: Session, *, user_id: int, wallet_address: str = "") -> UserModel:
+    """テスト用 User を wallet_address 付きで作成する。Layer 1 NULL wallet guard を通過させるために使用。"""
+    wallet = wallet_address or ("0x" + f"{user_id:02x}" * 20)
+    u = UserModel(
+        id=user_id,
+        email=f"user{user_id}@test.example",
+        username=f"testuser{user_id}",
+        hashed_password="hashed_for_test",
+        wallet_address=wallet[:42],
+    )
+    db.add(u)
+    db.commit()
+    return u
 
 
 def _make_proposal(
@@ -230,6 +246,8 @@ def test_onchain_execution_links_proposal_id_to_tx_hash(db_session: Session) -> 
     """on-chain 経路の正常執行: proposal_id ↔ tx_hash が DB に紐付く。"""
     from app.proposals.router import _execute_aave_for_proposal
 
+    # Layer 1 NULL wallet guard を通過させるために wallet_address 付きユーザーを作成
+    _make_user_with_wallet(db_session, user_id=1, wallet_address="0x" + "ab" * 20)
     p = _make_proposal(db_session, execution_route=ExecutionRoute.ONCHAIN_AAVE.value)
     fake_result = MagicMock()
     fake_result.tx_hash = "0x" + "ab" * 32
@@ -255,6 +273,9 @@ def test_onchain_partners_not_mixed(db_session: Session) -> None:
     """他 partner の tx と非混在: 各 proposal の tx_hash は own proposal_id に紐付く。"""
     from app.proposals.router import _execute_aave_for_proposal
 
+    # Layer 1 NULL wallet guard を通過させるために wallet_address 付きユーザーを作成
+    _make_user_with_wallet(db_session, user_id=11, wallet_address="0x" + "11" * 20)
+    _make_user_with_wallet(db_session, user_id=22, wallet_address="0x" + "22" * 20)
     p1 = _make_proposal(db_session, user_id=11, execution_route=ExecutionRoute.ONCHAIN_AAVE.value)
     p2 = _make_proposal(db_session, user_id=22, execution_route=ExecutionRoute.ONCHAIN_AAVE.value)
 
