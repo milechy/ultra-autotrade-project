@@ -5,6 +5,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useLiff } from "@/hooks/useLiff";
 import { ChatHeader } from "./_components/ChatHeader";
 import { ProposalBubble, type Proposal } from "./_components/ProposalBubble";
@@ -25,6 +26,7 @@ type SystemMsg = { id: string; text: string };
 
 export default function LiffApprovePage() {
   const { isReady, error, liffConfigured } = useLiff();
+  const t = useTranslations("Liff.approve");
   const token =
     typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
 
@@ -72,9 +74,9 @@ export default function LiffApprovePage() {
           }
         }),
     ])
-      .catch(() => setFetchError("データ取得に失敗しました"))
+      .catch(() => setFetchError(t("fetchError")))
       .finally(() => setLoading(false));
-  }, [isReady, token]);
+  }, [isReady, token, t]);
 
   // scroll to bottom when proposal appears
   useEffect(() => {
@@ -103,7 +105,7 @@ export default function LiffApprovePage() {
         }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      addSystemMsg("却下しました");
+      addSystemMsg(t("rejected"));
       setActionState("done");
       setProposal(null);
     } catch {
@@ -113,7 +115,7 @@ export default function LiffApprovePage() {
 
   function handleApproved(_txHash: string) {
     setSheetOpen(false);
-    addSystemMsg("承認しました ✓");
+    addSystemMsg(t("approved"));
     setActionState("done");
     setProposal(null);
   }
@@ -130,7 +132,7 @@ export default function LiffApprovePage() {
   if (!isReady) {
     return (
       <div className="flex items-center justify-center min-h-dvh bg-zinc-950">
-        <p className="text-zinc-400 text-sm">読み込み中...</p>
+        <p className="text-zinc-400 text-sm">{t("loading")}</p>
       </div>
     );
   }
@@ -140,7 +142,7 @@ export default function LiffApprovePage() {
     return (
       <div className="flex items-center justify-center min-h-dvh bg-zinc-950 px-4">
         <p className="text-red-400 text-sm text-center">
-          LIFF初期化エラー: {error}
+          {t("liffInitError", { error })}
         </p>
       </div>
     );
@@ -156,7 +158,7 @@ export default function LiffApprovePage() {
       }
       return (
         <div className="flex items-center justify-center min-h-dvh bg-zinc-950 px-4">
-          <p className="text-zinc-400 text-sm">再認証中...</p>
+          <p className="text-zinc-400 text-sm">{t("reauthing")}</p>
         </div>
       );
     }
@@ -185,7 +187,7 @@ export default function LiffApprovePage() {
                     onClick={() => window.location.reload()}
                     className="text-xs text-zinc-400 underline"
                   >
-                    再試行
+                    {t("retry")}
                   </button>
                 </div>
               </div>
@@ -225,7 +227,7 @@ export default function LiffApprovePage() {
                 <ProposalBubble proposal={proposal} />
                 {extraCount > 0 && (
                   <p className="text-xs text-zinc-500 text-center mt-1 mb-2">
-                    他に {extraCount} 件の提案があります →
+                    {t("extraProposals", { count: extraCount })}
                   </p>
                 )}
               </>
@@ -237,7 +239,7 @@ export default function LiffApprovePage() {
               !fetchError &&
               !loading && (
                 <div className="flex flex-col items-center justify-center py-16 text-zinc-600">
-                  <p className="text-sm">提案を待っています...</p>
+                  <p className="text-sm">{t("waitingProposal")}</p>
                 </div>
               )}
 

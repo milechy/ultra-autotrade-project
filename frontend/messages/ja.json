@@ -891,6 +891,109 @@
       "termsSub": "利用規約・プライバシーポリシー",
       "footer": "UAT App v1.0 | © 2026 UAT Co., Ltd."
     },
+    "confirm": {
+      "title": "重要事項の確認",
+      "subtitle": "運用開始前に以下をご確認ください",
+      "progressLabel": "確認状況",
+      "confirmedBtn": "確認しました",
+      "termsLink": "利用規約",
+      "privacyLink": "プライバシーポリシー",
+      "submitBtn": "運用を開始する",
+      "submitting": "保存中...",
+      "items": {
+        "self_custody": {
+          "title": "資産はユーザー自身が管理します",
+          "detail": "本サービスはノンカストディアル型です。お客様のウォレット秘密鍵は弊社サーバーに保存されません。ウォレットおよびLINEアカウントの管理責任はお客様ご自身にあります。"
+        },
+        "defi_risk": {
+          "title": "DeFi運用にはリスクがあります",
+          "detail": "スマートコントラクトのリスク、価格変動リスク、流動性リスク、清算リスクが存在します。元本を失う可能性があります。本サービスは投資助言ではなく、運用はすべて自己責任となります。"
+        },
+        "user_responsibility": {
+          "title": "アカウント管理は利用者自身の責任です",
+          "detail": "LINEアカウントの管理、不正アクセスへの対応はユーザーご自身の責任となります。弊社はアカウント損失・不正利用による損害に対して責任を負いません。"
+        },
+        "age_confirm": {
+          "title": "18歳以上であることを確認します",
+          "detail": "本サービスのご利用には18歳以上であることが必要です。18歳未満の方はご利用いただけません。"
+        }
+      }
+    },
+    "history": {
+      "headerTitle": "会話履歴",
+      "headerSubtitle": "UAT AI とのチャット記録",
+      "backAriaLabel": "戻る",
+      "loading": "読み込み中...",
+      "fetchError": "データ取得に失敗しました",
+      "empty": "会話履歴がありません",
+      "loadMore": "もっと見る",
+      "loadingMore": "読み込み中...",
+      "liffInitError": "LIFF初期化エラー: {error}",
+      "reauthing": "再認証中..."
+    },
+    "approve": {
+      "loading": "読み込み中...",
+      "reauthing": "再認証中...",
+      "liffInitError": "LIFF初期化エラー: {error}",
+      "fetchError": "データ取得に失敗しました",
+      "retry": "再試行",
+      "rejected": "却下しました",
+      "approved": "承認しました ✓",
+      "extraProposals": "他に {count} 件の提案があります →",
+      "waitingProposal": "提案を待っています...",
+      "header": {
+        "assistantSubtitle": "自動売買アシスタント",
+        "backAriaLabel": "戻る",
+        "historyAriaLabel": "履歴",
+        "running": "稼働中",
+        "paused": "一時停止",
+        "stopped": "停止中"
+      },
+      "actionBar": {
+        "newWaiting": "新しい提案を待っています",
+        "waiting": "提案を待っています...",
+        "reject": "却下する",
+        "rejecting": "却下中...",
+        "approve": "承認する ✓",
+        "approving": "承認中..."
+      },
+      "rejectConfirm": {
+        "prompt": "本当に却下しますか？",
+        "yes": "はい",
+        "no": "いいえ"
+      },
+      "decisionHistory": {
+        "approved": "承認済",
+        "rejected": "却下"
+      },
+      "proposalBubble": {
+        "confidence": "信頼度",
+        "collapse": "閉じる",
+        "expand": "続きを見る",
+        "hfAfter": "実行後 HF:",
+        "gasEstimate": "ガス概算:",
+        "totalWithGas": "合計（ガス込み）:"
+      },
+      "confirmSheet": {
+        "title": "この提案を承認しますか？",
+        "operation": "操作",
+        "supply": "Supply (入金)",
+        "withdraw": "Withdraw (出金)",
+        "amount": "金額",
+        "hfAfter": "実行後 Health Factor",
+        "gasEstimate": "ガス概算",
+        "processing": "処理中...",
+        "approved": "承認済み ✓",
+        "signApprove": "署名して承認",
+        "cancel": "キャンセル",
+        "cannotSign": "署名できない場合は",
+        "approveInBrowser": "ブラウザで承認する →",
+        "revertError": "approve トランザクションが revert しました。残高・ガス代を確認してください。",
+        "unsupportedOperation": "未対応の operation: {operation}",
+        "signFailed": "署名処理に失敗しました",
+        "signCanceled": "署名がキャンセルされました"
+      }
+    },
     "chat": {
       "panelTitle": "UAT AI",
       "onlineStatus": "オンライン",

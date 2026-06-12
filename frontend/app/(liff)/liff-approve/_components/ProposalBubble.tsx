@@ -3,6 +3,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { ArrowUp, ArrowDown } from "lucide-react";
 
 export type Proposal = {
@@ -25,6 +26,7 @@ interface ProposalBubbleProps {
 }
 
 export function ProposalBubble({ proposal }: ProposalBubbleProps) {
+  const t = useTranslations("Liff.approve.proposalBubble");
   const [expanded, setExpanded] = useState(false);
 
   const timeStr = new Date(proposal.created_at).toLocaleTimeString("ja-JP", {
@@ -93,7 +95,7 @@ export function ProposalBubble({ proposal }: ProposalBubbleProps) {
         {/* confidence bar */}
         <div className="space-y-1">
           <div className="flex justify-between text-xs">
-            <span className="text-zinc-500">信頼度</span>
+            <span className="text-zinc-500">{t("confidence")}</span>
             <span className={proposal.confidence >= 70 ? "text-green-400" : "text-blue-400"}>
               {proposal.confidence}%
             </span>
@@ -116,7 +118,7 @@ export function ProposalBubble({ proposal }: ProposalBubbleProps) {
               onClick={() => setExpanded((v) => !v)}
               className="text-xs text-zinc-500 underline mt-0.5"
             >
-              {expanded ? "閉じる" : "続きを見る"}
+              {expanded ? t("collapse") : t("expand")}
             </button>
           )}
         </div>
@@ -124,7 +126,7 @@ export function ProposalBubble({ proposal }: ProposalBubbleProps) {
         {/* HF delta */}
         {proposal.expected_hf_after && (
           <p className="text-xs text-zinc-500">
-            実行後 HF:{" "}
+            {t("hfAfter")}{" "}
             {proposal.current_hf && (
               <span>{Number(proposal.current_hf).toFixed(2)} → </span>
             )}
@@ -142,9 +144,9 @@ export function ProposalBubble({ proposal }: ProposalBubbleProps) {
         {/* gas + total */}
         {gasUsd && (
           <div className="space-y-0.5">
-            <p className="text-xs text-zinc-600">ガス概算: {gasUsd}</p>
+            <p className="text-xs text-zinc-600">{t("gasEstimate")} {gasUsd}</p>
             {totalUsd && (
-              <p className="text-xs text-zinc-400 font-medium">合計（ガス込み）: {totalUsd}</p>
+              <p className="text-xs text-zinc-400 font-medium">{t("totalWithGas")} {totalUsd}</p>
             )}
           </div>
         )}

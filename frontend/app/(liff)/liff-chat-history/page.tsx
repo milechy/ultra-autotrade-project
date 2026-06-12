@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ChevronLeft } from "lucide-react";
 import { useLiff } from "@/hooks/useLiff";
 import { getAuthToken } from "@/lib/auth/token-key";
@@ -28,6 +29,7 @@ type ChatHistoryResponse = {
 
 export default function LiffChatHistoryPage() {
   const router = useRouter();
+  const t = useTranslations("Liff.history");
   const { isReady, error, liffConfigured } = useLiff();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -59,7 +61,7 @@ export default function LiffChatHistoryPage() {
       setHasMore(data.has_more);
     } catch (err: unknown) {
       setFetchError(
-        err instanceof Error ? err.message : "データ取得に失敗しました"
+        err instanceof Error ? err.message : t("fetchError")
       );
     }
   };
@@ -85,7 +87,7 @@ export default function LiffChatHistoryPage() {
   if (!isReady) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-zinc-950">
-        <p className="text-zinc-400 text-sm">読み込み中...</p>
+        <p className="text-zinc-400 text-sm">{t("loading")}</p>
       </div>
     );
   }
@@ -95,7 +97,7 @@ export default function LiffChatHistoryPage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
         <p className="text-red-400 text-sm text-center">
-          LIFF初期化エラー: {error}
+          {t("liffInitError", { error })}
         </p>
       </div>
     );
@@ -109,7 +111,7 @@ export default function LiffChatHistoryPage() {
       }
       return (
         <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
-          <p className="text-zinc-400 text-sm">再認証中...</p>
+          <p className="text-zinc-400 text-sm">{t("reauthing")}</p>
         </div>
       );
     }
@@ -123,31 +125,31 @@ export default function LiffChatHistoryPage() {
         <button
           onClick={() => router.back()}
           className="text-white mr-3 p-0.5 hover:bg-white/10 rounded transition-colors"
-          aria-label="戻る"
+          aria-label={t("backAriaLabel")}
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 min-w-0">
-          <div className="text-white font-semibold text-base leading-none">会話履歴</div>
-          <div className="text-zinc-400 text-xs mt-0.5">UAT AI とのチャット記録</div>
+          <div className="text-white font-semibold text-base leading-none">{t("headerTitle")}</div>
+          <div className="text-zinc-400 text-xs mt-0.5">{t("headerSubtitle")}</div>
         </div>
       </div>
 
       <div className="px-4 py-6">
 
       {loading && (
-        <p className="text-zinc-400 text-sm text-center py-8">読み込み中...</p>
+        <p className="text-zinc-400 text-sm text-center py-8">{t("loading")}</p>
       )}
 
       {fetchError && (
         <p className="text-red-400 text-sm text-center py-8">
-          データ取得に失敗しました
+          {t("fetchError")}
         </p>
       )}
 
       {!loading && !fetchError && messages.length === 0 && (
         <p className="text-zinc-400 text-sm text-center py-8">
-          会話履歴がありません
+          {t("empty")}
         </p>
       )}
 
@@ -195,7 +197,7 @@ export default function LiffChatHistoryPage() {
             className="text-sm text-zinc-400 border border-zinc-700 rounded-lg px-4 py-2
                        hover:text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-50"
           >
-            {loadingMore ? "読み込み中..." : "もっと見る"}
+            {loadingMore ? t("loadingMore") : t("loadMore")}
           </button>
         </div>
       )}

@@ -3,6 +3,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Check, X, ArrowUp, ArrowDown } from "lucide-react";
 
 export type DecisionHistoryEntry = {
@@ -19,6 +20,7 @@ interface DecisionHistoryItemProps {
 
 export function DecisionHistoryItem({ item }: DecisionHistoryItemProps) {
   const router = useRouter();
+  const t = useTranslations("Liff.approve.decisionHistory");
 
   const dateStr = new Date(item.created_at).toLocaleDateString("ja-JP", {
     month: "2-digit",
@@ -50,11 +52,11 @@ export function DecisionHistoryItem({ item }: DecisionHistoryItemProps) {
       <div className="flex-1" />
       {item.agreed ? (
         <span className="flex items-center gap-0.5 text-xs text-green-500 shrink-0">
-          <Check className="h-3 w-3" /> 承認済
+          <Check className="h-3 w-3" /> {t("approved")}
         </span>
       ) : (
         <span className="flex items-center gap-0.5 text-xs text-red-400 shrink-0">
-          <X className="h-3 w-3" /> 却下
+          <X className="h-3 w-3" /> {t("rejected")}
         </span>
       )}
       <span className="text-xs text-zinc-600 shrink-0 ml-2">{dateStr}</span>
