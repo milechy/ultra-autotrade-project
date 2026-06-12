@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { executeGridBot, fetchGridStatus } from "@/lib/api/exchange";
@@ -10,7 +11,9 @@ import type { GridStatusResponse, GridConfigRequest } from "@/lib/api/exchange";
 
 const SYMBOLS = ["BTC/USDT", "ETH/USDT"] as const;
 
-function GridVisualization({ gridStatus }: { gridStatus: GridStatusResponse }) {
+type TFunction = ReturnType<typeof useTranslations>;
+
+function GridVisualization({ gridStatus, t }: { gridStatus: GridStatusResponse; t: TFunction }) {
   const upper = parseFloat(gridStatus.upper_price);
   const lower = parseFloat(gridStatus.lower_price);
   const current = gridStatus.current_price ? parseFloat(gridStatus.current_price) : null;
@@ -19,7 +22,7 @@ function GridVisualization({ gridStatus }: { gridStatus: GridStatusResponse }) {
   if (range <= 0 || gridStatus.levels.length === 0) {
     return (
       <div style={{ color: "#9ca3af", fontSize: 13, padding: "16px 0" }}>
-        グリッドレベルがありません
+        {t("noGridLevels")}
       </div>
     );
   }
@@ -33,8 +36,8 @@ function GridVisualization({ gridStatus }: { gridStatus: GridStatusResponse }) {
     <div style={{ position: "relative", width: "100%", maxWidth: 480 }}>
       {/* Price axis labels */}
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 11, color: "#666" }}>
-        <span>上限: ${upper.toLocaleString()}</span>
-        <span>下限: ${lower.toLocaleString()}</span>
+        <span>{t("upperLabel")}: ${upper.toLocaleString()}</span>
+        <span>{t("lowerLabel")}: ${lower.toLocaleString()}</span>
       </div>
 
       {/* Grid levels container */}
@@ -86,10 +89,10 @@ function GridVisualization({ gridStatus }: { gridStatus: GridStatusResponse }) {
                 {isBuy ? "BUY" : "SELL"}
               </span>
               {level.filled && (
-                <span style={{ fontSize: 11, color: "#374151", fontWeight: 600 }}>✓ 約定</span>
+                <span style={{ fontSize: 11, color: "#374151", fontWeight: 600 }}>✓ {t("filled")}</span>
               )}
               {isCurrent && (
-                <span style={{ fontSize: 11, color: "#d97706", fontWeight: 700 }}>← 現在値</span>
+                <span style={{ fontSize: 11, color: "#d97706", fontWeight: 700 }}>{t("currentPriceIndicator")}</span>
               )}
             </div>
           );
@@ -99,7 +102,7 @@ function GridVisualization({ gridStatus }: { gridStatus: GridStatusResponse }) {
       {/* Current price overlay label */}
       {current != null && (
         <div style={{ marginTop: 8, fontSize: 13, color: "#d97706", fontWeight: 600 }}>
-          現在価格: ${current.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {t("currentPriceLabel")}: ${current.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       )}
     </div>
@@ -108,6 +111,7 @@ function GridVisualization({ gridStatus }: { gridStatus: GridStatusResponse }) {
 
 function GridContent() {
   const { token } = useAuth();
+  const t = useTranslations("Grid");
 
   const [upperPrice, setUpperPrice] = useState("");
   const [lowerPrice, setLowerPrice] = useState("");
@@ -124,13 +128,13 @@ function GridContent() {
   const handleExecute = useCallback(async () => {
     if (!token) return;
     if (!upperPrice || !lowerPrice || !amountPerGrid) {
-      setError("上限価格・下限価格・各グリッド金額を入力してください");
+      setError(t("errInputRequired"));
       return;
     }
     const upper = parseFloat(upperPrice);
     const lower = parseFloat(lowerPrice);
     if (isNaN(upper) || isNaN(lower) || upper <= lower) {
-      setError("上限価格は下限価格より大きい値を入力してください");
+      setError(t("errUpperLower"));
       return;
     }
     setIsExecuting(true);
@@ -149,11 +153,11 @@ function GridContent() {
       setGridStatus(result);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(`Bot起動エラー: ${msg}`);
+      setError(t("botStartError", { msg }));
     } finally {
       setIsExecuting(false);
     }
-  }, [token, upperPrice, lowerPrice, gridCount, symbol, amountPerGrid, dryRun]);
+  }, [token, upperPrice, lowerPrice, gridCount, symbol, amountPerGrid, dryRun, t]);
 
   const handleFetchStatus = useCallback(async () => {
     if (!token) return;
@@ -164,11 +168,11 @@ function GridContent() {
       setGridStatus(result);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(`ステータス取得エラー: ${msg}`);
+      setError(t("statusFetchError", { msg }));
     } finally {
       setIsFetchingStatus(false);
     }
-  }, [token]);
+  }, [token, t]);
 
   const pnl = gridStatus ? parseFloat(gridStatus.pnl_usd) : null;
 
@@ -178,7 +182,7 @@ function GridContent() {
       <div style={{ marginBottom: 8 }}>
         <h1 style={{ margin: 0 }}>Grid Trading Bot</h1>
         <p style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
-          グリッド間隔で自動売買を行うボット設定
+          {t("subtitle")}
         </p>
       </div>
 
@@ -190,18 +194,18 @@ function GridContent() {
 
       {/* 設定フォーム */}
       <section style={{ marginTop: 16 }}>
-        <h2 style={{ fontSize: 16, marginBottom: 12 }}>グリッド設定</h2>
+        <h2 style={{ fontSize: 16, marginBottom: 12 }}>{t("gridSettings")}</h2>
         <div style={{ ...cardStyle, maxWidth: 520 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
             {/* 上限価格 */}
             <div>
-              <label style={labelStyle}>上限価格 (USD)</label>
+              <label style={labelStyle}>{t("upperPriceLabel")}</label>
               <input
                 type="number"
                 value={upperPrice}
                 onChange={(e) => setUpperPrice(e.target.value)}
-                placeholder="例: 50000"
+                placeholder={t("upperPricePlaceholder")}
                 style={inputStyle}
                 disabled
               />
@@ -209,12 +213,12 @@ function GridContent() {
 
             {/* 下限価格 */}
             <div>
-              <label style={labelStyle}>下限価格 (USD)</label>
+              <label style={labelStyle}>{t("lowerPriceLabel")}</label>
               <input
                 type="number"
                 value={lowerPrice}
                 onChange={(e) => setLowerPrice(e.target.value)}
-                placeholder="例: 40000"
+                placeholder={t("lowerPricePlaceholder")}
                 style={inputStyle}
                 disabled
               />
@@ -222,7 +226,7 @@ function GridContent() {
 
             {/* グリッド数 */}
             <div>
-              <label style={labelStyle}>グリッド数（2〜100）</label>
+              <label style={labelStyle}>{t("gridCountLabel")}</label>
               <input
                 type="number"
                 value={gridCount}
@@ -236,7 +240,7 @@ function GridContent() {
 
             {/* シンボル */}
             <div>
-              <label style={labelStyle}>取引ペア</label>
+              <label style={labelStyle}>{t("symbolLabel")}</label>
               <select
                 value={symbol}
                 onChange={(e) => setSymbol(e.target.value)}
@@ -251,12 +255,12 @@ function GridContent() {
 
             {/* 各グリッド金額 */}
             <div style={{ gridColumn: "1 / -1" }}>
-              <label style={labelStyle}>各グリッド金額 (USD)</label>
+              <label style={labelStyle}>{t("amountPerGridLabel")}</label>
               <input
                 type="number"
                 value={amountPerGrid}
                 onChange={(e) => setAmountPerGrid(e.target.value)}
-                placeholder="例: 100"
+                placeholder={t("amountPerGridPlaceholder")}
                 style={inputStyle}
                 disabled
               />
@@ -274,7 +278,7 @@ function GridContent() {
               disabled
             />
             <label htmlFor="dry-run-toggle" style={{ fontSize: 14, color: "#374151", cursor: "pointer" }}>
-              ドライランモード（実際の注文は発行しない）
+              {t("dryRunLabel")}
             </label>
           </div>
 
@@ -288,7 +292,7 @@ function GridContent() {
               fontSize: 13,
               color: "#92400e",
             }}>
-              ドライランモードが有効です。実際の注文は発行されません。
+              {t("dryRunActive")}
             </div>
           )}
         </div>
@@ -311,7 +315,7 @@ function GridContent() {
               cursor: "not-allowed",
             }}
           >
-            {isExecuting ? "起動中..." : "Bot起動"}
+            {isExecuting ? t("starting") : t("startBot")}
           </button>
           <button
             onClick={handleFetchStatus}
@@ -327,7 +331,7 @@ function GridContent() {
               cursor: "not-allowed",
             }}
           >
-            {isFetchingStatus ? "取得中..." : "ステータス取得"}
+            {isFetchingStatus ? t("fetching") : t("fetchStatus")}
           </button>
         </div>
       </section>
@@ -336,12 +340,12 @@ function GridContent() {
       {gridStatus && (
         <>
           <section style={{ marginTop: 32 }}>
-            <h2 style={{ fontSize: 16, marginBottom: 12 }}>Bot ステータス</h2>
+            <h2 style={{ fontSize: 16, marginBottom: 12 }}>{t("botStatus")}</h2>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
 
               {/* 稼働状態カード */}
               <div style={cardStyle}>
-                <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>稼働状態</div>
+                <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{t("operationStatus")}</div>
                 <span style={{
                   display: "inline-block",
                   padding: "4px 14px",
@@ -351,7 +355,7 @@ function GridContent() {
                   background: gridStatus.enabled ? "#dcfce7" : "#f3f4f6",
                   color: gridStatus.enabled ? "#16a34a" : "#374151",
                 }}>
-                  {gridStatus.enabled ? "稼働中" : "停止中"}
+                  {gridStatus.enabled ? t("running") : t("stopped")}
                 </span>
                 <div style={{ marginTop: 8, fontSize: 13, color: "#666" }}>
                   {gridStatus.symbol}
@@ -360,19 +364,19 @@ function GridContent() {
 
               {/* 注文統計カード */}
               <div style={cardStyle}>
-                <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>注文統計</div>
+                <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{t("orderStats")}</div>
                 <div style={{ fontSize: 28, fontWeight: 700, color: "#111" }}>
                   {gridStatus.filled_orders}
                   <span style={{ fontSize: 16, color: "#666", fontWeight: 400 }}>
                     {" "}/ {gridStatus.total_orders}
                   </span>
                 </div>
-                <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>約定済み / 総注文数</div>
+                <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>{t("filledOrders")}</div>
               </div>
 
               {/* PnL カード */}
               <div style={cardStyle}>
-                <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>損益 (USD)</div>
+                <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{t("pnl")}</div>
                 <div style={{
                   fontSize: 32,
                   fontWeight: 700,
@@ -386,8 +390,8 @@ function GridContent() {
 
           {/* グリッドビジュアライゼーション */}
           <section style={{ marginTop: 32 }}>
-            <h2 style={{ fontSize: 16, marginBottom: 12 }}>グリッドビジュアライゼーション</h2>
-            <GridVisualization gridStatus={gridStatus} />
+            <h2 style={{ fontSize: 16, marginBottom: 12 }}>{t("gridVisualization")}</h2>
+            <GridVisualization gridStatus={gridStatus} t={t} />
           </section>
         </>
       )}
@@ -396,6 +400,7 @@ function GridContent() {
 }
 
 export default function GridPage() {
+  const t = useTranslations("Grid");
   return (
     <AuthGuard>
       <>
@@ -405,7 +410,7 @@ export default function GridPage() {
           <div className="absolute inset-0 bg-white dark:bg-gray-900/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center rounded-lg">
             <div className="text-center">
               <p className="text-2xl font-bold text-gray-700 mb-2">Coming Soon</p>
-              <p className="text-gray-500">Phase 2で対応予定</p>
+              <p className="text-gray-500">{t("comingSoon")}</p>
             </div>
           </div>
           <div className="pointer-events-none select-none">
