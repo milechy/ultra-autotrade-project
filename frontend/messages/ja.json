@@ -1037,5 +1037,90 @@
     "goToDashboard": "ダッシュボードへ",
     "fundError": "入金処理中にエラーが発生しました。もう一度お試しください。",
     "footerNote": "入金はPrivyの入金アドレス経由で処理され、別チェーンの USDC は自動でブリッジされます。ネットワーク・ブリッジ手数料がかかる場合があります。"
+  },
+  "WalletOnboarding": {
+    "headerTitle": "はじめに",
+    "headerSubtitle": "Ultra AutoTradeで資産運用を始めるための4つのステップ",
+    "prevBtn": "← 前のステップ",
+    "nextBtn": "次のステップ →",
+    "stepBadge": "STEP {id}",
+    "steps": {
+      "wallet": {
+        "title": "ウォレットを準備する",
+        "description": "MetaMaskをインストールして、ウォレットを作成します。",
+        "tip": "MetaMaskの代わりにRabby WalletやCoinbase Walletも使えます。",
+        "details": {
+          "metamask": "MetaMask公式サイトにアクセス",
+          "chrome": "Chrome拡張機能をインストール",
+          "create": "「新しいウォレットを作成」を選択",
+          "password": "パスワードを設定（強力なものを使用）",
+          "seed": "シードフレーズを安全な場所に保管"
+        },
+        "seedWarning": "シードフレーズは絶対に誰にも教えないでください"
+      },
+      "network": {
+        "title": "ネットワークを追加する",
+        "description": "Base Sepoliaネットワークをウォレットに追加します。",
+        "tip": "ChainListを使うと、ネットワーク情報を手入力する必要がありません。",
+        "details": {
+          "chainlist": "ChainListにアクセス",
+          "search": "「Base Sepolia」を検索して「Add to MetaMask」をクリック",
+          "approve": "MetaMaskのポップアップで「承認」を選択",
+          "confirm": "MetaMaskの上部ネットワーク欄が「Base Sepolia」になっていることを確認"
+        }
+      },
+      "testEth": {
+        "title": "テスト用ETHを入手する",
+        "description": "ガス代用のテストETH（SepoliaETH）をウォレットに送金します。",
+        "tip": "テストネットのため、実際の資産は不要です。フォーセットから無料でテストETHが取得できます。",
+        "details": {
+          "faucet": "Coinbase Faucetにアクセス",
+          "input": "ウォレットアドレスを入力してテストETHを受け取る",
+          "confirm": "MetaMaskに「Base Sepolia ETH」が届いたことを確認"
+        }
+      },
+      "connect": {
+        "title": "Ultra AutoTradeに接続する",
+        "description": "ウォレットをUltra AutoTradeに接続して運用を開始します。",
+        "tip": "接続はウォレットアドレスの読み取りのみです。当社が秘密鍵を聞くことは一切ありません。",
+        "details": {
+          "login": "Ultra AutoTradeにログイン",
+          "click": "「ウォレット接続」ボタンをクリック",
+          "approve": "MetaMaskのポップアップで接続を承認",
+          "sign": "AIの提案を確認し、実行する場合は署名して承認"
+        }
+      }
+    },
+    "safety": {
+      "title": "🛡️ あなたの資産を守る仕組み",
+      "nonCustodial": "ノンカストディアル",
+      "nonCustodialDesc": "— あなたの秘密鍵は当社が管理しません",
+      "signRequired": "署名が必須",
+      "signRequiredDesc": "— AIの提案を実行するにはあなたの承認が必要です",
+      "emergencyStop": "緊急停止",
+      "emergencyStopDesc": "— Health Factorが危険水準になると自動ブレーキが作動",
+      "fourAgents": "4つのAIエージェント",
+      "fourAgentsDesc": "— 市場・リスク・マクロ・行動パターンを常時監視"
+    },
+    "faq": {
+      "title": "よくある質問",
+      "minAmount": {
+        "q": "最低いくらから始められますか？",
+        "a": "最低金額の制限はありませんが、ガス代を考慮すると100 USDC以上を推奨します。少額だとガス代の比率が高くなり、利回りが相殺される可能性があります。"
+      },
+      "lossRisk": {
+        "q": "損失のリスクはありますか？",
+        "a": "はい。暗号資産のDeFi運用には元本を失うリスクがあります。AIが最適な判断を支援しますが、市場リスク・スマートコントラクトリスク・清算リスクなどがあります。詳しくはリスク開示書をお読みください。"
+      },
+      "aiAutoTrade": {
+        "q": "AIが勝手に取引しますか？",
+        "a": "いいえ。AIは「提案」するだけです。実際の預け入れ・引き出しには、必ずあなたのMetaMaskでの署名（承認）が必要です。署名しない限り資産は動きません。"
+      },
+      "howToStop": {
+        "q": "やめたいときはどうすればいいですか？",
+        "a": "いつでも資産をAaveから引き出せます。Ultra AutoTradeを解除した後も、資産はあなたのウォレットに残ります。引き出しに必要なのはガス代のみです。"
+      }
+    },
+    "ctaBtn": "ウォレットを接続して始める →"
   }
 }

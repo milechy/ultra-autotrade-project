@@ -1037,5 +1037,90 @@
     "goToDashboard": "Go to Dashboard",
     "fundError": "An error occurred during the deposit process. Please try again.",
     "footerNote": "Deposits are processed via Privy's deposit address. USDC from other chains is automatically bridged. Network and bridge fees may apply."
+  },
+  "WalletOnboarding": {
+    "headerTitle": "Get Started",
+    "headerSubtitle": "Four steps to start managing assets with Ultra AutoTrade",
+    "prevBtn": "← Previous step",
+    "nextBtn": "Next step →",
+    "stepBadge": "STEP {id}",
+    "steps": {
+      "wallet": {
+        "title": "Set Up Your Wallet",
+        "description": "Install MetaMask and create your wallet.",
+        "tip": "You can also use Rabby Wallet or Coinbase Wallet instead of MetaMask.",
+        "details": {
+          "metamask": "Go to the MetaMask official website",
+          "chrome": "Install the Chrome extension",
+          "create": "Select \"Create a new wallet\"",
+          "password": "Set a strong password",
+          "seed": "Store your seed phrase in a safe place"
+        },
+        "seedWarning": "Never share your seed phrase with anyone"
+      },
+      "network": {
+        "title": "Add the Network",
+        "description": "Add the Base Sepolia network to your wallet.",
+        "tip": "Using ChainList means you don't need to enter network details manually.",
+        "details": {
+          "chainlist": "Go to ChainList",
+          "search": "Search for \"Base Sepolia\" and click \"Add to MetaMask\"",
+          "approve": "Click \"Approve\" in the MetaMask popup",
+          "confirm": "Verify that your MetaMask shows \"Base Sepolia\" at the top"
+        }
+      },
+      "testEth": {
+        "title": "Get Test ETH",
+        "description": "Send test ETH (SepoliaETH) to your wallet for gas fees.",
+        "tip": "This is a testnet, so no real funds are needed. Get free test ETH from the faucet.",
+        "details": {
+          "faucet": "Go to Coinbase Faucet",
+          "input": "Enter your wallet address to receive test ETH",
+          "confirm": "Confirm that \"Base Sepolia ETH\" has arrived in MetaMask"
+        }
+      },
+      "connect": {
+        "title": "Connect to Ultra AutoTrade",
+        "description": "Connect your wallet to Ultra AutoTrade and start investing.",
+        "tip": "The connection only reads your wallet address. We never ask for your private key.",
+        "details": {
+          "login": "Log in to Ultra AutoTrade",
+          "click": "Click the \"Connect Wallet\" button",
+          "approve": "Approve the connection in the MetaMask popup",
+          "sign": "Review AI proposals and sign to approve when ready"
+        }
+      }
+    },
+    "safety": {
+      "title": "🛡️ How We Protect Your Assets",
+      "nonCustodial": "Non-custodial",
+      "nonCustodialDesc": "— We never hold your private key",
+      "signRequired": "Signature required",
+      "signRequiredDesc": "— Your approval is required to execute any AI proposal",
+      "emergencyStop": "Emergency stop",
+      "emergencyStopDesc": "— Automatic brake activates when Health Factor reaches a dangerous level",
+      "fourAgents": "Four AI agents",
+      "fourAgentsDesc": "— Continuously monitoring market, risk, macro, and behavioral patterns"
+    },
+    "faq": {
+      "title": "FAQ",
+      "minAmount": {
+        "q": "What is the minimum amount to start?",
+        "a": "There is no minimum, but we recommend at least 100 USDC to offset gas fees. With small amounts, gas costs can eat into returns."
+      },
+      "lossRisk": {
+        "q": "Is there a risk of loss?",
+        "a": "Yes. DeFi investing with crypto assets carries the risk of losing principal. AI helps optimize decisions, but market risk, smart contract risk, and liquidation risk exist. Please read the risk disclosure."
+      },
+      "aiAutoTrade": {
+        "q": "Does the AI trade automatically?",
+        "a": "No. The AI only makes \"proposals.\" Any deposit or withdrawal requires your signature (approval) in MetaMask. Assets never move without your sign-off."
+      },
+      "howToStop": {
+        "q": "How do I stop using the service?",
+        "a": "You can withdraw your assets from Aave at any time. Even after cancelling Ultra AutoTrade, your assets remain in your wallet. You only need gas fees to withdraw."
+      }
+    },
+    "ctaBtn": "Connect Wallet to Get Started →"
   }
 }
