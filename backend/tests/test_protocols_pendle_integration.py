@@ -15,17 +15,21 @@ DummyPendleClient / DummyLidoClient を用いて Router → Service → Client �
   6. /api/protocols/health/pendle          — ProtocolMonitor 正常パス
   7. 入力バリデーション (422)
   8. staging 環境での DummyClient 禁止ガード (500/503)
+  9. /api/protocols/pendle/positions       — ポジション一覧 (RBAC + Decimal 文字列化)
 
 注意: Phase 4 実機検証 (staging-new) は P0-1 fix (LIDO_SANDBOX=false in staging) 完了後。
 """
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
 
 # テスト対象 router
+from app.auth.dependencies import require_admin
 from app.protocols.pendle.router import router as pendle_router
 from app.protocols.risk.router import router as health_router
 
@@ -37,12 +41,24 @@ DUMMY_MARKET_ADDRESS = "0x" + "ab" * 20
 # ---------------------------------------------------------------------------
 
 
+def _admin_user() -> MagicMock:
+    u = MagicMock()
+    u.id = 1
+    u.role = "admin"
+    u.is_active = True
+    return u
+
+
 @pytest.fixture(scope="module")
 def pendle_app() -> FastAPI:
-    """Pendle 関連エンドポイントのみを持つ最小 FastAPI アプリ (DB 不要)。"""
+    """Pendle 関連エンドポイントのみを持つ最小 FastAPI アプリ (DB 不要)。
+
+    positions エンドポイントが require_admin を依存するため、admin override を注入済み。
+    """
     app = FastAPI()
     app.include_router(pendle_router)
     app.include_router(health_router)
+    app.dependency_overrides[require_admin] = lambda: _admin_user()
     return app
 
 
@@ -273,3 +289,95 @@ class TestEnvGuard:
         staging_client = TestClient(pendle_app, raise_server_exceptions=False)
         resp = staging_client.get("/api/protocols/pendle/markets")
         assert resp.status_code in (500, 503)
+
+
+# ---------------------------------------------------------------------------
+# 9. ポジション一覧 GET /api/protocols/pendle/positions
+# ---------------------------------------------------------------------------
+
+
+class TestPositionsEndpoint:
+    """GET /api/protocols/pendle/positions のテスト。
+
+    RBAC・Decimal 文字列化・フロント契約 (frontend/lib/api/pendle.ts) を検証する。
+    """
+
+    def test_returns_200_with_admin(self, client: TestClient) -> None:
+        """admin override 有り（pendle_app fixture）で 200 を返すこと。"""
+        resp = client.get("/api/protocols/pendle/positions")
+        assert resp.status_code == 200
+
+    def test_response_has_positions_and_total(self, client: TestClient) -> None:
+        """レスポンスに positions と total_value_usd フィールドが存在すること。"""
+        data = client.get("/api/protocols/pendle/positions").json()
+        assert "positions" in data
+        assert "total_value_usd" in data
+
+    def test_sandbox_returns_one_position(self, client: TestClient) -> None:
+        """sandbox モードではダミー 1 件のポジションを返すこと。"""
+        data = client.get("/api/protocols/pendle/positions").json()
+        assert len(data["positions"]) == 1
+
+    def test_decimal_fields_are_strings(self, client: TestClient) -> None:
+        """Decimal フィールド (pt_amount / yt_amount / pt_price_usd / yt_price_usd / implied_apy) が
+        文字列で返却されること。（フロントエンド契約: Number(str).toFixed() で受ける）"""
+        pos = client.get("/api/protocols/pendle/positions").json()["positions"][0]
+        for field in ("pt_amount", "yt_amount", "pt_price_usd", "yt_price_usd", "implied_apy"):
+            assert isinstance(pos[field], str), f"{field} が文字列ではありません"
+            # 数値変換可能であることも確認
+            float(pos[field])
+
+    def test_total_value_usd_is_string(self, client: TestClient) -> None:
+        """total_value_usd が文字列で返却されること。"""
+        data = client.get("/api/protocols/pendle/positions").json()
+        assert isinstance(data["total_value_usd"], str)
+        float(data["total_value_usd"])
+
+    def test_position_has_all_frontend_contract_fields(self, client: TestClient) -> None:
+        """フロント契約 (frontend/lib/api/pendle.ts PendlePosition) のフィールドが全て存在すること。"""
+        pos = client.get("/api/protocols/pendle/positions").json()["positions"][0]
+        required_fields = (
+            "id",
+            "market_address",
+            "underlying_asset",
+            "pt_amount",
+            "yt_amount",
+            "pt_price_usd",
+            "yt_price_usd",
+            "implied_apy",
+            "maturity",
+            "days_to_maturity",
+            "fetched_at",
+        )
+        for field in required_fields:
+            assert field in pos, f"フロント契約フィールド '{field}' が見つかりません"
+
+    def test_days_to_maturity_is_int(self, client: TestClient) -> None:
+        """days_to_maturity が整数で返却されること。"""
+        pos = client.get("/api/protocols/pendle/positions").json()["positions"][0]
+        assert isinstance(pos["days_to_maturity"], int)
+
+    def test_maturity_is_iso8601(self, client: TestClient) -> None:
+        """maturity / fetched_at が ISO8601 文字列であること。"""
+        from datetime import datetime
+
+        pos = client.get("/api/protocols/pendle/positions").json()["positions"][0]
+        # 例外が出なければ OK
+        datetime.fromisoformat(pos["maturity"].replace("Z", "+00:00"))
+        datetime.fromisoformat(pos["fetched_at"].replace("Z", "+00:00"))
+
+    def test_rbac_unauthenticated_returns_401_or_403(self, pendle_app: FastAPI) -> None:
+        """admin override を外すと 401/403 を返すこと。"""
+
+        def _deny() -> None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
+            )
+
+        # 認証拒否用の別アプリを作成（既存 pendle_app の override を汚染しない）
+        deny_app = FastAPI()
+        deny_app.include_router(pendle_router)
+        deny_app.dependency_overrides[require_admin] = _deny
+        deny_client = TestClient(deny_app, raise_server_exceptions=False)
+        resp = deny_client.get("/api/protocols/pendle/positions")
+        assert resp.status_code in (401, 403)

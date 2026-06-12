@@ -8,7 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 
 class PendleMarketInfo(BaseModel):
@@ -207,3 +207,44 @@ class RouterV4AddLiquidityResult(BaseModel):
     to: Optional[str] = None
     approvals: list[RouterV4Approval] = Field(default_factory=list)
     error: Optional[str] = None
+
+
+# --- Positions スキーマ ---
+
+
+class PendlePosition(BaseModel):
+    """Pendle PT/YT ポジション情報。
+
+    Decimal フィールドはフロントエンド契約上すべて文字列で返却する。
+    （frontend/lib/api/pendle.ts PendlePosition インターフェース準拠）
+    """
+
+    id: str
+    market_address: str
+    underlying_asset: str
+    pt_amount: Decimal
+    yt_amount: Decimal
+    pt_price_usd: Decimal
+    yt_price_usd: Decimal
+    implied_apy: Decimal
+    maturity: datetime
+    days_to_maturity: int
+    fetched_at: datetime
+
+    @field_serializer("pt_amount", "yt_amount", "pt_price_usd", "yt_price_usd", "implied_apy")
+    def serialize_decimal(self, v: Decimal) -> str:
+        return str(v)
+
+
+class PendlePositionResponse(BaseModel):
+    """Pendle ポジション一覧レスポンス。
+
+    total_value_usd はフロントエンド契約上文字列で返却する。
+    """
+
+    positions: list[PendlePosition]
+    total_value_usd: Decimal
+
+    @field_serializer("total_value_usd")
+    def serialize_total(self, v: Decimal) -> str:
+        return str(v)
