@@ -5,6 +5,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 import { useLiff } from "@/hooks/useLiff";
 import { getAuthToken } from "@/lib/auth/token-key";
 import { BrowserLoginPrompt } from "../_components/BrowserLoginPrompt";
@@ -25,6 +27,7 @@ type ChatHistoryResponse = {
 };
 
 export default function LiffChatHistoryPage() {
+  const router = useRouter();
   const { isReady, error, liffConfigured } = useLiff();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -114,11 +117,23 @@ export default function LiffChatHistoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 px-4 py-6 max-w-md mx-auto">
-      <h1 className="text-xl font-bold mb-2 text-center">会話履歴</h1>
-      <p className="text-zinc-500 text-xs text-center mb-6">
-        AIアシスタントとの会話記録
-      </p>
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 max-w-md mx-auto">
+      {/* ヘッダー */}
+      <div className="flex items-center bg-[#1a3d2e] px-4 py-3 sticky top-0 z-10">
+        <button
+          onClick={() => router.back()}
+          className="text-white mr-3 p-0.5 hover:bg-white/10 rounded transition-colors"
+          aria-label="戻る"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="text-white font-semibold text-base leading-none">会話履歴</div>
+          <div className="text-zinc-400 text-xs mt-0.5">UAT AI とのチャット記録</div>
+        </div>
+      </div>
+
+      <div className="px-4 py-6">
 
       {loading && (
         <p className="text-zinc-400 text-sm text-center py-8">読み込み中...</p>
@@ -184,6 +199,7 @@ export default function LiffChatHistoryPage() {
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 }
