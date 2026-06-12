@@ -5,14 +5,17 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from decimal import Decimal
 
-from .client import AbstractPendleClient
+from .client import AbstractPendleClient, DummyPendleClient
 from .config import PendleConfig
 from .schemas import (
     PendleMarketInfo,
     PendleMintRequest,
     PendleMintResponse,
+    PendlePosition,
+    PendlePositionResponse,
     PendleRedeemRequest,
     PendleRedeemResponse,
 )
@@ -212,6 +215,64 @@ class PendleService:
     async def get_market_info(self, market_address: str) -> PendleMarketInfo:
         """マーケット情報を取得する。"""
         return await self._client.get_market_info(market_address)
+
+    async def get_positions(self) -> PendlePositionResponse:
+        """PT/YT ポジション一覧を返す。
+
+        sandbox モード（DummyPendleClient）の場合はダミー 1 件を返す。
+        非 sandbox モードでは実残量取得手段が無いため正直な空リストを返す（捏造禁止）。
+        例外は握りつぶして fail-open（500 にしない）。
+        """
+        try:
+            market = self._config.market_address
+            info = await self._client.get_market_info(market)
+
+            is_sandbox = isinstance(self._client, DummyPendleClient)
+
+            if is_sandbox:
+                pt_amount = Decimal("100")
+                yt_amount = Decimal("100")
+                pt_price_usd = info.pt_price
+                yt_price_usd = info.yt_price
+                total_value_usd = pt_amount * pt_price_usd + yt_amount * yt_price_usd
+                position = PendlePosition(
+                    id=f"pendle-{market[:10]}",
+                    market_address=market,
+                    underlying_asset=info.underlying_asset,
+                    pt_amount=pt_amount,
+                    yt_amount=yt_amount,
+                    pt_price_usd=pt_price_usd,
+                    yt_price_usd=yt_price_usd,
+                    implied_apy=info.implied_apy,
+                    maturity=info.maturity,
+                    days_to_maturity=info.days_to_maturity,
+                    fetched_at=datetime.now(tz=timezone.utc),
+                )
+                logger.info(
+                    "get_positions (sandbox): market=%s, total_value_usd=%s",
+                    market[:10],
+                    total_value_usd,
+                )
+                return PendlePositionResponse(
+                    positions=[position],
+                    total_value_usd=total_value_usd,
+                )
+
+            # 非 sandbox: 実残量取得手段が無いため空を返す
+            logger.info(
+                "get_positions (live): on-chain position fetch not implemented, returning empty"
+            )
+            return PendlePositionResponse(
+                positions=[],
+                total_value_usd=Decimal("0"),
+            )
+
+        except Exception:
+            logger.warning("get_positions 失敗、空レスポンスを返す", exc_info=True)
+            return PendlePositionResponse(
+                positions=[],
+                total_value_usd=Decimal("0"),
+            )
 
     async def estimate_fixed_yield(self, amount: Decimal, market_address: str) -> Decimal:
         """固定利回りの年換算推定値を返す（%）。

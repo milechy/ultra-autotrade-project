@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.auth.dependencies import require_admin
 
 from .client import get_pendle_client, get_pendle_router_v4_client
 from .config import get_pendle_config
@@ -17,6 +19,7 @@ from .schemas import (
     PendleMarketInfo,
     PendleMintRequest,
     PendleMintResponse,
+    PendlePositionResponse,
     PendleRedeemRequest,
     PendleRedeemResponse,
     RouterV4AddLiquidityRequest,
@@ -36,6 +39,21 @@ def _get_service() -> PendleService:
     config = get_pendle_config()
     client = get_pendle_client(config)
     return PendleService(client=client, config=config)
+
+
+@router.get(
+    "/positions",
+    response_model=PendlePositionResponse,
+    dependencies=[Depends(require_admin)],
+)
+async def list_positions() -> PendlePositionResponse:
+    """Pendle PT/YT ポジション一覧を返す。admin RBAC 必須。
+
+    sandbox モードではダミー 1 件を返す。
+    非 sandbox モードでは実残量取得手段が無いため空リストを返す。
+    """
+    service = _get_service()
+    return await service.get_positions()
 
 
 @router.get("/markets", response_model=list[PendleMarketInfo])
