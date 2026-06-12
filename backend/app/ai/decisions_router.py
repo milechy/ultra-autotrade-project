@@ -2,10 +2,12 @@
 # backend/app/ai/decisions_router.py
 """AI判定履歴API ルーター定義。"""
 
-from datetime import datetime
-from typing import Optional
+import logging
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -14,7 +16,9 @@ from app.auth.models import User
 from app.database import get_db
 
 from .decisions_schemas import AIDecisionCreate, AIDecisionListResponse, AIDecisionResponse
-from .models import AIDecision
+from .models import AIDecision, AiDecisionFeature
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ai/decisions", tags=["ai-decisions"])
 
@@ -70,6 +74,128 @@ def list_decisions(
         limit=limit,
         offset=offset,
     )
+
+
+# ---------------------------------------------------------------------------
+# A/B 計測エンドポイント (EPIC-1 1-12)
+# /{decision_id} より前に定義することで static path が優先される
+# ---------------------------------------------------------------------------
+
+_EMPTY_BUCKET: Dict[str, Any] = {
+    "count": 0,
+    "action_distribution": {"BUY": 0, "SELL": 0, "HOLD": 0},
+    "avg_confidence": None,
+    "verdict_distribution": {},
+}
+
+
+def _build_empty_ab_response() -> Dict[str, Any]:
+    """集計失敗時の fail-open レスポンス。"""
+    return {
+        "days": 14,
+        "buckets": {
+            "legacy": dict(_EMPTY_BUCKET),
+            "new": dict(_EMPTY_BUCKET),
+        },
+    }
+
+
+def _safe_avg_confidence(rows: List[Any]) -> Optional[str]:
+    """Decimal で平均を計算し文字列で返す。空リストは None。"""
+    if not rows:
+        return None
+    total = Decimal(0)
+    count = 0
+    for row in rows:
+        try:
+            total += Decimal(str(row.confidence))
+            count += 1
+        except (InvalidOperation, TypeError, AttributeError):
+            pass
+    if count == 0:
+        return None
+    return str((total / Decimal(count)).quantize(Decimal("0.01")))
+
+
+def _count_verdicts(rows: List[Any]) -> Dict[str, int]:
+    """deterministic_breakdown->>'action' の分布を集計する。"""
+    counts: Dict[str, int] = {}
+    for row in rows:
+        breakdown = row.deterministic_breakdown
+        if not isinstance(breakdown, dict):
+            continue
+        action = breakdown.get("action")
+        if isinstance(action, str):
+            counts[action] = counts.get(action, 0) + 1
+    return counts
+
+
+@router.get(
+    "/consensus-ab-metrics",
+    summary="コンセンサス A/B 計測集計",
+    response_model=None,
+)
+def get_consensus_ab_metrics(
+    days: int = Query(14, ge=1, le=90, description="集計対象日数（デフォルト14日）"),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """bucket(id % 2)別に judge_action 分布・confidence 平均・verdict 分布を返す。
+
+    - bucket=0: legacy（偶数 id）
+    - bucket=1: new（奇数 id）
+    - SELECT のみ。write 禁止。
+    - 集計失敗時は 500 にせず空 distribution + logger.warning (fail-open)。
+    - confidence 平均等の数値は Decimal で計算し文字列で返却。
+    """
+    try:
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+
+        # ai_decisions と ai_decision_features を JOIN して対象期間の行を取得
+        stmt = (
+            select(
+                AIDecision.id,
+                AiDecisionFeature.judge_action,
+                AiDecisionFeature.confidence,
+                AiDecisionFeature.deterministic_breakdown,
+            )
+            .join(
+                AiDecisionFeature,
+                AiDecisionFeature.ai_decision_id == AIDecision.id,
+            )
+            .where(AIDecision.created_at >= since)
+        )
+        rows = db.execute(stmt).fetchall()
+
+        # bucket 振り分け: id % 2 == 0 → legacy, id % 2 == 1 → new
+        buckets: Dict[str, List[Any]] = {"legacy": [], "new": []}
+        for row in rows:
+            bucket_key = "new" if row.id % 2 == 1 else "legacy"
+            buckets[bucket_key].append(row)
+
+        result: Dict[str, Any] = {"days": days, "buckets": {}}
+        for bucket_key, bucket_rows in buckets.items():
+            action_dist: Dict[str, int] = {"BUY": 0, "SELL": 0, "HOLD": 0}
+            for row in bucket_rows:
+                action = row.judge_action
+                if action in action_dist:
+                    action_dist[action] += 1
+                else:
+                    # 予期しない action 値もカウント（SELL-spam 監視用）
+                    action_dist[action] = action_dist.get(action, 0) + 1
+
+            result["buckets"][bucket_key] = {
+                "count": len(bucket_rows),
+                "action_distribution": action_dist,
+                "avg_confidence": _safe_avg_confidence(bucket_rows),
+                "verdict_distribution": _count_verdicts(bucket_rows),
+            }
+
+        return result
+
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("consensus-ab-metrics 集計失敗 (fail-open): %s", exc)
+        return _build_empty_ab_response()
 
 
 @router.get("/{decision_id}", response_model=AIDecisionResponse, summary="AI判定詳細")
