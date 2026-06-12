@@ -43,7 +43,17 @@
     "dialogDescription": "All automated trading will stop immediately. Manual restart by admin is required.",
     "cancelButton": "Cancel",
     "stopButton": "Stop",
-    "stoppingButton": "Stopping..."
+    "stoppingButton": "Stopping...",
+    "sectionTitle": "Emergency Stop",
+    "stoppedMessage": "Emergency stop is active. All automated trading has been halted.",
+    "warningText": "Pressing this button will immediately stop all automated trading. Once stopped, only an admin can resume.",
+    "errorPrefix": "Emergency stop error: {msg}",
+    "executeButton": "Execute Emergency Stop"
+  },
+  "RiskModeSelector": {
+    "title": "Risk Mode",
+    "maxBorrow": "Max borrow {pct}%",
+    "minHealthFactor": "Min health factor: {hf}"
   },
   "StatusBadge": {
     "NORMAL": "Normal",

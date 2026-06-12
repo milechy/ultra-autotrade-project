@@ -43,7 +43,17 @@
     "dialogDescription": "全ての自動取引が即時停止されます。再開には管理者の操作が必要です。",
     "cancelButton": "キャンセル",
     "stopButton": "停止する",
-    "stoppingButton": "停止中..."
+    "stoppingButton": "停止中...",
+    "sectionTitle": "緊急停止",
+    "stoppedMessage": "緊急停止が有効です。全ての自動取引が停止されています。",
+    "warningText": "ボタンを押すと、全ての自動取引が即時停止されます。一度停止すると、管理者のみが再開できます。",
+    "errorPrefix": "緊急停止エラー: {msg}",
+    "executeButton": "緊急停止を実行"
+  },
+  "RiskModeSelector": {
+    "title": "リスクモード",
+    "maxBorrow": "最大借入 {pct}%",
+    "minHealthFactor": "最低健全度: {hf}"
   },
   "StatusBadge": {
     "NORMAL": "正常",
