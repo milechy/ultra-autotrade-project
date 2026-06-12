@@ -97,7 +97,7 @@ export function ChatPanel({ onClose }: Props) {
       id: "init",
       role: "ai",
       content:
-        "こんにちは！UATa AIです。\n運用状況や市場について何でもお聞きください。",
+        "こんにちは！UAT AIです。\n運用状況や市場について何でもお聞きください。",
       timestamp: new Date(),
     },
   ])
@@ -221,7 +221,7 @@ export function ChatPanel({ onClose }: Props) {
           </button>
           <div className="flex-1 min-w-0">
             <div className="text-white font-semibold text-base leading-none">
-              UATa AI
+              UAT AI
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               <div className="w-1.5 h-1.5 rounded-full bg-[#4ade9a]" />
@@ -276,7 +276,7 @@ export function ChatPanel({ onClose }: Props) {
                 onClick={() => handleSuggest(btn)}
                 disabled={loading}
                 className="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 disabled:opacity-40
-                           text-zinc-200 text-xs px-3 py-2.5 rounded-xl text-left transition-colors
+                           text-zinc-100 text-xs px-3 py-2.5 rounded-xl text-left transition-colors
                            border border-zinc-700 hover:border-zinc-600"
               >
                 {btn.label}
