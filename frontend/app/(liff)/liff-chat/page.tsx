@@ -157,13 +157,31 @@ export default function LiffChatPage() {
         >
           <Menu className="w-6 h-6" />
         </button>
-        <span
-          className="font-bold text-xl tracking-wider bg-clip-text text-transparent
-                     bg-[length:300%_100%] animate-logo-shine motion-reduce:animate-none
-                     bg-[linear-gradient(100deg,#4ade9a_0%,#4ade9a_45%,#ffffff_50%,#4ade9a_55%,#4ade9a_100%)]"
+        <svg
+          width="36"
+          height="36"
+          viewBox="0 0 100 100"
+          aria-label="UAT"
+          className="flex-shrink-0"
         >
-          UAT
-        </span>
+          {/* ベゼル: フラットグレー */}
+          <circle cx="50" cy="50" r="49" fill="#CCCCCC" />
+          {/* 内面: 赤 — カラータイマー点滅 */}
+          <circle
+            cx="50"
+            cy="50"
+            r="41.5"
+            fill="#E8341A"
+            className="animate-color-timer motion-reduce:animate-none"
+          />
+          {/* U リング: 白 */}
+          <g transform="translate(1.75,1.75) scale(0.965)">
+            <path
+              d="M 82.9 22.4 A 43 43 0 1 1 17.1 22.4 L 28.6 32.0 A 28 28 0 1 0 71.4 32.0 Z"
+              fill="white"
+            />
+          </g>
+        </svg>
         <button
           onClick={() => setActivePanel("account")}
           className="text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
