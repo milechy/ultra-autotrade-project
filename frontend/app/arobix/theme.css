@@ -132,3 +132,45 @@
   position: relative;
   background: var(--bg-app);
 }
+
+/* ================================================================
+ * Liff dark → Arobix warm-light overrides
+ * 既存 liff 画面のダーク系 Tailwind クラスを .arobix-root スコープ内で
+ * Arobix ウォームライトパレットにマッピングする。
+ * ================================================================ */
+
+/* App background */
+.arobix-root { background-color: #f7f2ea; }
+
+/* Zinc dark backgrounds → Arobix warm */
+.arobix-root .bg-zinc-950 { background-color: #f7f2ea !important; }
+.arobix-root .bg-zinc-900 { background-color: #f5ecdd !important; }
+.arobix-root .bg-zinc-800 { background-color: #ede4d4 !important; }
+.arobix-root .bg-zinc-700 { background-color: #e0d5c4 !important; }
+
+/* Dark green headers → Arobix gradient */
+.arobix-root .bg-\[\#1a3d2e\] {
+  background: linear-gradient(135deg, #b9a4f2 0%, #ecaccd 52%, #fbd9a0 100%) !important;
+}
+
+/* Light text on dark → dark text on light */
+.arobix-root .text-white { color: #2a2440 !important; }
+.arobix-root .text-zinc-100 { color: #1c1a27 !important; }
+.arobix-root .text-zinc-300 { color: #2a2440 !important; }
+.arobix-root .text-zinc-400 { color: #736f7e !important; }
+.arobix-root .text-zinc-500 { color: #9d98a6 !important; }
+.arobix-root .text-zinc-600 { color: #b0aab9 !important; }
+
+/* Keep white text on intentionally colored buttons/badges */
+.arobix-root .bg-\[\#1D9E75\].text-white,
+.arobix-root .bg-\[\#1D9E75\] .text-white,
+.arobix-root .bg-red-500.text-white,
+.arobix-root .bg-red-500 .text-white { color: white !important; }
+
+/* Keep text-transparent for logo-shine / bg-clip-text */
+.arobix-root .text-transparent { color: transparent !important; }
+
+/* Borders */
+.arobix-root .border-zinc-800 { border-color: #e5ddd0 !important; }
+.arobix-root .border-zinc-700 { border-color: #d8cfc4 !important; }
+.arobix-root .border-zinc-600 { border-color: #cfc5b8 !important; }

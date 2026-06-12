@@ -1,6 +1,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 'use client'
 
+import '../arobix/theme.css'
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useLiff } from '@/hooks/useLiff'
@@ -48,24 +49,30 @@ export default function LiffLayout({ children }: { children: React.ReactNode }) 
   // 下の通常描画にフォールスルーして children をブラウザで表示する（degrade）。
   if (liffConfigured && error) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
-        <p className="text-red-400">LIFF初期化エラー: {error}</p>
+      <div className="arobix-root">
+        <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
+          <p className="text-red-400">LIFF初期化エラー: {error}</p>
+        </div>
       </div>
     )
   }
 
   if (!isInitialized) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
-        <p className="text-zinc-400">読み込み中...</p>
+      <div className="arobix-root">
+        <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
+          <p className="text-zinc-400">読み込み中...</p>
+        </div>
       </div>
     )
   }
 
   if (reauth.state === 'reauthing') {
     return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
-        <p className="text-zinc-400">セッションを復元しています...</p>
+      <div className="arobix-root">
+        <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
+          <p className="text-zinc-400">セッションを復元しています...</p>
+        </div>
       </div>
     )
   }
@@ -79,8 +86,10 @@ export default function LiffLayout({ children }: { children: React.ReactNode }) 
   const isExempt = AUTH_GUARD_EXEMPT.includes(pathname ?? '')
   if (liffConfigured && !isLoggedIn && !token && !isExempt) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center px-4">
-        <p className="text-zinc-400 text-sm">LINEアプリから開いてください</p>
+      <div className="arobix-root">
+        <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center px-4">
+          <p className="text-zinc-400 text-sm">LINEアプリから開いてください</p>
+        </div>
       </div>
     )
   }
@@ -90,16 +99,20 @@ export default function LiffLayout({ children }: { children: React.ReactNode }) 
   // /liff-confirm へ遷移するまで読み込み表示でブロックする (未同意ホームの一瞬の表示も防ぐ)。
   if (needsTermsGate && termsState !== 'accepted') {
     return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
-        <p className="text-zinc-400">読み込み中...</p>
+      <div className="arobix-root">
+        <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
+          <p className="text-zinc-400">読み込み中...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <PrivyRootClient>
-      <SessionExpiryBanner loginHref="/liff-login" />
-      {children}
-    </PrivyRootClient>
+    <div className="arobix-root">
+      <PrivyRootClient>
+        <SessionExpiryBanner loginHref="/liff-login" />
+        {children}
+      </PrivyRootClient>
+    </div>
   )
 }
