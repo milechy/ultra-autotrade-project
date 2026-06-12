@@ -59,7 +59,7 @@ export function ChatHeader({ token }: ChatHeaderProps) {
       </button>
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-zinc-100 leading-none">UATa AI</p>
+        <p className="text-sm font-semibold text-zinc-100 leading-none">UAT AI</p>
         <p className="text-xs text-zinc-500 mt-0.5 leading-none">自動売買アシスタント</p>
       </div>
 

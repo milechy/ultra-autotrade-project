@@ -1,7 +1,8 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
+import QRCode from "qrcode"
 import {
   Copy,
   QrCode,
@@ -50,6 +51,12 @@ export function MyWalletPanel() {
 
   const [qrExpanded, setQrExpanded] = useState(false)
   const [toastMsg, setToastMsg] = useState("")
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    if (!qrExpanded || !address || !canvasRef.current) return
+    void QRCode.toCanvas(canvasRef.current, address, { width: 200, margin: 2 })
+  }, [qrExpanded, address])
 
   // 「ウォレットに接続する」: Privy login をトリガ。
   // login 後は useWallet().address が更新され再描画される。
@@ -222,14 +229,7 @@ export function MyWalletPanel() {
         <div className="bg-zinc-900 rounded-2xl p-4 space-y-3 border border-zinc-800">
           <p className="text-zinc-300 text-sm font-medium text-center">受取用 QR コード</p>
           <div className="flex justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(address)}`}
-              alt="ウォレットアドレス QR コード"
-              width={200}
-              height={200}
-              className="rounded-xl bg-white p-2"
-            />
+            <canvas ref={canvasRef} className="rounded-xl bg-white p-2" />
           </div>
           <p className="text-zinc-500 text-xs text-center">
             このQRコードをスキャンしてUSDCを受け取れます
