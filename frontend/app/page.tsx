@@ -21,7 +21,7 @@ function RedirectGate() {
     if (isAuthenticated) {
       router.replace(getRoleDefaultPath(user?.role))
     } else {
-      router.replace('/login')
+      router.replace('/connect')
     }
   }, [isLoading, isAuthenticated, user, router])
 
