@@ -22,28 +22,40 @@
 
 ---
 
-## 暫定 JSONL スキーマ
+## 公式確認済みスキーマ (2026-06-12)
 
-> **[警告] 暫定スキーマです。**
+> **[確認済み]** microsoft/SkillOpt の `skillopt/envs/_template/loader_template.py`（`_normalize_item()`）
+> および `skillopt/envs/base.py` を確認した結果、以下のスキーマが公式推奨です。
 >
-> microsoft/SkillOpt の validation タスクの正式スキーマは README では未公開で、
-> `docs/guideline.html` 等の詳細ドキュメントで定義されています。
-> 本ディレクトリのファイルは **公式ドキュメント確認前の暫定版** であり、
-> SkillOpt を実際に運用する前に公式形式に合わせて修正が必要です。
->
-> 参照すべき公式リソース:
-> - `docs/guideline.html`（SkillOpt リポジトリ内）
-> - `examples/` ディレクトリ（SkillOpt リポジトリ内）
+> 出典:
+> - https://github.com/microsoft/SkillOpt `skillopt/envs/_template/loader_template.py`
+> - https://github.com/microsoft/SkillOpt `skillopt/envs/base.py`
 
-各ファイルは **1 行 1 タスクの JSON Lines** 形式です。現時点の暫定フィールド:
+各ファイルは **1 行 1 タスクの JSON Lines** 形式です。フィールド定義:
 
 ```json
 {
-  "input": "エージェントへの入力（タスク説明 / コンテキスト）",
-  "expected_behavior": "期待される出力・判断・振る舞いの記述",
-  "scoring_hint": "スコアリング時に参照するヒント（何が正解か）"
+  "id": "role-001",
+  "question": "エージェントへの入力（タスク説明 / コンテキスト）",
+  "ground_truth": "期待される出力・判断・振る舞いの記述",
+  "task_type": "カテゴリ名（stratified sampling 用）",
+  "scoring_hint": "スコアリング時に参照するヒント（何が正解か）[カスタムフィールド]"
 }
 ```
+
+### フィールド詳細
+
+| フィールド | 必須 / 推奨 | 説明 |
+|---|---|---|
+| `id` | **必須** | SkillOpt 唯一の Hard requirement。`role-NNN` 形式（例: `planner-001`） |
+| `question` | 推奨標準 | エージェントへの入力。旧フィールド名 `input` に相当 |
+| `ground_truth` | 推奨標準 | 期待する出力・判断。旧フィールド名 `expected_behavior` に相当 |
+| `task_type` | 推奨標準 | タスクカテゴリ。SkillOpt の stratified sampling に使用 |
+| `scoring_hint` | カスタム | 本プロジェクト独自フィールド。SkillOpt 本体は参照しないが独自ハーネス（`run_skillopt.py`）が使用 |
+
+> **注意:** SkillOpt 本体は `scripts/skillopt_validation/` 配下の jsonl を直接読まない。
+> `skillopt_config.json` の `validation_tasks` フィールドは `run_skillopt.py` 独自ハーネスが
+> 参照する。CLI への `--validation-data` 引数配線は現時点では行っていない。
 
 ---
 
@@ -87,4 +99,4 @@
 
 ---
 
-*2026-06-11 初版 scaffold（暫定スキーマ・公式 guideline 確認後に更新要）*
+*2026-06-11 初版 scaffold / 2026-06-12 公式推奨スキーマへ移行（id 必須 / question / ground_truth / task_type 追加、Asana 1215615130885943）*
