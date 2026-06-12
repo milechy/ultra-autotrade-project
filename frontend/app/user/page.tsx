@@ -2,6 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -9,35 +10,24 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertTriangle, Wallet, Brain, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
-const steps = [
-  {
-    number: 1,
-    icon: Wallet,
-    title: 'ウォレットを接続',
-    description: 'MetaMask / WalletConnect 対応ウォレットをBase メインネットに接続',
-  },
-  {
-    number: 2,
-    icon: Brain,
-    title: 'AIが市場を分析',
-    description: 'Claude Opus が最適なタイミングを提案。GPT-4o でクロス検証。',
-  },
-  {
-    number: 3,
-    icon: CheckCircle,
-    title: 'あなたが承認・署名',
-    description: '提案を確認し、ウォレットで署名。あなたが最終判断者です。',
-  },
-]
+const STEP_ICONS = [Wallet, Brain, CheckCircle] as const
 
 export default function LandingPage() {
+  const t = useTranslations('UserHome')
+
+  const steps = [
+    { number: 1, icon: STEP_ICONS[0], title: t('step1.title'), description: t('step1.description') },
+    { number: 2, icon: STEP_ICONS[1], title: t('step2.title'), description: t('step2.description') },
+    { number: 3, icon: STEP_ICONS[2], title: t('step3.title'), description: t('step3.description') },
+  ]
+
   return (
     <main className="min-h-[calc(100vh-4rem)] px-4 py-8">
       <div className="max-w-md mx-auto space-y-8">
         {/* Hero */}
         <div className="text-center space-y-6 pt-8">
           <h1 className="text-2xl font-bold tracking-tight leading-snug">
-            AIが最適なタイミングで、<br />あなたの資産を運用します
+            {t('heroLine1')}<br />{t('heroLine2')}
           </h1>
           <Button size="lg" className="w-full text-base font-semibold" asChild>
             <Link href="/user/wallet">
@@ -46,7 +36,7 @@ export default function LandingPage() {
             </Link>
           </Button>
           <p className="text-xs text-muted-foreground">
-            Non-custodial — あなたのウォレット、あなたの資産
+            {t('nonCustodial')}
           </p>
         </div>
 
@@ -60,7 +50,7 @@ export default function LandingPage() {
               Aave V3
             </Badge>
             <Badge variant="outline" className="text-indigo-400 border-indigo-400/50">
-              Base メインネット
+              Base Mainnet
             </Badge>
           </div>
         </div>
@@ -91,7 +81,7 @@ export default function LandingPage() {
         <Alert className="border-amber-500/50 bg-amber-500/10 text-amber-400">
           <AlertTriangle className="h-4 w-4 text-amber-400" />
           <AlertDescription className="text-xs leading-relaxed text-amber-400/90">
-            これは投資助言ではありません。暗号資産取引には元本損失のリスクがあります。ご自身の判断と責任において利用してください。
+            {t('riskDisclaimer')}
           </AlertDescription>
         </Alert>
 
@@ -99,7 +89,7 @@ export default function LandingPage() {
         <div className="text-center pb-4">
           <Button variant="ghost" size="sm" asChild>
             <Link href="/user/dashboard" className="text-xs text-muted-foreground">
-              すでに接続済みの方はダッシュボードへ →
+              {t('dashboardCta')}
             </Link>
           </Button>
         </div>
