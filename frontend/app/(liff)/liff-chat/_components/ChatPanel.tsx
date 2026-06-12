@@ -4,8 +4,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { ChevronLeft, History } from "lucide-react"
+import { ChevronLeft } from "lucide-react"
 import { getAuthToken } from "@/lib/auth/token-key"
 
 // ---------------------------------------------------------------------------
@@ -97,35 +96,17 @@ export function ChatPanel({ onClose }: Props) {
       id: "init",
       role: "ai",
       content:
-        "こんにちは！UATa AIです。\n運用状況や市場について何でもお聞きください。",
+        "こんにちは！UAT AIです。\n運用状況や市場について何でもお聞きください。",
       timestamp: new Date(),
     },
   ])
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const router = useRouter()
 
   // 新メッセージが追加されるたびに末尾へスクロール
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
-
-  // 履歴画面へ遷移 (#539 degrade 取りこぼし対策)
-  //
-  // 旧実装は window.location.href で /liff-history へハード遷移していたため、
-  // アプリ全体が再マウントされ useLiff が liffConfigured=true (初期値) から
-  // 再 init する。その init 解決前に (liff)/layout.tsx の中央 degrade ガードが
-  // 評価され、ブラウザ(非LIFF) や token 復元前のタイミングで
-  // 「LINEアプリから開いてください」黒画面・行き止まりが一瞬〜恒久的に出る取りこぼしがあった。
-  //
-  // ここでは Next.js client router によるソフト遷移に変える。アプリは再マウントされず、
-  // 既に解決済みの degrade 状態 (liffConfigured / isLoggedIn) と token がメモリに残るため、
-  // liff-history 側は #539 で実装済みの degrade 分岐 (BrowserLoginPrompt / 自動再認証) に
-  // 正しく入り、黒画面にならない。LIFF 実機では従来どおり履歴画面へ遷移する。
-  const handleHistoryOpen = () => {
-    onClose()
-    router.push("/liff-history")
-  }
 
   // サジェストボタンタップ → ユーザーメッセージ追加 → AI 返答取得
   const handleSuggest = async (btn: {
@@ -221,20 +202,13 @@ export function ChatPanel({ onClose }: Props) {
           </button>
           <div className="flex-1 min-w-0">
             <div className="text-white font-semibold text-base leading-none">
-              UATa AI
+              UAT AI
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               <div className="w-1.5 h-1.5 rounded-full bg-[#4ade9a]" />
               <span className="text-zinc-400 text-xs">オンライン</span>
             </div>
           </div>
-          <button
-            onClick={handleHistoryOpen}
-            className="text-zinc-400 p-1 hover:text-zinc-200 hover:bg-white/10 rounded transition-colors"
-            aria-label="履歴"
-          >
-            <History className="w-5 h-5" />
-          </button>
         </div>
 
         {/* メッセージエリア */}
@@ -246,7 +220,7 @@ export function ChatPanel({ onClose }: Props) {
           {/* タイピングインジケーター */}
           {loading && (
             <div className="flex justify-start">
-              <div className="w-7 h-7 rounded-full bg-[#1D9E75] flex items-center justify-center text-white text-xs font-bold mr-2 mt-0.5 flex-shrink-0">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[#2a2440] text-xs font-bold mr-2 mt-0.5 flex-shrink-0" style={{background: 'linear-gradient(135deg, #b9a4f2 0%, #ecaccd 52%, #fbd9a0 100%)'}}>
                 AI
               </div>
               <div className="bg-zinc-800 rounded-2xl rounded-tl-none px-4 py-2.5 max-w-[80%]">
@@ -276,7 +250,7 @@ export function ChatPanel({ onClose }: Props) {
                 onClick={() => handleSuggest(btn)}
                 disabled={loading}
                 className="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 disabled:opacity-40
-                           text-zinc-200 text-xs px-3 py-2.5 rounded-xl text-left transition-colors
+                           text-zinc-100 text-xs px-3 py-2.5 rounded-xl text-left transition-colors
                            border border-zinc-700 hover:border-zinc-600"
               >
                 {btn.label}

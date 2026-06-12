@@ -319,11 +319,12 @@ export default function LiffChatPage() {
       {/* ── FAB（右下固定） */}
       <button
         onClick={() => setChatOpen(true)}
-        className="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-[#1D9E75] shadow-lg
-                   flex items-center justify-center active:scale-95 transition-transform"
+        className="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full shadow-lg
+                   flex items-center justify-center active:scale-95 transition-transform
+                   bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0]"
         aria-label="チャットを開く"
       >
-        <MessageCircle className="w-6 h-6 text-white" />
+        <MessageCircle className="w-6 h-6 text-[#2a2440]" />
         {unreadCount > 0 && (
           <span
             className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs

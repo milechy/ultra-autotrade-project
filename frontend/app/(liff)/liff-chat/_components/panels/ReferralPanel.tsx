@@ -116,12 +116,26 @@ export function ReferralPanel() {
     }
   }, [info?.referral_code, showToast])
 
-  const handleMailShare = useCallback(() => {
+  const handleMailShare = useCallback(async () => {
     const code = info?.referral_code
     if (!code) return
     const subject = encodeURIComponent("【UATaのご紹介】AI自動資産運用サービス")
     const body = encodeURIComponent(buildShareText(code))
-    window.location.href = `mailto:?subject=${subject}&body=${body}`
+    const mailtoUrl = `mailto:?subject=${subject}&body=${body}`
+    try {
+      const { getLiff, isLiffConfigured } = await import("@/lib/liff/init")
+      const liff = isLiffConfigured() ? await getLiff() : null
+      if (liff) {
+        // LIFF webview では openWindow(external=true) でOS のメールアプリを起動する。
+        // window.location.href = 'mailto:' は LINE 内ブラウザが外部ブラウザを開くだけで
+        // メールアプリが起動しないため使用しない。
+        liff.openWindow({ url: mailtoUrl, external: true })
+      } else {
+        window.open(mailtoUrl, "_blank")
+      }
+    } catch {
+      window.open(mailtoUrl, "_blank")
+    }
   }, [info?.referral_code])
 
   const displayInfo = info ?? EMPTY_INFO

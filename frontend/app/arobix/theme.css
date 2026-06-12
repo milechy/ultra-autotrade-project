@@ -156,6 +156,7 @@
 /* Light text on dark → dark text on light */
 .arobix-root .text-white { color: #2a2440 !important; }
 .arobix-root .text-zinc-100 { color: #1c1a27 !important; }
+.arobix-root .text-zinc-200 { color: #2a2440 !important; }
 .arobix-root .text-zinc-300 { color: #2a2440 !important; }
 .arobix-root .text-zinc-400 { color: #736f7e !important; }
 .arobix-root .text-zinc-500 { color: #9d98a6 !important; }
