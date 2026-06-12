@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { useTranslations } from "next-intl";
 import { ethers } from "ethers";
 import { Loader2, Lock } from "lucide-react";
 import {
@@ -41,6 +42,7 @@ export function ApproveConfirmSheet({
 }: ApproveConfirmSheetProps) {
   const { login } = usePrivy();
   const { wallets } = useWallets();
+  const t = useTranslations("Liff.approve.confirmSheet");
   const [signingStatus, setSigningStatus] = useState<SigningStatus>("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -113,9 +115,7 @@ export function ApproveConfirmSheet({
         const approveReceipt =
           await ethProvider.waitForTransaction(approveTxHash);
         if (approveReceipt === null || approveReceipt.status === 0) {
-          throw new Error(
-            "approve トランザクションが revert しました。残高・ガス代を確認してください。"
-          );
+          throw new Error(t("revertError"));
         }
 
         setSigningStatus("confirming");
@@ -143,7 +143,7 @@ export function ApproveConfirmSheet({
           ],
         })) as string;
       } else {
-        throw new Error(`未対応の operation: ${txData.operation}`);
+        throw new Error(t("unsupportedOperation", { operation: txData.operation }));
       }
 
       setSigningStatus("confirming");
@@ -163,12 +163,12 @@ export function ApproveConfirmSheet({
     } catch (err) {
       setSigningStatus("error");
       const msg =
-        err instanceof Error ? err.message : "署名処理に失敗しました";
+        err instanceof Error ? err.message : t("signFailed");
       setError(
-        msg.includes("rejected") ? "署名がキャンセルされました" : msg
+        msg.includes("rejected") ? t("signCanceled") : msg
       );
     }
-  }, [wallets, login, proposal.id, token, onApproved]);
+  }, [wallets, login, proposal.id, token, onApproved, t]);
 
   function handleOpenExternal() {
     const url = `https://app.ultra-auto-trade.com/partner/proposals?proposal_id=${proposal.id}&from=liff`;
@@ -200,18 +200,18 @@ export function ApproveConfirmSheet({
         <div className="mx-auto mb-4 h-1 w-8 rounded-full bg-zinc-700" />
 
         <h2 className="text-base font-semibold text-zinc-100 mb-4">
-          この提案を承認しますか？
+          {t("title")}
         </h2>
 
         {/* detail rows */}
         <div className="space-y-3 mb-5">
-          <DetailRow label="操作">
+          <DetailRow label={t("operation")}>
             <span className={proposal.operation === "SUPPLY" ? "text-green-400" : "text-red-400"}>
-              {proposal.operation === "SUPPLY" ? "Supply (入金)" : "Withdraw (出金)"}
+              {proposal.operation === "SUPPLY" ? t("supply") : t("withdraw")}
             </span>
           </DetailRow>
 
-          <DetailRow label="金額">
+          <DetailRow label={t("amount")}>
             <span className="text-zinc-100 font-semibold">{amountUsd}</span>
             <span className="text-zinc-500 text-xs ml-1">
               ({amountFormatted} {proposal.asset})
@@ -219,7 +219,7 @@ export function ApproveConfirmSheet({
           </DetailRow>
 
           {hfAfter && (
-            <DetailRow label="実行後 Health Factor">
+            <DetailRow label={t("hfAfter")}>
               <span className={hfPositive ? "text-green-400 font-semibold" : "text-zinc-100"}>
                 {hfAfter}
                 {hfDelta && (
@@ -232,7 +232,7 @@ export function ApproveConfirmSheet({
           )}
 
           {gasUsd && (
-            <DetailRow label="ガス概算">
+            <DetailRow label={t("gasEstimate")}>
               <span className="text-zinc-400">{gasUsd}</span>
             </DetailRow>
           )}
@@ -258,7 +258,7 @@ export function ApproveConfirmSheet({
           ) : (
             <Lock className="h-4 w-4" />
           )}
-          {isBusy ? "処理中..." : signingStatus === "success" ? "承認済み ✓" : "署名して承認"}
+          {isBusy ? t("processing") : signingStatus === "success" ? t("approved") : t("signApprove")}
         </button>
 
         {/* cancel */}
@@ -269,17 +269,17 @@ export function ApproveConfirmSheet({
                      hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed
                      text-sm font-medium transition-colors"
         >
-          キャンセル
+          {t("cancel")}
         </button>
 
         {/* external browser fallback */}
         <div className="mt-4 text-center">
-          <span className="text-zinc-600 text-xs">署名できない場合は</span>
+          <span className="text-zinc-600 text-xs">{t("cannotSign")}</span>
           <button
             onClick={handleOpenExternal}
             className="ml-1 text-xs text-zinc-400 underline underline-offset-2"
           >
-            ブラウザで承認する →
+            {t("approveInBrowser")}
           </button>
         </div>
       </div>
