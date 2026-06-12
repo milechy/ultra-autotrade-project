@@ -690,6 +690,109 @@
       "termsSub": "Terms of service & privacy policy",
       "footer": "UAT App v1.0 | © 2026 UAT Co., Ltd."
     },
+    "confirm": {
+      "title": "Important Disclosures",
+      "subtitle": "Please review the following before you start",
+      "progressLabel": "Progress",
+      "confirmedBtn": "Confirmed",
+      "termsLink": "Terms of Service",
+      "privacyLink": "Privacy Policy",
+      "submitBtn": "Start investing",
+      "submitting": "Saving...",
+      "items": {
+        "self_custody": {
+          "title": "You are responsible for your own assets",
+          "detail": "This service is non-custodial. Your wallet private key is never stored on our servers. You are solely responsible for managing your wallet and LINE account."
+        },
+        "defi_risk": {
+          "title": "DeFi investing carries risks",
+          "detail": "Smart contract risk, price volatility, liquidity risk, and liquidation risk all exist. You may lose your principal. This service does not constitute investment advice, and all investing is at your own risk."
+        },
+        "user_responsibility": {
+          "title": "You are responsible for your account",
+          "detail": "Managing your LINE account and responding to unauthorized access is your responsibility. We are not liable for any losses or damages resulting from account loss or unauthorized use."
+        },
+        "age_confirm": {
+          "title": "You confirm you are 18 or older",
+          "detail": "You must be 18 or older to use this service. Users under 18 are not permitted."
+        }
+      }
+    },
+    "history": {
+      "headerTitle": "Chat History",
+      "headerSubtitle": "Conversation record with UAT AI",
+      "backAriaLabel": "Go back",
+      "loading": "Loading...",
+      "fetchError": "Failed to load data",
+      "empty": "No conversation history",
+      "loadMore": "Load more",
+      "loadingMore": "Loading...",
+      "liffInitError": "LIFF init error: {error}",
+      "reauthing": "Re-authenticating..."
+    },
+    "approve": {
+      "loading": "Loading...",
+      "reauthing": "Re-authenticating...",
+      "liffInitError": "LIFF init error: {error}",
+      "fetchError": "Failed to load data",
+      "retry": "Retry",
+      "rejected": "Rejected",
+      "approved": "Approved ✓",
+      "extraProposals": "{count} more proposal(s) →",
+      "waitingProposal": "Waiting for a proposal...",
+      "header": {
+        "assistantSubtitle": "Automated trading assistant",
+        "backAriaLabel": "Go back",
+        "historyAriaLabel": "History",
+        "running": "Running",
+        "paused": "Paused",
+        "stopped": "Stopped"
+      },
+      "actionBar": {
+        "newWaiting": "Waiting for the next proposal",
+        "waiting": "Waiting for a proposal...",
+        "reject": "Reject",
+        "rejecting": "Rejecting...",
+        "approve": "Approve ✓",
+        "approving": "Approving..."
+      },
+      "rejectConfirm": {
+        "prompt": "Are you sure you want to reject?",
+        "yes": "Yes",
+        "no": "No"
+      },
+      "decisionHistory": {
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "proposalBubble": {
+        "confidence": "Confidence",
+        "collapse": "Show less",
+        "expand": "Show more",
+        "hfAfter": "HF after:",
+        "gasEstimate": "Gas est.:",
+        "totalWithGas": "Total (incl. gas):"
+      },
+      "confirmSheet": {
+        "title": "Approve this proposal?",
+        "operation": "Operation",
+        "supply": "Supply (Deposit)",
+        "withdraw": "Withdraw",
+        "amount": "Amount",
+        "hfAfter": "Health Factor after",
+        "gasEstimate": "Gas estimate",
+        "processing": "Processing...",
+        "approved": "Approved ✓",
+        "signApprove": "Sign & Approve",
+        "cancel": "Cancel",
+        "cannotSign": "Can't sign? ",
+        "approveInBrowser": "Approve in browser →",
+        "revertError": "The approve transaction was reverted. Please check your balance and gas.",
+        "unsupportedOperation": "Unsupported operation: {operation}",
+        "signFailed": "Signing failed",
+        "signCanceled": "Signing was canceled"
+      }
+    },
     "chat": {
       "panelTitle": "UAT AI",
       "onlineStatus": "Online",
