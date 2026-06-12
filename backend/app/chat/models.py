@@ -20,7 +20,17 @@ Alembic 不使用プロジェクトのため、下記 SQL は手動実行が必�
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -49,14 +59,22 @@ class ChatMessage(Base):
     """
 
     __tablename__ = "chat_messages"
-    __table_args__ = (CheckConstraint("role IN ('user', 'ai')", name="ck_chat_messages_role"),)
+    __table_args__ = (
+        CheckConstraint("role IN ('user', 'ai')", name="ck_chat_messages_role"),
+        # WHERE user_id = ? ORDER BY created_at DESC を 1 index で賄う複合 index
+        # (docstring の手動 SQL / migration cm20260612 と一致させること)
+        Index(
+            "idx_chat_messages_user_created",
+            "user_id",
+            text("created_at DESC"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(_BIGINT_OR_INT, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
     role: Mapped[str] = mapped_column(
         Text,
