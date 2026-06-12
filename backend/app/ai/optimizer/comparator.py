@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Optional
 
 from .net_benefit import ExpectedNetBenefitCalculator
-from .schemas import NetBenefitResult, StrategyComparison
+from .schemas import NetBenefitResult, StrategyCandidate, StrategyComparison
 from .strategy_scorer import StrategyScorer
 
 logger = logging.getLogger(__name__)
@@ -60,6 +60,7 @@ class StrategyComparator:
         return StrategyScorer(
             pendle_adapter=getattr(self._scorer, "_pendle_adapter", None),
             lido_adapter=getattr(self._scorer, "_lido_adapter", None),
+            aave_adapter=getattr(self._scorer, "_aave_adapter", None),
             risk_mode=risk_mode,
         )
 
@@ -84,6 +85,33 @@ class StrategyComparator:
         """
         scorer = self._scorer_for_risk_mode(risk_mode)
         candidates = scorer.get_all_candidates()
+        return self._build_comparison(candidates, investment_usd, holding_days)
+
+    async def compare_async(
+        self,
+        investment_usd: Decimal,
+        risk_mode: str = "conservative",
+        holding_days: int = 30,
+    ) -> StrategyComparison:
+        """全プロトコルを比較して推奨を生成する（adapter live 経路 / 非同期版）。
+
+        compare() の sync シグネチャを維持したまま、注入済み adapter から実 APY を
+        取得する get_all_candidates_async() を使う非同期版（#625 M2/M3 フォローアップ）。
+
+        adapter が未注入なら従来どおりダミー定数で動作する（fail-open / 後方互換）。
+        ランキング以降のロジックは compare() と完全共通（_build_comparison）。
+        """
+        scorer = self._scorer_for_risk_mode(risk_mode)
+        candidates = await scorer.get_all_candidates_async()
+        return self._build_comparison(candidates, investment_usd, holding_days)
+
+    def _build_comparison(
+        self,
+        candidates: list[StrategyCandidate],
+        investment_usd: Decimal,
+        holding_days: int,
+    ) -> StrategyComparison:
+        """候補リストからランク付け・推奨・タイムスタンプを構築する（sync/async 共通）。"""
         ranked_results = self._calculator.rank_strategies(candidates, investment_usd, holding_days)
 
         # 何もしない場合の機会コスト = 0（現金は利回りなし）

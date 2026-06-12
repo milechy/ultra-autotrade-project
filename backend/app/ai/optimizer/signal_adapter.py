@@ -14,11 +14,13 @@ StrategyScorer が使える形に変換する。
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
+    from app.automation.aave_data_fetcher import AaveMarketData
     from app.protocols.lido.client import AbstractLidoClient
     from app.protocols.pendle.client import AbstractPendleClient
 
@@ -32,6 +34,7 @@ _FALLBACK_PEG_DEVIATION: Decimal = Decimal("0")
 _FALLBACK_PENDLE_PT_APY: Decimal = Decimal("5.2")
 _FALLBACK_PENDLE_YT_APY: Decimal = Decimal("8.0")
 _FALLBACK_PENDLE_MATURITY_DAYS: int = 30
+_FALLBACK_AAVE_USDC_APY: Decimal = Decimal("4.5")
 
 
 class LidoSignalAdapter:
@@ -179,3 +182,60 @@ class PendleSignalAdapter:
         except Exception as exc:
             logger.warning("PendleSignalAdapter.get_maturity_days 失敗、フォールバック: %s", exc)
             return _FALLBACK_PENDLE_MATURITY_DAYS
+
+
+class AaveSignalAdapter:
+    """Aave の read-only マーケットデータ（supply APY）を取得するアダプター。
+
+    M3 対応: Lido/Pendle と対称に Aave も実 APY を取得できるようにする。
+    データ源は `app.automation.aave_data_fetcher.fetch_aave_market_data_safe`
+    （Pool.getReserveData() を直接読む read-only 経路、秘密鍵不要）。
+
+    本体の fetch 関数自体が fail-open（失敗フィールドは None）で実装されているため、
+    本アダプターは supply_apy が None / 取得失敗時にフォールバック定数を返す。
+    既定の fetcher は同期（ブロッキング RPC）のため、async 経路を塞がないよう
+    asyncio.to_thread で別スレッド実行する。
+    """
+
+    def __init__(
+        self,
+        fetcher: Optional[Callable[[str], "AaveMarketData"]] = None,
+        asset_symbol: str = "USDC",
+    ) -> None:
+        """AaveSignalAdapter を初期化する。
+
+        Args:
+            fetcher: AaveMarketData を返す同期 callable。None の場合は
+                aave_data_fetcher.fetch_aave_market_data_safe を遅延 import で使う。
+                テストでは mock callable を注入できる。
+            asset_symbol: 取得対象の資産シンボル（既定 USDC）。
+        """
+        self._fetcher = fetcher
+        self._asset_symbol = asset_symbol
+
+    def _resolve_fetcher(self) -> Callable[[str], "AaveMarketData"]:
+        if self._fetcher is not None:
+            return self._fetcher
+        from app.automation.aave_data_fetcher import (  # noqa: PLC0415
+            fetch_aave_market_data_safe,
+        )
+
+        return fetch_aave_market_data_safe
+
+    async def get_supply_apy(self) -> Decimal:
+        """Aave supply APY（%, 0-100 表記）を返す。失敗時はフォールバック値。"""
+        try:
+            fetcher = self._resolve_fetcher()
+            data = await asyncio.to_thread(fetcher, self._asset_symbol)
+            supply_apy = data.get("supply_apy")
+            if supply_apy is None:
+                logger.debug(
+                    "AaveSignalAdapter.get_supply_apy: supply_apy=None, フォールバック=%s",
+                    _FALLBACK_AAVE_USDC_APY,
+                )
+                return _FALLBACK_AAVE_USDC_APY
+            logger.debug("AaveSignalAdapter.get_supply_apy: apy=%s", supply_apy)
+            return supply_apy
+        except Exception as exc:
+            logger.warning("AaveSignalAdapter.get_supply_apy 失敗、フォールバック: %s", exc)
+            return _FALLBACK_AAVE_USDC_APY

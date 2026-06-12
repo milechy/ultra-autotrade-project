@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Optional
 
 from .schemas import Protocol, StrategyCandidate
-from .signal_adapter import LidoSignalAdapter, PendleSignalAdapter
+from .signal_adapter import AaveSignalAdapter, LidoSignalAdapter, PendleSignalAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,7 @@ class StrategyScorer:
         self,
         pendle_adapter: Optional[PendleSignalAdapter] = None,
         lido_adapter: Optional[LidoSignalAdapter] = None,
+        aave_adapter: Optional[AaveSignalAdapter] = None,
         risk_mode: str = "balanced",
     ) -> None:
         """StrategyScorer を初期化する。
@@ -74,11 +75,13 @@ class StrategyScorer:
         Args:
             pendle_adapter: Pendle シグナルアダプター。None の場合はダミー定数を使用。
             lido_adapter: Lido シグナルアダプター。None の場合はダミー定数を使用。
+            aave_adapter: Aave シグナルアダプター。None の場合はダミー定数を使用。
             risk_mode: リスクモード（conservative/balanced/aggressive）。
                        ランキングに使用するリスクペナルティ係数を変える。
         """
         self._pendle_adapter = pendle_adapter
         self._lido_adapter = lido_adapter
+        self._aave_adapter = aave_adapter
         self._risk_mode = risk_mode
         self._risk_weight = _RISK_WEIGHT.get(risk_mode, _DEFAULT_RISK_WEIGHT)
         if risk_mode not in _RISK_WEIGHT:
@@ -237,6 +240,35 @@ class StrategyScorer:
     # 非同期スコアメソッド（adapter から実データ取得）
     # ---------------------------------------------------------------------- #
 
+    async def score_aave_async(self, asset: str = "USDC") -> StrategyCandidate:
+        """Aave V3 supply の StrategyCandidate を生成する（adapter 優先 / M3）。
+
+        adapter が注入されている場合は実 supply APY を使用する。
+        未注入時はダミー定数 AAVE_USDC_APY（4.5）を継続使用（後方互換 / fail-open）。
+        """
+        if self._aave_adapter is not None:
+            apy = await self._aave_adapter.get_supply_apy()
+        else:
+            apy = self.AAVE_USDC_APY
+
+        risk_penalty = self._apply_risk_weight(self.RISK_AAVE_USDC)
+        logger.debug(
+            "score_aave_async: asset=%s, apy=%s, risk_penalty=%s (mode=%s)",
+            asset,
+            apy,
+            risk_penalty,
+            self._risk_mode,
+        )
+        return StrategyCandidate(
+            protocol=Protocol.AAVE,
+            asset=asset,
+            expected_apy=apy,
+            gas_cost_usd=self.GAS_AAVE,
+            bridge_cost_usd=Decimal("0"),
+            risk_penalty=risk_penalty,
+            liquidity_available=self.LIQUIDITY_AAVE,
+        )
+
     async def score_lido_async(self) -> StrategyCandidate:
         """Lido stETH ステーキングの StrategyCandidate を生成する（adapter 優先）。
 
@@ -358,16 +390,15 @@ class StrategyScorer:
     async def get_all_candidates_async(self) -> list[StrategyCandidate]:
         """全5プロトコルの候補を取得する（adapter から実データ取得・非同期版）。
 
-        adapter が注入されていれば Lido/Pendle は実データ優先。なければダミー定数。
+        adapter が注入されていれば Aave/Lido/Pendle すべて実データ優先。なければダミー定数。
 
-        注意（M3 非対称・暫定）: Aave は本メソッドでも score_aave()（同期・ダミー APY
-        AAVE_USDC_APY=4.5）を継続使用する。Aave 実 APY 取得 adapter は未実装のため、
-        adapter 注入時は Aave だけダミー / Lido・Pendle だけ実 APY という非対称が生じる。
-        Aave 側の実 APY 化は next-PR（router docstring TODO 参照）で対応する。
-        本メソッド自体も現状 router の sync compare() からは未配線。
+        M3 解消（#625 フォローアップ）: 従来は Aave のみ同期 score_aave()（ダミー APY）を
+        使い Lido/Pendle と非対称だったが、aave_adapter 注入時は score_aave_async() 経由で
+        実 supply APY を使用するようになり対称化した。aave_adapter 未注入時は従来どおり
+        ダミー定数 AAVE_USDC_APY を継続（fail-open / 後方互換）。
         """
         candidates = [
-            self.score_aave(),
+            await self.score_aave_async(),
             await self.score_lido_async(),
             await self.score_lido_aave_async(),
             await self.score_pendle_pt_async(),

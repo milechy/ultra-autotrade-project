@@ -84,7 +84,7 @@ class TestOptimizerRouter:
     ) -> None:
         """conservative モードで 200 が返ること。"""
         mock_comparator = MagicMock()
-        mock_comparator.compare.return_value = _make_comparison()
+        mock_comparator.compare_async = AsyncMock(return_value=_make_comparison())
         mock_comparator.generate_report.return_value = "レポート本文"
         mock_comparator_cls.return_value = mock_comparator
 
@@ -116,7 +116,7 @@ class TestOptimizerRouter:
     ) -> None:
         """aggressive モードでも 200 が返ること。"""
         mock_comparator = MagicMock()
-        mock_comparator.compare.return_value = _make_comparison()
+        mock_comparator.compare_async = AsyncMock(return_value=_make_comparison())
         mock_comparator.generate_report.return_value = "aggressive report"
         mock_comparator_cls.return_value = mock_comparator
 
@@ -144,7 +144,7 @@ class TestOptimizerRouter:
     ) -> None:
         """compare / allocate に正しい引数が渡ること。"""
         mock_comparator = MagicMock()
-        mock_comparator.compare.return_value = _make_comparison()
+        mock_comparator.compare_async = AsyncMock(return_value=_make_comparison())
         mock_comparator.generate_report.return_value = ""
         mock_comparator_cls.return_value = mock_comparator
 
@@ -161,7 +161,7 @@ class TestOptimizerRouter:
             },
         )
 
-        mock_comparator.compare.assert_called_once_with(
+        mock_comparator.compare_async.assert_awaited_once_with(
             investment_usd=Decimal("5000"),
             risk_mode="balanced",
             holding_days=60,
@@ -179,7 +179,7 @@ class TestOptimizerRouter:
     ) -> None:
         """内部例外が 503 になること。"""
         mock_comparator = MagicMock()
-        mock_comparator.compare.side_effect = RuntimeError("DB接続失敗")
+        mock_comparator.compare_async = AsyncMock(side_effect=RuntimeError("DB接続失敗"))
         mock_comparator_cls.return_value = mock_comparator
 
         resp = client.post(
@@ -200,7 +200,7 @@ class TestOptimizerRouter:
     ) -> None:
         """ValueError が 422 になること。"""
         mock_comparator = MagicMock()
-        mock_comparator.compare.side_effect = ValueError("不正なリスクモード")
+        mock_comparator.compare_async = AsyncMock(side_effect=ValueError("不正なリスクモード"))
         mock_comparator_cls.return_value = mock_comparator
 
         resp = client.post(
