@@ -120,11 +120,11 @@ export function ChatPanel({ onClose }: Props) {
   //
   // ここでは Next.js client router によるソフト遷移に変える。アプリは再マウントされず、
   // 既に解決済みの degrade 状態 (liffConfigured / isLoggedIn) と token がメモリに残るため、
-  // liff-history 側は #539 で実装済みの degrade 分岐 (BrowserLoginPrompt / 自動再認証) に
+  // liff-chat-history 側は #539 で実装済みの degrade 分岐 (BrowserLoginPrompt / 自動再認証) に
   // 正しく入り、黒画面にならない。LIFF 実機では従来どおり履歴画面へ遷移する。
   const handleHistoryOpen = () => {
     onClose()
-    router.push("/liff-history")
+    router.push("/liff-chat-history")
   }
 
   // サジェストボタンタップ → ユーザーメッセージ追加 → AI 返答取得
