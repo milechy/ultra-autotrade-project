@@ -1,7 +1,7 @@
 """DummyLidoClient / LidoClient のユニットテスト。"""
 
 from decimal import Decimal
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -226,3 +226,122 @@ class TestGetPosition:
             position = await client.get_position()
         assert position.balance == Decimal("0")
         assert position.value_usd == Decimal("0")
+
+
+class TestLidoClientGetStethEthRatio:
+    """LidoClient.get_steth_eth_ratio の on-chain call テスト（Web3 は mock）。"""
+
+    def _make_initialized_client(self) -> LidoClient:
+        """初期化済み LidoClient を返すヘルパー。"""
+        client = LidoClient(LidoConfig(sandbox=False))
+        mock_contract = MagicMock()
+        client._contract = mock_contract
+        client._initialized = True
+        return client
+
+    @pytest.mark.asyncio
+    async def test_ratio_normal_case_returns_decimal(self) -> None:
+        """正常系: getTotalPooledEther / getTotalShares が Decimal で返ること。"""
+        client = self._make_initialized_client()
+        # 100 ETH pooled, 95 shares -> ratio = 100/95
+        client._contract.functions.getTotalPooledEther.return_value.call.return_value = (
+            100_000_000_000_000_000_000
+        )
+        client._contract.functions.getTotalShares.return_value.call.return_value = (
+            95_000_000_000_000_000_000
+        )
+
+        ratio = await client.get_steth_eth_ratio()
+
+        expected = Decimal(100_000_000_000_000_000_000) / Decimal(95_000_000_000_000_000_000)
+        assert ratio == expected
+        assert type(ratio) is Decimal
+
+    @pytest.mark.asyncio
+    async def test_ratio_total_shares_zero_returns_one(self) -> None:
+        """total_shares == 0 のとき Decimal("1") を返すこと（fail-open）。"""
+        client = self._make_initialized_client()
+        client._contract.functions.getTotalPooledEther.return_value.call.return_value = 0
+        client._contract.functions.getTotalShares.return_value.call.return_value = 0
+
+        ratio = await client.get_steth_eth_ratio()
+
+        assert ratio == Decimal("1")
+        assert type(ratio) is Decimal
+
+    @pytest.mark.asyncio
+    async def test_ratio_rpc_failure_raises_runtime_error(self) -> None:
+        """RPC 呼出し失敗時に RuntimeError が raise されること。"""
+        client = self._make_initialized_client()
+        client._contract.functions.getTotalPooledEther.return_value.call.side_effect = Exception(
+            "connection refused"
+        )
+
+        with pytest.raises(RuntimeError, match="stETH/ETH レート取得失敗"):
+            await client.get_steth_eth_ratio()
+
+    @pytest.mark.asyncio
+    async def test_ratio_total_shares_call_failure_raises_runtime_error(self) -> None:
+        """getTotalShares RPC 失敗時も RuntimeError が raise されること。"""
+        client = self._make_initialized_client()
+        client._contract.functions.getTotalPooledEther.return_value.call.return_value = (
+            100_000_000_000_000_000_000
+        )
+        client._contract.functions.getTotalShares.return_value.call.side_effect = Exception(
+            "RPC timeout"
+        )
+
+        with pytest.raises(RuntimeError, match="stETH/ETH レート取得失敗"):
+            await client.get_steth_eth_ratio()
+
+
+class TestLidoClientGetStethBalance:
+    """LidoClient.get_steth_balance の on-chain call テスト（Web3 は mock）。"""
+
+    def _make_initialized_client(self) -> LidoClient:
+        """初期化済み LidoClient を返すヘルパー。"""
+        client = LidoClient(LidoConfig(sandbox=False))
+        mock_contract = MagicMock()
+        client._contract = mock_contract
+        client._initialized = True
+        return client
+
+    @pytest.mark.asyncio
+    async def test_balance_normal_case_returns_decimal(self) -> None:
+        """正常系: balanceOf の返値が ETH 単位の Decimal で返ること。"""
+        client = self._make_initialized_client()
+        # 2.5 ETH = 2_500_000_000_000_000_000 Wei
+        client._contract.functions.balanceOf.return_value.call.return_value = (
+            2_500_000_000_000_000_000
+        )
+
+        with patch("web3.Web3.to_checksum_address", side_effect=lambda x: x):
+            balance = await client.get_steth_balance(_TEST_WALLET)
+
+        assert balance == Decimal("2.5")
+        assert type(balance) is Decimal
+
+    @pytest.mark.asyncio
+    async def test_balance_rpc_failure_raises_runtime_error(self) -> None:
+        """RPC 呼出し失敗時に RuntimeError が raise されること。"""
+        client = self._make_initialized_client()
+        client._contract.functions.balanceOf.return_value.call.side_effect = Exception(
+            "RPC connection error"
+        )
+
+        with patch("web3.Web3.to_checksum_address", side_effect=lambda x: x):
+            with pytest.raises(RuntimeError, match="stETH 残高取得失敗"):
+                await client.get_steth_balance(_TEST_WALLET)
+
+    @pytest.mark.asyncio
+    async def test_balance_invalid_address_raises_runtime_error(self) -> None:
+        """無効なアドレスで ValueError が RuntimeError としてラップされること。"""
+        client = self._make_initialized_client()
+
+        # to_checksum_address が無効アドレスで ValueError を raise するケース
+        with patch(
+            "web3.Web3.to_checksum_address",
+            side_effect=ValueError("invalid address"),
+        ):
+            with pytest.raises(RuntimeError, match="stETH 残高取得失敗"):
+                await client.get_steth_balance("not-a-valid-address")
