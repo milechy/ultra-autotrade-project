@@ -161,3 +161,39 @@ export interface WalletConnectResponse {
 export async function walletConnect(request: WalletConnectRequest): Promise<WalletConnectResponse> {
   return await postJson<WalletConnectResponse>("/auth/wallet/connect", request);
 }
+
+export interface TermsStatusResponse {
+  accepted: boolean;
+  terms_version: string | null;
+  terms_accepted_at: string | null;
+  current_version: string;
+  needs_acceptance: boolean;
+}
+
+/**
+ * 利用規約の同意状態を取得（GET /auth/terms/status）
+ */
+export async function getTermsStatus(token: string): Promise<TermsStatusResponse> {
+  return await getJson<TermsStatusResponse>("/auth/terms/status", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+/**
+ * 利用規約に同意を記録（POST /auth/terms/accept）
+ * @param token   JWT アクセストークン
+ * @param version 同意バージョン文字列（例: "2.0"）
+ */
+export async function acceptTerms(token: string, version: string): Promise<TermsStatusResponse> {
+  return await postJson<TermsStatusResponse>(
+    "/auth/terms/accept",
+    { version },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+}
