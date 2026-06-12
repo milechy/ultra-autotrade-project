@@ -2,6 +2,7 @@
 "use client"
 
 import { ExternalLink, FileText, Shield } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 // 利用規約/プライバシーポリシーは外部ブラウザ (新コンテキスト) で開く。
 // LIFF webview 内で SPA を置換すると liff-chat の履歴が汚れ「戻る」で
@@ -26,19 +27,21 @@ function openExternal(path: string) {
 }
 
 export function TermsPanel() {
+  const t = useTranslations("Liff.panels.terms")
+
   const links = [
     {
       href: "/terms",
-      label: "利用規約",
-      desc: "サービス利用条件・免責事項",
+      label: t("termsLabel"),
+      desc: t("termsDesc"),
       icon: FileText,
     },
     {
       // 実ルートは /privacy-policy (frontend/app/(user)/privacy-policy/page.tsx)。
       // 旧 href ".../privacy" は 404 のため修正。
       href: "/privacy-policy",
-      label: "プライバシーポリシー",
-      desc: "個人情報の取り扱い",
+      label: t("privacyLabel"),
+      desc: t("privacyDesc"),
       icon: Shield,
     },
   ]
@@ -60,7 +63,7 @@ export function TermsPanel() {
         </button>
       ))}
       <p className="text-zinc-600 text-xs text-center pt-2">
-        UAT App v1.0 | © 2026 UAT Co., Ltd.
+        {t("footer")}
       </p>
     </div>
   )

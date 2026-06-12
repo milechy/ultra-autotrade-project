@@ -3,6 +3,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { Copy, Mail, Share2, CheckCircle, Users, Gift, TrendingUp, ChevronRight } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { getReferralInfo, createReferralCode, type ReferralInfo } from "@/lib/api/referral"
 import { getAuthToken } from "@/lib/auth/token-key"
 
@@ -32,6 +33,7 @@ const EMPTY_INFO: ReferralInfo = {
 }
 
 export function ReferralPanel() {
+  const t = useTranslations("Liff.panels.referral")
   const [info, setInfo] = useState<ReferralInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -52,7 +54,7 @@ export function ReferralPanel() {
         setError(null)
       })
       .catch(() => {
-        setError("データを取得できませんでした")
+        setError(t("dataError"))
         setInfo(EMPTY_INFO)
       })
       .finally(() => setLoading(false))
@@ -66,9 +68,9 @@ export function ReferralPanel() {
       setInfo((prev) =>
         prev ? { ...prev, referral_code: res.referral_code } : null
       )
-      showToast("紹介コードを発行しました")
+      showToast(t("toastCodeCreated"))
     } catch {
-      showToast("コードの発行に失敗しました")
+      showToast(t("toastCodeCreateFailed"))
     } finally {
       setCreatingCode(false)
     }
@@ -79,11 +81,11 @@ export function ReferralPanel() {
     if (!code) return
     try {
       await navigator.clipboard.writeText(code)
-      showToast("コードをコピーしました")
+      showToast(t("toastCodeCopied"))
     } catch {
-      showToast("コピーに失敗しました")
+      showToast(t("toastCopyFailed"))
     }
-  }, [info?.referral_code, showToast])
+  }, [info?.referral_code, showToast, t])
 
   const handleCopyLink = useCallback(async () => {
     const code = info?.referral_code
@@ -91,11 +93,11 @@ export function ReferralPanel() {
     const url = `${SIGNUP_URL}?ref=${code}`
     try {
       await navigator.clipboard.writeText(url)
-      showToast("リンクをコピーしました")
+      showToast(t("toastLinkCopied"))
     } catch {
-      showToast("コピーに失敗しました")
+      showToast(t("toastCopyFailed"))
     }
-  }, [info?.referral_code, showToast])
+  }, [info?.referral_code, showToast, t])
 
   const handleLineShare = useCallback(async () => {
     const code = info?.referral_code
@@ -109,12 +111,12 @@ export function ReferralPanel() {
         await liff.shareTargetPicker([{ type: "text", text: shareText }])
       } else {
         await navigator.clipboard.writeText(shareText)
-        showToast("LINEシェア非対応環境 — テキストをコピーしました")
+        showToast(t("toastLineShareFallback"))
       }
     } catch {
-      showToast("シェアに失敗しました")
+      showToast(t("toastShareFailed"))
     }
-  }, [info?.referral_code, showToast])
+  }, [info?.referral_code, showToast, t])
 
   const handleMailShare = useCallback(async () => {
     const code = info?.referral_code
@@ -164,7 +166,7 @@ export function ReferralPanel() {
       {error && (
         <div className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/30
                         rounded-xl px-3 py-2">
-          {error}（オフライン表示中）
+          {error}{t("offlineLabel")}
         </div>
       )}
 
@@ -176,29 +178,29 @@ export function ReferralPanel() {
           </div>
         ) : (
           <>
-            <p className="text-zinc-400 text-xs mb-1">合計報酬</p>
+            <p className="text-zinc-400 text-xs mb-1">{t("totalRewardLabel")}</p>
             <p className="text-[#4ade9a] text-3xl font-bold mb-1">
               ¥{totalReward}
             </p>
             <p className="text-zinc-400 text-xs mb-5">
-              {displayInfo.referral_count}名の紹介から獲得
+              {displayInfo.referral_count}{t("referralCountLabel")}
             </p>
 
             {/* 統計 3つ */}
             <div className="grid grid-cols-3 gap-2 pt-4 border-t border-white/10">
               <StatCard
                 icon={<Users className="w-4 h-4" />}
-                label="紹介人数"
-                value={`${displayInfo.referral_count}名`}
+                label={t("statsReferralCount")}
+                value={`${displayInfo.referral_count}`}
               />
               <StatCard
                 icon={<TrendingUp className="w-4 h-4" />}
-                label="運用開始済み"
-                value={`${operatingCount}名`}
+                label={t("statsOperating")}
+                value={`${operatingCount}`}
               />
               <StatCard
                 icon={<Gift className="w-4 h-4" />}
-                label="今月の報酬"
+                label={t("statsMonthlyReward")}
                 value={`¥${monthlyReward}`}
               />
             </div>
@@ -208,7 +210,7 @@ export function ReferralPanel() {
 
       {/* 紹介コード */}
       <div className="space-y-2">
-        <p className="text-zinc-400 text-xs font-medium px-1">紹介コード</p>
+        <p className="text-zinc-400 text-xs font-medium px-1">{t("referralCodeLabel")}</p>
         {displayInfo.referral_code ? (
           <div className="flex items-center gap-2">
             <div className="flex-1 bg-zinc-800 rounded-xl px-4 py-3 flex items-center">
@@ -223,7 +225,7 @@ export function ReferralPanel() {
                          transition-colors whitespace-nowrap"
             >
               <Copy className="w-4 h-4" />
-              コピー
+              {t("copyCodeBtn")}
             </button>
           </div>
         ) : (
@@ -234,7 +236,7 @@ export function ReferralPanel() {
                        text-white text-sm font-semibold py-3 rounded-xl
                        transition-colors"
           >
-            {creatingCode ? "発行中..." : "紹介コードを発行する"}
+            {creatingCode ? t("creatingCodeBtn") : t("createCodeBtn")}
           </button>
         )}
       </div>
@@ -242,7 +244,7 @@ export function ReferralPanel() {
       {/* シェアボタン */}
       {displayInfo.referral_code && (
         <div className="space-y-2">
-          <p className="text-zinc-400 text-xs font-medium px-1">友達に送る</p>
+          <p className="text-zinc-400 text-xs font-medium px-1">{t("shareSectionLabel")}</p>
           <div className="space-y-2">
             <button
               onClick={handleLineShare}
@@ -251,7 +253,7 @@ export function ReferralPanel() {
                          transition-colors"
             >
               <Share2 className="w-5 h-5" />
-              <span className="flex-1 text-left">LINEで送る</span>
+              <span className="flex-1 text-left">{t("lineShareBtn")}</span>
               <ChevronRight className="w-4 h-4 opacity-60" />
             </button>
 
@@ -262,7 +264,7 @@ export function ReferralPanel() {
                          transition-colors"
             >
               <Mail className="w-5 h-5" />
-              <span className="flex-1 text-left">メールで送る</span>
+              <span className="flex-1 text-left">{t("mailShareBtn")}</span>
               <ChevronRight className="w-4 h-4 opacity-60" />
             </button>
 
@@ -273,7 +275,7 @@ export function ReferralPanel() {
                          transition-colors"
             >
               <Copy className="w-5 h-5" />
-              <span className="flex-1 text-left">リンクをコピー</span>
+              <span className="flex-1 text-left">{t("copyLinkBtn")}</span>
               <ChevronRight className="w-4 h-4 opacity-60" />
             </button>
           </div>
@@ -282,20 +284,20 @@ export function ReferralPanel() {
 
       {/* 報酬の仕組み */}
       <div className="space-y-2">
-        <p className="text-zinc-400 text-xs font-medium px-1">報酬の仕組み</p>
+        <p className="text-zinc-400 text-xs font-medium px-1">{t("howItWorksLabel")}</p>
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-4">
           <HowItWorksStep
             step={1}
-            text="友達に紹介コードを送る"
+            text={t("howItWorksStep1")}
           />
           <HowItWorksStep
             step={2}
-            text="友達が登録して資産運用を開始"
+            text={t("howItWorksStep2")}
           />
           <HowItWorksStep
             step={3}
-            text="紹介した友達の毎月の実受取利益（手数料控除後）の 10% を、翌月末にあなたへ自動でお支払い"
-            reward="紹介し続ける限り継続"
+            text={t("howItWorksStep3")}
+            reward={t("howItWorksReward")}
           />
         </div>
       </div>
@@ -303,10 +305,10 @@ export function ReferralPanel() {
       {/* 紹介した友達リスト */}
       {displayInfo.referred_users.length > 0 && (
         <div className="space-y-2">
-          <p className="text-zinc-400 text-xs font-medium px-1">紹介した友達</p>
+          <p className="text-zinc-400 text-xs font-medium px-1">{t("referredUsersLabel")}</p>
           <div className="space-y-2">
             {displayInfo.referred_users.map((user, i) => (
-              <ReferredUserRow key={i} user={user} />
+              <ReferredUserRow key={i} user={user} tPanel={t} />
             ))}
           </div>
         </div>
@@ -314,8 +316,7 @@ export function ReferralPanel() {
 
       {!loading && displayInfo.referred_users.length === 0 && displayInfo.referral_code && (
         <div className="text-center py-8 text-zinc-600 text-sm">
-          まだ紹介した友達がいません。<br />
-          コードを友達に送ってみましょう！
+          {t("noReferredUsers")}
         </div>
       )}
     </div>
@@ -367,7 +368,13 @@ function HowItWorksStep({
   )
 }
 
-function ReferredUserRow({ user }: { user: { name: string; joined_at: string; status: string; reward_jpy: string } }) {
+function ReferredUserRow({
+  user,
+  tPanel,
+}: {
+  user: { name: string; joined_at: string; status: string; reward_jpy: string }
+  tPanel: (key: string, opts?: Record<string, unknown>) => string
+}) {
   const isActive = user.status === "運用中"
   const initial = user.name ? user.name.charAt(0).toUpperCase() : "?"
   const joinedDate = user.joined_at ? user.joined_at.slice(0, 10) : ""
@@ -384,7 +391,7 @@ function ReferredUserRow({ user }: { user: { name: string; joined_at: string; st
       {/* 名前・日付 */}
       <div className="flex-1 min-w-0">
         <p className="text-white text-sm font-medium truncate">{user.name}</p>
-        <p className="text-zinc-500 text-xs mt-0.5">登録日: {joinedDate}</p>
+        <p className="text-zinc-500 text-xs mt-0.5">{tPanel("joinedDateLabel")} {joinedDate}</p>
       </div>
 
       {/* ステータス・報酬 */}

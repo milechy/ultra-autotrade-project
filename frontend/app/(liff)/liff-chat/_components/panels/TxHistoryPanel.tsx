@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react"
 import { ArrowDown, ArrowUp, ChevronLeft, Download, ExternalLink, Loader2 } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { getAuthToken } from "@/lib/auth/token-key"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
@@ -82,13 +83,6 @@ function groupByMonth(txs: Transaction[]): Array<{ month: string; items: Transac
   return Array.from(groups.entries()).map(([month, items]) => ({ month, items }))
 }
 
-function statusLabel(status: string): string {
-  if (status === "executed" || status === "completed") return "実行済み"
-  if (status === "pending") return "保留中"
-  if (status === "failed") return "失敗"
-  return status
-}
-
 // --- Detail Panel ---
 interface TxDetailPanelProps {
   tx: Transaction
@@ -96,20 +90,28 @@ interface TxDetailPanelProps {
 }
 
 function TxDetailPanel({ tx, onClose }: TxDetailPanelProps) {
+  const t = useTranslations("Liff.panels.txHistory")
   const isSupply = tx.operation === "SUPPLY"
   const amountDisplay = formatAmountUsd(tx.amount_usd, tx.operation)
 
+  function statusLabel(status: string): string {
+    if (status === "executed" || status === "completed") return t("statusExecuted")
+    if (status === "pending") return t("statusPending")
+    if (status === "failed") return t("statusFailed")
+    return status
+  }
+
   const detailRows: Array<{ label: string; value: string }> = [
-    { label: "操作", value: isSupply ? "SUPPLY (入金)" : "WITHDRAW (出金)" },
-    { label: "アセット", value: tx.asset },
-    { label: "日時", value: formatDate(tx.created_at) },
-    { label: "ステータス", value: statusLabel(tx.status) },
+    { label: t("detailOperation"), value: isSupply ? t("operationSupply") : t("operationWithdraw") },
+    { label: t("detailAsset"), value: tx.asset },
+    { label: t("detailDate"), value: formatDate(tx.created_at) },
+    { label: t("detailStatus"), value: statusLabel(tx.status) },
   ]
-  if (tx.protocol) detailRows.push({ label: "プロトコル", value: tx.protocol })
-  if (tx.apy) detailRows.push({ label: "APY", value: `${tx.apy}%` })
-  if (tx.gas_fee_usd) detailRows.push({ label: "ガス代", value: `$${Number(tx.gas_fee_usd).toFixed(4)}` })
-  if (tx.wallet_address) detailRows.push({ label: "ウォレット", value: `${tx.wallet_address.slice(0, 6)}...${tx.wallet_address.slice(-4)}` })
-  if (tx.tx_hash) detailRows.push({ label: "Tx Hash", value: `${tx.tx_hash.slice(0, 8)}...${tx.tx_hash.slice(-6)}` })
+  if (tx.protocol) detailRows.push({ label: t("detailProtocol"), value: tx.protocol })
+  if (tx.apy) detailRows.push({ label: t("detailApy"), value: `${tx.apy}%` })
+  if (tx.gas_fee_usd) detailRows.push({ label: t("detailGas"), value: `$${Number(tx.gas_fee_usd).toFixed(4)}` })
+  if (tx.wallet_address) detailRows.push({ label: t("detailWallet"), value: `${tx.wallet_address.slice(0, 6)}...${tx.wallet_address.slice(-4)}` })
+  if (tx.tx_hash) detailRows.push({ label: t("detailTxHash"), value: `${tx.tx_hash.slice(0, 8)}...${tx.tx_hash.slice(-6)}` })
 
   return (
     <div className="fixed inset-0 z-[60] bg-zinc-900 flex flex-col animate-in slide-in-from-right duration-200 w-[375px] mx-auto">
@@ -118,7 +120,7 @@ function TxDetailPanel({ tx, onClose }: TxDetailPanelProps) {
         <button onClick={onClose} className="text-white mr-2">
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <h2 className="text-white font-semibold text-base">取引詳細</h2>
+        <h2 className="text-white font-semibold text-base">{t("detailTitle")}</h2>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-8">
@@ -151,7 +153,7 @@ function TxDetailPanel({ tx, onClose }: TxDetailPanelProps) {
             className="mt-6 flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors text-sm"
           >
             <ExternalLink className="w-4 h-4" />
-            Basescanで確認する
+            {t("detailBasescanBtn")}
           </a>
         )}
       </div>
@@ -161,6 +163,7 @@ function TxDetailPanel({ tx, onClose }: TxDetailPanelProps) {
 
 // --- Main Panel ---
 export function TxHistoryPanel() {
+  const t = useTranslations("Liff.panels.txHistory")
   const [txs, setTxs] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -191,7 +194,7 @@ export function TxHistoryPanel() {
       .then((r) => {
         if (r.status === 401) {
           setAuthExpired(true)
-          throw new Error("認証の有効期限が切れました")
+          throw new Error("auth_expired")
         }
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json() as Promise<Transaction[] | { items: Transaction[] }>
@@ -201,7 +204,9 @@ export function TxHistoryPanel() {
         setTxs(items)
       })
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : "データ取得に失敗しました")
+        if (err instanceof Error && err.message !== "auth_expired") {
+          setError(err.message)
+        }
       })
       .finally(() => setLoading(false))
   }, [])
@@ -223,6 +228,13 @@ export function TxHistoryPanel() {
     document.body.removeChild(link)
   }
 
+  function statusLabel(status: string): string {
+    if (status === "executed" || status === "completed") return t("statusExecuted")
+    if (status === "pending") return t("statusPending")
+    if (status === "failed") return t("statusFailed")
+    return status
+  }
+
   // フィルタリング
   const filteredTxs = txs.filter((tx) => {
     if (filter === "all") return true
@@ -237,7 +249,7 @@ export function TxHistoryPanel() {
   const grouped = groupByMonth(filteredTxs)
 
   const FILTERS: Array<{ id: FilterType; label: string }> = [
-    { id: "all", label: "すべて" },
+    { id: "all", label: t("filterAll") },
     { id: "SUPPLY", label: "SUPPLY" },
     { id: "WITHDRAW", label: "WITHDRAW" },
     { id: "USDC", label: "USDC" },
@@ -248,7 +260,7 @@ export function TxHistoryPanel() {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
         <Loader2 className="w-6 h-6 mb-3 text-zinc-600 animate-spin" />
-        <p className="text-sm">読み込み中...</p>
+        <p className="text-sm">{t("loading")}</p>
       </div>
     )
   }
@@ -257,9 +269,9 @@ export function TxHistoryPanel() {
   if (authExpired) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-        <p className="text-sm text-zinc-300 mb-1">ログインの有効期限が切れました</p>
+        <p className="text-sm text-zinc-300 mb-1">{t("authExpiredTitle")}</p>
         <p className="text-xs text-zinc-500 mb-5">
-          取引履歴を表示するには、もう一度ログインしてください。
+          {t("authExpiredDesc")}
         </p>
         <button
           onClick={() => {
@@ -269,7 +281,7 @@ export function TxHistoryPanel() {
           }}
           className="bg-[#1D9E75] hover:bg-[#178a66] text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
         >
-          再ログイン
+          {t("reloginBtn")}
         </button>
       </div>
     )
@@ -292,7 +304,7 @@ export function TxHistoryPanel() {
           className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs px-3 py-1.5 rounded-lg transition-colors"
         >
           <Download className="w-3.5 h-3.5" />
-          CSV
+          {t("csvBtn")}
         </button>
       </div>
 
@@ -332,7 +344,7 @@ export function TxHistoryPanel() {
       {/* 取引リスト */}
       {filteredTxs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
-          <p className="text-sm">取引履歴がありません</p>
+          <p className="text-sm">{t("noTxs")}</p>
         </div>
       ) : (
         <div className="flex flex-col">

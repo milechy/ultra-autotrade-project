@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react"
 import { MessageCircle, Bell, AlertTriangle, ShieldAlert, FileText, Info } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { getAuthToken } from "@/lib/auth/token-key"
 import { liffFetch } from "@/lib/liff/liff-fetch"
 
@@ -129,6 +130,7 @@ function NotificationRow({
 // ---------------------------------------------------------------------------
 
 export function NotificationPanel() {
+  const t = useTranslations("Liff.panels.notification")
   const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS)
   const [pushPermission, setPushPermission] = useState<NotificationPermission>("default")
   const [testSending, setTestSending] = useState(false)
@@ -219,12 +221,12 @@ export function NotificationPanel() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
-        setTestMessage("テスト通知を送信しました")
+        setTestMessage(t("testNotificationSent"))
       } else {
-        setTestMessage("送信に失敗しました（API未実装の可能性があります）")
+        setTestMessage(t("testNotificationFailed"))
       }
     } catch {
-      setTestMessage("送信に失敗しました")
+      setTestMessage(t("testNotificationError"))
     } finally {
       setTestSending(false)
       setTimeout(() => setTestMessage(null), 4000)
@@ -233,23 +235,23 @@ export function NotificationPanel() {
 
   const pushBadge =
     pushPermission === "granted" ? (
-      <span className="text-[10px] text-[#4ade9a] font-semibold">許可済み</span>
+      <span className="text-[10px] text-[#4ade9a] font-semibold">{t("pushGranted")}</span>
     ) : (
-      <span className="text-[10px] text-yellow-400 font-semibold">未許可</span>
+      <span className="text-[10px] text-yellow-400 font-semibold">{t("pushNotGranted")}</span>
     )
 
   return (
     <div className="pb-4">
       {/* 通知チャネル */}
-      <SectionHeader label="通知チャネル" />
+      <SectionHeader label={t("channelSection")} />
 
       {/* LINE 通知 */}
       <div className="flex items-center justify-between bg-zinc-800 rounded-xl px-4 py-3 mb-2">
         <div className="flex items-center gap-3">
           <MessageCircle className="w-5 h-5 text-[#4ade9a]" />
           <div>
-            <div className="text-white text-sm">LINE 通知</div>
-            <div className="text-[#4ade9a] text-xs">接続済み</div>
+            <div className="text-white text-sm">{t("lineNotification")}</div>
+            <div className="text-[#4ade9a] text-xs">{t("lineConnected")}</div>
           </div>
         </div>
         <Toggle
@@ -264,7 +266,7 @@ export function NotificationPanel() {
           <Bell className="w-5 h-5 text-[#4ade9a]" />
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-white text-sm">PWA プッシュ通知</span>
+              <span className="text-white text-sm">{t("pushNotification")}</span>
               {pushBadge}
             </div>
           </div>
@@ -276,27 +278,27 @@ export function NotificationPanel() {
       </div>
 
       {/* AI・取引 */}
-      <SectionHeader label="AI・取引" />
+      <SectionHeader label={t("aiTradeSection")} />
 
       <NotificationRow
         icon={<Bell className="w-5 h-5" />}
-        label="AI 提案通知"
+        label={t("aiProposalLabel")}
         checked={settings.preferences.ai_proposal}
         onChange={(v) => updatePref("ai_proposal", v)}
       />
       <NotificationRow
         icon={<Bell className="w-5 h-5" />}
-        label="実行完了通知"
+        label={t("executionCompleteLabel")}
         checked={settings.preferences.execution_complete}
         onChange={(v) => updatePref("execution_complete", v)}
       />
 
       {/* リスク・安全 */}
-      <SectionHeader label="リスク・安全" />
+      <SectionHeader label={t("riskSafetySection")} />
 
       <NotificationRow
         icon={<AlertTriangle className="w-5 h-5" />}
-        label="Health Factor 警告"
+        label={t("healthFactorLabel")}
         checked={settings.preferences.health_factor_warning}
         onChange={(v) => updatePref("health_factor_warning", v)}
       />
@@ -305,9 +307,9 @@ export function NotificationPanel() {
           <ShieldAlert className="w-5 h-5 text-[#4ade9a]" />
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-white text-sm">緊急停止通知</span>
+              <span className="text-white text-sm">{t("emergencyStopLabel")}</span>
               <span className="text-[10px] text-zinc-400 font-semibold bg-zinc-700 px-1.5 py-0.5 rounded">
-                変更不可
+                {t("immutableBadge")}
               </span>
             </div>
           </div>
@@ -320,17 +322,17 @@ export function NotificationPanel() {
       </div>
 
       {/* レポート */}
-      <SectionHeader label="レポート" />
+      <SectionHeader label={t("reportSection")} />
 
       <NotificationRow
         icon={<FileText className="w-5 h-5" />}
-        label="月次レポート"
+        label={t("monthlyReportLabel")}
         checked={settings.preferences.monthly_report}
         onChange={(v) => updatePref("monthly_report", v)}
       />
       <NotificationRow
         icon={<Info className="w-5 h-5" />}
-        label="システムお知らせ"
+        label={t("systemNoticeLabel")}
         checked={settings.preferences.system_notice}
         onChange={(v) => updatePref("system_notice", v)}
       />
@@ -342,7 +344,7 @@ export function NotificationPanel() {
         disabled={testSending}
         className="w-full py-3 border border-zinc-700 text-zinc-300 rounded-xl text-sm hover:bg-zinc-800 transition-colors mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {testSending ? "送信中..." : "テスト通知を送信"}
+        {testSending ? t("testNotificationSending") : t("testNotificationBtn")}
       </button>
 
       {testMessage && (

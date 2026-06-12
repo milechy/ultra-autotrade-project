@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Loader2,
 } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { usePrivy } from "@privy-io/react-auth"
 import { useWallet } from "@/hooks/useWallet"
 import { useLinkedWalletAddress } from "@/hooks/useLinkedWalletAddress"
@@ -26,6 +27,7 @@ import { useLinkedWalletAddress } from "@/hooks/useLinkedWalletAddress"
 type FetchState = "loading" | "ready" | "empty" | "error"
 
 export function MyWalletPanel() {
+  const t = useTranslations("Liff.panels.myWallet")
   const { ready: privyReady, login } = usePrivy()
 
   // live wallet（injected / Privy embedded）は useWallet に集約済み。
@@ -77,9 +79,9 @@ export function MyWalletPanel() {
     if (!address) return
     try {
       await navigator.clipboard.writeText(address)
-      showToast("アドレスをコピーしました ✓")
+      showToast(t("toastCopied"))
     } catch {
-      showToast("コピーに失敗しました")
+      showToast(t("toastCopyFailed"))
     }
   }
 
@@ -111,11 +113,11 @@ export function MyWalletPanel() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-[#4ade9a]" />
-            <span className="text-[#4ade9a] text-xs font-semibold">Non-Custodial</span>
+            <span className="text-[#4ade9a] text-xs font-semibold">{t("nonCustodial")}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#1D9E75] inline-block" />
-            <span className="text-zinc-300 text-xs">Base Mainnet</span>
+            <span className="text-zinc-300 text-xs">{t("baseMainnet")}</span>
           </div>
         </div>
 
@@ -127,7 +129,7 @@ export function MyWalletPanel() {
         ) : fetchState === "loading" ? (
           <div className="flex items-center gap-2 text-zinc-500 text-xs">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-[#4ade9a]" />
-            <span>ウォレットアドレスを読み込み中...</span>
+            <span>{t("addressLoading")}</span>
           </div>
         ) : fetchState === "error" ? (
           // fail-visible: 永久ローディングにせずエラー + リトライ
@@ -135,7 +137,7 @@ export function MyWalletPanel() {
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-[#e24b4a] flex-shrink-0 mt-0.5" />
               <p className="text-[#e24b4a] text-xs leading-relaxed">
-                ウォレットアドレスの取得に失敗しました。通信環境をご確認のうえ再試行してください。
+                {t("addressError")}
               </p>
             </div>
             <button
@@ -145,7 +147,7 @@ export function MyWalletPanel() {
                          transition-colors text-xs text-zinc-200"
             >
               <RefreshCw className="w-3.5 h-3.5 text-[#4ade9a]" />
-              再試行
+              {t("retryBtn")}
             </button>
           </div>
         ) : (
@@ -156,10 +158,10 @@ export function MyWalletPanel() {
                 <Wallet className="w-5 h-5 text-[#4ade9a]" />
               </div>
               <p className="text-zinc-200 text-sm font-medium">
-                ウォレットが未接続です
+                {t("walletNotConnected")}
               </p>
               <p className="text-zinc-500 text-xs leading-relaxed">
-                ウォレットに接続すると、受取用アドレスや QR コードが表示されます。
+                {t("walletNotConnectedDesc")}
               </p>
             </div>
             <button
@@ -169,7 +171,7 @@ export function MyWalletPanel() {
                          transition-colors text-sm font-semibold text-white"
             >
               <Wallet className="w-4 h-4" />
-              ウォレットに接続する
+              {t("connectBtn")}
             </button>
             {/* Privy 初期化前など login が使えない場合のフォールバック再試行 */}
             <button
@@ -179,7 +181,7 @@ export function MyWalletPanel() {
                          transition-colors text-xs text-zinc-400"
             >
               <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
-              再読み込み
+              {t("reloadBtn")}
             </button>
           </div>
         )}
@@ -195,7 +197,7 @@ export function MyWalletPanel() {
                        transition-colors"
           >
             <Copy className="w-4 h-4 text-[#4ade9a]" />
-            <span className="text-[10px] text-zinc-300">コピー</span>
+            <span className="text-[10px] text-zinc-300">{t("copyLabel")}</span>
           </button>
 
           <button
@@ -207,7 +209,7 @@ export function MyWalletPanel() {
                        transition-colors"
           >
             <QrCode className="w-4 h-4 text-[#4ade9a]" />
-            <span className="text-[10px] text-zinc-300">QR コード</span>
+            <span className="text-[10px] text-zinc-300">{t("qrLabel")}</span>
           </button>
 
           <button
@@ -219,7 +221,7 @@ export function MyWalletPanel() {
                        transition-colors"
           >
             <ExternalLink className="w-4 h-4 text-[#4ade9a]" />
-            <span className="text-[10px] text-zinc-300">Basescan</span>
+            <span className="text-[10px] text-zinc-300">{t("basescanLabel")}</span>
           </button>
         </div>
       </div>
@@ -227,12 +229,12 @@ export function MyWalletPanel() {
       {/* QRコードセクション */}
       {qrExpanded && address && (
         <div className="bg-zinc-900 rounded-2xl p-4 space-y-3 border border-zinc-800">
-          <p className="text-zinc-300 text-sm font-medium text-center">受取用 QR コード</p>
+          <p className="text-zinc-300 text-sm font-medium text-center">{t("qrTitle")}</p>
           <div className="flex justify-center">
             <canvas ref={canvasRef} className="rounded-xl bg-white p-2" />
           </div>
           <p className="text-zinc-500 text-xs text-center">
-            このQRコードをスキャンしてUSDCを受け取れます
+            {t("qrNote")}
           </p>
         </div>
       )}
@@ -241,7 +243,7 @@ export function MyWalletPanel() {
       <div className="flex items-start gap-2 px-1">
         <Shield className="w-4 h-4 text-zinc-500 flex-shrink-0 mt-0.5" />
         <p className="text-zinc-500 text-xs leading-relaxed">
-          送金前に先頭4桁・末尾4桁をご確認ください
+          {t("securityNote")}
         </p>
       </div>
 
