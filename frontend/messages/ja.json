@@ -428,6 +428,7 @@
         "title": "アカウント",
         "editNamePlaceholder": "ユーザー名",
         "editNameAriaLabel": "ユーザー名",
+        "editNameEditAriaLabel": "ユーザー名を編集",
         "saveNameAriaLabel": "名前を保存",
         "cancelEditAriaLabel": "編集をキャンセル",
         "changeIconAriaLabel": "アイコンを変更",
@@ -518,7 +519,8 @@
         "successMsg": "出金リクエストを送信しました。反映まで少々お待ちください。",
         "withdrawFailed": "出金処理に失敗しました",
         "moonpayTitle": "クレジットカードで購入",
-        "moonpayDesc": "MoonPay を使って、クレジットカードまたはデビットカードで USDC を購入できます。"
+        "moonpayDesc": "MoonPay を使って、クレジットカードまたはデビットカードで USDC を購入できます。",
+        "quickMax": "全額"
       },
       "myWallet": {
         "title": "MY WALLET",
@@ -571,7 +573,9 @@
         "toastCodeCreated": "紹介コードを発行しました",
         "toastCodeCreateFailed": "コードの発行に失敗しました",
         "toastLineShareFallback": "LINEシェア非対応環境 — テキストをコピーしました",
-        "toastShareFailed": "シェアに失敗しました"
+        "toastShareFailed": "シェアに失敗しました",
+        "shareTextBody": "【UATaのご紹介】\nAIが自動で資産運用してくれるサービスです。\n紹介コード「{code}」を使ってアカウント登録できます。\n▼ アカウント開設はこちら\n{url}",
+        "mailSubject": "【UATaのご紹介】AI自動資産運用サービス"
       },
       "opMode": {
         "title": "運用モード切替",

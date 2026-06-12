@@ -18,8 +18,11 @@ function getToken(): string {
   return getAuthToken() ?? ""
 }
 
-function buildShareText(code: string): string {
-  return `【UATaのご紹介】\nAIが自動で資産運用してくれるサービスです。\n紹介コード「${code}」を使ってアカウント登録できます。\n▼ アカウント開設はこちら\n${SIGNUP_URL}?ref=${code}`
+function buildShareText(code: string, template: string): string {
+  // template uses {code} and {url} as placeholders (from i18n keys shareTextBody)
+  return template
+    .replace("{code}", code)
+    .replace("{url}", `${SIGNUP_URL}?ref=${code}`)
 }
 
 /** フォールバック用のスケルトンデータ（ローディング中 or エラー時） */
@@ -102,7 +105,7 @@ export function ReferralPanel() {
   const handleLineShare = useCallback(async () => {
     const code = info?.referral_code
     if (!code) return
-    const shareText = buildShareText(code)
+    const shareText = buildShareText(code, t("shareTextBody"))
     try {
       const { getLiff, isLiffConfigured } = await import("@/lib/liff/init")
       // ブラウザ PWA モード（LIFF 未設定）は SDK を触らずクリップボードへ degrade。
@@ -121,8 +124,8 @@ export function ReferralPanel() {
   const handleMailShare = useCallback(async () => {
     const code = info?.referral_code
     if (!code) return
-    const subject = encodeURIComponent("【UATaのご紹介】AI自動資産運用サービス")
-    const body = encodeURIComponent(buildShareText(code))
+    const subject = encodeURIComponent(t("mailSubject"))
+    const body = encodeURIComponent(buildShareText(code, t("shareTextBody")))
     const mailtoUrl = `mailto:?subject=${subject}&body=${body}`
     try {
       const { getLiff, isLiffConfigured } = await import("@/lib/liff/init")
@@ -138,7 +141,7 @@ export function ReferralPanel() {
     } catch {
       window.open(mailtoUrl, "_blank")
     }
-  }, [info?.referral_code])
+  }, [info?.referral_code, t])
 
   const displayInfo = info ?? EMPTY_INFO
 

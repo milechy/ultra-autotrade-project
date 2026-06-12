@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react"
 import { useTranslations } from "next-intl"
+import { useLanguage } from "@/lib/useLanguage"
 import { getAuthToken, clearAuthToken } from "@/lib/auth/token-key"
 import { liffFetch } from "@/lib/liff/liff-fetch"
 
@@ -47,6 +48,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 export function AccountPanel() {
   const t = useTranslations("Liff.panels.account")
+  const { language } = useLanguage()
   const router = useRouter()
   const { logout: privyLogout, authenticated } = usePrivy()
   // 認証状態。未ログイン時に「ログアウト」/「アカウント削除」等の操作系を出さないためのガード。
@@ -167,11 +169,15 @@ export function AccountPanel() {
     return `${addr.slice(0, 6)}…${addr.slice(-4)}`
   }
 
-  // 運用開始日フォーマット
+  // 運用開始日フォーマット（locale に応じて EN/JA 日付形式を切り替え）
   const getStartedAt = () => {
     if (!userData?.created_at) return "—"
     const d = new Date(userData.created_at)
-    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+    return new Intl.DateTimeFormat(language === "en" ? "en-US" : "ja-JP", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(d)
   }
 
   // 運用モード表示
@@ -493,7 +499,7 @@ export function AccountPanel() {
                 <button
                   type="button"
                   onClick={handleStartEditName}
-                  aria-label="ユーザー名を編集"
+                  aria-label={t("editNameEditAriaLabel")}
                   className="flex-shrink-0 text-zinc-500 hover:text-[#4ade9a] transition-colors"
                 >
                   <Pencil className="w-3.5 h-3.5" />

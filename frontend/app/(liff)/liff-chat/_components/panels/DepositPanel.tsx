@@ -293,7 +293,9 @@ export function DepositPanel() {
                 className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs py-2 rounded-lg
                            border border-zinc-700 transition-colors"
               >
-                ¥{(amt / 10000).toFixed(0)}万
+                {language === "en"
+                  ? `¥${amt.toLocaleString()}`
+                  : `¥${(amt / 10000).toFixed(0)}万`}
               </button>
             ))}
           </div>
@@ -409,7 +411,7 @@ export function DepositPanel() {
               className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs py-2 rounded-lg
                          border border-zinc-700 transition-colors"
             >
-              全額
+              {t("quickMax")}
             </button>
           </div>
 

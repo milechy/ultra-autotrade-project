@@ -393,6 +393,7 @@
         "title": "Account",
         "editNamePlaceholder": "Username",
         "editNameAriaLabel": "Username",
+        "editNameEditAriaLabel": "Edit username",
         "saveNameAriaLabel": "Save name",
         "cancelEditAriaLabel": "Cancel editing",
         "changeIconAriaLabel": "Change icon",
@@ -483,7 +484,8 @@
         "successMsg": "Withdrawal request submitted. Please wait for confirmation.",
         "withdrawFailed": "Withdrawal failed",
         "moonpayTitle": "Buy with card",
-        "moonpayDesc": "Purchase USDC with a credit or debit card via MoonPay."
+        "moonpayDesc": "Purchase USDC with a credit or debit card via MoonPay.",
+        "quickMax": "Max"
       },
       "myWallet": {
         "title": "MY WALLET",
@@ -536,7 +538,9 @@
         "toastCodeCreated": "Referral code generated",
         "toastCodeCreateFailed": "Failed to generate code",
         "toastLineShareFallback": "LINE share unavailable — text copied",
-        "toastShareFailed": "Share failed"
+        "toastShareFailed": "Share failed",
+        "shareTextBody": "[Introducing UATa]\nUATa is an AI-powered automated asset management service.\nRegister with referral code \"{code}\":\n{url}",
+        "mailSubject": "[Introducing UATa] AI Automated Asset Management"
       },
       "opMode": {
         "title": "Operation Mode",
