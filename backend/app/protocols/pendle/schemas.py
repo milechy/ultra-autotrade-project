@@ -123,10 +123,11 @@ class RouterV4SwapRequest(BaseModel):
     )
     receiver: str = Field(..., description="受取アドレス")
     portfolio_value_usd: Optional[Decimal] = Field(
-        default=None, description="ポートフォリオ総額（USD）。10%上限チェック用"
+        default=None, ge=Decimal("0"), description="ポートフォリオ総額（USD）。10%上限チェック用"
     )
     amount_in_usd: Optional[Decimal] = Field(
         default=None,
+        ge=Decimal("0"),
         description="トレード金額（USD）。portfolio_value_usd と併用必須（未指定時は fail-closed で拒否）",
     )
 
@@ -176,10 +177,11 @@ class RouterV4AddLiquidityRequest(BaseModel):
     )
     receiver: str = Field(..., description="受取アドレス")
     portfolio_value_usd: Optional[Decimal] = Field(
-        default=None, description="ポートフォリオ総額（USD）。10%上限チェック用"
+        default=None, ge=Decimal("0"), description="ポートフォリオ総額（USD）。10%上限チェック用"
     )
     amount_in_usd: Optional[Decimal] = Field(
         default=None,
+        ge=Decimal("0"),
         description="トレード金額（USD）。portfolio_value_usd と併用必須（未指定時は fail-closed で拒否）",
     )
 

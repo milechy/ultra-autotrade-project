@@ -560,3 +560,109 @@ class TestRouterEndpointPassthrough:
         call_kwargs = mock_client.add_liquidity.call_args
         assert call_kwargs.kwargs.get("portfolio_value_usd") == Decimal("500.0")
         assert call_kwargs.kwargs.get("amount_in_usd") == Decimal("25.0")
+
+
+class TestRouterEndpointNegativeUsdRejected:
+    """負の amount_in_usd / portfolio_value_usd は API 境界（ge=0）で 422 拒否されること。
+
+    負値が通ると `negative > limit` が常に False になり 10%上限ガードを素通りできるため、
+    pydantic の ge=0 制約でスキーマレベル拒否する。
+    """
+
+    def test_v4_swap_negative_amount_in_usd_returns_422(self) -> None:
+        """POST /v4/swap: 負の amount_in_usd は 422。client には到達しない。"""
+        with (
+            patch("app.protocols.pendle.router.get_pendle_config"),
+            patch("app.protocols.pendle.router.get_pendle_router_v4_client") as mock_factory,
+        ):
+            mock_client = AsyncMock()
+            mock_factory.return_value = mock_client
+
+            response = _http_client.post(
+                "/api/protocols/pendle/v4/swap",
+                json={
+                    "market_address": MARKET_ADDR,
+                    "token_in": TOKEN_IN_ADDR,
+                    "token_out": "YT",
+                    "amount_in": "1.0",
+                    "receiver": RECEIVER_ADDR,
+                    "portfolio_value_usd": "1000.0",
+                    "amount_in_usd": "-50.0",
+                },
+            )
+
+        assert response.status_code == 422
+        mock_client.buy_yt.assert_not_called()
+
+    def test_v4_swap_negative_portfolio_value_usd_returns_422(self) -> None:
+        """POST /v4/swap: 負の portfolio_value_usd は 422。"""
+        with (
+            patch("app.protocols.pendle.router.get_pendle_config"),
+            patch("app.protocols.pendle.router.get_pendle_router_v4_client") as mock_factory,
+        ):
+            mock_client = AsyncMock()
+            mock_factory.return_value = mock_client
+
+            response = _http_client.post(
+                "/api/protocols/pendle/v4/swap",
+                json={
+                    "market_address": MARKET_ADDR,
+                    "token_in": TOKEN_IN_ADDR,
+                    "token_out": "YT",
+                    "amount_in": "1.0",
+                    "receiver": RECEIVER_ADDR,
+                    "portfolio_value_usd": "-1000.0",
+                    "amount_in_usd": "50.0",
+                },
+            )
+
+        assert response.status_code == 422
+        mock_client.buy_yt.assert_not_called()
+
+    def test_v4_add_liquidity_negative_amount_in_usd_returns_422(self) -> None:
+        """POST /v4/add-liquidity: 負の amount_in_usd は 422。"""
+        with (
+            patch("app.protocols.pendle.router.get_pendle_config"),
+            patch("app.protocols.pendle.router.get_pendle_router_v4_client") as mock_factory,
+        ):
+            mock_client = AsyncMock()
+            mock_factory.return_value = mock_client
+
+            response = _http_client.post(
+                "/api/protocols/pendle/v4/add-liquidity",
+                json={
+                    "market_address": MARKET_ADDR,
+                    "token_in": TOKEN_IN_ADDR,
+                    "amount_in": "1.0",
+                    "receiver": RECEIVER_ADDR,
+                    "portfolio_value_usd": "500.0",
+                    "amount_in_usd": "-25.0",
+                },
+            )
+
+        assert response.status_code == 422
+        mock_client.add_liquidity.assert_not_called()
+
+    def test_v4_add_liquidity_negative_portfolio_value_usd_returns_422(self) -> None:
+        """POST /v4/add-liquidity: 負の portfolio_value_usd は 422。"""
+        with (
+            patch("app.protocols.pendle.router.get_pendle_config"),
+            patch("app.protocols.pendle.router.get_pendle_router_v4_client") as mock_factory,
+        ):
+            mock_client = AsyncMock()
+            mock_factory.return_value = mock_client
+
+            response = _http_client.post(
+                "/api/protocols/pendle/v4/add-liquidity",
+                json={
+                    "market_address": MARKET_ADDR,
+                    "token_in": TOKEN_IN_ADDR,
+                    "amount_in": "1.0",
+                    "receiver": RECEIVER_ADDR,
+                    "portfolio_value_usd": "-500.0",
+                    "amount_in_usd": "25.0",
+                },
+            )
+
+        assert response.status_code == 422
+        mock_client.add_liquidity.assert_not_called()
