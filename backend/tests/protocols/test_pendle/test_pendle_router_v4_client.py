@@ -50,7 +50,7 @@ def router_client() -> PendleRouterV4Client:
 class TestPendleRouterV4ClientInit:
     def test_router_address_is_correct(self, router_client: PendleRouterV4Client) -> None:
         """Router アドレスが正しい Pendle V4 アドレスであること。"""
-        assert router_client._ROUTER_ADDRESS == "0x888888888889758F76e7103c6CbF23ABbF58F946"
+        assert router_client._config.router_address == "0x888888888889758F76e7103c6CbF23ABbF58F946"
 
     def test_default_slippage_is_half_percent(self, router_client: PendleRouterV4Client) -> None:
         """デフォルトスリッページが 0.5% (0.005) であること。"""

@@ -375,7 +375,7 @@ class TestFactory:
     def test_factory_uses_correct_router_address(self) -> None:
         config = PendleConfig(sandbox=False)
         client = get_pendle_router_v4_client(config)
-        assert client._ROUTER_ADDRESS == "0x888888888889758F76e7103c6CbF23ABbF58F946"
+        assert client._config.router_address == "0x888888888889758F76e7103c6CbF23ABbF58F946"
 
     def test_factory_inherits_config_enable_flag(self) -> None:
         """ファクトリから生成したクライアントが config の enable_onchain_write を引き継ぐこと。"""

@@ -409,7 +409,6 @@ class PendleRouterV4Client:
     """
 
     _SDK_BASE = "https://api-v2.pendle.finance/sdk/api/v1"
-    _ROUTER_ADDRESS = "0x888888888889758F76e7103c6CbF23ABbF58F946"
     _DEFAULT_SLIPPAGE = Decimal("0.005")
     _REQUEST_TIMEOUT: float = 15.0
 
@@ -437,7 +436,7 @@ class PendleRouterV4Client:
             "PendleRouterV4Client initialized (chain=%s, chain_id=%d, router=%s)",
             config.chain,
             self._chain_id,
-            self._ROUTER_ADDRESS[:10] + "...",
+            self._config.router_address[:10] + "...",
         )
 
     async def _call_sdk(self, endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
@@ -573,12 +572,12 @@ class PendleRouterV4Client:
             (ok, to_address, error): ok=False のとき error に理由を格納する。
         """
         to_addr = sdk_response.get("data", {}).get("tx", {}).get("to")
-        if not self._addr_eq(to_addr, self._ROUTER_ADDRESS):
+        if not self._addr_eq(to_addr, self._config.router_address):
             return False, None, "router address mismatch"
         # approvals がある場合は spender も Router であることを照合する。
         for approval in self._extract_approvals(sdk_response):
             if approval.spender is not None and not self._addr_eq(
-                approval.spender, self._ROUTER_ADDRESS
+                approval.spender, self._config.router_address
             ):
                 return False, None, "router address mismatch"
         return True, to_addr, ""
