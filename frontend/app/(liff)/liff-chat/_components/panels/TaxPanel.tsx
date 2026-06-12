@@ -3,7 +3,10 @@
 
 import { useEffect, useState } from "react"
 import { FileDown, ChevronRight, Loader2, AlertCircle } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { getAuthToken } from "@/lib/auth/token-key"
+
+type TFn = ReturnType<typeof useTranslations>
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
@@ -12,6 +15,7 @@ interface UserSettings {
 }
 
 export function TaxPanel() {
+  const t = useTranslations("Liff.panels.tax")
   const [settings, setSettings] = useState<UserSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -32,11 +36,11 @@ export function TaxPanel() {
         setError(null)
       })
       .catch(() => {
-        setError("設定の読み込みに失敗しました")
+        setError(t("loadError"))
         setSettings({})
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [t])
 
   const hasCorpInfo = !!settings?.corporate_fiscal_month
 
@@ -69,24 +73,23 @@ export function TaxPanel() {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
         <Loader2 className="w-6 h-6 animate-spin mb-3 text-zinc-600" />
-        <p className="text-sm">読み込み中...</p>
+        <p className="text-sm">{t("loading")}</p>
       </div>
     )
   }
 
-  const tabs = ["個人", "法人"] as const
-  type Tab = (typeof tabs)[number]
+  const tabs = [t("tabPersonal"), t("tabCorporate")] as const
 
-  const activeTab: Tab = hasCorpInfo ? "法人" : "個人"
+  const activeTabIsPersonal = !hasCorpInfo
 
   return (
     <div className="pb-4">
       {/* タブ */}
       <div className="flex border-b border-zinc-800 mb-4">
-        {tabs.map((tab) => {
-          const isPersonal = tab === "個人"
-          const active = hasCorpInfo ? !isPersonal : isPersonal
-          const disabled = hasCorpInfo ? isPersonal : !isPersonal
+        {tabs.map((tab, idx) => {
+          const isPersonalTab = idx === 0
+          const active = hasCorpInfo ? !isPersonalTab : isPersonalTab
+          const disabled = hasCorpInfo ? isPersonalTab : !isPersonalTab
           return (
             <button
               key={tab}
@@ -113,24 +116,25 @@ export function TaxPanel() {
         </div>
       )}
 
-      {activeTab === "個人" && (
+      {activeTabIsPersonal && (
         <PersonalTabContent
           selectedYear={selectedYear}
           onYearChange={setSelectedYear}
           currentYear={currentYear}
           buildDownloadUrl={buildDownloadUrl}
           downloadFile={downloadFile}
+          t={t}
         />
       )}
 
-      {activeTab === "法人" && settings?.corporate_fiscal_month && (
-        <CorporateTabContent fiscalMonth={settings.corporate_fiscal_month} />
+      {!activeTabIsPersonal && settings?.corporate_fiscal_month && (
+        <CorporateTabContent fiscalMonth={settings.corporate_fiscal_month} t={t} />
       )}
 
       {/* 注意書き */}
       <div className="mt-6 px-1">
         <p className="text-zinc-500 text-xs leading-relaxed">
-          CSV ファイルは Cryptact（暗号資産税務ソフト）で直接インポートできます。
+          {t("cryptactNote")}
         </p>
       </div>
     </div>
@@ -141,12 +145,13 @@ interface YearSelectorProps {
   selectedYear: number
   onYearChange: (year: number) => void
   currentYear: number
+  t: TFn
 }
 
-function YearSelector({ selectedYear, onYearChange, currentYear }: YearSelectorProps) {
+function YearSelector({ selectedYear, onYearChange, currentYear, t }: YearSelectorProps) {
   return (
     <div className="flex items-center gap-3 mb-5">
-      <span className="text-zinc-400 text-sm">対象年度</span>
+      <span className="text-zinc-400 text-sm">{t("yearLabel")}</span>
       <div className="flex gap-2">
         {[currentYear, currentYear - 1].map((year) => (
           <button
@@ -158,7 +163,7 @@ function YearSelector({ selectedYear, onYearChange, currentYear }: YearSelectorP
                 : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
             }`}
           >
-            {year}年
+            {year}
           </button>
         ))}
       </div>
@@ -202,6 +207,7 @@ interface PersonalTabContentProps {
   currentYear: number
   buildDownloadUrl: (path: string) => string
   downloadFile: (url: string, filename: string) => Promise<void>
+  t: TFn
 }
 
 function PersonalTabContent({
@@ -210,6 +216,7 @@ function PersonalTabContent({
   currentYear,
   buildDownloadUrl,
   downloadFile,
+  t,
 }: PersonalTabContentProps) {
   return (
     <div className="space-y-3">
@@ -217,10 +224,11 @@ function PersonalTabContent({
         selectedYear={selectedYear}
         onYearChange={onYearChange}
         currentYear={currentYear}
+        t={t}
       />
       <DownloadButton
-        label="Cryptact 用 CSV"
-        description="暗号資産税務計算ツール対応"
+        label={t("cryptactCsvLabel")}
+        description={t("cryptactCsvDesc")}
         onClick={() => {
           const url = buildDownloadUrl(
             `/api/proposals/tax/cryptact-csv?year=${selectedYear}`
@@ -229,8 +237,8 @@ function PersonalTabContent({
         }}
       />
       <DownloadButton
-        label="取引一覧 CSV"
-        description="全取引データのエクスポート"
+        label={t("txCsvLabel")}
+        description={t("txCsvDesc")}
         onClick={() => {
           const url = buildDownloadUrl(
             `/api/transactions/export?year=${selectedYear}`
@@ -244,15 +252,16 @@ function PersonalTabContent({
 
 interface CorporateTabContentProps {
   fiscalMonth: number
+  t: TFn
 }
 
-function CorporateTabContent({ fiscalMonth }: CorporateTabContentProps) {
+function CorporateTabContent({ fiscalMonth, t }: CorporateTabContentProps) {
   return (
     <div className="space-y-3">
       {/* 決算月表示 */}
       <div className="flex items-center justify-between bg-zinc-800 rounded-xl px-4 py-3 mb-2">
-        <span className="text-zinc-400 text-sm">決算月</span>
-        <span className="text-white text-sm font-semibold">{fiscalMonth}月</span>
+        <span className="text-zinc-400 text-sm">{t("corpFiscalMonthLabel")}</span>
+        <span className="text-white text-sm font-semibold">{t("corpFiscalMonthUnit", { month: fiscalMonth })}</span>
       </div>
 
       {/* 準備中: freee/弥生 CSV は税理士承認の仕訳マッピング適用後に提供する。
@@ -260,10 +269,9 @@ function CorporateTabContent({ fiscalMonth }: CorporateTabContentProps) {
       <div className="flex items-start gap-2 bg-zinc-800/60 border border-zinc-700 rounded-xl px-4 py-3 text-sm">
         <AlertCircle className="w-4 h-4 text-[#1D9E75] flex-shrink-0 mt-0.5" />
         <div className="text-zinc-300 leading-relaxed">
-          <p className="font-medium text-white mb-1">法人向け CSV は準備中です</p>
+          <p className="font-medium text-white mb-1">{t("corpCsvPendingTitle")}</p>
           <p className="text-zinc-400 text-xs">
-            freee / 弥生 形式の仕訳 CSV は、税理士監修の会計マッピング適用後に提供します。
-            決算月の設定は保存済みです。
+            {t("corpCsvPendingDesc")}
           </p>
         </div>
       </div>

@@ -6,6 +6,8 @@
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { Menu, User, MessageCircle } from "lucide-react"
+import { useTranslations } from "next-intl"
+import { useLanguage } from "@/lib/useLanguage"
 import { HamburgerMenu } from "./_components/HamburgerMenu"
 import { SlideUpPanel } from "./_components/SlideUpPanel"
 import { MyWalletPanel } from "./_components/panels/MyWalletPanel"
@@ -24,7 +26,7 @@ const AssetChart = dynamic(() => import("./_components/AssetChart"), {
   ssr: false,
   loading: () => (
     <div className="h-[200px] w-full flex items-center justify-center">
-      <span className="text-zinc-600 text-xs">グラフを読み込み中...</span>
+      <span className="text-zinc-600 text-xs" id="chart-loading-placeholder" />
     </div>
   ),
 })
@@ -54,26 +56,13 @@ interface CoinHolding {
 }
 
 // ────────────────────────────────────────────
-// ハンバーガーパネル定義（既存維持）
-// ────────────────────────────────────────────
-
-const PANEL_TITLES: Record<string, string> = {
-  myWallet:     "MY WALLET",
-  deposit:      "入金/出金",
-  referral:     "紹介キャンペーン",
-  opMode:       "運用モード切替",
-  txHistory:    "取引履歴",
-  tax:          "TAX & REPORTS",
-  notification: "通知設定",
-  account:      "アカウント",
-  terms:        "利用規約",
-}
-
-// ────────────────────────────────────────────
 // ページ本体
 // ────────────────────────────────────────────
 
 export default function LiffChatPage() {
+  const t = useTranslations("Liff")
+  const { language, setLanguage } = useLanguage()
+
   // ── 既存 state（ハンバーガー）
   const [menuOpen, setMenuOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<string | null>(null)
@@ -145,6 +134,19 @@ export default function LiffChatPage() {
   const isBuy = action === "BUY"
   const isSell = action === "SELL"
 
+  // ── パネルタイトル（i18n 化）
+  const PANEL_TITLES: Record<string, string> = {
+    myWallet:     t("menu.myWalletLabel"),
+    deposit:      t("panels.deposit.title"),
+    referral:     t("panels.referral.title"),
+    opMode:       t("panels.opMode.title"),
+    txHistory:    t("panels.txHistory.title"),
+    tax:          t("panels.tax.title"),
+    notification: t("panels.notification.title"),
+    account:      t("panels.account.title"),
+    terms:        t("panels.terms.title"),
+  }
+
   return (
     <div className="w-[375px] mx-auto h-dvh bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden relative">
 
@@ -153,7 +155,7 @@ export default function LiffChatPage() {
         <button
           onClick={() => setMenuOpen(true)}
           className="text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
-          aria-label="メニューを開く"
+          aria-label={t("header.menuAriaLabel")}
         >
           <Menu className="w-6 h-6" />
         </button>
@@ -161,7 +163,7 @@ export default function LiffChatPage() {
           width="36"
           height="36"
           viewBox="0 0 100 100"
-          aria-label="UAT"
+          aria-label={t("header.logoAriaLabel")}
           className="flex-shrink-0"
         >
           {/* ベゼル: フラットグレー */}
@@ -182,13 +184,24 @@ export default function LiffChatPage() {
             />
           </g>
         </svg>
-        <button
-          onClick={() => setActivePanel("account")}
-          className="text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
-          aria-label="アカウント"
-        >
-          <User className="w-6 h-6" />
-        </button>
+        <div className="flex items-center gap-1">
+          {/* JP/EN トグルボタン */}
+          <button
+            onClick={() => setLanguage(language === "ja" ? "en" : "ja")}
+            aria-label={t("header.langToggleAriaLabel")}
+            className="text-zinc-300 text-xs font-semibold px-2 py-1 rounded-md
+                       hover:bg-white/10 transition-colors border border-zinc-600"
+          >
+            {language === "ja" ? "EN" : "JP"}
+          </button>
+          <button
+            onClick={() => setActivePanel("account")}
+            className="text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
+            aria-label={t("header.accountAriaLabel")}
+          >
+            <User className="w-6 h-6" />
+          </button>
+        </div>
       </header>
 
       {/* ── メインコンテンツ */}
@@ -200,7 +213,7 @@ export default function LiffChatPage() {
           className="bg-[#1a3d2e] rounded-2xl mx-4 mt-4 p-4 text-left w-[calc(100%-2rem)]
                      active:brightness-90 transition-all"
         >
-          <div className="text-zinc-400 text-xs mb-1">CURRENT ASSET</div>
+          <div className="text-zinc-400 text-xs mb-1">{t("home.currentAsset")}</div>
           <div className="text-white text-3xl font-bold">
             ${assetData?.current_usd?.toLocaleString() ?? "—"}
           </div>
@@ -211,7 +224,7 @@ export default function LiffChatPage() {
           >
             {(assetData?.pnl_pct ?? 0) >= 0 ? "+" : ""}
             {assetData?.pnl_pct?.toFixed(2) ?? "—"}%
-            <span className="text-zinc-500 ml-2">先月比</span>
+            <span className="text-zinc-500 ml-2">{t("home.lastMonthComparison")}</span>
           </div>
         </button>
 
@@ -241,10 +254,10 @@ export default function LiffChatPage() {
                 isBuy ? "text-[#4ade9a]" : isSell ? "text-red-400" : "text-zinc-400"
               }`}
             >
-              AI JUDGMENT
+              {t("home.aiJudgment")}
             </span>
             {confidence > 0 && (
-              <span className="ml-auto text-zinc-500 text-xs">{confidence}% 信頼度</span>
+              <span className="ml-auto text-zinc-500 text-xs">{confidence}% {t("home.confidenceLabel")}</span>
             )}
           </div>
 
@@ -266,13 +279,13 @@ export default function LiffChatPage() {
                   isBuy ? "bg-[#1D9E75]" : "bg-red-500"
                 }`}
               >
-                承認する
+                {t("home.approve")}
               </button>
               <button
                 onClick={handleReject}
                 className="flex-1 py-3 border border-zinc-600 text-zinc-300 rounded-xl font-semibold"
               >
-                見送る
+                {t("home.reject")}
               </button>
             </div>
           )}
@@ -283,18 +296,18 @@ export default function LiffChatPage() {
             className="mt-2 text-zinc-500 text-xs underline"
             aria-expanded={reasonOpen}
           >
-            なぜ{action}？
+            {t("home.whyAction", { action })}
           </button>
           {reasonOpen && (
             <p className="mt-2 text-zinc-400 text-xs leading-relaxed whitespace-pre-wrap">
-              {aiJudgment?.reason ?? "理由データがありません"}
+              {aiJudgment?.reason ?? t("home.noReason")}
             </p>
           )}
         </div>
 
         {/* 運用中コイン一覧 */}
         <div className="mx-4 mt-4">
-          <h3 className="text-zinc-400 text-xs font-semibold mb-3">運用中コイン</h3>
+          <h3 className="text-zinc-400 text-xs font-semibold mb-3">{t("home.operatingCoins")}</h3>
           <div className="space-y-2">
             {coins.map((coin) => (
               <button
@@ -327,7 +340,7 @@ export default function LiffChatPage() {
             ))}
             {coins.length === 0 && (
               <div className="text-center py-6 text-zinc-600 text-sm">
-                運用中のコインがありません
+                {t("home.noCoins")}
               </div>
             )}
           </div>
@@ -340,7 +353,7 @@ export default function LiffChatPage() {
         className="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full shadow-lg
                    flex items-center justify-center active:scale-95 transition-transform
                    bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0]"
-        aria-label="チャットを開く"
+        aria-label={t("home.openChatAriaLabel")}
       >
         <MessageCircle className="w-6 h-6 text-[#2a2440]" />
         {unreadCount > 0 && (
@@ -360,7 +373,7 @@ export default function LiffChatPage() {
       <SlideUpPanel
         open={graphOpen}
         onClose={() => setGraphOpen(false)}
-        title="資産推移"
+        title={t("panels.assetHistory")}
       >
         {/* 期間切替タブ */}
         <div className="flex gap-2 mb-4">
@@ -386,19 +399,19 @@ export default function LiffChatPage() {
         <div className="grid grid-cols-2 gap-3 mt-4">
           {[
             {
-              label: "開始額",
+              label: t("panels.statsStart"),
               value: `$${assetData?.initial_usd?.toLocaleString() ?? "—"}`,
             },
             {
-              label: "現在",
+              label: t("panels.statsCurrent"),
               value: `$${assetData?.current_usd?.toLocaleString() ?? "—"}`,
             },
             {
-              label: "利益",
+              label: t("panels.statsProfit"),
               value: `$${assetData?.pnl_usd?.toLocaleString() ?? "—"}`,
             },
             {
-              label: "利回り",
+              label: t("panels.statsYield"),
               value: `${assetData?.pnl_pct?.toFixed(2) ?? "—"}%`,
             },
           ].map((s) => (

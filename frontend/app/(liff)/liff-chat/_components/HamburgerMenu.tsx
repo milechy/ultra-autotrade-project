@@ -13,6 +13,7 @@ import {
   BookOpen,
   ChevronRight,
 } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 interface HamburgerMenuProps {
   open: boolean
@@ -20,19 +21,21 @@ interface HamburgerMenuProps {
   onPanelOpen: (id: string) => void
 }
 
-const MENU_ITEMS = [
-  { id: "myWallet",     label: "MY WALLET",      sub: "ウォレットアドレス・QRコード",   icon: Wallet },
-  { id: "deposit",      label: "入金/出金",        sub: "USDCの入出金",                 icon: ArrowDownUp },
-  { id: "referral",     label: "紹介キャンペーン", sub: "お友達を紹介して報酬を獲得",    icon: Users },
-  { id: "opMode",       label: "運用モード切替",   sub: "おまかせ / アクティブ",         icon: Settings2 },
-  { id: "txHistory",    label: "取引履歴",         sub: "過去の取引を確認",              icon: Clock },
-  { id: "tax",          label: "TAX & REPORTS",   sub: "税務レポート・CSV出力",          icon: FileText },
-  { id: "notification", label: "通知設定",         sub: "LINE・プッシュ通知の設定",      icon: Bell },
-  { id: "account",      label: "アカウント",       sub: "プロフィール・ログアウト",       icon: User },
-  { id: "terms",        label: "利用規約",         sub: "利用規約・プライバシーポリシー", icon: BookOpen },
-]
-
 export function HamburgerMenu({ open, onClose, onPanelOpen }: HamburgerMenuProps) {
+  const t = useTranslations("Liff.menu")
+
+  const MENU_ITEMS = [
+    { id: "myWallet",     label: t("myWalletLabel"),     sub: t("myWalletSub"),     icon: Wallet },
+    { id: "deposit",      label: t("depositLabel"),      sub: t("depositSub"),      icon: ArrowDownUp },
+    { id: "referral",     label: t("referralLabel"),     sub: t("referralSub"),     icon: Users },
+    { id: "opMode",       label: t("opModeLabel"),       sub: t("opModeSub"),       icon: Settings2 },
+    { id: "txHistory",    label: t("txHistoryLabel"),    sub: t("txHistorySub"),    icon: Clock },
+    { id: "tax",          label: t("taxLabel"),          sub: t("taxSub"),          icon: FileText },
+    { id: "notification", label: t("notificationLabel"), sub: t("notificationSub"), icon: Bell },
+    { id: "account",      label: t("accountLabel"),      sub: t("accountSub"),      icon: User },
+    { id: "terms",        label: t("termsLabel"),        sub: t("termsSub"),        icon: BookOpen },
+  ]
+
   return (
     <>
       {/* バックドロップ */}
@@ -51,11 +54,11 @@ export function HamburgerMenu({ open, onClose, onPanelOpen }: HamburgerMenuProps
       >
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
-          <span className="text-[#4ade9a] font-bold text-lg">UAT</span>
+          <span className="text-[#4ade9a] font-bold text-lg">{t("title")}</span>
           <button
             onClick={onClose}
             className="text-white text-xl leading-none w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors"
-            aria-label="メニューを閉じる"
+            aria-label={t("closeAriaLabel")}
           >
             ×
           </button>
@@ -81,7 +84,7 @@ export function HamburgerMenu({ open, onClose, onPanelOpen }: HamburgerMenuProps
 
         {/* フッター */}
         <div className="mt-auto px-4 py-4">
-          <p className="text-zinc-600 text-xs text-center">UAT App v1.0 | © 2026 UAT Co., Ltd.</p>
+          <p className="text-zinc-600 text-xs text-center">{t("footer")}</p>
         </div>
       </div>
     </>

@@ -3,53 +3,45 @@
 
 import { useEffect, useState } from "react"
 import { Bot, MousePointer2 } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { getAuthToken } from "@/lib/auth/token-key"
 import { liffFetch } from "@/lib/liff/liff-fetch"
 
 type UserMode = "managed" | "active"
 
-interface ModeOption {
-  id: UserMode
-  label: string
-  desc: string
-  icon: React.ElementType
-  color: string
-  bg: string
-  border: string
-}
-
-const MODES: ModeOption[] = [
-  {
-    id: "managed",
-    label: "完全おまかせ",
-    desc: "AIが自動で判断・実行。承認不要。実行後にLINEで通知。",
-    icon: Bot,
-    color: "text-[#4ade9a]",
-    bg: "bg-[#1D9E75]/10",
-    border: "border-[#1D9E75]",
-  },
-  {
-    id: "active",
-    label: "アクティブ",
-    desc: "AIが提案。自分で承認してから実行。",
-    icon: MousePointer2,
-    color: "text-blue-400",
-    bg: "bg-blue-500/10",
-    border: "border-blue-500",
-  },
-]
-
-const MODE_LABEL: Record<UserMode, string> = {
-  managed: "完全おまかせ",
-  active: "アクティブ",
-}
-
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 export function OpModePanel() {
+  const t = useTranslations("Liff.panels.opMode")
   const [currentMode, setCurrentMode] = useState<UserMode | null>(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
+
+  const MODES = [
+    {
+      id: "managed" as UserMode,
+      label: t("managedLabel"),
+      desc: t("managedDesc"),
+      icon: Bot,
+      color: "text-[#4ade9a]",
+      bg: "bg-[#1D9E75]/10",
+      border: "border-[#1D9E75]",
+    },
+    {
+      id: "active" as UserMode,
+      label: t("activeLabel"),
+      desc: t("activeDesc"),
+      icon: MousePointer2,
+      color: "text-blue-400",
+      bg: "bg-blue-500/10",
+      border: "border-blue-500",
+    },
+  ]
+
+  const MODE_LABEL: Record<UserMode, string> = {
+    managed: t("managedLabel"),
+    active: t("activeLabel"),
+  }
 
   // 初回ロード: GET /api/user/settings
   useEffect(() => {
@@ -69,7 +61,7 @@ export function OpModePanel() {
     if (newMode === currentMode) return
     const token = getAuthToken()
     if (!token) {
-      setToast("認証が切れています。再ログインしてください")
+      setToast(t("toastAuthExpired"))
       setTimeout(() => setToast(null), 2500)
       return
     }
@@ -86,12 +78,12 @@ export function OpModePanel() {
         body: JSON.stringify({ user_mode: newMode }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setToast(`「${MODE_LABEL[newMode]}」に切り替えました`)
+      setToast(t("toastSwitched", { mode: MODE_LABEL[newMode] }))
       setTimeout(() => setToast(null), 2500)
     } catch {
       // ロールバック
       setCurrentMode(prev)
-      setToast("切り替えに失敗しました")
+      setToast(t("toastSwitchFailed"))
       setTimeout(() => setToast(null), 2500)
     }
   }
@@ -114,15 +106,15 @@ export function OpModePanel() {
         <div>
           <p className="text-xl font-bold text-white" data-testid="opmode-current">
             {loading
-              ? "読み込み中..."
+              ? t("loadingMode")
               : currentMode
               ? MODE_LABEL[currentMode]
-              : "未設定"}
+              : t("modeUnset")}
           </p>
-          <p className="text-zinc-300 text-sm mt-0.5">現在の運用モード</p>
+          <p className="text-zinc-300 text-sm mt-0.5">{t("currentModeLabel")}</p>
         </div>
         <span className="text-xs text-[#4ade9a] border border-[#1D9E75] rounded-full px-2 py-1">
-          設定中
+          {t("activeBadge")}
         </span>
       </div>
 

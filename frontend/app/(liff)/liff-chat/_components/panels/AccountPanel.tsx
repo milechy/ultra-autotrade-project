@@ -15,6 +15,8 @@ import {
   Camera,
   X,
 } from "lucide-react"
+import { useTranslations } from "next-intl"
+import { useLanguage } from "@/lib/useLanguage"
 import { getAuthToken, clearAuthToken } from "@/lib/auth/token-key"
 import { liffFetch } from "@/lib/liff/liff-fetch"
 
@@ -45,6 +47,8 @@ interface CorpForm {
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 export function AccountPanel() {
+  const t = useTranslations("Liff.panels.account")
+  const { language } = useLanguage()
   const router = useRouter()
   const { logout: privyLogout, authenticated } = usePrivy()
   // 認証状態。未ログイン時に「ログアウト」/「アカウント削除」等の操作系を出さないためのガード。
@@ -155,7 +159,7 @@ export function AccountPanel() {
   const getDisplayName = () => {
     if (userData?.username) return userData.username
     if (userData?.email) return userData.email.split("@")[0]
-    return "ユーザー"
+    return t("defaultUser")
   }
 
   // ウォレットアドレス短縮表示
@@ -165,18 +169,22 @@ export function AccountPanel() {
     return `${addr.slice(0, 6)}…${addr.slice(-4)}`
   }
 
-  // 運用開始日フォーマット
+  // 運用開始日フォーマット（locale に応じて EN/JA 日付形式を切り替え）
   const getStartedAt = () => {
     if (!userData?.created_at) return "—"
     const d = new Date(userData.created_at)
-    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+    return new Intl.DateTimeFormat(language === "en" ? "en-US" : "ja-JP", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(d)
   }
 
   // 運用モード表示
   const getModeLabel = () => {
-    if (userData?.user_mode === "managed") return "完全おまかせ"
-    if (userData?.user_mode === "active") return "アクティブ"
-    return "—"
+    if (userData?.user_mode === "managed") return t("modeManagedLabel")
+    if (userData?.user_mode === "active") return t("modeActiveLabel")
+    return t("modeUnknown")
   }
 
   // ウォレットアドレスコピー
@@ -186,10 +194,10 @@ export function AccountPanel() {
     try {
       await navigator.clipboard.writeText(addr)
       setCopied(true)
-      showToast("コピーしました")
+      showToast(t("toastCopied"))
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      showToast("コピーできませんでした")
+      showToast(t("toastCopyFailed"))
     }
   }
 
@@ -224,20 +232,20 @@ export function AccountPanel() {
             corporate_fiscal_month: updated?.corporate_fiscal_month ?? corpForm.month,
           }))
         } else if (res.status === 401) {
-          showToast("認証が切れています。再ログインしてください")
+          showToast(t("toastAuthExpired"))
           return
         } else {
-          showToast("決算月の保存に失敗しました")
+          showToast(t("toastCorpFiscalFailed"))
           return
         }
       } catch {
-        showToast("通信エラーが発生しました")
+        showToast(t("toastNetworkError"))
         return
       }
     }
 
     setCorpSaved(true)
-    showToast("保存しました")
+    showToast(t("toastCorpSaved"))
     setTimeout(() => setCorpSaved(false), 2000)
   }
 
@@ -253,7 +261,7 @@ export function AccountPanel() {
   const handleSaveName = async () => {
     const next = nameDraft.trim()
     if (!next) {
-      showToast("名前を入力してください")
+      showToast(t("toastNameEmpty"))
       return
     }
     if (next === (userData?.username ?? "")) {
@@ -262,7 +270,7 @@ export function AccountPanel() {
     }
     const token = getAuthToken() ?? ""
     if (!token) {
-      showToast("再ログインしてください")
+      showToast(t("toastAuthExpired"))
       return
     }
     setNameSaving(true)
@@ -282,19 +290,19 @@ export function AccountPanel() {
         } | null
         setUserData((prev) => ({ ...prev, username: updated?.username ?? next }))
         setEditingName(false)
-        showToast("名前を変更しました")
+        showToast(t("toastNameChanged"))
       } else if (res.status === 409) {
-        showToast("このユーザー名は既に使用されています")
+        showToast(t("toastNameDuplicate"))
       } else if (res.status === 422) {
-        showToast("名前の形式が正しくありません（3〜50文字・先頭は英数字）")
+        showToast(t("toastNameFormatError"))
       } else if (res.status === 401) {
-        showToast("認証が切れています。再ログインしてください")
+        showToast(t("toastAuthExpired"))
       } else {
         // 偽装成功はしない（非永続をマスクしていた旧 fallback を撤廃）
-        showToast("変更に失敗しました")
+        showToast(t("toastNameSaveFailed"))
       }
     } catch {
-      showToast("通信エラーが発生しました")
+      showToast(t("toastNetworkError"))
     } finally {
       setNameSaving(false)
     }
@@ -314,12 +322,12 @@ export function AccountPanel() {
     e.target.value = "" // 同じファイルを再選択できるようにリセット
     if (!file) return
     if (!file.type.startsWith("image/")) {
-      showToast("画像を選択してください")
+      showToast(t("toastIconNotImage"))
       return
     }
     // 2MB 超は localStorage quota を圧迫するため拒否
     if (file.size > 2 * 1024 * 1024) {
-      showToast("2MB 以下の画像を選択してください")
+      showToast(t("toastIconTooLarge"))
       return
     }
     const reader = new FileReader()
@@ -332,9 +340,9 @@ export function AccountPanel() {
       } catch {
         // quota 超過などは握り潰す（表示は維持）
       }
-      showToast("アイコンを変更しました")
+      showToast(t("toastIconChanged"))
     }
-    reader.onerror = () => showToast("画像を読み込めませんでした")
+    reader.onerror = () => showToast(t("toastIconLoadFailed"))
     reader.readAsDataURL(file)
   }
 
@@ -346,7 +354,7 @@ export function AccountPanel() {
     } catch {
       // ignore
     }
-    showToast("アイコンをリセットしました")
+    showToast(t("toastIconReset"))
   }
 
   // ログアウト
@@ -396,19 +404,19 @@ export function AccountPanel() {
         },
       })
       if (res.ok) {
-        showToast("削除申請を受け付けました")
+        showToast(t("toastDeleteRequested"))
         setDeleteSheet(false)
       } else if (res.status === 409) {
         // 残高ありなどサーバ側拒否（将来仕様）
-        showToast("残高があるため申請できません")
+        showToast(t("toastDeleteBalanceError"))
       } else if (res.status === 404 || res.status === 405) {
-        showToast("サポートへお問い合わせください")
+        showToast(t("toastDeleteContactSupport"))
         setDeleteSheet(false)
       } else {
-        showToast("エラーが発生しました")
+        showToast(t("toastDeleteError"))
       }
     } catch {
-      showToast("サポートへお問い合わせください")
+      showToast(t("toastDeleteContactSupport"))
       setDeleteSheet(false)
     } finally {
       setDeleteSubmitting(false)
@@ -427,14 +435,14 @@ export function AccountPanel() {
             <button
               type="button"
               onClick={handlePickAvatar}
-              aria-label="アイコンを変更"
+              aria-label={t("changeIconAriaLabel")}
               className="w-14 h-14 rounded-full overflow-hidden bg-[#1D9E75]/20 border border-[#1D9E75] flex items-center justify-center text-[#4ade9a] text-xl font-bold"
             >
               {avatarData ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={avatarData}
-                  alt="アバター"
+                  alt={t("avatarAlt")}
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -462,15 +470,15 @@ export function AccountPanel() {
                   onChange={(e) => setNameDraft(e.target.value)}
                   autoFocus
                   maxLength={40}
-                  placeholder="ユーザー名"
-                  aria-label="ユーザー名"
+                  placeholder={t("editNamePlaceholder")}
+                  aria-label={t("editNameAriaLabel")}
                   className="flex-1 min-w-0 bg-zinc-800 text-white px-2.5 py-1.5 rounded-lg text-sm outline-none focus:ring-1 focus:ring-[#1D9E75]"
                 />
                 <button
                   type="button"
                   onClick={handleSaveName}
                   disabled={nameSaving}
-                  aria-label="名前を保存"
+                  aria-label={t("saveNameAriaLabel")}
                   className="w-7 h-7 rounded-lg bg-[#1D9E75] flex items-center justify-center disabled:opacity-40"
                 >
                   <Check className="w-4 h-4 text-white" />
@@ -479,7 +487,7 @@ export function AccountPanel() {
                   type="button"
                   onClick={() => setEditingName(false)}
                   disabled={nameSaving}
-                  aria-label="編集をキャンセル"
+                  aria-label={t("cancelEditAriaLabel")}
                   className="w-7 h-7 rounded-lg bg-zinc-800 flex items-center justify-center disabled:opacity-40"
                 >
                   <X className="w-4 h-4 text-zinc-400" />
@@ -491,7 +499,7 @@ export function AccountPanel() {
                 <button
                   type="button"
                   onClick={handleStartEditName}
-                  aria-label="ユーザー名を編集"
+                  aria-label={t("editNameEditAriaLabel")}
                   className="flex-shrink-0 text-zinc-500 hover:text-[#4ade9a] transition-colors"
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -507,13 +515,13 @@ export function AccountPanel() {
                 onClick={handleClearAvatar}
                 className="text-zinc-500 hover:text-zinc-300 text-xs mt-1 transition-colors"
               >
-                アイコンをリセット
+                {t("resetIcon")}
               </button>
             )}
             {/* ログイン方法バッジ（LIFF = LINE ログイン） */}
             <div className="flex flex-wrap gap-1 mt-1">
               <span className="bg-zinc-800 text-zinc-300 text-xs px-2 py-0.5 rounded-full">
-                LINE
+                {t("lineLoginBadge")}
               </span>
             </div>
           </div>
@@ -524,19 +532,19 @@ export function AccountPanel() {
       <div className="bg-zinc-900 rounded-xl overflow-hidden">
         {/* 運用開始日 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-          <span className="text-zinc-400 text-sm">運用開始日</span>
+          <span className="text-zinc-400 text-sm">{t("startedAt")}</span>
           <span className="text-white text-sm">{getStartedAt()}</span>
         </div>
 
         {/* 運用モード */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-          <span className="text-zinc-400 text-sm">運用モード</span>
+          <span className="text-zinc-400 text-sm">{t("opMode")}</span>
           <span className="text-white text-sm">{getModeLabel()}</span>
         </div>
 
         {/* ウォレットアドレス */}
         <div className="flex items-center justify-between px-4 py-3">
-          <span className="text-zinc-400 text-sm">ウォレット</span>
+          <span className="text-zinc-400 text-sm">{t("wallet")}</span>
           {shortAddress ? (
             <button
               onClick={handleCopyWallet}
@@ -550,7 +558,7 @@ export function AccountPanel() {
               )}
             </button>
           ) : (
-            <span className="text-zinc-600 text-sm">未連携</span>
+            <span className="text-zinc-600 text-sm">{t("walletNotLinked")}</span>
           )}
         </div>
       </div>
@@ -563,7 +571,7 @@ export function AccountPanel() {
         >
           <div className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-zinc-400" />
-            <span className="text-zinc-300 text-sm font-medium">法人として使う</span>
+            <span className="text-zinc-300 text-sm font-medium">{t("corpSectionTitle")}</span>
           </div>
           <ChevronDown
             className={`w-4 h-4 text-zinc-500 transition-transform duration-200 ${
@@ -575,13 +583,13 @@ export function AccountPanel() {
         {corpExpanded && (
           <div className="px-4 pb-4 space-y-3 border-t border-zinc-800 pt-3">
             <input
-              placeholder="法人名"
+              placeholder={t("corpNamePlaceholder")}
               value={corpForm.name}
               onChange={(e) => setCorpForm((p) => ({ ...p, name: e.target.value }))}
               className="w-full bg-zinc-800 text-white px-3 py-2.5 rounded-lg text-sm placeholder-zinc-500 outline-none focus:ring-1 focus:ring-[#1D9E75]"
             />
             <input
-              placeholder="法人番号（13桁）"
+              placeholder={t("corpNumberPlaceholder")}
               value={corpForm.number}
               onChange={(e) => setCorpForm((p) => ({ ...p, number: e.target.value }))}
               maxLength={13}
@@ -589,7 +597,7 @@ export function AccountPanel() {
               className="w-full bg-zinc-800 text-white px-3 py-2.5 rounded-lg text-sm placeholder-zinc-500 outline-none focus:ring-1 focus:ring-[#1D9E75]"
             />
             <input
-              placeholder="代表者名"
+              placeholder={t("corpRepPlaceholder")}
               value={corpForm.rep}
               onChange={(e) => setCorpForm((p) => ({ ...p, rep: e.target.value }))}
               className="w-full bg-zinc-800 text-white px-3 py-2.5 rounded-lg text-sm placeholder-zinc-500 outline-none focus:ring-1 focus:ring-[#1D9E75]"
@@ -597,7 +605,7 @@ export function AccountPanel() {
 
             {/* 決算月グリッド */}
             <div>
-              <p className="text-zinc-400 text-xs mb-2">決算月</p>
+              <p className="text-zinc-400 text-xs mb-2">{t("corpFiscalMonthLabel")}</p>
               <div className="grid grid-cols-6 gap-1.5">
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                   <button
@@ -609,7 +617,7 @@ export function AccountPanel() {
                         : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
                     }`}
                   >
-                    {m}月
+                    {t("corpFiscalMonthUnit", { m })}
                   </button>
                 ))}
               </div>
@@ -620,7 +628,7 @@ export function AccountPanel() {
               disabled={!corpForm.name || !corpForm.number || !corpForm.rep || !corpForm.month}
               className="w-full py-3 bg-[#1D9E75] text-white rounded-xl text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
             >
-              {corpSaved ? "保存しました ✓" : "保存する"}
+              {corpSaved ? t("corpSavedBtn") : t("corpSaveBtn")}
             </button>
           </div>
         )}
@@ -635,7 +643,7 @@ export function AccountPanel() {
             className="flex items-center gap-3 w-full px-4 py-4 bg-zinc-900 rounded-xl hover:bg-zinc-800 transition-colors"
           >
             <LogOut className="w-5 h-5 text-red-400" />
-            <span className="text-red-400 font-medium">ログアウト</span>
+            <span className="text-red-400 font-medium">{t("logoutBtn")}</span>
           </button>
 
           {/* アカウント削除ボタン */}
@@ -645,7 +653,7 @@ export function AccountPanel() {
               className="flex items-center gap-2 px-4 py-2 text-zinc-600 hover:text-zinc-400 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
-              <span className="text-xs">アカウントを削除</span>
+              <span className="text-xs">{t("deleteAccountBtn")}</span>
             </button>
           </div>
         </>
@@ -663,23 +671,23 @@ export function AccountPanel() {
                         animate-in slide-in-from-bottom duration-300"
           >
             <div className="mx-auto mb-4 h-1 w-8 rounded-full bg-zinc-700" />
-            <h3 className="text-white font-semibold mb-2">アカウントを削除しますか？</h3>
+            <h3 className="text-white font-semibold mb-2">{t("deleteSheetTitle")}</h3>
             <p className="text-zinc-400 text-sm mb-6">
-              残高がある場合、削除申請を受け付けられません。先に全額出金してください。
+              {t("deleteSheetDesc")}
             </p>
             <button
               onClick={handleDeleteRequest}
               disabled={deleteSubmitting}
               className="w-full py-3.5 bg-red-600/20 border border-red-600 text-red-400 rounded-xl font-medium mb-3 disabled:opacity-50"
             >
-              {deleteSubmitting ? "申請中…" : "削除を申請する"}
+              {deleteSubmitting ? t("deleteSubmittingBtn") : t("deleteSubmitBtn")}
             </button>
             <button
               onClick={() => setDeleteSheet(false)}
               disabled={deleteSubmitting}
               className="w-full py-3.5 border border-zinc-700 text-zinc-400 rounded-xl font-medium disabled:opacity-50"
             >
-              キャンセル
+              {t("deleteCancelBtn")}
             </button>
           </div>
         </>

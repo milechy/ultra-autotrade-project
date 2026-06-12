@@ -11,6 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts"
+import { useTranslations } from "next-intl"
 
 interface Props {
   period: "1M" | "3M" | "6M" | "1Y"
@@ -36,6 +37,7 @@ const PERIOD_DAYS: Record<Props["period"], number> = {
 }
 
 export default function AssetChart({ period }: Props) {
+  const t = useTranslations("Liff.panels")
   const [data, setData] = useState<DataPoint[]>([])
 
   useEffect(() => {
@@ -81,7 +83,7 @@ export default function AssetChart({ period }: Props) {
               fontSize: "12px",
             }}
             labelStyle={{ color: "#9ca3af" }}
-            formatter={(v: number) => [`$${v.toLocaleString()}`, "残高"]}
+            formatter={(v: number) => [`$${v.toLocaleString()}`, t("statsCurrent")]}
           />
           <Area
             type="monotone"
