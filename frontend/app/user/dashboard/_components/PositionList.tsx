@@ -4,6 +4,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AssetIcon } from '@/components/shared'
@@ -34,7 +35,7 @@ interface PortfolioCurrentResponse {
   has_data: boolean
 }
 
-function PositionCard({ pos }: { pos: Position }) {
+function PositionCard({ pos, t }: { pos: Position; t: ReturnType<typeof useTranslations> }) {
   return (
     <Card className="border-zinc-800 bg-zinc-900">
       <CardContent className="p-4">
@@ -47,13 +48,13 @@ function PositionCard({ pos }: { pos: Position }) {
             </div>
           </div>
           <div className="text-right flex-1 px-3">
-            <p className="text-xs text-zinc-500">供給 / 借入</p>
+            <p className="text-xs text-zinc-500">{t('supplyBorrow')}</p>
             <p className="text-sm font-medium text-white">
               {pos.supplied.toLocaleString()} / {pos.borrowed.toLocaleString()}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-zinc-500">USD換算</p>
+            <p className="text-xs text-zinc-500">{t('usdValue')}</p>
             <p className="text-sm font-semibold text-white">${pos.usdValue.toLocaleString()}</p>
           </div>
         </div>
@@ -65,6 +66,7 @@ function PositionCard({ pos }: { pos: Position }) {
 export function PositionList() {
   const { isConnected } = useWallet()
   const { token, isLoading: authLoading } = useAuth()
+  const t = useTranslations('Dashboard')
   const [positions, setPositions] = useState<Position[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
@@ -107,12 +109,12 @@ export function PositionList() {
   if (error) {
     return (
       <div className="flex flex-col items-center gap-2 py-6">
-        <p className="text-sm text-zinc-400 text-center">データを取得できません</p>
+        <p className="text-sm text-zinc-400 text-center">{t('fetchError')}</p>
         <button
           onClick={() => { setLoading(true); fetchPositions() }}
           className="text-xs text-blue-400 hover:text-blue-300 underline"
         >
-          再試行
+          {t('retry')}
         </button>
       </div>
     )
@@ -121,10 +123,10 @@ export function PositionList() {
   if (positions.length === 0) {
     return (
       <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-center space-y-3">
-        <p className="text-sm text-zinc-400">まだポジションがありません。</p>
-        <p className="text-sm text-zinc-500">承認画面でAI提案を確認しましょう。</p>
+        <p className="text-sm text-zinc-400">{t('noPositions2')}</p>
+        <p className="text-sm text-zinc-500">{t('approvePrompt')}</p>
         <Link href="/user/approve" className="text-xs text-blue-400 hover:text-blue-300 underline">
-          承認画面へ →
+          {t('goToApprove')}
         </Link>
       </div>
     )
@@ -133,7 +135,7 @@ export function PositionList() {
   return (
     <div className="space-y-3">
       {positions.map((pos) => (
-        <PositionCard key={pos.symbol} pos={pos} />
+        <PositionCard key={pos.symbol} pos={pos} t={t} />
       ))}
     </div>
   )

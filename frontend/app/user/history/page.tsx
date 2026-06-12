@@ -232,11 +232,11 @@ function AaveHistoryTab() {
   )
 }
 
-function StatusBadge({ status }: { status: TradeStatus }) {
+function StatusBadge({ status, t }: { status: TradeStatus; t: ReturnType<typeof useTranslations> }) {
   const map: Record<TradeStatus, { label: string; variant: 'default' | 'destructive' | 'secondary' | 'outline' }> = {
-    SUCCESS: { label: '成功', variant: 'default' },
-    FAILED: { label: '失敗', variant: 'destructive' },
-    SKIPPED: { label: 'スキップ', variant: 'secondary' },
+    SUCCESS: { label: t('statusSuccess'), variant: 'default' },
+    FAILED: { label: t('statusFailed'), variant: 'destructive' },
+    SKIPPED: { label: t('statusSkipped'), variant: 'secondary' },
   }
   const { label, variant } = map[status]
   return <Badge variant={variant}>{label}</Badge>
@@ -258,11 +258,11 @@ function PnlCell({ pnl }: { pnl: string | null }) {
   return <span className={`font-medium ${colored}`}>{prefix}{(isNaN(val) ? 0 : val).toFixed(2)}</span>
 }
 
-function HistoryTable({ records }: { records: TradeRecord[] }) {
+function HistoryTable({ records, t }: { records: TradeRecord[]; t: ReturnType<typeof useTranslations> }) {
   if (records.length === 0) {
     return (
       <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">
-        該当する取引履歴がありません
+        {t('noFilteredHistory')}
       </div>
     )
   }
@@ -272,13 +272,13 @@ function HistoryTable({ records }: { records: TradeRecord[] }) {
       <table className="min-w-full text-sm">
         <thead className="border-b bg-muted/50">
           <tr>
-            <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">日時</th>
-            <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">ペア</th>
-            <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">種別</th>
-            <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">数量</th>
-            <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">約定価格</th>
-            <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">損益</th>
-            <th className="px-3 py-2.5 text-center font-medium text-muted-foreground">状態</th>
+            <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">{t('colDate')}</th>
+            <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">{t('colPair')}</th>
+            <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">{t('colType')}</th>
+            <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">{t('colQuantity')}</th>
+            <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">{t('colFilledPrice')}</th>
+            <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">{t('colPnl')}</th>
+            <th className="px-3 py-2.5 text-center font-medium text-muted-foreground">{t('colState')}</th>
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -307,7 +307,7 @@ function HistoryTable({ records }: { records: TradeRecord[] }) {
                 <PnlCell pnl={r.pnl} />
               </td>
               <td className="px-3 py-2.5 text-center">
-                <StatusBadge status={r.status} />
+                <StatusBadge status={r.status} t={t} />
               </td>
             </tr>
           ))}
@@ -426,15 +426,15 @@ function HistoryPage() {
         {activeTab === 'exchange' && (
           <div className="relative">
             <div className="absolute inset-0 bg-white dark:bg-gray-900/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
-              <p className="text-gray-500 font-medium">取引所履歴は準備中です</p>
+              <p className="text-gray-500 font-medium">{t('exchangeComingSoon')}</p>
             </div>
             <div className="pointer-events-none select-none opacity-50">
               {showFilters && (
                 <div className="rounded-lg border p-4 space-y-3">
-                  <h2 className="text-sm font-medium">フィルター</h2>
+                  <h2 className="text-sm font-medium">{t('filter')}</h2>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">開始日</label>
+                      <label className="text-xs text-muted-foreground">{t('startDate')}</label>
                       <Input
                         type="date"
                         value={dateFrom}
@@ -443,7 +443,7 @@ function HistoryPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">終了日</label>
+                      <label className="text-xs text-muted-foreground">{t('endDate')}</label>
                       <Input
                         type="date"
                         value={dateTo}
@@ -453,7 +453,7 @@ function HistoryPage() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">アクション</label>
+                    <label className="text-xs text-muted-foreground">{t('actionLabel')}</label>
                     <div className="flex gap-2">
                       {(['', 'BUY', 'SELL'] as const).map(v => (
                         <button
@@ -465,17 +465,17 @@ function HistoryPage() {
                               : 'bg-muted text-muted-foreground hover:bg-muted/80'
                           }`}
                         >
-                          {v === '' ? '全て' : v}
+                          {v === '' ? t('allFilter') : v}
                         </button>
                       ))}
                     </div>
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" className="flex-1" onClick={handleFilterApply}>
-                      適用
+                      {t('apply')}
                     </Button>
                     <Button size="sm" variant="outline" className="flex-1" onClick={handleFilterReset}>
-                      リセット
+                      {t('reset')}
                     </Button>
                   </div>
                 </div>
@@ -490,16 +490,16 @@ function HistoryPage() {
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                   <RefreshCw className="mb-3 h-8 w-8 animate-spin" />
-                  <p className="text-sm">読み込み中...</p>
+                  <p className="text-sm">{t('loadingText')}</p>
                 </div>
               ) : (
                 <>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>全 {total} 件</span>
-                    <span>ページ {page} / {totalPages}</span>
+                    <span>{t('totalCountExchange', { total })}</span>
+                    <span>{t('pageCount', { page, totalPages })}</span>
                   </div>
 
-                  <HistoryTable records={records} />
+                  <HistoryTable records={records} t={t} />
 
                   {totalPages > 1 && (
                     <div className="flex items-center justify-center gap-2">

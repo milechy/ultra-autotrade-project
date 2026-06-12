@@ -22,7 +22,7 @@ function formatYAxis(v: number) {
   return `$${v}`
 }
 
-export default function AssetChartRecharts({ data }: { data: DataPoint[] }) {
+export default function AssetChartRecharts({ data, tooltipLabel }: { data: DataPoint[]; tooltipLabel?: string }) {
   return (
     <ResponsiveContainer width="100%" height={200}>
       <LineChart data={data} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
@@ -47,7 +47,7 @@ export default function AssetChartRecharts({ data }: { data: DataPoint[] }) {
             borderRadius: '8px',
             fontSize: '12px',
           }}
-          formatter={(v: number) => [`$${v.toLocaleString()}`, '総資産']}
+          formatter={(v: number) => [`$${v.toLocaleString()}`, tooltipLabel ?? '']}
         />
         <Line
           type="monotone"

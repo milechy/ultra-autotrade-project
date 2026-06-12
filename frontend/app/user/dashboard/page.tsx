@@ -287,7 +287,7 @@ function ActiveDashboard() {
 
       {/* Disclaimer */}
       <p className="text-center text-xs text-zinc-600">
-        ※参考利回りです。将来の収益を保証するものではありません
+        {t('disclaimer')}
       </p>
     </div>
   )

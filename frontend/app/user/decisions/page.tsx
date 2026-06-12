@@ -42,14 +42,13 @@ interface Factors {
   sentiment: Factor
 }
 
-const DEFAULT_FACTORS: Factors = {
-  technical: { score: 0, label: 'データなし' },
-  macro: { score: 0, label: 'データなし' },
-  geopolitical: { score: 0, label: 'データなし' },
-  sentiment: { score: 0, label: 'データなし' },
-}
-
-function extractFactors(ragContextJson: unknown): Factors {
+function extractFactors(ragContextJson: unknown, noDataLabel: string): Factors {
+  const defaultFactors: Factors = {
+    technical: { score: 0, label: noDataLabel },
+    macro: { score: 0, label: noDataLabel },
+    geopolitical: { score: 0, label: noDataLabel },
+    sentiment: { score: 0, label: noDataLabel },
+  }
   if (
     ragContextJson !== null &&
     typeof ragContextJson === 'object' &&
@@ -82,7 +81,7 @@ function extractFactors(ragContextJson: unknown): Factors {
       return { technical, macro, geopolitical, sentiment }
     }
   }
-  return DEFAULT_FACTORS
+  return defaultFactors
 }
 
 export default function DecisionsPage() {
@@ -93,6 +92,7 @@ export default function DecisionsPage() {
 
   const t = useTranslations('Decisions')
   const tCommon = useTranslations('Common')
+  const noDataLabel = t('noData')
 
   const loading = latestLoading || listLoading
   const error = latestError ?? listError
@@ -157,7 +157,7 @@ export default function DecisionsPage() {
 
             {/* Factor analysis */}
             <section>
-              <FactorAnalysis factors={extractFactors(latest.rag_context_json)} />
+              <FactorAnalysis factors={extractFactors(latest.rag_context_json, noDataLabel)} />
             </section>
 
             {/* Decision timeline */}
