@@ -4,6 +4,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { Wallet, RefreshCw } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { KPICard, HealthFactorGauge, StatusBadge } from '@/components/shared'
@@ -29,6 +30,7 @@ export function PortfolioSummary() {
   const { address, isConnected } = useWallet()
   const { getUserAccountData } = useAaveV3()
   const { systemStatus, isStopped } = useAutomationStatus()
+  const t = useTranslations('Dashboard')
   const [data, setData] = useState<AaveUserAccountData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -43,7 +45,7 @@ export function PortfolioSummary() {
       const result = await getUserAccountData(address)
       setData(result)
     } catch (e) {
-      if (!silent) setError(e instanceof Error ? e.message : 'データ取得に失敗しました')
+      if (!silent) setError(e instanceof Error ? e.message : t('fetchDataFailed'))
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -66,7 +68,7 @@ export function PortfolioSummary() {
   if (!isConnected) {
     return (
       <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-center">
-        <p className="text-sm text-zinc-400">ウォレットを接続してください</p>
+        <p className="text-sm text-zinc-400">{t('connectWallet')}</p>
       </div>
     )
   }
@@ -89,7 +91,7 @@ export function PortfolioSummary() {
           onClick={() => fetchData()}
           className="text-xs text-blue-400 hover:text-blue-300 underline"
         >
-          再試行
+          {t('retry')}
         </button>
       </div>
     )
@@ -104,26 +106,26 @@ export function PortfolioSummary() {
         <div className="rounded-lg border border-red-800 bg-red-950/40 px-4 py-3 flex items-start gap-2">
           <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-red-400" />
           <p className="text-sm text-red-400 font-medium">
-            緊急停止中 — 全ての自動取引が停止されています。解除には管理者への連絡が必要です。
+            {t('emergencyStop')}
           </p>
         </div>
       )}
       {refreshing && (
         <div className="flex items-center gap-1.5 text-xs text-zinc-500">
           <RefreshCw className="h-3 w-3 animate-spin" />
-          <span>更新中...</span>
+          <span>{t('refreshing')}</span>
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <KPICard
-          label="総資産額"
+          label={t('totalAssetLabel')}
           value={collateralUSD}
           prefix="$"
           icon={Wallet}
         />
         <Card className="border-zinc-800 bg-zinc-900">
           <CardHeader className="pb-2 pt-4 px-4">
-            
+
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <HealthFactorGauge value={healthFactor} size="lg" />
@@ -131,7 +133,7 @@ export function PortfolioSummary() {
         </Card>
         <Card className="border-zinc-800 bg-zinc-900">
           <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm font-medium text-zinc-400">運用ステータス</CardTitle>
+            <CardTitle className="text-sm font-medium text-zinc-400">{t('operationStatus')}</CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <StatusBadge status={systemStatus} />

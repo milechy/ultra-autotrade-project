@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
+import { useTranslations } from 'next-intl'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/lib/auth'
 import { apiFetch } from '@/lib/api/client'
@@ -12,11 +13,7 @@ const PnlChartRecharts = dynamic(() => import('./PnlChartRecharts'), { ssr: fals
 
 type Period = 'daily' | 'weekly' | 'monthly'
 
-const PERIOD_TABS: { value: Period; label: string }[] = [
-  { value: 'daily', label: '日次' },
-  { value: 'weekly', label: '週次' },
-  { value: 'monthly', label: '月次' },
-]
+const PERIOD_VALUES: Period[] = ['daily', 'weekly', 'monthly']
 
 interface SnapshotItem {
   total_value_usd: string
@@ -37,6 +34,7 @@ interface PnlPoint {
 
 export function PnlChart() {
   const { token, isLoading: authLoading } = useAuth()
+  const t = useTranslations('Dashboard')
   const [period, setPeriod] = useState<Period>('daily')
   const [data, setData] = useState<PnlPoint[]>([])
   const [loading, setLoading] = useState(false)
@@ -82,20 +80,26 @@ export function PnlChart() {
     return () => clearInterval(id)
   }, [fetchData, token])
 
+  const periodLabels: Record<Period, string> = {
+    daily: t('periodDaily'),
+    weekly: t('periodWeekly'),
+    monthly: t('periodMonthly'),
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex gap-1 rounded-lg border border-zinc-800 bg-zinc-800/40 p-1 w-fit">
-        {PERIOD_TABS.map((tab) => (
+        {PERIOD_VALUES.map((value) => (
           <button
-            key={tab.value}
-            onClick={() => setPeriod(tab.value)}
+            key={value}
+            onClick={() => setPeriod(value)}
             className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-              period === tab.value
+              period === value
                 ? 'bg-zinc-700 text-white'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            {tab.label}
+            {periodLabels[value]}
           </button>
         ))}
       </div>
@@ -103,20 +107,20 @@ export function PnlChart() {
         <Skeleton className="h-[200px] rounded-xl" />
       ) : error ? (
         <div className="flex flex-col items-center gap-2 py-8">
-          <p className="text-sm text-zinc-400 text-center">データを取得できません</p>
+          <p className="text-sm text-zinc-400 text-center">{t('fetchError')}</p>
           <button
             onClick={() => { setLoading(true); fetchData() }}
             className="text-xs text-blue-400 hover:text-blue-300 underline"
           >
-            再試行
+            {t('retry')}
           </button>
         </div>
       ) : data.length < 2 ? (
         <div className="flex flex-col items-center gap-2 py-8">
-          <p className="text-sm text-zinc-400 text-center">損益データがまだありません</p>
+          <p className="text-sm text-zinc-400 text-center">{t('noPnlData')}</p>
         </div>
       ) : (
-        <PnlChartRecharts data={data} />
+        <PnlChartRecharts data={data} tooltipLabel={t('pnlTooltip')} />
       )}
     </div>
   )

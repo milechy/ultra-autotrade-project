@@ -24,7 +24,7 @@ function formatYAxis(v: number) {
   return `$${v}`
 }
 
-export default function PnlChartRecharts({ data }: { data: PnlPoint[] }) {
+export default function PnlChartRecharts({ data, tooltipLabel }: { data: PnlPoint[]; tooltipLabel?: string }) {
   const allPositive = data.every((d) => d.pnl >= 0)
   const allNegative = data.every((d) => d.pnl <= 0)
   const lineColor = allNegative ? '#f87171' : allPositive ? '#34d399' : '#60a5fa'
@@ -56,7 +56,7 @@ export default function PnlChartRecharts({ data }: { data: PnlPoint[] }) {
           }}
           formatter={(v: number) => {
             const sign = v >= 0 ? '+' : ''
-            return [`${sign}$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, '損益']
+            return [`${sign}$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, tooltipLabel ?? '']
           }}
         />
         <Line
