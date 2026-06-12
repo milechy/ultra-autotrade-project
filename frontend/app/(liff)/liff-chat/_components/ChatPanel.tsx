@@ -4,7 +4,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { ChevronLeft } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ChevronLeft, History } from "lucide-react"
 import { getAuthToken } from "@/lib/auth/token-key"
 
 // ---------------------------------------------------------------------------
@@ -102,11 +103,29 @@ export function ChatPanel({ onClose }: Props) {
   ])
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   // 新メッセージが追加されるたびに末尾へスクロール
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
+
+  // 履歴画面へ遷移 (#539 degrade 取りこぼし対策)
+  //
+  // 旧実装は window.location.href で /liff-history へハード遷移していたため、
+  // アプリ全体が再マウントされ useLiff が liffConfigured=true (初期値) から
+  // 再 init する。その init 解決前に (liff)/layout.tsx の中央 degrade ガードが
+  // 評価され、ブラウザ(非LIFF) や token 復元前のタイミングで
+  // 「LINEアプリから開いてください」黒画面・行き止まりが一瞬〜恒久的に出る取りこぼしがあった。
+  //
+  // ここでは Next.js client router によるソフト遷移に変える。アプリは再マウントされず、
+  // 既に解決済みの degrade 状態 (liffConfigured / isLoggedIn) と token がメモリに残るため、
+  // liff-chat-history 側は #539 で実装済みの degrade 分岐 (BrowserLoginPrompt / 自動再認証) に
+  // 正しく入り、黒画面にならない。LIFF 実機では従来どおり履歴画面へ遷移する。
+  const handleHistoryOpen = () => {
+    onClose()
+    router.push("/liff-chat-history")
+  }
 
   // サジェストボタンタップ → ユーザーメッセージ追加 → AI 返答取得
   const handleSuggest = async (btn: {
@@ -209,6 +228,13 @@ export function ChatPanel({ onClose }: Props) {
               <span className="text-zinc-400 text-xs">オンライン</span>
             </div>
           </div>
+          <button
+            onClick={handleHistoryOpen}
+            className="text-zinc-400 p-1 hover:text-zinc-200 hover:bg-white/10 rounded transition-colors"
+            aria-label="チャット履歴"
+          >
+            <History className="w-5 h-5" />
+          </button>
         </div>
 
         {/* メッセージエリア */}

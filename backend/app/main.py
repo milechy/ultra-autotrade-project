@@ -49,6 +49,8 @@ from app.auth.service import AuthService
 from app.automation.automation_router import router as automation_router
 from app.automation.howl_review import start_howl_background_task
 from app.bots.router import router as octobot_router
+from app.chat.models import ChatMessage  # noqa: F401 — ensure table registered with Base.metadata
+from app.chat.router import router as chat_router
 from app.data_feeds.finance_feed import start_finance_background_task
 from app.data_feeds.geopolitical import start_geo_risk_background_task
 from app.data_feeds.mmt_feed import start_mmt_background_task
@@ -292,6 +294,9 @@ def create_app() -> FastAPI:
     app.include_router(referral_api_router)  # Lane C1: /api/referral/* (全 active user)
     app.include_router(tos_router)  # ToS active consent (MVP-P0-14)
     app.include_router(health_detail_router)  # /health/detail (admin, 5/14 DoD #6)
+    app.include_router(
+        chat_router, prefix="/api"
+    )  # Chat history persistence (GID: 1215648108179500)
 
     # Register global error handlers (production safety)
     register_error_handlers(app)

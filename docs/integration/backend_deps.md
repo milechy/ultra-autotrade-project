@@ -88,6 +88,18 @@
 
 ## backend/app/main.py
 
+### 変更 #14: chat_router include_router + ChatMessage table 登録 (PR #643 / 2026-06-12)
+- **コミット範囲**: `feat/chat-history-persistence`
+- **変更内容**: `app.include_router(chat_router, prefix="/api")` を追加 (3 行) +
+  `from app.chat.models import ChatMessage  # noqa: F401` の table 登録用 import を追加 (2 行)。
+- **理由**: チャット会話保存 + 履歴表示 (Asana GID: 1215648108179500)。
+  LIFF チャットの会話を chat_messages テーブルに永続化し、`/api/chat/*` で
+  履歴取得を提供する。`Base.metadata.create_all()` での table 自動作成のため
+  models import が必要 (既存 tos_router / referral_api_router と同パターン)。
+- **影響範囲**: include_router 登録 + noqa F401 import のみ。既存 endpoint・
+  起動シーケンスへの影響なし。
+- **承認**: feat/chat-history-persistence → main (PR #643)
+
 ### 変更 #13: 4軸コンセンサス weight startup validation 登録 (PR #630 / 2026-06-12)
 - **コミット範囲**: `feat/consensus-config-prompts`
 - **変更内容**: `startup_validate_consensus_weights` startup hook を追加 (12 行追加のみ)。
