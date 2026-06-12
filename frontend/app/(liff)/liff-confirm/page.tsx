@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { CheckCircle, ChevronDown, ExternalLink } from "lucide-react"
 
 const getToken = () =>
@@ -12,42 +13,18 @@ const getToken = () =>
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
-// 規約 ver03 — 2026-06 本番運用開始に合わせ改訂
-const ITEMS = [
-  {
-    id: "self_custody",
-    title: "資産はユーザー自身が管理します",
-    detail:
-      "本サービスはノンカストディアル型です。お客様のウォレット秘密鍵は弊社サーバーに保存されません。ウォレットおよびLINEアカウントの管理責任はお客様ご自身にあります。",
-  },
-  {
-    id: "defi_risk",
-    title: "DeFi運用にはリスクがあります",
-    detail:
-      "スマートコントラクトのリスク、価格変動リスク、流動性リスク、清算リスクが存在します。元本を失う可能性があります。本サービスは投資助言ではなく、運用はすべて自己責任となります。",
-  },
-  {
-    id: "user_responsibility",
-    title: "アカウント管理は利用者自身の責任です",
-    detail:
-      "LINEアカウントの管理、不正アクセスへの対応はユーザーご自身の責任となります。弊社はアカウント損失・不正利用による損害に対して責任を負いません。",
-  },
-  {
-    id: "age_confirm",
-    title: "18歳以上であることを確認します",
-    detail:
-      "本サービスのご利用には18歳以上であることが必要です。18歳未満の方はご利用いただけません。",
-  },
-]
+// 規約 ver03 — id は messages キーとして使用
+const ITEM_IDS = ["self_custody", "defi_risk", "user_responsibility", "age_confirm"] as const
 
 export default function LiffConfirmPage() {
   const router = useRouter()
+  const t = useTranslations("Liff.confirm")
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  const allChecked = ITEMS.every((item) => checked[item.id])
+  const allChecked = ITEM_IDS.every((id) => checked[id])
   const checkedCount = Object.values(checked).filter(Boolean).length
 
   // terms_agreed_at チェック: 既に同意済みなら /liff-chat へリダイレクト
@@ -109,11 +86,11 @@ export default function LiffConfirmPage() {
     <div className="w-[375px] mx-auto h-dvh bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden">
       {/* ヘッダー */}
       <div className="bg-[#1a3d2e] px-4 py-5 flex-shrink-0">
-        <h1 className="text-white font-bold text-lg">重要事項の確認</h1>
-        <p className="text-zinc-300 text-sm mt-1">運用開始前に以下をご確認ください</p>
+        <h1 className="text-white font-bold text-lg">{t("title")}</h1>
+        <p className="text-zinc-300 text-sm mt-1">{t("subtitle")}</p>
         {/* ステップドット (ver03: 4 items) */}
         <div className="flex gap-1.5 mt-3">
-          {Array.from({ length: ITEMS.length }, (_, i) => i).map((i) => (
+          {ITEM_IDS.map((_, i) => (
             <div
               key={i}
               className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -127,25 +104,25 @@ export default function LiffConfirmPage() {
       {/* プログレスバー */}
       <div className="px-4 py-3 border-b border-zinc-800 flex-shrink-0">
         <div className="flex items-center justify-between text-sm mb-1.5">
-          <span className="text-zinc-400">確認状況</span>
-          <span className="text-[#4ade9a] font-semibold">{checkedCount} / {ITEMS.length}</span>
+          <span className="text-zinc-400">{t("progressLabel")}</span>
+          <span className="text-[#4ade9a] font-semibold">{checkedCount} / {ITEM_IDS.length}</span>
         </div>
         <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
           <div
             className="h-full bg-[#1D9E75] rounded-full transition-all duration-500 ease-out"
-            style={{ width: `${(checkedCount / ITEMS.length) * 100}%` }}
+            style={{ width: `${(checkedCount / ITEM_IDS.length) * 100}%` }}
           />
         </div>
       </div>
 
       {/* アコーディオンリスト */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        {ITEMS.map((item, idx) => {
-          const isChecked = checked[item.id]
-          const isExpanded = expanded[item.id]
+        {ITEM_IDS.map((id, idx) => {
+          const isChecked = checked[id]
+          const isExpanded = expanded[id]
           return (
             <div
-              key={item.id}
+              key={id}
               className={`rounded-xl border transition-all duration-200 ${
                 isChecked
                   ? "border-[#1D9E75] bg-[#1D9E75]/5"
@@ -155,16 +132,16 @@ export default function LiffConfirmPage() {
               <button
                 className="flex items-center w-full px-4 py-4 text-left"
                 onClick={() =>
-                  setExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
+                  setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))
                 }
               >
                 <button
                   className="mr-3 flex-shrink-0"
                   onClick={(e) => {
                     e.stopPropagation()
-                    setChecked((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
-                    if (!expanded[item.id]) {
-                      setExpanded((prev) => ({ ...prev, [item.id]: true }))
+                    setChecked((prev) => ({ ...prev, [id]: !prev[id] }))
+                    if (!expanded[id]) {
+                      setExpanded((prev) => ({ ...prev, [id]: true }))
                     }
                   }}
                 >
@@ -181,7 +158,7 @@ export default function LiffConfirmPage() {
                     isChecked ? "text-[#4ade9a]" : "text-white"
                   }`}
                 >
-                  {item.title}
+                  {t(`items.${id}.title`)}
                 </span>
                 <ChevronDown
                   className={`w-4 h-4 text-zinc-500 transition-transform ${
@@ -191,15 +168,15 @@ export default function LiffConfirmPage() {
               </button>
               {isExpanded && (
                 <div className="px-4 pb-4">
-                  <p className="text-zinc-400 text-sm leading-relaxed">{item.detail}</p>
+                  <p className="text-zinc-400 text-sm leading-relaxed">{t(`items.${id}.detail`)}</p>
                   {!isChecked && (
                     <button
                       onClick={() =>
-                        setChecked((prev) => ({ ...prev, [item.id]: true }))
+                        setChecked((prev) => ({ ...prev, [id]: true }))
                       }
                       className="mt-3 w-full py-2.5 rounded-lg bg-[#1D9E75]/20 text-[#4ade9a] text-sm font-medium border border-[#1D9E75]/30 hover:bg-[#1D9E75]/30 transition-colors"
                     >
-                      確認しました
+                      {t("confirmedBtn")}
                     </button>
                   )}
                 </div>
@@ -218,7 +195,7 @@ export default function LiffConfirmPage() {
             rel="noopener noreferrer"
             className="flex items-center gap-1 hover:text-zinc-300"
           >
-            利用規約 <ExternalLink className="w-3 h-3" />
+            {t("termsLink")} <ExternalLink className="w-3 h-3" />
           </a>
           <a
             href="/privacy-policy"
@@ -226,7 +203,7 @@ export default function LiffConfirmPage() {
             rel="noopener noreferrer"
             className="flex items-center gap-1 hover:text-zinc-300"
           >
-            プライバシーポリシー <ExternalLink className="w-3 h-3" />
+            {t("privacyLink")} <ExternalLink className="w-3 h-3" />
           </a>
         </div>
         <button
@@ -241,10 +218,10 @@ export default function LiffConfirmPage() {
           {submitting ? (
             <span className="flex items-center justify-center gap-2">
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              保存中...
+              {t("submitting")}
             </span>
           ) : (
-            "運用を開始する"
+            t("submitBtn")
           )}
         </button>
       </div>
