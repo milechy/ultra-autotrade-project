@@ -3,10 +3,11 @@
 対象:
 - PENDLE_ENABLE_ONCHAIN_WRITE 二段ガード (Q1)
 - dry_run 明示 (Q2)
-- 単一トレード 10%上限 (Q3)
+- 単一トレード 10%上限 USD 換算 (Q3)
 - SDK timeout/HTTPStatusError fail-open
 - approvals 抽出
 - get_pendle_router_v4_client ファクトリ関数
+- router endpoint 経由の amount_in_usd / portfolio_value_usd passthrough (e)
 """
 
 from __future__ import annotations
@@ -17,9 +18,12 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from app.protocols.pendle.client import PendleRouterV4Client, get_pendle_router_v4_client
 from app.protocols.pendle.config import PendleConfig
+from app.protocols.pendle.router import router as pendle_router
 from app.protocols.pendle.schemas import (
     RouterV4AddLiquidityResult,
     RouterV4Approval,
@@ -166,47 +170,65 @@ class TestDryRunEnabled:
 
 
 # ---------------------------------------------------------------------------
-# Q3: 10%上限チェック
+# Q3: 10%上限チェック（USD 換算統一）
 # ---------------------------------------------------------------------------
 
 
 class TestMaxSingleTradeGuard:
-    """portfolio_value_usd × 10% を超えたら拒否されること。"""
+    """portfolio_value_usd × 10% を超えたら拒否されること（USD 換算で比較）。"""
 
     @pytest.mark.asyncio
-    async def test_exceeds_10pct_is_rejected(self, enabled_client: PendleRouterV4Client) -> None:
-        """amount_in > portfolio × 10% は拒否。"""
+    async def test_exceeds_10pct_usd_is_rejected(
+        self, enabled_client: PendleRouterV4Client
+    ) -> None:
+        """amount_in_usd > portfolio × 10% は拒否。"""
         portfolio = Decimal("100")
-        amount_in = Decimal("11")  # 11% > 10%
+        amount_in_usd = Decimal("11")  # 11% > 10%
         result = await enabled_client.buy_yt(
-            MARKET, TOKEN_IN, amount_in, RECEIVER, portfolio_value_usd=portfolio
+            MARKET,
+            TOKEN_IN,
+            Decimal("1.0"),
+            RECEIVER,
+            portfolio_value_usd=portfolio,
+            amount_in_usd=amount_in_usd,
         )
         assert result.success is False
         assert "exceeds max single trade" in (result.error or "")
+        assert "amount_in_usd" in (result.error or "")
 
     @pytest.mark.asyncio
-    async def test_exactly_10pct_is_allowed(self, enabled_client: PendleRouterV4Client) -> None:
-        """amount_in = portfolio × 10% は通過。"""
+    async def test_exactly_10pct_usd_is_allowed(self, enabled_client: PendleRouterV4Client) -> None:
+        """amount_in_usd = portfolio × 10% は通過（境界値ちょうど許可）。"""
         portfolio = Decimal("100")
-        amount_in = Decimal("10")  # 10% = 上限ちょうど
+        amount_in_usd = Decimal("10")  # 10% = 上限ちょうど
         with patch.object(
             enabled_client, "_call_sdk", new=AsyncMock(return_value=_MOCK_SWAP_RESPONSE)
         ):
             result = await enabled_client.buy_yt(
-                MARKET, TOKEN_IN, amount_in, RECEIVER, portfolio_value_usd=portfolio
+                MARKET,
+                TOKEN_IN,
+                Decimal("1.0"),
+                RECEIVER,
+                portfolio_value_usd=portfolio,
+                amount_in_usd=amount_in_usd,
             )
         assert result.success is True
 
     @pytest.mark.asyncio
-    async def test_within_10pct_is_allowed(self, enabled_client: PendleRouterV4Client) -> None:
-        """amount_in < portfolio × 10% は通過。"""
+    async def test_within_10pct_usd_is_allowed(self, enabled_client: PendleRouterV4Client) -> None:
+        """amount_in_usd < portfolio × 10% は通過。"""
         portfolio = Decimal("100")
-        amount_in = Decimal("5")  # 5% < 10%
+        amount_in_usd = Decimal("5")  # 5% < 10%
         with patch.object(
             enabled_client, "_call_sdk", new=AsyncMock(return_value=_MOCK_SWAP_RESPONSE)
         ):
             result = await enabled_client.buy_yt(
-                MARKET, TOKEN_IN, amount_in, RECEIVER, portfolio_value_usd=portfolio
+                MARKET,
+                TOKEN_IN,
+                Decimal("1.0"),
+                RECEIVER,
+                portfolio_value_usd=portfolio,
+                amount_in_usd=amount_in_usd,
             )
         assert result.success is True
 
@@ -214,7 +236,7 @@ class TestMaxSingleTradeGuard:
     async def test_none_portfolio_skips_check_with_warning(
         self, enabled_client: PendleRouterV4Client, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """portfolio_value_usd=None はチェックをスキップし warning ログを出すこと。"""
+        """portfolio_value_usd=None はチェックをスキップし warning ログを出すこと（d）。"""
         with caplog.at_level(logging.WARNING, logger="app.protocols.pendle.client"):
             with patch.object(
                 enabled_client, "_call_sdk", new=AsyncMock(return_value=_MOCK_SWAP_RESPONSE)
@@ -226,15 +248,57 @@ class TestMaxSingleTradeGuard:
         assert any("10%上限チェックをスキップ" in r.message for r in caplog.records)
 
     @pytest.mark.asyncio
-    async def test_add_liquidity_10pct_rejected(self, enabled_client: PendleRouterV4Client) -> None:
-        """add_liquidity でも 10%上限が機能すること。"""
+    async def test_portfolio_specified_without_amount_in_usd_is_fail_closed(
+        self, enabled_client: PendleRouterV4Client
+    ) -> None:
+        """portfolio 指定 + amount_in_usd 欠落 → fail-closed 拒否（c）。"""
         portfolio = Decimal("100")
-        amount_in = Decimal("20")  # 20% > 10%
+        result = await enabled_client.buy_yt(
+            MARKET,
+            TOKEN_IN,
+            Decimal("1.0"),
+            RECEIVER,
+            portfolio_value_usd=portfolio,
+            # amount_in_usd を渡さない
+        )
+        assert result.success is False
+        assert "amount_in_usd 未指定" in (result.error or "")
+        assert "fail-closed" in (result.error or "")
+
+    @pytest.mark.asyncio
+    async def test_add_liquidity_10pct_usd_rejected(
+        self, enabled_client: PendleRouterV4Client
+    ) -> None:
+        """add_liquidity でも 10%上限が USD 換算で機能すること。"""
+        portfolio = Decimal("100")
+        amount_in_usd = Decimal("20")  # 20% > 10%
         result = await enabled_client.add_liquidity(
-            MARKET, TOKEN_IN, amount_in, RECEIVER, portfolio_value_usd=portfolio
+            MARKET,
+            TOKEN_IN,
+            Decimal("1.0"),
+            RECEIVER,
+            portfolio_value_usd=portfolio,
+            amount_in_usd=amount_in_usd,
         )
         assert result.success is False
         assert "exceeds max single trade" in (result.error or "")
+
+    @pytest.mark.asyncio
+    async def test_add_liquidity_portfolio_without_amount_in_usd_fail_closed(
+        self, enabled_client: PendleRouterV4Client
+    ) -> None:
+        """add_liquidity: portfolio 指定 + amount_in_usd 欠落 → fail-closed（c）。"""
+        portfolio = Decimal("100")
+        result = await enabled_client.add_liquidity(
+            MARKET,
+            TOKEN_IN,
+            Decimal("1.0"),
+            RECEIVER,
+            portfolio_value_usd=portfolio,
+            # amount_in_usd を渡さない
+        )
+        assert result.success is False
+        assert "amount_in_usd 未指定" in (result.error or "")
 
     def test_10pct_uses_decimal_not_float(self, enabled_client: PendleRouterV4Client) -> None:
         """max_single_trade_pct が Decimal であること（float 禁止）。"""
@@ -375,7 +439,7 @@ class TestFactory:
     def test_factory_uses_correct_router_address(self) -> None:
         config = PendleConfig(sandbox=False)
         client = get_pendle_router_v4_client(config)
-        assert client._ROUTER_ADDRESS == "0x888888888889758F76e7103c6CbF23ABbF58F946"
+        assert client._config.router_address == "0x888888888889758F76e7103c6CbF23ABbF58F946"
 
     def test_factory_inherits_config_enable_flag(self) -> None:
         """ファクトリから生成したクライアントが config の enable_onchain_write を引き継ぐこと。"""
@@ -411,3 +475,194 @@ class TestConfigDefaults:
         """config デフォルトの router_address が正式アドレスであること。"""
         config = PendleConfig()
         assert config.router_address == "0x888888888889758F76e7103c6CbF23ABbF58F946"
+
+
+# ---------------------------------------------------------------------------
+# (e) router endpoint 経由の amount_in_usd / portfolio_value_usd passthrough
+# ---------------------------------------------------------------------------
+
+_test_app = FastAPI()
+_test_app.include_router(pendle_router)
+_http_client = TestClient(_test_app)
+
+MARKET_ADDR = "0x" + "aa" * 20
+TOKEN_IN_ADDR = "0x" + "bb" * 20
+TOKEN_OUT_ADDR = "0x" + "cc" * 20
+RECEIVER_ADDR = "0x" + "dd" * 20
+
+
+class TestRouterEndpointPassthrough:
+    """router endpoint 経由で amount_in_usd / portfolio_value_usd が client に渡ること（e）。"""
+
+    def test_v4_swap_yt_with_amount_in_usd_passthrough(self) -> None:
+        """POST /v4/swap (token_out=YT) で amount_in_usd が client に到達すること。"""
+        captured_kwargs: list[dict] = []
+
+        async def mock_buy_yt(**kwargs: object) -> RouterV4AddLiquidityResult:  # type: ignore[return]
+            captured_kwargs.append(dict(kwargs))
+            from app.protocols.pendle.schemas import RouterV4SwapResult  # noqa: PLC0415
+
+            return RouterV4SwapResult(success=False, error="mock guard")
+
+        with (
+            patch("app.protocols.pendle.router.get_pendle_config"),
+            patch("app.protocols.pendle.router.get_pendle_router_v4_client") as mock_factory,
+        ):
+            mock_client = AsyncMock()
+            mock_client.buy_yt.side_effect = mock_buy_yt
+            mock_factory.return_value = mock_client
+
+            _http_client.post(
+                "/api/protocols/pendle/v4/swap",
+                json={
+                    "market_address": MARKET_ADDR,
+                    "token_in": TOKEN_IN_ADDR,
+                    "token_out": "YT",
+                    "amount_in": "1.0",
+                    "receiver": RECEIVER_ADDR,
+                    "portfolio_value_usd": "1000.0",
+                    "amount_in_usd": "50.0",
+                },
+            )
+
+        mock_client.buy_yt.assert_called_once()
+        call_kwargs = mock_client.buy_yt.call_args
+        assert call_kwargs.kwargs.get("portfolio_value_usd") == Decimal("1000.0")
+        assert call_kwargs.kwargs.get("amount_in_usd") == Decimal("50.0")
+
+    def test_v4_add_liquidity_with_amount_in_usd_passthrough(self) -> None:
+        """POST /v4/add-liquidity で amount_in_usd が client に到達すること。"""
+        with (
+            patch("app.protocols.pendle.router.get_pendle_config"),
+            patch("app.protocols.pendle.router.get_pendle_router_v4_client") as mock_factory,
+        ):
+            mock_client = AsyncMock()
+            from app.protocols.pendle.schemas import RouterV4AddLiquidityResult  # noqa: PLC0415
+
+            mock_client.add_liquidity.return_value = RouterV4AddLiquidityResult(
+                success=False, error="mock guard"
+            )
+            mock_factory.return_value = mock_client
+
+            _http_client.post(
+                "/api/protocols/pendle/v4/add-liquidity",
+                json={
+                    "market_address": MARKET_ADDR,
+                    "token_in": TOKEN_IN_ADDR,
+                    "amount_in": "1.0",
+                    "receiver": RECEIVER_ADDR,
+                    "portfolio_value_usd": "500.0",
+                    "amount_in_usd": "25.0",
+                },
+            )
+
+        mock_client.add_liquidity.assert_called_once()
+        call_kwargs = mock_client.add_liquidity.call_args
+        assert call_kwargs.kwargs.get("portfolio_value_usd") == Decimal("500.0")
+        assert call_kwargs.kwargs.get("amount_in_usd") == Decimal("25.0")
+
+
+class TestRouterEndpointNegativeUsdRejected:
+    """負の amount_in_usd / portfolio_value_usd は API 境界（ge=0）で 422 拒否されること。
+
+    負値が通ると `negative > limit` が常に False になり 10%上限ガードを素通りできるため、
+    pydantic の ge=0 制約でスキーマレベル拒否する。
+    """
+
+    def test_v4_swap_negative_amount_in_usd_returns_422(self) -> None:
+        """POST /v4/swap: 負の amount_in_usd は 422。client には到達しない。"""
+        with (
+            patch("app.protocols.pendle.router.get_pendle_config"),
+            patch("app.protocols.pendle.router.get_pendle_router_v4_client") as mock_factory,
+        ):
+            mock_client = AsyncMock()
+            mock_factory.return_value = mock_client
+
+            response = _http_client.post(
+                "/api/protocols/pendle/v4/swap",
+                json={
+                    "market_address": MARKET_ADDR,
+                    "token_in": TOKEN_IN_ADDR,
+                    "token_out": "YT",
+                    "amount_in": "1.0",
+                    "receiver": RECEIVER_ADDR,
+                    "portfolio_value_usd": "1000.0",
+                    "amount_in_usd": "-50.0",
+                },
+            )
+
+        assert response.status_code == 422
+        mock_client.buy_yt.assert_not_called()
+
+    def test_v4_swap_negative_portfolio_value_usd_returns_422(self) -> None:
+        """POST /v4/swap: 負の portfolio_value_usd は 422。"""
+        with (
+            patch("app.protocols.pendle.router.get_pendle_config"),
+            patch("app.protocols.pendle.router.get_pendle_router_v4_client") as mock_factory,
+        ):
+            mock_client = AsyncMock()
+            mock_factory.return_value = mock_client
+
+            response = _http_client.post(
+                "/api/protocols/pendle/v4/swap",
+                json={
+                    "market_address": MARKET_ADDR,
+                    "token_in": TOKEN_IN_ADDR,
+                    "token_out": "YT",
+                    "amount_in": "1.0",
+                    "receiver": RECEIVER_ADDR,
+                    "portfolio_value_usd": "-1000.0",
+                    "amount_in_usd": "50.0",
+                },
+            )
+
+        assert response.status_code == 422
+        mock_client.buy_yt.assert_not_called()
+
+    def test_v4_add_liquidity_negative_amount_in_usd_returns_422(self) -> None:
+        """POST /v4/add-liquidity: 負の amount_in_usd は 422。"""
+        with (
+            patch("app.protocols.pendle.router.get_pendle_config"),
+            patch("app.protocols.pendle.router.get_pendle_router_v4_client") as mock_factory,
+        ):
+            mock_client = AsyncMock()
+            mock_factory.return_value = mock_client
+
+            response = _http_client.post(
+                "/api/protocols/pendle/v4/add-liquidity",
+                json={
+                    "market_address": MARKET_ADDR,
+                    "token_in": TOKEN_IN_ADDR,
+                    "amount_in": "1.0",
+                    "receiver": RECEIVER_ADDR,
+                    "portfolio_value_usd": "500.0",
+                    "amount_in_usd": "-25.0",
+                },
+            )
+
+        assert response.status_code == 422
+        mock_client.add_liquidity.assert_not_called()
+
+    def test_v4_add_liquidity_negative_portfolio_value_usd_returns_422(self) -> None:
+        """POST /v4/add-liquidity: 負の portfolio_value_usd は 422。"""
+        with (
+            patch("app.protocols.pendle.router.get_pendle_config"),
+            patch("app.protocols.pendle.router.get_pendle_router_v4_client") as mock_factory,
+        ):
+            mock_client = AsyncMock()
+            mock_factory.return_value = mock_client
+
+            response = _http_client.post(
+                "/api/protocols/pendle/v4/add-liquidity",
+                json={
+                    "market_address": MARKET_ADDR,
+                    "token_in": TOKEN_IN_ADDR,
+                    "amount_in": "1.0",
+                    "receiver": RECEIVER_ADDR,
+                    "portfolio_value_usd": "-500.0",
+                    "amount_in_usd": "25.0",
+                },
+            )
+
+        assert response.status_code == 422
+        mock_client.add_liquidity.assert_not_called()

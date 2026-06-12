@@ -409,7 +409,6 @@ class PendleRouterV4Client:
     """
 
     _SDK_BASE = "https://api-v2.pendle.finance/sdk/api/v1"
-    _ROUTER_ADDRESS = "0x888888888889758F76e7103c6CbF23ABbF58F946"
     _DEFAULT_SLIPPAGE = Decimal("0.005")
     _REQUEST_TIMEOUT: float = 15.0
 
@@ -437,7 +436,7 @@ class PendleRouterV4Client:
             "PendleRouterV4Client initialized (chain=%s, chain_id=%d, router=%s)",
             config.chain,
             self._chain_id,
-            self._ROUTER_ADDRESS[:10] + "...",
+            self._config.router_address[:10] + "...",
         )
 
     async def _call_sdk(self, endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
@@ -473,10 +472,14 @@ class PendleRouterV4Client:
 
     def _check_guards(
         self,
-        amount_in: Decimal,
+        amount_in_usd: Decimal | None,
         portfolio_value_usd: Decimal | None = None,
     ) -> RouterV4SwapResult | None:
-        """二段ガード + 10%上限チェック。
+        """二段ガード + 10%上限チェック（USD 換算統一）。
+
+        Args:
+            amount_in_usd: トレード金額（USD）。portfolio_value_usd 指定時は必須（fail-closed）。
+            portfolio_value_usd: ポートフォリオ総額（USD）。None のときチェックをスキップ。
 
         問題があれば RouterV4SwapResult(success=False) を返す。問題なければ None を返す。
         """
@@ -486,15 +489,20 @@ class PendleRouterV4Client:
                 success=False,
                 error="on-chain write disabled (PENDLE_ENABLE_ONCHAIN_WRITE=false)",
             )
-        # Q2: 単一トレード上限（10%）チェック
+        # Q2: 単一トレード上限（10%）チェック（USD 換算で比較）
         if portfolio_value_usd is not None:
+            if amount_in_usd is None:
+                return RouterV4SwapResult(
+                    success=False,
+                    error="amount_in_usd 未指定のため 10%上限を検証できません (fail-closed)",
+                )
             limit = portfolio_value_usd * self._config.max_single_trade_pct
-            if amount_in > limit:
+            if amount_in_usd > limit:
                 return RouterV4SwapResult(
                     success=False,
                     error=(
                         f"exceeds max single trade ({self._config.max_single_trade_pct * 100:.0f}%): "
-                        f"amount_in={amount_in}, limit={limit}"
+                        f"amount_in_usd={amount_in_usd}, limit={limit}"
                     ),
                 )
         else:
@@ -505,10 +513,14 @@ class PendleRouterV4Client:
 
     def _check_guards_liq(
         self,
-        amount_in: Decimal,
+        amount_in_usd: Decimal | None,
         portfolio_value_usd: Decimal | None = None,
     ) -> RouterV4AddLiquidityResult | None:
-        """二段ガード + 10%上限チェック（add_liquidity 用）。
+        """二段ガード + 10%上限チェック（add_liquidity 用、USD 換算統一）。
+
+        Args:
+            amount_in_usd: トレード金額（USD）。portfolio_value_usd 指定時は必須（fail-closed）。
+            portfolio_value_usd: ポートフォリオ総額（USD）。None のときチェックをスキップ。
 
         問題があれば RouterV4AddLiquidityResult(success=False) を返す。問題なければ None を返す。
         """
@@ -518,13 +530,18 @@ class PendleRouterV4Client:
                 error="on-chain write disabled (PENDLE_ENABLE_ONCHAIN_WRITE=false)",
             )
         if portfolio_value_usd is not None:
+            if amount_in_usd is None:
+                return RouterV4AddLiquidityResult(
+                    success=False,
+                    error="amount_in_usd 未指定のため 10%上限を検証できません (fail-closed)",
+                )
             limit = portfolio_value_usd * self._config.max_single_trade_pct
-            if amount_in > limit:
+            if amount_in_usd > limit:
                 return RouterV4AddLiquidityResult(
                     success=False,
                     error=(
                         f"exceeds max single trade ({self._config.max_single_trade_pct * 100:.0f}%): "
-                        f"amount_in={amount_in}, limit={limit}"
+                        f"amount_in_usd={amount_in_usd}, limit={limit}"
                     ),
                 )
         else:
@@ -573,12 +590,12 @@ class PendleRouterV4Client:
             (ok, to_address, error): ok=False のとき error に理由を格納する。
         """
         to_addr = sdk_response.get("data", {}).get("tx", {}).get("to")
-        if not self._addr_eq(to_addr, self._ROUTER_ADDRESS):
+        if not self._addr_eq(to_addr, self._config.router_address):
             return False, None, "router address mismatch"
         # approvals がある場合は spender も Router であることを照合する。
         for approval in self._extract_approvals(sdk_response):
             if approval.spender is not None and not self._addr_eq(
-                approval.spender, self._ROUTER_ADDRESS
+                approval.spender, self._config.router_address
             ):
                 return False, None, "router address mismatch"
         return True, to_addr, ""
@@ -612,6 +629,7 @@ class PendleRouterV4Client:
         dry_run: bool = True,
         portfolio_value_usd: Decimal | None = None,
         token_in_decimals: int | None = None,
+        amount_in_usd: Decimal | None = None,
     ) -> RouterV4SwapResult:
         """YT を購入する（token_in → YT swap）。
 
@@ -626,11 +644,13 @@ class PendleRouterV4Client:
             token_in_decimals: 入力トークンの decimals。**非18桁トークン（USDC/USDT=6,
                 WBTC=8）では必ず指定すること**。None の場合 config の token→decimals マップで
                 解決し、未知トークンは 18。
+            amount_in_usd: トレード金額（USD）。portfolio_value_usd と併用必須
+                （未指定時は fail-closed で拒否）。
 
         Returns:
             RouterV4SwapResult
         """
-        guard = self._check_guards(amount_in, portfolio_value_usd)
+        guard = self._check_guards(amount_in_usd, portfolio_value_usd)
         if guard is not None:
             return guard
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
@@ -658,6 +678,7 @@ class PendleRouterV4Client:
         dry_run: bool = True,
         portfolio_value_usd: Decimal | None = None,
         token_out_decimals: int | None = None,
+        amount_in_usd: Decimal | None = None,
     ) -> RouterV4SwapResult:
         """YT を売却する（YT → token_out swap）。
 
@@ -672,11 +693,13 @@ class PendleRouterV4Client:
             token_out_decimals: 出力トークンの decimals。**非18桁トークン（USDC/USDT=6,
                 WBTC=8）では必ず指定すること**。None の場合 config の token→decimals マップで
                 解決し、未知トークンは 18。
+            amount_in_usd: トレード金額（USD）。portfolio_value_usd と併用必須
+                （未指定時は fail-closed で拒否）。
 
         Returns:
             RouterV4SwapResult
         """
-        guard = self._check_guards(yt_amount_in, portfolio_value_usd)
+        guard = self._check_guards(amount_in_usd, portfolio_value_usd)
         if guard is not None:
             return guard
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
@@ -704,6 +727,7 @@ class PendleRouterV4Client:
         dry_run: bool = True,
         portfolio_value_usd: Decimal | None = None,
         token_in_decimals: int | None = None,
+        amount_in_usd: Decimal | None = None,
     ) -> RouterV4SwapResult:
         """PT を購入する（token_in → PT swap）。
 
@@ -718,11 +742,13 @@ class PendleRouterV4Client:
             token_in_decimals: 入力トークンの decimals。**非18桁トークン（USDC/USDT=6,
                 WBTC=8）では必ず指定すること**。None の場合 config の token→decimals マップで
                 解決し、未知トークンは 18。
+            amount_in_usd: トレード金額（USD）。portfolio_value_usd と併用必須
+                （未指定時は fail-closed で拒否）。
 
         Returns:
             RouterV4SwapResult
         """
-        guard = self._check_guards(amount_in, portfolio_value_usd)
+        guard = self._check_guards(amount_in_usd, portfolio_value_usd)
         if guard is not None:
             return guard
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
@@ -750,6 +776,7 @@ class PendleRouterV4Client:
         dry_run: bool = True,
         portfolio_value_usd: Decimal | None = None,
         token_out_decimals: int | None = None,
+        amount_in_usd: Decimal | None = None,
     ) -> RouterV4SwapResult:
         """PT を売却する（PT → token_out swap）。
 
@@ -764,11 +791,13 @@ class PendleRouterV4Client:
             token_out_decimals: 出力トークンの decimals。**非18桁トークン（USDC/USDT=6,
                 WBTC=8）では必ず指定すること**。None の場合 config の token→decimals マップで
                 解決し、未知トークンは 18。
+            amount_in_usd: トレード金額（USD）。portfolio_value_usd と併用必須
+                （未指定時は fail-closed で拒否）。
 
         Returns:
             RouterV4SwapResult
         """
-        guard = self._check_guards(pt_amount_in, portfolio_value_usd)
+        guard = self._check_guards(amount_in_usd, portfolio_value_usd)
         if guard is not None:
             return guard
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
@@ -891,6 +920,7 @@ class PendleRouterV4Client:
         dry_run: bool = True,
         portfolio_value_usd: Decimal | None = None,
         token_in_decimals: int | None = None,
+        amount_in_usd: Decimal | None = None,
     ) -> RouterV4AddLiquidityResult:
         """マーケットに流動性を追加する（token_in → LP）。
 
@@ -905,11 +935,13 @@ class PendleRouterV4Client:
             token_in_decimals: 入力トークンの decimals。**非18桁トークン（USDC/USDT=6,
                 WBTC=8）では必ず指定すること**。None の場合 config の token→decimals マップで
                 解決し、未知トークンは 18。
+            amount_in_usd: トレード金額（USD）。portfolio_value_usd と併用必須
+                （未指定時は fail-closed で拒否）。
 
         Returns:
             RouterV4AddLiquidityResult
         """
-        guard_liq = self._check_guards_liq(amount_in, portfolio_value_usd)
+        guard_liq = self._check_guards_liq(amount_in_usd, portfolio_value_usd)
         if guard_liq is not None:
             return guard_liq
 
