@@ -2,6 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import { AssetIcon } from '@/components/shared/AssetIcon'
 import { TxHashLink } from '@/components/shared/TxHashLink'
@@ -28,23 +29,24 @@ function formatAmount(amount: number, asset: string): string {
 }
 
 export function RecentApprovals({ approvals }: RecentApprovalsProps) {
+  const t = useTranslations('RecentApprovals')
   const displayItems = approvals.slice(0, 5)
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">最近の承認履歴</h2>
+        <h2 className="text-base font-semibold">{t('recentTitle')}</h2>
         <Link
           href="/history"
           className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
         >
-          全履歴を見る →
+          {t('viewAllHistory')}
         </Link>
       </div>
 
       {displayItems.length === 0 ? (
         <p className="text-sm text-muted-foreground py-4 text-center">
-          承認履歴はありません
+          {t('noRecentApprovals')}
         </p>
       ) : (
         <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
@@ -73,7 +75,7 @@ export function RecentApprovals({ approvals }: RecentApprovalsProps) {
                       : 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800 text-xs'
                   }
                 >
-                  {item.status === 'success' ? '成功' : '失敗'}
+                  {item.status === 'success' ? t('statusSuccess') : t('statusFailed')}
                 </Badge>
                 <TxHashLink hash={item.txHash} />
               </div>
