@@ -76,6 +76,19 @@ module.exports = {
           "33%": { backgroundPosition: "100% 0" },
           "100%": { backgroundPosition: "100% 0" },
         },
+        // ウルトラマン カラータイマー: 5s サイクル、4回点滅
+        "color-timer": {
+          "0%":   { opacity: "1" },
+          "9%":   { opacity: "0.15" },
+          "18%":  { opacity: "1" },
+          "27%":  { opacity: "0.15" },
+          "36%":  { opacity: "1" },
+          "45%":  { opacity: "0.15" },
+          "54%":  { opacity: "1" },
+          "63%":  { opacity: "0.15" },
+          "72%":  { opacity: "1" },
+          "100%": { opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -83,6 +96,7 @@ module.exports = {
         "scan-line": "scan-line 2s ease-in-out forwards",
         // sweep 1.5s + wait 3s = 4.5s 周期で無限ループ
         "logo-shine": "logo-shine 4.5s ease-in-out infinite",
+        "color-timer": "color-timer 5s linear infinite",
       },
     },
   },
