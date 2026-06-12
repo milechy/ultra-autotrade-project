@@ -982,5 +982,27 @@
     "withdrawBadge": "引き出し",
     "holdTitle": "何もしない",
     "holdBadge": "ホールド"
+  },
+  "ProposalCard": {
+    "hfChangeLabel": "ヘルスファクター変化",
+    "estimatedGasLabel": "推定ガス代",
+    "slippageWarning": "スリッページが高めです（{pct}%）",
+    "processingButton": "処理中...",
+    "approveButton": "承認",
+    "rejectButton": "却下"
+  },
+  "TransactionStatus": {
+    "requestingSignature": "署名をリクエスト中...",
+    "waitingConfirmation": "確認待ち...",
+    "txSuccess": "トランザクション完了",
+    "txFailed": "トランザクション失敗",
+    "retryHint": "再度「承認」ボタンを押してください"
+  },
+  "RecentApprovals": {
+    "recentTitle": "最近の承認履歴",
+    "viewAllHistory": "全履歴を見る →",
+    "noRecentApprovals": "承認履歴はありません",
+    "statusSuccess": "成功",
+    "statusFailed": "失敗"
   }
 }

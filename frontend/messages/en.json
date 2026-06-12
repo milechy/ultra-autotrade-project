@@ -982,5 +982,27 @@
     "withdrawBadge": "Withdraw",
     "holdTitle": "Do nothing",
     "holdBadge": "Hold"
+  },
+  "ProposalCard": {
+    "hfChangeLabel": "Health Factor Change",
+    "estimatedGasLabel": "Estimated Gas",
+    "slippageWarning": "High slippage ({pct}%)",
+    "processingButton": "Processing...",
+    "approveButton": "Approve",
+    "rejectButton": "Reject"
+  },
+  "TransactionStatus": {
+    "requestingSignature": "Requesting signature...",
+    "waitingConfirmation": "Waiting for confirmation...",
+    "txSuccess": "Transaction complete",
+    "txFailed": "Transaction failed",
+    "retryHint": "Please press the \"Approve\" button again"
+  },
+  "RecentApprovals": {
+    "recentTitle": "Recent Approvals",
+    "viewAllHistory": "View all history →",
+    "noRecentApprovals": "No approval history",
+    "statusSuccess": "Success",
+    "statusFailed": "Failed"
   }
 }
