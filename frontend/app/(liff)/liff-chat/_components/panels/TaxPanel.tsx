@@ -6,6 +6,8 @@ import { FileDown, ChevronRight, Loader2, AlertCircle } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { getAuthToken } from "@/lib/auth/token-key"
 
+type TFn = ReturnType<typeof useTranslations>
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 interface UserSettings {
@@ -143,7 +145,7 @@ interface YearSelectorProps {
   selectedYear: number
   onYearChange: (year: number) => void
   currentYear: number
-  t: (key: string) => string
+  t: TFn
 }
 
 function YearSelector({ selectedYear, onYearChange, currentYear, t }: YearSelectorProps) {
@@ -205,7 +207,7 @@ interface PersonalTabContentProps {
   currentYear: number
   buildDownloadUrl: (path: string) => string
   downloadFile: (url: string, filename: string) => Promise<void>
-  t: (key: string) => string
+  t: TFn
 }
 
 function PersonalTabContent({
@@ -250,7 +252,7 @@ function PersonalTabContent({
 
 interface CorporateTabContentProps {
   fiscalMonth: number
-  t: (key: string, opts?: Record<string, unknown>) => string
+  t: TFn
 }
 
 function CorporateTabContent({ fiscalMonth, t }: CorporateTabContentProps) {

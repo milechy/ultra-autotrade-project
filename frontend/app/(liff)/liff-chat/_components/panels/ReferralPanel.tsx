@@ -5,6 +5,8 @@ import { useEffect, useState, useCallback } from "react"
 import { Copy, Mail, Share2, CheckCircle, Users, Gift, TrendingUp, ChevronRight } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { getReferralInfo, createReferralCode, type ReferralInfo } from "@/lib/api/referral"
+
+type TFn = ReturnType<typeof useTranslations>
 import { getAuthToken } from "@/lib/auth/token-key"
 
 // SIGNUP URL: 専用の env/定数が無いため、sibling パネル (TermsPanel 等) と同じ
@@ -376,7 +378,7 @@ function ReferredUserRow({
   tPanel,
 }: {
   user: { name: string; joined_at: string; status: string; reward_jpy: string }
-  tPanel: (key: string, opts?: Record<string, unknown>) => string
+  tPanel: TFn
 }) {
   const isActive = user.status === "運用中"
   const initial = user.name ? user.name.charAt(0).toUpperCase() : "?"
