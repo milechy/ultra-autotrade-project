@@ -3,80 +3,43 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
-const steps = [
-  {
-    id: 1,
-    title: "ウォレットを準備する",
-    emoji: "👛",
-    description: "MetaMaskをインストールして、ウォレットを作成します。",
-    details: [
-      { text: "MetaMask公式サイトにアクセス", link: "https://metamask.io/download/" },
-      { text: "Chrome拡張機能をインストール" },
-      { text: "「新しいウォレットを作成」を選択" },
-      { text: "パスワードを設定（強力なものを使用）" },
-      { text: "シードフレーズを安全な場所に保管", warning: "シードフレーズは絶対に誰にも教えないでください" },
-    ],
-    tip: "MetaMaskの代わりにRabby WalletやCoinbase Walletも使えます。",
-  },
-  {
-    id: 2,
-    title: "ネットワークを追加する",
-    emoji: "🌐",
-    description: "Base Sepoliaネットワークをウォレットに追加します。",
-    details: [
-      { text: "ChainListにアクセス", link: "https://chainlist.org/?search=base+sepolia&testnets=true" },
-      { text: "「Base Sepolia」を検索して「Add to MetaMask」をクリック" },
-      { text: "MetaMaskのポップアップで「承認」を選択" },
-      { text: "MetaMaskの上部ネットワーク欄が「Base Sepolia」になっていることを確認" },
-    ],
-    tip: "ChainListを使うと、ネットワーク情報を手入力する必要がありません。",
-  },
-  {
-    id: 3,
-    title: "テスト用ETHを入手する",
-    emoji: "💰",
-    description: "ガス代用のテストETH（SepoliaETH）をウォレットに送金します。",
-    details: [
-      { text: "Coinbase Faucetにアクセス", link: "https://faucet.quicknode.com/base/sepolia" },
-      { text: "ウォレットアドレスを入力してテストETHを受け取る" },
-      { text: "MetaMaskに「Base Sepolia ETH」が届いたことを確認" },
-    ],
-    tip: "テストネットのため、実際の資産は不要です。フォーセットから無料でテストETHが取得できます。",
-  },
-  {
-    id: 4,
-    title: "Ultra AutoTradeに接続する",
-    emoji: "🔗",
-    description: "ウォレットをUltra AutoTradeに接続して運用を開始します。",
-    details: [
-      { text: "Ultra AutoTradeにログイン" },
-      { text: "「ウォレット接続」ボタンをクリック" },
-      { text: "MetaMaskのポップアップで接続を承認" },
-      { text: "AIの提案を確認し、実行する場合は署名して承認" },
-    ],
-    tip: "接続はウォレットアドレスの読み取りのみです。当社が秘密鍵を聞くことは一切ありません。",
-  },
-];
+const STEP_KEYS = ["wallet", "network", "testEth", "connect"] as const;
+type StepKey = (typeof STEP_KEYS)[number];
 
-const faqs = [
-  {
-    q: "最低いくらから始められますか？",
-    a: "最低金額の制限はありませんが、ガス代を考慮すると100 USDC以上を推奨します。少額だとガス代の比率が高くなり、利回りが相殺される可能性があります。",
-  },
-  {
-    q: "損失のリスクはありますか？",
-    a: "はい。暗号資産のDeFi運用には元本を失うリスクがあります。AIが最適な判断を支援しますが、市場リスク・スマートコントラクトリスク・清算リスクなどがあります。詳しくはリスク開示書をお読みください。",
-  },
-  {
-    q: "AIが勝手に取引しますか？",
-    a: "いいえ。AIは「提案」するだけです。実際の預け入れ・引き出しには、必ずあなたのMetaMaskでの署名（承認）が必要です。署名しない限り資産は動きません。",
-  },
-  {
-    q: "やめたいときはどうすればいいですか？",
-    a: "いつでも資産をAaveから引き出せます。Ultra AutoTradeを解除した後も、資産はあなたのウォレットに残ります。引き出しに必要なのはガス代のみです。",
-  },
-];
+const FAQ_KEYS = ["minAmount", "lossRisk", "aiAutoTrade", "howToStop"] as const;
+type FaqKey = (typeof FAQ_KEYS)[number];
+
+const STEP_EMOJIS: Record<StepKey, string> = {
+  wallet: "👛",
+  network: "🌐",
+  testEth: "💰",
+  connect: "🔗",
+};
+
+const STEP_DETAIL_KEYS: Record<StepKey, string[]> = {
+  wallet: ["site", "ext", "create", "password", "seed"],
+  network: ["chainlist", "search", "approve", "verify"],
+  testEth: ["faucet", "input", "verify"],
+  connect: ["login", "clickConnect", "approve", "sign"],
+};
+
+const STEP_DETAIL_LINKS: Record<string, string> = {
+  "wallet.site": "https://metamask.io/download/",
+  "network.chainlist": "https://chainlist.org/?search=base+sepolia&testnets=true",
+  "testEth.faucet": "https://faucet.quicknode.com/base/sepolia",
+};
+
+const STEP_DETAIL_WARNINGS = new Set(["wallet.seed"]);
+
+const SAFETY_KEYS = [
+  "nonCustodial",
+  "signRequired",
+  "emergencyStop",
+  "fourAgents",
+] as const;
+type SafetyKey = (typeof SAFETY_KEYS)[number];
 
 interface StepDetail {
   text: string;
@@ -86,11 +49,17 @@ interface StepDetail {
 
 interface Step {
   id: number;
+  key: StepKey;
   title: string;
   emoji: string;
   description: string;
   details: StepDetail[];
   tip?: string;
+}
+
+interface Faq {
+  q: string;
+  a: string;
 }
 
 function StepCard({
@@ -164,18 +133,55 @@ function StepCard({
 }
 
 export default function OnboardingPage() {
+  const t = useTranslations("Onboarding");
   const [activeStep, setActiveStep] = useState(1);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+
+  const steps: Step[] = STEP_KEYS.map((key, idx) => {
+    const detailKeys = STEP_DETAIL_KEYS[key];
+    const details: StepDetail[] = detailKeys.map((dk) => {
+      const linkKey = `${key}.${dk}`;
+      const isWarning = STEP_DETAIL_WARNINGS.has(linkKey);
+      return {
+        text: t(`steps.${key}.details.${dk}`),
+        link: STEP_DETAIL_LINKS[linkKey],
+        warning: isWarning ? t(`steps.${key}.seedWarning`) : undefined,
+      };
+    });
+
+    const hasTip = key === "wallet" || key === "network" || key === "testEth" || key === "connect";
+
+    return {
+      id: idx + 1,
+      key,
+      title: t(`steps.${key}.title`),
+      emoji: STEP_EMOJIS[key],
+      description: t(`steps.${key}.description`),
+      details,
+      tip: hasTip ? t(`steps.${key}.tip`) : undefined,
+    };
+  });
+
+  const faqs: Faq[] = FAQ_KEYS.map((key) => ({
+    q: t(`faqs.${key}.q`),
+    a: t(`faqs.${key}.a`),
+  }));
+
+  const safetyItems: { key: SafetyKey; label: string; desc: string }[] = SAFETY_KEYS.map(
+    (key) => ({
+      key,
+      label: t(`safety.${key}.label`),
+      desc: t(`safety.${key}.desc`),
+    })
+  );
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6">
       <div className="max-w-3xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold">はじめに</h1>
-          <p className="text-zinc-400">
-            Ultra AutoTradeで資産運用を始めるための4つのステップ
-          </p>
+          <h1 className="text-3xl font-bold">{t("headerTitle")}</h1>
+          <p className="text-zinc-400">{t("headerSubtitle")}</p>
         </div>
 
         {/* Progress bar */}
@@ -209,43 +215,33 @@ export default function OnboardingPage() {
             disabled={activeStep === 1}
             className="px-4 py-2 text-sm rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            ← 前のステップ
+            {t("prevStep")}
           </button>
           <button
             onClick={() => setActiveStep((s) => Math.min(steps.length, s + 1))}
             disabled={activeStep === steps.length}
             className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            次のステップ →
+            {t("nextStep")}
           </button>
         </div>
 
         {/* Safety notice */}
         <div className="rounded-xl border border-emerald-800 bg-emerald-950/20 p-6">
-          <h3 className="font-bold text-emerald-400 mb-3">🛡️ あなたの資産を守る仕組み</h3>
+          <h3 className="font-bold text-emerald-400 mb-3">🛡️ {t("safety.title")}</h3>
           <div className="space-y-2 text-sm text-zinc-400">
-            <p>
-              ✅ <strong className="text-zinc-300">ノンカストディアル</strong>{" "}
-              — あなたの秘密鍵は当社が管理しません
-            </p>
-            <p>
-              ✅ <strong className="text-zinc-300">署名が必須</strong>{" "}
-              — AIの提案を実行するにはあなたの承認が必要です
-            </p>
-            <p>
-              ✅ <strong className="text-zinc-300">緊急停止</strong>{" "}
-              — Health Factorが危険水準になると自動ブレーキが作動
-            </p>
-            <p>
-              ✅ <strong className="text-zinc-300">4つのAIエージェント</strong>{" "}
-              — 市場・リスク・マクロ・行動パターンを常時監視
-            </p>
+            {safetyItems.map(({ key, label, desc }) => (
+              <p key={key}>
+                ✅ <strong className="text-zinc-300">{label}</strong>{" "}
+                — {desc}
+              </p>
+            ))}
           </div>
         </div>
 
         {/* FAQ */}
         <div>
-          <h2 className="text-xl font-bold mb-4">よくある質問</h2>
+          <h2 className="text-xl font-bold mb-4">{t("faqTitle")}</h2>
           <div className="space-y-2">
             {faqs.map((faq, i) => (
               <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-900/40 overflow-hidden">
@@ -272,7 +268,7 @@ export default function OnboardingPage() {
             href="/user/wallet"
             className="inline-block rounded-lg bg-blue-600 px-8 py-3 text-sm font-bold text-white hover:bg-blue-500 transition-all"
           >
-            ウォレットを接続して始める →
+            {t("cta")}
           </a>
         </div>
       </div>
