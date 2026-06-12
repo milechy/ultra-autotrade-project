@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -37,22 +38,10 @@ interface ScenarioCardData {
   jpyAmount: number | null
 }
 
-const SCENARIO_META: Record<string, { title: string; badge: string; badgeVariant: 'default' | 'secondary' | 'outline' }> = {
-  supply: {
-    title: '今預けたら',
-    badge: '供給',
-    badgeVariant: 'default',
-  },
-  withdraw: {
-    title: '全額引き出したら',
-    badge: '引き出し',
-    badgeVariant: 'secondary',
-  },
-  hold: {
-    title: '何もしない',
-    badge: 'ホールド',
-    badgeVariant: 'outline',
-  },
+const SCENARIO_BADGE_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
+  supply: 'default',
+  withdraw: 'secondary',
+  hold: 'outline',
 }
 
 function ScenarioCardSkeleton() {
@@ -104,6 +93,15 @@ function SimulationContent() {
   const [cards, setCards] = useState<ScenarioCardData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const t = useTranslations('Simulation')
+
+  const getScenarioMeta = (name: string): { title: string; badge: string; badgeVariant: 'default' | 'secondary' | 'outline' } => {
+    if (name === 'supply') return { title: t('supplyTitle'), badge: t('supplyBadge'), badgeVariant: 'default' }
+    if (name === 'withdraw') return { title: t('withdrawTitle'), badge: t('withdrawBadge'), badgeVariant: 'secondary' }
+    if (name === 'hold') return { title: t('holdTitle'), badge: t('holdBadge'), badgeVariant: 'outline' }
+    const variant: 'default' | 'secondary' | 'outline' = SCENARIO_BADGE_VARIANT[name] ?? 'outline'
+    return { title: name, badge: name, badgeVariant: variant }
+  }
 
   useEffect(() => {
     fetch(`${API_URL}/api/transparency/simulation`)
@@ -114,11 +112,7 @@ function SimulationContent() {
       .then(async (data) => {
         const cardDataList = await Promise.all(
           data.scenarios.map(async (scenario) => {
-            const meta = SCENARIO_META[scenario.name] ?? {
-              title: scenario.name,
-              badge: scenario.name,
-              badgeVariant: 'outline' as const,
-            }
+            const meta = getScenarioMeta(scenario.name)
             const gainUSDC = parseFloat(scenario.projected_gain_usd)
             const projectedUSDC = BASELINE_USDC + gainUSDC
             const gainPct = BASELINE_USDC > 0 ? (gainUSDC / BASELINE_USDC) * 100 : 0
@@ -150,7 +144,7 @@ function SimulationContent() {
           { name: 'hold', gainUSDC: 28.77 },
         ]
         const fallbackCards: ScenarioCardData[] = mockScenarios.map((s) => {
-          const meta = SCENARIO_META[s.name]
+          const meta = getScenarioMeta(s.name)
           return {
             name: s.name,
             title: meta.title,
@@ -163,9 +157,10 @@ function SimulationContent() {
           }
         })
         setCards(fallbackCards)
-        setError('シミュレーション中... (オフラインモード)')
+        setError(t('offlineMode'))
       })
       .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (loading) {
@@ -191,18 +186,19 @@ function SimulationContent() {
       ))}
 
       <p className="text-xs text-muted-foreground text-center pt-2">
-        ⚠️ この予測は保証ではありません。市場状況により実際の結果は異なります。
+        {t('disclaimer')}
       </p>
     </div>
   )
 }
 
 export default function SimulationPage() {
+  const t = useTranslations('Simulation')
   return (
     <main className="px-4 py-6 max-w-md mx-auto">
       <div className="mb-4">
-        <h1 className="text-2xl font-bold">シミュレーション</h1>
-        <p className="text-xs text-muted-foreground mt-1">30日後の予測シナリオ</p>
+        <h1 className="text-2xl font-bold">{t('pageTitle')}</h1>
+        <p className="text-xs text-muted-foreground mt-1">{t('pageSubtitle')}</p>
       </div>
       <ErrorBoundary>
         <SimulationContent />
