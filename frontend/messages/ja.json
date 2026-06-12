@@ -360,7 +360,86 @@
     "riskLow": "低",
     "riskMedium": "中",
     "riskHigh": "高",
-    "strategist": "ストラテジスト"
+    "strategist": "ストラテジスト",
+    "comingSoon": "Phase 2で対応予定"
+  },
+  "Grid": {
+    "subtitle": "グリッド間隔で自動売買を行うボット設定",
+    "noGridLevels": "グリッドレベルがありません",
+    "upperLabel": "上限",
+    "lowerLabel": "下限",
+    "gridSettings": "グリッド設定",
+    "upperPriceLabel": "上限価格 (USD)",
+    "lowerPriceLabel": "下限価格 (USD)",
+    "gridCountLabel": "グリッド数（2〜100）",
+    "symbolLabel": "取引ペア",
+    "amountPerGridLabel": "各グリッド金額 (USD)",
+    "dryRunLabel": "ドライランモード（実際の注文は発行しない）",
+    "dryRunActive": "ドライランモードが有効です。実際の注文は発行されません。",
+    "starting": "起動中...",
+    "startBot": "Bot起動",
+    "fetching": "取得中...",
+    "fetchStatus": "ステータス取得",
+    "botStatus": "Bot ステータス",
+    "operationStatus": "稼働状態",
+    "running": "稼働中",
+    "stopped": "停止中",
+    "orderStats": "注文統計",
+    "filledOrders": "約定済み / 総注文数",
+    "pnl": "損益 (USD)",
+    "gridVisualization": "グリッドビジュアライゼーション",
+    "errInputRequired": "上限価格・下限価格・各グリッド金額を入力してください",
+    "errUpperLower": "上限価格は下限価格より大きい値を入力してください",
+    "botStartError": "Bot起動エラー: {msg}",
+    "statusFetchError": "ステータス取得エラー: {msg}",
+    "filled": "約定",
+    "currentPriceIndicator": "← 現在値",
+    "currentPriceLabel": "現在価格",
+    "comingSoon": "Phase 2で対応予定",
+    "upperPricePlaceholder": "例: 50000",
+    "lowerPricePlaceholder": "例: 40000",
+    "amountPerGridPlaceholder": "例: 100"
+  },
+  "TermsAccept": {
+    "title": "重要事項の確認",
+    "subtitle": "運用開始前に以下をご確認ください",
+    "progressLabel": "確認状況",
+    "confirmItem": "確認しました",
+    "termsLink": "利用規約",
+    "privacyLink": "プライバシーポリシー",
+    "saving": "保存中...",
+    "startButton": "運用を開始する",
+    "item1": {
+      "title": "資産はユーザー自身が管理します",
+      "detail": "本サービスはノンカストディアル型です。秘密鍵はユーザーが管理し、弊社はウォレットにアクセスできません。"
+    },
+    "item2": {
+      "title": "DeFi運用にはリスクがあります",
+      "detail": "スマートコントラクトのリスク、価格変動リスク、流動性リスクが存在します。投資は自己責任でお願いします。"
+    },
+    "item3": {
+      "title": "アカウント管理は利用者自身の責任です",
+      "detail": "ログイン情報の管理、不正アクセスへの対応はユーザーご自身の責任となります。弊社はアカウント損失に対して責任を負いません。"
+    }
+  },
+  "UserHome": {
+    "heroLine1": "AIが最適なタイミングで、",
+    "heroLine2": "あなたの資産を運用します",
+    "nonCustodial": "Non-custodial — あなたのウォレット、あなたの資産",
+    "step1": {
+      "title": "ウォレットを接続",
+      "description": "MetaMask / WalletConnect 対応ウォレットをBase メインネットに接続"
+    },
+    "step2": {
+      "title": "AIが市場を分析",
+      "description": "Claude Opus が最適なタイミングを提案。GPT-4o でクロス検証。"
+    },
+    "step3": {
+      "title": "あなたが承認・署名",
+      "description": "提案を確認し、ウォレットで署名。あなたが最終判断者です。"
+    },
+    "riskDisclaimer": "これは投資助言ではありません。暗号資産取引には元本損失のリスクがあります。ご自身の判断と責任において利用してください。",
+    "dashboardCta": "すでに接続済みの方はダッシュボードへ →"
   },
   "Chat": {
     "headerTitle": "UATa AI",

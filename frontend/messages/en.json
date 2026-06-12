@@ -360,7 +360,86 @@
     "riskLow": "Low",
     "riskMedium": "Medium",
     "riskHigh": "High",
-    "strategist": "Strategist"
+    "strategist": "Strategist",
+    "comingSoon": "Coming in Phase 2"
+  },
+  "Grid": {
+    "subtitle": "Automated trading bot with grid-interval orders",
+    "noGridLevels": "No grid levels",
+    "upperLabel": "Upper",
+    "lowerLabel": "Lower",
+    "gridSettings": "Grid Settings",
+    "upperPriceLabel": "Upper Price (USD)",
+    "lowerPriceLabel": "Lower Price (USD)",
+    "gridCountLabel": "Grid Count (2–100)",
+    "symbolLabel": "Trading Pair",
+    "amountPerGridLabel": "Amount per Grid (USD)",
+    "dryRunLabel": "Dry-run mode (no real orders placed)",
+    "dryRunActive": "Dry-run mode is enabled. No real orders will be placed.",
+    "starting": "Starting...",
+    "startBot": "Start Bot",
+    "fetching": "Fetching...",
+    "fetchStatus": "Fetch Status",
+    "botStatus": "Bot Status",
+    "operationStatus": "Status",
+    "running": "Running",
+    "stopped": "Stopped",
+    "orderStats": "Order Stats",
+    "filledOrders": "Filled / Total Orders",
+    "pnl": "PnL (USD)",
+    "gridVisualization": "Grid Visualization",
+    "errInputRequired": "Please enter upper price, lower price, and amount per grid",
+    "errUpperLower": "Upper price must be greater than lower price",
+    "botStartError": "Bot start error: {msg}",
+    "statusFetchError": "Status fetch error: {msg}",
+    "filled": "Filled",
+    "currentPriceIndicator": "← Current",
+    "currentPriceLabel": "Current Price",
+    "comingSoon": "Coming in Phase 2",
+    "upperPricePlaceholder": "e.g. 50000",
+    "lowerPricePlaceholder": "e.g. 40000",
+    "amountPerGridPlaceholder": "e.g. 100"
+  },
+  "TermsAccept": {
+    "title": "Important Information",
+    "subtitle": "Please review the following before starting",
+    "progressLabel": "Progress",
+    "confirmItem": "I understand",
+    "termsLink": "Terms of Service",
+    "privacyLink": "Privacy Policy",
+    "saving": "Saving...",
+    "startButton": "Start investing",
+    "item1": {
+      "title": "You manage your own assets",
+      "detail": "This service is non-custodial. You hold your private keys; we have no access to your wallet."
+    },
+    "item2": {
+      "title": "DeFi involves risks",
+      "detail": "Smart contract risk, price volatility, and liquidity risk all exist. Please invest at your own responsibility."
+    },
+    "item3": {
+      "title": "You are responsible for your account",
+      "detail": "Managing login credentials and responding to unauthorized access is your responsibility. We are not liable for account losses."
+    }
+  },
+  "UserHome": {
+    "heroLine1": "AI manages your assets",
+    "heroLine2": "at the optimal time",
+    "nonCustodial": "Non-custodial — your wallet, your assets",
+    "step1": {
+      "title": "Connect your wallet",
+      "description": "Connect a MetaMask / WalletConnect wallet to Base Mainnet"
+    },
+    "step2": {
+      "title": "AI analyzes the market",
+      "description": "Claude Opus suggests optimal timing. Cross-verified by GPT-4o."
+    },
+    "step3": {
+      "title": "You approve and sign",
+      "description": "Review the proposal and sign with your wallet. You are the final decision-maker."
+    },
+    "riskDisclaimer": "This is not investment advice. Cryptocurrency trading carries the risk of principal loss. Please use at your own judgment and responsibility.",
+    "dashboardCta": "Already connected? Go to dashboard →"
   },
   "Chat": {
     "headerTitle": "UATa AI",
