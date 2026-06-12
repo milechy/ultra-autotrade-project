@@ -256,7 +256,11 @@
     "period": "Period",
     "days7": "7 days",
     "days30": "30 days",
-    "noData": "No data available"
+    "noData": "No data available",
+    "pageTitle": "AI Decision Feed",
+    "pageSubtitle": "Latest AI decisions (updates every 60s)",
+    "noHistory": "No AI decision history",
+    "fetchError": "Fetch error"
   },
   "Landing": {
     "tagline": "AI protecting your assets 24/7",
@@ -864,5 +868,58 @@
       "bullet2": "Choose from 3 levels of risk settings",
       "bullet3": "View all details of AI decisions"
     }
+  },
+    "Help": {
+    "pageTitle": "FAQ",
+    "pageSubtitle": "Frequently asked questions about Ultra AutoTrade",
+    "faqs": {
+      "item1Question": "What is Health Factor (HF)?",
+      "item1Answer": "Health Factor is a safety metric for collateral in Aave. If it falls below 1.0, liquidation risk arises. Our system automatically manages it to stay at 1.6 or above.",
+      "item2Question": "What happens if HF drops below 1.6?",
+      "item2Answer": "The system switches to SAFE_MODE and halts new deposits. If necessary, positions are automatically reduced. If HF falls below 1.3, HARD_STOP (full withdrawal) is triggered.",
+      "item3Question": "What should I do if an emergency stop is triggered?",
+      "item3Answer": "All automated trading stops. Your funds remain safely held in Aave. An administrator will review the situation and manually resume operations. No action is required from the user.",
+      "item4Question": "Why did the yield decrease?",
+      "item4Answer": "The USDC supply rate on Aave fluctuates based on market supply and demand. When borrowing demand decreases, the rate drops. The AI monitors market conditions and aims to operate at the optimal timing.",
+      "item5Question": "What should I do if I want to stop using the service?",
+      "item5Answer": "Please contact the administrator. They will handle the withdrawal from Aave. Your funds will be returned to your wallet.",
+      "item6Question": "How often does the AI make decisions?",
+      "item6Answer": "Market analysis and decisions are performed automatically every 4 hours. You can check the results on the dashboard.",
+      "item7Question": "Is there a deadline for approving trades?",
+      "item7Answer": "In active mode, please approve or reject AI proposals within 1 hour. Requests will be automatically cancelled on timeout.",
+      "item8Question": "What is the minimum investment amount?",
+      "item8Answer": "There is no minimum during the test period. The minimum for the production environment will be communicated separately.",
+      "item9Question": "What is the difference between testnet and production?",
+      "item9Answer": "Testnet uses virtual funds for operational verification. Production uses real USDC. The operation is the same, but gains and losses on testnet do not affect real assets.",
+      "item10Question": "Who should I contact if a problem occurs?",
+      "item10Answer": "Please contact the Slack #ultra-auto-project channel or the project representative directly. Including a screenshot of the error and steps to reproduce it will help us respond quickly."
+    }
+  },
+  "Performance": {
+    "pageTitle": "Performance",
+    "pageSubtitle": "AI proposal results summary",
+    "winRateLabel": "Win Rate ({days}d)",
+    "proposalsSummary": "{total} proposals / {positive} positive",
+    "cumulativePnlLabel": "Cumulative P&L",
+    "usdcConversionLabel": "≈ {value} (USDC equivalent)",
+    "winRateTitle": "Win Rate",
+    "avgGainLabel": "Avg gain: {sign}¥{value} / trade",
+    "monthlyPnlTitle": "Monthly P&L",
+    "disclaimer": "* Past results do not guarantee future performance.",
+    "noData": "Could not retrieve data",
+    "downloading": "Downloading…",
+    "downloadButton": "Monthly Report"
+  },
+  "Simulation": {
+    "pageTitle": "Simulation",
+    "pageSubtitle": "Projected scenarios for the next 30 days",
+    "disclaimer": "⚠️ These projections are not a guarantee. Actual results may differ based on market conditions.",
+    "offlineMode": "Simulating... (offline mode)",
+    "supplyTitle": "If you deposit now",
+    "supplyBadge": "Supply",
+    "withdrawTitle": "If you withdraw all",
+    "withdrawBadge": "Withdraw",
+    "holdTitle": "Do nothing",
+    "holdBadge": "Hold"
   }
 }

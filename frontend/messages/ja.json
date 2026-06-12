@@ -256,7 +256,11 @@
     "period": "期間",
     "days7": "7日間",
     "days30": "30日間",
-    "noData": "データがありません"
+    "noData": "データがありません",
+    "pageTitle": "AI判定フィード",
+    "pageSubtitle": "最新のAI判定結果（60秒更新）",
+    "noHistory": "AI判定履歴がありません",
+    "fetchError": "取得エラー"
   },
   "Landing": {
     "tagline": "AIが24時間、あなたの資産を守る",
@@ -864,5 +868,58 @@
       "bullet2": "リスク設定を3段階から選択可能",
       "bullet3": "判定の詳細を全て確認できます"
     }
+  },
+    "Help": {
+    "pageTitle": "よくある質問",
+    "pageSubtitle": "Ultra AutoTradeの利用に関するFAQです",
+    "faqs": {
+      "item1Question": "Health Factor（HF）とは何ですか？",
+      "item1Answer": "Aaveにおける担保の安全度指標です。1.0を下回ると清算リスクが発生します。当システムでは1.6以上を維持するよう自動管理しています。",
+      "item2Question": "HFが1.6を下回るとどうなりますか？",
+      "item2Answer": "SAFE_MODEに移行し、新規供給を停止します。必要に応じて自動でポジション縮小を行います。HF < 1.3の場合はHARD_STOP（全引き出し）が発動します。",
+      "item3Question": "緊急停止が発動したらどうすればいいですか？",
+      "item3Answer": "すべての自動取引が停止します。資金はAave上に安全に保管されたままです。管理者が状況を確認後、手動で再開します。特にユーザー側の操作は不要です。",
+      "item4Question": "利回りが下がったのはなぜですか？",
+      "item4Answer": "AaveのUSDC供給利率は市場の需給で変動します。借入需要が減ると利率が低下します。AIが市場状況を判断し、最適なタイミングでの運用を目指しています。",
+      "item5Question": "運用をやめたい場合はどうすればいいですか？",
+      "item5Answer": "管理者にご連絡ください。Aaveからの引き出し手続きを行います。資金はお使いのウォレットに返却されます。",
+      "item6Question": "AIの判定はどのくらいの頻度で行われますか？",
+      "item6Answer": "4時間ごとに自動で市場分析と判定を実施します。判定結果はダッシュボードで確認できます。",
+      "item7Question": "取引の承認期限はありますか？",
+      "item7Answer": "アクティブモードの場合、AI提案から1時間以内に承認/否認してください。タイムアウトで自動キャンセルされます。",
+      "item8Question": "最低運用金額はいくらですか？",
+      "item8Answer": "テスト期間中は特に制限はありません。本番環境での最低金額は別途ご案内します。",
+      "item9Question": "テストネットと本番の違いは何ですか？",
+      "item9Answer": "テストネットは仮想資金で動作確認を行う環境です。本番は実際のUSDCを使用します。操作方法は同じですが、テストネットでの損益は実際の資産に影響しません。",
+      "item10Question": "問題が発生した場合の連絡先は？",
+      "item10Answer": "Slack #ultra-auto-project チャンネル、またはプロジェクト担当者に直接ご連絡ください。エラーのスクリーンショットと再現手順を添えていただけると迅速に対応できます。"
+    }
+  },
+  "Performance": {
+    "pageTitle": "パフォーマンス",
+    "pageSubtitle": "AI提案の実績サマリー",
+    "winRateLabel": "勝率（{days}日）",
+    "proposalsSummary": "{total}回提案 / {positive}回プラス",
+    "cumulativePnlLabel": "累計損益",
+    "usdcConversionLabel": "≈ {value} (USDC換算)",
+    "winRateTitle": "勝率",
+    "avgGainLabel": "平均損益: {sign}¥{value} / 回",
+    "monthlyPnlTitle": "月次損益",
+    "disclaimer": "※ 実績は将来の結果を保証しません",
+    "noData": "データを取得できませんでした",
+    "downloading": "取得中…",
+    "downloadButton": "月次レポートDL"
+  },
+  "Simulation": {
+    "pageTitle": "シミュレーション",
+    "pageSubtitle": "30日後の予測シナリオ",
+    "disclaimer": "⚠️ この予測は保証ではありません。市場状況により実際の結果は異なります。",
+    "offlineMode": "シミュレーション中... (オフラインモード)",
+    "supplyTitle": "今預けたら",
+    "supplyBadge": "供給",
+    "withdrawTitle": "全額引き出したら",
+    "withdrawBadge": "引き出し",
+    "holdTitle": "何もしない",
+    "holdBadge": "ホールド"
   }
 }
