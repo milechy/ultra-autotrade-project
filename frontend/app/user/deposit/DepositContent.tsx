@@ -7,6 +7,7 @@ import { useReadContract } from 'wagmi'
 import { useFundWallet } from '@privy-io/react-auth'
 import { base, baseSepolia } from 'wagmi/chains'
 import { formatUnits } from 'viem'
+import { useTranslations } from 'next-intl'
 import { useWallet } from '@/hooks/useWallet'
 import { getChainDisplayName } from '@/lib/web3/config'
 import {
@@ -39,6 +40,7 @@ function getChainForPrivy(chainId: number | undefined) {
 export function DepositContent() {
   // injected / Privy embedded を統合した単一情報源（useWallet）から取得。
   const { address, isConnected, chainId } = useWallet()
+  const t = useTranslations('Deposit')
   const [isFunding, setIsFunding] = useState(false)
   const [fundError, setFundError] = useState<string | null>(null)
 
@@ -82,7 +84,7 @@ export function DepositContent() {
       })
     } catch (e) {
       if (e instanceof Error && !e.message.toLowerCase().includes('exit')) {
-        setFundError('入金処理中にエラーが発生しました。もう一度お試しください。')
+        setFundError(t('fundError'))
       }
     } finally {
       setIsFunding(false)
@@ -94,9 +96,9 @@ export function DepositContent() {
     return (
       <Alert>
         <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>ウォレット未接続</AlertTitle>
+        <AlertTitle>{t('walletNotConnectedTitle')}</AlertTitle>
         <AlertDescription>
-          入金するには先にウォレットを接続してください。
+          {t('walletNotConnectedDesc')}
         </AlertDescription>
       </Alert>
     )
@@ -107,26 +109,26 @@ export function DepositContent() {
       {/* Wallet info */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">接続中のウォレット</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">{t('connectedWalletTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">アドレス</span>
+            <span className="text-muted-foreground">{t('addressLabel')}</span>
             <span className="font-mono font-medium">
               {address.slice(0, 6)}...{address.slice(-4)}
             </span>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">ネットワーク</span>
+            <span className="text-muted-foreground">{t('networkLabel')}</span>
             <Badge variant="outline" className="text-xs">
-              {chainName ?? '不明'}
+              {chainName ?? t('networkUnknown')}
             </Badge>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">USDC残高</span>
+            <span className="text-muted-foreground">{t('usdcBalanceLabel')}</span>
             <div className="flex items-center gap-1.5">
               {balanceLoading ? (
-                <span className="text-muted-foreground text-xs">取得中...</span>
+                <span className="text-muted-foreground text-xs">{t('balanceLoading')}</span>
               ) : (
                 <span className={`font-mono font-semibold ${meetsDepositGate ? 'text-green-600' : 'text-amber-500'}`}>
                   {usdcAmount !== null ? `$${usdcAmount.toFixed(2)}` : '—'}
@@ -135,7 +137,7 @@ export function DepositContent() {
               <button
                 onClick={() => void refetchBalance()}
                 className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="残高を更新"
+                aria-label={t('refreshAriaLabel')}
               >
                 <RefreshCw className="h-3.5 w-3.5" />
               </button>
@@ -150,19 +152,17 @@ export function DepositContent() {
           {meetsDepositGate ? (
             <Alert className="border-green-500/40 bg-green-950/20">
               <CheckCircle2 className="h-4 w-4 text-green-500" />
-              <AlertTitle className="text-green-500">入金確認済み</AlertTitle>
+              <AlertTitle className="text-green-500">{t('depositConfirmedTitle')}</AlertTitle>
               <AlertDescription>
-                USDC ${usdcAmount?.toFixed(2)} — 最低入金額 ${DEPOSIT_GATE_USD} を満たしています。
-                AIによる自動運用が可能な状態です。
+                {t('depositConfirmedDesc', { amount: usdcAmount?.toFixed(2) ?? '—', gate: String(DEPOSIT_GATE_USD) })}
               </AlertDescription>
             </Alert>
           ) : (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>最低入金額を満たしていません</AlertTitle>
+              <AlertTitle>{t('depositGateFailTitle')}</AlertTitle>
               <AlertDescription>
-                自動運用を開始するには USDC で最低 ${DEPOSIT_GATE_USD} の入金が必要です。
-                現在の残高: {usdcAmount !== null ? `$${usdcAmount.toFixed(2)}` : '—'}
+                {t('depositGateFailDesc', { gate: String(DEPOSIT_GATE_USD), balance: usdcAmount !== null ? `$${usdcAmount.toFixed(2)}` : '—' })}
               </AlertDescription>
             </Alert>
           )}
@@ -180,17 +180,16 @@ export function DepositContent() {
       {/* Fund wallet CTA */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">USDCを入金する</CardTitle>
+          <CardTitle className="text-base">{t('fundCardTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            取引所（例: SBI VCトレード）やお持ちのウォレットから USDC を送金して入金できます。
-            資産はサーバーには預けられず、あなたのウォレットに直接届きます。
+            {t('fundDesc')}
           </p>
           <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground space-y-1">
-            <p>・入金先: あなた自身のウォレット（ノンカストディアル）</p>
-            <p>・推奨金額: ${DEPOSIT_GATE_USD} USDC 以上</p>
-            <p>・着金チェーン: {chainName ?? 'Base'}（別ネットワークの USDC も自動変換）</p>
+            <p>・{t('fundBullet1')}</p>
+            <p>・{t('fundBullet2', { gate: String(DEPOSIT_GATE_USD) })}</p>
+            <p>・{t('fundBullet3', { chain: chainName ?? 'Base' })}</p>
           </div>
           <Button
             className="w-full"
@@ -201,12 +200,12 @@ export function DepositContent() {
             {isFunding ? (
               <>
                 <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                処理中...
+                {t('processingButton')}
               </>
             ) : (
               <>
                 <ArrowDownToLine className="mr-2 h-4 w-4" />
-                入金アドレスを表示
+                {t('showAddressButton')}
               </>
             )}
           </Button>
@@ -214,7 +213,7 @@ export function DepositContent() {
             <Button variant="outline" className="w-full" size="sm" asChild>
               <a href="/user/dashboard" className="flex items-center gap-1.5">
                 <ExternalLink className="h-3.5 w-3.5" />
-                ダッシュボードへ
+                {t('goToDashboard')}
               </a>
             </Button>
           )}
@@ -222,8 +221,7 @@ export function DepositContent() {
       </Card>
 
       <p className="text-center text-xs text-muted-foreground px-4">
-        入金はPrivyの入金アドレス経由で処理され、別チェーンの USDC は自動でブリッジされます。
-        ネットワーク・ブリッジ手数料がかかる場合があります。
+        {t('footerNote')}
       </p>
     </div>
   )
