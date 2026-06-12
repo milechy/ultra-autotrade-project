@@ -716,5 +716,25 @@
       "placeholderDefault": "ご質問ありがとうございます。データを確認中です。",
       "responseFallback": "応答を取得できませんでした"
     }
+  },
+  "Onboarding": {
+    "pageTitle": "運用モードを選択",
+    "pageSubtitle": "あなたに合った運用スタイルを選んでください",
+    "saving": "保存中...",
+    "startBtn": "このモードで始める",
+    "saveError": "モードの設定に失敗しました。もう一度お試しください。",
+    "managed": {
+      "title": "完全おまかせモード",
+      "badge": "おすすめ",
+      "bullet1": "入金したらAIが全自動で運用します",
+      "bullet2": "危険時は自動で資産を守ります",
+      "bullet3": "結果はLINEでお知らせ"
+    },
+    "active": {
+      "title": "アクティブモード",
+      "bullet1": "AIの提案を確認して自分で承認",
+      "bullet2": "リスク設定を3段階から選択可能",
+      "bullet3": "判定の詳細を全て確認できます"
+    }
   }
 }

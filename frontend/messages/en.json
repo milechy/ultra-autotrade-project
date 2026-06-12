@@ -716,5 +716,25 @@
       "placeholderDefault": "Thank you for your question. Retrieving data now.",
       "responseFallback": "Could not retrieve response"
     }
+  },
+  "Onboarding": {
+    "pageTitle": "Select Operation Mode",
+    "pageSubtitle": "Choose the management style that suits you",
+    "saving": "Saving...",
+    "startBtn": "Start with this mode",
+    "saveError": "Failed to set the mode. Please try again.",
+    "managed": {
+      "title": "Fully Automated Mode",
+      "badge": "Recommended",
+      "bullet1": "AI manages your assets fully automatically after deposit",
+      "bullet2": "Assets are protected automatically in case of risk",
+      "bullet3": "Results are notified via LINE"
+    },
+    "active": {
+      "title": "Active Mode",
+      "bullet1": "Review AI proposals and approve them yourself",
+      "bullet2": "Choose from 3 levels of risk settings",
+      "bullet3": "View all details of AI decisions"
+    }
   }
 }

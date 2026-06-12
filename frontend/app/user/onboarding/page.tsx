@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Sparkles, Brain, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { apiPut } from '@/lib/api/client'
 import { useAuth } from '@/lib/auth'
@@ -15,12 +16,14 @@ interface ModeCardProps {
   icon: React.ReactNode
   title: string
   badge?: string
-  bullets: string[]
+  bullets: readonly string[]
   isLoading: boolean
   onSelect: (mode: UserMode) => void
+  startLabel: string
+  savingLabel: string
 }
 
-function ModeCard({ mode, icon, title, badge, bullets, isLoading, onSelect }: ModeCardProps) {
+function ModeCard({ mode, icon, title, badge, bullets, isLoading, onSelect, startLabel, savingLabel }: ModeCardProps) {
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4 flex flex-col">
       <div className="flex items-start justify-between">
@@ -58,10 +61,10 @@ function ModeCard({ mode, icon, title, badge, bullets, isLoading, onSelect }: Mo
         {isLoading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span>保存中...</span>
+            <span>{savingLabel}</span>
           </>
         ) : (
-          'このモードで始める'
+          startLabel
         )}
       </button>
     </div>
@@ -70,6 +73,7 @@ function ModeCard({ mode, icon, title, badge, bullets, isLoading, onSelect }: Mo
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const t = useTranslations('Onboarding')
   const { isAdmin, isLoading: authLoading } = useAuth()
   const [loadingMode, setLoadingMode] = useState<UserMode | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -90,18 +94,30 @@ export default function OnboardingPage() {
       await apiPut('/api/user/settings', { user_mode: mode })
       router.push('/user/dashboard')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'モードの設定に失敗しました。もう一度お試しください。')
+      setError(e instanceof Error ? e.message : t('saveError'))
       setLoadingMode(null)
     }
   }
+
+  const managedBullets = [
+    t('managed.bullet1'),
+    t('managed.bullet2'),
+    t('managed.bullet3'),
+  ] as const
+
+  const activeBullets = [
+    t('active.bullet1'),
+    t('active.bullet2'),
+    t('active.bullet3'),
+  ] as const
 
   return (
     <div className="min-h-screen bg-zinc-950 px-4 py-10">
       <div className="mx-auto max-w-md space-y-8">
         {/* Header */}
         <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-bold text-zinc-100">運用モードを選択</h1>
-          <p className="text-sm text-zinc-400">あなたに合った運用スタイルを選んでください</p>
+          <h1 className="text-2xl font-bold text-zinc-100">{t('pageTitle')}</h1>
+          <p className="text-sm text-zinc-400">{t('pageSubtitle')}</p>
         </div>
 
         {/* Error message */}
@@ -117,28 +133,24 @@ export default function OnboardingPage() {
           <ModeCard
             mode="managed"
             icon={<Sparkles className="h-6 w-6" />}
-            title="完全おまかせモード"
-            badge="おすすめ"
-            bullets={[
-              '入金したらAIが全自動で運用します',
-              '危険時は自動で資産を守ります',
-              '結果はLINEでお知らせ',
-            ]}
+            title={t('managed.title')}
+            badge={t('managed.badge')}
+            bullets={managedBullets}
             isLoading={loadingMode === 'managed'}
             onSelect={handleSelect}
+            startLabel={t('startBtn')}
+            savingLabel={t('saving')}
           />
 
           <ModeCard
             mode="active"
             icon={<Brain className="h-6 w-6" />}
-            title="アクティブモード"
-            bullets={[
-              'AIの提案を確認して自分で承認',
-              'リスク設定を3段階から選択可能',
-              '判定の詳細を全て確認できます',
-            ]}
+            title={t('active.title')}
+            bullets={activeBullets}
             isLoading={loadingMode === 'active'}
             onSelect={handleSelect}
+            startLabel={t('startBtn')}
+            savingLabel={t('saving')}
           />
         </div>
       </div>
