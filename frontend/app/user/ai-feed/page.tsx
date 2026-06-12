@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { LoadingPage } from '@/components/shared/LoadingSpinner'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { AiFeedItem, type AiEvent } from '@/components/user/AiFeedItem'
@@ -21,6 +22,7 @@ function AiFeedContent() {
   const [error, setError] = useState<string | null>(null)
   const [performance, setPerformance] = useState<PerformanceData | null>(null)
   const [perfLoading, setPerfLoading] = useState(true)
+  const t = useTranslations('AiFeed')
 
   useEffect(() => {
     if (!token) return
@@ -31,7 +33,7 @@ function AiFeedContent() {
         setEvents(raw as AiEvent[])
         setError(null)
       } catch (e: unknown) {
-        const msg = (e as { message?: string })?.message ?? '取得エラー'
+        const msg = (e as { message?: string })?.message ?? t('fetchError')
         setError(msg)
       } finally {
         setLoading(false)
@@ -66,7 +68,7 @@ function AiFeedContent() {
       )}
       {events.length === 0 ? (
         <div className="text-center text-muted-foreground text-sm py-16">
-          AI判定履歴がありません
+          {t('noHistory')}
         </div>
       ) : (
         events.map((event, i) => <AiFeedItem key={i} event={event} />)
@@ -76,11 +78,12 @@ function AiFeedContent() {
 }
 
 export default function AiFeedPage() {
+  const t = useTranslations('AiFeed')
   return (
     <main className="px-4 py-6 max-w-md mx-auto">
       <div className="mb-4">
-        <h1 className="text-2xl font-bold">AI判定フィード</h1>
-        <p className="text-xs text-muted-foreground mt-1">最新のAI判定結果（60秒更新）</p>
+        <h1 className="text-2xl font-bold">{t('pageTitle')}</h1>
+        <p className="text-xs text-muted-foreground mt-1">{t('pageSubtitle')}</p>
       </div>
       <ErrorBoundary>
         <AiFeedContent />
