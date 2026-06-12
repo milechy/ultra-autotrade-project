@@ -16,7 +16,7 @@ interface ModeCardProps {
   icon: React.ReactNode
   title: string
   badge?: string
-  bullets: string[]
+  bullets: readonly string[]
   isLoading: boolean
   onSelect: (mode: UserMode) => void
   startLabel: string
@@ -135,7 +135,7 @@ export default function OnboardingPage() {
             icon={<Sparkles className="h-6 w-6" />}
             title={t('managed.title')}
             badge={t('managed.badge')}
-            bullets={managedBullets as unknown as string[]}
+            bullets={managedBullets}
             isLoading={loadingMode === 'managed'}
             onSelect={handleSelect}
             startLabel={t('startBtn')}
@@ -146,7 +146,7 @@ export default function OnboardingPage() {
             mode="active"
             icon={<Brain className="h-6 w-6" />}
             title={t('active.title')}
-            bullets={activeBullets as unknown as string[]}
+            bullets={activeBullets}
             isLoading={loadingMode === 'active'}
             onSelect={handleSelect}
             startLabel={t('startBtn')}
