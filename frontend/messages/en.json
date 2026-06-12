@@ -891,6 +891,109 @@
       "termsSub": "Terms of service & privacy policy",
       "footer": "UAT App v1.0 | © 2026 UAT Co., Ltd."
     },
+    "confirm": {
+      "title": "Important Disclosures",
+      "subtitle": "Please review the following before you start",
+      "progressLabel": "Progress",
+      "confirmedBtn": "Confirmed",
+      "termsLink": "Terms of Service",
+      "privacyLink": "Privacy Policy",
+      "submitBtn": "Start investing",
+      "submitting": "Saving...",
+      "items": {
+        "self_custody": {
+          "title": "You are responsible for your own assets",
+          "detail": "This service is non-custodial. Your wallet private key is never stored on our servers. You are solely responsible for managing your wallet and LINE account."
+        },
+        "defi_risk": {
+          "title": "DeFi investing carries risks",
+          "detail": "Smart contract risk, price volatility, liquidity risk, and liquidation risk all exist. You may lose your principal. This service does not constitute investment advice, and all investing is at your own risk."
+        },
+        "user_responsibility": {
+          "title": "You are responsible for your account",
+          "detail": "Managing your LINE account and responding to unauthorized access is your responsibility. We are not liable for any losses or damages resulting from account loss or unauthorized use."
+        },
+        "age_confirm": {
+          "title": "You confirm you are 18 or older",
+          "detail": "You must be 18 or older to use this service. Users under 18 are not permitted."
+        }
+      }
+    },
+    "history": {
+      "headerTitle": "Chat History",
+      "headerSubtitle": "Conversation record with UAT AI",
+      "backAriaLabel": "Go back",
+      "loading": "Loading...",
+      "fetchError": "Failed to load data",
+      "empty": "No conversation history",
+      "loadMore": "Load more",
+      "loadingMore": "Loading...",
+      "liffInitError": "LIFF init error: {error}",
+      "reauthing": "Re-authenticating..."
+    },
+    "approve": {
+      "loading": "Loading...",
+      "reauthing": "Re-authenticating...",
+      "liffInitError": "LIFF init error: {error}",
+      "fetchError": "Failed to load data",
+      "retry": "Retry",
+      "rejected": "Rejected",
+      "approved": "Approved ✓",
+      "extraProposals": "{count} more proposal(s) →",
+      "waitingProposal": "Waiting for a proposal...",
+      "header": {
+        "assistantSubtitle": "Automated trading assistant",
+        "backAriaLabel": "Go back",
+        "historyAriaLabel": "History",
+        "running": "Running",
+        "paused": "Paused",
+        "stopped": "Stopped"
+      },
+      "actionBar": {
+        "newWaiting": "Waiting for the next proposal",
+        "waiting": "Waiting for a proposal...",
+        "reject": "Reject",
+        "rejecting": "Rejecting...",
+        "approve": "Approve ✓",
+        "approving": "Approving..."
+      },
+      "rejectConfirm": {
+        "prompt": "Are you sure you want to reject?",
+        "yes": "Yes",
+        "no": "No"
+      },
+      "decisionHistory": {
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "proposalBubble": {
+        "confidence": "Confidence",
+        "collapse": "Show less",
+        "expand": "Show more",
+        "hfAfter": "HF after:",
+        "gasEstimate": "Gas est.:",
+        "totalWithGas": "Total (incl. gas):"
+      },
+      "confirmSheet": {
+        "title": "Approve this proposal?",
+        "operation": "Operation",
+        "supply": "Supply (Deposit)",
+        "withdraw": "Withdraw",
+        "amount": "Amount",
+        "hfAfter": "Health Factor after",
+        "gasEstimate": "Gas estimate",
+        "processing": "Processing...",
+        "approved": "Approved ✓",
+        "signApprove": "Sign & Approve",
+        "cancel": "Cancel",
+        "cannotSign": "Can't sign? ",
+        "approveInBrowser": "Approve in browser →",
+        "revertError": "The approve transaction was reverted. Please check your balance and gas.",
+        "unsupportedOperation": "Unsupported operation: {operation}",
+        "signFailed": "Signing failed",
+        "signCanceled": "Signing was canceled"
+      }
+    },
     "chat": {
       "panelTitle": "UAT AI",
       "onlineStatus": "Online",
@@ -993,6 +1096,30 @@
     "holdTitle": "Do nothing",
     "holdBadge": "Hold"
   },
+  "Trade": {
+    "pageTitle": "Trade Approval",
+    "refreshAriaLabel": "Refresh",
+    "botDisabledLabel": "⚠️ Bot trading is currently disabled (Coming Soon)",
+    "botDisabledDesc": "AI decision results are shown for reference only",
+    "shadowModeActive": "Shadow Mode is active. The approve button is disabled.",
+    "loadingText": "Loading...",
+    "noPendingTitle": "No pending trades",
+    "noPendingDesc": "Trades will appear here once AI judgment is complete",
+    "fetchError": "Fetch error",
+    "approveSuccess": "{symbol} {action} approved",
+    "skipSuccess": "{symbol} skipped",
+    "orderError": "Order error: {msg}",
+    "confirmDialogTitle": "Approve this trade?",
+    "tradingPairLabel": "Trading Pair",
+    "actionLabel": "Action",
+    "quantityLabel": "Quantity",
+    "estimatedPriceLabel": "Estimated Price",
+    "cancelButton": "Cancel",
+    "approveAndExecuteButton": "Approve & Execute",
+    "confidenceLabel": "Confidence",
+    "shadowModeWarning": "No actual trades will be placed in Shadow Mode",
+    "skipButton": "Skip"
+  },
   "Wallet": {
     "pageTitle": "Connect Wallet",
     "pageSubtitle": "Please connect to Base Mainnet",
@@ -1070,5 +1197,112 @@
       "subtitle": "Yield Trading",
       "description": "Buy and sell tokenized yields on the Pendle protocol. Advanced yield optimization using principal tokens (PT) and yield tokens (YT)."
     }
+  },
+  "WalletOnboarding": {
+    "headerTitle": "Get Started",
+    "headerSubtitle": "Four steps to start managing assets with Ultra AutoTrade",
+    "prevBtn": "← Previous step",
+    "nextBtn": "Next step →",
+    "stepBadge": "STEP {id}",
+    "steps": {
+      "wallet": {
+        "title": "Set Up Your Wallet",
+        "description": "Install MetaMask and create your wallet.",
+        "tip": "You can also use Rabby Wallet or Coinbase Wallet instead of MetaMask.",
+        "details": {
+          "metamask": "Go to the MetaMask official website",
+          "chrome": "Install the Chrome extension",
+          "create": "Select \"Create a new wallet\"",
+          "password": "Set a strong password",
+          "seed": "Store your seed phrase in a safe place"
+        },
+        "seedWarning": "Never share your seed phrase with anyone"
+      },
+      "network": {
+        "title": "Add the Network",
+        "description": "Add the Base Sepolia network to your wallet.",
+        "tip": "Using ChainList means you don't need to enter network details manually.",
+        "details": {
+          "chainlist": "Go to ChainList",
+          "search": "Search for \"Base Sepolia\" and click \"Add to MetaMask\"",
+          "approve": "Click \"Approve\" in the MetaMask popup",
+          "confirm": "Verify that your MetaMask shows \"Base Sepolia\" at the top"
+        }
+      },
+      "testEth": {
+        "title": "Get Test ETH",
+        "description": "Send test ETH (SepoliaETH) to your wallet for gas fees.",
+        "tip": "This is a testnet, so no real funds are needed. Get free test ETH from the faucet.",
+        "details": {
+          "faucet": "Go to Coinbase Faucet",
+          "input": "Enter your wallet address to receive test ETH",
+          "confirm": "Confirm that \"Base Sepolia ETH\" has arrived in MetaMask"
+        }
+      },
+      "connect": {
+        "title": "Connect to Ultra AutoTrade",
+        "description": "Connect your wallet to Ultra AutoTrade and start investing.",
+        "tip": "The connection only reads your wallet address. We never ask for your private key.",
+        "details": {
+          "login": "Log in to Ultra AutoTrade",
+          "click": "Click the \"Connect Wallet\" button",
+          "approve": "Approve the connection in the MetaMask popup",
+          "sign": "Review AI proposals and sign to approve when ready"
+        }
+      }
+    },
+    "safety": {
+      "title": "🛡️ How We Protect Your Assets",
+      "nonCustodial": "Non-custodial",
+      "nonCustodialDesc": "— We never hold your private key",
+      "signRequired": "Signature required",
+      "signRequiredDesc": "— Your approval is required to execute any AI proposal",
+      "emergencyStop": "Emergency stop",
+      "emergencyStopDesc": "— Automatic brake activates when Health Factor reaches a dangerous level",
+      "fourAgents": "Four AI agents",
+      "fourAgentsDesc": "— Continuously monitoring market, risk, macro, and behavioral patterns"
+    },
+    "faq": {
+      "title": "FAQ",
+      "minAmount": {
+        "q": "What is the minimum amount to start?",
+        "a": "There is no minimum, but we recommend at least 100 USDC to offset gas fees. With small amounts, gas costs can eat into returns."
+      },
+      "lossRisk": {
+        "q": "Is there a risk of loss?",
+        "a": "Yes. DeFi investing with crypto assets carries the risk of losing principal. AI helps optimize decisions, but market risk, smart contract risk, and liquidation risk exist. Please read the risk disclosure."
+      },
+      "aiAutoTrade": {
+        "q": "Does the AI trade automatically?",
+        "a": "No. The AI only makes \"proposals.\" Any deposit or withdrawal requires your signature (approval) in MetaMask. Assets never move without your sign-off."
+      },
+      "howToStop": {
+        "q": "How do I stop using the service?",
+        "a": "You can withdraw your assets from Aave at any time. Even after cancelling Ultra AutoTrade, your assets remain in your wallet. You only need gas fees to withdraw."
+      }
+    },
+    "ctaBtn": "Connect Wallet to Get Started →"
+  },
+  "ProposalCard": {
+    "hfChangeLabel": "Health Factor Change",
+    "estimatedGasLabel": "Estimated Gas",
+    "slippageWarning": "High slippage ({pct}%)",
+    "processingButton": "Processing...",
+    "approveButton": "Approve",
+    "rejectButton": "Reject"
+  },
+  "TransactionStatus": {
+    "requestingSignature": "Requesting signature...",
+    "waitingConfirmation": "Waiting for confirmation...",
+    "txSuccess": "Transaction complete",
+    "txFailed": "Transaction failed",
+    "retryHint": "Please press the \"Approve\" button again"
+  },
+  "RecentApprovals": {
+    "recentTitle": "Recent Approvals",
+    "viewAllHistory": "View all history →",
+    "noRecentApprovals": "No approval history",
+    "statusSuccess": "Success",
+    "statusFailed": "Failed"
   }
 }

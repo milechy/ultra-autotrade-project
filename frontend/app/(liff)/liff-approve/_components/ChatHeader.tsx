@@ -5,16 +5,11 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, History } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type AutomationStatus = "RUNNING" | "PAUSED" | "STOPPED";
-
-const statusConfig: Record<AutomationStatus, { label: string; color: string }> = {
-  RUNNING: { label: "稼働中", color: "bg-green-500" },
-  PAUSED: { label: "一時停止", color: "bg-yellow-500" },
-  STOPPED: { label: "停止中", color: "bg-red-500" },
-};
 
 interface ChatHeaderProps {
   token: string | null;
@@ -22,7 +17,14 @@ interface ChatHeaderProps {
 
 export function ChatHeader({ token }: ChatHeaderProps) {
   const router = useRouter();
+  const t = useTranslations("Liff.approve.header");
   const [status, setStatus] = useState<AutomationStatus>("RUNNING");
+
+  const statusConfig: Record<AutomationStatus, { label: string; color: string }> = {
+    RUNNING: { label: t("running"), color: "bg-green-500" },
+    PAUSED: { label: t("paused"), color: "bg-yellow-500" },
+    STOPPED: { label: t("stopped"), color: "bg-red-500" },
+  };
 
   useEffect(() => {
     if (!token) return;
@@ -36,6 +38,7 @@ export function ChatHeader({ token }: ChatHeaderProps) {
         }
       })
       .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   function handleBack() {
@@ -53,14 +56,14 @@ export function ChatHeader({ token }: ChatHeaderProps) {
       <button
         onClick={handleBack}
         className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
-        aria-label="戻る"
+        aria-label={t("backAriaLabel")}
       >
         <ChevronLeft className="h-5 w-5" />
       </button>
 
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-zinc-100 leading-none">UAT AI</p>
-        <p className="text-xs text-zinc-500 mt-0.5 leading-none">自動売買アシスタント</p>
+        <p className="text-xs text-zinc-500 mt-0.5 leading-none">{t("assistantSubtitle")}</p>
       </div>
 
       <div className="flex items-center gap-1.5 shrink-0">
@@ -71,7 +74,7 @@ export function ChatHeader({ token }: ChatHeaderProps) {
       <button
         onClick={() => router.push("/liff-history")}
         className="ml-1 p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
-        aria-label="履歴"
+        aria-label={t("historyAriaLabel")}
       >
         <History className="h-4 w-4" />
       </button>

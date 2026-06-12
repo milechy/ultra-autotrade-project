@@ -891,6 +891,109 @@
       "termsSub": "利用規約・プライバシーポリシー",
       "footer": "UAT App v1.0 | © 2026 UAT Co., Ltd."
     },
+    "confirm": {
+      "title": "重要事項の確認",
+      "subtitle": "運用開始前に以下をご確認ください",
+      "progressLabel": "確認状況",
+      "confirmedBtn": "確認しました",
+      "termsLink": "利用規約",
+      "privacyLink": "プライバシーポリシー",
+      "submitBtn": "運用を開始する",
+      "submitting": "保存中...",
+      "items": {
+        "self_custody": {
+          "title": "資産はユーザー自身が管理します",
+          "detail": "本サービスはノンカストディアル型です。お客様のウォレット秘密鍵は弊社サーバーに保存されません。ウォレットおよびLINEアカウントの管理責任はお客様ご自身にあります。"
+        },
+        "defi_risk": {
+          "title": "DeFi運用にはリスクがあります",
+          "detail": "スマートコントラクトのリスク、価格変動リスク、流動性リスク、清算リスクが存在します。元本を失う可能性があります。本サービスは投資助言ではなく、運用はすべて自己責任となります。"
+        },
+        "user_responsibility": {
+          "title": "アカウント管理は利用者自身の責任です",
+          "detail": "LINEアカウントの管理、不正アクセスへの対応はユーザーご自身の責任となります。弊社はアカウント損失・不正利用による損害に対して責任を負いません。"
+        },
+        "age_confirm": {
+          "title": "18歳以上であることを確認します",
+          "detail": "本サービスのご利用には18歳以上であることが必要です。18歳未満の方はご利用いただけません。"
+        }
+      }
+    },
+    "history": {
+      "headerTitle": "会話履歴",
+      "headerSubtitle": "UAT AI とのチャット記録",
+      "backAriaLabel": "戻る",
+      "loading": "読み込み中...",
+      "fetchError": "データ取得に失敗しました",
+      "empty": "会話履歴がありません",
+      "loadMore": "もっと見る",
+      "loadingMore": "読み込み中...",
+      "liffInitError": "LIFF初期化エラー: {error}",
+      "reauthing": "再認証中..."
+    },
+    "approve": {
+      "loading": "読み込み中...",
+      "reauthing": "再認証中...",
+      "liffInitError": "LIFF初期化エラー: {error}",
+      "fetchError": "データ取得に失敗しました",
+      "retry": "再試行",
+      "rejected": "却下しました",
+      "approved": "承認しました ✓",
+      "extraProposals": "他に {count} 件の提案があります →",
+      "waitingProposal": "提案を待っています...",
+      "header": {
+        "assistantSubtitle": "自動売買アシスタント",
+        "backAriaLabel": "戻る",
+        "historyAriaLabel": "履歴",
+        "running": "稼働中",
+        "paused": "一時停止",
+        "stopped": "停止中"
+      },
+      "actionBar": {
+        "newWaiting": "新しい提案を待っています",
+        "waiting": "提案を待っています...",
+        "reject": "却下する",
+        "rejecting": "却下中...",
+        "approve": "承認する ✓",
+        "approving": "承認中..."
+      },
+      "rejectConfirm": {
+        "prompt": "本当に却下しますか？",
+        "yes": "はい",
+        "no": "いいえ"
+      },
+      "decisionHistory": {
+        "approved": "承認済",
+        "rejected": "却下"
+      },
+      "proposalBubble": {
+        "confidence": "信頼度",
+        "collapse": "閉じる",
+        "expand": "続きを見る",
+        "hfAfter": "実行後 HF:",
+        "gasEstimate": "ガス概算:",
+        "totalWithGas": "合計（ガス込み）:"
+      },
+      "confirmSheet": {
+        "title": "この提案を承認しますか？",
+        "operation": "操作",
+        "supply": "Supply (入金)",
+        "withdraw": "Withdraw (出金)",
+        "amount": "金額",
+        "hfAfter": "実行後 Health Factor",
+        "gasEstimate": "ガス概算",
+        "processing": "処理中...",
+        "approved": "承認済み ✓",
+        "signApprove": "署名して承認",
+        "cancel": "キャンセル",
+        "cannotSign": "署名できない場合は",
+        "approveInBrowser": "ブラウザで承認する →",
+        "revertError": "approve トランザクションが revert しました。残高・ガス代を確認してください。",
+        "unsupportedOperation": "未対応の operation: {operation}",
+        "signFailed": "署名処理に失敗しました",
+        "signCanceled": "署名がキャンセルされました"
+      }
+    },
     "chat": {
       "panelTitle": "UAT AI",
       "onlineStatus": "オンライン",
@@ -993,6 +1096,30 @@
     "holdTitle": "何もしない",
     "holdBadge": "ホールド"
   },
+  "Trade": {
+    "pageTitle": "取引承認",
+    "refreshAriaLabel": "更新",
+    "botDisabledLabel": "⚠️ Bot売買は現在無効です（Coming Soon）",
+    "botDisabledDesc": "AI判定結果は参考情報として表示しています",
+    "shadowModeActive": "Shadow Mode が有効です。承認ボタンは無効化されています。",
+    "loadingText": "読み込み中...",
+    "noPendingTitle": "承認待ちの取引はありません",
+    "noPendingDesc": "AI判定が完了すると、ここに表示されます",
+    "fetchError": "取得エラー",
+    "approveSuccess": "{symbol} {action} を承認しました",
+    "skipSuccess": "{symbol} をスキップしました",
+    "orderError": "注文エラー: {msg}",
+    "confirmDialogTitle": "取引を承認しますか？",
+    "tradingPairLabel": "通貨ペア",
+    "actionLabel": "アクション",
+    "quantityLabel": "数量",
+    "estimatedPriceLabel": "推定価格",
+    "cancelButton": "キャンセル",
+    "approveAndExecuteButton": "承認して実行",
+    "confidenceLabel": "信頼度",
+    "shadowModeWarning": "Shadow Mode中は実際の取引は行われません",
+    "skipButton": "スキップ"
+  },
   "Wallet": {
     "pageTitle": "ウォレット接続",
     "pageSubtitle": "Base メインネットに接続してください",
@@ -1070,5 +1197,112 @@
       "subtitle": "イールドトレーディング",
       "description": "Pendleプロトコルでトークン化された利回りを売買します。元本トークン（PT）と利回りトークン（YT）を活用した高度なイールド最適化戦略です。"
     }
+  },
+  "WalletOnboarding": {
+    "headerTitle": "はじめに",
+    "headerSubtitle": "Ultra AutoTradeで資産運用を始めるための4つのステップ",
+    "prevBtn": "← 前のステップ",
+    "nextBtn": "次のステップ →",
+    "stepBadge": "STEP {id}",
+    "steps": {
+      "wallet": {
+        "title": "ウォレットを準備する",
+        "description": "MetaMaskをインストールして、ウォレットを作成します。",
+        "tip": "MetaMaskの代わりにRabby WalletやCoinbase Walletも使えます。",
+        "details": {
+          "metamask": "MetaMask公式サイトにアクセス",
+          "chrome": "Chrome拡張機能をインストール",
+          "create": "「新しいウォレットを作成」を選択",
+          "password": "パスワードを設定（強力なものを使用）",
+          "seed": "シードフレーズを安全な場所に保管"
+        },
+        "seedWarning": "シードフレーズは絶対に誰にも教えないでください"
+      },
+      "network": {
+        "title": "ネットワークを追加する",
+        "description": "Base Sepoliaネットワークをウォレットに追加します。",
+        "tip": "ChainListを使うと、ネットワーク情報を手入力する必要がありません。",
+        "details": {
+          "chainlist": "ChainListにアクセス",
+          "search": "「Base Sepolia」を検索して「Add to MetaMask」をクリック",
+          "approve": "MetaMaskのポップアップで「承認」を選択",
+          "confirm": "MetaMaskの上部ネットワーク欄が「Base Sepolia」になっていることを確認"
+        }
+      },
+      "testEth": {
+        "title": "テスト用ETHを入手する",
+        "description": "ガス代用のテストETH（SepoliaETH）をウォレットに送金します。",
+        "tip": "テストネットのため、実際の資産は不要です。フォーセットから無料でテストETHが取得できます。",
+        "details": {
+          "faucet": "Coinbase Faucetにアクセス",
+          "input": "ウォレットアドレスを入力してテストETHを受け取る",
+          "confirm": "MetaMaskに「Base Sepolia ETH」が届いたことを確認"
+        }
+      },
+      "connect": {
+        "title": "Ultra AutoTradeに接続する",
+        "description": "ウォレットをUltra AutoTradeに接続して運用を開始します。",
+        "tip": "接続はウォレットアドレスの読み取りのみです。当社が秘密鍵を聞くことは一切ありません。",
+        "details": {
+          "login": "Ultra AutoTradeにログイン",
+          "click": "「ウォレット接続」ボタンをクリック",
+          "approve": "MetaMaskのポップアップで接続を承認",
+          "sign": "AIの提案を確認し、実行する場合は署名して承認"
+        }
+      }
+    },
+    "safety": {
+      "title": "🛡️ あなたの資産を守る仕組み",
+      "nonCustodial": "ノンカストディアル",
+      "nonCustodialDesc": "— あなたの秘密鍵は当社が管理しません",
+      "signRequired": "署名が必須",
+      "signRequiredDesc": "— AIの提案を実行するにはあなたの承認が必要です",
+      "emergencyStop": "緊急停止",
+      "emergencyStopDesc": "— Health Factorが危険水準になると自動ブレーキが作動",
+      "fourAgents": "4つのAIエージェント",
+      "fourAgentsDesc": "— 市場・リスク・マクロ・行動パターンを常時監視"
+    },
+    "faq": {
+      "title": "よくある質問",
+      "minAmount": {
+        "q": "最低いくらから始められますか？",
+        "a": "最低金額の制限はありませんが、ガス代を考慮すると100 USDC以上を推奨します。少額だとガス代の比率が高くなり、利回りが相殺される可能性があります。"
+      },
+      "lossRisk": {
+        "q": "損失のリスクはありますか？",
+        "a": "はい。暗号資産のDeFi運用には元本を失うリスクがあります。AIが最適な判断を支援しますが、市場リスク・スマートコントラクトリスク・清算リスクなどがあります。詳しくはリスク開示書をお読みください。"
+      },
+      "aiAutoTrade": {
+        "q": "AIが勝手に取引しますか？",
+        "a": "いいえ。AIは「提案」するだけです。実際の預け入れ・引き出しには、必ずあなたのMetaMaskでの署名（承認）が必要です。署名しない限り資産は動きません。"
+      },
+      "howToStop": {
+        "q": "やめたいときはどうすればいいですか？",
+        "a": "いつでも資産をAaveから引き出せます。Ultra AutoTradeを解除した後も、資産はあなたのウォレットに残ります。引き出しに必要なのはガス代のみです。"
+      }
+    },
+    "ctaBtn": "ウォレットを接続して始める →"
+  },
+  "ProposalCard": {
+    "hfChangeLabel": "ヘルスファクター変化",
+    "estimatedGasLabel": "推定ガス代",
+    "slippageWarning": "スリッページが高めです（{pct}%）",
+    "processingButton": "処理中...",
+    "approveButton": "承認",
+    "rejectButton": "却下"
+  },
+  "TransactionStatus": {
+    "requestingSignature": "署名をリクエスト中...",
+    "waitingConfirmation": "確認待ち...",
+    "txSuccess": "トランザクション完了",
+    "txFailed": "トランザクション失敗",
+    "retryHint": "再度「承認」ボタンを押してください"
+  },
+  "RecentApprovals": {
+    "recentTitle": "最近の承認履歴",
+    "viewAllHistory": "全履歴を見る →",
+    "noRecentApprovals": "承認履歴はありません",
+    "statusSuccess": "成功",
+    "statusFailed": "失敗"
   }
 }
