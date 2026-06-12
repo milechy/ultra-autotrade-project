@@ -113,6 +113,8 @@ async def router_v4_swap(request: RouterV4SwapRequest) -> RouterV4SwapResult:
                 receiver=request.receiver,
                 slippage=request.slippage,
                 dry_run=True,
+                portfolio_value_usd=request.portfolio_value_usd,
+                amount_in_usd=request.amount_in_usd,
             )
         elif token_out == "PT":  # noqa: S105 — トークン種別文字列（パスワードではない）
             result = await client.buy_pt(
@@ -122,6 +124,8 @@ async def router_v4_swap(request: RouterV4SwapRequest) -> RouterV4SwapResult:
                 receiver=request.receiver,
                 slippage=request.slippage,
                 dry_run=True,
+                portfolio_value_usd=request.portfolio_value_usd,
+                amount_in_usd=request.amount_in_usd,
             )
         elif request.token_in.upper() == "YT":
             result = await client.sell_yt(
@@ -131,6 +135,8 @@ async def router_v4_swap(request: RouterV4SwapRequest) -> RouterV4SwapResult:
                 receiver=request.receiver,
                 slippage=request.slippage,
                 dry_run=True,
+                portfolio_value_usd=request.portfolio_value_usd,
+                amount_in_usd=request.amount_in_usd,
             )
         elif request.token_in.upper() == "PT":
             result = await client.sell_pt(
@@ -140,6 +146,8 @@ async def router_v4_swap(request: RouterV4SwapRequest) -> RouterV4SwapResult:
                 receiver=request.receiver,
                 slippage=request.slippage,
                 dry_run=True,
+                portfolio_value_usd=request.portfolio_value_usd,
+                amount_in_usd=request.amount_in_usd,
             )
         else:
             result = RouterV4SwapResult(
@@ -167,6 +175,8 @@ async def router_v4_add_liquidity(
             receiver=request.receiver,
             slippage=request.slippage,
             dry_run=True,
+            portfolio_value_usd=request.portfolio_value_usd,
+            amount_in_usd=request.amount_in_usd,
         )
     except Exception as exc:
         logger.exception("RouterV4 add_liquidity 失敗")

@@ -122,6 +122,13 @@ class RouterV4SwapRequest(BaseModel):
         description="スリッページ（0.005 = 0.5%）。0 < slippage <= 0.05（5%）",
     )
     receiver: str = Field(..., description="受取アドレス")
+    portfolio_value_usd: Optional[Decimal] = Field(
+        default=None, description="ポートフォリオ総額（USD）。10%上限チェック用"
+    )
+    amount_in_usd: Optional[Decimal] = Field(
+        default=None,
+        description="トレード金額（USD）。portfolio_value_usd と併用必須（未指定時は fail-closed で拒否）",
+    )
 
     @field_validator("amount_in", mode="before")
     @classmethod
@@ -168,6 +175,13 @@ class RouterV4AddLiquidityRequest(BaseModel):
         description="スリッページ（0.005 = 0.5%）。0 < slippage <= 0.05（5%）",
     )
     receiver: str = Field(..., description="受取アドレス")
+    portfolio_value_usd: Optional[Decimal] = Field(
+        default=None, description="ポートフォリオ総額（USD）。10%上限チェック用"
+    )
+    amount_in_usd: Optional[Decimal] = Field(
+        default=None,
+        description="トレード金額（USD）。portfolio_value_usd と併用必須（未指定時は fail-closed で拒否）",
+    )
 
     @field_validator("amount_in", mode="before")
     @classmethod
