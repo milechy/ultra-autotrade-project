@@ -255,6 +255,51 @@ def _generate_embedding(text: str) -> Optional[list[float]]:
         return None
 
 
+def _write_shadow_consensus(
+    db: Session,
+    feature: AiDecisionFeature,
+    market_ctx: Any,
+) -> None:
+    """4 軸コンセンサスの決定論判定を Shadow 記録する (EPIC-1 1-7 / fail-open)。
+
+    consensus_4axis_mode が "off" の場合は何もしない。それ以外 (shadow/a_b/on)
+    のとき feature.deterministic_breakdown に DeterministicVerdict を格納する。
+    Shadow = 記録のみで、既存の判定・保存ロジックには一切影響させない。
+
+    market_ctx が MarketContext でない場合 (degraded dict) は skip する。
+    本関数の例外は WARNING ログに留め、呼び出し元の判定保存処理を阻害しない。
+    """
+    from app.ai.agents import run_all_agents  # noqa: PLC0415
+    from app.ai.config import get_ai_settings  # noqa: PLC0415
+
+    try:
+        settings = get_ai_settings()
+        if settings.consensus_4axis_mode == "off":
+            return
+        if not isinstance(market_ctx, MarketContext):
+            return
+
+        agent_ctx = run_all_agents(market_ctx)
+        verdict = agent_ctx.evaluate_4axis_consensus(
+            score_threshold=settings.consensus_score_threshold,
+            conf_threshold=settings.consensus_conf_threshold,
+        )
+        feature.deterministic_breakdown = verdict.model_dump(mode="json")
+        db.flush()
+        logger.info(
+            "shadow consensus recorded: feature_id=%s mode=%s action=%s",
+            feature.id,
+            settings.consensus_4axis_mode,
+            verdict.action.value,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "_write_shadow_consensus failed (fail-open, decision_id=%s): %s",
+            getattr(feature, "ai_decision_id", None),
+            exc,
+        )
+
+
 def save_ai_decision_features(
     db: Session,
     decision: AIDecision,
@@ -297,6 +342,8 @@ def save_ai_decision_features(
             result.final_action.value,
             result.final_confidence,
         )
+        # EPIC-1 1-7: 4 軸コンセンサス Shadow 書込配線 (記録のみ / fail-open)
+        _write_shadow_consensus(db, feature, market_ctx)
     except Exception as exc:  # noqa: BLE001
         logger.warning(
             "save_ai_decision_features failed (fail-open, decision_id=%d): %s",
