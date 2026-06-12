@@ -306,11 +306,16 @@ def save_ai_decision_features(
     result: CrossValidationResult,
     aave_data: "AaveMarketData",
     market_ctx: Any,
-) -> None:
+) -> "AiDecisionFeature | None":
     """ai_decision_features に判定時の特徴量を INSERT する (fail-open)。
 
     呼び出し元の db.commit() 前に呼ぶこと。INSERT 失敗は WARNING ログに留め、
     判定結果の保存 (save_ai_decision) には影響させない。
+
+    Returns:
+        flush 済みの AiDecisionFeature（_write_shadow_consensus 後の状態）。
+        INSERT 失敗時は None を返す。
+        呼び出し側は None の場合も継続できる設計 (fail-open)。
 
     Args:
         db: SQLAlchemy セッション (flush 済み decision を持つ)。
@@ -344,12 +349,33 @@ def save_ai_decision_features(
         )
         # EPIC-1 1-7: 4 軸コンセンサス Shadow 書込配線 (記録のみ / fail-open)
         _write_shadow_consensus(db, feature, market_ctx)
+        return feature
     except Exception as exc:  # noqa: BLE001
         logger.warning(
             "save_ai_decision_features failed (fail-open, decision_id=%d): %s",
             decision.id,
             exc,
         )
+        return None
+
+
+def _consensus_ab_bucket(decision_id: int) -> str:
+    """CONSENSUS_4AXIS_MODE="a_b" 時の 50/50 バケット振り分けを返す。
+
+    decisions_router (backend/app/ai/decisions_router.py) の計測エンドポイントと
+    同一規約: ``"new" if id % 2 == 1 else "legacy"``。
+    **この式を decisions_router と乖離させないこと**。
+    乖離すると 1-12 A/B 計測の bucket 定義と実際のルーティングが食い違い、
+    計測値が無意味になる。
+
+    Args:
+        decision_id: ai_decisions.id (flush 後の確定値)。
+
+    Returns:
+        "new"    — 奇数 id → 4 軸 deterministic verdict を採用。
+        "legacy" — 偶数 id → 従来 LLM final_action をそのまま routing。
+    """
+    return "new" if decision_id % 2 == 1 else "legacy"
 
 
 def _get_tier_interval_hours(tier: str) -> int:
@@ -625,12 +651,45 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
         decision = save_ai_decision(db, result, _DEFAULT_QUERY, rag_context=rag_ctx)
 
         # Hermes Phase 0: 判定時の特徴量を ai_decision_features に INSERT (fail-open)
-        save_ai_decision_features(db, decision, result, aave_data, market_ctx)
+        # EPIC-1 1-11: save_ai_decision_features は AiDecisionFeature | None を返すよう拡張済み。
+        # a_b モード時に deterministic_breakdown を参照するため戻り値を受け取る。
+        feature = save_ai_decision_features(db, decision, result, aave_data, market_ctx)
+
+        # EPIC-1 1-11: CONSENSUS_4AXIS_MODE="a_b" 50/50 A/B ルーティング。
+        # **不変性ガード**: mode が "a_b" 以外のときは下記ブロックを一切通らない。
+        # off / shadow / on の既存パスは 1 行も変更しない。
+        from app.ai.config import get_ai_settings  # noqa: PLC0415
+
+        _mode = get_ai_settings().consensus_4axis_mode
+        routing_result = result  # デフォルト: 元の result で routing
+        if _mode == "a_b":
+            _bucket = _consensus_ab_bucket(decision.id)
+            _adopted_action = result.final_action  # fail-open デフォルト = legacy
+            if _bucket == "new":
+                # 二重計算回避: _write_shadow_consensus が既に格納した verdict を再利用する。
+                # fail-open: feature が None / deterministic_breakdown が None / KeyError
+                # → _adopted_action は元の final_action のまま (legacy フォールバック)。
+                try:
+                    if feature is not None and feature.deterministic_breakdown is not None:
+                        _adopted_action = TradeAction(feature.deterministic_breakdown["action"])
+                except (KeyError, ValueError) as _ab_exc:
+                    logger.warning(
+                        "consensus a_b: verdict lookup failed (fail-open fallback to legacy): %s",
+                        _ab_exc,
+                    )
+                # routing 専用コピーを作成 — 記録済み judge_action (1-12 計測) を汚染しない
+                routing_result = result.model_copy(update={"final_action": _adopted_action})
+            logger.info(
+                "consensus a_b routing: decision_id=%s bucket=%s adopted_action=%s",
+                decision.id,
+                _bucket,
+                _adopted_action.value,
+            )
 
         # BUY / SELL 時は Proposal 作成
         proposals_created = 0
-        if result.final_action in (TradeAction.BUY, TradeAction.SELL):
-            proposals_created = _create_proposals_for_users(db, decision, result)
+        if routing_result.final_action in (TradeAction.BUY, TradeAction.SELL):
+            proposals_created = _create_proposals_for_users(db, decision, routing_result)
 
         db.commit()
 
