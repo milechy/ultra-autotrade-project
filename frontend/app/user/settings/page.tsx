@@ -448,7 +448,7 @@ function SettingsPage() {
               <Input
                 value={settings.exchange_symbol}
                 onChange={e => set('exchange_symbol', e.target.value)}
-                placeholder="例: BTC/USDT"
+                placeholder={t('tradingPairPlaceholder')}
                 disabled={!isAdmin}
               />
             </div>

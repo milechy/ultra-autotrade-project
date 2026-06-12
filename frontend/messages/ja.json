@@ -228,6 +228,7 @@
     "tradingTitle": "取引",
     "shadowModeDesc": "ONにすると実際の注文は発生しません",
     "tradingPair": "取引ペア",
+    "tradingPairPlaceholder": "例: BTC/USDT",
     "leverage": "レバレッジ",
     "botTrading": "Bot売買",
     "comingSoonDesc": "Phase 2で対応予定",

@@ -228,6 +228,7 @@
     "tradingTitle": "Trading",
     "shadowModeDesc": "When ON, no real orders will be placed.",
     "tradingPair": "Trading Pair",
+    "tradingPairPlaceholder": "e.g. BTC/USDT",
     "leverage": "Leverage",
     "botTrading": "Bot Trading",
     "comingSoonDesc": "Planned for Phase 2",
