@@ -3,7 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
 import { Toaster } from 'sonner'
@@ -40,20 +40,27 @@ function toSystemStatus(s: AutomationStatus): SystemStatus {
   return 'NORMAL'
 }
 
+/** UserGuard を適用しないパス（Privy オンボーディング経路） */
+const GUARD_EXEMPT_PATHS = ['/connect']
+
 function UserGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
+
+  const isExempt = GUARD_EXEMPT_PATHS.includes(pathname ?? '')
 
   useEffect(() => {
+    if (isExempt) return
     if (!isLoading && !isAuthenticated) {
       router.replace('/login')
     }
-  }, [isLoading, isAuthenticated, router])
+  }, [isLoading, isAuthenticated, router, isExempt])
 
   if (isLoading) {
     return <div style={{ padding: 40, textAlign: 'center' }}>読み込み中...</div>
   }
-  if (!isAuthenticated) {
+  if (!isExempt && !isAuthenticated) {
     return null
   }
   return <>{children}</>
