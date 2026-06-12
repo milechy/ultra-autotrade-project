@@ -142,11 +142,20 @@ export default function BrowserTermsAcceptPage() {
                   : "border-zinc-800 bg-zinc-900"
               }`}
             >
-              <button
-                className="flex items-center w-full px-4 py-4 text-left"
+              {/* interactive content (button) のネスト禁止 (HTML 仕様) のため外側は div + role="button" */}
+              <div
+                role="button"
+                tabIndex={0}
+                className="flex items-center w-full px-4 py-4 text-left cursor-pointer"
                 onClick={() =>
                   setExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
                 }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    setExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
+                  }
+                }}
               >
                 <button
                   className="mr-3 flex-shrink-0"
@@ -178,7 +187,7 @@ export default function BrowserTermsAcceptPage() {
                     isExpanded ? "rotate-180" : ""
                   }`}
                 />
-              </button>
+              </div>
               {isExpanded && (
                 <div className="px-4 pb-4">
                   <p className="text-zinc-400 text-sm leading-relaxed">{item.detail}</p>
