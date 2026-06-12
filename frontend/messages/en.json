@@ -982,5 +982,29 @@
     "withdrawBadge": "Withdraw",
     "holdTitle": "Do nothing",
     "holdBadge": "Hold"
+  },
+  "Trade": {
+    "pageTitle": "Trade Approval",
+    "refreshAriaLabel": "Refresh",
+    "botDisabledLabel": "⚠️ Bot trading is currently disabled (Coming Soon)",
+    "botDisabledDesc": "AI decision results are shown for reference only",
+    "shadowModeActive": "Shadow Mode is active. The approve button is disabled.",
+    "loadingText": "Loading...",
+    "noPendingTitle": "No pending trades",
+    "noPendingDesc": "Trades will appear here once AI judgment is complete",
+    "fetchError": "Fetch error",
+    "approveSuccess": "{symbol} {action} approved",
+    "skipSuccess": "{symbol} skipped",
+    "orderError": "Order error: {msg}",
+    "confirmDialogTitle": "Approve this trade?",
+    "tradingPairLabel": "Trading Pair",
+    "actionLabel": "Action",
+    "quantityLabel": "Quantity",
+    "estimatedPriceLabel": "Estimated Price",
+    "cancelButton": "Cancel",
+    "approveAndExecuteButton": "Approve & Execute",
+    "confidenceLabel": "Confidence",
+    "shadowModeWarning": "No actual trades will be placed in Shadow Mode",
+    "skipButton": "Skip"
   }
 }
