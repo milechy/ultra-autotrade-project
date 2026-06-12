@@ -1,6 +1,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 'use client'
 
+import '../arobix/theme.css'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useSmartBack } from '@/hooks/useSmartBack'
@@ -9,7 +10,7 @@ export default function PrivacyPolicyPage() {
   const goBack = useSmartBack()
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="arobix-root min-h-screen bg-zinc-950 text-zinc-100">
       <div className="max-w-2xl mx-auto px-4 py-8">
         <Button
           variant="ghost"
