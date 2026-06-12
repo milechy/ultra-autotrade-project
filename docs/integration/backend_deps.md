@@ -88,6 +88,19 @@
 
 ## backend/app/main.py
 
+### 変更 #13: 4軸コンセンサス weight startup validation 登録 (PR #630 / 2026-06-12)
+- **コミット範囲**: `feat/consensus-config-prompts`
+- **変更内容**: `startup_validate_consensus_weights` startup hook を追加 (12 行追加のみ)。
+  `app.ai.agents` の `validate_agent_weights(MultiAgentContext.DEFAULT_WEIGHTS)` を
+  起動時に実行し、不正な 4軸コンセンサス weight 設定を fail-fast で拒否する。
+- **理由**: EPIC-1 1-5/1-8 — 4軸コンセンサス env 設定 (CONSENSUS_4AXIS_MODE 等) の
+  導入に伴い、weight 合計不一致等の設定ミスを runtime ではなく起動時に検出する
+  fail-closed 安全装置。既存の `startup_validate_model_config` /
+  `startup_validate_oracle_staleness_env` と同パターン。
+- **影響範囲**: 新規 startup hook 追加のみ。既存 endpoint・起動シーケンスへの影響なし
+  (weight が正常なら no-op + INFO ログ 1 行)。
+- **承認**: feat/consensus-config-prompts → main (PR #630)
+
 ### 変更 #12: ToS model import 名の変更 (UserAction → ToSUserAction) (PR #534 / 2026-06-04)
 - **コミット範囲**: `fix/main-ci-tos-i001`
 - **変更内容**: `from app.tos.models import (... UserAction ...)` の import を
