@@ -25,14 +25,27 @@ import { getAuthToken } from "@/lib/auth/token-key"
 /** liff-confirm / settings_router (LIFF_TERMS_VERSION) と一致させること。 */
 const LIFF_TERMS_VERSION = "liff-v3"
 
+/** ブラウザ wallet 経路の同意バージョン (POST /auth/terms/accept で記録)。 */
+const BROWSER_TERMS_VERSION = "2.0"
+
+/** デフォルト accepted バージョン一覧 (LIFF 経路向け後方互換)。 */
+const DEFAULT_ACCEPTED_VERSIONS: readonly string[] = [LIFF_TERMS_VERSION]
+
 export type LiffTermsGateState = "loading" | "accepted" | "not-accepted"
 
 /**
- * 重要事項同意 (liff-v3) の状態を返す。
- * @param enabled false の間はゲートを無効化し常に "accepted" を返す
- *                (除外ページ / 未認証時に呼び出し側が無効化する)。
+ * 重要事項同意の状態を返す。LIFF / ブラウザ両経路に対応。
+ *
+ * @param enabled          false の間はゲートを無効化し常に "accepted" を返す
+ *                         (除外ページ / 未認証時に呼び出し側が無効化する)。
+ * @param acceptedVersions 「同意済み」とみなすバージョン一覧。
+ *                         デフォルト ['liff-v3'] — 既存 LIFF 呼び出しは引数省略で後方互換。
+ *                         ブラウザ経路では ['liff-v3', '2.0'] を渡す。
  */
-export function useLiffTermsGate(enabled: boolean): LiffTermsGateState {
+export function useLiffTermsGate(
+  enabled: boolean,
+  acceptedVersions: readonly string[] = DEFAULT_ACCEPTED_VERSIONS
+): LiffTermsGateState {
   const [state, setState] = useState<LiffTermsGateState>("loading")
 
   useEffect(() => {
@@ -60,7 +73,9 @@ export function useLiffTermsGate(enabled: boolean): LiffTermsGateState {
       .then((data: { terms_version?: string | null } | null) => {
         if (cancelled) return
         setState(
-          data?.terms_version === LIFF_TERMS_VERSION ? "accepted" : "not-accepted"
+          data?.terms_version != null && acceptedVersions.includes(data.terms_version)
+            ? "accepted"
+            : "not-accepted"
         )
       })
       .catch(() => {
@@ -72,7 +87,9 @@ export function useLiffTermsGate(enabled: boolean): LiffTermsGateState {
     return () => {
       cancelled = true
     }
-  }, [enabled])
+  }, [enabled, acceptedVersions])
 
   return state
 }
+
+export { LIFF_TERMS_VERSION, BROWSER_TERMS_VERSION }

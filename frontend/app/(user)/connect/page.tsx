@@ -11,6 +11,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/lib/auth'
 import { useMinimumBalance } from '@/hooks/useMinimumBalance'
 import { apiPut } from '@/lib/api/client'
+import { acceptTerms } from '@/lib/api/auth'
+import { getAuthToken } from '@/lib/auth/token-key'
 import { OperationModeSelector } from '@/components/OperationModeSelector'
 
 type UserMode = 'managed' | 'active' | 'pro'
@@ -147,6 +149,16 @@ export default function ConnectPage() {
       const ethProvider = new ethers.BrowserProvider(eip1193 as unknown as ethers.Eip1193Provider)
       const signer = await ethProvider.getSigner()
       await loginWithWallet(address, signer)
+      // 利用規約同意を即時記録する（UI チェックボックス同意済みが前提）。
+      // 失敗しても遷移は継続 — BrowserTermsGate が backstop として機能する。
+      try {
+        const tok = getAuthToken()
+        if (tok) {
+          await acceptTerms(tok, "2.0")
+        }
+      } catch (termsErr) {
+        console.error('Failed to record terms acceptance:', termsErr)
+      }
       // Sync user mode to backend (fire-and-forget; auth continues on failure)
       try {
         await apiPut('/api/user/settings', { user_mode: userMode })
