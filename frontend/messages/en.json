@@ -240,6 +240,14 @@
     "modeChanged": "Operation mode updated.",
     "modeChangeFailed": "Failed to change mode."
   },
+  "OperationMode": {
+    "managedLabel": "Full Auto",
+    "managedDesc": "AI makes and executes all decisions automatically. For beginners.",
+    "activeLabel": "Semi Auto",
+    "activeDesc": "AI proposes, you approve, then it executes. For intermediate users.",
+    "proLabel": "Manual",
+    "proDesc": "AI proposes, you decide manually. For advanced users."
+  },
   "AiFeed": {
     "title": "AI Trend",
     "confidence": "Confidence",

@@ -240,6 +240,14 @@
     "modeChanged": "運用モードを変更しました",
     "modeChangeFailed": "モードの変更に失敗しました"
   },
+  "OperationMode": {
+    "managedLabel": "フルオート",
+    "managedDesc": "AIが全自動で判断・実行。初心者向け。",
+    "activeLabel": "セミオート",
+    "activeDesc": "AIが提案→ユーザーが承認→実行。中級者向け。",
+    "proLabel": "マニュアル",
+    "proDesc": "AIが提案→手動判断。上級者向け。"
+  },
   "AiFeed": {
     "title": "AIトレンド",
     "confidence": "確信度",
