@@ -10,9 +10,20 @@ AI 判定モジュール関連の設定値読み出しモジュール。
 """
 
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from app.utils.config import get_env
+
+# ---------------------------------------------------------------------------
+# 4 軸コンセンサス設定（EPIC-1 1-5）
+# ---------------------------------------------------------------------------
+# CONSENSUS_4AXIS_MODE の許可リスト（fail-closed: 範囲外は RuntimeError）
+#   off     — 4 軸合議を使わず従来ロジックのみ
+#   shadow  — 算出・記録のみ（実行系には影響させない）
+#   a_b     — A/B 比較用（一部トラフィックに適用）
+#   on      — 4 軸合議を本番経路に適用
+VALID_CONSENSUS_4AXIS_MODES: frozenset[str] = frozenset({"off", "shadow", "a_b", "on"})
 
 # ---------------------------------------------------------------------------
 # モデル名許可リスト（Single source of truth）
@@ -60,6 +71,15 @@ class AISettings:
     prompt_version: str
     shadow_mode: bool  # True=判定記録のみ、実行しない
     ai_fallback_model: str  # Opus失敗時のフォールバックモデル（環境変数: AI_FALLBACK_MODEL）
+    # --- 4 軸コンセンサス設定（EPIC-1 1-5）---
+    # デフォルト値は AISettings を直接構築する既存テストとの後方互換のため必須
+    consensus_4axis_mode: str = (
+        "shadow"  # CONSENSUS_4AXIS_MODE（許可リスト外は RuntimeError / fail-closed）
+    )
+    consensus_score_threshold: Decimal = Decimal(
+        "0.40"
+    )  # CONSENSUS_SCORE_THRESHOLD（weighted directional score 閾値 ±）
+    consensus_conf_threshold: int = 65  # CONSENSUS_CONF_THRESHOLD（weighted confidence 閾値）
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -91,6 +111,40 @@ def _get_env_bool(name: str, default: bool) -> bool:
     return raw.lower() in ("true", "1", "yes")
 
 
+def _get_env_decimal(name: str, default: Decimal) -> Decimal:
+    """
+    Decimal 値の環境変数を取得するヘルパー（金融閾値は Decimal 型のみ）。
+
+    不正な値が入っていた場合は RuntimeError にする。
+    """
+    raw = get_env(name, required=False)
+    if raw is None or raw == "":
+        return default
+
+    try:
+        return Decimal(raw)
+    except (InvalidOperation, ValueError) as exc:
+        raise RuntimeError(f"Invalid decimal value for env var {name}: {raw!r}") from exc
+
+
+def _get_env_consensus_mode(name: str, default: str) -> str:
+    """
+    CONSENSUS_4AXIS_MODE を取得するヘルパー（fail-closed）。
+
+    許可リスト VALID_CONSENSUS_4AXIS_MODES 外の値は RuntimeError にする。
+    """
+    raw = get_env(name, required=False)
+    if raw is None or raw == "":
+        return default
+
+    if raw not in VALID_CONSENSUS_4AXIS_MODES:
+        raise RuntimeError(
+            f"Invalid value for env var {name}: {raw!r}. "
+            f"Must be one of: {sorted(VALID_CONSENSUS_4AXIS_MODES)}"
+        )
+    return raw
+
+
 def _validate_model_config() -> None:
     """起動時検証: VALID_CLAUDE_MODELS 許可リスト方式（deny-list ではなく allow-list）。
 
@@ -120,6 +174,9 @@ def get_ai_settings() -> AISettings:
       - AI_MIN_CONFIDENCE_THRESHOLD（デフォルト: 40）
       - AI_CROSS_VALIDATION_ENABLED（デフォルト: True）
       - AI_PROMPT_VERSION（デフォルト: v1）
+      - CONSENSUS_4AXIS_MODE（デフォルト: shadow / 許可リスト外は RuntimeError）
+      - CONSENSUS_SCORE_THRESHOLD（デフォルト: Decimal("0.40")）
+      - CONSENSUS_CONF_THRESHOLD（デフォルト: 65）
     """
     anthropic_api_key = get_env("ANTHROPIC_API_KEY", required=False)
     openai_api_key = get_env("OPENAI_API_KEY", required=False)
@@ -139,6 +196,19 @@ def get_ai_settings() -> AISettings:
     prompt_version = get_env("AI_PROMPT_VERSION", required=False) or "v1"
     shadow_mode = _get_env_bool("AI_SHADOW_MODE", default=False)
 
+    consensus_4axis_mode = _get_env_consensus_mode(
+        "CONSENSUS_4AXIS_MODE",
+        default="shadow",
+    )
+    consensus_score_threshold = _get_env_decimal(
+        "CONSENSUS_SCORE_THRESHOLD",
+        default=Decimal("0.40"),
+    )
+    consensus_conf_threshold = _get_env_int(
+        "CONSENSUS_CONF_THRESHOLD",
+        default=65,
+    )
+
     return AISettings(
         anthropic_api_key=anthropic_api_key,
         openai_api_key=openai_api_key,
@@ -149,4 +219,7 @@ def get_ai_settings() -> AISettings:
         prompt_version=prompt_version,
         shadow_mode=shadow_mode,
         ai_fallback_model=ai_fallback_model,
+        consensus_4axis_mode=consensus_4axis_mode,
+        consensus_score_threshold=consensus_score_threshold,
+        consensus_conf_threshold=consensus_conf_threshold,
     )

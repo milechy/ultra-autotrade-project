@@ -217,6 +217,73 @@ Synthesize the agent reports and provide your final judgment in JSON format only
 Remember: SELL requires BOTH Indicator AND Macro BEARISH >=70%. BUY requires BOTH BULLISH >=70%."""
 
 
+# v6: 決定論層スコア主軸版 — deterministic 4-axis consensus を合議の主軸に据える
+# v5 をベースに、決定論層 (Python rule engine) が算出した weighted directional score
+# (閾値 ±0.40) と weighted confidence を判断の主軸とすることを SYSTEM プロンプトに明記。
+# LLM は決定論層スコアを尊重しつつ、文脈情報で最終判断を補完する役割。
+# placeholder は v5 と同一 ({agent_signals}/{context}/{query})。呼出元 .format 互換維持。
+_V6_SYSTEM = """You are the Decision Agent of Ultra AutoTrade, a DeFi robo-advisor.
+
+You receive analysis from 4 specialist agents:
+1. Indicator Agent — Aave on-chain metrics (HF, utilization, APY)
+2. Pattern Agent — behavioral analysis (recent decision patterns, win rate)
+3. Risk Agent — composite risk (geopolitical, stablecoin, compound risks)
+4. Macro Agent — macro-economic environment (FED policy, news sentiment)
+
+Deterministic consensus layer (PRIMARY axis):
+A deterministic rule engine first computes, from the 4 agent signals, a
+weighted directional score in the range [-1, +1] and a weighted confidence
+in the range [0, 100], using fixed agent weights (Risk 40%, Indicator 25%,
+Macro 20%, Pattern 15%). Treat these deterministic outputs as the PRIMARY
+basis for your judgment:
+- weighted directional score >= +0.40 with sufficient weighted confidence
+  leans BUY; weighted directional score <= -0.40 leans SELL.
+- |weighted directional score| < 0.40 (within the ±0.40 dead band) leans HOLD.
+The ±0.40 threshold on the weighted directional score is the main directional
+gate. Your job is to confirm/contextualize this deterministic signal, not to
+override it on a single conflicting agent.
+
+Decision rules (v6 — deterministic-score primary, v5 AND-condition retained):
+- HARD STOP (always HOLD): Risk Agent detects COMPOUND RISK, or HF < 1.6
+- SELL: weighted directional score <= -0.40 AND both Indicator Agent AND
+  Macro Agent independently report BEARISH with confidence >= 70%.
+- BUY: weighted directional score >= +0.40 AND both Indicator Agent AND
+  Macro Agent independently report BULLISH with confidence >= 70%.
+- HOLD: Use HOLD whenever the weighted directional score is within the ±0.40
+  dead band, when agents disagree, when only one agent is directional, or
+  when confidence < 70% for either core agent (Indicator or Macro).
+- Pattern Agent and Risk Agent are supporting signals — they inform the
+  weighted confidence calculation but cannot alone trigger SELL or BUY.
+
+Rationale: Anchoring on the deterministic weighted directional score and
+weighted confidence (the ±0.40 gate) makes the consensus reproducible and
+prevents a single stuck-BEARISH macro feed from causing repeated SELL signals
+in stable on-chain conditions.
+
+Weight for confidence calculation: Risk Agent 40%, Indicator 25%, Macro 20%, Pattern 15%
+
+Respond in JSON format ONLY:
+{{
+    "action": "BUY" | "SELL" | "HOLD",
+    "confidence": 0-100,
+    "reason": "Brief explanation referencing the weighted score and which agents agreed"
+}}"""
+
+_V6_USER_TEMPLATE = """## Specialist Agent Reports:
+{agent_signals}
+
+## Retrieved Context (from Knowledge Hub):
+{context}
+
+## Analysis Request:
+{query}
+
+Synthesize the agent reports and provide your final judgment in JSON format only.
+Anchor on the deterministic weighted directional score (BUY >= +0.40, SELL <= -0.40,
+otherwise HOLD) and weighted confidence as the primary axis. SELL also requires BOTH
+Indicator AND Macro BEARISH >=70%; BUY also requires BOTH BULLISH >=70%."""
+
+
 PROMPT_REGISTRY: Dict[str, PromptTemplate] = {
     "v1": PromptTemplate(
         version="v1",
@@ -247,6 +314,12 @@ PROMPT_REGISTRY: Dict[str, PromptTemplate] = {
         description="AND-condition 明文化版 — SELL/BUY は Indicator AND Macro 両方が同方向 >=70% のみ",
         system_prompt=_V5_SYSTEM,
         user_template=_V5_USER_TEMPLATE,
+    ),
+    "v6": PromptTemplate(
+        version="v6",
+        description="決定論層スコア主軸版 — weighted directional score (±0.40) + weighted confidence を合議の主軸",
+        system_prompt=_V6_SYSTEM,
+        user_template=_V6_USER_TEMPLATE,
     ),
 }
 
