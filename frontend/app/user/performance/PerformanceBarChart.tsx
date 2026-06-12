@@ -12,10 +12,12 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts'
+import { useTranslations } from 'next-intl'
 import type { MonthlyPnl } from '@/components/transparency'
 import { formatJPY } from '@/lib/jpy-converter'
 
 export default function PerformanceBarChart({ monthly }: { monthly: MonthlyPnl[] }) {
+  const t = useTranslations('Performance')
   return (
     <ResponsiveContainer width="100%" height={200}>
       <BarChart data={monthly} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
@@ -30,8 +32,8 @@ export default function PerformanceBarChart({ monthly }: { monthly: MonthlyPnl[]
           tickFormatter={(v: number) => `¥${(v / 1000).toFixed(0)}k`}
         />
         <Tooltip
-          formatter={(v: number) => [formatJPY(v), '損益']}
-          labelFormatter={(l: string) => `${l}月`}
+          formatter={(v: number) => [formatJPY(v), t('tooltipLabel')]}
+          labelFormatter={(l: string) => `${l}${t('monthSuffix')}`}
         />
         <Bar dataKey="gain_jpy" radius={[4, 4, 0, 0]}>
           {monthly.map((entry, i) => (

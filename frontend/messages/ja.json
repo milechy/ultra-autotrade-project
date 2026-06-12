@@ -908,7 +908,9 @@
     "disclaimer": "※ 実績は将来の結果を保証しません",
     "noData": "データを取得できませんでした",
     "downloading": "取得中…",
-    "downloadButton": "月次レポートDL"
+    "downloadButton": "月次レポートDL",
+    "tooltipLabel": "損益",
+    "monthSuffix": "月"
   },
   "Simulation": {
     "pageTitle": "シミュレーション",

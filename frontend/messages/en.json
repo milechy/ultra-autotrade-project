@@ -908,7 +908,9 @@
     "disclaimer": "* Past results do not guarantee future performance.",
     "noData": "Could not retrieve data",
     "downloading": "Downloading…",
-    "downloadButton": "Monthly Report"
+    "downloadButton": "Monthly Report",
+    "tooltipLabel": "P&L",
+    "monthSuffix": ""
   },
   "Simulation": {
     "pageTitle": "Simulation",
