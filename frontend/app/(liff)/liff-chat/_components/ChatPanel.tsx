@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ChevronLeft, History } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { getAuthToken } from "@/lib/auth/token-key"
 
 // ---------------------------------------------------------------------------
@@ -27,36 +28,41 @@ interface Props {
 // サジェストボタン定義（8 つ）
 // ---------------------------------------------------------------------------
 
-const SUGGEST_BUTTONS = [
-  { id: "status",    label: "今の運用状況は？",    prompt: "現在の運用状況を教えてください" },
-  { id: "reason",    label: "今日の判断理由",       prompt: "今日のAI判断の理由を教えてください" },
-  { id: "health",    label: "ヘルスファクターは？", prompt: "現在のHealth Factorを教えてください" },
-  { id: "profit",    label: "今月の利益",           prompt: "今月の利益を教えてください" },
-  { id: "risk",      label: "リスク状況",           prompt: "現在のリスク状況を教えてください" },
-  { id: "market",    label: "市場の状況",           prompt: "現在の市場状況を教えてください" },
-  { id: "next",      label: "次の動きは？",         prompt: "次の運用の動きについて教えてください" },
-  { id: "recommend", label: "アドバイスをください", prompt: "今の私の運用についてアドバイスをください" },
-] as const
+type SuggestKey =
+  | "suggestStatus"
+  | "suggestReason"
+  | "suggestHealth"
+  | "suggestProfit"
+  | "suggestRisk"
+  | "suggestMarket"
+  | "suggestNext"
+  | "suggestRecommend"
 
-type SuggestId = typeof SUGGEST_BUTTONS[number]["id"]
+type PlaceholderKey =
+  | "placeholderStatus"
+  | "placeholderReason"
+  | "placeholderHealth"
+  | "placeholderProfit"
+  | "placeholderRisk"
+  | "placeholderMarket"
+  | "placeholderNext"
+  | "placeholderRecommend"
 
-// ---------------------------------------------------------------------------
-// プレースホルダー応答（/api/chat が未実装の場合のフォールバック）
-// ---------------------------------------------------------------------------
-
-function getPlaceholderResponse(id: SuggestId | string): string {
-  const responses: Record<string, string> = {
-    status:    "現在の運用状況を確認中です。データの取得にしばらくお待ちください。",
-    reason:    "今日のAI判断は市場の状況と過去のデータを分析した結果です。詳細はダッシュボードをご確認ください。",
-    health:    "Health Factorは安全な範囲内で維持されています。",
-    profit:    "今月の利益データを集計中です。",
-    risk:      "現在のリスクレベルは低〜中程度です。",
-    market:    "市場は通常の変動範囲内で推移しています。",
-    next:      "次の運用判断はAIが自動的に行います。",
-    recommend: "現在の設定は最適化されています。引き続き安心してお任せください。",
-  }
-  return responses[id] ?? "ご質問ありがとうございます。データを確認中です。"
-}
+const SUGGEST_CONFIG: Array<{
+  id: string
+  labelKey: SuggestKey
+  promptKey: SuggestKey
+  placeholderKey: PlaceholderKey
+}> = [
+  { id: "status",    labelKey: "suggestStatus",    promptKey: "suggestStatus",    placeholderKey: "placeholderStatus" },
+  { id: "reason",    labelKey: "suggestReason",    promptKey: "suggestReason",    placeholderKey: "placeholderReason" },
+  { id: "health",    labelKey: "suggestHealth",    promptKey: "suggestHealth",    placeholderKey: "placeholderHealth" },
+  { id: "profit",    labelKey: "suggestProfit",    promptKey: "suggestProfit",    placeholderKey: "placeholderProfit" },
+  { id: "risk",      labelKey: "suggestRisk",      promptKey: "suggestRisk",      placeholderKey: "placeholderRisk" },
+  { id: "market",    labelKey: "suggestMarket",    promptKey: "suggestMarket",    placeholderKey: "placeholderMarket" },
+  { id: "next",      labelKey: "suggestNext",      promptKey: "suggestNext",      placeholderKey: "placeholderNext" },
+  { id: "recommend", labelKey: "suggestRecommend", promptKey: "suggestRecommend", placeholderKey: "placeholderRecommend" },
+]
 
 // ---------------------------------------------------------------------------
 // MessageBubble（同ファイル内）
@@ -92,18 +98,24 @@ function MessageBubble({ message }: { message: Message }) {
 // ---------------------------------------------------------------------------
 
 export function ChatPanel({ onClose }: Props) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "init",
-      role: "ai",
-      content:
-        "こんにちは！UAT AIです。\n運用状況や市場について何でもお聞きください。",
-      timestamp: new Date(),
-    },
-  ])
+  const t = useTranslations("Liff.chat")
+  const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+
+  // 初期挨拶メッセージ（t() が使えるのはクライアントのみ）
+  useEffect(() => {
+    setMessages([
+      {
+        id: "init",
+        role: "ai",
+        content: t("greeting"),
+        timestamp: new Date(),
+      },
+    ])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // 新メッセージが追加されるたびに末尾へスクロール
   useEffect(() => {
@@ -132,6 +144,7 @@ export function ChatPanel({ onClose }: Props) {
     id: string
     label: string
     prompt: string
+    placeholderKey: PlaceholderKey
   }) => {
     if (loading) return
 
@@ -175,13 +188,13 @@ export function ChatPanel({ onClose }: Props) {
           data.response ??
           data.message ??
           data.content ??
-          "応答を取得できませんでした"
+          t("responseFallback")
       } else {
         // API 未実装 or エラー → プレースホルダー
-        aiContent = getPlaceholderResponse(btn.id)
+        aiContent = t(btn.placeholderKey)
       }
     } catch {
-      aiContent = getPlaceholderResponse(btn.id)
+      aiContent = t(btn.placeholderKey)
     }
 
     const aiMsg: Message = {
@@ -215,23 +228,23 @@ export function ChatPanel({ onClose }: Props) {
           <button
             onClick={onClose}
             className="text-white mr-3 p-0.5 hover:bg-white/10 rounded transition-colors"
-            aria-label="閉じる"
+            aria-label={t("closeAriaLabel")}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="flex-1 min-w-0">
             <div className="text-white font-semibold text-base leading-none">
-              UAT AI
+              {t("panelTitle")}
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               <div className="w-1.5 h-1.5 rounded-full bg-[#4ade9a]" />
-              <span className="text-zinc-400 text-xs">オンライン</span>
+              <span className="text-zinc-400 text-xs">{t("onlineStatus")}</span>
             </div>
           </div>
           <button
             onClick={handleHistoryOpen}
             className="text-zinc-400 p-1 hover:text-zinc-200 hover:bg-white/10 rounded transition-colors"
-            aria-label="チャット履歴"
+            aria-label={t("historyAriaLabel")}
           >
             <History className="w-5 h-5" />
           </button>
@@ -268,20 +281,24 @@ export function ChatPanel({ onClose }: Props) {
 
         {/* サジェストボタン（固定底部）*/}
         <div className="flex-shrink-0 px-4 pb-6 pt-3 border-t border-zinc-800">
-          <p className="text-zinc-600 text-xs mb-2">質問を選んでください</p>
+          <p className="text-zinc-600 text-xs mb-2">{t("suggestLabel")}</p>
           <div className="grid grid-cols-2 gap-2">
-            {SUGGEST_BUTTONS.map((btn) => (
-              <button
-                key={btn.id}
-                onClick={() => handleSuggest(btn)}
-                disabled={loading}
-                className="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 disabled:opacity-40
-                           text-zinc-100 text-xs px-3 py-2.5 rounded-xl text-left transition-colors
-                           border border-zinc-700 hover:border-zinc-600"
-              >
-                {btn.label}
-              </button>
-            ))}
+            {SUGGEST_CONFIG.map((cfg) => {
+              const label = t(cfg.labelKey)
+              const prompt = t(cfg.promptKey)
+              return (
+                <button
+                  key={cfg.id}
+                  onClick={() => handleSuggest({ id: cfg.id, label, prompt, placeholderKey: cfg.placeholderKey })}
+                  disabled={loading}
+                  className="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 disabled:opacity-40
+                             text-zinc-100 text-xs px-3 py-2.5 rounded-xl text-left transition-colors
+                             border border-zinc-700 hover:border-zinc-600"
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
