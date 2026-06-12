@@ -71,6 +71,7 @@ function StepCard({
   isActive: boolean;
   onClick: () => void;
 }) {
+  const t = useTranslations("Onboarding");
   return (
     <div
       onClick={onClick}
@@ -88,7 +89,7 @@ function StepCard({
               isActive ? "bg-blue-600 text-white" : "bg-zinc-800 text-zinc-400"
             }`}
           >
-            STEP {step.id}
+            {t("stepBadge", { id: step.id })}
           </span>
           <h3 className="text-lg font-bold text-zinc-100 mt-1">{step.title}</h3>
         </div>
