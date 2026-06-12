@@ -104,7 +104,7 @@ class TestRecommendEndpoint:
             patch("app.ai.optimizer.router.PortfolioAllocator") as mock_allocator_cls,
         ):
             mock_comparator = MagicMock()
-            mock_comparator.compare.return_value = comparison
+            mock_comparator.compare_async = AsyncMock(return_value=comparison)
             mock_comparator.generate_report.return_value = report
             mock_comparator_cls.return_value = mock_comparator
 
@@ -134,7 +134,7 @@ class TestRecommendEndpoint:
             patch("app.ai.optimizer.router.PortfolioAllocator") as mock_allocator_cls,
         ):
             mock_comparator = MagicMock()
-            mock_comparator.compare.return_value = comparison
+            mock_comparator.compare_async = AsyncMock(return_value=comparison)
             mock_comparator.generate_report.return_value = report
             mock_comparator_cls.return_value = mock_comparator
 
@@ -160,7 +160,7 @@ class TestRecommendEndpoint:
         """ValueError 発生時に 422 を返すこと。"""
         with patch("app.ai.optimizer.router.StrategyComparator") as mock_comparator_cls:
             mock_comparator = MagicMock()
-            mock_comparator.compare.side_effect = ValueError("無効な投資額")
+            mock_comparator.compare_async = AsyncMock(side_effect=ValueError("無効な投資額"))
             mock_comparator_cls.return_value = mock_comparator
 
             response = _client.post(
@@ -178,7 +178,7 @@ class TestRecommendEndpoint:
         """予期しない例外発生時に 503 を返すこと。"""
         with patch("app.ai.optimizer.router.StrategyComparator") as mock_comparator_cls:
             mock_comparator = MagicMock()
-            mock_comparator.compare.side_effect = RuntimeError("内部エラー")
+            mock_comparator.compare_async = AsyncMock(side_effect=RuntimeError("内部エラー"))
             mock_comparator_cls.return_value = mock_comparator
 
             response = _client.post(
@@ -202,7 +202,7 @@ class TestRecommendEndpoint:
             patch("app.ai.optimizer.router.PortfolioAllocator") as mock_allocator_cls,
         ):
             mock_comparator = MagicMock()
-            mock_comparator.compare.return_value = comparison
+            mock_comparator.compare_async = AsyncMock(return_value=comparison)
             mock_comparator.generate_report.return_value = "balanced report"
             mock_comparator_cls.return_value = mock_comparator
 
@@ -220,12 +220,64 @@ class TestRecommendEndpoint:
             )
 
         assert response.status_code == 200
-        # compare に balanced モードが渡されること
-        mock_comparator.compare.assert_called_once_with(
+        # compare_async に balanced モードが渡されること
+        mock_comparator.compare_async.assert_awaited_once_with(
             investment_usd=Decimal("5000"),
             risk_mode="balanced",
             holding_days=90,
         )
+
+
+class TestBuildLiveScorer:
+    """_build_live_scorer の adapter 注入・fail-open 検証（#625 M2/M3）。"""
+
+    def test_injects_all_adapters(self) -> None:
+        """正常時は Pendle/Lido/Aave の全 adapter が注入されること。"""
+        from app.ai.optimizer.router import _build_live_scorer
+
+        scorer = _build_live_scorer("balanced")
+        assert scorer._pendle_adapter is not None
+        assert scorer._lido_adapter is not None
+        assert scorer._aave_adapter is not None
+        assert scorer._risk_mode == "balanced"
+
+    def test_fail_open_when_pendle_factory_raises(self) -> None:
+        """Pendle client 生成失敗時も他 adapter は注入され例外を投げないこと（fail-open）。"""
+        from app.ai.optimizer.router import _build_live_scorer
+
+        with patch(
+            "app.protocols.pendle.client.get_pendle_client",
+            side_effect=RuntimeError("pendle down"),
+        ):
+            scorer = _build_live_scorer("conservative")
+        # Pendle のみ None、Lido/Aave は生成される
+        assert scorer._pendle_adapter is None
+        assert scorer._lido_adapter is not None
+        assert scorer._aave_adapter is not None
+
+    def test_recommend_live_path_with_adapter_failures_returns_200(self) -> None:
+        """全 client 生成失敗でも live 経路がフォールバックで 200 を返すこと（fail-open）。"""
+        with (
+            patch(
+                "app.protocols.pendle.client.get_pendle_client",
+                side_effect=RuntimeError("pendle down"),
+            ),
+            patch(
+                "app.protocols.lido.client.get_lido_client",
+                side_effect=RuntimeError("lido down"),
+            ),
+        ):
+            response = _client.post(
+                "/api/ai/optimizer/recommend",
+                json={
+                    "investment_usd": "1000",
+                    "risk_mode": "balanced",
+                    "holding_days": 30,
+                },
+            )
+        assert response.status_code == 200, response.text
+        candidates = response.json()["comparison"]["candidates"]
+        assert len(candidates) == 5
 
 
 class TestRecommendRiskModeLive:

@@ -17,11 +17,13 @@ import pytest
 
 from app.ai.optimizer.schemas import Protocol
 from app.ai.optimizer.signal_adapter import (
+    _FALLBACK_AAVE_USDC_APY,
     _FALLBACK_LIDO_APY,
     _FALLBACK_PEG_DEVIATION,
     _FALLBACK_PENDLE_MATURITY_DAYS,
     _FALLBACK_PENDLE_PT_APY,
     _FALLBACK_PENDLE_YT_APY,
+    AaveSignalAdapter,
     LidoSignalAdapter,
     PendleSignalAdapter,
 )
@@ -462,3 +464,94 @@ class TestRiskModeWeight:
         """_RISK_WEIGHT の各値が Decimal 型であること。"""
         for mode, weight in _RISK_WEIGHT.items():
             assert isinstance(weight, Decimal), f"risk_mode={mode}: weight is not Decimal"
+
+
+# --------------------------------------------------------------------------- #
+# AaveSignalAdapter / score_aave_async テスト（M3 解消 / #625 フォローアップ）
+# --------------------------------------------------------------------------- #
+class TestAaveSignalAdapter:
+    """AaveSignalAdapter の実 APY 取得・フォールバック・例外時の検証。"""
+
+    @pytest.mark.asyncio
+    async def test_returns_real_supply_apy(self) -> None:
+        """fetcher が supply_apy を返す場合はその値を返すこと。"""
+
+        def fake_fetcher(asset_symbol: str) -> dict[str, object]:
+            return {
+                "utilization_rate": Decimal("50"),
+                "supply_apy": Decimal("6.3"),
+                "borrow_apy": Decimal("8.0"),
+                "health_factor": None,
+            }
+
+        adapter = AaveSignalAdapter(fetcher=fake_fetcher)
+        apy = await adapter.get_supply_apy()
+        assert apy == Decimal("6.3")
+
+    @pytest.mark.asyncio
+    async def test_falls_back_when_supply_apy_none(self) -> None:
+        """fetcher が supply_apy=None を返す場合はフォールバック定数を返すこと。"""
+
+        def fake_fetcher(asset_symbol: str) -> dict[str, object]:
+            return {
+                "utilization_rate": None,
+                "supply_apy": None,
+                "borrow_apy": None,
+                "health_factor": None,
+            }
+
+        adapter = AaveSignalAdapter(fetcher=fake_fetcher)
+        apy = await adapter.get_supply_apy()
+        assert apy == _FALLBACK_AAVE_USDC_APY
+
+    @pytest.mark.asyncio
+    async def test_falls_back_when_fetcher_raises(self) -> None:
+        """fetcher が例外を投げても握りつぶしフォールバック定数を返すこと（fail-open）。"""
+
+        def boom(asset_symbol: str) -> dict[str, object]:
+            raise RuntimeError("rpc down")
+
+        adapter = AaveSignalAdapter(fetcher=boom)
+        apy = await adapter.get_supply_apy()
+        assert apy == _FALLBACK_AAVE_USDC_APY
+
+    @pytest.mark.asyncio
+    async def test_score_aave_async_uses_adapter(self) -> None:
+        """score_aave_async が adapter 注入時に実 APY を反映すること。"""
+
+        def fake_fetcher(asset_symbol: str) -> dict[str, object]:
+            return {
+                "utilization_rate": None,
+                "supply_apy": Decimal("7.1"),
+                "borrow_apy": None,
+                "health_factor": None,
+            }
+
+        scorer = StrategyScorer(aave_adapter=AaveSignalAdapter(fetcher=fake_fetcher))
+        aave = await scorer.score_aave_async()
+        assert aave.protocol == Protocol.AAVE
+        assert aave.expected_apy == Decimal("7.1")
+
+    @pytest.mark.asyncio
+    async def test_score_aave_async_without_adapter_uses_dummy(self) -> None:
+        """aave_adapter 未注入なら従来のダミー定数を継続使用すること（後方互換）。"""
+        scorer = StrategyScorer()
+        aave = await scorer.score_aave_async()
+        assert aave.expected_apy == StrategyScorer.AAVE_USDC_APY
+
+    @pytest.mark.asyncio
+    async def test_m3_symmetry_aave_real_apy_in_ranking(self) -> None:
+        """M3: aave_adapter 注入時 get_all_candidates_async の Aave が実 APY を反映すること。"""
+
+        def fake_fetcher(asset_symbol: str) -> dict[str, object]:
+            return {
+                "utilization_rate": None,
+                "supply_apy": Decimal("9.9"),
+                "borrow_apy": None,
+                "health_factor": None,
+            }
+
+        scorer = StrategyScorer(aave_adapter=AaveSignalAdapter(fetcher=fake_fetcher))
+        candidates = await scorer.get_all_candidates_async()
+        aave = next(c for c in candidates if c.protocol == Protocol.AAVE)
+        assert aave.expected_apy == Decimal("9.9")

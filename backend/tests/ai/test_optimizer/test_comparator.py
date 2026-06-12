@@ -72,6 +72,63 @@ class TestCompare:
             assert isinstance(candidate.risk_adjusted_yield, Decimal)
 
 
+class TestCompareAsync:
+    """compare_async メソッドのテスト（#625 M2/M3 live 配線）。"""
+
+    @pytest.mark.asyncio
+    async def test_compare_async_returns_all_candidates(
+        self, comparator: StrategyComparator
+    ) -> None:
+        """compare_async が全5候補を含む StrategyComparison を返すこと（adapter なし）。"""
+        result = await comparator.compare_async(Decimal("10000"))
+        assert len(result.candidates) == 5
+        assert result.recommended.rank == 1
+
+    @pytest.mark.asyncio
+    async def test_compare_async_matches_sync_without_adapters(
+        self, comparator: StrategyComparator
+    ) -> None:
+        """adapter 未注入なら compare() と compare_async() の数値が一致すること（後方互換）。"""
+        sync_result = comparator.compare(Decimal("10000"), risk_mode="balanced")
+        async_result = await comparator.compare_async(Decimal("10000"), risk_mode="balanced")
+        sync_map = {c.protocol.value: c.expected_net_benefit for c in sync_result.candidates}
+        async_map = {c.protocol.value: c.expected_net_benefit for c in async_result.candidates}
+        assert sync_map == async_map
+
+    @pytest.mark.asyncio
+    async def test_compare_async_reflects_injected_aave_apy(self) -> None:
+        """aave_adapter 注入時、compare_async の Aave 候補が実 APY を反映すること（M3）。"""
+        from app.ai.optimizer.signal_adapter import AaveSignalAdapter
+
+        def fake_fetcher(asset_symbol: str) -> dict[str, object]:
+            return {
+                "utilization_rate": None,
+                "supply_apy": Decimal("12.0"),
+                "borrow_apy": None,
+                "health_factor": None,
+            }
+
+        scorer = StrategyScorer(aave_adapter=AaveSignalAdapter(fetcher=fake_fetcher))
+        comparator = StrategyComparator(scorer=scorer)
+        # 実 APY を反映した async 経路
+        async_result = await comparator.compare_async(Decimal("10000"), risk_mode="balanced")
+        async_aave = next(c for c in async_result.candidates if c.protocol.value == "aave")
+        # ダミー APY (4.5) を使う sync 経路と比較し、実 APY (12.0) の方が利益が大きいこと
+        sync_result = comparator.compare(Decimal("10000"), risk_mode="balanced")
+        sync_aave = next(c for c in sync_result.candidates if c.protocol.value == "aave")
+        assert async_aave.expected_net_benefit > sync_aave.expected_net_benefit
+
+    @pytest.mark.asyncio
+    async def test_compare_async_risk_mode_propagates(self) -> None:
+        """compare_async でも risk_mode がランキングへ伝播すること（M1 + async）。"""
+        comparator = StrategyComparator()
+        conservative = await comparator.compare_async(Decimal("10000"), risk_mode="conservative")
+        aggressive = await comparator.compare_async(Decimal("10000"), risk_mode="aggressive")
+        c_yt = next(c for c in conservative.candidates if c.protocol.value == "pendle_yt")
+        a_yt = next(c for c in aggressive.candidates if c.protocol.value == "pendle_yt")
+        assert c_yt.expected_net_benefit < a_yt.expected_net_benefit
+
+
 class TestGenerateReport:
     """generate_report メソッドのテスト。"""
 
