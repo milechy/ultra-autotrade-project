@@ -206,6 +206,30 @@ class TestAIDecisionsAPI:
         data = r.json()
         assert all(item["confidence"] >= 80 for item in data["items"])
 
+    def test_list_decisions_viewer_allowed(self, client: TestClient) -> None:
+        """viewer ロールで GET /api/ai/decisions が 200 を返すことを確認 (liff-history 403 解消)。"""
+        admin_token = get_admin_token(client)
+        client.post(
+            "/users",
+            json={
+                "email": "viewer2@test.com",
+                "username": "viewer2",
+                "password": "viewerpassword456",
+                "role": "viewer",
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        r = client.post(
+            "/auth/login", json={"email": "viewer2@test.com", "password": "viewerpassword456"}
+        )
+        viewer_token = r.json()["access_token"]
+        r = client.get(
+            "/api/ai/decisions",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert r.status_code == 200
+        assert "items" in r.json()
+
     def test_filter_by_agreed(self, client: TestClient) -> None:
         token = get_admin_token(client)
         client.post(

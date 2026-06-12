@@ -42,7 +42,7 @@ def list_decisions(
     agreed: Optional[bool] = None,
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
-    current_user: User = Depends(require_editor),
+    current_user: User = Depends(require_viewer),
     db: Session = Depends(get_db),
 ) -> AIDecisionListResponse:
     """判定履歴リストを返す（ページネーション・フィルタ付き）。"""
