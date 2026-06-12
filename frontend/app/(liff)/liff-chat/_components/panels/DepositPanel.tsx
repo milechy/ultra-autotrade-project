@@ -174,8 +174,9 @@ export function DepositPanel() {
       }
     } finally {
       setIsFunding(false)
+      void fetchBalance()
     }
-  }, [address, chainId, depositAmount, fundWallet])
+  }, [address, chainId, depositAmount, fetchBalance, fundWallet])
 
   // ---- 出金可能額上限（全額ボタン用） ----------------------------------------
 
