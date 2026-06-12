@@ -2,6 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { RiskProfile } from './types'
@@ -14,10 +15,11 @@ interface RiskModeSelectorProps {
 }
 
 export function RiskModeSelector({ profiles, current, onSelect, className }: RiskModeSelectorProps) {
+  const t = useTranslations('RiskModeSelector')
   return (
     <Card className={className}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">リスクモード</CardTitle>
+        <CardTitle className="text-base">{t('title')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-3">
@@ -40,7 +42,7 @@ export function RiskModeSelector({ profiles, current, onSelect, className }: Ris
                       {profile.name_ja}
                     </p>
                     <span className="text-sm text-muted-foreground">
-                      最大借入 {profile.max_borrow_pct}%
+                      {t('maxBorrow', { pct: profile.max_borrow_pct })}
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground">{profile.description}</p>
@@ -55,7 +57,7 @@ export function RiskModeSelector({ profiles, current, onSelect, className }: Ris
                     ))}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    最低健全度: {profile.min_health_factor}
+                    {t('minHealthFactor', { hf: profile.min_health_factor })}
                   </p>
                 </div>
               </button>

@@ -2,10 +2,13 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { AlertTriangle, Copy, Check, Loader2 } from "lucide-react"
+import { AlertTriangle, Loader2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useLanguage } from "@/lib/useLanguage"
 import { liffFetch } from "@/lib/liff/liff-fetch"
+import { useFundWallet } from "@privy-io/react-auth"
+import { base, baseSepolia } from "wagmi/chains"
+import { useWallet } from "@/hooks/useWallet"
 import { MoonPayWidget } from "./MoonPayWidget"
 
 // ---- 型定義 ---------------------------------------------------------------
@@ -93,6 +96,9 @@ export function DepositPanel() {
   const { language } = useLanguage()
   const [tab, setTab] = useState<Tab>("deposit")
 
+  // Privy ウォレット情報（useFundWallet 用）
+  const { address, chainId } = useWallet()
+
   // 残高・ウォレット
   const [balance, setBalance] = useState<number | null>(null)
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
@@ -100,10 +106,8 @@ export function DepositPanel() {
 
   // 入金フォーム（金額は送金目安の表示用）
   const [depositAmount, setDepositAmount] = useState("")
-  // 入金用アドレスを表示中か
-  const [showDepositAddress, setShowDepositAddress] = useState(false)
-  // アドレスコピー状態
-  const [copied, setCopied] = useState(false)
+  // Privy fundWallet 処理中フラグ
+  const [isFunding, setIsFunding] = useState(false)
 
   // 出金フォーム
   const [withdrawAmount, setWithdrawAmount] = useState("")
@@ -142,6 +146,38 @@ export function DepositPanel() {
     void fetchBalance()
   }, [fetchBalance])
 
+  // ---- Privy fundWallet --------------------------------------------------
+
+  const { fundWallet } = useFundWallet({
+    onUserExited: () => {
+      setIsFunding(false)
+      void fetchBalance()
+    },
+  })
+
+  const handleFundWallet = useCallback(async () => {
+    if (!address) return
+    setIsFunding(true)
+    try {
+      await fundWallet({
+        address,
+        options: {
+          chain: chainId === 84532 ? baseSepolia : base,
+          amount: depositAmount || "200",
+          asset: "USDC",
+        },
+      })
+    } catch (e) {
+      if (e instanceof Error && !e.message.toLowerCase().includes("exit")) {
+        // ユーザーキャンセル以外のエラーはコンソールに記録（UI は onUserExited で復旧）
+        console.error("[DepositPanel] fundWallet error:", e.message)
+      }
+    } finally {
+      setIsFunding(false)
+      void fetchBalance()
+    }
+  }, [address, chainId, depositAmount, fetchBalance, fundWallet])
+
   // ---- 出金可能額上限（全額ボタン用） ----------------------------------------
 
   const maxWithdraw = balance ?? 0
@@ -159,22 +195,7 @@ export function DepositPanel() {
     setConfirmOpen(false)
     setConfirmError(null)
     setSuccessMsg(null)
-    setShowDepositAddress(false)
-    setCopied(false)
   }
-
-  // ---- 入金用アドレスのコピー -----------------------------------------------
-
-  const handleCopyAddress = useCallback(async () => {
-    if (!walletAddress) return
-    try {
-      await navigator.clipboard.writeText(walletAddress)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // clipboard 非対応環境では無視（アドレスは画面に表示済み）
-    }
-  }, [walletAddress])
 
   // ---- 出金確認シート -------------------------------------------------------
 
@@ -318,57 +339,17 @@ export function DepositPanel() {
             <MoonPayWidget />
           )}
 
-          {/* 入金用アドレス表示（入金するボタン押下後） */}
-          {showDepositAddress && (
-            walletAddress ? (
-              <div className="bg-[#1a3d2e] border border-[#1D9E75] rounded-xl px-4 py-4 space-y-3">
-                <p className="text-xs text-zinc-400">{t("depositAddressLabel")}</p>
-                <p className="text-xs font-mono text-zinc-100 break-all leading-relaxed">
-                  {walletAddress}
-                </p>
-                <button
-                  onClick={() => { void handleCopyAddress() }}
-                  className="flex items-center gap-2 w-full justify-center bg-[#1D9E75] hover:bg-[#1a8f6a]
-                             text-white font-semibold py-3 rounded-xl transition-colors"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      {t("depositAddressCopied")}
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      {t("depositAddressCopyBtn")}
-                    </>
-                  )}
-                </button>
-                <p className="text-xs text-zinc-500">
-                  {t("depositAddressNote")}
-                </p>
-              </div>
-            ) : (
-              <div className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-4">
-                <p className="text-sm text-zinc-400 text-center">
-                  {t("depositNoWallet")}
-                </p>
-              </div>
-            )
-          )}
-
-          {/* 入金ボタン（アドレス表示をトグル） */}
-          {!showDepositAddress && (
-            <button
-              onClick={() => {
-                setSuccessMsg(null)
-                setShowDepositAddress(true)
-              }}
-              className="w-full bg-[#1D9E75] hover:bg-[#1a8f6a]
-                         text-white font-semibold py-3 rounded-xl transition-colors"
-            >
-              {t("depositBtn")}
-            </button>
-          )}
+          {/* 入金ボタン（Privy fundWallet モーダルを開く） */}
+          <button
+            onClick={() => { void handleFundWallet() }}
+            disabled={!address || isFunding}
+            className="w-full flex items-center justify-center gap-2 bg-[#1D9E75] hover:bg-[#1a8f6a]
+                       disabled:opacity-40 disabled:cursor-not-allowed
+                       text-white font-semibold py-3 rounded-xl transition-colors"
+          >
+            {isFunding && <Loader2 className="w-4 h-4 animate-spin" />}
+            {t("depositBtn")}
+          </button>
         </div>
       )}
 
