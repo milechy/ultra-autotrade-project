@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Bell, TrendingUp, ShieldAlert, Save, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -90,6 +91,8 @@ function SectionHeader({ icon: Icon, title }: { icon: React.ElementType; title: 
 }
 
 function SettingsPage() {
+  const t = useTranslations('Settings')
+  const tCommon = useTranslations('Common')
   const { token, isAdmin, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const { systemStatus, isStopped, refreshStatus } = useAutomationStatus()
@@ -170,11 +173,11 @@ function SettingsPage() {
       await putJson('/api/user/settings', settings, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      setSuccessMsg('設定を保存しました')
+      setSuccessMsg(t('saveSuccess'))
       setTimeout(() => setSuccessMsg(null), 3000)
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : '保存エラー'
-      setError(`保存失敗: ${msg}`)
+      const msg = e instanceof Error ? e.message : t('saveErrorDefault')
+      setError(t('saveError', { msg }))
     } finally {
       setIsSaving(false)
     }
@@ -191,9 +194,9 @@ function SettingsPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       setSelectedRiskProfile(name)
-      toast.success('リスクモードを保存しました')
+      toast.success(t('riskModeSaved'))
     } catch {
-      toast.error('リスクモードの保存に失敗しました')
+      toast.error(t('riskModeSaveError'))
     }
   }
 
@@ -207,7 +210,7 @@ function SettingsPage() {
       }
       await refreshStatus()
     } catch {
-      toast.error('操作に失敗しました')
+      toast.error(t('operationFailed'))
     }
   }
 
@@ -219,18 +222,18 @@ function SettingsPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       setSettings(prev => ({ ...prev, user_mode: mode }))
-      toast.success('運用モードを変更しました')
+      toast.success(t('modeChanged'))
     } catch {
-      toast.error('モードの変更に失敗しました')
+      toast.error(t('modeChangeFailed'))
     } finally {
       setIsModeChanging(false)
     }
   }
 
   const notificationLevelOptions: { value: NotificationLevel; label: string }[] = [
-    { value: 'all', label: '全て' },
-    { value: 'alert', label: 'ALERT以上' },
-    { value: 'emergency', label: 'EMERGENCYのみ' },
+    { value: 'all', label: t('notifyAllLevel') },
+    { value: 'alert', label: t('notifyAlert') },
+    { value: 'emergency', label: t('notifyEmergencyOnly') },
   ]
 
   if (!isAdmin) return null
@@ -239,7 +242,7 @@ function SettingsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-muted-foreground">
         <RefreshCw className="mb-3 h-8 w-8 animate-spin" />
-        <p className="text-sm">読み込み中...</p>
+        <p className="text-sm">{tCommon('loading')}</p>
       </div>
     )
   }
@@ -248,10 +251,10 @@ function SettingsPage() {
     <div className="min-h-screen bg-background">
       <div className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
         <div className="flex items-center justify-between px-4 py-3">
-          <h1 className="text-lg font-semibold">設定</h1>
+          <h1 className="text-lg font-semibold">{t('title')}</h1>
           <Button size="sm" onClick={handleSave} disabled={isSaving}>
             <Save className="mr-1.5 h-3.5 w-3.5" />
-            {isSaving ? '保存中...' : '保存'}
+            {isSaving ? t('saving') : tCommon('save')}
           </Button>
         </div>
       </div>
@@ -271,17 +274,17 @@ function SettingsPage() {
         {/* 1. 運用モード */}
         <Card className={isStopped ? 'opacity-50 pointer-events-none' : ''}>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">運用モード</CardTitle>
+            <CardTitle className="text-base">{t('operationMode')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* ON/OFFスイッチ */}
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">{isRunning ? '運用中' : '一時停止'}</p>
+                <p className="text-sm font-medium">{isRunning ? t('running_active') : t('paused')}</p>
                 <p className="text-xs text-muted-foreground">
                   {isRunning
-                    ? 'AIによる分析と提案が有効です'
-                    : 'AIによる分析・提案を停止中です。資金はそのまま安全に保持されます。'}
+                    ? t('runningDesc')
+                    : t('pausedDesc')}
                 </p>
               </div>
               <Toggle
@@ -292,7 +295,7 @@ function SettingsPage() {
 
             {/* フルオート/セミオート/マニュアル */}
             <div className="pt-2 border-t">
-              <p className="text-xs text-muted-foreground mb-3">実行ポリシー</p>
+              <p className="text-xs text-muted-foreground mb-3">{t('executionPolicy')}</p>
               <OperationModeSelector
                 currentMode={settings.user_mode}
                 onModeChange={(mode) => { void handleModeChange(mode) }}
@@ -305,8 +308,8 @@ function SettingsPage() {
         {/* 2. リスクモード */}
         <Card>
           <CardHeader className="pb-3">
-            <SectionHeader icon={ShieldAlert} title="リスクモード" />
-            <CardTitle className="text-base">リスクモード選択</CardTitle>
+            <SectionHeader icon={ShieldAlert} title={t('riskMode')} />
+            <CardTitle className="text-base">{t('riskModeSelect')}</CardTitle>
           </CardHeader>
           <CardContent>
             {riskProfileLoading ? (
@@ -322,7 +325,7 @@ function SettingsPage() {
                 onSelect={(name) => { void handleRiskModeSelect(name) }}
               />
             ) : (
-              <p className="text-sm text-muted-foreground">リスクプロファイルを取得できませんでした</p>
+              <p className="text-sm text-muted-foreground">{t('riskProfileError')}</p>
             )}
           </CardContent>
         </Card>
@@ -330,14 +333,14 @@ function SettingsPage() {
         {/* 3. 通知設定 */}
         <Card>
           <CardHeader className="pb-3">
-            <SectionHeader icon={Bell} title="通知設定" />
-            <CardTitle className="text-base">通知</CardTitle>
+            <SectionHeader icon={Bell} title={t('notifications')} />
+            <CardTitle className="text-base">{t('notificationTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">Slack通知</p>
-                <p className="text-xs text-muted-foreground">取引・アラートをSlackに送信</p>
+                <p className="text-sm font-medium">{t('slackNotification')}</p>
+                <p className="text-xs text-muted-foreground">{t('slackNotificationDesc')}</p>
               </div>
               <Toggle
                 checked={settings.slack_enabled}
@@ -346,8 +349,8 @@ function SettingsPage() {
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">LINE通知</p>
-                <p className="text-xs text-muted-foreground">取引・アラートをLINEに送信</p>
+                <p className="text-sm font-medium">{t('lineNotification')}</p>
+                <p className="text-xs text-muted-foreground">{t('lineNotificationDesc')}</p>
               </div>
               <Toggle
                 checked={settings.line_enabled}
@@ -355,7 +358,7 @@ function SettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-medium">通知レベル</p>
+              <p className="text-sm font-medium">{t('notificationLevel')}</p>
               <div className="flex gap-2 flex-wrap">
                 {notificationLevelOptions.map(opt => (
                   <button
@@ -378,13 +381,13 @@ function SettingsPage() {
         {/* 4. リスク管理 — admin のみ表示 */}
         {isAdmin && <Card>
           <CardHeader className="pb-3">
-            <SectionHeader icon={ShieldAlert} title="リスク管理" />
-            <CardTitle className="text-base">リスク</CardTitle>
+            <SectionHeader icon={ShieldAlert} title={t('riskManagement')} />
+            <CardTitle className="text-base">{t('riskTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">最大ポジション (%)</label>
-              <p className="text-xs text-muted-foreground">総資産に対する1回あたりの最大取引割合</p>
+              <label className="text-sm font-medium">{t('maxPositionPct')}</label>
+              <p className="text-xs text-muted-foreground">{t('maxPositionPctDesc')}</p>
               <Input
                 type="number"
                 min={1}
@@ -396,7 +399,7 @@ function SettingsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">1日の最大取引数</label>
+              <label className="text-sm font-medium">{t('maxDailyTrades')}</label>
               <Input
                 type="number"
                 min={1}
@@ -407,8 +410,8 @@ function SettingsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Health Factor 下限</label>
-              <p className="text-xs text-muted-foreground">この値を下回ると自動的に取引を停止します</p>
+              <label className="text-sm font-medium">{t('hfThreshold')}</label>
+              <p className="text-xs text-muted-foreground">{t('hfThresholdDesc')}</p>
               <Input
                 type="number"
                 min={1.0}
@@ -425,14 +428,14 @@ function SettingsPage() {
         {/* 5. 取引設定 — admin のみ表示 */}
         {isAdmin && <Card>
           <CardHeader className="pb-3">
-            <SectionHeader icon={TrendingUp} title="取引設定" />
-            <CardTitle className="text-base">取引</CardTitle>
+            <SectionHeader icon={TrendingUp} title={t('tradingSettings')} />
+            <CardTitle className="text-base">{t('tradingTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Shadow Mode</p>
-                <p className="text-xs text-muted-foreground">ONにすると実際の注文は発生しません</p>
+                <p className="text-xs text-muted-foreground">{t('shadowModeDesc')}</p>
               </div>
               <Toggle
                 checked={settings.shadow_mode}
@@ -441,16 +444,16 @@ function SettingsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">取引ペア</label>
+              <label className="text-sm font-medium">{t('tradingPair')}</label>
               <Input
                 value={settings.exchange_symbol}
                 onChange={e => set('exchange_symbol', e.target.value)}
-                placeholder="例: BTC/USDT"
+                placeholder={t('tradingPairPlaceholder')}
                 disabled={!isAdmin}
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">レバレッジ</label>
+              <label className="text-sm font-medium">{t('leverage')}</label>
               <Input
                 type="number"
                 min={1}
@@ -465,10 +468,10 @@ function SettingsPage() {
             <div className="flex items-center justify-between p-4 border rounded-lg opacity-60">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">Bot売買</span>
+                  <span className="font-medium">{t('botTrading')}</span>
                   <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">Coming Soon</span>
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">Phase 2で対応予定</p>
+                <p className="text-sm text-muted-foreground mt-1">{t('comingSoonDesc')}</p>
               </div>
               <input type="checkbox" disabled checked={false} className="w-5 h-5 cursor-not-allowed" />
             </div>
@@ -485,7 +488,7 @@ function SettingsPage() {
 
         <Button className="w-full" onClick={handleSave} disabled={isSaving}>
           <Save className="mr-2 h-4 w-4" />
-          {isSaving ? '保存中...' : '設定を保存'}
+          {isSaving ? t('saving') : t('save')}
         </Button>
       </div>
     </div>

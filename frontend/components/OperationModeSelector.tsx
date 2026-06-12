@@ -2,37 +2,33 @@
 // Unauthorized copying or distribution is strictly prohibited.
 'use client'
 
+import { useTranslations } from 'next-intl'
+
 type UserMode = 'managed' | 'active' | 'pro'
 
-const MODE_OPTIONS: {
-  value: UserMode
-  label: string
-  description: string
-  borderColor: string
-  ringColor: string
-}[] = [
+const MODE_OPTIONS = [
   {
-    value: 'managed',
-    label: 'フルオート',
-    description: 'AIが全自動で判断・実行。初心者向け。',
+    value: 'managed' as UserMode,
+    labelKey: 'managedLabel',
+    descKey: 'managedDesc',
     borderColor: 'border-green-600 bg-green-950/40',
     ringColor: 'ring-2 ring-green-500',
   },
   {
-    value: 'active',
-    label: 'セミオート',
-    description: 'AIが提案→ユーザーが承認→実行。中級者向け。',
+    value: 'active' as UserMode,
+    labelKey: 'activeLabel',
+    descKey: 'activeDesc',
     borderColor: 'border-yellow-600 bg-yellow-950/40',
     ringColor: 'ring-2 ring-yellow-500',
   },
   {
-    value: 'pro',
-    label: 'マニュアル',
-    description: 'AIが提案→手動判断。上級者向け。',
+    value: 'pro' as UserMode,
+    labelKey: 'proLabel',
+    descKey: 'proDesc',
     borderColor: 'border-blue-600 bg-blue-950/40',
     ringColor: 'ring-2 ring-blue-500',
   },
-]
+] as const
 
 interface OperationModeSelectorProps {
   currentMode: string
@@ -45,6 +41,8 @@ export function OperationModeSelector({
   onModeChange,
   disabled = false,
 }: OperationModeSelectorProps) {
+  const t = useTranslations('OperationMode')
+
   return (
     <div className="space-y-2" data-testid="mode-selector">
       {MODE_OPTIONS.map((option) => (
@@ -60,8 +58,8 @@ export function OperationModeSelector({
               : 'opacity-60 hover:opacity-90'
           } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
         >
-          <p className="text-sm font-medium text-zinc-100">{option.label}</p>
-          <p className="text-xs text-zinc-400 mt-0.5">{option.description}</p>
+          <p className="text-sm font-medium text-zinc-100">{t(option.labelKey)}</p>
+          <p className="text-xs text-zinc-400 mt-0.5">{t(option.descKey)}</p>
         </button>
       ))}
     </div>
