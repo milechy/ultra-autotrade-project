@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
@@ -19,6 +20,7 @@ const TRANSPARENCY_BASE = '/api/transparency'
 function MonthlyReportDownloadButton() {
   const { token } = useAuth()
   const [downloading, setDownloading] = useState(false)
+  const t = useTranslations('Performance')
 
   if (!token) return null
 
@@ -58,12 +60,13 @@ function MonthlyReportDownloadButton() {
       disabled={downloading}
       className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      {downloading ? '取得中…' : '月次レポートDL'}
+      {downloading ? t('downloading') : t('downloadButton')}
     </button>
   )
 }
 
 function WinRateBar({ rate }: { rate: number }) {
+  const t = useTranslations('Performance')
   const color = rate >= 70 ? 'bg-green-500' : rate >= 50 ? 'bg-yellow-500' : 'bg-red-500'
   const textColor =
     rate >= 70
@@ -74,7 +77,7 @@ function WinRateBar({ rate }: { rate: number }) {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">勝率</span>
+        <span className="text-sm text-muted-foreground">{t('winRateTitle')}</span>
         <span className={`text-lg font-bold ${textColor}`}>{rate.toFixed(1)}%</span>
       </div>
       <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
@@ -90,6 +93,7 @@ function PerformanceContent() {
   const [totalPnlJpy, setTotalPnlJpy] = useState<number | null>(null)
   const [totalPnlUsdc] = useState<number>(0)
   const [loading, setLoading] = useState(true)
+  const t = useTranslations('Performance')
 
   useEffect(() => {
     Promise.all([
@@ -122,12 +126,13 @@ function PerformanceContent() {
 
   if (!perf) {
     return (
-      <p className="text-center text-muted-foreground py-12">データを取得できませんでした</p>
+      <p className="text-center text-muted-foreground py-12">{t('noData')}</p>
     )
   }
 
   const gainJpy = perf.total_gain_jpy ?? 0
   const gainPositive = gainJpy >= 0
+  const gainSign = gainPositive ? '+' : ''
 
   return (
     <div className="space-y-4">
@@ -135,27 +140,29 @@ function PerformanceContent() {
       <div className="grid grid-cols-2 gap-3">
         <Card>
           <CardHeader className="pb-1 pt-3 px-3">
-            <CardTitle className="text-xs text-muted-foreground">勝率（{perf.period_days}日）</CardTitle>
+            <CardTitle className="text-xs text-muted-foreground">
+              {t('winRateLabel', { days: perf.period_days })}
+            </CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3">
             <p className="text-2xl font-bold">{Number(perf.win_rate ?? 0).toFixed(1)}%</p>
             <p className="text-xs text-muted-foreground">
-              {perf.total_proposals}回提案 / {perf.positive_results}回プラス
+              {t('proposalsSummary', { total: perf.total_proposals, positive: perf.positive_results })}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-1 pt-3 px-3">
-            <CardTitle className="text-xs text-muted-foreground">累計損益</CardTitle>
+            <CardTitle className="text-xs text-muted-foreground">{t('cumulativePnlLabel')}</CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3">
             <p className={`text-2xl font-bold ${gainPositive ? 'text-green-600' : 'text-red-600'}`}>
-              {gainPositive ? '+' : ''}¥{Number(gainJpy).toLocaleString('ja-JP')}
+              {gainSign}¥{Number(gainJpy).toLocaleString('ja-JP')}
             </p>
             {totalPnlJpy !== null && (
               <p className="text-xs text-muted-foreground">
-                ≈ {formatJPY(totalPnlJpy)} (USDC換算)
+                {t('usdcConversionLabel', { value: formatJPY(totalPnlJpy) })}
               </p>
             )}
           </CardContent>
@@ -167,7 +174,7 @@ function PerformanceContent() {
         <CardContent className="pt-4">
           <WinRateBar rate={Number(perf.win_rate ?? 0)} />
           <p className="text-xs text-muted-foreground mt-3">
-            平均損益: {gainPositive ? '+' : ''}¥{Number(perf.avg_gain_per_trade_jpy ?? 0).toLocaleString('ja-JP')} / 回
+            {t('avgGainLabel', { sign: gainSign, value: Number(perf.avg_gain_per_trade_jpy ?? 0).toLocaleString('ja-JP') })}
           </p>
         </CardContent>
       </Card>
@@ -176,7 +183,7 @@ function PerformanceContent() {
       {monthly.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">月次損益</CardTitle>
+            <CardTitle className="text-base">{t('monthlyPnlTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <PerformanceBarChart monthly={monthly} />
@@ -185,19 +192,20 @@ function PerformanceContent() {
       )}
 
       <p className="text-xs text-muted-foreground text-center">
-        ※ 実績は将来の結果を保証しません
+        {t('disclaimer')}
       </p>
     </div>
   )
 }
 
 export default function PerformancePage() {
+  const t = useTranslations('Performance')
   return (
     <main className="px-4 py-6 max-w-md mx-auto">
       <div className="mb-4 flex items-start justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold">パフォーマンス</h1>
-          <p className="text-xs text-muted-foreground mt-1">AI提案の実績サマリー</p>
+          <h1 className="text-2xl font-bold">{t('pageTitle')}</h1>
+          <p className="text-xs text-muted-foreground mt-1">{t('pageSubtitle')}</p>
         </div>
         <MonthlyReportDownloadButton />
       </div>
