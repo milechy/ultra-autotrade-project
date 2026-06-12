@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -48,7 +49,7 @@ _TIER_FEE_RATES = [Decimal("0.30"), Decimal("0.25"), Decimal("0.20")]
 
 
 @pytest.fixture()
-def db_session() -> Session:
+def db_session() -> Generator[Session, None, None]:
     """SQLite in-memory テスト DB セッション（test_proposals_fee_wiring.py のパターンを踏襲）。"""
     fd, path = tempfile.mkstemp(suffix=".db")
     engine = create_engine(f"sqlite:///{path}", connect_args={"check_same_thread": False})
