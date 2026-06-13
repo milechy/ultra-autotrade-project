@@ -4,6 +4,7 @@
 
 import dynamic from 'next/dynamic'
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import { apiFetch } from '@/lib/api/client'
 import { useAuth } from '@/lib/auth'
 import AuthGuard from '@/components/AuthGuard'
@@ -64,42 +65,14 @@ interface FinalizeResult {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const TIER_LABELS: Record<string, string> = {
-  LOWER: 'スタンダード',
-  MIDDLE: 'プレミアム',
-  UPPER: 'アルティメット',
-}
-
-const RISK_LABELS: Record<string, string> = {
-  conservative: '保守的',
-  balanced: 'バランス',
-  aggressive: '積極的',
-}
-
 function jpyFmt(v: string | number) {
   const n = typeof v === 'string' ? Number(v) : v
   return `¥${Math.round(n).toLocaleString()}`
 }
 
-function monthFmt(s: string) {
-  const d = new Date(s)
-  return `${d.getFullYear()}年${d.getMonth() + 1}月`
-}
-
 function todayMonthStr() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-}
-
-function buildMonthOptions() {
-  const options: { value: string; label: string }[] = []
-  const now = new Date()
-  for (let i = 0; i < 6; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-    options.push({ value, label: `${d.getFullYear()}年${d.getMonth() + 1}月` })
-  }
-  return options
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +86,7 @@ function UsersTable({
   items: AllUsersFeeItem[]
   onFinalize: () => void
 }) {
+  const t = useTranslations('AdminFeeManagement')
   const [sortKey, setSortKey] = useState<keyof AllUsersFeeItem>('user_id')
   const [sortAsc, setSortAsc] = useState(true)
 
@@ -140,10 +114,24 @@ function UsersTable({
     )
   }
 
+  function tierLabel(tier: string): string {
+    if (tier === 'LOWER') return t('tierLower')
+    if (tier === 'MIDDLE') return t('tierMiddle')
+    if (tier === 'UPPER') return t('tierUpper')
+    return tier
+  }
+
+  function riskLabel(risk: string): string {
+    if (risk === 'conservative') return t('riskConservative')
+    if (risk === 'balanced') return t('riskBalanced')
+    if (risk === 'aggressive') return t('riskAggressive')
+    return risk
+  }
+
   if (items.length === 0) {
     return (
       <p className="text-sm text-zinc-500 text-center py-8">
-        対象月のデータがありません
+        {t('tableNoData')}
       </p>
     )
   }
@@ -151,9 +139,9 @@ function UsersTable({
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs text-zinc-500">{items.length} 件</p>
+        <p className="text-xs text-zinc-500">{t('itemsCount', { count: items.length })}</p>
         <Button size="sm" variant="outline" onClick={onFinalize} className="text-xs h-7">
-          月次 finalize 実行
+          {t('tableFinalizeBtn')}
         </Button>
       </div>
       <div className="overflow-x-auto">
@@ -162,13 +150,13 @@ function UsersTable({
             <tr className="border-b border-zinc-800">
               <th className="text-left">{thBtn('UID', 'user_id')}</th>
               <th className="text-left">{thBtn('Tier', 'tier')}</th>
-              <th className="text-left">{thBtn('リスク', 'risk_mode')}</th>
-              <th className="text-right">{thBtn('入金', 'deposit_jpy')}</th>
-              <th className="text-right">{thBtn('純利益', 'net_profit_jpy')}</th>
-              <th className="text-right">{thBtn('手数料', 'fee_amount_jpy')}</th>
-              <th className="text-right">{thBtn('サブスク', 'subscription_amount_jpy')}</th>
-              <th className="text-right">{thBtn('手取り', 'user_takehome_jpy')}</th>
-              <th className="text-left text-xs text-zinc-500 py-2">確定</th>
+              <th className="text-left">{thBtn(t('thRisk'), 'risk_mode')}</th>
+              <th className="text-right">{thBtn(t('thDeposit'), 'deposit_jpy')}</th>
+              <th className="text-right">{thBtn(t('thNetProfit'), 'net_profit_jpy')}</th>
+              <th className="text-right">{thBtn(t('thFee'), 'fee_amount_jpy')}</th>
+              <th className="text-right">{thBtn(t('thSubscription'), 'subscription_amount_jpy')}</th>
+              <th className="text-right">{thBtn(t('thTakehome'), 'user_takehome_jpy')}</th>
+              <th className="text-left text-xs text-zinc-500 py-2">{t('thFinalized')}</th>
             </tr>
           </thead>
           <tbody>
@@ -178,8 +166,8 @@ function UsersTable({
                 className="border-b border-zinc-800/40 hover:bg-zinc-800/20"
               >
                 <td className="py-2.5 pr-3 text-zinc-300">{item.user_id}</td>
-                <td className="py-2.5 pr-3 text-zinc-400 text-xs">{TIER_LABELS[item.tier] ?? item.tier}</td>
-                <td className="py-2.5 pr-3 text-zinc-400 text-xs">{RISK_LABELS[item.risk_mode] ?? item.risk_mode}</td>
+                <td className="py-2.5 pr-3 text-zinc-400 text-xs">{tierLabel(item.tier)}</td>
+                <td className="py-2.5 pr-3 text-zinc-400 text-xs">{riskLabel(item.risk_mode)}</td>
                 <td className="py-2.5 pr-3 text-right text-zinc-400">{jpyFmt(item.deposit_jpy)}</td>
                 <td className={`py-2.5 pr-3 text-right ${Number(item.net_profit_jpy) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {jpyFmt(item.net_profit_jpy)}
@@ -189,9 +177,9 @@ function UsersTable({
                 <td className="py-2.5 pr-3 text-right text-zinc-100 font-medium">{jpyFmt(item.user_takehome_jpy)}</td>
                 <td className="py-2.5 text-xs">
                   {item.finalized_at ? (
-                    <span className="text-emerald-500">確定済</span>
+                    <span className="text-emerald-500">{t('finalizedYes')}</span>
                   ) : (
-                    <span className="text-zinc-600">未確定</span>
+                    <span className="text-zinc-600">{t('finalizedNo')}</span>
                   )}
                 </td>
               </tr>
@@ -216,10 +204,16 @@ function FinalizeModal({
   token: string
   onClose: () => void
 }) {
+  const t = useTranslations('AdminFeeManagement')
   const [dryRun, setDryRun] = useState(true)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<FinalizeResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  function monthFmt(s: string) {
+    const d = new Date(s)
+    return t('monthYear', { year: d.getFullYear(), month: d.getMonth() + 1 })
+  }
 
   async function run() {
     setLoading(true)
@@ -232,7 +226,7 @@ function FinalizeModal({
       )
       setResult(res)
     } catch {
-      setError('実行に失敗しました')
+      setError(t('modalErrorFail'))
     } finally {
       setLoading(false)
     }
@@ -241,12 +235,12 @@ function FinalizeModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 w-full max-w-sm mx-4">
-        <h3 className="text-base font-semibold text-zinc-100 mb-4">月次 finalize 実行</h3>
+        <h3 className="text-base font-semibold text-zinc-100 mb-4">{t('modalTitle')}</h3>
 
         {!result && (
           <>
             <p className="text-sm text-zinc-400 mb-4">
-              対象月: <span className="text-zinc-200">{monthFmt(month)}</span>
+              {t('modalTargetMonth', { month: monthFmt(month) })}
             </p>
             <label className="flex items-center gap-2 text-sm text-zinc-300 mb-5 cursor-pointer">
               <input
@@ -255,18 +249,18 @@ function FinalizeModal({
                 onChange={(e) => setDryRun(e.target.checked)}
                 className="accent-indigo-500"
               />
-              dry_run（DB 書込なし・計算のみ）
+              {t('modalDryRunLabel')}
             </label>
             {error && <p className="text-xs text-red-400 mb-3">{error}</p>}
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={onClose} className="flex-1">キャンセル</Button>
+              <Button variant="outline" size="sm" onClick={onClose} className="flex-1">{t('modalCancelBtn')}</Button>
               <Button
                 size="sm"
                 onClick={run}
                 disabled={loading}
                 className={`flex-1 ${dryRun ? 'bg-zinc-700 hover:bg-zinc-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}
               >
-                {loading ? '実行中…' : dryRun ? 'dry_run 実行' : '本番実行'}
+                {loading ? t('modalRunningBtn') : dryRun ? t('modalDryRunBtn') : t('modalLiveBtn')}
               </Button>
             </div>
           </>
@@ -276,22 +270,22 @@ function FinalizeModal({
           <>
             <div className="space-y-2 mb-5 text-sm">
               {result.dry_run && (
-                <p className="text-amber-400 text-xs font-medium">dry_run モード（DB 未書込）</p>
+                <p className="text-amber-400 text-xs font-medium">{t('modalDryRunNote')}</p>
               )}
               <div className="grid grid-cols-2 gap-1 text-xs">
-                <span className="text-zinc-500">処理ユーザー</span>
-                <span className="text-zinc-200 text-right">{result.users_processed} 名</span>
-                <span className="text-zinc-500">スキップ（スナップなし）</span>
-                <span className="text-zinc-400 text-right">{result.users_skipped_no_snapshot} 名</span>
-                <span className="text-zinc-500">スキップ（確定済）</span>
-                <span className="text-zinc-400 text-right">{result.users_skipped_already_finalized} 名</span>
-                <span className="text-zinc-500">手数料合計</span>
+                <span className="text-zinc-500">{t('modalUsersProcessed')}</span>
+                <span className="text-zinc-200 text-right">{t('usersCount', { count: result.users_processed })}</span>
+                <span className="text-zinc-500">{t('modalSkippedNoSnap')}</span>
+                <span className="text-zinc-400 text-right">{t('usersCount', { count: result.users_skipped_no_snapshot })}</span>
+                <span className="text-zinc-500">{t('modalSkippedFinalized')}</span>
+                <span className="text-zinc-400 text-right">{t('usersCount', { count: result.users_skipped_already_finalized })}</span>
+                <span className="text-zinc-500">{t('modalFeeTotal')}</span>
                 <span className="text-zinc-200 text-right">{jpyFmt(result.total_fee_jpy)}</span>
-                <span className="text-zinc-500">サブスク合計</span>
+                <span className="text-zinc-500">{t('modalSubsTotal')}</span>
                 <span className="text-zinc-200 text-right">{jpyFmt(result.total_subscription_jpy)}</span>
               </div>
             </div>
-            <Button size="sm" variant="outline" onClick={onClose} className="w-full">閉じる</Button>
+            <Button size="sm" variant="outline" onClick={onClose} className="w-full">{t('modalCloseBtn')}</Button>
           </>
         )}
       </div>
@@ -304,6 +298,7 @@ function FinalizeModal({
 // ---------------------------------------------------------------------------
 
 function IncomeSection({ token }: { token: string }) {
+  const t = useTranslations('AdminFeeManagement')
   const now = new Date()
   const defaultFrom = `${now.getFullYear()}-01-01`
   const defaultTo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
@@ -331,11 +326,11 @@ function IncomeSection({ token }: { token: string }) {
       }
       setChartData([entry])
     } catch {
-      setError('データ取得に失敗しました')
+      setError(t('incomeErrorFetch'))
     } finally {
       setLoading(false)
     }
-  }, [monthFrom, monthTo])
+  }, [monthFrom, monthTo, t])
 
   useEffect(() => {
     void fetchIncome()
@@ -345,7 +340,7 @@ function IncomeSection({ token }: { token: string }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <label className="block text-xs text-zinc-500 mb-1">開始月</label>
+          <label className="block text-xs text-zinc-500 mb-1">{t('incomeLabelFrom')}</label>
           <input
             type="month"
             value={monthFrom.slice(0, 7)}
@@ -354,7 +349,7 @@ function IncomeSection({ token }: { token: string }) {
           />
         </div>
         <div>
-          <label className="block text-xs text-zinc-500 mb-1">終了月</label>
+          <label className="block text-xs text-zinc-500 mb-1">{t('incomeLabelTo')}</label>
           <input
             type="month"
             value={monthTo.slice(0, 7)}
@@ -363,7 +358,7 @@ function IncomeSection({ token }: { token: string }) {
           />
         </div>
         <Button size="sm" variant="outline" onClick={fetchIncome} disabled={loading} className="text-xs h-9">
-          {loading ? '取得中…' : '更新'}
+          {loading ? t('incomeLoadingBtn') : t('incomeRefreshBtn')}
         </Button>
       </div>
 
@@ -373,14 +368,14 @@ function IncomeSection({ token }: { token: string }) {
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: 'サブスク合計', value: jpyFmt(income.subscription_total) },
-              { label: '成果報酬合計', value: jpyFmt(income.fee_total) },
-              { label: '超過利益合計', value: jpyFmt(income.yield_excess_total) },
-              { label: 'UATa 純収益', value: jpyFmt(income.uata_income_total), accent: true },
-            ].map(({ label, value, accent }) => (
-              <Card key={label} className="bg-zinc-900 border-zinc-800">
+              { labelKey: 'incomeSubsTotal' as const, value: jpyFmt(income.subscription_total) },
+              { labelKey: 'incomeFeeTotal' as const, value: jpyFmt(income.fee_total) },
+              { labelKey: 'incomeYieldExcess' as const, value: jpyFmt(income.yield_excess_total) },
+              { labelKey: 'incomeUataNet' as const, value: jpyFmt(income.uata_income_total), accent: true },
+            ].map(({ labelKey, value, accent }) => (
+              <Card key={labelKey} className="bg-zinc-900 border-zinc-800">
                 <CardContent className="pt-4 pb-3 px-4">
-                  <p className="text-xs text-zinc-500 mb-1">{label}</p>
+                  <p className="text-xs text-zinc-500 mb-1">{t(labelKey)}</p>
                   <p className={`text-base font-semibold ${accent ? 'text-indigo-400' : 'text-zinc-100'}`}>{value}</p>
                 </CardContent>
               </Card>
@@ -389,7 +384,7 @@ function IncomeSection({ token }: { token: string }) {
 
           <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-zinc-400">収益内訳</CardTitle>
+              <CardTitle className="text-sm text-zinc-400">{t('incomeChartTitle')}</CardTitle>
             </CardHeader>
             <CardContent>
               <IncomeChartRecharts data={chartData} />
@@ -405,18 +400,30 @@ function IncomeSection({ token }: { token: string }) {
 // Page
 // ---------------------------------------------------------------------------
 
-const MONTH_OPTIONS = buildMonthOptions()
-
 type Tab = 'users' | 'income'
+
+function buildMonthOptions(t: ReturnType<typeof useTranslations<'AdminFeeManagement'>>) {
+  const options: { value: string; label: string }[] = []
+  const now = new Date()
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+    options.push({ value, label: t('monthYear', { year: d.getFullYear(), month: d.getMonth() + 1 }) })
+  }
+  return options
+}
 
 function AdminFeesContent() {
   const { token } = useAuth()
+  const t = useTranslations('AdminFeeManagement')
   const [tab, setTab] = useState<Tab>('users')
   const [month, setMonth] = useState(todayMonthStr())
   const [users, setUsers] = useState<AllUsersFeeItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showFinalize, setShowFinalize] = useState(false)
+
+  const monthOptions = buildMonthOptions(t)
 
   const fetchUsers = useCallback(async () => {
     if (!token) return
@@ -427,11 +434,11 @@ function AdminFeesContent() {
       const data = await apiFetch<AllUsersFeeItem[]>(`/api/v1/fees/all-users?${params.toString()}`)
       setUsers(data)
     } catch {
-      setError('ユーザーデータの取得に失敗しました')
+      setError(t('errorFetchUsers'))
     } finally {
       setLoading(false)
     }
-  }, [token, month])
+  }, [token, month, t])
 
   useEffect(() => {
     if (tab === 'users') void fetchUsers()
@@ -441,19 +448,19 @@ function AdminFeesContent() {
     <div className="min-h-screen bg-zinc-950">
       <div className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
         <div className="px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-zinc-100">手数料管理</h1>
+          <h1 className="text-lg font-semibold text-zinc-100">{t('pageTitle')}</h1>
           <div className="flex gap-1">
-            {(['users', 'income'] as Tab[]).map((t) => (
+            {(['users', 'income'] as Tab[]).map((tabKey) => (
               <button
-                key={t}
-                onClick={() => setTab(t)}
+                key={tabKey}
+                onClick={() => setTab(tabKey)}
                 className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
-                  tab === t
+                  tab === tabKey
                     ? 'bg-zinc-800 text-zinc-100'
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                {t === 'users' ? 'ユーザー別' : 'UATa 収益'}
+                {tabKey === 'users' ? t('tabUsers') : t('tabIncome')}
               </button>
             ))}
           </div>
@@ -464,13 +471,13 @@ function AdminFeesContent() {
         {tab === 'users' && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <label className="text-xs text-zinc-500">対象月</label>
+              <label className="text-xs text-zinc-500">{t('labelTargetMonth')}</label>
               <select
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
                 className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
-                {MONTH_OPTIONS.map((o) => (
+                {monthOptions.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
