@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { fetchExchangeStatus } from "@/lib/api/exchange";
 
 export default function DashboardPage() {
+  const t = useTranslations("AdminDashboard");
   const { token } = useAuth();
-  const [status, setStatus] = useState<string>("読み込み中...");
+  const [status, setStatus] = useState<string>(t("loading"));
   const [hf, setHf] = useState<string>("—");
   const [trades, setTrades] = useState<string>("—");
 
@@ -18,32 +20,32 @@ export default function DashboardPage() {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
-      .then((d) => setStatus(d.is_trading_paused ? "停止中" : "稼働中"))
-      .catch(() => setStatus("取得失敗"));
+      .then((d) => setStatus(d.is_trading_paused ? t("statusStopped") : t("statusRunning")))
+      .catch(() => setStatus(t("fetchFailed")));
 
     fetch("/api/aave/status", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
       .then((d) => setHf(d.health_factor ?? "—"))
-      .catch(() => setHf("取得失敗"));
+      .catch(() => setHf(t("fetchFailed")));
 
     fetchExchangeStatus(token)
-      .then((d) => setTrades(`${d.daily_trades_used ?? 0}件`))
-      .catch(() => setTrades("取得失敗"));
-  }, [token]);
+      .then((d) => setTrades(t("tradeCount", { count: d.daily_trades_used ?? 0 })))
+      .catch(() => setTrades(t("fetchFailed")));
+  }, [token, t]);
 
   return (
     <AuthGuard adminOnly>
       <div style={{ padding: "2rem" }}>
         <h1 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "1.5rem" }}>
-          運用ダッシュボード
+          {t("pageTitle")}
         </h1>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
-          <Card label="システムステータス" value={status} />
-          <Card label="Health Factor" value={hf} />
-          <Card label="本日の取引" value={trades} />
-          <Card label="総AUM" value="$15,000" />
+          <Card label={t("cardSystemStatus")} value={status} />
+          <Card label={t("cardHealthFactor")} value={hf} />
+          <Card label={t("cardDailyTrades")} value={trades} />
+          <Card label={t("cardTotalAum")} value="$15,000" />
         </div>
       </div>
     </AuthGuard>
