@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import { useAuth } from '@/lib/auth'
 import {
   getAIFeedbackByDecision,
@@ -15,13 +16,6 @@ interface FeedbackSectionProps {
 }
 
 type ActualOutcome = 'profit' | 'loss' | 'neutral' | 'unknown'
-
-const OUTCOME_LABELS: Record<ActualOutcome, string> = {
-  profit: '利益',
-  loss: '損失',
-  neutral: '中立',
-  unknown: '不明',
-}
 
 function formatDateTime(iso: string): string {
   try {
@@ -39,6 +33,7 @@ function formatDateTime(iso: string): string {
 }
 
 export function FeedbackSection({ decisionId }: FeedbackSectionProps) {
+  const t = useTranslations('FeedbackSection')
   const { token } = useAuth()
 
   const [feedbacks, setFeedbacks] = useState<AIFeedbackResponse[]>([])
@@ -86,7 +81,7 @@ export function FeedbackSection({ decisionId }: FeedbackSectionProps) {
         pnl_usd: pnlValue,
         improvement_suggestion: suggestion.trim() || undefined,
       })
-      setSuccessMsg('フィードバックを記録しました')
+      setSuccessMsg(t('submitSuccess'))
       // フォームリセット
       setIsCorrect(null)
       setOutcome('unknown')
@@ -98,18 +93,25 @@ export function FeedbackSection({ decisionId }: FeedbackSectionProps) {
       const msg =
         err instanceof Error
           ? err.message
-          : (err as { message?: string })?.message ?? '記録に失敗しました'
+          : (err as { message?: string })?.message ?? t('submitFailed')
       setSubmitError(msg)
     } finally {
       setSubmitting(false)
     }
   }
 
+  const OUTCOME_LABELS: Record<ActualOutcome, string> = {
+    profit: t('outcomeProfit'),
+    loss: t('outcomeLoss'),
+    neutral: t('outcomeNeutral'),
+    unknown: t('outcomeUnknown'),
+  }
+
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-          フィードバック
+          {t('sectionTitle')}
         </span>
         <button
           onClick={() => {
@@ -119,7 +121,7 @@ export function FeedbackSection({ decisionId }: FeedbackSectionProps) {
           }}
           className="text-xs px-2 py-1 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
         >
-          {showForm ? 'キャンセル' : '+ 記録する'}
+          {showForm ? t('cancelButton') : t('recordButton')}
         </button>
       </div>
 
@@ -136,12 +138,12 @@ export function FeedbackSection({ decisionId }: FeedbackSectionProps) {
           {/* 結果（正解/不正解） */}
           <div>
             <label className="text-xs text-gray-600 dark:text-gray-400 block mb-1">
-              結果
+              {t('resultLabel')}
             </label>
             <div className="flex gap-2">
               {[
-                { val: true, label: '正解' },
-                { val: false, label: '不正解' },
+                { val: true, label: t('correct') },
+                { val: false, label: t('incorrect') },
               ].map(({ val, label }) => (
                 <button
                   key={String(val)}
@@ -164,7 +166,7 @@ export function FeedbackSection({ decisionId }: FeedbackSectionProps) {
           {/* 実績 */}
           <div>
             <label className="text-xs text-gray-600 dark:text-gray-400 block mb-1">
-              実績
+              {t('outcomeLabel')}
             </label>
             <select
               value={outcome}
@@ -182,14 +184,14 @@ export function FeedbackSection({ decisionId }: FeedbackSectionProps) {
           {/* 実績損益 USD */}
           <div>
             <label className="text-xs text-gray-600 dark:text-gray-400 block mb-1">
-              実績損益 (USD)（任意）
+              {t('pnlLabel')}
             </label>
             <input
               type="number"
               step="0.01"
               value={pnlInput}
               onChange={(e) => setPnlInput(e.target.value)}
-              placeholder="例: 150.00"
+              placeholder={t('pnlPlaceholder')}
               className="w-full text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 placeholder-gray-400"
             />
           </div>
@@ -197,12 +199,12 @@ export function FeedbackSection({ decisionId }: FeedbackSectionProps) {
           {/* 改善提案 */}
           <div>
             <label className="text-xs text-gray-600 dark:text-gray-400 block mb-1">
-              改善提案（任意）
+              {t('suggestionLabel')}
             </label>
             <textarea
               value={suggestion}
               onChange={(e) => setSuggestion(e.target.value)}
-              placeholder="改善提案を入力..."
+              placeholder={t('suggestionPlaceholder')}
               rows={2}
               maxLength={2000}
               className="w-full text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 placeholder-gray-400 resize-none"
@@ -218,17 +220,17 @@ export function FeedbackSection({ decisionId }: FeedbackSectionProps) {
             disabled={submitting}
             className="w-full py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded transition-colors"
           >
-            {submitting ? '記録中...' : '記録する'}
+            {submitting ? t('submitting') : t('submitButton')}
           </button>
         </form>
       )}
 
       {/* 既存フィードバック一覧 */}
       {loadingFeedbacks ? (
-        <div className="text-xs text-gray-400 dark:text-gray-600 py-2">読み込み中...</div>
+        <div className="text-xs text-gray-400 dark:text-gray-600 py-2">{t('loading')}</div>
       ) : feedbacks.length === 0 ? (
         <div className="text-xs text-gray-400 dark:text-gray-600 py-2">
-          フィードバックはまだありません
+          {t('noFeedback')}
         </div>
       ) : (
         <ul className="space-y-2">
@@ -242,25 +244,25 @@ export function FeedbackSection({ decisionId }: FeedbackSectionProps) {
                   {formatDateTime(fb.recorded_at)}
                 </span>
                 {fb.is_correct === true && (
-                  <span className="text-green-600 dark:text-green-400 font-medium">正解</span>
+                  <span className="text-green-600 dark:text-green-400 font-medium">{t('correct')}</span>
                 )}
                 {fb.is_correct === false && (
-                  <span className="text-red-600 dark:text-red-400 font-medium">不正解</span>
+                  <span className="text-red-600 dark:text-red-400 font-medium">{t('incorrect')}</span>
                 )}
                 <span className="text-gray-600 dark:text-gray-400">
-                  実績: {OUTCOME_LABELS[fb.actual_outcome] ?? fb.actual_outcome}
+                  {t('outcomeDisplay')}: {OUTCOME_LABELS[fb.actual_outcome] ?? fb.actual_outcome}
                 </span>
                 {fb.pnl_usd != null && (
                   <span className="text-gray-600 dark:text-gray-400">
-                    損益: ${Number(fb.pnl_usd).toFixed(2)}
+                    {t('pnlDisplay')}: ${Number(fb.pnl_usd).toFixed(2)}
                   </span>
                 )}
                 <span className="ml-auto text-gray-400 dark:text-gray-600">
                   {fb.feedback_source === 'manual'
-                    ? '手動'
+                    ? t('sourceManual')
                     : fb.feedback_source === 'auto_howl'
-                    ? '自動(HOWL)'
-                    : '自動(実績)'}
+                    ? t('sourceAutoHowl')
+                    : t('sourceAutoOutcome')}
                 </span>
               </div>
               {fb.improvement_suggestion && (

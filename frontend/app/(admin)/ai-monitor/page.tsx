@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { getJson } from "@/lib/api/http";
@@ -163,6 +164,7 @@ export default function AiMonitorPage() {
 const POLL_INTERVAL_SEC = 30;
 
 function AiMonitorContent() {
+  const t = useTranslations("AiMonitor");
   const { token } = useAuth();
   const [records, setRecords] = useState<AiDecisionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -194,12 +196,12 @@ function AiMonitorContent() {
         setLastUpdated(new Date());
         setCountdown(POLL_INTERVAL_SEC);
       } else {
-        setError(`データ取得エラー: ${msg}`);
+        setError(t("fetchError", { msg }));
       }
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [token, t]);
 
   const fetchTrend = useCallback(async () => {
     if (!token) return;
@@ -241,7 +243,7 @@ function AiMonitorContent() {
 
   return (
     <>
-      <title>AI判定モニター - Ultra AutoTrade</title>
+      <title>{t("pageTitle")}</title>
 
       {/* Header */}
       <div style={{
@@ -253,17 +255,17 @@ function AiMonitorContent() {
         gap: 12,
       }}>
         <div>
-          <h1 style={{ margin: 0 }}>AI判定モニター</h1>
+          <h1 style={{ margin: 0 }}>{t("heading")}</h1>
           <p style={{ margin: "4px 0 0", color: "#666", fontSize: 13 }}>
-            マルチLLMによるリアルタイム売買判定の履歴
+            {t("subheading")}
           </p>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           {lastUpdated && (
             <span style={{ fontSize: 12, color: "#888" }}>
-              最終更新: {lastUpdated.toLocaleTimeString("ja-JP")}
-              {" "}（{countdown}秒後に自動更新）
+              {t("lastUpdated", { time: lastUpdated.toLocaleTimeString("ja-JP") })}
+              {" "}（{t("autoRefresh", { countdown })}）
             </span>
           )}
           <button
@@ -271,7 +273,7 @@ function AiMonitorContent() {
             disabled={isLoading}
             style={outlineBtnStyle}
           >
-            {isLoading ? "読み込み中..." : "今すぐ更新"}
+            {isLoading ? t("loading") : t("refreshNow")}
           </button>
         </div>
       </div>
@@ -292,8 +294,8 @@ function AiMonitorContent() {
         }}>
           <span style={{ fontSize: 16 }}>🚧</span>
           <span>
-            <strong>準備中:</strong>{" "}
-            AI判定履歴APIは現在実装中です。以下はサンプルデータです。
+            <strong>{t("preparingLabel")}</strong>{" "}
+            {t("preparingBody")}
           </span>
         </div>
       )}
@@ -307,27 +309,27 @@ function AiMonitorContent() {
       {records.length > 0 && (
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
           <StatCard
-            label="総判定数"
+            label={t("statTotal")}
             value={String(records.length)}
             subColor="#374151"
           />
           <StatCard
-            label="BUY"
+            label={t("statBuy")}
             value={String(records.filter((r) => r.final_decision === "BUY").length)}
             subColor="#16a34a"
           />
           <StatCard
-            label="SELL"
+            label={t("statSell")}
             value={String(records.filter((r) => r.final_decision === "SELL").length)}
             subColor="#dc2626"
           />
           <StatCard
-            label="HOLD"
+            label={t("statHold")}
             value={String(records.filter((r) => r.final_decision === "HOLD").length)}
             subColor="#6b7280"
           />
           <StatCard
-            label="実行済み"
+            label={t("statExecuted")}
             value={String(records.filter((r) => r.executed).length)}
             subColor="#2563eb"
           />
@@ -337,19 +339,19 @@ function AiMonitorContent() {
       {/* Table */}
       <section>
         <h2 style={{ fontSize: 15, marginBottom: 10, marginTop: 0 }}>
-          判定履歴
+          {t("historyHeading")}
           <span style={{ fontWeight: 400, color: "#888", fontSize: 12, marginLeft: 8 }}>
-            全 {records.length} 件
+            {t("historyCount", { count: records.length })}
           </span>
         </h2>
 
         {isLoading && records.length === 0 && (
-          <div style={{ color: "#9ca3af", fontSize: 14, padding: "24px 0" }}>読み込み中...</div>
+          <div style={{ color: "#9ca3af", fontSize: 14, padding: "24px 0" }}>{t("loading")}</div>
         )}
 
         {!isLoading && !error && records.length === 0 && (
           <div style={{ color: "#9ca3af", fontSize: 14, padding: "24px 0" }}>
-            判定履歴がありません。
+            {t("noHistory")}
           </div>
         )}
 
@@ -358,7 +360,15 @@ function AiMonitorContent() {
             <table style={tableStyle}>
               <thead>
                 <tr>
-                  {["時刻", "ペア", "フェーズA判定", "フェーズB判定", "最終判定", "信頼度", "実行済み"].map((h) => (
+                  {[
+                    t("colTime"),
+                    t("colPair"),
+                    t("colPhaseA"),
+                    t("colPhaseB"),
+                    t("colFinal"),
+                    t("colConfidence"),
+                    t("colExecuted"),
+                  ].map((h) => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
@@ -406,7 +416,7 @@ function AiMonitorContent() {
                         background: record.executed ? "#dbeafe" : "#f3f4f6",
                         color: record.executed ? "#1d4ed8" : "#9ca3af",
                       }}>
-                        {record.executed ? "済" : "未"}
+                        {record.executed ? t("executedYes") : t("executedNo")}
                       </span>
                     </td>
                   </tr>
@@ -417,33 +427,33 @@ function AiMonitorContent() {
         )}
 
         <p style={{ marginTop: 10, fontSize: 12, color: "#aaa" }}>
-          ※ 行にカーソルを当てると判断理由が表示されます。
+          {t("hoverHint")}
         </p>
       </section>
 
       {/* Charts section */}
       <section style={{ marginTop: 32 }}>
         <h2 style={{ fontSize: 15, marginBottom: 16, marginTop: 0 }}>
-          トレンド分析
+          {t("trendHeading")}
           {isTrendMock && (
             <span style={{ fontWeight: 400, color: "#f59e0b", fontSize: 11, marginLeft: 8 }}>
-              サンプルデータ
+              {t("sampleData")}
             </span>
           )}
         </h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
           <div style={chartCardStyle}>
-            <h3 style={chartTitleStyle}>信頼度トレンド（直近7日）</h3>
+            <h3 style={chartTitleStyle}>{t("chartConfidence")}</h3>
             <ConfidenceTrendChart data={trendData} />
           </div>
           <div style={chartCardStyle}>
-            <h3 style={chartTitleStyle}>判定アクション分布</h3>
+            <h3 style={chartTitleStyle}>{t("chartActionDist")}</h3>
             <ActionDistributionChart
               data={(records as AiDecisionRecord[]).map((r) => ({ timestamp: r.timestamp, action: r.final_decision } as ActionRecord))}
             />
           </div>
           <div style={chartCardStyle}>
-            <h3 style={chartTitleStyle}>Two-Phase一致率</h3>
+            <h3 style={chartTitleStyle}>{t("chartTwoPhase")}</h3>
             <AccuracyChart
               data={(records as AiDecisionRecord[]).map((r) => ({
                 timestamp: r.timestamp,
