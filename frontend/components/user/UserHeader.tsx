@@ -6,6 +6,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { HelpCircle, ShieldAlert, ShieldOff } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useWallet } from '@/hooks/useWallet'
 import { getChainDisplayName } from '@/lib/web3/config'
 import { useAuth } from '@/lib/auth'
@@ -14,44 +15,45 @@ import { Badge } from '@/components/ui/badge'
 import { postJson } from '@/lib/api/http'
 import { useAutomationStatus } from '@/components/user/UserProviders'
 
-const adminNavItems = [
-  { href: '/user/dashboard', label: 'ダッシュボード' },
-  { href: '/user/ai-feed', label: 'AI判定' },
-  { href: '/user/approve', label: '取引承認' },
-  { href: '/user/history', label: '取引履歴' },
-  { href: '/user/deposit', label: '入金' },
-  { href: '/user/settings', label: '設定' },
-  { href: '/user/grid', label: 'Grid Bot' },
-  { href: '/user/copy-trading', label: 'Copy Trading' },
-  { href: '/user/wallet', label: 'ウォレット' },
-]
-
-// partner (非 admin) が /user/approve 等の user レイアウト画面に居るとき、
-// user 用ナビではなく partner ポータルへの導線を出す。
-const partnerNavItems = [
-  { href: '/partner/dashboard', label: 'ダッシュボード' },
-  { href: '/user/approve', label: '取引承認' },
-  { href: '/partner/users', label: 'テスター管理' },
-  { href: '/partner/referral', label: '紹介プログラム' },
-  { href: '/partner/proposals', label: 'AI提案' },
-  { href: '/partner/settings', label: '設定' },
-]
-
-const viewerNavItems = [
-  { href: '/user/dashboard', label: 'ダッシュボード' },
-  { href: '/user/ai-feed', label: 'AI判定' },
-  { href: '/user/history', label: '取引履歴' },
-]
-
 export function UserHeader() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout, token, isAdmin, isPartner } = useAuth()
+  const t = useTranslations('UserHeader')
   // injected / Privy embedded を統合した単一情報源（useWallet）から取得。
   const { address, chainId } = useWallet()
   const { isStopped, refreshStatus } = useAutomationStatus()
   const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false)
   const [showResumeConfirm, setShowResumeConfirm] = useState(false)
+
+  const adminNavItems = [
+    { href: '/user/dashboard', label: t('adminNav.dashboard') },
+    { href: '/user/ai-feed', label: t('adminNav.aiFeed') },
+    { href: '/user/approve', label: t('adminNav.approve') },
+    { href: '/user/history', label: t('adminNav.history') },
+    { href: '/user/deposit', label: t('adminNav.deposit') },
+    { href: '/user/settings', label: t('adminNav.settings') },
+    { href: '/user/grid', label: t('adminNav.gridBot') },
+    { href: '/user/copy-trading', label: t('adminNav.copyTrading') },
+    { href: '/user/wallet', label: t('adminNav.wallet') },
+  ]
+
+  // partner (非 admin) が /user/approve 等の user レイアウト画面に居るとき、
+  // user 用ナビではなく partner ポータルへの導線を出す。
+  const partnerNavItems = [
+    { href: '/partner/dashboard', label: t('partnerNav.dashboard') },
+    { href: '/user/approve', label: t('partnerNav.approve') },
+    { href: '/partner/users', label: t('partnerNav.users') },
+    { href: '/partner/referral', label: t('partnerNav.referral') },
+    { href: '/partner/proposals', label: t('partnerNav.proposals') },
+    { href: '/partner/settings', label: t('partnerNav.settings') },
+  ]
+
+  const viewerNavItems = [
+    { href: '/user/dashboard', label: t('viewerNav.dashboard') },
+    { href: '/user/ai-feed', label: t('viewerNav.aiFeed') },
+    { href: '/user/history', label: t('viewerNav.history') },
+  ]
 
   const handleLogout = async () => {
     await logout()
@@ -147,8 +149,8 @@ export function UserHeader() {
               <button
                 onClick={() => setShowResumeConfirm(true)}
                 className="flex items-center justify-center h-7 w-7 rounded-full bg-amber-500 hover:bg-amber-400 text-white transition-colors"
-                aria-label="停止解除"
-                title="停止解除"
+                aria-label={t('resumeAriaLabel')}
+                title={t('resumeAriaLabel')}
               >
                 <ShieldOff size={14} />
               </button>
@@ -156,7 +158,7 @@ export function UserHeader() {
               <button
                 onClick={() => setShowEmergencyConfirm(true)}
                 className="flex items-center justify-center h-7 w-7 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground transition-colors"
-                aria-label="緊急停止"
+                aria-label={t('emergencyStopAriaLabel')}
               >
                 <ShieldAlert size={14} />
               </button>
@@ -164,8 +166,8 @@ export function UserHeader() {
             <Link
               href="/user/help"
               className="flex items-center justify-center h-7 w-7 rounded text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="ヘルプ"
-              title="よくある質問"
+              aria-label={t('helpAriaLabel')}
+              title={t('helpTitle')}
             >
               <HelpCircle size={16} />
             </Link>
@@ -174,7 +176,7 @@ export function UserHeader() {
                 onClick={handleLogout}
                 className="text-xs border rounded px-2 py-1 text-muted-foreground hover:text-foreground transition-colors"
               >
-                ログアウト
+                {t('logout')}
               </button>
             )}
           </div>
@@ -186,19 +188,19 @@ export function UserHeader() {
       {showEmergencyConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-sm rounded-xl bg-background border p-6 shadow-xl">
-            <p className="mb-4 text-base font-semibold">本当に全ての運用を停止しますか？</p>
+            <p className="mb-4 text-base font-semibold">{t('confirmStopTitle')}</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowEmergencyConfirm(false)}
                 className="flex-1 rounded border px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                キャンセル
+                {t('cancelButton')}
               </button>
               <button
                 onClick={handleEmergencyStop}
                 className="flex-1 rounded bg-destructive px-3 py-2 text-sm font-bold text-destructive-foreground hover:bg-destructive/90 transition-colors"
               >
-                停止する
+                {t('stopButton')}
               </button>
             </div>
           </div>
@@ -209,22 +211,22 @@ export function UserHeader() {
       {showResumeConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-sm rounded-xl bg-background border p-6 shadow-xl">
-            <p className="mb-2 text-base font-semibold">運用を再開しますか？</p>
+            <p className="mb-2 text-base font-semibold">{t('confirmResumeTitle')}</p>
             <p className="mb-4 text-sm text-amber-600 dark:text-amber-400">
-              注意: Health Factor など自動条件が未改善の場合、再開後に再停止される可能性があります。
+              {t('resumeWarning')}
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowResumeConfirm(false)}
                 className="flex-1 rounded border px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                キャンセル
+                {t('cancelButton')}
               </button>
               <button
                 onClick={handleResume}
                 className="flex-1 rounded bg-amber-500 px-3 py-2 text-sm font-bold text-white hover:bg-amber-400 transition-colors"
               >
-                再開する
+                {t('resumeButton')}
               </button>
             </div>
           </div>

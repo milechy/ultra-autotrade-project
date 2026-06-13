@@ -5,10 +5,12 @@
 import { useState } from 'react'
 import { AlertTriangle, ShieldOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useTranslations } from 'next-intl'
 import { useAuth } from '@/lib/auth'
 import { postJson } from '@/lib/api/http'
 import { useAutomationStatus } from '@/components/user/UserProviders'
 export function EmergencyStopButton() {
+  const t = useTranslations('EmergencyStop')
   const { token } = useAuth()
   const { isStopped, refreshStatus } = useAutomationStatus()
   const [showConfirm, setShowConfirm] = useState(false)
@@ -57,8 +59,8 @@ export function EmergencyStopButton() {
             ? 'bg-amber-500 hover:bg-amber-400'
             : 'bg-destructive hover:bg-destructive/90',
         ].join(' ')}
-        aria-label={isStopped ? '停止解除' : '緊急停止'}
-        title={isStopped ? '停止解除' : '緊急停止'}
+        aria-label={isStopped ? t('floatAriaLabelUnstop') : t('floatAriaLabelStop')}
+        title={isStopped ? t('floatAriaLabelUnstop') : t('floatAriaLabelStop')}
       >
         {isStopped ? (
           <ShieldOff className="h-5 w-5 text-white" />
@@ -71,10 +73,10 @@ export function EmergencyStopButton() {
         <button
           onClick={() => setShowConfirm(true)}
           className="fixed bottom-20 right-[72px] z-50 cursor-pointer"
-          aria-label="停止解除"
+          aria-label={t('floatAriaLabelUnstop')}
         >
           <span className="rounded bg-amber-500 px-2 py-1 text-xs text-white font-medium">
-            停止中 — タップで解除
+            {t('floatStoppedLabel')}
           </span>
         </button>
       )}
@@ -91,12 +93,12 @@ export function EmergencyStopButton() {
                     <ShieldOff className="h-6 w-6 text-amber-500" />
                   </div>
                   <div>
-                    <h2 className="text-base font-semibold">運用を再開しますか？</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">緊急停止を解除します</p>
+                    <h2 className="text-base font-semibold">{t('resumeDialogTitle')}</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t('resumeDialogSubtitle')}</p>
                   </div>
                 </div>
                 <p className="mb-6 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
-                  注意: Health Factor など自動条件が未改善の場合、再開後に再停止される可能性があります。
+                  {t('resumeHealthWarning')}
                 </p>
                 <div className="flex gap-3">
                   <Button
@@ -105,14 +107,14 @@ export function EmergencyStopButton() {
                     onClick={() => setShowConfirm(false)}
                     disabled={isLoading}
                   >
-                    キャンセル
+                    {t('cancelButton')}
                   </Button>
                   <Button
                     className="flex-1 font-bold bg-amber-500 hover:bg-amber-400 text-white"
                     onClick={handleResume}
                     disabled={isLoading}
                   >
-                    {isLoading ? '解除中...' : '再開する'}
+                    {isLoading ? t('resumeLoadingButton') : t('resumeButton')}
                   </Button>
                 </div>
               </>
@@ -124,12 +126,12 @@ export function EmergencyStopButton() {
                     <AlertTriangle className="h-6 w-6 text-destructive" />
                   </div>
                   <div>
-                    <h2 className="text-base font-semibold">本当に全ての運用を停止しますか？</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">同じボタンで解除できます</p>
+                    <h2 className="text-base font-semibold">{t('stopDialogTitle')}</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t('stopDialogSubtitle')}</p>
                   </div>
                 </div>
                 <p className="mb-6 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-                  全ての自動取引が即時停止されます。
+                  {t('stopWarningMsg')}
                 </p>
                 <div className="flex gap-3">
                   <Button
@@ -138,7 +140,7 @@ export function EmergencyStopButton() {
                     onClick={() => setShowConfirm(false)}
                     disabled={isLoading}
                   >
-                    キャンセル
+                    {t('cancelButton')}
                   </Button>
                   <Button
                     variant="destructive"
@@ -146,7 +148,7 @@ export function EmergencyStopButton() {
                     onClick={handleStop}
                     disabled={isLoading}
                   >
-                    {isLoading ? '停止中...' : '停止する'}
+                    {isLoading ? t('stopLoadingButton') : t('floatStopButton')}
                   </Button>
                 </div>
               </>
