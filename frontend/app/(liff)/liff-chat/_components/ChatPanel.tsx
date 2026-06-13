@@ -280,7 +280,7 @@ export function ChatPanel({ onClose }: Props) {
         </div>
 
         {/* サジェストボタン（固定底部）*/}
-        <div className="flex-shrink-0 px-4 pb-6 pt-3 border-t border-zinc-800">
+        <div className="flex-shrink-0 px-4 pt-3 border-t border-zinc-800 ax-safe-bottom">
           <p className="text-zinc-600 text-xs mb-2">{t("suggestLabel")}</p>
           <div className="grid grid-cols-2 gap-2">
             {SUGGEST_CONFIG.map((cfg) => {
