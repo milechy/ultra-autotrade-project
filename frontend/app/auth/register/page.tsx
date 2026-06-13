@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, FormEvent, Suspense } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,6 +20,7 @@ function getReferralCookie(): string {
 }
 
 function RegisterWithReferralForm() {
+  const t = useTranslations('AuthRegister')
   const router = useRouter()
   const searchParams = useSearchParams()
   const refCode = searchParams.get('ref') ?? ''
@@ -44,7 +46,7 @@ function RegisterWithReferralForm() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!consent) {
-      setError('紹介プログラムへの同意が必要です')
+      setError(t('consentRequired'))
       return
     }
     setError(null)
@@ -66,7 +68,7 @@ function RegisterWithReferralForm() {
       const message =
         err && typeof err === 'object' && 'message' in err
           ? String((err as { message: string }).message)
-          : '登録に失敗しました'
+          : t('registrationFailed')
       setError(message)
     } finally {
       setSubmitting(false)
@@ -79,17 +81,17 @@ function RegisterWithReferralForm() {
         <Card className="w-full max-w-sm">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Ultra AutoTrade</CardTitle>
-            <CardDescription>招待コードが必要です</CardDescription>
+            <CardDescription>{t('noCodeCardDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                招待コードが必要です。紹介者から受け取った招待リンク（/r/&lt;code&gt;）からアクセスしてください。
+                {t('noCodeErrorMessage')}
               </AlertDescription>
             </Alert>
             <Button variant="outline" className="w-full" onClick={() => router.replace('/login')}>
-              ログインへ
+              {t('noCodeLoginButton')}
             </Button>
           </CardContent>
         </Card>
@@ -102,7 +104,7 @@ function RegisterWithReferralForm() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Ultra AutoTrade</CardTitle>
-          <CardDescription>招待登録</CardDescription>
+          <CardDescription>{t('cardDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={(e) => { void handleSubmit(e) }} className="space-y-4">
@@ -115,16 +117,16 @@ function RegisterWithReferralForm() {
 
             {/* 招待コード（読み取り専用） */}
             <div className="space-y-1.5">
-              <Label>招待コード</Label>
+              <Label>{t('referralCodeLabel')}</Label>
               <div className="flex items-center gap-2 rounded-md border border-input bg-muted px-3 py-2 text-sm font-mono">
                 <span className="flex-1 truncate text-foreground">{referralCode}</span>
                 <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
               </div>
-              <p className="text-xs text-green-600">招待コード適用済</p>
+              <p className="text-xs text-green-600">{t('referralCodeApplied')}</p>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="email">メールアドレス</Label>
+              <Label htmlFor="email">{t('emailLabel')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -138,7 +140,7 @@ function RegisterWithReferralForm() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="username">表示名</Label>
+              <Label htmlFor="username">{t('usernameLabel')}</Label>
               <Input
                 id="username"
                 type="text"
@@ -152,7 +154,7 @@ function RegisterWithReferralForm() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password">パスワード</Label>
+              <Label htmlFor="password">{t('passwordLabel')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -176,19 +178,19 @@ function RegisterWithReferralForm() {
                 className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
               />
               <Label htmlFor="consent" className="text-xs leading-relaxed cursor-pointer">
-                紹介者があなたの取引履歴（種別/金額/日時、ウォレット情報を除く）を閲覧することに同意します
+                {t('consentText')}
               </Label>
             </div>
 
             <Button type="submit" className="w-full" disabled={submitting || !consent}>
-              {submitting ? '登録中...' : 'アカウントを作成'}
+              {submitting ? t('submittingButton') : t('submitButton')}
             </Button>
           </form>
 
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            すでにアカウントをお持ちの方は
+            {t('hasAccountText')}
             <a href="/login" className="underline underline-offset-4 hover:text-primary ml-1">
-              ログイン
+              {t('loginLink')}
             </a>
           </p>
         </CardContent>
