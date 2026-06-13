@@ -178,7 +178,7 @@ function RegisterForm() {
                 required
                 autoComplete="username"
                 disabled={submitting}
-                placeholder="山田太郎"
+                placeholder={t('displayNamePlaceholder')}
               />
             </div>
 
@@ -213,12 +213,13 @@ function RegisterForm() {
 }
 
 export default function RegisterPage() {
+  const t = useTranslations('Register');
   return (
     <>
-      <title>アカウント登録 - Ultra AutoTrade</title>
+      <title>{t('title')}</title>
       <Suspense fallback={
         <div className="flex min-h-screen items-center justify-center">
-          <p className="text-muted-foreground">読み込み中...</p>
+          <p className="text-muted-foreground">{t('loading')}</p>
         </div>
       }>
         <RegisterForm />
