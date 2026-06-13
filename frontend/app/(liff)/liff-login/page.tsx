@@ -66,7 +66,7 @@ export default function LiffLoginPage() {
   if (!isReady) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-muted-foreground">Loading...</p>
+        <p className="text-muted-foreground">{t("loading")}</p>
       </div>
     );
   }
