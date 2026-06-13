@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { getJson } from "@/lib/api/http";
@@ -32,19 +33,20 @@ type RateLimitStatus = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatResetTime(seconds: number): string {
+function formatResetSeconds(seconds: number): string {
   if (seconds <= 0) return "—";
-  if (seconds < 60) return `${Math.ceil(seconds)}秒`;
-  if (seconds < 3600) return `${Math.ceil(seconds / 60)}分`;
-  return `${Math.ceil(seconds / 3600)}時間`;
+  if (seconds < 60) return `${Math.ceil(seconds)}s`;
+  if (seconds < 3600) return `${Math.ceil(seconds / 60)}m`;
+  return `${Math.ceil(seconds / 3600)}h`;
 }
 
-function formatWindowName(seconds: number): string {
-  if (seconds === 60) return "1分";
-  if (seconds === 900) return "15分";
-  if (seconds === 3600) return "1時間";
-  if (seconds === 86400) return "24時間";
-  return `${seconds}秒`;
+function formatWindowSeconds(seconds: number): string {
+  // Returns a locale-neutral key used to look up i18n label
+  if (seconds === 60) return "1min";
+  if (seconds === 900) return "15min";
+  if (seconds === 3600) return "1hour";
+  if (seconds === 86400) return "24hour";
+  return String(seconds);
 }
 
 function usageColor(pct: number): string {
@@ -72,6 +74,7 @@ export default function RateLimitsPage() {
 const POLL_INTERVAL_SEC = 15;
 
 function RateLimitsContent() {
+  const t = useTranslations("AdminRateLimits");
   const { token } = useAuth();
   const [status, setStatus] = useState<RateLimitStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -97,7 +100,7 @@ function RateLimitsContent() {
         // Feature not yet wired — show empty state
         setError(null);
       } else {
-        setError(`データ取得エラー: ${msg}`);
+        setError(t("fetchError", { msg }));
       }
     } finally {
       setIsLoading(false);
@@ -130,24 +133,24 @@ function RateLimitsContent() {
 
   return (
     <>
-      <title>APIレート制限 - Ultra AutoTrade</title>
+      <title>{t("pageTitle")}</title>
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap" as const, gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0 }}>APIレート制限ダッシュボード</h1>
+          <h1 style={{ margin: 0 }}>{t("title")}</h1>
           <p style={{ margin: "4px 0 0", color: "#666", fontSize: 13 }}>
-            各APIのレート制限使用状況（スライディングウィンドウ）
+            {t("subtitle")}
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
           {lastUpdated && (
             <span style={{ fontSize: 12, color: "#888" }}>
-              最終更新: {lastUpdated.toLocaleTimeString("ja-JP")} （{countdown}秒後に自動更新）
+              {t("lastUpdated", { time: lastUpdated.toLocaleTimeString("ja-JP"), countdown })}
             </span>
           )}
           <button onClick={fetchData} disabled={isLoading} style={outlineBtnStyle}>
-            {isLoading ? "読み込み中..." : "今すぐ更新"}
+            {isLoading ? t("loading") : t("refreshNow")}
           </button>
         </div>
       </div>
@@ -155,12 +158,12 @@ function RateLimitsContent() {
       {/* Alert banners */}
       {hasWarning && (
         <div style={{ padding: "12px 16px", background: "#fff1f2", border: "1px solid #fecaca", borderRadius: 10, color: "#b91c1c", fontSize: 13, marginBottom: 12 }}>
-          <strong>警告:</strong> 1つ以上のAPIが使用率90%を超えています。
+          {t("alertCritical")}
         </div>
       )}
       {!hasWarning && hasAlert && (
         <div style={{ padding: "12px 16px", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: 10, color: "#92400e", fontSize: 13, marginBottom: 12 }}>
-          <strong>注意:</strong> 1つ以上のAPIが使用率80%を超えています。
+          {t("alertWarning")}
         </div>
       )}
 
@@ -168,7 +171,7 @@ function RateLimitsContent() {
 
       {!status && !isLoading && !error && (
         <div style={{ padding: "24px", textAlign: "center" as const, color: "#9ca3af", fontSize: 13 }}>
-          データを取得中...
+          {t("fetchingData")}
         </div>
       )}
 
@@ -178,13 +181,17 @@ function RateLimitsContent() {
           {status.apis.map((api) => {
             const color = usageColor(api.usage_pct);
             const bg = usageBg(api.usage_pct);
+            const windowKey = formatWindowSeconds(api.window_seconds);
+            const windowLabel = windowKey in { "1min": 1, "15min": 1, "1hour": 1, "24hour": 1 }
+              ? t(`windowNames.${windowKey as "1min" | "15min" | "1hour" | "24hour"}`)
+              : `${api.window_seconds}s`;
             return (
               <div key={api.api_name} style={{ ...cardStyle }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div>
                     <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>{api.display_name}</span>
                     <span style={{ fontSize: 12, color: "#9ca3af", marginLeft: 8 }}>
-                      ウィンドウ: {formatWindowName(api.window_seconds)}
+                      {t("window", { name: windowLabel })}
                     </span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -195,7 +202,7 @@ function RateLimitsContent() {
                       {api.usage_pct.toFixed(1)}%
                     </span>
                     <span style={{ fontSize: 12, color: "#6b7280" }}>
-                      リセット: {formatResetTime(api.reset_in_seconds)}
+                      {t("reset", { time: formatResetSeconds(api.reset_in_seconds) })}
                     </span>
                   </div>
                 </div>
@@ -227,7 +234,7 @@ function RateLimitsContent() {
       {status && chartData.length > 0 && (
         <div style={cardStyle}>
           <h2 style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginTop: 0, marginBottom: 12 }}>
-            使用率一覧（%）
+            {t("usageChart")}
           </h2>
           <RateLimitsBarChart data={chartData} />
         </div>

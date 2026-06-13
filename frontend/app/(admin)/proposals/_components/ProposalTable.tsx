@@ -2,6 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import type { AdminProposal } from '@/lib/api/admin-proposals'
 
@@ -23,27 +24,12 @@ function formatDateTime(iso: string): string {
   }
 }
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  pending: {
-    label: '保留中',
-    className: 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400',
-  },
-  approved: {
-    label: '承認済み',
-    className: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400',
-  },
-  rejected: {
-    label: '拒否',
-    className: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400',
-  },
-  executed: {
-    label: '実行済み',
-    className: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400',
-  },
-  expired: {
-    label: '期限切れ',
-    className: 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400',
-  },
+const STATUS_CLASS: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400',
+  approved: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400',
+  rejected: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400',
+  executed: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400',
+  expired: 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400',
 }
 
 const OP_CONFIG: Record<string, { label: string; className: string }> = {
@@ -54,10 +40,20 @@ const OP_CONFIG: Record<string, { label: string; className: string }> = {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? { label: status, className: '' }
+  const t = useTranslations('ProposalTable')
+  const className = STATUS_CLASS[status] ?? ''
+  const labelKey = `status${status.charAt(0).toUpperCase()}${status.slice(1)}` as
+    | 'statusPending'
+    | 'statusApproved'
+    | 'statusRejected'
+    | 'statusExecuted'
+    | 'statusExpired'
+  const label = labelKey in {
+    statusPending: 1, statusApproved: 1, statusRejected: 1, statusExecuted: 1, statusExpired: 1,
+  } ? t(labelKey) : status
   return (
-    <Badge variant="outline" className={`text-xs px-2 py-0.5 ${cfg.className}`}>
-      {cfg.label}
+    <Badge variant="outline" className={`text-xs px-2 py-0.5 ${className}`}>
+      {label}
     </Badge>
   )
 }
@@ -78,6 +74,7 @@ export function ProposalTable({
   onPageChange,
   onRowClick,
 }: ProposalTableProps) {
+  const t = useTranslations('ProposalTable')
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   return (
@@ -87,22 +84,22 @@ export function ProposalTable({
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">ID</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">ユーザー</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">操作</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">資産</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">金額 (USD)</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 max-w-xs">理由</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">ステータス</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">作成日時</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">期限</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t('colId')}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t('colUser')}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t('colOperation')}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t('colAsset')}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t('colAmountUsd')}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 max-w-xs">{t('colReason')}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t('colStatus')}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t('colCreatedAt')}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t('colExpires')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {proposals.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-400">
-                  条件に一致する提案がありません
+                  {t('empty')}
                 </td>
               </tr>
             ) : (
@@ -153,7 +150,7 @@ export function ProposalTable({
       <div className="md:hidden space-y-3">
         {proposals.length === 0 ? (
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 text-center text-sm text-gray-400">
-            条件に一致する提案がありません
+            {t('empty')}
           </div>
         ) : (
           proposals.map((p) => (
@@ -176,7 +173,7 @@ export function ProposalTable({
                 {p.email && ` · ${p.email}`}
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-400 text-xs">金額</span>
+                <span className="text-gray-400 text-xs">{t('mobileAmount')}</span>
                 <span className="font-mono text-gray-800 dark:text-gray-200 text-xs">
                   ${Number(p.amount_usd).toLocaleString('ja-JP', { maximumFractionDigits: 2 })}
                 </span>
@@ -196,17 +193,17 @@ export function ProposalTable({
             disabled={page <= 1}
             className="px-3 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
-            前へ
+            {t('paginationPrev')}
           </button>
           <span className="text-xs text-gray-600 dark:text-gray-400">
-            {page} / {totalPages}（全 {total} 件）
+            {t('paginationInfo', { page, totalPages, total })}
           </span>
           <button
             onClick={() => onPageChange(Math.min(totalPages, page + 1))}
             disabled={page >= totalPages}
             className="px-3 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
-            次へ
+            {t('paginationNext')}
           </button>
         </div>
       )}
