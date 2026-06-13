@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { getAuthToken } from "@/lib/auth/token-key";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -34,6 +35,7 @@ export default function DemoConsentModal({
   onAccepted,
   tokenKey,
 }: DemoConsentModalProps) {
+  const t = useTranslations("DemoConsent");
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [hasReadAll, setHasReadAll] = useState(false);
   const [demoAck, setDemoAck] = useState(false);
@@ -85,11 +87,11 @@ export default function DemoConsentModal({
       });
       if (!res.ok) {
         const detail = await safeDetail(res);
-        throw new Error(detail ?? `同意の記録に失敗しました (HTTP ${res.status})`);
+        throw new Error(detail ?? t("recordErrorHttp", { status: res.status }));
       }
       onAccepted();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "同意の記録に失敗しました");
+      setError(e instanceof Error ? e.message : t("recordError"));
     } finally {
       setSubmitting(false);
     }
@@ -107,10 +109,10 @@ export default function DemoConsentModal({
           id="demo-consent-title"
           className="mb-2 text-xl font-bold text-zinc-100"
         >
-          Ultra AutoTrade デモ運用 利用規約への同意
+          {t("title")}
         </h2>
         <p className="mb-4 text-sm text-zinc-400">
-          下記の規約・手数料構造を全文お読みのうえ、同意してください。
+          {t("subtitle")}
         </p>
 
         <div
@@ -119,38 +121,32 @@ export default function DemoConsentModal({
           data-testid="tos-scroll-area"
           className="mb-4 h-64 overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-950 p-4 text-sm leading-relaxed text-zinc-300"
         >
-          <h3 className="font-semibold text-zinc-100">第1条 (デモ運用)</h3>
+          <h3 className="font-semibold text-zinc-100">{t("article1Title")}</h3>
           <p className="mb-3">
-            本サービスは現時点でデモ運用であり、実資金は動かしません。
-            画面に表示される運用結果は学習・検証目的のシミュレーション値です。
+            {t("article1Content")}
           </p>
-          <h3 className="font-semibold text-zinc-100">第2条 (手数料構造)</h3>
+          <h3 className="font-semibold text-zinc-100">{t("article2Title")}</h3>
           <p className="mb-3">
-            利用者の Tier (LOWER / MIDDLE / UPPER) と RiskMode
-            (CONSERVATIVE / BALANCED / AGGRESSIVE) に応じて月額サブスク料率および
-            取引手数料が変動します。詳細は手数料一覧画面で確認できます。
+            {t("article2Content")}
           </p>
-          <h3 className="font-semibold text-zinc-100">第3条 (個人情報)</h3>
+          <h3 className="font-semibold text-zinc-100">{t("article3Title")}</h3>
           <p className="mb-3">
-            同意ログは利用者保護および学習データ用途で保存され、
-            IP / User-Agent / 改ざん検知用ハッシュを含みます。
+            {t("article3Content")}
           </p>
-          <h3 className="font-semibold text-zinc-100">第4条 (免責)</h3>
+          <h3 className="font-semibold text-zinc-100">{t("article4Title")}</h3>
           <p className="mb-3">
-            本サービスの運用結果について、運営者は一切の損害賠償責任を負いません。
-            実資金運用が解禁された場合は別途同意取得を行います。
+            {t("article4Content")}
           </p>
-          <h3 className="font-semibold text-zinc-100">第5条 (同意の撤回)</h3>
+          <h3 className="font-semibold text-zinc-100">{t("article5Title")}</h3>
           <p className="mb-3">
-            同意撤回はサポート窓口経由でいつでも可能です。
-            撤回後はサービス利用ができなくなります。
+            {t("article5Content")}
           </p>
-          <p className="text-xs text-zinc-500">— 以上 (v{TOS_VERSION}) —</p>
+          <p className="text-xs text-zinc-500">{t("versionFooter", { version: TOS_VERSION })}</p>
         </div>
 
         {!hasReadAll && (
           <p className="mb-3 text-xs text-amber-400" data-testid="tos-scroll-hint">
-            ↑ 規約の最後までスクロールしてください
+            {t("scrollHint")}
           </p>
         )}
 
@@ -165,8 +161,8 @@ export default function DemoConsentModal({
               className="mt-0.5 w-5 h-5 rounded border-zinc-600 bg-zinc-800 text-blue-500 disabled:opacity-40"
             />
             <span className="text-sm text-zinc-200">
-              本サービスは現時点で <strong>デモ運用</strong>{" "}
-              であり、実資金は動かさないことを理解し同意します。
+              {t("consent1Prefix")} <strong>{t("consent1Emphasis")}</strong>{" "}
+              {t("consent1Suffix")}
             </span>
           </label>
 
@@ -180,7 +176,7 @@ export default function DemoConsentModal({
               className="mt-0.5 w-5 h-5 rounded border-zinc-600 bg-zinc-800 text-blue-500 disabled:opacity-40"
             />
             <span className="text-sm text-zinc-200">
-              上記手数料構造に同意します。
+              {t("consent2Label")}
             </span>
           </label>
         </div>
@@ -205,11 +201,11 @@ export default function DemoConsentModal({
               : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
           }`}
         >
-          {submitting ? "記録中..." : "同意してデモを利用する"}
+          {submitting ? t("submittingButton") : t("submitButton")}
         </button>
 
         <p className="mt-4 text-center text-xs text-zinc-600">
-          v{TOS_VERSION} • 同意内容はサーバーに改ざん検知付きで記録されます
+          {t("pageFooter", { version: TOS_VERSION })}
         </p>
       </div>
     </div>
