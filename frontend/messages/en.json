@@ -2233,6 +2233,8 @@
     "confirmPauseBody": "Automated trading for this user will be paused.",
     "confirmResumeBody": "Automated trading for this user will be resumed.",
     "cancelButton": "Cancel",
-    "confirmActionButton": "{action}"
+    "confirmActionButton": "{action}",
+    "actionPause": "Pause",
+    "actionResume": "Resume"
   }
 }

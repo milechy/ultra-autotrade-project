@@ -2233,6 +2233,8 @@
     "confirmPauseBody": "このユーザーの自動取引を一時停止します。",
     "confirmResumeBody": "このユーザーの自動取引を再開します。",
     "cancelButton": "キャンセル",
-    "confirmActionButton": "{action}する"
+    "confirmActionButton": "{action}する",
+    "actionPause": "停止",
+    "actionResume": "再開"
   }
 }
