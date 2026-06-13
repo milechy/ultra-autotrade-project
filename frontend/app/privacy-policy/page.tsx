@@ -25,7 +25,7 @@ export default function PrivacyPolicyPage() {
         </Button>
 
         <h1 className="text-2xl font-bold mb-2">{t('pageTitle')}</h1>
-        <p className="text-sm text-zinc-500 mb-8">{t('lastUpdated', { date: '2026年3月24日' })}</p>
+        <p className="text-sm text-zinc-500 mb-8">{t('lastUpdated', { date: t('lastUpdatedDate') })}</p>
 
         <div className="space-y-8 text-sm text-zinc-300 leading-relaxed">
           <section>

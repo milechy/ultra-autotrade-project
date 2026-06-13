@@ -99,7 +99,7 @@ function SignupForm() {
                 required
                 autoComplete="username"
                 disabled={submitting}
-                placeholder="山田太郎"
+                placeholder={t('namePlaceholder')}
               />
             </div>
 

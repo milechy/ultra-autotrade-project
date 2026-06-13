@@ -2,6 +2,8 @@
 // Unauthorized copying or distribution is strictly prohibited.
 import type { Metadata, Viewport } from 'next'
 import '../styles/globals.css'
+import { NextIntlClientProvider } from 'next-intl'
+import { getLocale, getMessages } from 'next-intl/server'
 import { PWAProvider, InstallBanner, UpdatePrompt } from '@/components/pwa'
 import { DemoBanner } from '@/components/DemoBanner'
 import { getLocale, getMessages } from 'next-intl/server'

@@ -316,7 +316,7 @@ export function DepositPanel() {
               >
                 {language === "en"
                   ? `¥${amt.toLocaleString()}`
-                  : `¥${(amt / 10000).toFixed(0)}万`}
+                  : `¥${(amt / 10000).toFixed(0)}${t('unitMan')}`}
               </button>
             ))}
           </div>

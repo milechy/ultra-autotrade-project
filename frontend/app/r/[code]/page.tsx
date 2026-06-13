@@ -3,10 +3,12 @@
 // Unauthorized copying or distribution is strictly prohibited.
 import { useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
 export default function ReferralRedirectPage() {
   const params = useParams()
   const router = useRouter()
+  const t = useTranslations('ReferralPage')
   const code = typeof params.code === 'string' ? params.code : ''
 
   useEffect(() => {
@@ -18,7 +20,7 @@ export default function ReferralRedirectPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <p className="text-muted-foreground">リダイレクト中...</p>
+      <p className="text-muted-foreground">{t('redirecting')}</p>
     </div>
   )
 }

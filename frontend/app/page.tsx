@@ -4,6 +4,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { AuthProvider, useAuth } from '@/lib/auth'
 
 function getRoleDefaultPath(role: string | undefined): string {
@@ -15,6 +16,7 @@ function getRoleDefaultPath(role: string | undefined): string {
 function RedirectGate() {
   const router = useRouter()
   const { isLoading, isAuthenticated, user } = useAuth()
+  const t = useTranslations('RootPage')
 
   useEffect(() => {
     if (isLoading) return
@@ -27,7 +29,7 @@ function RedirectGate() {
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <p className="text-gray-400 text-sm">読み込み中...</p>
+      <p className="text-gray-400 text-sm">{t('loading')}</p>
     </div>
   )
 }

@@ -721,7 +721,8 @@
         "withdrawFailed": "Withdrawal failed",
         "moonpayTitle": "Buy with card",
         "moonpayDesc": "Purchase USDC with a credit or debit card via MoonPay.",
-        "quickMax": "Max"
+        "quickMax": "Max",
+        "unitMan": "万"
       },
       "myWallet": {
         "title": "MY WALLET",
@@ -1459,7 +1460,8 @@
     "section8Title": "8. Changes to Privacy Policy",
     "section8Body": "This policy may be changed with prior notice. If there are significant changes, we will notify you on the Service. If you continue to use the Service after changes are made, you will be deemed to have agreed to the revised policy.",
     "section9Title": "9. Contact Information",
-    "section9Body": "For questions or requests regarding this policy, please contact the Service's support team. When contacting us, please provide your wallet address and the content of your request."
+    "section9Body": "For questions or requests regarding this policy, please contact the Service's support team. When contacting us, please provide your wallet address and the content of your request.",
+    "lastUpdatedDate": "March 24, 2026"
   },
   "PartnerDashboard": {
     "title": "Partner Dashboard",
@@ -2214,7 +2216,8 @@
     "comingSoonDescription": "Create New Account",
     "comingSoonMessage": "Open registration is currently not available. If you have an invitation, please register via the invitation link.",
     "comingSoonLoginButton": "Go to Login",
-    "consentPrefix": "I agree to the "
+    "consentPrefix": "I agree to the ",
+    "namePlaceholder": "John Doe"
   },
   "DemoConsent": {
     "title": "Ultra AutoTrade Demo Service Terms of Use Agreement",
@@ -3477,5 +3480,11 @@
     "loading": "Loading...",
     "authorizing": "Authorizing...",
     "openInLine": "Please open in the LINE app"
+  },
+  "RootPage": {
+    "loading": "Loading..."
+  },
+  "ReferralPage": {
+    "redirecting": "Redirecting..."
   }
 }

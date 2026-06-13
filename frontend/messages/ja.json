@@ -721,7 +721,8 @@
         "withdrawFailed": "出金処理に失敗しました",
         "moonpayTitle": "クレジットカードで購入",
         "moonpayDesc": "MoonPay を使って、クレジットカードまたはデビットカードで USDC を購入できます。",
-        "quickMax": "全額"
+        "quickMax": "全額",
+        "unitMan": "万"
       },
       "myWallet": {
         "title": "MY WALLET",
@@ -1459,7 +1460,8 @@
     "section8Title": "8. プライバシーポリシーの変更",
     "section8Body": "本ポリシーは事前通知のうえ変更されることがあります。重要な変更がある場合は、本サービス上でお知らせします。変更後も本サービスを継続して利用された場合、変更後のポリシーに同意したものとみなします。",
     "section9Title": "9. 問い合わせ先",
-    "section9Body": "本ポリシーに関するご質問・ご要望は、本サービスのサポートチームまでお問い合わせください。お問い合わせの際は、ウォレットアドレスおよびご要望の内容をお伝えください。"
+    "section9Body": "本ポリシーに関するご質問・ご要望は、本サービスのサポートチームまでお問い合わせください。お問い合わせの際は、ウォレットアドレスおよびご要望の内容をお伝えください。",
+    "lastUpdatedDate": "2026年3月24日"
   },
   "PartnerDashboard": {
     "title": "パートナーダッシュボード",
@@ -2214,7 +2216,8 @@
     "comingSoonDescription": "新規アカウント登録",
     "comingSoonMessage": "一般登録は現在準備中です。招待をお持ちの方は招待リンクからご登録ください。",
     "comingSoonLoginButton": "ログインへ",
-    "consentPrefix": ""
+    "consentPrefix": "",
+    "namePlaceholder": "山田太郎"
   },
   "DemoConsent": {
     "title": "Ultra AutoTrade デモ運用 利用規約への同意",
@@ -3477,5 +3480,11 @@
     "loading": "読み込み中...",
     "authorizing": "認証中...",
     "openInLine": "LINEアプリから開いてください"
+  },
+  "RootPage": {
+    "loading": "読み込み中..."
+  },
+  "ReferralPage": {
+    "redirecting": "リダイレクト中..."
   }
 }
