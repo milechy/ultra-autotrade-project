@@ -24,6 +24,7 @@ import {
 } from 'viem'
 import { base } from 'viem/chains'
 import { AlertTriangle, ShieldCheck, ExternalLink, Loader2, CheckCircle } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -92,8 +93,9 @@ function shortHash(hash: string): string {
 /**
  * ウォレット/RPC エラーをユーザー向けカテゴリに分類する。
  * EIP-1193 のエラーコードと message 文字列の両方をチェック。
+ * message は呼び出し側で t() を使って翻訳する。
  */
-function classifyError(err: unknown): WithdrawError {
+function classifyErrorKind(err: unknown): { kind: WithdrawErrorKind; raw: string } {
   const raw =
     err instanceof Error
       ? err.message
@@ -107,21 +109,13 @@ function classifyError(err: unknown): WithdrawError {
       ? (err as { code?: number | string }).code
       : undefined
   if (code === 4001 || lower.includes('user rejected') || lower.includes('user denied')) {
-    return { kind: 'user_rejected', message: '署名がキャンセルされました。', raw }
+    return { kind: 'user_rejected', raw }
   }
   if (lower.includes('insufficient funds') || lower.includes('insufficient balance') || lower.includes('exceeds balance')) {
-    return {
-      kind: 'insufficient_funds',
-      message: '残高またはガス代が不足しています。USDC 残高と ETH (gas) を確認してください。',
-      raw,
-    }
+    return { kind: 'insufficient_funds', raw }
   }
   if (lower.includes('wrong network') || lower.includes('chain mismatch') || lower.includes('unsupported chain') || lower.includes('switch chain')) {
-    return {
-      kind: 'wrong_network',
-      message: `Base ネットワーク (chainId=${DEFAULT_CHAIN_ID}) に切り替えてください。`,
-      raw,
-    }
+    return { kind: 'wrong_network', raw }
   }
   if (
     lower.includes('rpc') ||
@@ -130,13 +124,9 @@ function classifyError(err: unknown): WithdrawError {
     lower.includes('fetch failed') ||
     lower.includes('http request failed')
   ) {
-    return {
-      kind: 'rpc_error',
-      message: 'RPC との通信に失敗しました。時間を置いて再試行してください。',
-      raw,
-    }
+    return { kind: 'rpc_error', raw }
   }
-  return { kind: 'unknown', message: `送信に失敗しました: ${raw}`, raw }
+  return { kind: 'unknown', raw }
 }
 
 /**
@@ -153,14 +143,15 @@ async function logUserAction(actionType: string, payload: Record<string, unknown
 }
 
 function NonCustodialNotice() {
+  const t = useTranslations('Withdraw')
   return (
     <Alert className="border-blue-800 bg-blue-950/40">
       <ShieldCheck className="h-4 w-4 text-blue-400" />
       <AlertDescription className="text-blue-200 text-xs leading-relaxed">
-        <strong className="font-semibold">ノンカストディアル出金:</strong>{' '}
-        本サービスはノンカストディアルです。出金は常にあなた自身の Privy 鍵による署名が必要です。
-        delegated signing (代理署名) は出金には<strong>適用されません</strong>。
-        運営はあなたの資金を移動する権限を持ちません。
+        <strong className="font-semibold">{t('nonCustodialNote')}</strong>{' '}
+        {t('nonCustodialBody')}{' '}
+        <strong>{t('nonCustodialNoDelegated')}</strong>
+        {t('nonCustodialBody2')}
       </AlertDescription>
     </Alert>
   )
@@ -181,31 +172,32 @@ function ConfirmDialog({
   onCancel: () => void
   isLoading: boolean
 }) {
+  const t = useTranslations('Withdraw')
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
       <div className="w-full max-w-sm rounded-xl bg-zinc-900 border border-zinc-800 p-6 shadow-xl">
-        <h2 className="mb-4 text-lg font-semibold text-zinc-100">出金内容を確認</h2>
+        <h2 className="mb-4 text-lg font-semibold text-zinc-100">{t('confirmTitle')}</h2>
         <div className="mb-4 space-y-3 text-sm">
           <div>
-            <div className="text-xs text-zinc-500 mb-1">宛先アドレス</div>
+            <div className="text-xs text-zinc-500 mb-1">{t('confirmToLabel')}</div>
             <div className="font-mono text-zinc-200 break-all text-xs bg-zinc-950 p-2 rounded">
               {toAddress}
             </div>
           </div>
           <div>
-            <div className="text-xs text-zinc-500 mb-1">数量</div>
+            <div className="text-xs text-zinc-500 mb-1">{t('confirmAmountLabel')}</div>
             <div className="font-mono text-zinc-100 text-lg">
               {amount} <span className="text-sm text-zinc-400">USDC</span>
             </div>
           </div>
           <div>
-            <div className="text-xs text-zinc-500 mb-1">ネットワーク</div>
+            <div className="text-xs text-zinc-500 mb-1">{t('confirmNetworkLabel')}</div>
             <div className="text-zinc-200">Base (Chain {DEFAULT_CHAIN_ID})</div>
           </div>
           <div>
-            <div className="text-xs text-zinc-500 mb-1">推定 gas 代</div>
+            <div className="text-xs text-zinc-500 mb-1">{t('confirmGasLabel')}</div>
             <div className="font-mono text-zinc-200 text-sm">
-              {gasEstimateText ?? '見積もり中...'}
+              {gasEstimateText ?? t('estimating')}
             </div>
           </div>
         </div>
@@ -213,14 +205,13 @@ function ConfirmDialog({
         <Alert className="mb-4 border-yellow-800 bg-yellow-950/40">
           <AlertTriangle className="h-4 w-4 text-yellow-400" />
           <AlertDescription className="text-yellow-200 text-xs">
-            この操作にはあなたの Privy 鍵による<strong className="font-semibold">本人署名</strong>が必要です。
-            送金後の取り消しはできません。
+            {t('confirmSignNote')}<strong className="font-semibold">{t('confirmSignRequired')}</strong>{t('confirmSignNote2')}
           </AlertDescription>
         </Alert>
 
         <div className="flex gap-3">
           <Button variant="outline" className="flex-1" onClick={onCancel} disabled={isLoading}>
-            キャンセル
+            {t('cancel')}
           </Button>
           <Button
             className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
@@ -230,10 +221,10 @@ function ConfirmDialog({
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                処理中...
+                {t('processing')}
               </>
             ) : (
-              '署名して送金'
+              t('signAndSend')
             )}
           </Button>
         </div>
@@ -243,6 +234,7 @@ function ConfirmDialog({
 }
 
 function WithdrawPageInner() {
+  const t = useTranslations('Withdraw')
   const { authenticated } = usePrivy()
   const { wallets } = useWallets()
   const wallet = wallets[0] ?? null
@@ -339,7 +331,7 @@ function WithdrawPageInner() {
       const weiCost = gasUnits * gasPrice
       const ethCost = parseFloat(formatUnits(weiCost, 18))
       const usdCost = ethCost * ETH_USD_FALLBACK
-      return `${ethCost.toFixed(6)} ETH (約 $${usdCost.toFixed(3)})`
+      return `${ethCost.toFixed(6)} ETH (≈ $${usdCost.toFixed(3)})`
     } catch (err) {
       console.warn('[withdraw] gas estimate failed:', err)
       return null
@@ -353,7 +345,7 @@ function WithdrawPageInner() {
     setShowConfirm(true)
     // 非同期で gas 見積もり
     const est = await estimateGas()
-    setGasEstimateText(est ?? '見積もり失敗 (RPC エラー)')
+    setGasEstimateText(est ?? t('estimateFail'))
   }
 
   const handleConfirm = async () => {
@@ -371,7 +363,7 @@ function WithdrawPageInner() {
           kind: 'error',
           error: {
             kind: 'wrong_network',
-            message: `Base ネットワーク (chainId=${DEFAULT_CHAIN_ID}) に切り替えてください。現在: ${currentChainId}`,
+            message: t('err_wrongNetworkCurrent', { chainId: DEFAULT_CHAIN_ID, current: currentChainId }),
           },
         })
         return
@@ -411,13 +403,31 @@ function WithdrawPageInner() {
         ],
       })) as string
     } catch (err) {
-      const classified = classifyError(err)
+      const { kind, raw } = classifyErrorKind(err)
+      let message: string
+      switch (kind) {
+        case 'user_rejected':
+          message = t('err_user_rejected')
+          break
+        case 'insufficient_funds':
+          message = t('err_insufficient')
+          break
+        case 'wrong_network':
+          message = t('err_wrongNetwork', { chainId: DEFAULT_CHAIN_ID })
+          break
+        case 'rpc_error':
+          message = t('err_rpc')
+          break
+        default:
+          message = t('err_sendFail', { raw })
+      }
+      const classified: WithdrawError = { kind, message, raw }
       setTxState({ kind: 'error', error: classified })
       await logUserAction('withdrawal_failed', {
         to_address: toAddress,
         amount_usdc: amount,
-        error_kind: classified.kind,
-        error_message: classified.message,
+        error_kind: kind,
+        error_message: message,
       })
       return
     }
@@ -434,7 +444,7 @@ function WithdrawPageInner() {
       blockNumber = receipt.blockNumber
       setTxState({ kind: 'waiting_receipt', txHash, blockNumber })
       if (receipt.status !== 'success') {
-        const errMsg = 'トランザクションは取り込まれましたが失敗しました (revert)。'
+        const errMsg = t('err_revert')
         setTxState({
           kind: 'error',
           error: { kind: 'unknown', message: errMsg, raw: errMsg },
@@ -448,19 +458,34 @@ function WithdrawPageInner() {
         return
       }
     } catch (err) {
-      const classified = classifyError(err)
+      const { kind, raw } = classifyErrorKind(err)
+      let baseMsg: string
+      switch (kind) {
+        case 'user_rejected':
+          baseMsg = t('err_user_rejected')
+          break
+        case 'insufficient_funds':
+          baseMsg = t('err_insufficient')
+          break
+        case 'wrong_network':
+          baseMsg = t('err_wrongNetwork', { chainId: DEFAULT_CHAIN_ID })
+          break
+        case 'rpc_error':
+          baseMsg = t('err_rpc')
+          break
+        default:
+          baseMsg = t('err_sendFail', { raw })
+      }
       // receipt 待機失敗は致命的だが tx 自体は発火済みのため、エラー表示は緩める
+      const message = t('err_receiptFail', { message: baseMsg, txHash: shortHash(txHash) })
       setTxState({
         kind: 'error',
-        error: {
-          ...classified,
-          message: `tx は送信済みですが receipt 取得に失敗: ${classified.message} (tx=${shortHash(txHash)})`,
-        },
+        error: { kind, message, raw },
       })
       await logUserAction('withdrawal_failed', {
         tx_hash: txHash,
-        error_kind: classified.kind,
-        error_message: classified.message,
+        error_kind: kind,
+        error_message: message,
       })
       return
     }
@@ -515,7 +540,7 @@ function WithdrawPageInner() {
   const balanceText =
     usdcBalance != null
       ? `${parseFloat(formatUnits(usdcBalance, USDC_DECIMALS)).toFixed(6)} USDC`
-      : '取得中...'
+      : t('fetching')
 
   const isProcessing =
     txState.kind === 'signing' ||
@@ -526,8 +551,8 @@ function WithdrawPageInner() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="max-w-xl mx-auto px-4 py-8 space-y-4">
         <div>
-          <h1 className="text-2xl font-bold mb-2">USDC 出金</h1>
-          <p className="text-sm text-zinc-400">Base ネットワーク上の USDC を指定アドレスへ送金します。</p>
+          <h1 className="text-2xl font-bold mb-2">{t('pageTitle')}</h1>
+          <p className="text-sm text-zinc-400">{t('pageDesc')}</p>
         </div>
 
         <NonCustodialNotice />
@@ -536,33 +561,33 @@ function WithdrawPageInner() {
           <Alert className="border-red-800 bg-red-950/40">
             <AlertTriangle className="h-4 w-4 text-red-400" />
             <AlertDescription className="text-red-200 text-sm">
-              ウォレット未接続です。先にウォレットを接続してください。
+              {t('notConnectedDesc')}
             </AlertDescription>
           </Alert>
         )}
 
         <Card className="border-zinc-800 bg-zinc-900/60">
           <CardHeader>
-            <CardTitle className="text-base text-zinc-200">出金情報</CardTitle>
+            <CardTitle className="text-base text-zinc-200">{t('withdrawFormTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {fromAddress && (
               <div>
                 <label className="text-xs text-zinc-500 uppercase tracking-wide block mb-1">
-                  送金元 (あなた)
+                  {t('fromLabel')}
                 </label>
                 <div className="font-mono text-xs text-zinc-300 bg-zinc-950 p-2 rounded break-all">
                   {fromAddress}
                 </div>
                 <div className="mt-1 text-xs text-zinc-400">
-                  残高: <span className="font-mono text-zinc-200">{balanceText}</span>
+                  {t('balanceLabel')} <span className="font-mono text-zinc-200">{balanceText}</span>
                 </div>
               </div>
             )}
 
             <div>
               <label htmlFor="to-address" className="text-xs text-zinc-500 uppercase tracking-wide block mb-1">
-                宛先アドレス
+                {t('toAddressLabel')}
               </label>
               <input
                 id="to-address"
@@ -574,13 +599,13 @@ function WithdrawPageInner() {
                 disabled={!authenticated || isProcessing}
               />
               {toAddress && !addressValid && (
-                <p className="mt-1 text-xs text-red-400">アドレス形式が不正です (EIP-55 checksum / 42 文字)</p>
+                <p className="mt-1 text-xs text-red-400">{t('addressInvalid')}</p>
               )}
             </div>
 
             <div>
               <label htmlFor="amount" className="text-xs text-zinc-500 uppercase tracking-wide block mb-1">
-                数量 (USDC)
+                {t('amountLabel')}
               </label>
               <input
                 id="amount"
@@ -594,16 +619,16 @@ function WithdrawPageInner() {
               />
               {amount && amountNum == null && (
                 <p className="mt-1 text-xs text-red-400">
-                  正の数値で入力してください (小数点以下最大 {USDC_DECIMALS} 桁)
+                  {t('amountInvalid', { decimals: USDC_DECIMALS })}
                 </p>
               )}
               {amount && amountNum != null && amountExceedsBalance && (
                 <p className="mt-1 text-xs text-red-400">
-                  USDC 残高 ({balanceText}) を超えています。
+                  {t('amountExceedsBalance', { balance: balanceText })}
                 </p>
               )}
               <p className="mt-1 text-xs text-zinc-500">
-                ETH (gas) 残高は送信時にウォレット側で検証されます。
+                {t('gasNote')}
               </p>
             </div>
 
@@ -612,7 +637,7 @@ function WithdrawPageInner() {
                 <Loader2 className="h-4 w-4 text-blue-400 animate-spin" />
                 <AlertDescription className="text-blue-200 text-sm">
                   <div className="mb-1">
-                    待機中...{' '}
+                    {t('waitingReceipt')}{' '}
                     {txState.blockNumber != null && (
                       <span className="font-mono text-xs">(block {txState.blockNumber.toString()})</span>
                     )}
@@ -634,7 +659,7 @@ function WithdrawPageInner() {
               <Alert className="border-blue-800 bg-blue-950/40">
                 <Loader2 className="h-4 w-4 text-blue-400 animate-spin" />
                 <AlertDescription className="text-blue-200 text-sm">
-                  記録中...
+                  {t('logging')}
                 </AlertDescription>
               </Alert>
             )}
@@ -644,7 +669,7 @@ function WithdrawPageInner() {
                 <CheckCircle className="h-4 w-4 text-emerald-400" />
                 <AlertDescription className="text-emerald-200 text-sm">
                   <div className="mb-1">
-                    出金 tx が確定しました。
+                    {t('txConfirmed')}
                     {txState.blockNumber != null && (
                       <span className="ml-1 font-mono text-xs">
                         (block {txState.blockNumber.toString()})
@@ -657,7 +682,7 @@ function WithdrawPageInner() {
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-emerald-300 hover:underline font-mono text-xs"
                   >
-                    Basescan で開く: {shortHash(txState.txHash)}
+                    {t('viewOnBasescan')} {shortHash(txState.txHash)}
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 </AlertDescription>
@@ -672,19 +697,19 @@ function WithdrawPageInner() {
                     {(() => {
                       switch (txState.error.kind) {
                         case 'user_rejected':
-                          return 'ユーザーがキャンセル'
+                          return t('errorReason_userCancelled')
                         case 'insufficient_funds':
-                          return '残高不足'
+                          return t('errorReason_insufficient')
                         case 'wrong_network':
-                          return 'ネットワーク違い'
+                          return t('errorReason_wrongNetwork')
                         case 'rpc_error':
-                          return 'RPC エラー'
+                          return t('errorReason_rpc')
                         case 'address_invalid':
-                          return 'アドレス不正'
+                          return t('errorReason_badAddress')
                         case 'amount_invalid':
-                          return '数量不正'
+                          return t('errorReason_badAmount')
                         default:
-                          return 'エラー'
+                          return t('errorReason_unknown')
                       }
                     })()}
                   </div>
@@ -699,7 +724,7 @@ function WithdrawPageInner() {
               disabled={!canSubmit || isProcessing}
               onClick={handleOpenConfirm}
             >
-              出金内容を確認
+              {t('withdrawBtn')}
             </Button>
           </CardContent>
         </Card>
