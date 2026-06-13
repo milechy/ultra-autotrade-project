@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import React from "react";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import {
@@ -38,15 +39,15 @@ type WorkflowResult = {
   status: string;
 };
 
-const STATUS_COLORS: Record<KnowledgeItemStatus, { bg: string; color: string; label: string }> = {
-  pending:  { bg: "#fff8e1", color: "#b45309", label: "待機中" },
-  analyzed: { bg: "#e8f5e9", color: "#1b5e20", label: "完了" },
-  skipped:  { bg: "#f3f4f6", color: "#6b7280", label: "スキップ" },
-  error:    { bg: "#fff1f2", color: "#b91c1c", label: "エラー" },
+const STATUS_COLORS: Record<KnowledgeItemStatus, { bg: string; color: string }> = {
+  pending:  { bg: "#fff8e1", color: "#b45309" },
+  analyzed: { bg: "#e8f5e9", color: "#1b5e20" },
+  skipped:  { bg: "#f3f4f6", color: "#6b7280" },
+  error:    { bg: "#fff1f2", color: "#b91c1c" },
 };
 
-function StatusBadge({ status }: { status: KnowledgeItemStatus }) {
-  const s = STATUS_COLORS[status] ?? { bg: "#f3f4f6", color: "#374151", label: status };
+function StatusBadge({ status, label }: { status: KnowledgeItemStatus; label: string }) {
+  const s = STATUS_COLORS[status] ?? { bg: "#f3f4f6", color: "#374151" };
   return (
     <span style={{
       display: "inline-block",
@@ -57,7 +58,7 @@ function StatusBadge({ status }: { status: KnowledgeItemStatus }) {
       background: s.bg,
       color: s.color,
     }}>
-      {s.label}
+      {label}
     </span>
   );
 }
@@ -74,12 +75,13 @@ function formatDate(iso: string): string {
 }
 
 export default function KnowledgeIndexPage() {
+  const t = useTranslations("AdminKnowledge");
   const { token, isAdmin } = useAuth();
   const [items, setItems] = React.useState<KnowledgeItem[]>([]);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
 
-  // フォーム
+  // form
   const [itemType, setItemType] = React.useState<KnowledgeItemType>("url");
   const [title, setTitle] = React.useState("");
   const [sourceUrl, setSourceUrl] = React.useState("");
@@ -88,14 +90,14 @@ export default function KnowledgeIndexPage() {
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = React.useState<string | null>(null);
 
-  // RAG検索
+  // RAG search
   const [ragQuery, setRagQuery] = React.useState("");
   const [ragTopK, setRagTopK] = React.useState("3");
   const [ragSearching, setRagSearching] = React.useState(false);
   const [ragResult, setRagResult] = React.useState<SearchTestResponse | null>(null);
   const [ragError, setRagError] = React.useState<string | null>(null);
 
-  // ワークフロー実行
+  // workflow
   const [workflowRunning, setWorkflowRunning] = React.useState(false);
   const [workflowResult, setWorkflowResult] = React.useState<WorkflowResult | null>(null);
   const [workflowIsError, setWorkflowIsError] = React.useState(false);
@@ -134,7 +136,7 @@ export default function KnowledgeIndexPage() {
         raw_text: itemType === "text" ? rawText.trim() : undefined,
       };
       const created = await createKnowledgeItem(req);
-      setSubmitSuccess(`登録しました（ID: ${created.id}）`);
+      setSubmitSuccess(t("registered", { id: created.id }));
       setTitle("");
       setSourceUrl("");
       setRawText("");
@@ -177,7 +179,7 @@ export default function KnowledgeIndexPage() {
   }
 
   async function handleWorkflowRun() {
-    if (!window.confirm("pendingアイテムをすべて処理しますか？\nRAG → AI → 取引実行のフルパイプラインが実行されます。")) {
+    if (!window.confirm(t("workflowConfirm"))) {
       return;
     }
     setWorkflowRunning(true);
@@ -206,70 +208,77 @@ export default function KnowledgeIndexPage() {
     }
   }
 
+  const statusLabelMap: Record<KnowledgeItemStatus, string> = {
+    pending:  t("statusPending"),
+    analyzed: t("statusAnalyzed"),
+    skipped:  t("statusSkipped"),
+    error:    t("statusError"),
+  };
+
   return (
     <AuthGuard adminOnly>
       <>
-        <title>ナレッジ Hub - Ultra AutoTrade</title>
+        <title>{t("pageTitle")}</title>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 12 }}>
           <div>
-            <h1 style={{ marginBottom: 4 }}>ナレッジ Hub</h1>
+            <h1 style={{ marginBottom: 4 }}>{t("pageHeading")}</h1>
             <p style={{ marginTop: 0, color: "#666" }}>
-              URL またはテキストを登録してRAG検索の知識ベースを構築します。
+              {t("pageDescription")}
             </p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <Link href="/knowledge/search" style={outlineBtnStyle}>RAG検索 →</Link>
+            <Link href="/knowledge/search" style={outlineBtnStyle}>{t("navRagSearch")}</Link>
             <button onClick={loadItems} disabled={isLoading} style={outlineBtnStyle}>
-              {isLoading ? "読み込み中..." : "更新"}
+              {isLoading ? t("navLoading") : t("navRefresh")}
             </button>
           </div>
         </div>
 
-        {/* 登録フォーム */}
+        {/* registration form */}
         <section style={cardStyle}>
-          <h2 style={{ marginTop: 0, fontSize: 16 }}>ナレッジ登録</h2>
+          <h2 style={{ marginTop: 0, fontSize: 16 }}>{t("formSection")}</h2>
 
           <form onSubmit={handleSubmit}>
-            {/* item_type 切替 */}
+            {/* item_type toggle */}
             <div style={{ display: "flex", gap: 0, marginBottom: 16, border: "1px solid #ddd", borderRadius: 8, overflow: "hidden", width: "fit-content" }}>
-              {(["url", "text"] as KnowledgeItemType[]).map((t) => (
+              {(["url", "text"] as KnowledgeItemType[]).map((typ) => (
                 <button
-                  key={t}
+                  key={typ}
                   type="button"
-                  onClick={() => setItemType(t)}
+                  onClick={() => setItemType(typ)}
                   style={{
                     padding: "6px 20px",
                     border: "none",
-                    background: itemType === t ? "#1a1a2e" : "#fff",
-                    color: itemType === t ? "#fff" : "#444",
-                    fontWeight: itemType === t ? 600 : 400,
+                    background: itemType === typ ? "#1a1a2e" : "#fff",
+                    color: itemType === typ ? "#fff" : "#444",
+                    fontWeight: itemType === typ ? 600 : 400,
                     cursor: "pointer",
                     fontSize: 14,
                     transition: "background 0.15s",
                   }}
                 >
-                  {t === "url" ? "URL" : "テキスト"}
+                  {typ === "url" ? t("typeUrl") : t("typeText")}
                 </button>
               ))}
             </div>
 
-            {/* タイトル（任意） */}
+            {/* title (optional) */}
             <div style={{ marginBottom: 12 }}>
-              <label style={labelStyle}>タイトル（任意）</label>
+              <label style={labelStyle}>{t("labelTitleOptional")}</label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="例: BTC相場分析 2026-03"
+                placeholder={t("placeholderTitle")}
                 style={inputStyle}
               />
             </div>
 
-            {/* URL or テキスト */}
+            {/* URL or text */}
             {itemType === "url" ? (
               <div style={{ marginBottom: 12 }}>
-                <label style={labelStyle}>URL <span style={{ color: "#e53e3e" }}>*</span></label>
+                <label style={labelStyle}>{t("labelUrl")} <span style={{ color: "#e53e3e" }}>*</span></label>
                 <input
                   type="url"
                   value={sourceUrl}
@@ -281,11 +290,11 @@ export default function KnowledgeIndexPage() {
               </div>
             ) : (
               <div style={{ marginBottom: 12 }}>
-                <label style={labelStyle}>テキスト <span style={{ color: "#e53e3e" }}>*</span></label>
+                <label style={labelStyle}>{t("labelText")} <span style={{ color: "#e53e3e" }}>*</span></label>
                 <textarea
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
-                  placeholder="登録するテキストを入力してください..."
+                  placeholder={t("placeholderText")}
                   required
                   rows={5}
                   style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
@@ -301,17 +310,17 @@ export default function KnowledgeIndexPage() {
             )}
 
             <button type="submit" disabled={submitting} style={primaryBtnStyle}>
-              {submitting ? "登録中..." : "登録する"}
+              {submitting ? t("btnRegistering") : t("btnRegister")}
             </button>
           </form>
         </section>
 
-        {/* アイテム一覧テーブル */}
+        {/* item list table */}
         <section style={{ marginTop: 24 }}>
           <h2 style={{ fontSize: 16, marginBottom: 12 }}>
-            登録済みアイテム
+            {t("tableSection")}
             <span style={{ fontWeight: 400, color: "#888", fontSize: 13, marginLeft: 8 }}>
-              全 {items.length} 件（30秒自動更新）
+              {t("tableCount", { count: items.length })}{t("tableAutoUpdate")}
             </span>
           </h2>
 
@@ -320,7 +329,7 @@ export default function KnowledgeIndexPage() {
           )}
 
           {!loadError && items.length === 0 && !isLoading && (
-            <p style={{ color: "#888" }}>アイテムがありません。上のフォームから登録してください。</p>
+            <p style={{ color: "#888" }}>{t("noItems")}</p>
           )}
 
           {items.length > 0 && (
@@ -328,7 +337,14 @@ export default function KnowledgeIndexPage() {
               <table style={tableStyle}>
                 <thead>
                   <tr>
-                    {["ID", "タイトル / URL", "種別", "ステータス", "チャンク数", "登録日時"].map((h) => (
+                    {([
+                      t("colId"),
+                      t("colTitleUrl"),
+                      t("colType"),
+                      t("colStatus"),
+                      t("colChunks"),
+                      t("colCreatedAt"),
+                    ]).map((h) => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
@@ -339,7 +355,7 @@ export default function KnowledgeIndexPage() {
                       <td style={tdStyle}>{item.id}</td>
                       <td style={{ ...tdStyle, maxWidth: 300 }}>
                         <div style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {item.title ?? <span style={{ color: "#aaa" }}>（タイトルなし）</span>}
+                          {item.title ?? <span style={{ color: "#aaa" }}>{t("noTitle")}</span>}
                         </div>
                         {item.source_url && (
                           <div style={{ fontSize: 11, color: "#888", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>
@@ -351,11 +367,11 @@ export default function KnowledgeIndexPage() {
                       </td>
                       <td style={tdStyle}>
                         <span style={{ fontSize: 12, color: "#555" }}>
-                          {item.item_type === "url" ? "URL" : "テキスト"}
+                          {item.item_type === "url" ? t("typeUrl") : t("typeText")}
                         </span>
                       </td>
                       <td style={tdStyle}>
-                        <StatusBadge status={item.status} />
+                        <StatusBadge status={item.status} label={statusLabelMap[item.status] ?? item.status} />
                       </td>
                       <td style={{ ...tdStyle, textAlign: "center" }}>{item.chunk_count}</td>
                       <td style={{ ...tdStyle, fontSize: 12, color: "#666", whiteSpace: "nowrap" }}>
@@ -368,21 +384,22 @@ export default function KnowledgeIndexPage() {
             </div>
           )}
         </section>
-        {/* ─── RAG検索テスト ─────────────────────────────────────────── */}
+
+        {/* ─── RAG Search Test ─────────────────────────────────────────── */}
         <section className="mt-8">
           <h2 className="text-base font-semibold mb-3 text-gray-900 dark:text-gray-100">
-            RAG検索テスト
+            {t("ragSection")}
           </h2>
           <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-5 bg-white dark:bg-gray-900">
             <form onSubmit={handleRagSearch} className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  検索クエリ
+                  {t("ragQueryLabel")}
                 </label>
                 <textarea
                   value={ragQuery}
                   onChange={(e) => setRagQuery(e.target.value)}
-                  placeholder="例: BTC/USDT の強気トレンドについて"
+                  placeholder={t("ragQueryPlaceholder")}
                   rows={3}
                   required
                   className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -391,16 +408,16 @@ export default function KnowledgeIndexPage() {
               <div className="flex items-center gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                    取得件数 (top_k)
+                    {t("ragTopKLabel")}
                   </label>
                   <select
                     value={ragTopK}
                     onChange={(e) => setRagTopK(e.target.value)}
                     className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="3">3件</option>
-                    <option value="5">5件</option>
-                    <option value="10">10件</option>
+                    <option value="3">{t("countUnit", { n: 3 })}</option>
+                    <option value="5">{t("countUnit", { n: 5 })}</option>
+                    <option value="10">{t("countUnit", { n: 10 })}</option>
                   </select>
                 </div>
                 <div className="flex-1" />
@@ -415,7 +432,7 @@ export default function KnowledgeIndexPage() {
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
                   )}
-                  {ragSearching ? "検索中..." : "RAG検索を実行"}
+                  {ragSearching ? t("ragSearching") : t("ragSearchBtn")}
                 </button>
               </div>
             </form>
@@ -429,14 +446,14 @@ export default function KnowledgeIndexPage() {
             {ragResult && (
               <div className="mt-4">
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  検索クエリ: <span className="font-medium text-gray-700 dark:text-gray-300">{ragResult.query}</span>
-                  　取得: {ragResult.results.length} 件
+                  {t("ragResultPrefix")}<span className="font-medium text-gray-700 dark:text-gray-300">{ragResult.query}</span>
+                  {" "}{t("ragResultFetched", { count: ragResult.results.length })}
                 </p>
                 <div className="space-y-2">
                   {ragResult.results.length === 0 && (
                     <div className="py-8 text-center text-gray-400 dark:text-gray-600">
-                      <p className="text-sm">該当するチャンクが見つかりませんでした。</p>
-                      <p className="text-xs mt-1">クエリを変えて再試行してください。</p>
+                      <p className="text-sm">{t("ragNoResults")}</p>
+                      <p className="text-xs mt-1">{t("ragRetry")}</p>
                     </div>
                   )}
                   {ragResult.results.map((item, i) => (
@@ -477,22 +494,22 @@ export default function KnowledgeIndexPage() {
           </div>
         </section>
 
-        {/* ─── 手動ワークフロー実行 ──────────────────────────────────── */}
+        {/* ─── Manual Workflow Execution ──────────────────────────────────── */}
         {isAdmin && (
           <section className="mt-6 mb-8">
             <h2 className="text-base font-semibold mb-3 text-gray-900 dark:text-gray-100">
-              手動ワークフロー実行
+              {t("workflowSection")}
             </h2>
             <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-5 bg-white dark:bg-gray-900">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Pendingステータスのナレッジアイテムをバックエンドで処理します（RAG → AI → 取引実行）。
+                {t("workflowDescription")}
               </p>
               <button
                 onClick={handleWorkflowRun}
                 disabled={workflowRunning}
                 className="px-5 py-2 text-sm bg-gray-900 dark:bg-gray-100 dark:bg-gray-800 text-white dark:text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
               >
-                {workflowRunning ? "処理中..." : "Pendingアイテムを処理"}
+                {workflowRunning ? t("workflowRunning") : t("workflowRun")}
               </button>
               {workflowResult && (
                 <div className={`mt-3 p-3 rounded-lg text-sm ${
@@ -500,14 +517,14 @@ export default function KnowledgeIndexPage() {
                     ? "bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300"
                     : "bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
                 }`}>
-                  <p className="font-medium mb-1">ステータス: {workflowResult.status}</p>
+                  <p className="font-medium mb-1">{t("workflowStatusLabel", { status: workflowResult.status })}</p>
                   <div className="flex gap-4 text-xs flex-wrap">
-                    <span>取得: {workflowResult.fetched_count}件</span>
-                    <span>取引: {workflowResult.traded_count}件</span>
-                    <span>スキップ: {workflowResult.skipped_count}件</span>
-                    <span>HOLD: {workflowResult.hold_count}件</span>
+                    <span>{t("workflowFetched", { count: workflowResult.fetched_count })}</span>
+                    <span>{t("workflowTraded", { count: workflowResult.traded_count })}</span>
+                    <span>{t("workflowSkipped", { count: workflowResult.skipped_count })}</span>
+                    <span>{t("workflowHold", { count: workflowResult.hold_count })}</span>
                     {workflowResult.errors.length > 0 && (
-                      <span className="text-red-600">エラー: {workflowResult.errors.length}件</span>
+                      <span className="text-red-600">{t("workflowErrors", { count: workflowResult.errors.length })}</span>
                     )}
                   </div>
                 </div>
