@@ -7,6 +7,7 @@
 // B方式: URLにcodeがある場合はプリフィル+読み取り専用、ない場合は手動入力
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, FormEvent, Suspense } from "react";
+import { useTranslations } from "next-intl";
 import { apiFetch, apiPost } from "@/lib/api/client";
 import { setAuthToken } from "@/lib/auth/token-key";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ interface RegisterResponse {
 type CodeStatus = "idle" | "checking" | "valid" | "invalid";
 
 function RegisterForm() {
+  const t = useTranslations('Register');
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlCode = searchParams.get("code"); // URL から取得したコード（変更不可）
@@ -64,7 +66,7 @@ function RegisterForm() {
     e.preventDefault();
     const code = invitationCode.trim();
     if (!code) {
-      setError("招待コードを入力してください");
+      setError(t('codeRequiredError'));
       return;
     }
     setError(null);
@@ -81,7 +83,7 @@ function RegisterForm() {
       localStorage.setItem("ultra_auth_expires", String(Date.now() + result.expires_in * 1000));
       router.replace("/user/dashboard");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "登録に失敗しました";
+      const message = err instanceof Error ? err.message : t('registrationFailed');
       setError(message);
     } finally {
       setSubmitting(false);
@@ -99,7 +101,7 @@ function RegisterForm() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Ultra AutoTrade</CardTitle>
-          <CardDescription>アカウント登録</CardDescription>
+          <CardDescription>{t('cardDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -112,7 +114,7 @@ function RegisterForm() {
 
             {/* 招待コード */}
             <div className="space-y-1.5">
-              <Label htmlFor="invitationCode">招待コード</Label>
+              <Label htmlFor="invitationCode">{t('invitationCodeLabel')}</Label>
               {urlCode ? (
                 // URL からプリフィル: 読み取り専用表示
                 <div className={`flex items-center gap-2 rounded-md border px-3 py-2 bg-muted text-sm font-mono ${
@@ -137,23 +139,23 @@ function RegisterForm() {
                   value={invitationCode}
                   onChange={(e) => setInvitationCode(e.target.value)}
                   required
-                  placeholder="招待コードを入力してください"
+                  placeholder={t('invitationCodePlaceholder')}
                   disabled={submitting}
                   autoComplete="off"
                 />
               )}
               {codeStatus === "invalid" && urlCode && (
                 <p className="text-xs text-destructive">
-                  招待コードが無効または期限切れです。担当者にお問い合わせください。
+                  {t('codeInvalidError')}
                 </p>
               )}
               {codeStatus === "valid" && (
-                <p className="text-xs text-green-600">招待コードが確認されました</p>
+                <p className="text-xs text-green-600">{t('codeValidMessage')}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">メールアドレス</Label>
+              <Label htmlFor="email">{t('emailLabel')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -167,7 +169,7 @@ function RegisterForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="displayName">表示名</Label>
+              <Label htmlFor="displayName">{t('displayNameLabel')}</Label>
               <Input
                 id="displayName"
                 type="text"
@@ -176,12 +178,12 @@ function RegisterForm() {
                 required
                 autoComplete="username"
                 disabled={submitting}
-                placeholder="山田太郎"
+                placeholder={t('displayNamePlaceholder')}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">パスワード</Label>
+              <Label htmlFor="password">{t('passwordLabel')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -194,14 +196,14 @@ function RegisterForm() {
             </div>
 
             <Button type="submit" className="w-full" disabled={submitDisabled}>
-              {submitting ? "登録中..." : "アカウントを作成"}
+              {submitting ? t('submittingButton') : t('submitButton')}
             </Button>
           </form>
 
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            すでにアカウントをお持ちの方は
+            {t('hasAccountText')}
             <a href="/login" className="underline underline-offset-4 hover:text-primary ml-1">
-              ログイン
+              {t('loginLink')}
             </a>
           </p>
         </CardContent>
@@ -211,12 +213,13 @@ function RegisterForm() {
 }
 
 export default function RegisterPage() {
+  const t = useTranslations('Register');
   return (
     <>
-      <title>アカウント登録 - Ultra AutoTrade</title>
+      <title>{t('title')}</title>
       <Suspense fallback={
         <div className="flex min-h-screen items-center justify-center">
-          <p className="text-muted-foreground">読み込み中...</p>
+          <p className="text-muted-foreground">{t('loading')}</p>
         </div>
       }>
         <RegisterForm />
