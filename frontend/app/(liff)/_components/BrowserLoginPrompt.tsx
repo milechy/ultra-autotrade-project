@@ -6,6 +6,7 @@
 "use client";
 
 import { Loader2, Wallet } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useLiffBrowserAuth } from "@/hooks/useLiffBrowserAuth";
 
 interface BrowserLoginPromptProps {
@@ -14,6 +15,7 @@ interface BrowserLoginPromptProps {
 }
 
 export function BrowserLoginPrompt({ onSuccess }: BrowserLoginPromptProps) {
+  const t = useTranslations("LiffBrowserLoginPrompt");
   const { signIn, signingIn, error } = useLiffBrowserAuth();
 
   async function handleLogin() {
@@ -30,12 +32,10 @@ export function BrowserLoginPrompt({ onSuccess }: BrowserLoginPromptProps) {
     <div className="flex flex-col items-center justify-center min-h-dvh bg-zinc-950 px-6 text-center">
       <Wallet className="h-10 w-10 text-green-500 mb-4" />
       <h2 className="text-zinc-100 text-base font-semibold mb-2">
-        ログインが必要です
+        {t("title")}
       </h2>
       <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
-        ご自身のウォレットでログインすると、
-        <br />
-        提案の確認と承認ができます。
+        {t("description")}
       </p>
 
       <button
@@ -51,15 +51,13 @@ export function BrowserLoginPrompt({ onSuccess }: BrowserLoginPromptProps) {
         ) : (
           <Wallet className="h-4 w-4" />
         )}
-        {signingIn ? "ログイン中..." : "ウォレットでログイン"}
+        {signingIn ? t("signingIn") : t("loginButton")}
       </button>
 
       {error && <p className="text-red-400 text-xs mt-3 max-w-xs">{error}</p>}
 
       <p className="text-zinc-600 text-xs mt-6 leading-relaxed">
-        LINEアプリからご利用の場合は、
-        <br />
-        メニューから開き直してください。
+        {t("lineAppHint")}
       </p>
     </div>
   );

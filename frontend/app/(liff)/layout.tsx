@@ -4,12 +4,15 @@
 import '../arobix/theme.css'
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { NextIntlClientProvider, useTranslations } from 'next-intl'
 import { useLiff } from '@/hooks/useLiff'
 import { useLiffAutoReAuth } from '@/hooks/useLiffAutoReAuth'
 import { useLiffTermsGate } from '@/hooks/useLiffTermsGate'
 import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
 import { PrivyRootClient } from '@/lib/wallet/PrivyRootClient'
 import { getAuthToken } from '@/lib/auth/token-key'
+import jaMessages from '@/messages/ja.json'
+import enMessages from '@/messages/en.json'
 
 // degrade ガードを適用しない経路。
 // - liff-login : ログイン導線そのもの (未ログインで来る前提)
@@ -21,6 +24,25 @@ const AUTH_GUARD_EXEMPT = ['/liff-login', '/liff-sign-poc']
 // 誘導する (法的同意の 1 経路依存を解消; Asana 1215360586206558)。
 // パートナー承認系 (liff-approve / liff-fee-approve 等) は別系統のため対象外。
 const TERMS_GATE_PATHS = ['/liff-chat']
+
+// LiffLayoutLoading: layout レベルのローディング表示 (LiffIntlLayout の外側で使用するため
+// inline Provider パターンを採用する)
+function LiffLayoutLoadingInner() {
+  const t = useTranslations('LiffLayout')
+  return <p className="text-zinc-400">{t('reauthing')}</p>
+}
+
+function LiffLayoutLoading() {
+  // NOTE: このコンポーネントは LiffIntlLayout の外側で使われる。
+  // (liff)/layout.tsx は PrivyRootClient / LiffIntlLayout の親にあたるため
+  // inline Provider で NextIntlClientProvider を自己完結させる。
+  const messages = { LiffLayout: jaMessages.LiffLayout }
+  return (
+    <NextIntlClientProvider locale="ja" messages={messages}>
+      <LiffLayoutLoadingInner />
+    </NextIntlClientProvider>
+  )
+}
 
 export default function LiffLayout({ children }: { children: React.ReactNode }) {
   const { isInitialized, isLoggedIn, error, liffConfigured } = useLiff()
@@ -71,7 +93,7 @@ export default function LiffLayout({ children }: { children: React.ReactNode }) 
     return (
       <div className="arobix-root">
         <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
-          <p className="text-zinc-400">セッションを復元しています...</p>
+          <LiffLayoutLoading />
         </div>
       </div>
     )

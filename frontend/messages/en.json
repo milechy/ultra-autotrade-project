@@ -617,17 +617,7 @@
       "operatingCoins": "Active Holdings",
       "noCoins": "No active holdings",
       "openChatAriaLabel": "Open chat",
-      "assetChartLoading": "Loading chart...",
-      "emergencyStop": "Emergency Stop",
-      "emergencyStopAriaLabel": "Emergency stop autonomous trading",
-      "stoppedStatus": "Autonomous trading is stopped",
-      "stopConfirmTitle": "Stop autonomous trading?",
-      "stopConfirmDesc": "Stopping halts the AI's automatic decisions and execution. To resume, please contact support.",
-      "stopCancel": "Cancel",
-      "stopConfirm": "Stop",
-      "stopping": "Stopping...",
-      "stopSuccess": "Autonomous trading stopped",
-      "stopFailed": "Failed to stop. Please try again later."
+      "assetChartLoading": "Loading chart..."
     },
     "panels": {
       "assetHistory": "Asset History",
@@ -2726,5 +2716,79 @@
     "labelCooldown": "Cooldown",
     "suffixPercent": "%",
     "suffixSeconds": "seconds"
+  },
+  "LiffHistory": {
+    "loading": "Loading...",
+    "liffInitError": "LIFF init error: {error}",
+    "reauthing": "Re-authenticating...",
+    "title": "Trade History",
+    "totalCount": "{total} total",
+    "fetchError": "Failed to fetch data",
+    "noHistory": "No trade history",
+    "confidence": "Confidence {value}%",
+    "agreed": "Agreed",
+    "prevPage": "← Prev",
+    "nextPage": "Next →"
+  },
+  "LiffFeeApprove": {
+    "loading": "Loading...",
+    "liffInitError": "LIFF init error: {error}",
+    "reauthing": "Re-authenticating...",
+    "title": "Fee Approval",
+    "description": "Approve automatic monthly fee collection"
+  },
+  "LiffSignPoc": {
+    "title": "LIFF × Privy Sign PoC",
+    "subtitle": "Technical verification page — not a production feature",
+    "envInfo": "Environment Info",
+    "envUserAgent": "UserAgent",
+    "envLiffReady": "LIFF ready",
+    "envIsInClient": "isInClient",
+    "envPrivyReady": "Privy ready",
+    "envPrivyAuth": "Privy auth",
+    "envWallet": "Wallet",
+    "stepsTitle": "Verification Steps",
+    "step1": "1. LIFF Init",
+    "step2": "2. isInClient Check",
+    "step3": "3. Privy Init",
+    "step4": "4. Embedded Wallet",
+    "step5": "5. eth_signMessage (free)",
+    "step1FailDetail": "LIFF not initialized: {error}",
+    "step1PassDetail": "isLoggedIn={isLoggedIn}",
+    "step2FailDetail": "isInClient=false — Not in LINE app. Please open from LINE rich menu.",
+    "step2PassDetail": "isInClient=true (confirmed in LINE app)",
+    "step3FailDetail": "Privy SDK not initialized — PrivyProvider not found",
+    "step3PassDetail": "authenticated={authenticated}",
+    "step4FailNotAuth": "Not logged into Privy — please login first using the \"Privy Login\" button",
+    "step4FailNoWallet": "Embedded wallet not found. Check that embedded wallet is enabled in Privy dashboard.",
+    "step4PassDetail": "address={address}...",
+    "step5FailInvalid": "Signature empty or invalid: {signature}",
+    "step5PassDetail": "Signature success: {signature}... — LIFF Privy signing works ✓",
+    "step5FailCancelled": "User cancelled (normal operation)",
+    "step5FailError": "Signing failed: {msg}",
+    "runButton": "Run PoC Verification",
+    "runButtonRunning": "Verifying...",
+    "runButtonInitializing": "Initializing LIFF...",
+    "hint": "Open /liff-sign-poc from LINE app rich menu to run",
+    "privyLoginButton": "Login with Privy (required for Steps 3-5)"
+  },
+  "LiffBrowserLoginPrompt": {
+    "title": "Login Required",
+    "description": "Login with your wallet to view and approve proposals.",
+    "loginButton": "Login with Wallet",
+    "signingIn": "Logging in...",
+    "lineAppHint": "If you are using the LINE app, please reopen from the menu."
+  },
+  "LiffLayout": {
+    "reauthing": "Restoring session..."
+  },
+  "NotFound": {
+    "title": "Page Not Found",
+    "description": "The page you are looking for does not exist, or may have been moved or deleted. Please check the URL and try again.",
+    "suggestion": "AI-powered DeFi automated trading platform",
+    "homeButton": "Back to Home"
+  },
+  "DemoBanner": {
+    "notice": "⚠️ DEMO environment — All displayed data is sample data. This is not the production environment."
   }
 }
