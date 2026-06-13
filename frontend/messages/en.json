@@ -2683,7 +2683,6 @@
     "executed": "Executed",
     "executedYes": "Done",
     "executedNo": "Not executed",
-    "confidence": "Confidence {pct}%",
     "claudeConfidence": "Confidence {pct}%",
     "gptConfidence": "Confidence {pct}%",
     "rawResponse": "LLM Raw Response",

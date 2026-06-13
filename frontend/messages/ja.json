@@ -2683,7 +2683,6 @@
     "executed": "実行",
     "executedYes": "済",
     "executedNo": "未実行",
-    "confidence": "信頼度 {pct}%",
     "claudeConfidence": "信頼度 {pct}%",
     "gptConfidence": "信頼度 {pct}%",
     "rawResponse": "LLM生レスポンス",
