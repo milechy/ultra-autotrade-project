@@ -2827,5 +2827,120 @@
     "runbookHeading": "運用アクション（Runbook）",
     "runbookItem1": "highlights を確認し、未解決の警告がないことを確認。",
     "runbookItem2": "レポート生成が失敗した場合、ReportingService のログと依存関係を確認。"
+  },
+  "AdminAPIKeySection": {
+    "title": "APIキー管理",
+    "colName": "キー名",
+    "colCreatedAt": "作成日",
+    "colMaskedKey": "マスクキー",
+    "colStatus": "ステータス",
+    "colAction": "操作",
+    "statusActive": "有効",
+    "statusInactive": "無効",
+    "rotateBtn": "ローテーション",
+    "mockNote": "Phase 1はモック表示のみ。APIキーのフルテキストは表示されません。",
+    "dialogTitle": "APIキーのローテーション確認",
+    "dialogDescription": "をローテーションしますか？現在のキーは無効化されます。",
+    "cancelBtn": "キャンセル",
+    "rotatingBtn": "ローテーション中...",
+    "confirmRotateBtn": "ローテーションする"
+  },
+  "AdminAISettings": {
+    "title": "AI判定設定",
+    "labelFrequency": "判定頻度",
+    "freq1h": "1時間",
+    "freq2h": "2時間",
+    "freq4h": "4時間",
+    "freq8h": "8時間",
+    "freqManual": "手動のみ",
+    "labelConfidenceThreshold": "信頼度閾値",
+    "labelCrossVerification": "クロス検証"
+  },
+  "AdminOperationMode": {
+    "title": "運用モード",
+    "modeNormalLabel": "通常運用",
+    "modeNormalDescription": "AIによる自動売買を通常通り実行します。",
+    "modeSafeModeLabel": "安全モード",
+    "modeSafeModeDescription": "取引を一時停止し、監視のみを継続します。",
+    "modeHardStopLabel": "緊急停止",
+    "modeHardStopDescription": "全ての自動取引を即座に停止します。",
+    "currentMode": "現在のモード",
+    "dialogTitle": "運用モードの変更確認",
+    "dialogDescription": "運用モードを",
+    "dialogDescriptionSuffix": "に変更しますか？",
+    "hardStopWarning": "⚠ 緊急停止を有効にすると全ての自動取引が即座に停止されます。",
+    "cancelBtn": "キャンセル",
+    "confirmBtn": "変更する"
+  },
+  "AdminFeeConfig": {
+    "title": "手数料設定 (Fee Model v10)",
+    "effectiveFrom": "有効開始",
+    "loading": "読み込み中...",
+    "fetchError": "取得に失敗しました",
+    "tierSectionTitle": "Tier 別 手数料率 / 月次利回り上限",
+    "colDepositMin": "デポジット下限",
+    "colFeeRate": "手数料率",
+    "colMonthlyYieldCap": "月次利回り上限",
+    "subscriptionSectionTitle": "サブスクリプション率",
+    "otherRatesSectionTitle": "その他レート",
+    "expenseMarkup": "経費マークアップ",
+    "affiliateRate": "紹介キャンペーン報酬率",
+    "disabled": "無効",
+    "writeNote": "* 設定変更は DB 直接 + スクリプト再投入が必要です（UI 書き込み非対応 / Phase 1）"
+  },
+  "AdminNotification": {
+    "title": "通知設定",
+    "lineTokenLabel": "LINE トークン",
+    "testSendBtn": "テスト送信",
+    "sendingBtn": "送信中...",
+    "revealBtn": "表示",
+    "hideBtn": "隠す",
+    "slackTestSent": "Slack テスト送信しました（モック）",
+    "lineTestSent": "LINE テスト送信しました（モック）",
+    "labelNotificationLevel": "通知レベル閾値"
+  },
+  "AdminSettingsConfig": {
+    "pageTitle": "システム設定 - Ultra AutoTrade",
+    "heading": "システム設定",
+    "subheading": "運用モード・AI判定・Risk Engine・通知・APIキーを管理します。"
+  },
+  "AdminDecisionFilters": {
+    "title": "フィルター",
+    "labelActionFilter": "アクション別",
+    "labelConfidenceRange": "信頼度範囲",
+    "confidenceAll": "全範囲",
+    "confidence0to50": "0〜50%",
+    "confidence50to70": "50〜70%",
+    "confidence70to100": "70〜100%",
+    "labelAgreeFilter": "一致/不一致",
+    "agreeAgreedOnly": "一致のみ",
+    "agreeDisagreedOnly": "不一致のみ",
+    "resetFilters": "フィルターをリセット"
+  },
+  "AdminManualTrigger": {
+    "title": "手動判定実行",
+    "description": "AI判定ジョブを今すぐ1回実行します。BUY/SELL判定時はアクティブユーザー全員に提案が作成されます。",
+    "errorNotAuthenticated": "認証されていません",
+    "errorTriggerFailed": "AI判定の実行に失敗しました",
+    "resultTitle": "判定完了",
+    "resultAction": "判定",
+    "resultConfidence": "信頼度 {confidence}%",
+    "resultProposals": "作成された提案: {count}件",
+    "resultDecisionId": "判定ID",
+    "errorPrefix": "エラー",
+    "closeBtn": "閉じる",
+    "cancelBtn": "キャンセル",
+    "runningBtn": "実行中...",
+    "executeBtn": "実行"
+  },
+  "AdminDecisionKPIs": {
+    "labelTodayCount": "本日の判定数",
+    "suffixCount": "件",
+    "labelBuySellRatio": "BUY/SELL比率",
+    "labelAvgConfidence": "平均信頼度"
+  },
+  "AdminActionDistributionChart": {
+    "title": "BUY/SELL/HOLD分布",
+    "noData": "データなし"
   }
 }

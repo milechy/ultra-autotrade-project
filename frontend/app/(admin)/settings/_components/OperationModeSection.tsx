@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React, { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,35 +23,36 @@ interface OperationModeSectionProps {
   onModeChange: (mode: OperationMode) => void
 }
 
-const MODE_CONFIG: Record<
-  OperationMode,
-  { label: string; description: string; buttonClass: string }
-> = {
-  NORMAL: {
-    label: '通常運用',
-    description: 'AIによる自動売買を通常通り実行します。',
-    buttonClass:
-      'border-green-600 text-green-400 bg-green-900/20 hover:bg-green-900/40',
-  },
-  SAFE_MODE: {
-    label: '安全モード',
-    description: '取引を一時停止し、監視のみを継続します。',
-    buttonClass:
-      'border-yellow-600 text-yellow-400 bg-yellow-900/20 hover:bg-yellow-900/40',
-  },
-  HARD_STOP: {
-    label: '緊急停止',
-    description: '全ての自動取引を即座に停止します。',
-    buttonClass:
-      'border-red-600 text-red-400 bg-red-900/20 hover:bg-red-900/40',
-  },
-}
-
 export function OperationModeSection({
   mode,
   onModeChange,
 }: OperationModeSectionProps) {
+  const t = useTranslations('AdminOperationMode')
   const [pendingMode, setPendingMode] = useState<OperationMode | null>(null)
+
+  const MODE_CONFIG: Record<
+    OperationMode,
+    { label: string; description: string; buttonClass: string }
+  > = {
+    NORMAL: {
+      label: t('modeNormalLabel'),
+      description: t('modeNormalDescription'),
+      buttonClass:
+        'border-green-600 text-green-400 bg-green-900/20 hover:bg-green-900/40',
+    },
+    SAFE_MODE: {
+      label: t('modeSafeModeLabel'),
+      description: t('modeSafeModeDescription'),
+      buttonClass:
+        'border-yellow-600 text-yellow-400 bg-yellow-900/20 hover:bg-yellow-900/40',
+    },
+    HARD_STOP: {
+      label: t('modeHardStopLabel'),
+      description: t('modeHardStopDescription'),
+      buttonClass:
+        'border-red-600 text-red-400 bg-red-900/20 hover:bg-red-900/40',
+    },
+  }
 
   const handleModeClick = (target: OperationMode) => {
     if (target === mode) return
@@ -74,7 +76,7 @@ export function OperationModeSection({
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-gray-100 text-base font-semibold">
-              運用モード
+              {t('title')}
             </CardTitle>
             <StatusBadge status={mode} />
           </div>
@@ -102,7 +104,7 @@ export function OperationModeSection({
           </div>
           <p className="mt-3 text-xs text-gray-500">
             {/* TODO: PUT /api/automation/mode */}
-            現在のモード: <span className="text-gray-300 font-medium">{MODE_CONFIG[mode].label}</span>
+            {t('currentMode')}: <span className="text-gray-300 font-medium">{MODE_CONFIG[mode].label}</span>
             {' — '}{MODE_CONFIG[mode].description}
           </p>
         </CardContent>
@@ -111,16 +113,16 @@ export function OperationModeSection({
       <Dialog open={pendingMode !== null} onOpenChange={(open) => { if (!open) handleCancel() }}>
         <DialogContent className="bg-gray-900 border-gray-700 text-gray-100 max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-gray-100">運用モードの変更確認</DialogTitle>
+            <DialogTitle className="text-gray-100">{t('dialogTitle')}</DialogTitle>
             <DialogDescription className="text-gray-400">
-              運用モードを{' '}
+              {t('dialogDescription')}{' '}
               <span className="font-semibold text-gray-200">
                 {pendingMode ? MODE_CONFIG[pendingMode].label : ''}
               </span>{' '}
-              に変更しますか？
+              {t('dialogDescriptionSuffix')}
               {pendingMode === 'HARD_STOP' && (
                 <span className="block mt-2 text-red-400 font-medium">
-                  ⚠ 緊急停止を有効にすると全ての自動取引が即座に停止されます。
+                  {t('hardStopWarning')}
                 </span>
               )}
             </DialogDescription>
@@ -131,7 +133,7 @@ export function OperationModeSection({
               onClick={handleCancel}
               className="border-gray-700 text-gray-300 hover:bg-gray-800"
             >
-              キャンセル
+              {t('cancelBtn')}
             </Button>
             <Button
               onClick={handleConfirm}
@@ -143,7 +145,7 @@ export function OperationModeSection({
                   : 'bg-green-700 hover:bg-green-600 text-white'
               }
             >
-              変更する
+              {t('confirmBtn')}
             </Button>
           </DialogFooter>
         </DialogContent>

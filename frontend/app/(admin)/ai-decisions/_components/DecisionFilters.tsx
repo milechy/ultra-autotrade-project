@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import {
   Select,
   SelectContent,
@@ -33,6 +34,8 @@ const ACTION_BUTTONS: { label: string; value: ActionFilter }[] = [
 ]
 
 export function DecisionFilters({ filters, onChange }: DecisionFiltersProps) {
+  const t = useTranslations('AdminDecisionFilters')
+
   function setAction(value: ActionFilter) {
     onChange({ ...filters, action: value })
   }
@@ -48,13 +51,13 @@ export function DecisionFilters({ filters, onChange }: DecisionFiltersProps) {
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-white dark:bg-gray-900">
       <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-        フィルター
+        {t('title')}
       </h3>
       <div className="space-y-3">
         {/* Action filter buttons */}
         <div>
           <label className="text-xs font-medium text-gray-600 dark:text-gray-400 block mb-1">
-            アクション別
+            {t('labelActionFilter')}
           </label>
           <div className="flex gap-1 flex-wrap">
             {ACTION_BUTTONS.map(({ label, value }) => (
@@ -76,7 +79,7 @@ export function DecisionFilters({ filters, onChange }: DecisionFiltersProps) {
         {/* Confidence range */}
         <div>
           <label className="text-xs font-medium text-gray-600 dark:text-gray-400 block mb-1">
-            信頼度範囲
+            {t('labelConfidenceRange')}
           </label>
           <Select
             value={filters.confidenceRange}
@@ -86,10 +89,10 @@ export function DecisionFilters({ filters, onChange }: DecisionFiltersProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">全範囲</SelectItem>
-              <SelectItem value="0-50">0〜50%</SelectItem>
-              <SelectItem value="50-70">50〜70%</SelectItem>
-              <SelectItem value="70-100">70〜100%</SelectItem>
+              <SelectItem value="ALL">{t('confidenceAll')}</SelectItem>
+              <SelectItem value="0-50">{t('confidence0to50')}</SelectItem>
+              <SelectItem value="50-70">{t('confidence50to70')}</SelectItem>
+              <SelectItem value="70-100">{t('confidence70to100')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -97,7 +100,7 @@ export function DecisionFilters({ filters, onChange }: DecisionFiltersProps) {
         {/* Agree filter */}
         <div>
           <label className="text-xs font-medium text-gray-600 dark:text-gray-400 block mb-1">
-            一致/不一致
+            {t('labelAgreeFilter')}
           </label>
           <Select
             value={filters.agreeFilter}
@@ -108,8 +111,8 @@ export function DecisionFilters({ filters, onChange }: DecisionFiltersProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">ALL</SelectItem>
-              <SelectItem value="agreed">一致のみ</SelectItem>
-              <SelectItem value="disagreed">不一致のみ</SelectItem>
+              <SelectItem value="agreed">{t('agreeAgreedOnly')}</SelectItem>
+              <SelectItem value="disagreed">{t('agreeDisagreedOnly')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -120,7 +123,7 @@ export function DecisionFilters({ filters, onChange }: DecisionFiltersProps) {
           }
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
         >
-          フィルターをリセット
+          {t('resetFilters')}
         </button>
       </div>
     </div>

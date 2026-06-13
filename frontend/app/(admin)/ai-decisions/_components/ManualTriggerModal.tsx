@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,7 @@ interface ManualTriggerModalProps {
 }
 
 export function ManualTriggerModal({ open, onClose, onTriggered }: ManualTriggerModalProps) {
+  const t = useTranslations('AdminManualTrigger')
   const { token } = useAuth()
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<AITriggerResponse | null>(null)
@@ -30,7 +32,7 @@ export function ManualTriggerModal({ open, onClose, onTriggered }: ManualTrigger
 
   async function handleTrigger() {
     if (!token) {
-      setErrorMsg('認証されていません')
+      setErrorMsg(t('errorNotAuthenticated'))
       return
     }
     setRunning(true)
@@ -42,7 +44,7 @@ export function ManualTriggerModal({ open, onClose, onTriggered }: ManualTrigger
       onTriggered?.()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : (err as { message?: string })?.message ?? String(err)
-      setErrorMsg(msg || 'AI判定の実行に失敗しました')
+      setErrorMsg(msg || t('errorTriggerFailed'))
     } finally {
       setRunning(false)
     }
@@ -59,10 +61,10 @@ export function ManualTriggerModal({ open, onClose, onTriggered }: ManualTrigger
       <DialogContent className="max-w-md bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
         <DialogHeader>
           <DialogTitle className="text-gray-900 dark:text-gray-100">
-            手動判定実行
+            {t('title')}
           </DialogTitle>
           <DialogDescription className="text-gray-600 dark:text-gray-400">
-            AI判定ジョブを今すぐ1回実行します。BUY/SELL判定時はアクティブユーザー全員に提案が作成されます。
+            {t('description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -70,16 +72,16 @@ export function ManualTriggerModal({ open, onClose, onTriggered }: ManualTrigger
           {/* Result */}
           {result && (
             <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 p-3 space-y-1 text-sm">
-              <p className="font-semibold text-green-700 dark:text-green-300">判定完了</p>
+              <p className="font-semibold text-green-700 dark:text-green-300">{t('resultTitle')}</p>
               <p className="text-green-600 dark:text-green-400">
-                判定: <span className="font-mono font-bold">{result.action}</span>
-                {' '}（信頼度 {result.confidence}%）
+                {t('resultAction')}: <span className="font-mono font-bold">{result.action}</span>
+                {' '}({t('resultConfidence', { confidence: result.confidence })})
               </p>
               <p className="text-green-600 dark:text-green-400">
-                作成された提案: {result.proposals_created}件
+                {t('resultProposals', { count: result.proposals_created })}
               </p>
               <p className="text-xs text-green-500 dark:text-green-600">
-                判定ID: {result.decision_id}
+                {t('resultDecisionId')}: {result.decision_id}
               </p>
             </div>
           )}
@@ -87,7 +89,7 @@ export function ManualTriggerModal({ open, onClose, onTriggered }: ManualTrigger
           {/* Error */}
           {errorMsg && (
             <p className="text-sm text-red-600 dark:text-red-400">
-              エラー: {errorMsg}
+              {t('errorPrefix')}: {errorMsg}
             </p>
           )}
 
@@ -99,7 +101,7 @@ export function ManualTriggerModal({ open, onClose, onTriggered }: ManualTrigger
               disabled={running}
               className="border-gray-300 dark:border-gray-600"
             >
-              {result ? '閉じる' : 'キャンセル'}
+              {result ? t('closeBtn') : t('cancelBtn')}
             </Button>
             {!result && (
               <Button
@@ -108,7 +110,7 @@ export function ManualTriggerModal({ open, onClose, onTriggered }: ManualTrigger
                 disabled={running}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
-                {running ? '実行中...' : '実行'}
+                {running ? t('runningBtn') : t('executeBtn')}
               </Button>
             )}
           </div>

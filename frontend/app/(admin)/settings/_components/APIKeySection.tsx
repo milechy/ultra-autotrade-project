@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React, { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -35,6 +36,7 @@ interface APIKeySectionProps {
 }
 
 export function APIKeySection({ apiKeys, onRotate }: APIKeySectionProps) {
+  const t = useTranslations('AdminAPIKeySection')
   const [rotateTarget, setRotateTarget] = useState<string | null>(null)
   const [rotating, setRotating] = useState(false)
 
@@ -60,7 +62,7 @@ export function APIKeySection({ apiKeys, onRotate }: APIKeySectionProps) {
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader className="pb-3">
           <CardTitle className="text-gray-100 text-base font-semibold">
-            APIキー管理
+            {t('title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -68,11 +70,11 @@ export function APIKeySection({ apiKeys, onRotate }: APIKeySectionProps) {
             <Table>
               <TableHeader>
                 <TableRow className="border-gray-800 hover:bg-transparent">
-                  <TableHead className="text-gray-500 text-xs">キー名</TableHead>
-                  <TableHead className="text-gray-500 text-xs">作成日</TableHead>
-                  <TableHead className="text-gray-500 text-xs">マスクキー</TableHead>
-                  <TableHead className="text-gray-500 text-xs">ステータス</TableHead>
-                  <TableHead className="text-gray-500 text-xs text-right">操作</TableHead>
+                  <TableHead className="text-gray-500 text-xs">{t('colName')}</TableHead>
+                  <TableHead className="text-gray-500 text-xs">{t('colCreatedAt')}</TableHead>
+                  <TableHead className="text-gray-500 text-xs">{t('colMaskedKey')}</TableHead>
+                  <TableHead className="text-gray-500 text-xs">{t('colStatus')}</TableHead>
+                  <TableHead className="text-gray-500 text-xs text-right">{t('colAction')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -98,7 +100,7 @@ export function APIKeySection({ apiKeys, onRotate }: APIKeySectionProps) {
                             : 'bg-gray-800 text-gray-500 border border-gray-700'
                         }`}
                       >
-                        {key.status === 'active' ? '有効' : '無効'}
+                        {key.status === 'active' ? t('statusActive') : t('statusInactive')}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
@@ -108,7 +110,7 @@ export function APIKeySection({ apiKeys, onRotate }: APIKeySectionProps) {
                         onClick={() => handleRotateClick(key.name)}
                         className="border-gray-700 text-gray-300 hover:bg-gray-800 text-xs"
                       >
-                        ローテーション
+                        {t('rotateBtn')}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -117,7 +119,7 @@ export function APIKeySection({ apiKeys, onRotate }: APIKeySectionProps) {
             </Table>
           </div>
           <p className="mt-3 text-xs text-gray-600">
-            Phase 1はモック表示のみ。APIキーのフルテキストは表示されません。
+            {t('mockNote')}
           </p>
         </CardContent>
       </Card>
@@ -130,10 +132,10 @@ export function APIKeySection({ apiKeys, onRotate }: APIKeySectionProps) {
       >
         <DialogContent className="bg-gray-900 border-gray-700 text-gray-100 max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-gray-100">APIキーのローテーション確認</DialogTitle>
+            <DialogTitle className="text-gray-100">{t('dialogTitle')}</DialogTitle>
             <DialogDescription className="text-gray-400">
               <span className="font-semibold text-gray-200">{rotateTarget}</span>{' '}
-              をローテーションしますか？現在のキーは無効化されます。
+              {t('dialogDescription')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 mt-2">
@@ -143,14 +145,14 @@ export function APIKeySection({ apiKeys, onRotate }: APIKeySectionProps) {
               disabled={rotating}
               className="border-gray-700 text-gray-300 hover:bg-gray-800"
             >
-              キャンセル
+              {t('cancelBtn')}
             </Button>
             <Button
               onClick={handleConfirmRotate}
               disabled={rotating}
               className="bg-blue-700 hover:bg-blue-600 text-white"
             >
-              {rotating ? 'ローテーション中...' : 'ローテーションする'}
+              {rotating ? t('rotatingBtn') : t('confirmRotateBtn')}
             </Button>
           </DialogFooter>
         </DialogContent>

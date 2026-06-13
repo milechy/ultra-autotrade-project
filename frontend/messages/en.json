@@ -2827,5 +2827,120 @@
     "runbookHeading": "Operations Actions (Runbook)",
     "runbookItem1": "Review highlights and confirm there are no unresolved warnings.",
     "runbookItem2": "If report generation fails, check ReportingService logs and dependencies."
+  },
+  "AdminAPIKeySection": {
+    "title": "API Key Management",
+    "colName": "Key Name",
+    "colCreatedAt": "Created At",
+    "colMaskedKey": "Masked Key",
+    "colStatus": "Status",
+    "colAction": "Actions",
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "rotateBtn": "Rotate",
+    "mockNote": "Phase 1 mock display only. Full API key text is not shown.",
+    "dialogTitle": "Confirm API Key Rotation",
+    "dialogDescription": "will be rotated. The current key will be revoked.",
+    "cancelBtn": "Cancel",
+    "rotatingBtn": "Rotating...",
+    "confirmRotateBtn": "Rotate Key"
+  },
+  "AdminAISettings": {
+    "title": "AI Decision Settings",
+    "labelFrequency": "Decision Frequency",
+    "freq1h": "1 hour",
+    "freq2h": "2 hours",
+    "freq4h": "4 hours",
+    "freq8h": "8 hours",
+    "freqManual": "Manual only",
+    "labelConfidenceThreshold": "Confidence Threshold",
+    "labelCrossVerification": "Cross-Verification"
+  },
+  "AdminOperationMode": {
+    "title": "Operation Mode",
+    "modeNormalLabel": "Normal",
+    "modeNormalDescription": "AI-driven automated trading runs as usual.",
+    "modeSafeModeLabel": "Safe Mode",
+    "modeSafeModeDescription": "Trading paused; monitoring only.",
+    "modeHardStopLabel": "Emergency Stop",
+    "modeHardStopDescription": "All automated trading halted immediately.",
+    "currentMode": "Current mode",
+    "dialogTitle": "Confirm Mode Change",
+    "dialogDescription": "Change operation mode to",
+    "dialogDescriptionSuffix": "?",
+    "hardStopWarning": "Warning: Enabling Emergency Stop will halt all automated trading immediately.",
+    "cancelBtn": "Cancel",
+    "confirmBtn": "Apply"
+  },
+  "AdminFeeConfig": {
+    "title": "Fee Settings (Fee Model v10)",
+    "effectiveFrom": "Effective from",
+    "loading": "Loading...",
+    "fetchError": "Failed to fetch data",
+    "tierSectionTitle": "Fee Rate / Monthly Yield Cap by Tier",
+    "colDepositMin": "Min Deposit",
+    "colFeeRate": "Fee Rate",
+    "colMonthlyYieldCap": "Monthly Yield Cap",
+    "subscriptionSectionTitle": "Subscription Rates",
+    "otherRatesSectionTitle": "Other Rates",
+    "expenseMarkup": "Expense Markup",
+    "affiliateRate": "Referral Campaign Rate",
+    "disabled": "Disabled",
+    "writeNote": "* Configuration changes require direct DB update + script re-run (UI write not supported / Phase 1)"
+  },
+  "AdminNotification": {
+    "title": "Notification Settings",
+    "lineTokenLabel": "LINE Token",
+    "testSendBtn": "Send Test",
+    "sendingBtn": "Sending...",
+    "revealBtn": "Show",
+    "hideBtn": "Hide",
+    "slackTestSent": "Slack test message sent (mock)",
+    "lineTestSent": "LINE test message sent (mock)",
+    "labelNotificationLevel": "Notification Level"
+  },
+  "AdminSettingsConfig": {
+    "pageTitle": "System Settings - Ultra AutoTrade",
+    "heading": "System Settings",
+    "subheading": "Manage operation mode, AI decisions, Risk Engine, notifications, and API keys."
+  },
+  "AdminDecisionFilters": {
+    "title": "Filters",
+    "labelActionFilter": "By Action",
+    "labelConfidenceRange": "Confidence Range",
+    "confidenceAll": "All ranges",
+    "confidence0to50": "0–50%",
+    "confidence50to70": "50–70%",
+    "confidence70to100": "70–100%",
+    "labelAgreeFilter": "Agreement",
+    "agreeAgreedOnly": "Agreed only",
+    "agreeDisagreedOnly": "Disagreed only",
+    "resetFilters": "Reset filters"
+  },
+  "AdminManualTrigger": {
+    "title": "Manual Trigger",
+    "description": "Run the AI decision job once now. For BUY/SELL decisions, proposals will be created for all active users.",
+    "errorNotAuthenticated": "Not authenticated",
+    "errorTriggerFailed": "Failed to run AI decision",
+    "resultTitle": "Decision complete",
+    "resultAction": "Decision",
+    "resultConfidence": "confidence {confidence}%",
+    "resultProposals": "Proposals created: {count}",
+    "resultDecisionId": "Decision ID",
+    "errorPrefix": "Error",
+    "closeBtn": "Close",
+    "cancelBtn": "Cancel",
+    "runningBtn": "Running...",
+    "executeBtn": "Execute"
+  },
+  "AdminDecisionKPIs": {
+    "labelTodayCount": "Today's Decisions",
+    "suffixCount": "",
+    "labelBuySellRatio": "BUY/SELL Ratio",
+    "labelAvgConfidence": "Avg. Confidence"
+  },
+  "AdminActionDistributionChart": {
+    "title": "BUY/SELL/HOLD Distribution",
+    "noData": "No data"
   }
 }
