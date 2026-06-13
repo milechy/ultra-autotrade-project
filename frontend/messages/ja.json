@@ -1041,7 +1041,7 @@
       "bullet3": "判定の詳細を全て確認できます"
     }
   },
-    "Help": {
+  "Help": {
     "pageTitle": "よくある質問",
     "pageSubtitle": "Ultra AutoTradeの利用に関するFAQです",
     "faqs": {
@@ -1304,5 +1304,63 @@
     "noRecentApprovals": "承認履歴はありません",
     "statusSuccess": "成功",
     "statusFailed": "失敗"
+  },
+  "AdminSettingsUsers": {
+    "pageTitle": "ユーザー管理 - Ultra AutoTrade",
+    "heading": "ユーザー管理",
+    "description": "ユーザーアカウントと権限を管理します。",
+    "inviteButton": "招待",
+    "createButton": "+ ユーザー作成",
+    "loading": "読み込み中...",
+    "colEmail": "メールアドレス",
+    "colUsername": "ユーザー名",
+    "colRole": "ロール",
+    "colStatus": "ステータス",
+    "colLastLogin": "最終ログイン",
+    "colActions": "操作",
+    "youBadge": "あなた",
+    "roleChangeTitle": "ロールを変更",
+    "lastLoginUnknown": "不明",
+    "editButton": "編集",
+    "disableButton": "無効化",
+    "enableButton": "有効化",
+    "errorLoadUsers": "ユーザーの読み込みに失敗しました",
+    "errorGeneric": "操作に失敗しました",
+    "errorRoleChange": "ロール変更に失敗しました",
+    "errorInvite": "招待に失敗しました",
+    "roles": {
+      "viewer": "閲覧者",
+      "editor": "編集者",
+      "partner": "パートナー",
+      "admin": "管理者"
+    },
+    "statusActive": "有効",
+    "statusInactive": "無効",
+    "createModalTitle": "新規ユーザー作成",
+    "editModalTitle": "ユーザー編集",
+    "fieldEmail": "メールアドレス",
+    "fieldUsername": "ユーザー名",
+    "fieldPassword": "パスワード",
+    "fieldPasswordEdit": "新しいパスワード（変更しない場合は空欄）",
+    "fieldRole": "ロール",
+    "fieldActive": "有効",
+    "errorPasswordLength": "パスワードは8文字以上必要です",
+    "saving": "保存中...",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "disableModalTitle": "ユーザー無効化",
+    "disableConfirmText": "ユーザー {username}（{email}）を無効化しますか？",
+    "disableWarning": "無効化されたユーザーはログインできなくなります。後から有効化することも可能です。",
+    "processing": "処理中...",
+    "inviteModalTitle": "ユーザー招待",
+    "inviteModalDescription": "メールアドレスを入力してください。一時パスワードが自動生成されます。",
+    "inviting": "招待中...",
+    "inviteSubmit": "招待する",
+    "inviteResultTitle": "招待完了",
+    "inviteResultText": "{email} のアカウントを作成しました。以下の一時パスワードをユーザーに共有してください。",
+    "copyButton": "コピー",
+    "copiedButton": "コピー済",
+    "passwordWarning": "このパスワードは再表示できません。今すぐ控えてください。",
+    "closeButton": "閉じる"
   }
 }
