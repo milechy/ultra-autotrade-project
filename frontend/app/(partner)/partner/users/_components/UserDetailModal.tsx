@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   Dialog,
   DialogContent,
@@ -24,15 +25,6 @@ export interface UserDetailModalProps {
   onUpdated: (user: UserResponse) => void
   onDeleted: (userId: number) => void
   onEdit?: (user: UserResponse) => void
-}
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: '管理者',
-  partner: 'パートナー',
-  editor: '編集者',
-  viewer: '閲覧者',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -60,6 +52,7 @@ export function UserDetailModal({
   onDeleted,
   onEdit,
 }: UserDetailModalProps) {
+  const t = useTranslations('PartnerUserDetailModal')
   const [editing, setEditing] = useState(false)
   const [editUsername, setEditUsername] = useState('')
   const [editEmail, setEditEmail] = useState('')
@@ -68,6 +61,13 @@ export function UserDetailModal({
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+
+  const ROLE_LABELS: Record<string, string> = {
+    admin: t('roleAdmin'),
+    partner: t('rolePartner'),
+    editor: t('roleEditor'),
+    viewer: t('roleViewer'),
+  }
 
   function handleStartEdit() {
     if (!user) return
@@ -95,7 +95,7 @@ export function UserDetailModal({
       setEditing(false)
     } catch (e: unknown) {
       const err = e as { message?: string }
-      setEditError(err.message ?? '更新に失敗しました')
+      setEditError(err.message ?? t('updateFailed'))
     } finally {
       setEditLoading(false)
     }
@@ -111,7 +111,7 @@ export function UserDetailModal({
       setShowConfirmDelete(false)
     } catch (e: unknown) {
       const err = e as { message?: string }
-      setDeleteError(err.message ?? '削除に失敗しました')
+      setDeleteError(err.message ?? t('deleteFailed'))
     } finally {
       setDeleteLoading(false)
     }
@@ -130,9 +130,9 @@ export function UserDetailModal({
       <Dialog open={user !== null} onOpenChange={(o) => { if (!o) handleClose() }}>
         <DialogContent className="max-w-md bg-gray-950 border-gray-800">
           <DialogHeader>
-            <DialogTitle className="text-gray-100">ユーザー詳細</DialogTitle>
+            <DialogTitle className="text-gray-100">{t('title')}</DialogTitle>
             <DialogDescription className="text-gray-500 text-xs">
-              {user ? `登録日: ${formatDate(user.created_at)}` : ''}
+              {user ? t('registeredAt', { date: formatDate(user.created_at) }) : ''}
             </DialogDescription>
           </DialogHeader>
 
@@ -142,7 +142,7 @@ export function UserDetailModal({
                 {editing ? (
                   <>
                     <div>
-                      <label className="text-xs text-gray-500 mb-1 block">名前</label>
+                      <label className="text-xs text-gray-500 mb-1 block">{t('labelName')}</label>
                       <input
                         value={editUsername}
                         onChange={(e) => setEditUsername(e.target.value)}
@@ -150,7 +150,7 @@ export function UserDetailModal({
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-500 mb-1 block">メール</label>
+                      <label className="text-xs text-gray-500 mb-1 block">{t('labelEmail')}</label>
                       <input
                         type="email"
                         value={editEmail}
@@ -168,7 +168,7 @@ export function UserDetailModal({
                         onClick={handleCancelEdit}
                         className="border-gray-600 text-gray-300 hover:bg-gray-800"
                       >
-                        キャンセル
+                        {t('cancel')}
                       </Button>
                       <Button
                         size="sm"
@@ -176,28 +176,28 @@ export function UserDetailModal({
                         disabled={editLoading}
                         className="bg-blue-600 hover:bg-blue-700 text-white"
                       >
-                        {editLoading ? '保存中...' : '保存'}
+                        {editLoading ? t('saving') : t('save')}
                       </Button>
                     </div>
                   </>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">名前</div>
+                      <div className="text-xs text-gray-500 mb-1">{t('labelName')}</div>
                       <div className="text-gray-100">{user.username}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">メール</div>
+                      <div className="text-xs text-gray-500 mb-1">{t('labelEmail')}</div>
                       <div className="text-gray-100 text-xs break-all">{user.email}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">ロール</div>
+                      <div className="text-xs text-gray-500 mb-1">{t('labelRole')}</div>
                       <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-gray-700/50 text-gray-300">
                         {ROLE_LABELS[user.role] ?? user.role}
                       </span>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">ステータス</div>
+                      <div className="text-xs text-gray-500 mb-1">{t('labelStatus')}</div>
                       <span
                         className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${
                           user.is_active
@@ -205,15 +205,15 @@ export function UserDetailModal({
                             : 'bg-gray-700/50 text-gray-500'
                         }`}
                       >
-                        {user.is_active ? 'アクティブ' : '非アクティブ'}
+                        {user.is_active ? t('active') : t('inactive')}
                       </span>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">登録日</div>
+                      <div className="text-xs text-gray-500 mb-1">{t('labelRegisteredAt')}</div>
                       <div className="text-gray-300 text-xs">{formatDate(user.created_at)}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">最終更新</div>
+                      <div className="text-xs text-gray-500 mb-1">{t('labelLastUpdated')}</div>
                       <div className="text-gray-300 text-xs">{formatDate(user.updated_at)}</div>
                     </div>
                   </div>
@@ -228,7 +228,7 @@ export function UserDetailModal({
                     onClick={() => setShowConfirmDelete(true)}
                     className="border-red-800 text-red-400 hover:bg-red-950 hover:text-red-300"
                   >
-                    削除
+                    {t('delete')}
                   </Button>
                   <div className="flex gap-2">
                     {onEdit && (
@@ -238,7 +238,7 @@ export function UserDetailModal({
                         onClick={() => { handleClose(); onEdit(user) }}
                         className="border-gray-600 text-gray-300 hover:bg-gray-800"
                       >
-                        ログイン情報を編集
+                        {t('editLoginInfo')}
                       </Button>
                     )}
                     <Button
@@ -246,7 +246,7 @@ export function UserDetailModal({
                       onClick={handleStartEdit}
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
-                      編集
+                      {t('edit')}
                     </Button>
                   </div>
                 </div>
@@ -268,9 +268,9 @@ export function UserDetailModal({
       >
         <DialogContent className="max-w-sm bg-gray-900 border-gray-700">
           <DialogHeader>
-            <DialogTitle className="text-gray-100">ユーザーを無効化しますか？</DialogTitle>
+            <DialogTitle className="text-gray-100">{t('confirmDeleteTitle')}</DialogTitle>
             <DialogDescription className="text-gray-400">
-              このユーザーを削除します。この操作は取り消せません。
+              {t('confirmDeleteDesc')}
             </DialogDescription>
           </DialogHeader>
           {deleteError && <p className="text-xs text-red-400">{deleteError}</p>}
@@ -284,7 +284,7 @@ export function UserDetailModal({
               }}
               className="border-gray-600 text-gray-300 hover:bg-gray-800"
             >
-              キャンセル
+              {t('cancel')}
             </Button>
             <Button
               size="sm"
@@ -292,7 +292,7 @@ export function UserDetailModal({
               disabled={deleteLoading}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              {deleteLoading ? '削除中...' : '削除する'}
+              {deleteLoading ? t('deleting') : t('deleteConfirm')}
             </Button>
           </div>
         </DialogContent>
