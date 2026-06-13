@@ -2023,6 +2023,28 @@
     "section11Title": "11. Changes to Terms",
     "section11Body": "These terms may be changed with prior notice. If you continue to use the Service after changes are made, you will be deemed to have agreed to the revised terms."
   },
+  "AdminEvents": {
+    "browserTitle": "Monitoring Event Log - Ultra AutoTrade",
+    "pageTitle": "Monitoring Event Log",
+    "pageSubtitle": "Real-time display of system monitoring events",
+    "lastUpdated": "Last updated: {time} (auto-refresh every 30s)",
+    "mockDataNotice": "* Displaying mock data",
+    "filterLevel": "Level:",
+    "filterComponent": "Component:",
+    "componentAll": "All",
+    "filterDateRange": "Period:",
+    "loading": "Loading...",
+    "resultCount": "{count} event(s)",
+    "noResults": "No events match the current filters",
+    "detailTitle": "Event Detail",
+    "detailFieldId": "ID",
+    "detailFieldTimestamp": "Timestamp",
+    "detailFieldLevel": "Level",
+    "detailFieldComponent": "Component",
+    "detailFieldMessage": "Message",
+    "detailFieldMetricId": "Metric ID",
+    "detailFieldMetricValue": "Metric Value"
+  },
   "AdminTrades": {
     "pageTitle": "Trade History",
     "pageTitleTag": "Trade History - Ultra AutoTrade",

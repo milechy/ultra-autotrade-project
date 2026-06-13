@@ -2023,6 +2023,28 @@
     "section11Title": "11. 規約の変更",
     "section11Body": "本規約は事前通知のうえ変更されることがあります。変更後も本サービスを継続して利用された場合、変更後の規約に同意したものとみなします。"
   },
+  "AdminEvents": {
+    "browserTitle": "監視イベントログ - Ultra AutoTrade",
+    "pageTitle": "監視イベントログ",
+    "pageSubtitle": "システムの監視イベントをリアルタイムで表示します",
+    "lastUpdated": "最終更新: {time}（30秒自動更新）",
+    "mockDataNotice": "※ モックデータ表示中",
+    "filterLevel": "レベル:",
+    "filterComponent": "コンポーネント:",
+    "componentAll": "すべて",
+    "filterDateRange": "期間:",
+    "loading": "読み込み中...",
+    "resultCount": "{count} 件のイベント",
+    "noResults": "条件に一致するイベントがありません",
+    "detailTitle": "イベント詳細",
+    "detailFieldId": "ID",
+    "detailFieldTimestamp": "タイムスタンプ",
+    "detailFieldLevel": "レベル",
+    "detailFieldComponent": "コンポーネント",
+    "detailFieldMessage": "メッセージ",
+    "detailFieldMetricId": "メトリクスID",
+    "detailFieldMetricValue": "メトリクス値"
+  },
   "AdminTrades": {
     "pageTitle": "取引履歴",
     "pageTitleTag": "取引履歴 - Ultra AutoTrade",

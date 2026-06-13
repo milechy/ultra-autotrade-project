@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import React from "react";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import {
   searchKnowledge,
@@ -34,6 +35,7 @@ interface DebugMeta {
 }
 
 export default function RagTestPage() {
+  const t = useTranslations("AdminRagTest");
   const [query, setQuery] = React.useState("");
   const [topK, setTopK] = React.useState<number>(5);
   const [threshold, setThreshold] = React.useState<number>(0.7);
@@ -117,7 +119,7 @@ export default function RagTestPage() {
   return (
     <AuthGuard adminOnly>
       <>
-        <title>RAG 検索テスト (Admin) - Ultra AutoTrade</title>
+        <title>{t("pageTitle")}</title>
 
         {/* ページヘッダー */}
         <div
@@ -130,17 +132,17 @@ export default function RagTestPage() {
           }}
         >
           <div>
-            <h1 style={{ marginBottom: 4 }}>RAG 検索テスト</h1>
+            <h1 style={{ marginBottom: 4 }}>{t("heading")}</h1>
             <p style={{ marginTop: 0, color: "#666", fontSize: 14 }}>
-              ベクトル検索の動作確認・デバッグ用ページです。応答時間・生レスポンス・クエリ履歴を確認できます。
+              {t("description")}
             </p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <Link href="/knowledge/search" style={outlineBtnStyle}>
-              通常検索
+              {t("linkNormalSearch")}
             </Link>
             <Link href="/knowledge" style={outlineBtnStyle}>
-              ← ナレッジ一覧
+              {t("linkKnowledgeList")}
             </Link>
           </div>
         </div>
@@ -158,12 +160,12 @@ export default function RagTestPage() {
             >
               {/* クエリ入力 */}
               <div style={{ flex: 1, minWidth: 260 }}>
-                <label style={labelStyle}>検索クエリ</label>
+                <label style={labelStyle}>{t("labelQuery")}</label>
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="例: BTC の強気サインを教えて"
+                  placeholder={t("queryPlaceholder")}
                   required
                   style={inputStyle}
                   autoFocus
@@ -172,7 +174,7 @@ export default function RagTestPage() {
 
               {/* top_k */}
               <div>
-                <label style={labelStyle}>件数 (top_k)</label>
+                <label style={labelStyle}>{t("labelTopK")}</label>
                 <select
                   value={topK}
                   onChange={(e) => setTopK(Number(e.target.value))}
@@ -180,7 +182,7 @@ export default function RagTestPage() {
                 >
                   {TOP_K_OPTIONS.map((n) => (
                     <option key={n} value={n}>
-                      {n} 件
+                      {t("topKOption", { count: n })}
                     </option>
                   ))}
                 </select>
@@ -188,15 +190,15 @@ export default function RagTestPage() {
 
               {/* 類似度閾値 */}
               <div>
-                <label style={labelStyle}>類似度閾値</label>
+                <label style={labelStyle}>{t("labelThreshold")}</label>
                 <select
                   value={threshold}
                   onChange={(e) => setThreshold(Number(e.target.value))}
                   style={{ ...inputStyle, width: 90 }}
                 >
-                  {SIMILARITY_THRESHOLDS.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
+                  {SIMILARITY_THRESHOLDS.map((th) => (
+                    <option key={th} value={th}>
+                      {th}
                     </option>
                   ))}
                 </select>
@@ -212,7 +214,7 @@ export default function RagTestPage() {
                     searching || !query.trim() ? "not-allowed" : "pointer",
                 }}
               >
-                {searching ? "検索中..." : "検索"}
+                {searching ? t("btnSearching") : t("btnSearch")}
               </button>
             </div>
           </form>
@@ -235,7 +237,7 @@ export default function RagTestPage() {
               }}
             >
               <h2 style={{ fontSize: 16, margin: 0 }}>
-                検索結果
+                {t("resultsHeading")}
                 <span
                   style={{
                     fontWeight: 400,
@@ -244,12 +246,11 @@ export default function RagTestPage() {
                     marginLeft: 8,
                   }}
                 >
-                  「{lastQuery}」— {results.length} 件
+                  {t("resultsSummary", { query: lastQuery, count: results.length })}
                   {results.length !== debugMeta.rawResponse.results.length && (
                     <span style={{ color: "#b45309" }}>
                       {" "}
-                      (閾値フィルタ後 / 全{" "}
-                      {debugMeta.rawResponse.results.length} 件)
+                      {t("resultsFilterNote", { total: debugMeta.rawResponse.results.length })}
                     </span>
                   )}
                 </span>
@@ -282,7 +283,7 @@ export default function RagTestPage() {
                         : "#fecaca"),
                 }}
               >
-                応答時間: {debugMeta.responseMs}ms
+                {t("responseTimeBadge", { ms: debugMeta.responseMs })}
               </span>
 
               {/* 生JSON トグル */}
@@ -291,7 +292,7 @@ export default function RagTestPage() {
                 onClick={() => setShowRaw((v) => !v)}
                 style={outlineBtnStyle}
               >
-                {showRaw ? "生JSONを隠す" : "生JSONを表示"}
+                {showRaw ? t("btnHideRawJson") : t("btnShowRawJson")}
               </button>
             </div>
 
@@ -351,15 +352,15 @@ export default function RagTestPage() {
                 }}
               >
                 <div>
-                  <span style={{ color: "#94a3b8" }}>リクエスト時刻: </span>
+                  <span style={{ color: "#94a3b8" }}>{t("debugRequestedAt")} </span>
                   {formatTime(debugMeta.requestedAt)}
                 </div>
                 <div>
-                  <span style={{ color: "#94a3b8" }}>レスポンス時刻: </span>
+                  <span style={{ color: "#94a3b8" }}>{t("debugRespondedAt")} </span>
                   {formatTime(debugMeta.respondedAt)}
                 </div>
                 <div>
-                  <span style={{ color: "#94a3b8" }}>応答時間: </span>
+                  <span style={{ color: "#94a3b8" }}>{t("debugResponseMs")} </span>
                   {debugMeta.responseMs}ms
                 </div>
                 <div>
@@ -367,15 +368,15 @@ export default function RagTestPage() {
                   {debugMeta.topK}
                 </div>
                 <div>
-                  <span style={{ color: "#94a3b8" }}>類似度閾値: </span>
+                  <span style={{ color: "#94a3b8" }}>{t("debugThreshold")} </span>
                   {debugMeta.threshold}
                 </div>
                 <div>
-                  <span style={{ color: "#94a3b8" }}>APIヒット数: </span>
+                  <span style={{ color: "#94a3b8" }}>{t("debugApiHits")} </span>
                   {debugMeta.rawResponse.count}
                 </div>
                 <div>
-                  <span style={{ color: "#94a3b8" }}>フィルタ後件数: </span>
+                  <span style={{ color: "#94a3b8" }}>{t("debugFilteredCount")} </span>
                   {results.length}
                 </div>
               </div>
@@ -384,7 +385,7 @@ export default function RagTestPage() {
             {/* 結果リスト */}
             {results.length === 0 ? (
               <p style={{ color: "#888", marginTop: 16 }}>
-                該当するナレッジが見つかりませんでした。類似度閾値を下げるか、クエリを変えてお試しください。
+                {t("noResults")}
               </p>
             ) : (
               <div
@@ -442,7 +443,7 @@ export default function RagTestPage() {
                         <span style={{ fontWeight: 600, color: "#111" }}>
                           {r.title ?? (
                             <span style={{ color: "#aaa", fontWeight: 400 }}>
-                              （タイトルなし）
+                              {t("noTitle")}
                             </span>
                           )}
                         </span>
@@ -460,7 +461,7 @@ export default function RagTestPage() {
                           flexShrink: 0,
                         }}
                       >
-                        類似度 {(r.similarity * 100).toFixed(1)}%
+                        {t("similarityBadge", { pct: (r.similarity * 100).toFixed(1) })}
                       </span>
                     </div>
 
@@ -544,7 +545,7 @@ export default function RagTestPage() {
                 marginBottom: 10,
               }}
             >
-              クエリ履歴（直近 {MAX_HISTORY} 件）
+              {t("historyHeading", { max: MAX_HISTORY })}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {history.map((entry, idx) => (
@@ -581,8 +582,12 @@ export default function RagTestPage() {
                     {entry.query}
                   </span>
                   <span style={{ fontSize: 11, color: "#64748b" }}>
-                    top_k={entry.topK} / 閾値={entry.threshold} /{" "}
-                    {entry.resultCount}件 / {entry.responseMs}ms
+                    {t("historyEntryMeta", {
+                      topK: entry.topK,
+                      threshold: entry.threshold,
+                      resultCount: entry.resultCount,
+                      responseMs: entry.responseMs,
+                    })}
                   </span>
                   <button
                     type="button"
@@ -593,7 +598,7 @@ export default function RagTestPage() {
                       padding: "3px 10px",
                     }}
                   >
-                    再実行
+                    {t("btnRerun")}
                   </button>
                 </div>
               ))}
