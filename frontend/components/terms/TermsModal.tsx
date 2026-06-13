@@ -3,6 +3,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { getAuthToken } from "@/lib/auth/token-key";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -13,6 +14,7 @@ interface TermsModalProps {
 }
 
 export default function TermsModal({ onAccepted }: TermsModalProps) {
+  const t = useTranslations("TermsModal");
   const [checked, setChecked] = useState({
     terms: false,
     risk: false,
@@ -54,10 +56,10 @@ export default function TermsModal({ onAccepted }: TermsModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div className="mx-4 w-full max-w-lg rounded-2xl border border-zinc-700 bg-zinc-900 p-8 shadow-2xl">
         <h2 className="mb-2 text-xl font-bold text-zinc-100">
-          Ultra AutoTrade 利用規約への同意
+          {t("title")}
         </h2>
         <p className="mb-6 text-sm text-zinc-400">
-          サービスを利用するには、以下の全ての規約に同意する必要があります。
+          {t("subtitle")}
         </p>
 
         <div className="space-y-4">
@@ -70,14 +72,14 @@ export default function TermsModal({ onAccepted }: TermsModalProps) {
             />
             <div>
               <span className="text-sm font-medium text-zinc-200 group-hover:text-white">
-                利用規約に同意します
+                {t("termsConsentLabel")}
               </span>
               <a
                 href="/docs/terms-of-service"
                 target="_blank"
                 className="ml-2 text-xs text-blue-400 hover:underline"
               >
-                全文を読む →
+                {t("readFullLink")}
               </a>
             </div>
           </label>
@@ -91,17 +93,17 @@ export default function TermsModal({ onAccepted }: TermsModalProps) {
             />
             <div>
               <span className="text-sm font-medium text-zinc-200 group-hover:text-white">
-                リスク開示書を理解し同意します
+                {t("riskConsentLabel")}
               </span>
               <a
                 href="/docs/risk-disclosure"
                 target="_blank"
                 className="ml-2 text-xs text-blue-400 hover:underline"
               >
-                全文を読む →
+                {t("readFullLink")}
               </a>
               <p className="mt-1 text-xs text-zinc-500">
-                暗号資産の取引には元本を失うリスクがあります
+                {t("riskWarning")}
               </p>
             </div>
           </label>
@@ -115,14 +117,14 @@ export default function TermsModal({ onAccepted }: TermsModalProps) {
             />
             <div>
               <span className="text-sm font-medium text-zinc-200 group-hover:text-white">
-                プライバシーポリシーに同意します
+                {t("privacyConsentLabel")}
               </span>
               <a
                 href="/docs/privacy-policy"
                 target="_blank"
                 className="ml-2 text-xs text-blue-400 hover:underline"
               >
-                全文を読む →
+                {t("readFullLink")}
               </a>
             </div>
           </label>
@@ -135,7 +137,7 @@ export default function TermsModal({ onAccepted }: TermsModalProps) {
               className={checkboxClass}
             />
             <span className="text-sm font-medium text-zinc-200 group-hover:text-white">
-              18歳以上であることを確認します
+              {t("ageConsentLabel")}
             </span>
           </label>
         </div>
@@ -155,11 +157,11 @@ export default function TermsModal({ onAccepted }: TermsModalProps) {
               : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
           }`}
         >
-          {submitting ? "処理中..." : "同意してサービスを利用する"}
+          {submitting ? t("submittingButton") : t("submitButton")}
         </button>
 
         <p className="mt-4 text-center text-xs text-zinc-600">
-          v{CURRENT_VERSION} • 同意内容はサーバーに記録されます
+          {t("pageFooter", { version: CURRENT_VERSION })}
         </p>
       </div>
     </div>

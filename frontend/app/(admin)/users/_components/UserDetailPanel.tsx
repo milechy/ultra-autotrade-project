@@ -4,6 +4,7 @@
 
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
+import { useTranslations } from 'next-intl'
 import {
   Dialog,
   DialogContent,
@@ -111,12 +112,6 @@ function formatUSD(value: number): string {
   return '$' + value.toLocaleString('ja-JP', { maximumFractionDigits: 0 })
 }
 
-const RISK_LABELS: Record<RiskMode, string> = {
-  conservative: '保守',
-  balanced: 'バランス',
-  aggressive: '積極',
-}
-
 const RISK_COLORS: Record<RiskMode, string> = {
   conservative: 'bg-blue-900/50 text-blue-300 border-blue-800',
   balanced: 'bg-yellow-900/50 text-yellow-300 border-yellow-800',
@@ -148,7 +143,8 @@ function ConfirmToggleDialog({
   onConfirm: () => void
   onCancel: () => void
 }) {
-  const action = isPaused ? '再開' : '停止'
+  const t = useTranslations('UserDetailPanel')
+  const action = isPaused ? t('actionResume') : t('actionPause')
   const actionColor = isPaused
     ? 'bg-green-600 hover:bg-green-700'
     : 'bg-red-600 hover:bg-red-700'
@@ -158,12 +154,12 @@ function ConfirmToggleDialog({
       <DialogContent className="max-w-sm bg-gray-900 border-gray-700">
         <DialogHeader>
           <DialogTitle className="text-gray-100">
-            ユーザーを{action}しますか？
+            {t('confirmToggleTitle', { action })}
           </DialogTitle>
           <DialogDescription className="text-gray-400">
             {isPaused
-              ? 'このユーザーの自動取引を再開します。'
-              : 'このユーザーの自動取引を一時停止します。'}
+              ? t('confirmResumeBody')
+              : t('confirmPauseBody')}
           </DialogDescription>
         </DialogHeader>
         <div className="flex gap-2 justify-end pt-2">
@@ -173,14 +169,14 @@ function ConfirmToggleDialog({
             onClick={onCancel}
             className="border-gray-600 text-gray-300 hover:bg-gray-800"
           >
-            キャンセル
+            {t('cancelButton')}
           </Button>
           <Button
             size="sm"
             onClick={onConfirm}
             className={`text-white ${actionColor}`}
           >
-            {action}する
+            {t('confirmActionButton', { action })}
           </Button>
         </div>
       </DialogContent>
@@ -201,6 +197,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function UserDetailPanel({ user, onClose, onTogglePause }: UserDetailPanelProps) {
+  const t = useTranslations('UserDetailPanel')
   const [showConfirm, setShowConfirm] = useState(false)
 
   function handleToggleClick() {
@@ -213,25 +210,31 @@ export function UserDetailPanel({ user, onClose, onTogglePause }: UserDetailPane
     setShowConfirm(false)
   }
 
+  const RISK_LABELS: Record<RiskMode, string> = {
+    conservative: t('riskConservative'),
+    balanced: t('riskBalanced'),
+    aggressive: t('riskAggressive'),
+  }
+
   return (
     <>
       <Dialog open={user !== null} onOpenChange={(open) => { if (!open) onClose() }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-gray-950 border-gray-800 text-gray-100">
           <DialogHeader>
             <DialogTitle className="text-gray-100 flex items-center gap-2">
-              ユーザー詳細
+              {t('dialogTitle')}
               {user && (
                 <span className={`text-xs px-2 py-0.5 rounded-full border ${
                   user.isPaused
                     ? 'bg-orange-900/50 text-orange-300 border-orange-800'
                     : 'bg-green-900/50 text-green-300 border-green-800'
                 }`}>
-                  {user.isPaused ? '停止中' : '稼働中'}
+                  {user.isPaused ? t('statusPaused') : t('statusActive')}
                 </span>
               )}
             </DialogTitle>
             <DialogDescription className="text-gray-500 text-xs">
-              {user ? `登録日: ${formatDate(user.registeredAt)}` : ''}
+              {user ? t('registeredAt', { date: formatDate(user.registeredAt) }) : ''}
             </DialogDescription>
           </DialogHeader>
 
@@ -239,28 +242,28 @@ export function UserDetailPanel({ user, onClose, onTogglePause }: UserDetailPane
             <div className="space-y-5 text-sm">
               {/* Basic info */}
               <div className="rounded-lg bg-gray-800/60 p-4 space-y-3">
-                <SectionHeading>基本情報</SectionHeading>
+                <SectionHeading>{t('sectionBasicInfo')}</SectionHeading>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">ウォレットアドレス</div>
+                    <div className="text-xs text-gray-500 mb-1">{t('fieldWallet')}</div>
                     <WalletAddressMask address={user.address} chars={10} />
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">AUM</div>
+                    <div className="text-xs text-gray-500 mb-1">{t('fieldAum')}</div>
                     <div className="font-semibold text-gray-100">{formatUSD(user.aum)}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">リスクモード</div>
+                    <div className="text-xs text-gray-500 mb-1">{t('fieldRiskMode')}</div>
                     <span className={`inline-block text-xs px-2 py-0.5 rounded-full border ${RISK_COLORS[user.riskMode]}`}>
                       {RISK_LABELS[user.riskMode]}
                     </span>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">最終アクティビティ</div>
+                    <div className="text-xs text-gray-500 mb-1">{t('fieldLastActivity')}</div>
                     <div className="text-gray-300 text-xs">{formatDateTime(user.lastActivity)}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">ヘルスファクター</div>
+                    <div className="text-xs text-gray-500 mb-1">{t('fieldHealthFactor')}</div>
                     <div className={`font-mono font-bold ${
                       user.healthFactor < 1.6 ? 'text-red-400' :
                       user.healthFactor < 2.0 ? 'text-yellow-400' : 'text-green-400'
@@ -269,9 +272,9 @@ export function UserDetailPanel({ user, onClose, onTogglePause }: UserDetailPane
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">KYCステータス</div>
+                    <div className="text-xs text-gray-500 mb-1">{t('fieldKyc')}</div>
                     <Badge variant="outline" className="text-xs border-gray-600 text-gray-500">
-                      未実装 — Phase 2で対応
+                      {t('kycNotImplemented')}
                     </Badge>
                   </div>
                 </div>
@@ -279,13 +282,13 @@ export function UserDetailPanel({ user, onClose, onTogglePause }: UserDetailPane
 
               {/* Positions */}
               <div>
-                <SectionHeading>ポジション一覧</SectionHeading>
+                <SectionHeading>{t('sectionPositions')}</SectionHeading>
                 <UserPositions positions={user.positions} />
               </div>
 
               {/* HF Chart */}
               <div>
-                <SectionHeading>ヘルスファクター推移（直近7日）</SectionHeading>
+                <SectionHeading>{t('sectionHfChart')}</SectionHeading>
                 <div className="rounded-lg bg-gray-800/60 p-3">
                   <UserHFChart data={user.hfHistory} />
                 </div>
@@ -293,9 +296,9 @@ export function UserDetailPanel({ user, onClose, onTogglePause }: UserDetailPane
 
               {/* Recent trades */}
               <div>
-                <SectionHeading>取引履歴（直近5件）</SectionHeading>
+                <SectionHeading>{t('sectionRecentTrades')}</SectionHeading>
                 {user.recentTrades.length === 0 ? (
-                  <div className="text-xs text-gray-500 py-2 text-center">取引履歴なし</div>
+                  <div className="text-xs text-gray-500 py-2 text-center">{t('noTradeHistory')}</div>
                 ) : (
                   <div className="space-y-1.5">
                     {user.recentTrades.map((trade) => (
@@ -323,9 +326,9 @@ export function UserDetailPanel({ user, onClose, onTogglePause }: UserDetailPane
 
               {/* Recent AI decisions */}
               <div>
-                <SectionHeading>AI判定履歴（直近5件）</SectionHeading>
+                <SectionHeading>{t('sectionRecentDecisions')}</SectionHeading>
                 {user.recentDecisions.length === 0 ? (
-                  <div className="text-xs text-gray-500 py-2 text-center">AI判定履歴なし</div>
+                  <div className="text-xs text-gray-500 py-2 text-center">{t('noDecisionHistory')}</div>
                 ) : (
                   <div className="space-y-1.5">
                     {user.recentDecisions.map((dec) => (
@@ -339,7 +342,7 @@ export function UserDetailPanel({ user, onClose, onTogglePause }: UserDetailPane
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="font-mono text-gray-300">信頼度 {dec.confidence}%</span>
+                          <span className="font-mono text-gray-300">{t('confidenceLabel', { pct: dec.confidence })}</span>
                           <span className="text-gray-500">{formatDateTime(dec.timestamp)}</span>
                         </div>
                       </div>
@@ -359,7 +362,7 @@ export function UserDetailPanel({ user, onClose, onTogglePause }: UserDetailPane
                       : 'bg-orange-600 hover:bg-orange-700 text-white'
                   }
                 >
-                  {user.isPaused ? 'ユーザー再開' : 'ユーザー停止'}
+                  {user.isPaused ? t('buttonResume') : t('buttonPause')}
                 </Button>
               </div>
             </div>

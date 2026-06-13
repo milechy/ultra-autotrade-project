@@ -5,37 +5,39 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
+import { useTranslations } from 'next-intl';
 import { useAuth } from "../../lib/auth";
-
-const adminNavLinks = [
-  { href: "/dashboard/automation", label: "自動売買" },
-  { href: "/reports", label: "レポート" },
-  { href: "/knowledge", label: "ナレッジ" },
-  { href: "/ai-decisions", label: "AI判定" },
-  { href: "/ai-learning", label: "AI学習" },
-  { href: "/protocols", label: "プロトコル" },
-  { href: "/events", label: "データ" },
-  { href: "/trades", label: "取引所管理" },
-  { href: "/proposals", label: "提案管理" },
-  { href: "/fee-management", label: "手数料管理" },
-  { href: "/user/dashboard", label: "ユーザーアプリ →", highlight: true },
-];
-
-const partnerNavLinks: Array<{ href: string; label: string; highlight?: boolean }> = [
-  { href: "/partner/dashboard", label: "ダッシュボード" },
-  { href: "/partner/referral", label: "紹介プログラム" },
-  { href: "/partner/users", label: "テスター管理" },
-  { href: "/partner/proposals", label: "AI提案" },
-  { href: "/partner/notifications", label: "通知ログ" },
-  { href: "/partner/settings", label: "設定" },
-];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout, isLoading, isAdmin, isPartner } = useAuth();
   const router = useRouter();
+  const t = useTranslations('AppShell');
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const adminNavLinks = [
+    { href: "/dashboard/automation", label: t('adminNav.automation') },
+    { href: "/reports", label: t('adminNav.reports') },
+    { href: "/knowledge", label: t('adminNav.knowledge') },
+    { href: "/ai-decisions", label: t('adminNav.aiDecisions') },
+    { href: "/ai-learning", label: t('adminNav.aiLearning') },
+    { href: "/protocols", label: t('adminNav.protocols') },
+    { href: "/events", label: t('adminNav.events') },
+    { href: "/trades", label: t('adminNav.trades') },
+    { href: "/proposals", label: t('adminNav.proposals') },
+    { href: "/fee-management", label: t('adminNav.feeManagement') },
+    { href: "/user/dashboard", label: t('adminNav.userApp'), highlight: true },
+  ];
+
+  const partnerNavLinks: Array<{ href: string; label: string; highlight?: boolean }> = [
+    { href: "/partner/dashboard", label: t('partnerNav.dashboard') },
+    { href: "/partner/referral", label: t('partnerNav.referral') },
+    { href: "/partner/users", label: t('partnerNav.users') },
+    { href: "/partner/proposals", label: t('partnerNav.proposals') },
+    { href: "/partner/notifications", label: t('partnerNav.notifications') },
+    { href: "/partner/settings", label: t('partnerNav.settings') },
+  ];
 
   const activeNavLinks = isAdmin ? adminNavLinks : isPartner ? partnerNavLinks : [];
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -51,7 +53,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <strong>Ultra AutoTrade</strong>
             </Link>
             {isAdmin && (
-              <Link href="/dashboard" style={{ textDecoration: "none", color: "#666", fontSize: 12 }}>運用ダッシュボード</Link>
+              <Link href="/dashboard" style={{ textDecoration: "none", color: "#666", fontSize: 12 }}>{t('operationsDashboard')}</Link>
             )}
           </div>
 
@@ -65,18 +67,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <span style={{ color: "#999" }}>|</span>
                 {isAdmin && (
                   <>
-                    <Link href="/settings/config" style={navLinkStyle}>設定</Link>
-                    <Link href="/users" style={navLinkStyle}>ユーザー管理</Link>
-                    <Link href="/partner/dashboard" style={navLinkStyle}>パートナーダッシュボード</Link>
-                    <Link href="/partner/users" style={navLinkStyle}>テスター管理</Link>
+                    <Link href="/settings/config" style={navLinkStyle}>{t('adminLinks.settings')}</Link>
+                    <Link href="/users" style={navLinkStyle}>{t('adminLinks.userManagement')}</Link>
+                    <Link href="/partner/dashboard" style={navLinkStyle}>{t('adminLinks.partnerDashboard')}</Link>
+                    <Link href="/partner/users" style={navLinkStyle}>{t('adminLinks.testerManagement')}</Link>
                   </>
                 )}
                 <span style={{ color: "#666", fontSize: 12 }}>{user.username}</span>
-                <button onClick={handleLogout} style={logoutButtonStyle}>ログアウト</button>
+                <button onClick={handleLogout} style={logoutButtonStyle}>{t('logout')}</button>
               </>
             )}
             {!isLoading && !user && (
-              <Link href="/login" style={navLinkStyle}>ログイン</Link>
+              <Link href="/login" style={navLinkStyle}>{t('login')}</Link>
             )}
           </nav>
 
@@ -85,7 +87,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => setMenuOpen(v => !v)}
             style={hamburgerButtonStyle}
             className="mobile-hamburger"
-            aria-label="メニュー"
+            aria-label={t('menuAriaLabel')}
             aria-expanded={menuOpen}
           >
             <span style={hamburgerLineStyle} />
@@ -111,17 +113,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <>
                 {isAdmin && (
                   <>
-                    <Link href="/settings/config" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>設定</Link>
-                    <Link href="/users" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>ユーザー管理</Link>
-                    <Link href="/partner/dashboard" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>パートナーダッシュボード</Link>
-                    <Link href="/partner/users" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>テスター管理</Link>
+                    <Link href="/settings/config" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>{t('adminLinks.settings')}</Link>
+                    <Link href="/users" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>{t('adminLinks.userManagement')}</Link>
+                    <Link href="/partner/dashboard" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>{t('adminLinks.partnerDashboard')}</Link>
+                    <Link href="/partner/users" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>{t('adminLinks.testerManagement')}</Link>
                   </>
                 )}
-                <button onClick={handleLogout} style={mobileLogoutStyle}>ログアウト</button>
+                <button onClick={handleLogout} style={mobileLogoutStyle}>{t('logout')}</button>
               </>
             )}
             {!isLoading && !user && (
-              <Link href="/login" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>ログイン</Link>
+              <Link href="/login" style={mobileNavLinkStyle} onClick={() => setMenuOpen(false)}>{t('login')}</Link>
             )}
           </nav>
         )}

@@ -5,6 +5,7 @@
 // frontend/app/login/page.tsx
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, FormEvent, Suspense } from "react";
+import { useTranslations } from "next-intl";
 import { useAuth, AuthProvider } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,7 @@ function LoginForm() {
   const { login, isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations('Login');
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -72,7 +74,7 @@ function LoginForm() {
         : getRoleDefaultPath(loggedInUser.role);
       router.replace(dest);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "ログインに失敗しました";
+      const message = err instanceof Error ? err.message : t('loginFailedDefault');
       setError(message);
     } finally {
       setSubmitting(false);
@@ -82,7 +84,7 @@ function LoginForm() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">読み込み中...</p>
+        <p className="text-muted-foreground">{t('loading')}</p>
       </div>
     );
   }
@@ -96,7 +98,7 @@ function LoginForm() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Ultra AutoTrade</CardTitle>
-          <CardDescription>運用ダッシュボード</CardDescription>
+          <CardDescription>{t('cardDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -108,7 +110,7 @@ function LoginForm() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">メールアドレス</Label>
+              <Label htmlFor="email">{t('emailLabel')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -122,7 +124,7 @@ function LoginForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">パスワード</Label>
+              <Label htmlFor="password">{t('passwordLabel')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -135,20 +137,20 @@ function LoginForm() {
             </div>
 
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "ログイン中..." : "ログイン"}
+              {submitting ? t('submittingButton') : t('submitButton')}
             </Button>
           </form>
 
           {isPublicRegistrationEnabled() ? (
             <p className="mt-6 text-center text-xs text-muted-foreground">
-              アカウントをお持ちでない方は
+              {t('noAccountText')}
               <a href="/signup" className="underline underline-offset-4 hover:text-primary ml-1">
-                新規登録
+                {t('signupLink')}
               </a>
             </p>
           ) : (
             <p className="mt-6 text-center text-xs text-muted-foreground">
-              初期設定が必要な場合は管理者にお問い合わせください。
+              {t('contactAdminText')}
             </p>
           )}
         </CardContent>
@@ -158,12 +160,13 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  const t = useTranslations('Login');
   return (
     <AuthProvider>
-      <title>ログイン - Ultra AutoTrade</title>
+      <title>{t('title')}</title>
       <Suspense fallback={
         <div className="flex min-h-screen items-center justify-center">
-          <p className="text-muted-foreground">読み込み中...</p>
+          <p className="text-muted-foreground">{t('loading')}</p>
         </div>
       }>
         <LoginForm />
