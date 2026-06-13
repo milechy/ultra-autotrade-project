@@ -2600,5 +2600,60 @@
     "opBorrow": "Borrow",
     "opRepay": "Repay",
     "opNA": "N/A"
+  },
+  "AdminUserTable": {
+    "colWallet": "Wallet Address",
+    "colRegistered": "Registered",
+    "colAum": "AUM (USD)",
+    "colLastActivity": "Last Activity",
+    "colRiskMode": "Risk Mode",
+    "colStatus": "Status",
+    "riskConservative": "Conservative",
+    "riskBalanced": "Balanced",
+    "riskAggressive": "Aggressive",
+    "statusNormal": "Normal",
+    "statusWarning": "Warning",
+    "statusDanger": "Danger"
+  },
+  "SharedEmergencyStopButton": {
+    "buttonLabel": "Emergency Stop",
+    "dialogTitle": "Stop all operations?",
+    "dialogDescription": "All automated trading will stop immediately. Manual restart by admin is required.",
+    "cancelButton": "Cancel",
+    "stopButton": "Stop",
+    "stoppingButton": "Stopping..."
+  },
+  "UserErrorBoundary": {
+    "unexpectedError": "An unexpected error occurred",
+    "reload": "Reload page",
+    "goToLogin": "Go to login"
+  },
+  "SharedErrorBoundary": {
+    "title": "An error occurred",
+    "retry": "Retry"
+  },
+  "Charts": {
+    "noData": "No data available"
+  },
+  "SharedWalletAddressMask": {
+    "copied": "Address copied",
+    "copyError": "Copy failed"
+  },
+  "PendlePositionCard": {
+    "title": "Pendle PT/YT Positions",
+    "comingSoon": "Phase 2 · Coming Soon",
+    "totalValue": "Total Value",
+    "loading": "Loading...",
+    "apiNotImplemented": "API not yet implemented. Cannot fetch position data (GET /api/protocols/pendle/positions)",
+    "noPositions": "No position data",
+    "maturity": "Maturity: {date}",
+    "daysRemaining": "{days} days remaining",
+    "ptLabel": "PT (Principal Token)",
+    "ytLabel": "YT (Yield Token)",
+    "noData": "No data",
+    "unitPrice": "Price: ${price}",
+    "valuation": "Value: ${value}",
+    "estimatedApy": "Estimated APY",
+    "apyChartTitle": "APY Trend (30d)"
   }
 }

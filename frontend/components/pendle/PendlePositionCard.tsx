@@ -4,6 +4,7 @@
 
 import dynamic from 'next/dynamic'
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { fetchPendlePositions, type PendlePosition, type PendleApyPoint } from '@/lib/api/pendle'
 
 // recharts コンポーネントは SSR クラッシュ防止のため dynamic import 必須 (CLAUDE.md)
@@ -26,6 +27,8 @@ function PositionRow({
   position: PendlePosition
   mockApyHistory: PendleApyPoint[]
 }) {
+  const t = useTranslations('PendlePositionCard')
+
   // Decimal 型文字列 → Number 変換 (CLAUDE.md 標準チェックリスト準拠)
   const ptAmount = Number(position.pt_amount)
   const ytAmount = Number(position.yt_amount)
@@ -45,13 +48,13 @@ function PositionRow({
             {position.underlying_asset}
           </span>
           <span className="ml-2 text-xs text-zinc-500">
-            満期: {position.maturity}
+            {t('maturity', { date: position.maturity })}
           </span>
         </div>
         <span
           className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${maturityBadgeClass(position.days_to_maturity)}`}
         >
-          残存 {position.days_to_maturity} 日
+          {t('daysRemaining', { days: position.days_to_maturity })}
         </span>
       </div>
 
@@ -59,17 +62,17 @@ function PositionRow({
       <div className="grid grid-cols-2 gap-3">
         {/* PT */}
         <div className="rounded-lg bg-zinc-800/50 p-3">
-          <p className="text-xs text-zinc-500 mb-1">PT (元本トークン)</p>
+          <p className="text-xs text-zinc-500 mb-1">{t('ptLabel')}</p>
           <p className="text-sm font-medium text-zinc-200">
-            {ptAmount > 0 ? ptAmount.toFixed(4) : 'データなし'}
+            {ptAmount > 0 ? ptAmount.toFixed(4) : t('noData')}
           </p>
           {ptAmount > 0 && (
             <>
               <p className="text-xs text-zinc-500">
-                単価: ${ptPrice.toFixed(4)}
+                {t('unitPrice', { price: ptPrice.toFixed(4) })}
               </p>
               <p className="text-xs text-indigo-400 font-medium">
-                評価額: ${ptValue.toFixed(2)}
+                {t('valuation', { value: ptValue.toFixed(2) })}
               </p>
             </>
           )}
@@ -77,17 +80,17 @@ function PositionRow({
 
         {/* YT */}
         <div className="rounded-lg bg-zinc-800/50 p-3">
-          <p className="text-xs text-zinc-500 mb-1">YT (利回りトークン)</p>
+          <p className="text-xs text-zinc-500 mb-1">{t('ytLabel')}</p>
           <p className="text-sm font-medium text-zinc-200">
-            {ytAmount > 0 ? ytAmount.toFixed(4) : 'データなし'}
+            {ytAmount > 0 ? ytAmount.toFixed(4) : t('noData')}
           </p>
           {ytAmount > 0 && (
             <>
               <p className="text-xs text-zinc-500">
-                単価: ${ytPrice.toFixed(4)}
+                {t('unitPrice', { price: ytPrice.toFixed(4) })}
               </p>
               <p className="text-xs text-indigo-400 font-medium">
-                評価額: ${ytValue.toFixed(2)}
+                {t('valuation', { value: ytValue.toFixed(2) })}
               </p>
             </>
           )}
@@ -96,16 +99,16 @@ function PositionRow({
 
       {/* APY */}
       <div className="flex items-center justify-between border-t border-zinc-800 pt-2">
-        <span className="text-xs text-zinc-500">推定APY</span>
+        <span className="text-xs text-zinc-500">{t('estimatedApy')}</span>
         <span className="text-sm font-semibold text-green-400">
-          {apy > 0 ? `${apy.toFixed(2)}%` : 'データなし'}
+          {apy > 0 ? `${apy.toFixed(2)}%` : t('noData')}
         </span>
       </div>
 
       {/* APY 推移チャート */}
       {mockApyHistory.length > 0 && (
         <div className="border-t border-zinc-800 pt-3">
-          <PendleYieldChart data={mockApyHistory} title="APY推移 (30日)" />
+          <PendleYieldChart data={mockApyHistory} title={t('apyChartTitle')} />
         </div>
       )}
     </div>
@@ -121,6 +124,7 @@ function PositionRow({
  * - YieldChart は動的 import で SSR 回避
  */
 export default function PendlePositionCard() {
+  const t = useTranslations('PendlePositionCard')
   const [positions, setPositions] = useState<PendlePosition[]>([])
   const [totalValueUsd, setTotalValueUsd] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -157,10 +161,10 @@ export default function PendlePositionCard() {
       <div className="rounded-xl border border-zinc-800 p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-zinc-100">
-            Pendle PT/YT ポジション
+            {t('title')}
           </h2>
         </div>
-        <div className="text-sm text-zinc-500">読み込み中...</div>
+        <div className="text-sm text-zinc-500">{t('loading')}</div>
       </div>
     )
   }
@@ -171,13 +175,13 @@ export default function PendlePositionCard() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold text-zinc-100">
-            Pendle PT/YT ポジション
+            {t('title')}
           </h2>
-          <span className="text-xs text-zinc-500">Phase 2 · Coming Soon</span>
+          <span className="text-xs text-zinc-500">{t('comingSoon')}</span>
         </div>
         {totalValueUsd !== null && (
           <div className="text-right">
-            <p className="text-xs text-zinc-500">合計評価額</p>
+            <p className="text-xs text-zinc-500">{t('totalValue')}</p>
             <p className="text-sm font-semibold text-zinc-200">
               ${Number(totalValueUsd).toFixed(2)}
             </p>
@@ -188,15 +192,14 @@ export default function PendlePositionCard() {
       {/* API 未実装通知 */}
       {isFallback && (
         <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-400">
-          APIが未実装のため、ポジションデータを取得できません
-          （GET /api/protocols/pendle/positions）
+          {t('apiNotImplemented')}
         </div>
       )}
 
       {/* ポジション一覧 */}
       {positions.length === 0 ? (
         <div className="flex items-center justify-center py-8 text-sm text-zinc-500">
-          ポジションデータなし
+          {t('noPositions')}
         </div>
       ) : (
         <div className="space-y-3">

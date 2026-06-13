@@ -4,6 +4,7 @@
 
 import { useState } from 'react'
 import { AlertOctagon, Loader2 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -23,6 +24,7 @@ export interface EmergencyStopButtonProps {
 }
 
 export function EmergencyStopButton({ onStop, variant = 'floating' }: EmergencyStopButtonProps) {
+  const t = useTranslations('SharedEmergencyStopButton')
   const [isLoading, setIsLoading] = useState(false)
 
   const handleStop = async () => {
@@ -48,7 +50,7 @@ export function EmergencyStopButton({ onStop, variant = 'floating' }: EmergencyS
       ) : (
         <AlertOctagon className="h-4 w-4" />
       )}
-      緊急停止
+      {t('buttonLabel')}
     </Button>
   )
 
@@ -61,14 +63,14 @@ export function EmergencyStopButton({ onStop, variant = 'floating' }: EmergencyS
         <AlertDialogHeader>
           <AlertDialogTitle className="text-red-600 dark:text-red-400 flex items-center gap-2">
             <AlertOctagon className="h-5 w-5" />
-            本当に全ての運用を停止しますか？
+            {t('dialogTitle')}
           </AlertDialogTitle>
           <AlertDialogDescription className="text-sm leading-relaxed">
-            全ての自動取引が即時停止されます。再開には管理者の操作が必要です。
+            {t('dialogDescription')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoading}>キャンセル</AlertDialogCancel>
+          <AlertDialogCancel disabled={isLoading}>{t('cancelButton')}</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleStop}
             className="bg-red-600 hover:bg-red-700 text-white"
@@ -77,10 +79,10 @@ export function EmergencyStopButton({ onStop, variant = 'floating' }: EmergencyS
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                停止中...
+                {t('stoppingButton')}
               </>
             ) : (
-              '停止する'
+              t('stopButton')
             )}
           </AlertDialogAction>
         </AlertDialogFooter>

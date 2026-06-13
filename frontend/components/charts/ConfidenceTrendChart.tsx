@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import {
   LineChart,
   Line,
@@ -46,10 +47,12 @@ function formatLabel(iso: string): string {
 }
 
 export default function ConfidenceTrendChart({ data }: Props) {
+  const t = useTranslations("Charts");
+
   if (data.length === 0) {
     return (
       <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0", textAlign: "center" }}>
-        データがありません
+        {t("noData")}
       </div>
     );
   }

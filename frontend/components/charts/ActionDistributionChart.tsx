@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React, { useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   PieChart,
   Pie,
@@ -32,6 +33,7 @@ type Props = {
 };
 
 export default function ActionDistributionChart({ data }: Props) {
+  const t = useTranslations("Charts");
   const [period, setPeriod] = useState<Period>("7d");
 
   const cutoff = new Date(Date.now() - PERIOD_DAYS[period] * 24 * 60 * 60 * 1000);
@@ -79,7 +81,7 @@ export default function ActionDistributionChart({ data }: Props) {
 
       {chartData.length === 0 ? (
         <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0", textAlign: "center" }}>
-          データがありません
+          {t("noData")}
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={240}>

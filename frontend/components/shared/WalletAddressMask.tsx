@@ -4,6 +4,7 @@
 
 import { useState } from 'react'
 import { Copy, Check } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 
 export interface WalletAddressMaskProps {
@@ -17,16 +18,17 @@ function maskAddress(address: string, chars: number): string {
 }
 
 export function WalletAddressMask({ address, chars = 6 }: WalletAddressMaskProps) {
+  const t = useTranslations('SharedWalletAddressMask')
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(address)
       setCopied(true)
-      toast('アドレスをコピーしました')
+      toast(t('copied'))
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      toast.error('コピーに失敗しました')
+      toast.error(t('copyError'))
     }
   }
 

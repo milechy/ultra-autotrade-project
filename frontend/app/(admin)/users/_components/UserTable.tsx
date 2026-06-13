@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import {
   Table,
   TableBody,
@@ -56,12 +57,6 @@ function formatUSD(value: number): string {
   return '$' + value.toLocaleString('ja-JP', { maximumFractionDigits: 0 })
 }
 
-const RISK_LABELS: Record<RiskMode, string> = {
-  conservative: '保守',
-  balanced: 'バランス',
-  aggressive: '積極',
-}
-
 const RISK_COLORS: Record<RiskMode, string> = {
   conservative: 'bg-blue-900/50 text-blue-300',
   balanced: 'bg-yellow-900/50 text-yellow-300',
@@ -74,37 +69,45 @@ const STATUS_COLORS: Record<UserStatus, string> = {
   DANGER: 'bg-red-900/50 text-red-300',
 }
 
-const STATUS_LABELS: Record<UserStatus, string> = {
-  NORMAL: '正常',
-  WARNING: '警告',
-  DANGER: '危険',
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function UserTable({ users, onSelectUser }: UserTableProps) {
+  const t = useTranslations('AdminUserTable')
+
+  const RISK_LABELS: Record<RiskMode, string> = {
+    conservative: t('riskConservative'),
+    balanced: t('riskBalanced'),
+    aggressive: t('riskAggressive'),
+  }
+
+  const STATUS_LABELS: Record<UserStatus, string> = {
+    NORMAL: t('statusNormal'),
+    WARNING: t('statusWarning'),
+    DANGER: t('statusDanger'),
+  }
+
   return (
     <div className="rounded-xl border border-gray-800 overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-900 border-gray-800 hover:bg-gray-900">
             <TableHead className="text-gray-400 font-medium text-xs uppercase tracking-wider">
-              ウォレットアドレス
+              {t('colWallet')}
             </TableHead>
             <TableHead className="text-gray-400 font-medium text-xs uppercase tracking-wider">
-              登録日
+              {t('colRegistered')}
             </TableHead>
             <TableHead className="text-gray-400 font-medium text-xs uppercase tracking-wider text-right">
-              AUM (USD)
+              {t('colAum')}
             </TableHead>
             <TableHead className="text-gray-400 font-medium text-xs uppercase tracking-wider">
-              最終アクティビティ
+              {t('colLastActivity')}
             </TableHead>
             <TableHead className="text-gray-400 font-medium text-xs uppercase tracking-wider">
-              リスクモード
+              {t('colRiskMode')}
             </TableHead>
             <TableHead className="text-gray-400 font-medium text-xs uppercase tracking-wider">
-              ステータス
+              {t('colStatus')}
             </TableHead>
           </TableRow>
         </TableHeader>
