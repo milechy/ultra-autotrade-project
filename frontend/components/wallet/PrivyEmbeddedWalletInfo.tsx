@@ -6,6 +6,7 @@
 // メール / SNS ログイン → 自動生成された埋込ウォレットのアドレスとチェーンを表示。
 // 資金操作は含まない (Lane H demo 目的)。
 
+import { useTranslations } from 'next-intl'
 import { usePrivy } from '@privy-io/react-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,10 +16,10 @@ import { usePrivyEmbeddedWallet } from '@/hooks/usePrivyEmbeddedWallet'
 
 const CHAIN_NAMES: Record<number, string> = {
   84532: 'Base Sepolia',
-  8453: 'Base メインネット',
 }
 
 export function PrivyEmbeddedWalletInfo() {
+  const t = useTranslations('WalletPrivyEmbeddedWallet')
   const { login, logout } = usePrivy()
   const state = usePrivyEmbeddedWallet()
 
@@ -28,12 +29,12 @@ export function PrivyEmbeddedWalletInfo() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <KeyRound className="h-4 w-4" />
-            埋込ウォレット (Privy)
+            {t('unconfiguredTitle')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            NEXT_PUBLIC_PRIVY_APP_ID が未設定のため利用できません。
+            {t('unconfiguredMessage')}
           </p>
         </CardContent>
       </Card>
@@ -46,12 +47,12 @@ export function PrivyEmbeddedWalletInfo() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
-            初期化中
+            {t('initializingTitle')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Privy SDK を読み込んでいます。
+            {t('initializingMessage')}
           </p>
         </CardContent>
       </Card>
@@ -64,19 +65,18 @@ export function PrivyEmbeddedWalletInfo() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <Mail className="h-4 w-4" />
-            メール / SNS でログイン
+            {t('unauthenticatedTitle')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            メールまたは SNS (Google / Apple) でログインすると、
-            外部 wallet 不要で自動的に埋込ウォレットが作成されます。
+            {t('unauthenticatedMessage')}
           </p>
           <Button onClick={login} className="w-full">
-            ログインして埋込ウォレットを作成
+            {t('loginButton')}
           </Button>
           <p className="text-[11px] text-muted-foreground">
-            ※ デモ環境です。実資金は入れないでください。
+            {t('demoNotice')}
           </p>
         </CardContent>
       </Card>
@@ -87,16 +87,15 @@ export function PrivyEmbeddedWalletInfo() {
     return (
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">埋込ウォレット未生成</CardTitle>
+          <CardTitle className="text-base">{t('noWalletTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            ログイン済みですが埋込ウォレットが見つかりません。
-            一度ログアウトして再ログインしてください。
+            {t('noWalletMessage')}
           </p>
           <Button variant="outline" onClick={logout} className="w-full">
             <LogOut className="mr-2 h-4 w-4" />
-            ログアウト
+            {t('logoutButton')}
           </Button>
         </CardContent>
       </Card>
@@ -108,27 +107,29 @@ export function PrivyEmbeddedWalletInfo() {
   const chainName =
     chainId != null && CHAIN_NAMES[chainId]
       ? CHAIN_NAMES[chainId]
+      : chainId === 8453
+      ? t('chainMainnet')
       : chainId != null
       ? `Chain ${chainId}`
-      : '不明'
+      : t('chainUnknown')
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center justify-between">
-          <span>埋込ウォレット</span>
+          <span>{t('readyTitle')}</span>
           <Badge variant="secondary">Privy</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        <Row label="アドレス" value={address ?? '—'} mono />
-        <Row label="チェーン" value={chainName} />
+        <Row label={t('labelAddress')} value={address ?? '—'} mono />
+        <Row label={t('labelChain')} value={chainName} />
         <p className="text-[11px] text-muted-foreground pt-1">
-          ※ デモ環境です。実資金は入れないでください。
+          {t('demoNotice')}
         </p>
         <Button variant="outline" size="sm" onClick={logout} className="w-full">
           <LogOut className="mr-2 h-4 w-4" />
-          ログアウト
+          {t('logoutButton')}
         </Button>
       </CardContent>
     </Card>

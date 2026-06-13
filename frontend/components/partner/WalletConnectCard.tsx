@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { CheckCircle, Wallet, Network } from 'lucide-react'
 import { usePrivy, useWallets } from '@privy-io/react-auth'
@@ -21,7 +22,7 @@ const DEFAULT_CHAIN_ID = parseInt(
 
 const CHAIN_DISPLAY_NAMES: Record<number, string> = {
   84532: 'Base Sepolia',
-  8453: 'Base メインネット',
+  8453: 'Base Mainnet',
 }
 
 function getNetworkDisplayName(chainId: number): string {
@@ -53,6 +54,7 @@ function truncateAddress(addr: string): string {
 }
 
 export function WalletConnectCard() {
+  const t = useTranslations('PartnerWalletConnectCard')
   const token = getStoredToken()
   const { login, authenticated } = usePrivy()
   const { wallets } = useWallets()
@@ -65,7 +67,7 @@ export function WalletConnectCard() {
 
   const linkWallet = useCallback(async () => {
     if (!token) {
-      toast.error('認証されていません')
+      toast.error(t('errorNotAuthenticated'))
       return
     }
     if (!wallet) {
@@ -80,7 +82,7 @@ export function WalletConnectCard() {
           await wallet.switchChain(DEFAULT_CHAIN_ID)
         } catch {
           toast.error(
-            `${getNetworkDisplayName(DEFAULT_CHAIN_ID)} への切替に失敗しました`,
+            t('errorNetworkSwitch', { network: getNetworkDisplayName(DEFAULT_CHAIN_ID) }),
           )
           return
         }
@@ -88,7 +90,7 @@ export function WalletConnectCard() {
 
       const address = wallet.address
       if (!address || !address.startsWith('0x')) {
-        toast.error('ウォレットアドレスが取得できませんでした')
+        toast.error(t('errorAddressNotFound'))
         return
       }
 
@@ -99,7 +101,7 @@ export function WalletConnectCard() {
       try {
         eip1193 = await wallet.getEthereumProvider()
       } catch {
-        toast.error('ウォレットプロバイダーの取得に失敗しました')
+        toast.error(t('errorProviderNotFound'))
         return
       }
 
@@ -111,11 +113,11 @@ export function WalletConnectCard() {
         const signer = await ethProvider.getSigner()
         signature = await signer.signMessage(message)
       } catch {
-        toast.error('署名がキャンセルされました')
+        toast.error(t('errorSignatureCancelled'))
         return
       }
       if (!signature || !signature.startsWith('0x')) {
-        toast.error('署名の取得に失敗しました')
+        toast.error(t('errorSignatureFailed'))
         return
       }
 
@@ -123,7 +125,7 @@ export function WalletConnectCard() {
       // missing here, abort loudly rather than serialise undefined → {}.
       const payload = { address, signature, message }
       if (!payload.address || !payload.signature || !payload.message) {
-        toast.error('リクエスト内容に不足があります')
+        toast.error(t('errorRequestIncomplete'))
         return
       }
 
@@ -139,19 +141,19 @@ export function WalletConnectCard() {
     } catch (err: unknown) {
       const status = (err as HttpError)?.status
       if (status === 409) {
-        toast.error('このウォレットは別アカウントで登録済みです')
+        toast.error(t('errorDuplicateWallet'))
       } else if (status === 422) {
-        toast.error('署名検証に失敗しました')
+        toast.error(t('errorSignatureVerification'))
       } else if (status === 401) {
-        toast.error('認証セッションが切れました。再ログインしてください')
+        toast.error(t('errorSessionExpired'))
       } else {
-        toast.error('ウォレットの接続に失敗しました')
+        toast.error(t('errorConnectFailed'))
       }
     } finally {
       setIsLinking(false)
       pendingLinkRef.current = false
     }
-  }, [token, wallet])
+  }, [t, token, wallet])
 
   // If user clicked the button before Privy wallet was ready, resume once wallet appears.
   useEffect(() => {
@@ -164,7 +166,7 @@ export function WalletConnectCard() {
 
   const handleConnect = useCallback(() => {
     if (!token) {
-      toast.error('認証されていません')
+      toast.error(t('errorNotAuthenticated'))
       return
     }
     if (!authenticated || !wallet) {
@@ -174,19 +176,19 @@ export function WalletConnectCard() {
       return
     }
     void linkWallet()
-  }, [token, authenticated, wallet, login, linkWallet])
+  }, [t, token, authenticated, wallet, login, linkWallet])
 
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">ウォレット連携</CardTitle>
+        <CardTitle className="text-base">{t('cardTitle')}</CardTitle>
       </CardHeader>
       <CardContent>
         {linked ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
-              <span className="text-sm text-emerald-400">接続済み:</span>
+              <span className="text-sm text-emerald-400">{t('connectedLabel')}</span>
               <span className="font-mono text-sm">
                 {truncateAddress(linked.wallet_address)}
               </span>
@@ -198,14 +200,14 @@ export function WalletConnectCard() {
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">ウォレット未接続</p>
+            <p className="text-sm text-muted-foreground">{t('notConnected')}</p>
             <Button
               onClick={handleConnect}
               disabled={isLinking}
               size="sm"
             >
               <Wallet className="h-4 w-4 mr-2" />
-              {isLinking ? '接続中...' : 'ウォレット接続'}
+              {isLinking ? t('connectingButton') : t('connectButton')}
             </Button>
           </div>
         )}

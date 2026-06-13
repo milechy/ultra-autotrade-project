@@ -3,6 +3,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
@@ -20,6 +21,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 type State = 'loading' | 'unsupported' | 'denied' | 'subscribed' | 'unsubscribed'
 
 export function PushNotificationToggle() {
+  const t = useTranslations('PwaNotificationToggle')
   const [state, setState] = useState<State>('loading')
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export function PushNotificationToggle() {
   const subscribe = useCallback(async () => {
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
     if (!vapidKey) {
-      toast.error('VAPID キーが未設定です')
+      toast.error(t('errorVapidKeyMissing'))
       return
     }
     try {
@@ -60,16 +62,16 @@ export function PushNotificationToggle() {
         }),
       })
       setState('subscribed')
-      toast.success('プッシュ通知を有効にしました')
+      toast.success(t('successSubscribed'))
     } catch (err) {
       if (Notification.permission === 'denied') {
         setState('denied')
-        toast.error('通知がブロックされています。ブラウザの設定から許可してください。')
+        toast.error(t('errorBlocked'))
       } else {
-        toast.error('通知の登録に失敗しました')
+        toast.error(t('errorSubscribeFailed'))
       }
     }
-  }, [])
+  }, [t])
 
   const unsubscribe = useCallback(async () => {
     try {
@@ -83,11 +85,11 @@ export function PushNotificationToggle() {
         await sub.unsubscribe()
       }
       setState('unsubscribed')
-      toast.success('プッシュ通知を無効にしました')
+      toast.success(t('successUnsubscribed'))
     } catch {
-      toast.error('通知の解除に失敗しました')
+      toast.error(t('errorUnsubscribeFailed'))
     }
-  }, [])
+  }, [t])
 
   if (state === 'loading') return null
   if (state === 'unsupported') return null
@@ -95,7 +97,7 @@ export function PushNotificationToggle() {
   if (state === 'denied') {
     return (
       <p className="text-xs text-zinc-500">
-        通知がブロックされています。ブラウザの設定から許可してください。
+        {t('blockedMessage')}
       </p>
     )
   }
@@ -103,9 +105,9 @@ export function PushNotificationToggle() {
   return (
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-sm font-medium text-zinc-100">プッシュ通知</p>
+        <p className="text-sm font-medium text-zinc-100">{t('labelPushNotification')}</p>
         <p className="text-xs text-zinc-400">
-          {state === 'subscribed' ? '有効 — AI判定や承認依頼を受け取ります' : '無効'}
+          {state === 'subscribed' ? t('statusEnabled') : t('statusDisabled')}
         </p>
       </div>
       <Button
@@ -118,7 +120,7 @@ export function PushNotificationToggle() {
             : 'bg-blue-600 hover:bg-blue-700 text-white'
         }
       >
-        {state === 'subscribed' ? 'OFFにする' : '通知をONにする'}
+        {state === 'subscribed' ? t('buttonOff') : t('buttonOn')}
       </Button>
     </div>
   )
