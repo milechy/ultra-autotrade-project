@@ -2,6 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -28,13 +29,15 @@ interface ProposalFiltersProps {
 }
 
 export function ProposalFilters({ filters, onChange }: ProposalFiltersProps) {
+  const t = useTranslations('AdminProposalFilters')
+
   function set<K extends keyof ProposalFiltersState>(key: K, value: ProposalFiltersState[K]) {
     onChange({ ...filters, [key]: value })
   }
 
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
-      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">フィルター</h3>
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{t('heading')}</h3>
       <div className="flex flex-wrap gap-3">
         {/* Status */}
         <Select
@@ -42,15 +45,15 @@ export function ProposalFilters({ filters, onChange }: ProposalFiltersProps) {
           onValueChange={(v) => set('status', v as StatusFilter)}
         >
           <SelectTrigger className="h-8 w-40 text-xs">
-            <SelectValue placeholder="ステータス" />
+            <SelectValue placeholder={t('statusPlaceholder')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL" className="text-xs">すべて</SelectItem>
-            <SelectItem value="pending" className="text-xs">保留中</SelectItem>
-            <SelectItem value="approved" className="text-xs">承認済み</SelectItem>
-            <SelectItem value="rejected" className="text-xs">拒否</SelectItem>
-            <SelectItem value="executed" className="text-xs">実行済み</SelectItem>
-            <SelectItem value="expired" className="text-xs">期限切れ</SelectItem>
+            <SelectItem value="ALL" className="text-xs">{t('statusAll')}</SelectItem>
+            <SelectItem value="pending" className="text-xs">{t('statusPending')}</SelectItem>
+            <SelectItem value="approved" className="text-xs">{t('statusApproved')}</SelectItem>
+            <SelectItem value="rejected" className="text-xs">{t('statusRejected')}</SelectItem>
+            <SelectItem value="executed" className="text-xs">{t('statusExecuted')}</SelectItem>
+            <SelectItem value="expired" className="text-xs">{t('statusExpired')}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -60,10 +63,10 @@ export function ProposalFilters({ filters, onChange }: ProposalFiltersProps) {
           onValueChange={(v) => set('operation', v as OperationFilter)}
         >
           <SelectTrigger className="h-8 w-40 text-xs">
-            <SelectValue placeholder="操作種別" />
+            <SelectValue placeholder={t('operationPlaceholder')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL" className="text-xs">すべての操作</SelectItem>
+            <SelectItem value="ALL" className="text-xs">{t('operationAll')}</SelectItem>
             <SelectItem value="SUPPLY" className="text-xs">SUPPLY</SelectItem>
             <SelectItem value="WITHDRAW" className="text-xs">WITHDRAW</SelectItem>
             <SelectItem value="BORROW" className="text-xs">BORROW</SelectItem>
@@ -73,7 +76,7 @@ export function ProposalFilters({ filters, onChange }: ProposalFiltersProps) {
 
         {/* User search */}
         <Input
-          placeholder="ユーザー名 / メールで検索..."
+          placeholder={t('userSearchPlaceholder')}
           value={filters.userSearch}
           onChange={(e) => set('userSearch', e.target.value)}
           className="h-8 w-52 text-xs"
@@ -113,7 +116,7 @@ export function ProposalFilters({ filters, onChange }: ProposalFiltersProps) {
           }
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline self-center"
         >
-          リセット
+          {t('reset')}
         </button>
       </div>
     </div>

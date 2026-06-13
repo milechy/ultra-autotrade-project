@@ -3042,5 +3042,74 @@
     "cancel": "キャンセル",
     "save": "保存",
     "saving": "保存中..."
+  },
+  "AdminProposals": {
+    "pageTitle": "提案管理 - Ultra AutoTrade",
+    "heading": "提案管理",
+    "description": "全ユーザーのAI提案一覧・承認状況の確認",
+    "reload": "再読み込み",
+    "loading": "読み込み中...",
+    "fetchError": "提案の取得に失敗しました"
+  },
+  "AdminProposalFilters": {
+    "heading": "フィルター",
+    "statusPlaceholder": "ステータス",
+    "statusAll": "すべて",
+    "statusPending": "保留中",
+    "statusApproved": "承認済み",
+    "statusRejected": "拒否",
+    "statusExecuted": "実行済み",
+    "statusExpired": "期限切れ",
+    "operationPlaceholder": "操作種別",
+    "operationAll": "すべての操作",
+    "userSearchPlaceholder": "ユーザー名 / メールで検索...",
+    "reset": "リセット"
+  },
+  "AdminProposalDetailModal": {
+    "titlePrefix": "提案詳細 — #",
+    "statusPending": "保留中",
+    "statusApproved": "承認済み",
+    "statusRejected": "拒否",
+    "statusExecuted": "実行済み",
+    "statusExpired": "期限切れ",
+    "rowAmount": "金額",
+    "rowAmountUsd": "USD換算",
+    "rowExpectedHf": "予想HF",
+    "rowEstimatedGas": "推定ガス代",
+    "rowAiDecisionId": "AI Decision ID",
+    "rowCreatedAt": "作成日時",
+    "rowExpires": "期限",
+    "rowApprovedAt": "承認日時",
+    "rowRejectedAt": "拒否日時",
+    "rowExecutedAt": "実行日時",
+    "sectionReason": "AI判定理由",
+    "sectionTxHash": "Tx Hash"
+  },
+  "AdminAILearningCharts": {
+    "feedbackHeading": "フィードバック件数内訳（30日）",
+    "sourceHeading": "ソース内訳",
+    "noData": "データなし"
+  },
+  "AdminKnowledgeSearch": {
+    "pageTitle": "RAG検索 - ナレッジ Hub - Ultra AutoTrade",
+    "pageHeading": "RAG検索",
+    "pageDescription": "登録済みナレッジをベクトル検索で照会します。",
+    "navBack": "← ナレッジ一覧",
+    "queryLabel": "検索クエリ",
+    "queryPlaceholder": "例: BTC の強気サインを教えて",
+    "countLabel": "件数",
+    "countUnit": "{n}件",
+    "searchBtn": "検索",
+    "searching": "検索中...",
+    "resultHeading": "検索結果",
+    "resultSummary": "「{query}」— {count} 件",
+    "noResults": "該当するナレッジが見つかりませんでした。",
+    "similarity": "類似度 {pct}%",
+    "noTitle": "（タイトルなし）",
+    "chunkInfo": "チャンク ID: {chunkId} / ドキュメント ID: {docId}"
+  },
+  "AdminUserHFChart": {
+    "noData": "データなし",
+    "dangerLabel": "危険"
   }
 }

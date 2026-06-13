@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import React from "react";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import {
   searchKnowledge,
@@ -11,6 +12,7 @@ import {
 } from "@/lib/api/knowledge";
 
 export default function KnowledgeSearchPage() {
+  const t = useTranslations('AdminKnowledgeSearch')
   const [query, setQuery] = React.useState("");
   const [topK, setTopK] = React.useState(5);
   const [results, setResults] = React.useState<KnowledgeSearchResult[]>([]);
@@ -53,70 +55,70 @@ export default function KnowledgeSearchPage() {
   return (
     <AuthGuard adminOnly>
       <>
-        <title>RAG検索 - ナレッジ Hub - Ultra AutoTrade</title>
+        <title>{t('pageTitle')}</title>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 12 }}>
           <div>
-            <h1 style={{ marginBottom: 4 }}>RAG検索</h1>
+            <h1 style={{ marginBottom: 4 }}>{t('pageHeading')}</h1>
             <p style={{ marginTop: 0, color: "#666" }}>
-              登録済みナレッジをベクトル検索で照会します。
+              {t('pageDescription')}
             </p>
           </div>
-          <Link href="/knowledge" style={outlineBtnStyle}>← ナレッジ一覧</Link>
+          <Link href="/knowledge" style={outlineBtnStyle}>{t('navBack')}</Link>
         </div>
 
-        {/* 検索フォーム */}
+        {/* Search form */}
         <section style={cardStyle}>
           <form onSubmit={handleSearch}>
             <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: 240 }}>
-                <label style={labelStyle}>検索クエリ</label>
+                <label style={labelStyle}>{t('queryLabel')}</label>
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="例: BTC の強気サインを教えて"
+                  placeholder={t('queryPlaceholder')}
                   required
                   style={inputStyle}
                   autoFocus
                 />
               </div>
               <div>
-                <label style={labelStyle}>件数</label>
+                <label style={labelStyle}>{t('countLabel')}</label>
                 <select
                   value={topK}
                   onChange={(e) => setTopK(Number(e.target.value))}
                   style={{ ...inputStyle, width: 80 }}
                 >
                   {[3, 5, 10, 20].map((n) => (
-                    <option key={n} value={n}>{n}件</option>
+                    <option key={n} value={n}>{t('countUnit', { n })}</option>
                   ))}
                 </select>
               </div>
               <button type="submit" disabled={searching || !query.trim()} style={primaryBtnStyle}>
-                {searching ? "検索中..." : "検索"}
+                {searching ? t('searching') : t('searchBtn')}
               </button>
             </div>
           </form>
         </section>
 
-        {/* エラー */}
+        {/* Error */}
         {error && (
           <div style={errorBoxStyle}>{error}</div>
         )}
 
-        {/* 検索結果 */}
+        {/* Results */}
         {lastQuery !== null && !error && (
           <section style={{ marginTop: 20 }}>
             <h2 style={{ fontSize: 16, marginBottom: 12 }}>
-              検索結果
+              {t('resultHeading')}
               <span style={{ fontWeight: 400, color: "#888", fontSize: 13, marginLeft: 8 }}>
-                「{lastQuery}」— {results.length} 件
+                {t('resultSummary', { query: lastQuery, count: results.length })}
               </span>
             </h2>
 
             {results.length === 0 ? (
-              <p style={{ color: "#888" }}>該当するナレッジが見つかりませんでした。</p>
+              <p style={{ color: "#888" }}>{t('noResults')}</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {results.map((r, i) => (
@@ -147,7 +149,7 @@ export default function KnowledgeSearchPage() {
                           {i + 1}
                         </span>
                         <span style={{ fontWeight: 600, color: "#111" }}>
-                          {r.title ?? <span style={{ color: "#aaa", fontWeight: 400 }}>（タイトルなし）</span>}
+                          {r.title ?? <span style={{ color: "#aaa", fontWeight: 400 }}>{t('noTitle')}</span>}
                         </span>
                       </div>
                       <span style={{
@@ -161,7 +163,7 @@ export default function KnowledgeSearchPage() {
                         whiteSpace: "nowrap",
                         flexShrink: 0,
                       }}>
-                        類似度 {(r.similarity * 100).toFixed(1)}%
+                        {t('similarity', { pct: (r.similarity * 100).toFixed(1) })}
                       </span>
                     </div>
 
@@ -193,7 +195,7 @@ export default function KnowledgeSearchPage() {
                     </p>
 
                     <div style={{ marginTop: 8, fontSize: 11, color: "#9ca3af" }}>
-                      チャンク ID: {r.chunk_id} / ドキュメント ID: {r.document_id}
+                      {t('chunkInfo', { chunkId: r.chunk_id, docId: r.document_id })}
                     </div>
                   </div>
                 ))}

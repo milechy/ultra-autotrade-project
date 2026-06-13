@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import dynamic from 'next/dynamic'
+import { useTranslations } from 'next-intl'
 import type { FeedbackCountData, SourcePieEntry } from './AILearningChartsRecharts'
 
 // recharts は SSR でクラッシュするため dynamic import + ssr: false が必須
@@ -24,32 +25,34 @@ interface AILearningChartsProps {
 }
 
 export function AILearningCharts({ barData, pieData }: AILearningChartsProps) {
+  const t = useTranslations('AdminAILearningCharts')
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-      {/* フィードバック件数内訳 */}
+      {/* Feedback count breakdown */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-white dark:bg-gray-900">
         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-          フィードバック件数内訳（30日）
+          {t('feedbackHeading')}
         </h3>
         {barData.some((d) => d.件数 > 0) ? (
           <FeedbackBarChart data={barData} />
         ) : (
           <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
-            データなし
+            {t('noData')}
           </div>
         )}
       </div>
 
-      {/* フィードバックソース円グラフ */}
+      {/* Source pie chart */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-white dark:bg-gray-900">
         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-          ソース内訳
+          {t('sourceHeading')}
         </h3>
         {pieData.some((d) => d.value > 0) ? (
           <SourcePieChart data={pieData} />
         ) : (
           <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
-            データなし
+            {t('noData')}
           </div>
         )}
       </div>

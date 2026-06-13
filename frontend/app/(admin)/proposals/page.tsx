@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import AuthGuard from '@/components/AuthGuard'
 import { useAuth } from '@/lib/auth'
 import { listAdminProposals } from '@/lib/api/admin-proposals'
@@ -46,6 +47,7 @@ export default function ProposalsPage() {
 
 function ProposalsContent() {
   const { token } = useAuth()
+  const t = useTranslations('AdminProposals')
 
   const [proposals, setProposals] = useState<AdminProposal[]>([])
   const [total, setTotal] = useState(0)
@@ -72,13 +74,13 @@ function ProposalsContent() {
       } catch (err: unknown) {
         const msg = err && typeof err === 'object' && 'message' in err
           ? String((err as { message: unknown }).message)
-          : '提案の取得に失敗しました'
+          : t('fetchError')
         setError(msg)
       } finally {
         setLoading(false)
       }
     },
-    [token]
+    [token, t]
   )
 
   // Initial load
@@ -105,23 +107,23 @@ function ProposalsContent() {
 
   return (
     <>
-      <title>提案管理 - Ultra AutoTrade</title>
+      <title>{t('pageTitle')}</title>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
-            提案管理
+            {t('heading')}
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            全ユーザーのAI提案一覧・承認状況の確認
+            {t('description')}
           </p>
         </div>
         <button
           onClick={() => fetchProposals(filters, page)}
           className="px-4 py-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
         >
-          再読み込み
+          {t('reload')}
         </button>
       </div>
 
@@ -144,7 +146,7 @@ function ProposalsContent() {
 
       {/* Loading */}
       {loading && (
-        <div className="mb-4 text-sm text-gray-500 text-center py-4">読み込み中...</div>
+        <div className="mb-4 text-sm text-gray-500 text-center py-4">{t('loading')}</div>
       )}
 
       {/* Table */}
