@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Bell } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getStoredToken } from '@/lib/auth'
@@ -60,22 +61,23 @@ function fmtDatetime(iso: string): string {
   }
 }
 
-const SEVERITY_OPTIONS = [
-  { value: '', label: 'すべて' },
-  { value: 'info', label: 'INFO' },
-  { value: 'warning', label: 'WARNING' },
-  { value: 'alert', label: 'ALERT' },
-  { value: 'emergency', label: 'EMERGENCY' },
-]
-
 // ---- Page ----
 
 export default function PartnerNotificationsPage() {
+  const t = useTranslations('PartnerNotifications')
   const [data, setData] = useState<NotificationLogPage | null>(null)
   const [loading, setLoading] = useState(true)
   const [severity, setSeverity] = useState('')
   const [page, setPage] = useState(1)
   const perPage = 20
+
+  const SEVERITY_OPTIONS = [
+    { value: '', label: t('filterAll') },
+    { value: 'info', label: 'INFO' },
+    { value: 'warning', label: 'WARNING' },
+    { value: 'alert', label: 'ALERT' },
+    { value: 'emergency', label: 'EMERGENCY' },
+  ]
 
   const load = useCallback(async () => {
     const token = getStoredToken()
@@ -113,12 +115,12 @@ export default function PartnerNotificationsPage() {
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
       <h1 className="text-2xl font-bold flex items-center gap-2">
         <Bell className="h-6 w-6" />
-        通知ログ
+        {t('pageTitle')}
       </h1>
 
       {/* Filter bar */}
       <div className="flex items-center gap-3">
-        <label className="text-sm text-muted-foreground">重要度:</label>
+        <label className="text-sm text-muted-foreground">{t('filterLabel')}</label>
         <select
           value={severity}
           onChange={(e) => handleSeverityChange(e.target.value)}
@@ -130,14 +132,14 @@ export default function PartnerNotificationsPage() {
         </select>
         {data && (
           <span className="text-xs text-muted-foreground ml-auto">
-            全 {data.total} 件
+            {t('totalCount', { total: data.total })}
           </span>
         )}
       </div>
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">通知一覧</CardTitle>
+          <CardTitle className="text-base">{t('cardTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
@@ -148,18 +150,18 @@ export default function PartnerNotificationsPage() {
             </div>
           ) : !data || data.items.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-12">
-              通知はありません
+              {t('noNotifications')}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">日時</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">重要度</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">タイトル</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">内容</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">チャンネル</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('colDate')}</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('colSeverity')}</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('colTitle')}</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">{t('colBody')}</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">{t('colChannel')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -198,7 +200,7 @@ export default function PartnerNotificationsPage() {
             disabled={page <= 1}
             className="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40 hover:bg-muted transition-colors"
           >
-            前へ
+            {t('prevPage')}
           </button>
           <span className="text-sm text-muted-foreground">
             {page} / {totalPages}
@@ -208,7 +210,7 @@ export default function PartnerNotificationsPage() {
             disabled={page >= totalPages}
             className="px-3 py-1.5 text-sm border rounded-md disabled:opacity-40 hover:bg-muted transition-colors"
           >
-            次へ
+            {t('nextPage')}
           </button>
         </div>
       )}

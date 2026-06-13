@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { DollarSign, TrendingUp, Users, Shield, Wallet, AlertTriangle } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { fetchPerformance, type PerformanceResponse } from '@/lib/api/allocations'
@@ -45,6 +46,7 @@ function fmtTokenAmount(v: string | number | undefined | null, maxFractionDigits
 }
 
 export default function PerformanceSummaryKPI() {
+  const t = useTranslations('PartnerPerformanceKPI')
   const [data, setData] = useState<PerformanceResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const { data: walletBalance, loading: walletLoading } = useWalletBalance()
@@ -92,7 +94,7 @@ export default function PerformanceSummaryKPI() {
       {/* 現在の運用残高 */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">現在の運用残高</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">{t('currentBalance')}</CardTitle>
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -105,7 +107,7 @@ export default function PerformanceSummaryKPI() {
       {/* 全体損益 */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">全体損益</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">{t('totalPnl')}</CardTitle>
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -127,21 +129,21 @@ export default function PerformanceSummaryKPI() {
       {/* テスター数 */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">テスター数</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">{t('testerCount')}</CardTitle>
           <Users className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
             {data != null ? testerCount : '—'}
           </div>
-          <div className="text-xs text-muted-foreground mt-1">人</div>
+          <div className="text-xs text-muted-foreground mt-1">{t('testerUnit')}</div>
         </CardContent>
       </Card>
 
       {/* Health Factor */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Health Factor</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">{t('healthFactor')}</CardTitle>
           <Shield className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -150,7 +152,7 @@ export default function PerformanceSummaryKPI() {
           </div>
           {hf != null && (
             <div className={`text-xs mt-1 ${hfColor(hf)}`}>
-              {hf > 1.8 ? '安全' : hf >= 1.6 ? '注意' : '危険'}
+              {hf > 1.8 ? t('hfSafe') : hf >= 1.6 ? t('hfWarning') : t('hfDanger')}
             </div>
           )}
         </CardContent>
@@ -160,13 +162,13 @@ export default function PerformanceSummaryKPI() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            ウォレット残高 (Base)
+            {t('walletBalance')}
           </CardTitle>
           <div className="flex items-center gap-1">
             {walletBalance?.fallback_used && (
               <AlertTriangle
                 className="h-4 w-4 text-yellow-500"
-                aria-label="価格またはRPC取得失敗 (フォールバック使用中)"
+                aria-label={t('walletFallbackAlert')}
               />
             )}
             <Wallet className="h-4 w-4 text-muted-foreground" />

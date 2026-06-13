@@ -5,6 +5,7 @@
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ChevronLeft, DollarSign, TrendingUp } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { KPICard } from '@/components/shared/KPICard'
@@ -49,6 +50,7 @@ const ACTION_COLORS: Record<string, string> = {
 // ---- Page ----
 
 export default function PartnerUserDetailPage() {
+  const t = useTranslations('PartnerUserDetail')
   const params = useParams()
   const userId = Number(params.id)
 
@@ -70,11 +72,11 @@ export default function PartnerUserDetailPage() {
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ChevronLeft className="h-4 w-4" />
-          テスター一覧に戻る
+          {t('backToList')}
         </Link>
       </div>
 
-      <h1 className="text-2xl font-bold">テスター詳細</h1>
+      <h1 className="text-2xl font-bold">{t('pageTitle')}</h1>
 
       {/* KPI Cards */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -85,13 +87,13 @@ export default function PartnerUserDetailPage() {
         ) : (
           <>
             <KPICard
-              label="今日の運用残高"
+              label={t('kpiTodayBalance')}
               value={fmtUsd(stats?.today_amount)}
               prefix="$"
               icon={DollarSign}
             />
             <KPICard
-              label="今月の利回り"
+              label={t('kpiMonthReturn')}
               value={fmtPct(stats?.month_return_pct)}
               suffix="%"
               trend={returnTrend(stats?.month_return_pct)}
@@ -103,7 +105,7 @@ export default function PartnerUserDetailPage() {
               icon={TrendingUp}
             />
             <KPICard
-              label="昨日の利回り"
+              label={t('kpiYesterdayReturn')}
               value={fmtPct(stats?.yesterday_return_pct)}
               suffix="%"
               trend={returnTrend(stats?.yesterday_return_pct)}
@@ -122,7 +124,7 @@ export default function PartnerUserDetailPage() {
       <section>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">AI 判定履歴（直近 5 件）</CardTitle>
+            <CardTitle className="text-base">{t('aiHistoryTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {decisionsLoading ? (
@@ -132,20 +134,20 @@ export default function PartnerUserDetailPage() {
                 ))}
               </div>
             ) : !decisions || decisions.items.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">データなし</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t('noData')}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50">
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">
-                        判定
+                        {t('colDecision')}
                       </th>
                       <th className="text-right px-4 py-3 font-medium text-muted-foreground">
-                        確信度
+                        {t('colConfidence')}
                       </th>
                       <th className="text-right px-4 py-3 font-medium text-muted-foreground">
-                        日時
+                        {t('colDate')}
                       </th>
                     </tr>
                   </thead>
@@ -183,7 +185,7 @@ export default function PartnerUserDetailPage() {
       </section>
 
       <p className="text-xs text-muted-foreground text-center pb-4">
-        ※表示される利回りは参考値であり、将来の収益を保証するものではありません
+        {t('disclaimer')}
       </p>
     </div>
   )

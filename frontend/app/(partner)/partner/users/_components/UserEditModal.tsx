@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   Dialog,
   DialogContent,
@@ -65,6 +66,7 @@ function Field({
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function UserEditModal({ user, onClose, onUpdated }: UserEditModalProps) {
+  const t = useTranslations('PartnerUserEditModal')
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -104,7 +106,7 @@ export function UserEditModal({ user, onClose, onUpdated }: UserEditModalProps) 
     if (isActive !== user.is_active) payload.is_active = isActive
 
     if (Object.keys(payload).length === 0) {
-      setError('変更がありません')
+      setError(t('noChanges'))
       setLoading(false)
       return
     }
@@ -118,7 +120,7 @@ export function UserEditModal({ user, onClose, onUpdated }: UserEditModalProps) 
       setTimeout(handleClose, 800)
     } catch (e: unknown) {
       const err = e as { message?: string }
-      setError(err.message ?? '更新に失敗しました')
+      setError(err.message ?? t('updateFailed'))
     } finally {
       setLoading(false)
     }
@@ -128,9 +130,9 @@ export function UserEditModal({ user, onClose, onUpdated }: UserEditModalProps) 
     <Dialog open={user !== null} onOpenChange={(o) => { if (!o) handleClose() }}>
       <DialogContent className="max-w-md bg-gray-950 border-gray-800">
         <DialogHeader>
-          <DialogTitle className="text-gray-100">ログイン情報を編集</DialogTitle>
+          <DialogTitle className="text-gray-100">{t('title')}</DialogTitle>
           <DialogDescription className="text-gray-500 text-xs">
-            {user?.username} のアカウント情報を変更します
+            {user?.username ? t('description', { username: user.username }) : ''}
           </DialogDescription>
         </DialogHeader>
 
@@ -139,28 +141,28 @@ export function UserEditModal({ user, onClose, onUpdated }: UserEditModalProps) 
             {/* Fields */}
             <div className="rounded-lg bg-gray-800/50 p-4 space-y-3">
               <Field
-                label="メールアドレス"
+                label={t('labelEmail')}
                 type="email"
                 value={email}
                 onChange={setEmail}
               />
               <Field
-                label="ユーザー名"
+                label={t('labelUsername')}
                 value={username}
                 onChange={setUsername}
               />
               <Field
-                label="新しいパスワード"
+                label={t('labelPassword')}
                 type="password"
                 value={password}
                 onChange={setPassword}
-                placeholder="空欄 = 変更しない"
-                hint="8文字以上。空欄のままにすると変更されません。"
+                placeholder={t('passwordPlaceholder')}
+                hint={t('passwordHint')}
               />
 
               {/* is_active toggle */}
               <div>
-                <label className="text-xs text-gray-400 mb-2 block">ステータス</label>
+                <label className="text-xs text-gray-400 mb-2 block">{t('labelStatus')}</label>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -171,7 +173,7 @@ export function UserEditModal({ user, onClose, onUpdated }: UserEditModalProps) 
                         : 'border-gray-700 bg-gray-800 text-gray-500 hover:border-gray-600'
                     }`}
                   >
-                    アクティブ
+                    {t('statusActive')}
                   </button>
                   <button
                     type="button"
@@ -182,7 +184,7 @@ export function UserEditModal({ user, onClose, onUpdated }: UserEditModalProps) 
                         : 'border-gray-700 bg-gray-800 text-gray-500 hover:border-gray-600'
                     }`}
                   >
-                    非アクティブ
+                    {t('statusInactive')}
                   </button>
                 </div>
               </div>
@@ -193,7 +195,7 @@ export function UserEditModal({ user, onClose, onUpdated }: UserEditModalProps) 
               <p className="text-xs text-red-400 px-1">{error}</p>
             )}
             {success && (
-              <p className="text-xs text-green-400 px-1">保存しました</p>
+              <p className="text-xs text-green-400 px-1">{t('saved')}</p>
             )}
 
             {/* Actions */}
@@ -205,7 +207,7 @@ export function UserEditModal({ user, onClose, onUpdated }: UserEditModalProps) 
                 disabled={loading}
                 className="border-gray-600 text-gray-300 hover:bg-gray-800"
               >
-                キャンセル
+                {t('cancel')}
               </Button>
               <Button
                 size="sm"
@@ -213,7 +215,7 @@ export function UserEditModal({ user, onClose, onUpdated }: UserEditModalProps) 
                 disabled={loading}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
-                {loading ? '保存中...' : '保存'}
+                {loading ? t('saving') : t('save')}
               </Button>
             </div>
           </div>

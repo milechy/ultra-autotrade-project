@@ -13,6 +13,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts'
+import { useTranslations } from 'next-intl'
 
 export interface MonthlyData {
   month: string
@@ -27,10 +28,12 @@ interface Props {
 }
 
 export default function MonthlyChartRecharts({ data }: Props) {
+  const t = useTranslations('PartnerMonthlyChart')
+
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">
-        データがありません
+        {t('noData')}
       </div>
     )
   }
@@ -46,11 +49,11 @@ export default function MonthlyChartRecharts({ data }: Props) {
         />
         <ReferenceLine y={0} stroke="#9ca3af" />
         <Tooltip
-          formatter={(v: number) => [`${v.toFixed(2)}%`, '月次利回り']}
+          formatter={(v: number) => [`${v.toFixed(2)}%`, t('tooltipLabel')]}
           labelStyle={{ fontSize: 12 }}
           contentStyle={{ fontSize: 12 }}
         />
-        <Bar dataKey="return_pct" name="月次利回り" radius={[4, 4, 0, 0]}>
+        <Bar dataKey="return_pct" name={t('tooltipLabel')} radius={[4, 4, 0, 0]}>
           {data.map((entry, index) => (
             <Cell
               key={index}

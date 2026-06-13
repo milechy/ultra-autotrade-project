@@ -5,24 +5,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, DollarSign, TrendingUp } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { KPICard } from '@/components/shared/KPICard'
 import { getStoredToken } from '@/lib/auth'
 import { getReferralTransactions, type ReferralTransaction } from '@/lib/api/referral'
 import { getPartnerUserStats, type PartnerUserStats } from '@/lib/api/partner'
-
-const TYPE_LABELS: Record<string, string> = {
-  deposit: '入金',
-  withdraw: '出金',
-  borrow: '借入',
-  repay: '返済',
-  supply: '供給',
-}
-
-function formatType(type: string): string {
-  return TYPE_LABELS[type] ?? type
-}
 
 function fmtUsd(v: string | null | undefined): string {
   if (v == null) return '—'
@@ -44,9 +33,22 @@ function returnTrend(v: string | null | undefined): 'up' | 'down' | 'flat' {
 }
 
 export default function ReferralUserDetailPage() {
+  const t = useTranslations('PartnerReferralDetail')
   const params = useParams()
   const userId = Number(params.id)
   const token = getStoredToken()
+
+  const TYPE_LABELS: Record<string, string> = {
+    deposit: t('typeDeposit'),
+    withdraw: t('typeWithdraw'),
+    borrow: t('typeBorrow'),
+    repay: t('typeRepay'),
+    supply: t('typeSupply'),
+  }
+
+  function formatType(type: string): string {
+    return TYPE_LABELS[type] ?? type
+  }
 
   const [transactions, setTransactions] = useState<ReferralTransaction[]>([])
   const [loading, setLoading] = useState(true)
@@ -97,11 +99,11 @@ export default function ReferralUserDetailPage() {
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ChevronLeft className="h-4 w-4" />
-          紹介一覧に戻る
+          {t('backToList')}
         </Link>
       </div>
 
-      <h1 className="text-2xl font-bold">運用状況詳細</h1>
+      <h1 className="text-2xl font-bold">{t('pageTitle')}</h1>
 
       {/* KPI section */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -112,13 +114,13 @@ export default function ReferralUserDetailPage() {
         ) : (
           <>
             <KPICard
-              label="今日の運用残高"
+              label={t('kpiTodayBalance')}
               value={fmtUsd(stats?.today_amount)}
               prefix="$"
               icon={DollarSign}
             />
             <KPICard
-              label="今月の利回り"
+              label={t('kpiMonthReturn')}
               value={fmtPct(stats?.month_return_pct)}
               suffix="%"
               trend={returnTrend(stats?.month_return_pct)}
@@ -135,7 +137,7 @@ export default function ReferralUserDetailPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">取引履歴一覧</CardTitle>
+          <CardTitle className="text-base">{t('transactionTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
@@ -145,15 +147,15 @@ export default function ReferralUserDetailPage() {
               ))}
             </div>
           ) : transactions.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">データなし</p>
+            <p className="text-sm text-muted-foreground text-center py-8">{t('noData')}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">種別</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">金額</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">日時</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('colType')}</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t('colAmount')}</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t('colDate')}</th>
                   </tr>
                 </thead>
                 <tbody>

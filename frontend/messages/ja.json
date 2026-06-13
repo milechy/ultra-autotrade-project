@@ -2945,5 +2945,102 @@
   "AdminActionDistributionChart": {
     "title": "BUY/SELL/HOLD分布",
     "noData": "データなし"
+  },
+  "PartnerNotifications": {
+    "pageTitle": "通知ログ",
+    "filterLabel": "重要度:",
+    "filterAll": "すべて",
+    "totalCount": "全 {total} 件",
+    "cardTitle": "通知一覧",
+    "noNotifications": "通知はありません",
+    "colDate": "日時",
+    "colSeverity": "重要度",
+    "colTitle": "タイトル",
+    "colBody": "内容",
+    "colChannel": "チャンネル",
+    "prevPage": "前へ",
+    "nextPage": "次へ"
+  },
+  "PartnerMonthlyChart": {
+    "noData": "データがありません",
+    "tooltipLabel": "月次利回り"
+  },
+  "PartnerPerformanceKPI": {
+    "currentBalance": "現在の運用残高",
+    "totalPnl": "全体損益",
+    "testerCount": "テスター数",
+    "testerUnit": "人",
+    "healthFactor": "Health Factor",
+    "hfSafe": "安全",
+    "hfWarning": "注意",
+    "hfDanger": "危険",
+    "walletBalance": "ウォレット残高 (Base)",
+    "walletFallbackAlert": "価格またはRPC取得失敗 (フォールバック使用中)"
+  },
+  "PartnerAllocationTable": {
+    "cardTitle": "資金割り振り一覧",
+    "readOnlyBadge": "閲覧のみ（廃止予定）",
+    "noData": "割り振りデータがありません",
+    "colName": "名前",
+    "colPrincipal": "元本 (USD)",
+    "colCurrent": "現在値 (USD)",
+    "colPnl": "損益 (USD)",
+    "colReturn": "利回り",
+    "colTier": "ティア",
+    "colDate": "割当日",
+    "tierLower": "一般",
+    "tierMiddle": "ミドル",
+    "tierUpper": "アッパー"
+  },
+  "PartnerAllocationChart": {
+    "noData": "データがありません",
+    "tooltipLabel": "割り当て額"
+  },
+  "PartnerUserDetail": {
+    "backToList": "テスター一覧に戻る",
+    "pageTitle": "テスター詳細",
+    "kpiTodayBalance": "今日の運用残高",
+    "kpiMonthReturn": "今月の利回り",
+    "kpiYesterdayReturn": "昨日の利回り",
+    "aiHistoryTitle": "AI 判定履歴（直近 5 件）",
+    "noData": "データなし",
+    "colDecision": "判定",
+    "colConfidence": "確信度",
+    "colDate": "日時",
+    "disclaimer": "※表示される利回りは参考値であり、将来の収益を保証するものではありません"
+  },
+  "PartnerReferralDetail": {
+    "backToList": "紹介一覧に戻る",
+    "pageTitle": "運用状況詳細",
+    "kpiTodayBalance": "今日の運用残高",
+    "kpiMonthReturn": "今月の利回り",
+    "transactionTitle": "取引履歴一覧",
+    "noData": "データなし",
+    "colType": "種別",
+    "colAmount": "金額",
+    "colDate": "日時",
+    "typeDeposit": "入金",
+    "typeWithdraw": "出金",
+    "typeBorrow": "借入",
+    "typeRepay": "返済",
+    "typeSupply": "供給"
+  },
+  "PartnerUserEditModal": {
+    "title": "ログイン情報を編集",
+    "description": "{username} のアカウント情報を変更します",
+    "labelEmail": "メールアドレス",
+    "labelUsername": "ユーザー名",
+    "labelPassword": "新しいパスワード",
+    "passwordPlaceholder": "空欄 = 変更しない",
+    "passwordHint": "8文字以上。空欄のままにすると変更されません。",
+    "labelStatus": "ステータス",
+    "statusActive": "アクティブ",
+    "statusInactive": "非アクティブ",
+    "noChanges": "変更がありません",
+    "updateFailed": "更新に失敗しました",
+    "saved": "保存しました",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "saving": "保存中..."
   }
 }

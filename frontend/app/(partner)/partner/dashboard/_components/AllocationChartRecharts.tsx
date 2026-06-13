@@ -4,6 +4,7 @@
 // NOTE: This component must be loaded via dynamic(() => import('./AllocationChartRecharts'), { ssr: false })
 
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { useTranslations } from 'next-intl'
 import type { Allocation } from '@/lib/api/allocations'
 
 const COLORS = [
@@ -16,10 +17,12 @@ interface Props {
 }
 
 export default function AllocationChartRecharts({ allocations }: Props) {
+  const t = useTranslations('PartnerAllocationChart')
+
   if (!allocations || allocations.length === 0) {
     return (
       <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">
-        データがありません
+        {t('noData')}
       </div>
     )
   }
@@ -51,7 +54,7 @@ export default function AllocationChartRecharts({ allocations }: Props) {
           <Tooltip
             formatter={(value: number) => [
               `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value)}`,
-              '割り当て額',
+              t('tooltipLabel'),
             ]}
             contentStyle={{ fontSize: 12 }}
           />
