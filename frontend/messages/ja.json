@@ -2253,5 +2253,96 @@
     "submitButton": "同意してサービスを利用する",
     "submittingButton": "処理中...",
     "pageFooter": "v{version} • 同意内容はサーバーに記録されます"
+  },
+  "AppShell": {
+    "adminNav": {
+      "automation": "自動売買",
+      "reports": "レポート",
+      "knowledge": "ナレッジ",
+      "aiDecisions": "AI判定",
+      "aiLearning": "AI学習",
+      "protocols": "プロトコル",
+      "events": "データ",
+      "trades": "取引所管理",
+      "proposals": "提案管理",
+      "feeManagement": "手数料管理",
+      "userApp": "ユーザーアプリ →"
+    },
+    "partnerNav": {
+      "dashboard": "ダッシュボード",
+      "referral": "紹介プログラム",
+      "users": "テスター管理",
+      "proposals": "AI提案",
+      "notifications": "通知ログ",
+      "settings": "設定"
+    },
+    "adminLinks": {
+      "settings": "設定",
+      "userManagement": "ユーザー管理",
+      "partnerDashboard": "パートナーダッシュボード",
+      "testerManagement": "テスター管理"
+    },
+    "operationsDashboard": "運用ダッシュボード",
+    "logout": "ログアウト",
+    "login": "ログイン",
+    "menuAriaLabel": "メニュー"
+  },
+  "UserHeader": {
+    "adminNav": {
+      "dashboard": "ダッシュボード",
+      "aiFeed": "AI判定",
+      "approve": "取引承認",
+      "history": "取引履歴",
+      "deposit": "入金",
+      "settings": "設定",
+      "gridBot": "Grid Bot",
+      "copyTrading": "Copy Trading",
+      "wallet": "ウォレット"
+    },
+    "partnerNav": {
+      "dashboard": "ダッシュボード",
+      "approve": "取引承認",
+      "users": "テスター管理",
+      "referral": "紹介プログラム",
+      "proposals": "AI提案",
+      "settings": "設定"
+    },
+    "viewerNav": {
+      "dashboard": "ダッシュボード",
+      "aiFeed": "AI判定",
+      "history": "取引履歴"
+    },
+    "logout": "ログアウト",
+    "helpAriaLabel": "ヘルプ",
+    "helpTitle": "よくある質問",
+    "emergencyStopAriaLabel": "緊急停止",
+    "resumeAriaLabel": "停止解除",
+    "confirmStopTitle": "本当に全ての運用を停止しますか？",
+    "cancelButton": "キャンセル",
+    "stopButton": "停止する",
+    "confirmResumeTitle": "運用を再開しますか？",
+    "resumeWarning": "注意: Health Factor など自動条件が未改善の場合、再開後に再停止される可能性があります。",
+    "resumeButton": "再開する"
+  },
+  "SharedBottomNav": {
+    "adminNav": {
+      "home": "ホーム",
+      "approve": "承認",
+      "aiDecisions": "AI判定",
+      "settings": "設定"
+    },
+    "partnerNav": {
+      "home": "ホーム",
+      "approve": "承認",
+      "users": "テスター",
+      "referral": "紹介",
+      "proposals": "AI提案",
+      "settings": "設定"
+    },
+    "viewerNav": {
+      "home": "ホーム",
+      "aiDecisions": "AI判定",
+      "help": "ヘルプ"
+    }
   }
 }
