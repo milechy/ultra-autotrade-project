@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import {
   TradeActionBadge,
@@ -55,20 +56,11 @@ function statusBadgeClass(status: string): string {
   }
 }
 
-function statusLabel(status: string): string {
-  switch (status.toLowerCase()) {
-    case "success": return "成功";
-    case "failed": return "失敗";
-    case "pending": return "処理中";
-    default: return status;
-  }
+function statusLabel(status: string, labels: Record<string, string>): string {
+  return labels[status.toLowerCase()] ?? status;
 }
 
-function exportCsv(trades: AdminTransaction[]) {
-  const headers = [
-    "ID", "日時", "ユーザーID", "ウォレット", "操作", "アセット",
-    "数量", "USD相当", "ステータス", "Tx Hash", "チェーン", "Dry Run",
-  ];
+function exportCsv(trades: AdminTransaction[], headers: string[]) {
   const rows = trades.map((t) => [
     t.id,
     formatDateTime(t.created_at),
@@ -98,6 +90,8 @@ function exportCsv(trades: AdminTransaction[]) {
 // -----------------------------------------------------------------------
 
 function TradesContent() {
+  const t = useTranslations("AdminTrades");
+
   const [searchInput, setSearchInput] = useState("");
   const [actionFilter, setActionFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -154,7 +148,7 @@ function TradesContent() {
       setTrades(res.items);
       setTotal(res.total);
     } catch (err) {
-      setError("取引データの取得に失敗しました");
+      setError(t("fetchError"));
       setTrades([]);
       setTotal(0);
     } finally {
@@ -181,19 +175,24 @@ function TradesContent() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">取引履歴</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t("pageTitle")}</h1>
           <p className="mt-0.5 text-xs text-gray-400">
-            全ユーザーの取引一覧 — {total.toLocaleString()} 件中 {trades.length} 件表示
+            {t("subtitle", { total: total.toLocaleString(), count: trades.length })}
           </p>
         </div>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => exportCsv(trades)}
+          onClick={() => exportCsv(trades, [
+            t("csvHeaderId"), t("csvHeaderDatetime"), t("csvHeaderUserId"),
+            t("csvHeaderWallet"), t("csvHeaderOperation"), t("csvHeaderAsset"),
+            t("csvHeaderAmount"), t("csvHeaderAmountUsd"), t("csvHeaderStatus"),
+            t("csvHeaderTxHash"), t("csvHeaderChain"), t("csvHeaderDryRun"),
+          ])}
           disabled={trades.length === 0}
         >
           <Download className="mr-2 h-4 w-4" />
-          CSV エクスポート
+          {t("csvExport")}
         </Button>
       </div>
 
@@ -201,17 +200,17 @@ function TradesContent() {
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm">
         <div className="flex flex-wrap gap-3">
           <Input
-            placeholder="ユーザーID / ウォレットで検索..."
+            placeholder={t("searchPlaceholder")}
             value={searchInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="h-8 w-56 text-xs"
           />
           <Select value={actionFilter} onValueChange={handleActionChange}>
             <SelectTrigger className="h-8 w-36 text-xs">
-              <SelectValue placeholder="操作種別" />
+              <SelectValue placeholder={t("actionFilterPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL" className="text-xs">すべての操作</SelectItem>
+              <SelectItem value="ALL" className="text-xs">{t("actionAll")}</SelectItem>
               <SelectItem value="BUY" className="text-xs">BUY</SelectItem>
               <SelectItem value="SELL" className="text-xs">SELL</SelectItem>
               <SelectItem value="HOLD" className="text-xs">HOLD</SelectItem>
@@ -219,13 +218,13 @@ function TradesContent() {
           </Select>
           <Select value={statusFilter} onValueChange={handleStatusChange}>
             <SelectTrigger className="h-8 w-36 text-xs">
-              <SelectValue placeholder="ステータス" />
+              <SelectValue placeholder={t("statusFilterPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL" className="text-xs">すべて</SelectItem>
-              <SelectItem value="SUCCESS" className="text-xs">成功</SelectItem>
-              <SelectItem value="FAILED" className="text-xs">失敗</SelectItem>
-              <SelectItem value="PENDING" className="text-xs">処理中</SelectItem>
+              <SelectItem value="ALL" className="text-xs">{t("statusAll")}</SelectItem>
+              <SelectItem value="SUCCESS" className="text-xs">{t("statusSuccess")}</SelectItem>
+              <SelectItem value="FAILED" className="text-xs">{t("statusFailed")}</SelectItem>
+              <SelectItem value="PENDING" className="text-xs">{t("statusPending")}</SelectItem>
             </SelectContent>
           </Select>
           <DateRangeFilter onChange={handleDateRangeChange} presets />
@@ -244,12 +243,12 @@ function TradesContent() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">日時</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">ユーザー</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">操作</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">金額</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">ステータス</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">TxHash</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t("colDatetime")}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t("colUser")}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t("colAction")}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t("colAmount")}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t("colStatus")}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">{t("colTxHash")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -262,26 +261,26 @@ function TradesContent() {
             ) : trades.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
-                  条件に一致する取引がありません
+                  {t("noTrades")}
                 </td>
               </tr>
             ) : (
-              trades.map((t) => (
-                <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              trades.map((trade) => (
+                <tr key={trade.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                   <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                    {formatDateTime(t.created_at)}
+                    {formatDateTime(trade.created_at)}
                   </td>
                   <td className="px-4 py-3">
-                    {t.wallet_address ? (
-                      <WalletAddressMask address={t.wallet_address} />
+                    {trade.wallet_address ? (
+                      <WalletAddressMask address={trade.wallet_address} />
                     ) : (
-                      <span className="text-xs text-gray-500">UID: {t.user_id}</span>
+                      <span className="text-xs text-gray-500">{t("uidLabel", { uid: trade.user_id })}</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <TradeActionBadge action={t.operation as "BUY" | "SELL" | "HOLD"} />
-                      {t.is_dry_run && (
+                      <TradeActionBadge action={trade.operation as "BUY" | "SELL" | "HOLD"} />
+                      {trade.is_dry_run && (
                         <Badge variant="outline" className="text-xs px-1.5 py-0 text-purple-600 border-purple-200 bg-purple-50">
                           Dry Run
                         </Badge>
@@ -289,16 +288,16 @@ function TradesContent() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm font-mono text-gray-800 dark:text-gray-200">
-                    {t.operation === "HOLD" ? "—" : `$${Number(t.amount_usd).toLocaleString()}`}
+                    {trade.operation === "HOLD" ? "—" : `$${Number(trade.amount_usd).toLocaleString()}`}
                   </td>
                   <td className="px-4 py-3">
-                    <Badge variant="outline" className={`text-xs px-2 py-0.5 ${statusBadgeClass(t.status)}`}>
-                      {statusLabel(t.status)}
+                    <Badge variant="outline" className={`text-xs px-2 py-0.5 ${statusBadgeClass(trade.status)}`}>
+                      {statusLabel(trade.status, { success: t("statusSuccess"), failed: t("statusFailed"), pending: t("statusPending") })}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    {t.tx_hash ? (
-                      <TxHashLink hash={t.tx_hash} chain={t.chain as TxHashLinkProps["chain"]} truncate />
+                    {trade.tx_hash ? (
+                      <TxHashLink hash={trade.tx_hash} chain={trade.chain as TxHashLinkProps["chain"]} truncate />
                     ) : (
                       <span className="text-xs text-gray-400">—</span>
                     )}
@@ -318,40 +317,40 @@ function TradesContent() {
           </div>
         ) : trades.length === 0 ? (
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 text-center text-sm text-gray-400">
-            条件に一致する取引がありません
+            {t("noTrades")}
           </div>
         ) : (
-          trades.map((t) => (
-            <div key={t.id} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm space-y-3">
+          trades.map((trade) => (
+            <div key={trade.id} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <TradeActionBadge action={t.operation as "BUY" | "SELL" | "HOLD"} />
-                  {t.is_dry_run && (
+                  <TradeActionBadge action={trade.operation as "BUY" | "SELL" | "HOLD"} />
+                  {trade.is_dry_run && (
                     <Badge variant="outline" className="text-xs px-1.5 py-0 text-purple-600 border-purple-200 bg-purple-50">
                       Dry Run
                     </Badge>
                   )}
                 </div>
-                <Badge variant="outline" className={`text-xs px-2 py-0.5 flex-shrink-0 ${statusBadgeClass(t.status)}`}>
-                  {statusLabel(t.status)}
+                <Badge variant="outline" className={`text-xs px-2 py-0.5 flex-shrink-0 ${statusBadgeClass(trade.status)}`}>
+                  {statusLabel(trade.status, { success: t("statusSuccess"), failed: t("statusFailed"), pending: t("statusPending") })}
                 </Badge>
               </div>
-              <div className="text-xs text-gray-500">{formatDateTime(t.created_at)}</div>
+              <div className="text-xs text-gray-500">{formatDateTime(trade.created_at)}</div>
               <div>
-                {t.wallet_address ? (
-                  <WalletAddressMask address={t.wallet_address} />
+                {trade.wallet_address ? (
+                  <WalletAddressMask address={trade.wallet_address} />
                 ) : (
-                  <span className="text-xs text-gray-500">UID: {t.user_id}</span>
+                  <span className="text-xs text-gray-500">{t("uidLabel", { uid: trade.user_id })}</span>
                 )}
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">{t.asset}</span>
+                <span className="text-gray-600">{trade.asset}</span>
                 <span className="font-mono font-semibold text-gray-800 dark:text-gray-200">
-                  {t.operation === "HOLD" ? "—" : `$${Number(t.amount_usd).toLocaleString()}`}
+                  {trade.operation === "HOLD" ? "—" : `$${Number(trade.amount_usd).toLocaleString()}`}
                 </span>
               </div>
-              {t.tx_hash && (
-                <TxHashLink hash={t.tx_hash} chain={t.chain as TxHashLinkProps["chain"]} truncate />
+              {trade.tx_hash && (
+                <TxHashLink hash={trade.tx_hash} chain={trade.chain as TxHashLinkProps["chain"]} truncate />
               )}
             </div>
           ))
@@ -362,7 +361,7 @@ function TradesContent() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-sm text-gray-600">
           <span className="text-xs">
-            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} / {total.toLocaleString()} 件
+            {t("paginationRange", { from: page * PAGE_SIZE + 1, to: Math.min((page + 1) * PAGE_SIZE, total), total: total.toLocaleString() })}
           </span>
           <div className="flex items-center gap-2">
             <Button
@@ -373,10 +372,10 @@ function TradesContent() {
               className="h-8 px-2"
             >
               <ChevronLeft className="h-4 w-4" />
-              前へ
+              {t("prevPage")}
             </Button>
             <span className="text-xs">
-              {page + 1} / {totalPages}
+              {t("paginationPage", { current: page + 1, totalPages })}
             </span>
             <Button
               variant="outline"
@@ -385,7 +384,7 @@ function TradesContent() {
               disabled={page >= totalPages - 1 || loading}
               className="h-8 px-2"
             >
-              次へ
+              {t("nextPage")}
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -395,13 +394,18 @@ function TradesContent() {
   );
 }
 
-export default function TradesPage() {
+function TradesPageInner() {
+  const t = useTranslations("AdminTrades");
   return (
     <AuthGuard adminOnly>
       <>
-        <title>取引履歴 - Ultra AutoTrade</title>
+        <title>{t("pageTitleTag")}</title>
         <TradesContent />
       </>
     </AuthGuard>
   );
+}
+
+export default function TradesPage() {
+  return <TradesPageInner />;
 }
