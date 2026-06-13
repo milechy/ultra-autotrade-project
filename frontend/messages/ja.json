@@ -2655,5 +2655,67 @@
     "valuation": "評価額: ${value}",
     "estimatedApy": "推定APY",
     "apyChartTitle": "APY推移 (30日)"
+  },
+  "AdminUsers": {
+    "pageTitle": "ユーザー管理 - Ultra AutoTrade",
+    "heading": "ユーザー管理",
+    "userCount": "{count}人",
+    "totalAum": "総AUM: ${amount}",
+    "searchPlaceholder": "ウォレットアドレスで検索...",
+    "loading": "読み込み中...",
+    "rowHint": "行をクリックするとユーザー詳細が表示されます。",
+    "emptyQueryTitle": "該当するユーザーが見つかりません",
+    "emptyQuerySubtitle": "検索クエリを変更してください",
+    "emptyTitle": "登録ユーザーがいません",
+    "emptySubtitle": "ユーザーが登録されると、ここに表示されます"
+  },
+  "AdminAiDecisions": {
+    "pageTitle": "AI判定モニター - Ultra AutoTrade",
+    "heading": "AI判定モニター",
+    "subheading": "マルチLLMによるAI判定の詳細履歴・フィルタリング",
+    "manualTrigger": "手動判定実行",
+    "loading": "読み込み中...",
+    "emptyState": "条件に一致する判定履歴がありません。"
+  },
+  "DecisionDetailModal": {
+    "title": "AI判定詳細",
+    "finalDecision": "最終判定",
+    "executed": "実行",
+    "executedYes": "済",
+    "executedNo": "未実行",
+    "confidence": "信頼度 {pct}%",
+    "claudeConfidence": "信頼度 {pct}%",
+    "gptConfidence": "信頼度 {pct}%",
+    "rawResponse": "LLM生レスポンス",
+    "agreedMessage": "Claude と GPT-4o の判定が一致しました。",
+    "disagreedMessage": "Claude と GPT-4o の判定が不一致です。安全側の判定を採用。",
+    "ragTitle": "RAGコンテキスト（ソース数: {count}）",
+    "ragQuery": "検索クエリ: {query}"
+  },
+  "DecisionTable": {
+    "heading": "判定履歴",
+    "countSuffix": "{count} 件",
+    "emptyState": "該当する判定履歴がありません。",
+    "colTimestamp": "日時",
+    "colQuery": "クエリ",
+    "colDecision": "判定",
+    "colConfidence": "信頼度",
+    "colClaude": "Claude判定",
+    "colGpt": "GPT-4o判定",
+    "colMatch": "一致",
+    "prevPage": "前へ",
+    "nextPage": "次へ",
+    "rowHint": "行をクリックすると詳細が表示されます。"
+  },
+  "RiskEngineSection": {
+    "sectionTitle": "Risk Engine設定",
+    "labelHfWarning": "HF WARNING閾値",
+    "labelHfHardStop": "HF HARD_STOP閾値",
+    "warningHfHardStop": "⚠ この値を下げるとリスクが増大します",
+    "labelMaxSingleTrade": "単回取引上限",
+    "labelMaxDailyTrade": "日次取引上限",
+    "labelCooldown": "クールダウン",
+    "suffixPercent": "%",
+    "suffixSeconds": "秒"
   }
 }

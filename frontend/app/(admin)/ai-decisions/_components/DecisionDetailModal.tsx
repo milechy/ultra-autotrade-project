@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,8 @@ function formatDateTime(iso: string): string {
 }
 
 export function DecisionDetailModal({ decision, onClose }: DecisionDetailModalProps) {
+  const t = useTranslations('DecisionDetailModal')
+
   return (
     <Dialog
       open={decision !== null}
@@ -45,7 +48,7 @@ export function DecisionDetailModal({ decision, onClose }: DecisionDetailModalPr
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
         <DialogHeader>
           <DialogTitle className="text-gray-900 dark:text-gray-100">
-            AI判定詳細 — {decision && formatDateTime(decision.timestamp)}
+            {t('title')} — {decision && formatDateTime(decision.timestamp)}
           </DialogTitle>
           <DialogDescription className="text-gray-600 dark:text-gray-400">
             {decision?.query}
@@ -58,7 +61,7 @@ export function DecisionDetailModal({ decision, onClose }: DecisionDetailModalPr
             <div className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 flex-wrap">
               <div>
                 <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
-                  最終判定
+                  {t('finalDecision')}
                 </span>
                 <TradeActionBadge action={decision.final_action} />
               </div>
@@ -70,7 +73,7 @@ export function DecisionDetailModal({ decision, onClose }: DecisionDetailModalPr
               </div>
               <div>
                 <span className="text-xs text-gray-500 dark:text-gray-400 block">
-                  実行
+                  {t('executed')}
                 </span>
                 <span
                   className={`font-semibold text-sm ${
@@ -79,7 +82,7 @@ export function DecisionDetailModal({ decision, onClose }: DecisionDetailModalPr
                       : 'text-gray-400'
                   }`}
                 >
-                  {decision.executed ? '済' : '未実行'}
+                  {decision.executed ? t('executedYes') : t('executedNo')}
                 </span>
               </div>
             </div>
@@ -92,7 +95,7 @@ export function DecisionDetailModal({ decision, onClose }: DecisionDetailModalPr
                 </span>
                 <TradeActionBadge action={decision.claude_action} />
                 <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
-                  信頼度 {Math.round(decision.claude_confidence * 100)}%
+                  {t('claudeConfidence', { pct: Math.round(decision.claude_confidence * 100) })}
                 </span>
               </div>
               <p className="text-gray-700 dark:text-gray-300 text-sm">
@@ -101,7 +104,7 @@ export function DecisionDetailModal({ decision, onClose }: DecisionDetailModalPr
               {decision.claude_raw_response && (
                 <details className="mt-2">
                   <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300">
-                    LLM生レスポンス
+                    {t('rawResponse')}
                   </summary>
                   <pre className="mt-1 text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-x-auto text-gray-600 dark:text-gray-400">
                     {decision.claude_raw_response}
@@ -120,7 +123,7 @@ export function DecisionDetailModal({ decision, onClose }: DecisionDetailModalPr
                   <TradeActionBadge action={decision.gpt4o_action} />
                   {decision.gpt4o_confidence != null && (
                     <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
-                      信頼度 {Math.round(decision.gpt4o_confidence * 100)}%
+                      {t('gptConfidence', { pct: Math.round(decision.gpt4o_confidence * 100) })}
                     </span>
                   )}
                 </div>
@@ -132,7 +135,7 @@ export function DecisionDetailModal({ decision, onClose }: DecisionDetailModalPr
                 {decision.gpt4o_raw_response && (
                   <details className="mt-2">
                     <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300">
-                      LLM生レスポンス
+                      {t('rawResponse')}
                     </summary>
                     <pre className="mt-1 text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-x-auto text-gray-600 dark:text-gray-400">
                       {decision.gpt4o_raw_response}
@@ -150,9 +153,7 @@ export function DecisionDetailModal({ decision, onClose }: DecisionDetailModalPr
                   : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
               }`}
             >
-              {decision.agreed
-                ? 'Claude と GPT-4o の判定が一致しました。'
-                : 'Claude と GPT-4o の判定が不一致です。安全側の判定を採用。'}
+              {decision.agreed ? t('agreedMessage') : t('disagreedMessage')}
             </div>
 
             {/* Feedback section */}
@@ -162,10 +163,10 @@ export function DecisionDetailModal({ decision, onClose }: DecisionDetailModalPr
             {decision.rag_context && (
               <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                 <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">
-                  RAGコンテキスト（ソース数: {decision.rag_context.source_count}）
+                  {t('ragTitle', { count: decision.rag_context.source_count })}
                 </span>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  検索クエリ: {decision.rag_context.query}
+                  {t('ragQuery', { query: decision.rag_context.query })}
                 </p>
                 <ul className="space-y-1">
                   {decision.rag_context.chunks.map((chunk, i) => (

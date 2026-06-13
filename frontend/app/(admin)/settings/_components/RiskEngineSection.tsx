@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React from 'react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -71,6 +72,8 @@ function NumberField({
 }
 
 export function RiskEngineSection({ settings, onChange }: RiskEngineSectionProps) {
+  const t = useTranslations('RiskEngineSection')
+
   const update = <K extends keyof RiskSettings>(key: K, value: RiskSettings[K]) => {
     onChange({ ...settings, [key]: value })
   }
@@ -79,13 +82,13 @@ export function RiskEngineSection({ settings, onChange }: RiskEngineSectionProps
     <Card className="bg-gray-900 border-gray-800">
       <CardHeader className="pb-3">
         <CardTitle className="text-gray-100 text-base font-semibold">
-          Risk Engine設定
+          {t('sectionTitle')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* TODO: PUT /api/settings/risk */}
         <NumberField
-          label="HF WARNING閾値"
+          label={t('labelHfWarning')}
           value={settings.hfWarning}
           step={0.1}
           min={1.0}
@@ -93,36 +96,36 @@ export function RiskEngineSection({ settings, onChange }: RiskEngineSectionProps
           onChange={(v) => update('hfWarning', v)}
         />
         <NumberField
-          label="HF HARD_STOP閾値"
+          label={t('labelHfHardStop')}
           value={settings.hfHardStop}
           step={0.1}
           min={1.0}
           max={5.0}
-          warning="⚠ この値を下げるとリスクが増大します"
+          warning={t('warningHfHardStop')}
           onChange={(v) => update('hfHardStop', v)}
         />
         <NumberField
-          label="単回取引上限"
+          label={t('labelMaxSingleTrade')}
           value={settings.maxSingleTrade}
-          suffix="%"
+          suffix={t('suffixPercent')}
           step={1}
           min={1}
           max={100}
           onChange={(v) => update('maxSingleTrade', v)}
         />
         <NumberField
-          label="日次取引上限"
+          label={t('labelMaxDailyTrade')}
           value={settings.maxDailyTrade}
-          suffix="%"
+          suffix={t('suffixPercent')}
           step={1}
           min={1}
           max={100}
           onChange={(v) => update('maxDailyTrade', v)}
         />
         <NumberField
-          label="クールダウン"
+          label={t('labelCooldown')}
           value={settings.cooldownSeconds}
-          suffix="秒"
+          suffix={t('suffixSeconds')}
           step={60}
           min={0}
           onChange={(v) => update('cooldownSeconds', v)}

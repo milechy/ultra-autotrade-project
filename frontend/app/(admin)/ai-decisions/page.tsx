@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import AuthGuard from '@/components/AuthGuard'
 import { useAuth } from '@/lib/auth'
 import {
@@ -58,6 +59,7 @@ export default function AiDecisionsPage() {
 // ─── Page content ─────────────────────────────────────────────────────────────
 
 function AiDecisionsContent() {
+  const t = useTranslations('AdminAiDecisions')
   const { token } = useAuth()
 
   const [decisions, setDecisions] = useState<AiDecision[]>([])
@@ -92,13 +94,13 @@ function AiDecisionsContent() {
         const msg =
           err instanceof Error
             ? err.message
-            : (err as { message?: string })?.message ?? 'データ取得に失敗しました'
+            : (err as { message?: string })?.message ?? t('emptyState')
         setError(msg)
       } finally {
         setLoading(false)
       }
     },
-    [token]
+    [token, t]
   )
 
   // 初回ロードとフィルター/ページ変更時に再取得
@@ -123,23 +125,23 @@ function AiDecisionsContent() {
 
   return (
     <>
-      <title>AI判定モニター - Ultra AutoTrade</title>
+      <title>{t('pageTitle')}</title>
 
       {/* Page header */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
-            AI判定モニター
+            {t('heading')}
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            マルチLLMによるAI判定の詳細履歴・フィルタリング
+            {t('subheading')}
           </p>
         </div>
         <button
           onClick={() => setShowTriggerModal(true)}
           className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
         >
-          手動判定実行
+          {t('manualTrigger')}
         </button>
       </div>
 
@@ -153,7 +155,7 @@ function AiDecisionsContent() {
       {/* Loading skeleton */}
       {loading && decisions.length === 0 && (
         <div className="mb-6 py-12 text-center text-sm text-gray-400 dark:text-gray-600">
-          読み込み中...
+          {t('loading')}
         </div>
       )}
 
@@ -173,7 +175,7 @@ function AiDecisionsContent() {
       {/* Decision table */}
       {!loading && decisions.length === 0 && !error ? (
         <div className="py-16 text-center text-sm text-gray-400 dark:text-gray-600">
-          条件に一致する判定履歴がありません。
+          {t('emptyState')}
         </div>
       ) : (
         <DecisionTable
