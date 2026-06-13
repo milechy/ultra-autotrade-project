@@ -2180,5 +2180,40 @@
     "hasAccountText": "Already have an account?",
     "loginLink": "Login",
     "loading": "Loading..."
+  },
+  "Login": {
+    "title": "Login - Ultra AutoTrade",
+    "cardDescription": "Operations Dashboard",
+    "emailLabel": "Email Address",
+    "passwordLabel": "Password",
+    "submitButton": "Login",
+    "submittingButton": "Logging in...",
+    "loading": "Loading...",
+    "loginFailedDefault": "Login failed",
+    "noAccountText": "Don't have an account?",
+    "signupLink": "Sign up",
+    "contactAdminText": "Please contact an administrator for initial setup."
+  },
+  "Signup": {
+    "title": "Sign Up - Ultra AutoTrade",
+    "cardDescription": "Create New Account",
+    "emailLabel": "Email Address",
+    "usernameLabel": "Display Name",
+    "passwordLabel": "Password",
+    "passwordHint": "Please enter at least 8 characters",
+    "termsLink": "Terms of Service",
+    "privacyLink": "Privacy Policy",
+    "consentAnd": " and ",
+    "consentSuffix": "",
+    "submitButton": "Create Account",
+    "submittingButton": "Registering...",
+    "consentRequired": "You must agree to the Terms of Service and Privacy Policy",
+    "registrationFailed": "Registration failed",
+    "hasAccountText": "Already have an account?",
+    "loginLink": "Login",
+    "comingSoonDescription": "Create New Account",
+    "comingSoonMessage": "Open registration is currently not available. If you have an invitation, please register via the invitation link.",
+    "comingSoonLoginButton": "Go to Login",
+    "consentPrefix": "I agree to the "
   }
 }
