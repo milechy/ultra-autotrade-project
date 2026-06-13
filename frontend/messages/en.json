@@ -1041,7 +1041,7 @@
       "bullet3": "View all details of AI decisions"
     }
   },
-    "Help": {
+  "Help": {
     "pageTitle": "FAQ",
     "pageSubtitle": "Frequently asked questions about Ultra AutoTrade",
     "faqs": {
@@ -1304,5 +1304,81 @@
     "noRecentApprovals": "No approval history",
     "statusSuccess": "Success",
     "statusFailed": "Failed"
+  },
+  "AdminRebalance": {
+    "pageTitle": "Aave Rebalance",
+    "lastUpdated": "Last updated: {time} (auto-refresh 30s)",
+    "status": {
+      "heading": "Status",
+      "hfCardLabel": "Aave Health Factor",
+      "loading": "Loading...",
+      "totalAssetsLabel": "Total Assets (USD)",
+      "needsRebalance": "Rebalance Required",
+      "balanced": "Well Balanced",
+      "cooldownLabel": "Cooldown",
+      "cooldownRemaining": "Remaining (s)",
+      "cooldownReady": "Ready to Execute",
+      "previousRebalance": "Previous: {time}",
+      "allocationHeading": "Current vs Target Allocation",
+      "colAsset": "Asset",
+      "colCurrentUsd": "Current (USD)",
+      "colCurrentPct": "Current (%)",
+      "colTargetPct": "Target (%)",
+      "colDeviation": "Deviation (%)"
+    },
+    "hfBadge": {
+      "safe": "Safe",
+      "caution": "Caution",
+      "danger": "Danger"
+    },
+    "actions": {
+      "heading": "Actions",
+      "simulate": "Simulate",
+      "simulating": "Simulating...",
+      "execute": "Execute"
+    },
+    "simulation": {
+      "heading": "Simulation Result",
+      "executable": "Executable",
+      "notExecutable": "Not Executable",
+      "rejectionReasonsHeading": "Rejection Reasons:",
+      "currentHf": "Current HF",
+      "estimatedHf": "Estimated HF (after)",
+      "proposedOpsHeading": "Proposed Operations:",
+      "colAsset": "Asset",
+      "colOperation": "Operation",
+      "colAmountUsd": "Amount (USD)",
+      "colReason": "Reason"
+    },
+    "confirmDialog": {
+      "heading": "Confirm Rebalance Execution",
+      "proposalId": "Proposal ID:",
+      "totalAssets": "Total Assets:",
+      "opCount": "Operations:",
+      "opCountUnit": "{count} ops",
+      "estimatedHf": "Estimated HF (after):",
+      "warning": "This will execute actual transactions on Aave. Please review before confirming.",
+      "cancel": "Cancel",
+      "executing": "Executing...",
+      "execute": "Execute"
+    },
+    "history": {
+      "heading": "Rebalance History",
+      "noHistory": "No history",
+      "colProposalId": "Proposal ID",
+      "colCreatedAt": "Created At",
+      "colExecutedAt": "Executed At",
+      "colStatus": "Status",
+      "colOpCount": "Operations",
+      "colHfBefore": "HF (before)",
+      "colHfAfter": "HF (after)"
+    },
+    "errors": {
+      "fetchError": "Data fetch error: {message}",
+      "simulationError": "Simulation error: {message}",
+      "noConfirmationToken": "No confirmation token",
+      "executeError": "Execution error: {message}"
+    },
+    "documentTitle": "Aave Rebalance - Ultra AutoTrade"
   }
 }
