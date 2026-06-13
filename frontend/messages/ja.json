@@ -1041,7 +1041,7 @@
       "bullet3": "判定の詳細を全て確認できます"
     }
   },
-    "Help": {
+  "Help": {
     "pageTitle": "よくある質問",
     "pageSubtitle": "Ultra AutoTradeの利用に関するFAQです",
     "faqs": {
@@ -1460,5 +1460,39 @@
     "section8Body": "本ポリシーは事前通知のうえ変更されることがあります。重要な変更がある場合は、本サービス上でお知らせします。変更後も本サービスを継続して利用された場合、変更後のポリシーに同意したものとみなします。",
     "section9Title": "9. 問い合わせ先",
     "section9Body": "本ポリシーに関するご質問・ご要望は、本サービスのサポートチームまでお問い合わせください。お問い合わせの際は、ウォレットアドレスおよびご要望の内容をお伝えください。"
+  },
+  "PartnerDashboard": {
+    "title": "パートナーダッシュボード",
+    "allocationRatio": "割り振り比率",
+    "monthlyAum": "今月の運用金額",
+    "yesterdayAum": "昨日の運用金額",
+    "monthlyReturn": "今月の利回り",
+    "yesterdayReturn": "昨日の利回り",
+    "feeSchedule": "手数料体系",
+    "yourTier": "あなたのティア",
+    "noData": "データなし",
+    "monthlyPerformance": "月別運用実績",
+    "aiAccuracy": "AI 的中率",
+    "overallAccuracy": "全体的中率",
+    "last30Days": "直近30日",
+    "totalDecisions": "総判定数: {count} 回",
+    "correctCount": "的中: {count} 回",
+    "latestAiDecision": "最新 AI 判断",
+    "userList": "配下ユーザー一覧",
+    "noUsers": "ユーザーがいません",
+    "colName": "名前",
+    "colEmail": "メール",
+    "colJoinedAt": "登録日",
+    "colAum": "運用金額",
+    "colReturn": "利回り",
+    "colTier": "ティア",
+    "colStatus": "ステータス",
+    "disclaimer": "※表示される利回りは参考値であり、将来の収益を保証するものではありません",
+    "tierLabels": {
+      "LOWER": "一般",
+      "MIDDLE": "ミドル",
+      "UPPER": "アッパー",
+      "GENERAL": "一般"
+    }
   }
 }

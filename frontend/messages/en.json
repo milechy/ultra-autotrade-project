@@ -1041,7 +1041,7 @@
       "bullet3": "View all details of AI decisions"
     }
   },
-    "Help": {
+  "Help": {
     "pageTitle": "FAQ",
     "pageSubtitle": "Frequently asked questions about Ultra AutoTrade",
     "faqs": {
@@ -1460,5 +1460,39 @@
     "section8Body": "This policy may be changed with prior notice. If there are significant changes, we will notify you on the Service. If you continue to use the Service after changes are made, you will be deemed to have agreed to the revised policy.",
     "section9Title": "9. Contact Information",
     "section9Body": "For questions or requests regarding this policy, please contact the Service's support team. When contacting us, please provide your wallet address and the content of your request."
+  },
+  "PartnerDashboard": {
+    "title": "Partner Dashboard",
+    "allocationRatio": "Allocation Ratio",
+    "monthlyAum": "Monthly AUM",
+    "yesterdayAum": "Yesterday AUM",
+    "monthlyReturn": "Monthly Return",
+    "yesterdayReturn": "Yesterday Return",
+    "feeSchedule": "Fee Schedule",
+    "yourTier": "Your Tier",
+    "noData": "No data",
+    "monthlyPerformance": "Monthly Performance",
+    "aiAccuracy": "AI Accuracy",
+    "overallAccuracy": "Overall Accuracy",
+    "last30Days": "Last 30 days",
+    "totalDecisions": "Total decisions: {count}",
+    "correctCount": "Correct: {count}",
+    "latestAiDecision": "Latest AI Decision",
+    "userList": "User List",
+    "noUsers": "No users",
+    "colName": "Name",
+    "colEmail": "Email",
+    "colJoinedAt": "Joined",
+    "colAum": "AUM",
+    "colReturn": "Return",
+    "colTier": "Tier",
+    "colStatus": "Status",
+    "disclaimer": "* Displayed returns are indicative and do not guarantee future earnings",
+    "tierLabels": {
+      "LOWER": "General",
+      "MIDDLE": "Middle",
+      "UPPER": "Upper",
+      "GENERAL": "General"
+    }
   }
 }
