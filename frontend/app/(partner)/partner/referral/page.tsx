@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Copy, TrendingUp, Users } from 'lucide-react'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -29,6 +30,7 @@ function formatRate(value: string): string {
 }
 
 export default function PartnerReferralPage() {
+  const t = useTranslations('PartnerReferral')
   const token = getStoredToken()
 
   const [codeData, setCodeData] = useState<ReferralCodeResponse | null>(null)
@@ -45,11 +47,11 @@ export default function PartnerReferralPage() {
       const data = await postReferralCode(token)
       setCodeData(data)
     } catch {
-      toast.error('招待コードの取得に失敗しました')
+      toast.error(t('errorLoadCode'))
     } finally {
       setCodeLoading(false)
     }
-  }, [token])
+  }, [token, t])
 
   const loadUsers = useCallback(async () => {
     if (!token) return
@@ -93,15 +95,15 @@ export default function PartnerReferralPage() {
     if (!shareUrl) return
     try {
       await navigator.clipboard.writeText(shareUrl)
-      toast.success('コピーしました')
+      toast.success(t('copySuccess'))
     } catch {
-      toast.error('コピーに失敗しました')
+      toast.error(t('copyError'))
     }
   }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-2xl font-bold">紹介キャンペーン</h1>
+      <h1 className="text-2xl font-bold">{t('pageTitle')}</h1>
 
       {/* Earnings summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -109,7 +111,7 @@ export default function PartnerReferralPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
               <Users className="h-3.5 w-3.5" />
-              紹介数
+              {t('referralCount')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -117,7 +119,7 @@ export default function PartnerReferralPage() {
               <Skeleton className="h-7 w-16 rounded" />
             ) : (
               <p className="text-2xl font-bold">
-                {earnings ? `${earnings.referral_count}人` : '—'}
+                {earnings ? t('referralCountValue', { count: earnings.referral_count }) : '—'}
               </p>
             )}
           </CardContent>
@@ -127,10 +129,10 @@ export default function PartnerReferralPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
               <TrendingUp className="h-3.5 w-3.5" />
-              今月の報酬
+              {t('monthlyReward')}
               {earnings && (
                 <span className="ml-1 text-xs font-normal">
-                  (紹介友達の実受取利益の{formatRate(earnings.campaign_rate)})
+                  {t('monthlyRewardRate', { rate: formatRate(earnings.campaign_rate) })}
                 </span>
               )}
             </CardTitle>
@@ -149,7 +151,7 @@ export default function PartnerReferralPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-muted-foreground">
-              累計 payout
+              {t('totalPayout')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -167,15 +169,14 @@ export default function PartnerReferralPage() {
       {/* キャンペーン期限バナー */}
       {!earningsLoading && earnings?.campaign_expires_month && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
-          キャンペーン有効期限: <span className="font-medium">{earnings.campaign_expires_month.slice(0, 7)}</span> まで
-          （新規紹介をするとさらに1年延長されます）
+          {t('campaignExpiry', { month: earnings.campaign_expires_month.slice(0, 7) })}
         </div>
       )}
 
       {/* Referral code card */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">招待リンク</CardTitle>
+          <CardTitle className="text-base">{t('inviteLinkTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {codeLoading ? (
@@ -187,14 +188,14 @@ export default function PartnerReferralPage() {
               </div>
               <Button variant="outline" size="sm" onClick={() => { void handleCopy() }} className="gap-2">
                 <Copy className="h-4 w-4" />
-                コピー
+                {t('copy')}
               </Button>
               <p className="text-xs text-muted-foreground">
-                コード: <span className="font-mono font-medium">{codeData.referral_code}</span>
+                {t('codeLabel')}: <span className="font-mono font-medium">{codeData.referral_code}</span>
               </p>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">データなし</p>
+            <p className="text-sm text-muted-foreground">{t('noData')}</p>
           )}
         </CardContent>
       </Card>
@@ -204,9 +205,9 @@ export default function PartnerReferralPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Users className="h-4 w-4" />
-            紹介済みユーザー
+            {t('referredUsersTitle')}
             {!usersLoading && (
-              <span className="text-sm font-normal text-muted-foreground">({users.length}件)</span>
+              <span className="text-sm font-normal text-muted-foreground">{t('referredUsersCount', { count: users.length })}</span>
             )}
           </CardTitle>
         </CardHeader>
@@ -218,15 +219,15 @@ export default function PartnerReferralPage() {
               ))}
             </div>
           ) : users.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">紹介したユーザーはいません</p>
+            <p className="text-sm text-muted-foreground text-center py-8">{t('noReferredUsers')}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">メール</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">登録日</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">詳細</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('colEmail')}</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('colRegisteredAt')}</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t('colDetail')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -244,7 +245,7 @@ export default function PartnerReferralPage() {
                           href={`/partner/referral/${u.id}`}
                           className="text-xs text-blue-600 hover:underline dark:text-blue-400"
                         >
-                          取引履歴
+                          {t('tradeHistory')}
                         </Link>
                       </td>
                     </tr>

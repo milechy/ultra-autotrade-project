@@ -4,6 +4,7 @@
 
 // frontend/app/(admin)/settings/account/page.tsx
 import React, { useState } from "react";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { changePassword } from "@/lib/api/auth";
@@ -18,6 +19,7 @@ export default function AccountSettingsPage() {
 }
 
 function AccountSettingsContent() {
+  const t = useTranslations("AdminSettingsAccount");
   const { user, token } = useAuth();
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -33,17 +35,17 @@ function AccountSettingsContent() {
     setSuccess(null);
 
     if (newPassword !== confirmPassword) {
-      setError("新しいパスワードが一致しません");
+      setError(t("errorMismatch"));
       return;
     }
 
     if (newPassword.length < 8) {
-      setError("新しいパスワードは8文字以上必要です");
+      setError(t("errorTooShort"));
       return;
     }
 
     if (!token) {
-      setError("認証されていません");
+      setError(t("errorNotAuthenticated"));
       return;
     }
 
@@ -53,12 +55,12 @@ function AccountSettingsContent() {
         current_password: currentPassword,
         new_password: newPassword,
       });
-      setSuccess("パスワードを変更しました");
+      setSuccess(t("successMessage"));
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (err: any) {
-      setError(err?.message || "パスワード変更に失敗しました");
+      setError(err?.message || t("errorGeneric"));
     } finally {
       setIsSubmitting(false);
     }
@@ -70,27 +72,27 @@ function AccountSettingsContent() {
 
   return (
     <>
-      <title>アカウント設定 - Ultra AutoTrade</title>
+      <title>{t("pageTitle")}</title>
 
-      <h1 style={{ marginBottom: 6 }}>アカウント設定</h1>
+      <h1 style={{ marginBottom: 6 }}>{t("title")}</h1>
       <p style={{ marginTop: 0, color: "#555" }}>
-        プロフィール情報の確認とパスワード変更ができます。
+        {t("subtitle")}
       </p>
 
       {/* Profile Section */}
       <section style={sectionStyle}>
-        <h2 style={{ margin: 0, fontSize: 16 }}>プロフィール情報</h2>
+        <h2 style={{ margin: 0, fontSize: 16 }}>{t("profileSection")}</h2>
         <div style={{ marginTop: 16 }}>
           <div style={fieldRowStyle}>
-            <span style={labelStyle}>メールアドレス</span>
+            <span style={labelStyle}>{t("email")}</span>
             <span style={valueStyle}>{user.email}</span>
           </div>
           <div style={fieldRowStyle}>
-            <span style={labelStyle}>ユーザー名</span>
+            <span style={labelStyle}>{t("username")}</span>
             <span style={valueStyle}>{user.username}</span>
           </div>
           <div style={fieldRowStyle}>
-            <span style={labelStyle}>ロール</span>
+            <span style={labelStyle}>{t("role")}</span>
             <span style={valueStyle}>
               <span style={{
                 padding: "2px 8px",
@@ -99,12 +101,12 @@ function AccountSettingsContent() {
                 background: user.role === "admin" ? "#e8f5e9" : "#e3f2fd",
                 color: user.role === "admin" ? "#2e7d32" : "#1565c0",
               }}>
-                {user.role === "admin" ? "管理者" : "閲覧者"}
+                {user.role === "admin" ? t("roleAdmin") : t("roleViewer")}
               </span>
             </span>
           </div>
           <div style={fieldRowStyle}>
-            <span style={labelStyle}>ステータス</span>
+            <span style={labelStyle}>{t("status")}</span>
             <span style={valueStyle}>
               <span style={{
                 padding: "2px 8px",
@@ -113,12 +115,12 @@ function AccountSettingsContent() {
                 background: user.is_active ? "#e8f5e9" : "#ffebee",
                 color: user.is_active ? "#2e7d32" : "#c62828",
               }}>
-                {user.is_active ? "有効" : "無効"}
+                {user.is_active ? t("statusActive") : t("statusInactive")}
               </span>
             </span>
           </div>
           <div style={fieldRowStyle}>
-            <span style={labelStyle}>作成日時</span>
+            <span style={labelStyle}>{t("createdAt")}</span>
             <span style={valueStyle}>{new Date(user.created_at).toLocaleString()}</span>
           </div>
         </div>
@@ -126,7 +128,7 @@ function AccountSettingsContent() {
 
       {/* Password Change Section */}
       <section style={sectionStyle}>
-        <h2 style={{ margin: 0, fontSize: 16 }}>パスワード変更</h2>
+        <h2 style={{ margin: 0, fontSize: 16 }}>{t("passwordSection")}</h2>
         <form onSubmit={handleChangePassword} style={{ marginTop: 16 }}>
           {error && (
             <div style={errorStyle}>{error}</div>
@@ -136,7 +138,7 @@ function AccountSettingsContent() {
           )}
 
           <div style={{ marginBottom: 12 }}>
-            <label style={inputLabelStyle}>現在のパスワード</label>
+            <label style={inputLabelStyle}>{t("currentPassword")}</label>
             <input
               type="password"
               value={currentPassword}
@@ -147,7 +149,7 @@ function AccountSettingsContent() {
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <label style={inputLabelStyle}>新しいパスワード</label>
+            <label style={inputLabelStyle}>{t("newPassword")}</label>
             <input
               type="password"
               value={newPassword}
@@ -159,7 +161,7 @@ function AccountSettingsContent() {
           </div>
 
           <div style={{ marginBottom: 16 }}>
-            <label style={inputLabelStyle}>新しいパスワード（確認）</label>
+            <label style={inputLabelStyle}>{t("confirmPassword")}</label>
             <input
               type="password"
               value={confirmPassword}
@@ -175,7 +177,7 @@ function AccountSettingsContent() {
             disabled={isSubmitting}
             style={buttonStyle}
           >
-            {isSubmitting ? "変更中..." : "パスワードを変更"}
+            {isSubmitting ? t("submitting") : t("submit")}
           </button>
         </form>
       </section>

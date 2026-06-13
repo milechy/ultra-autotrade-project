@@ -5,36 +5,39 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, CheckCircle, Brain, Settings, HelpCircle, Users, ClipboardList, Gift } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
-
-const adminNavItems = [
-  { href: '/user/dashboard', label: 'ホーム', icon: Home },
-  { href: '/user/approve', label: '承認', icon: CheckCircle },
-  { href: '/user/ai-feed', label: 'AI判定', icon: Brain },
-  { href: '/user/settings', label: '設定', icon: Settings },
-]
-
-// partner (非 admin) が user レイアウト配下の画面 (/user/approve 等) に
-// 居ても、パートナー画面に戻れるようにパートナー導線を提示する。
-const partnerNavItems = [
-  { href: '/partner/dashboard', label: 'ホーム', icon: Home },
-  { href: '/user/approve', label: '承認', icon: CheckCircle },
-  { href: '/partner/users', label: 'テスター', icon: Users },
-  { href: '/partner/referral', label: '紹介', icon: Gift },
-  { href: '/partner/proposals', label: 'AI提案', icon: ClipboardList },
-  { href: '/partner/settings', label: '設定', icon: Settings },
-]
-
-const viewerNavItems = [
-  { href: '/user/dashboard', label: 'ホーム', icon: Home },
-  { href: '/user/ai-feed', label: 'AI判定', icon: Brain },
-  { href: '/user/help', label: 'ヘルプ', icon: HelpCircle },
-]
 
 export function BottomNav() {
   const pathname = usePathname()
   const { isAdmin, isPartner } = useAuth()
+  const t = useTranslations('SharedBottomNav')
+
+  const adminNavItems = [
+    { href: '/user/dashboard', label: t('adminNav.home'), icon: Home },
+    { href: '/user/approve', label: t('adminNav.approve'), icon: CheckCircle },
+    { href: '/user/ai-feed', label: t('adminNav.aiDecisions'), icon: Brain },
+    { href: '/user/settings', label: t('adminNav.settings'), icon: Settings },
+  ]
+
+  // partner (非 admin) が user レイアウト配下の画面 (/user/approve 等) に
+  // 居ても、パートナー画面に戻れるようにパートナー導線を提示する。
+  const partnerNavItems = [
+    { href: '/partner/dashboard', label: t('partnerNav.home'), icon: Home },
+    { href: '/user/approve', label: t('partnerNav.approve'), icon: CheckCircle },
+    { href: '/partner/users', label: t('partnerNav.users'), icon: Users },
+    { href: '/partner/referral', label: t('partnerNav.referral'), icon: Gift },
+    { href: '/partner/proposals', label: t('partnerNav.proposals'), icon: ClipboardList },
+    { href: '/partner/settings', label: t('partnerNav.settings'), icon: Settings },
+  ]
+
+  const viewerNavItems = [
+    { href: '/user/dashboard', label: t('viewerNav.home'), icon: Home },
+    { href: '/user/ai-feed', label: t('viewerNav.aiDecisions'), icon: Brain },
+    { href: '/user/help', label: t('viewerNav.help'), icon: HelpCircle },
+  ]
+
   // partner (admin でも)はパートナー導線を優先。admin はパートナー扱いだが
   // admin 専用メニューを優先するため先に判定する。
   const navItems = isAdmin
