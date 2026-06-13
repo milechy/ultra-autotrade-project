@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import {
   Table,
   TableBody,
@@ -45,6 +46,8 @@ export function DecisionTable({
   onRowClick,
   totalCount,
 }: DecisionTableProps) {
+  const t = useTranslations('DecisionTable')
+
   // totalCount が渡された場合はサーバーサイドページネーション（decisions は既に1ページ分）
   const isServerPaged = totalCount != null
   const totalPages = isServerPaged
@@ -58,16 +61,18 @@ export function DecisionTable({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-          判定履歴
+          {t('heading')}
           <span className="font-normal text-gray-400 dark:text-gray-500 text-xs ml-2">
-            {isServerPaged ? `${totalCount} 件` : `${decisions.length} 件`}
+            {isServerPaged
+              ? t('countSuffix', { count: totalCount })
+              : t('countSuffix', { count: decisions.length })}
           </span>
         </h2>
       </div>
 
       {decisions.length === 0 ? (
         <div className="py-12 text-center text-sm text-gray-400">
-          該当する判定履歴がありません。
+          {t('emptyState')}
         </div>
       ) : (
         <>
@@ -76,25 +81,25 @@ export function DecisionTable({
               <TableHeader>
                 <TableRow className="bg-gray-50 dark:bg-gray-800">
                   <TableHead className="text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    日時
+                    {t('colTimestamp')}
                   </TableHead>
                   <TableHead className="text-gray-700 dark:text-gray-300">
-                    クエリ
+                    {t('colQuery')}
                   </TableHead>
                   <TableHead className="text-gray-700 dark:text-gray-300">
-                    判定
+                    {t('colDecision')}
                   </TableHead>
                   <TableHead className="text-gray-700 dark:text-gray-300 text-right">
-                    信頼度
+                    {t('colConfidence')}
                   </TableHead>
                   <TableHead className="text-gray-700 dark:text-gray-300">
-                    Claude判定
+                    {t('colClaude')}
                   </TableHead>
                   <TableHead className="text-gray-700 dark:text-gray-300">
-                    GPT-4o判定
+                    {t('colGpt')}
                   </TableHead>
                   <TableHead className="text-gray-700 dark:text-gray-300 text-center">
-                    一致
+                    {t('colMatch')}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -159,7 +164,7 @@ export function DecisionTable({
                 disabled={page === 1}
                 className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
-                前へ
+                {t('prevPage')}
               </button>
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 {page} / {totalPages}
@@ -169,13 +174,13 @@ export function DecisionTable({
                 disabled={page === totalPages}
                 className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
-                次へ
+                {t('nextPage')}
               </button>
             </div>
           )}
 
           <p className="text-xs text-gray-400 dark:text-gray-600">
-            ※ 行をクリックすると詳細が表示されます。
+            ※ {t('rowHint')}
           </p>
         </>
       )}

@@ -2655,5 +2655,66 @@
     "valuation": "Value: ${value}",
     "estimatedApy": "Estimated APY",
     "apyChartTitle": "APY Trend (30d)"
+  },
+  "AdminUsers": {
+    "pageTitle": "User Management - Ultra AutoTrade",
+    "heading": "User Management",
+    "userCount": "{count} users",
+    "totalAum": "Total AUM: ${amount}",
+    "searchPlaceholder": "Search by wallet address...",
+    "loading": "Loading...",
+    "rowHint": "Click a row to view user details.",
+    "emptyQueryTitle": "No matching users found",
+    "emptyQuerySubtitle": "Please change the search query",
+    "emptyTitle": "No registered users",
+    "emptySubtitle": "Users will appear here once registered"
+  },
+  "AdminAiDecisions": {
+    "pageTitle": "AI Decision Monitor - Ultra AutoTrade",
+    "heading": "AI Decision Monitor",
+    "subheading": "Detailed history and filtering of AI decisions from multi-LLM",
+    "manualTrigger": "Run Manual Decision",
+    "loading": "Loading...",
+    "emptyState": "No decision history matching the criteria."
+  },
+  "DecisionDetailModal": {
+    "title": "AI Decision Details",
+    "finalDecision": "Final Decision",
+    "executed": "Executed",
+    "executedYes": "Done",
+    "executedNo": "Not executed",
+    "claudeConfidence": "Confidence {pct}%",
+    "gptConfidence": "Confidence {pct}%",
+    "rawResponse": "LLM Raw Response",
+    "agreedMessage": "Claude and GPT-4o decisions matched.",
+    "disagreedMessage": "Claude and GPT-4o decisions disagreed. Safer decision adopted.",
+    "ragTitle": "RAG Context (sources: {count})",
+    "ragQuery": "Search query: {query}"
+  },
+  "DecisionTable": {
+    "heading": "Decision History",
+    "countSuffix": "{count} records",
+    "emptyState": "No matching decision history.",
+    "colTimestamp": "Timestamp",
+    "colQuery": "Query",
+    "colDecision": "Decision",
+    "colConfidence": "Confidence",
+    "colClaude": "Claude Decision",
+    "colGpt": "GPT-4o Decision",
+    "colMatch": "Match",
+    "prevPage": "Previous",
+    "nextPage": "Next",
+    "rowHint": "Click a row to view details."
+  },
+  "RiskEngineSection": {
+    "sectionTitle": "Risk Engine Settings",
+    "labelHfWarning": "HF WARNING Threshold",
+    "labelHfHardStop": "HF HARD_STOP Threshold",
+    "warningHfHardStop": "Lowering this value increases risk",
+    "labelMaxSingleTrade": "Max Single Trade",
+    "labelMaxDailyTrade": "Max Daily Trade",
+    "labelCooldown": "Cooldown",
+    "suffixPercent": "%",
+    "suffixSeconds": "seconds"
   }
 }

@@ -4,6 +4,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { Users, Search } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import AuthGuard from '@/components/AuthGuard'
 import { UserTable, UserDetailPanel } from './_components'
 import type { UserDetail } from './_components/UserDetailPanel'
@@ -44,6 +45,7 @@ function toUserDetail(u: AdminUserDetail): UserDetail {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function UsersPage() {
+  const t = useTranslations('AdminUsers')
   const [users, setUsers] = useState<UserDetail[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -57,10 +59,10 @@ export default function UsersPage() {
         setLoading(false)
       })
       .catch((err) => {
-        setError(err?.message ?? 'データの取得に失敗しました')
+        setError(err?.message ?? t('loading'))
         setLoading(false)
       })
-  }, [])
+  }, [t])
 
   const filteredUsers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
@@ -94,7 +96,7 @@ export default function UsersPage() {
   return (
     <AuthGuard adminOnly>
       <>
-      <title>ユーザー管理 - Ultra AutoTrade</title>
+      <title>{t('pageTitle')}</title>
 
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
@@ -104,16 +106,16 @@ export default function UsersPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-gray-100">ユーザー管理</h1>
+              <h1 className="text-xl font-bold text-gray-100">{t('heading')}</h1>
               {!loading && (
                 <span className="inline-flex items-center rounded-full bg-blue-900/50 border border-blue-800 px-2.5 py-0.5 text-xs font-semibold text-blue-300">
-                  {users.length}人
+                  {t('userCount', { count: users.length })}
                 </span>
               )}
             </div>
             {!loading && (
               <p className="text-xs text-gray-500 mt-0.5">
-                総AUM: ${totalAUM.toLocaleString('ja-JP')}
+                {t('totalAum', { amount: totalAUM.toLocaleString('ja-JP') })}
               </p>
             )}
           </div>
@@ -124,7 +126,7 @@ export default function UsersPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-500 pointer-events-none" />
           <input
             type="text"
-            placeholder="ウォレットアドレスで検索..."
+            placeholder={t('searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-lg border border-gray-700 bg-gray-800 pl-9 pr-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
@@ -136,7 +138,7 @@ export default function UsersPage() {
       {loading && (
         <div className="flex items-center justify-center rounded-xl border border-gray-800 bg-gray-900/50 py-16">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-          <span className="ml-3 text-sm text-gray-400">読み込み中...</span>
+          <span className="ml-3 text-sm text-gray-400">{t('loading')}</span>
         </div>
       )}
 
@@ -155,7 +157,7 @@ export default function UsersPage() {
             <UserTable users={filteredUsers} onSelectUser={setSelectedUser} />
           )}
           <p className="mt-2 text-xs text-gray-600">
-            ※ 行をクリックするとユーザー詳細が表示されます。
+            ※ {t('rowHint')}
           </p>
         </>
       )}
@@ -174,18 +176,19 @@ export default function UsersPage() {
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 function EmptyState({ hasQuery }: { hasQuery: boolean }) {
+  const t = useTranslations('AdminUsers')
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border border-gray-800 bg-gray-900/50 py-16 text-center">
       <Users className="h-10 w-10 text-gray-700 mb-3" />
       {hasQuery ? (
         <>
-          <p className="text-gray-400 font-medium">該当するユーザーが見つかりません</p>
-          <p className="text-gray-600 text-sm mt-1">検索クエリを変更してください</p>
+          <p className="text-gray-400 font-medium">{t('emptyQueryTitle')}</p>
+          <p className="text-gray-600 text-sm mt-1">{t('emptyQuerySubtitle')}</p>
         </>
       ) : (
         <>
-          <p className="text-gray-400 font-medium">登録ユーザーがいません</p>
-          <p className="text-gray-600 text-sm mt-1">ユーザーが登録されると、ここに表示されます</p>
+          <p className="text-gray-400 font-medium">{t('emptyTitle')}</p>
+          <p className="text-gray-600 text-sm mt-1">{t('emptySubtitle')}</p>
         </>
       )}
     </div>
