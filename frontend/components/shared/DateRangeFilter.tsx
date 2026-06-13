@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -13,12 +14,7 @@ export interface DateRangeFilterProps {
 
 type PresetKey = '7d' | '30d' | '90d' | 'all'
 
-const presetOptions: { key: PresetKey; label: string }[] = [
-  { key: '7d', label: '7日' },
-  { key: '30d', label: '30日' },
-  { key: '90d', label: '90日' },
-  { key: 'all', label: 'ALL' },
-]
+const presetKeys: PresetKey[] = ['7d', '30d', '90d', 'all']
 
 function getPresetRange(key: PresetKey): { from: Date; to: Date } | 'all' {
   if (key === 'all') return 'all'
@@ -33,7 +29,15 @@ function toInputDate(date: Date): string {
   return date.toISOString().split('T')[0]
 }
 
+const presetLabelKey: Record<PresetKey, 'days7' | 'days30' | 'days90' | 'all'> = {
+  '7d': 'days7',
+  '30d': 'days30',
+  '90d': 'days90',
+  'all': 'all',
+}
+
 export function DateRangeFilter({ onChange, presets = true }: DateRangeFilterProps) {
+  const t = useTranslations('SharedDateRangeFilter')
   const [activePreset, setActivePreset] = useState<PresetKey | null>('30d')
   const today = new Date()
   const thirtyDaysAgo = new Date()
@@ -63,18 +67,18 @@ export function DateRangeFilter({ onChange, presets = true }: DateRangeFilterPro
     <div className="flex flex-wrap items-center gap-2">
       {presets && (
         <div className="flex items-center gap-1">
-          {presetOptions.map((preset) => (
+          {presetKeys.map((key) => (
             <Button
-              key={preset.key}
-              variant={activePreset === preset.key ? 'default' : 'outline'}
+              key={key}
+              variant={activePreset === key ? 'default' : 'outline'}
               size="sm"
-              onClick={() => handlePreset(preset.key)}
+              onClick={() => handlePreset(key)}
               className={cn(
                 'h-8 px-3 text-xs',
-                activePreset === preset.key && 'font-semibold'
+                activePreset === key && 'font-semibold'
               )}
             >
-              {preset.label}
+              {t(presetLabelKey[key])}
             </Button>
           ))}
         </div>

@@ -1,5 +1,8 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
+'use client'
+
+import { useTranslations } from 'next-intl'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -23,6 +26,7 @@ const actionConfig: Record<string, { label: string; className: string }> = {
 }
 
 export function AiFeedItem({ event }: { event: AiEvent }) {
+  const t = useTranslations('UserAiFeedItem')
   const action = String(event.action ?? 'HOLD').toUpperCase()
   const config = actionConfig[action] ?? { label: action, className: 'bg-gray-100 dark:bg-gray-800 text-gray-700 border-gray-200 dark:border-gray-700' }
 
@@ -43,12 +47,12 @@ export function AiFeedItem({ event }: { event: AiEvent }) {
             )}
             {event.agreed === true && (
               <Badge variant="outline" className="text-xs bg-green-100 text-green-800 border-green-200">
-                ✓ Claude・GPT一致
+                {t('claudeGptAgreed')}
               </Badge>
             )}
             {event.agreed === false && (
               <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-800 border-yellow-200">
-                △ 判定相違
+                {t('disagreement')}
               </Badge>
             )}
           </div>
@@ -58,7 +62,7 @@ export function AiFeedItem({ event }: { event: AiEvent }) {
           return (
             <div className="space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>信頼度</span>
+                <span>{t('confidence')}</span>
                 <span>{confidence}%</span>
               </div>
               <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">

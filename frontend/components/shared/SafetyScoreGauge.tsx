@@ -1,6 +1,8 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
+'use client'
 
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 
 export interface SafetyScoreGaugeProps {
@@ -10,12 +12,14 @@ export interface SafetyScoreGaugeProps {
   className?: string
 }
 
-function getScoreConfig(score: number): { label: string; color: string; stroke: string; bg: string } {
+type ScoreKey = 'safe' | 'caution' | 'danger'
+
+function getScoreConfig(score: number): { labelKey: ScoreKey; color: string; stroke: string; bg: string } {
   if (score >= 61)
-    return { label: '安全', color: 'text-green-400', stroke: '#4ade80', bg: 'bg-green-500/10' }
+    return { labelKey: 'safe', color: 'text-green-400', stroke: '#4ade80', bg: 'bg-green-500/10' }
   if (score >= 31)
-    return { label: '注意', color: 'text-yellow-400', stroke: '#facc15', bg: 'bg-yellow-500/10' }
-  return { label: '危険', color: 'text-red-400', stroke: '#f87171', bg: 'bg-red-500/10' }
+    return { labelKey: 'caution', color: 'text-yellow-400', stroke: '#facc15', bg: 'bg-yellow-500/10' }
+  return { labelKey: 'danger', color: 'text-red-400', stroke: '#f87171', bg: 'bg-red-500/10' }
 }
 
 const sizeConfig = {
@@ -38,8 +42,9 @@ export function SafetyScoreGauge({
   showLabel = true,
   className,
 }: SafetyScoreGaugeProps) {
+  const t = useTranslations('SharedSafetyScoreGauge')
   const clamped = Math.max(0, Math.min(100, Math.round(score)))
-  const { label, color, stroke, bg } = getScoreConfig(clamped)
+  const { labelKey, color, stroke, bg } = getScoreConfig(clamped)
   const { wh, r, strokeW, textSize } = sizeConfig[size]
 
   const circumference = 2 * Math.PI * r
@@ -84,8 +89,8 @@ export function SafetyScoreGauge({
       {/* Label */}
       {showLabel && (
         <div>
-          <p className={cn('font-bold', textSize, color)}>{clamped}点</p>
-          <p className={cn('text-sm font-medium', color)}>{label}</p>
+          <p className={cn('font-bold', textSize, color)}>{t('scoreLabel', { score: clamped })}</p>
+          <p className={cn('text-sm font-medium', color)}>{t(labelKey)}</p>
         </div>
       )}
     </div>

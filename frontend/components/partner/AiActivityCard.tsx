@@ -3,6 +3,7 @@
 // frontend/components/partner/AiActivityCard.tsx
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { Brain } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -17,23 +18,24 @@ function actionColor(action: string): string {
   return 'text-yellow-600 bg-yellow-50 border-yellow-200 dark:bg-yellow-950/30 dark:border-yellow-800 dark:text-yellow-400'
 }
 
-function actionLabel(action: string): string {
-  if (action === 'BUY') return '買い'
-  if (action === 'SELL') return '売り'
-  return '様子見'
-}
-
-function formatElapsed(iso: string): string {
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000)
-  if (diff < 1) return 'たった今'
-  if (diff < 60) return `${diff}分前`
-  return `${Math.floor(diff / 60)}時間前`
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AiActivityCard({ className }: { className?: string }) {
+  const t = useTranslations('PartnerAiActivityCard')
   const { data, loading, isNewDecision } = useLatestAiDecision()
+
+  function actionLabel(action: string): string {
+    if (action === 'BUY') return t('buy')
+    if (action === 'SELL') return t('sell')
+    return t('hold')
+  }
+
+  function formatElapsed(iso: string): string {
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000)
+    if (diff < 1) return t('justNow')
+    if (diff < 60) return t('minutesAgo', { n: diff })
+    return t('hoursAgo', { n: Math.floor(diff / 60) })
+  }
 
   if (loading) {
     return (
@@ -100,7 +102,7 @@ export function AiActivityCard({ className }: { className?: string }) {
                 data-testid="ai-activity-agreed"
                 className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
               >
-                Claude+GPT 一致
+                {t('claudeGptAgreed')}
               </span>
             )}
 

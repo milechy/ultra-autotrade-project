@@ -2,6 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { SimulationData, ScenarioResult } from './types'
@@ -12,6 +13,7 @@ interface WhatIfSimulationProps {
 }
 
 function ScenarioCard({ scenario, isBest }: { scenario: ScenarioResult; isBest: boolean }) {
+  const t = useTranslations('TransparencyWhatIfSimulation')
   const changePositive = Number(scenario.yield_change_pct ?? 0) >= 0
 
   return (
@@ -25,20 +27,20 @@ function ScenarioCard({ scenario, isBest }: { scenario: ScenarioResult; isBest: 
         <p className="text-sm font-semibold">{scenario.label}</p>
         {isBest && (
           <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-primary text-primary">
-            ベスト
+            {t('best')}
           </span>
         )}
       </div>
       <p className="text-xs text-muted-foreground">{scenario.description}</p>
       <div className="flex flex-col gap-1 text-sm mt-1">
         <div className="flex justify-between">
-          <span className="text-muted-foreground">収益変化</span>
+          <span className="text-muted-foreground">{t('yieldChange')}</span>
           <span className={cn('font-medium', changePositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
             {changePositive ? '+' : ''}{Number(scenario.yield_change_pct ?? 0).toFixed(1)}%
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">確率</span>
+          <span className="text-muted-foreground">{t('probability')}</span>
           <span>{scenario.probability}%</span>
         </div>
       </div>
@@ -47,6 +49,7 @@ function ScenarioCard({ scenario, isBest }: { scenario: ScenarioResult; isBest: 
 }
 
 export function WhatIfSimulation({ data, className }: WhatIfSimulationProps) {
+  const t = useTranslations('TransparencyWhatIfSimulation')
   if (!data) return null
   const scenarios = data.scenarios ?? []
   const colCount = scenarios.length
@@ -54,7 +57,7 @@ export function WhatIfSimulation({ data, className }: WhatIfSimulationProps) {
   return (
     <Card className={className}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">シナリオ分析</CardTitle>
+        <CardTitle className="text-base">{t('scenarioAnalysis')}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div

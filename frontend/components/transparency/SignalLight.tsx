@@ -2,6 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import type { SignalData } from './types'
@@ -43,6 +44,7 @@ const WEATHER_CONFIG = {
 }
 
 export function SignalLight({ signal, className }: SignalLightProps) {
+  const t = useTranslations('TransparencySignalLight')
   if (!signal || !signal.weather) return null
   const config = WEATHER_CONFIG[signal.weather as keyof typeof WEATHER_CONFIG] ?? WEATHER_CONFIG.cloudy
 
@@ -61,12 +63,12 @@ export function SignalLight({ signal, className }: SignalLightProps) {
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span>確信度:</span>
+          <span>{t('confidenceLabel')}</span>
           <span className="font-semibold">{signal.confidence}%</span>
         </div>
         {signal.updated_at && (
           <p className="text-xs text-muted-foreground">
-            更新: {new Date(signal.updated_at).toLocaleString('ja-JP')}
+            {t('updatedLabel')} {new Date(signal.updated_at).toLocaleString('ja-JP')}
           </p>
         )}
       </CardContent>

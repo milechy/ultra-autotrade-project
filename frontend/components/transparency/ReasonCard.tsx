@@ -2,6 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { ExplanationData, ExplanationStep } from './types'
@@ -54,12 +55,13 @@ function StepItem({ step }: { step: ExplanationStep }) {
 }
 
 export function ReasonCard({ explanation, className }: ReasonCardProps) {
+  const t = useTranslations('TransparencyReasonCard')
   if (!explanation || typeof explanation !== 'object') return null
   return (
     <Card className={className}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">
-          判断理由 — {explanation.action}（確信度 {explanation.confidence}%）
+          {t('cardTitle', { action: explanation.action, confidence: explanation.confidence })}
         </CardTitle>
       </CardHeader>
       <CardContent>
