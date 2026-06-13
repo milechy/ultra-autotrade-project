@@ -29,31 +29,19 @@ import {
   type AdminProposal,
   type AdminProposalStats,
 } from '@/lib/api/admin-proposals'
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: '承認待ち',
-  approved: '承認済み',
-  rejected: '拒否済み',
-  executed: '実行済み',
-  expired: '期限切れ',
-}
-
-const OPERATION_LABELS: Record<string, string> = {
-  SUPPLY: '預入（SUPPLY）',
-  WITHDRAW: '引出（WITHDRAW）',
-  BORROW: '借入（BORROW）',
-  REPAY: '返済（REPAY）',
-}
-
-const FILTER_OPTIONS = [
-  { value: '', label: 'すべて' },
-  { value: 'pending', label: '承認待ち' },
-  { value: 'approved', label: '承認済み' },
-  { value: 'rejected', label: '拒否済み' },
-  { value: 'executed', label: '実行済み' },
-]
+import { useTranslations } from 'next-intl'
 
 export default function PartnerProposalsPage() {
+  const t = useTranslations('PartnerProposals')
+
+  const FILTER_OPTIONS = [
+    { value: '', label: t('filterAll') },
+    { value: 'pending', label: t('status_pending') },
+    { value: 'approved', label: t('status_approved') },
+    { value: 'rejected', label: t('status_rejected') },
+    { value: 'executed', label: t('status_executed') },
+  ]
+
   const [stats, setStats] = useState<AdminProposalStats | null>(null)
   const [proposals, setProposals] = useState<AdminProposal[]>([])
   const [total, setTotal] = useState(0)
@@ -80,11 +68,11 @@ export default function PartnerProposalsPage() {
       setProposals(listData.items)
       setTotal(listData.total)
     } catch {
-      setError('データの取得に失敗しました')
+      setError(t('fetchError'))
     } finally {
       setIsLoading(false)
     }
-  }, [token, statusFilter, page])
+  }, [token, statusFilter, page, t])
 
   useEffect(() => {
     void loadData()
@@ -102,7 +90,7 @@ export default function PartnerProposalsPage() {
     // 懸念があるため除外。walletClientType === 'privy' が Privy embedded wallet の識別子。
     const wallet = wallets.find(w => w.walletClientType === 'privy') ?? null
     if (!wallet) {
-      setError('Privy embedded wallet が見つかりません。Privy メールアドレスでログインしてください（MetaMask 等の外部 wallet は使用不可）。')
+      setError(t('noWallet'))
       return
     }
 
@@ -112,7 +100,7 @@ export default function PartnerProposalsPage() {
 
     try {
       // Step 1: 未署名 tx をサーバーから取得
-      setSigningStep('トランザクションを準備中...')
+      setSigningStep(t('signingPrepare'))
       const txData = await buildPartnerTx(id, token)
 
       // EIP-1193 プロバイダー取得 (Privy が署名ポップアップを表示)
@@ -123,7 +111,7 @@ export default function PartnerProposalsPage() {
 
       if (txData.operation === 'SUPPLY' && txData.approve_tx && txData.supply_tx) {
         // SUPPLY: approve → supply の順に署名・送信
-        setSigningStep('Step 1/2: USDC approve に署名してください...')
+        setSigningStep(t('signingApproveStep'))
         const approveTxHash = await eip1193.request({
           method: 'eth_sendTransaction',
           params: [{
@@ -135,13 +123,13 @@ export default function PartnerProposalsPage() {
         }) as string
 
         // approve の確認を待ってから supply を送信
-        setSigningStep('approve 確認中...')
+        setSigningStep(t('signingApproveConfirm'))
         const approveReceipt = await ethProvider.waitForTransaction(approveTxHash)
         if (approveReceipt === null || approveReceipt.status === 0) {
-          throw new Error('approve トランザクションが revert しました。残高・ガス代を確認してください。')
+          throw new Error(t('errApproveRevert'))
         }
 
-        setSigningStep('Step 2/2: Aave supply に署名してください...')
+        setSigningStep(t('signingSupplyStep'))
         finalTxHash = await eip1193.request({
           method: 'eth_sendTransaction',
           params: [{
@@ -154,7 +142,7 @@ export default function PartnerProposalsPage() {
 
       } else if (txData.operation === 'WITHDRAW' && txData.withdraw_tx) {
         // WITHDRAW: withdraw を署名・送信
-        setSigningStep('Aave withdraw に署名してください...')
+        setSigningStep(t('signingWithdrawStep'))
         finalTxHash = await eip1193.request({
           method: 'eth_sendTransaction',
           params: [{
@@ -166,11 +154,11 @@ export default function PartnerProposalsPage() {
         }) as string
 
       } else {
-        throw new Error(`未対応の operation: ${txData.operation}`)
+        throw new Error(t('errUnsupportedOp', { op: txData.operation }))
       }
 
       // Step 3: tx_hash をバックエンドに報告
-      setSigningStep('完了を記録中...')
+      setSigningStep(t('signingRecording'))
       await submitPartnerTx(id, finalTxHash, txData.wallet_address, token)
       await loadData()
 
@@ -178,9 +166,9 @@ export default function PartnerProposalsPage() {
       const msg = err instanceof Error ? err.message : String(err)
       // ユーザーキャンセルは正常操作
       if (msg.includes('User rejected') || msg.includes('user rejected')) {
-        setError('署名がキャンセルされました')
+        setError(t('errCancelled'))
       } else {
-        setError(`承認に失敗しました: ${msg}`)
+        setError(t('errApprove', { msg }))
       }
     } finally {
       setActionLoading(null)
@@ -195,7 +183,7 @@ export default function PartnerProposalsPage() {
       await rejectProposal(id, token)
       await loadData()
     } catch {
-      setError('拒否に失敗しました')
+      setError(t('errReject'))
     } finally {
       setActionLoading(null)
     }
@@ -207,7 +195,7 @@ export default function PartnerProposalsPage() {
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
         <ClipboardList style={{ width: 24, height: 24, color: '#2563eb' }} />
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>AI提案管理</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{t('pageTitle')}</h1>
       </div>
 
       {/* KPI カード */}
@@ -215,7 +203,7 @@ export default function PartnerProposalsPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
           <Card>
             <CardHeader style={{ paddingBottom: 4 }}>
-              <CardTitle style={{ fontSize: 13, color: '#666' }}>承認待ち</CardTitle>
+              <CardTitle style={{ fontSize: 13, color: '#666' }}>{t('kpiPending')}</CardTitle>
             </CardHeader>
             <CardContent>
               <span style={{ fontSize: 28, fontWeight: 700, color: '#d97706' }}>{stats.pending}</span>
@@ -223,7 +211,7 @@ export default function PartnerProposalsPage() {
           </Card>
           <Card>
             <CardHeader style={{ paddingBottom: 4 }}>
-              <CardTitle style={{ fontSize: 13, color: '#666' }}>本日承認</CardTitle>
+              <CardTitle style={{ fontSize: 13, color: '#666' }}>{t('kpiApprovedToday')}</CardTitle>
             </CardHeader>
             <CardContent>
               <span style={{ fontSize: 28, fontWeight: 700, color: '#16a34a' }}>{stats.today_approved}</span>
@@ -231,7 +219,7 @@ export default function PartnerProposalsPage() {
           </Card>
           <Card>
             <CardHeader style={{ paddingBottom: 4 }}>
-              <CardTitle style={{ fontSize: 13, color: '#666' }}>本日拒否</CardTitle>
+              <CardTitle style={{ fontSize: 13, color: '#666' }}>{t('kpiRejectedToday')}</CardTitle>
             </CardHeader>
             <CardContent>
               <span style={{ fontSize: 28, fontWeight: 700, color: '#dc2626' }}>{stats.today_rejected}</span>
@@ -239,7 +227,7 @@ export default function PartnerProposalsPage() {
           </Card>
           <Card>
             <CardHeader style={{ paddingBottom: 4 }}>
-              <CardTitle style={{ fontSize: 13, color: '#666' }}>期限切れ</CardTitle>
+              <CardTitle style={{ fontSize: 13, color: '#666' }}>{t('kpiExpired')}</CardTitle>
             </CardHeader>
             <CardContent>
               <span style={{ fontSize: 28, fontWeight: 700, color: '#9ca3af' }}>{stats.expired}</span>
@@ -286,34 +274,34 @@ export default function PartnerProposalsPage() {
       {isLoading ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>
           <Loader2 style={{ width: 24, height: 24, display: 'inline-block' }} className="animate-spin" />
-          <p style={{ marginTop: 8, color: '#9ca3af' }}>読み込み中...</p>
+          <p style={{ marginTop: 8, color: '#9ca3af' }}>{t('loading')}</p>
         </div>
       ) : proposals.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>
-          該当する提案はありません
+          {t('noProposals')}
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #374151', background: 'rgba(255,255,255,0.04)' }}>
-                <th style={thStyle}>ユーザー</th>
-                <th style={thStyle}>操作</th>
-                <th style={thStyle}>アセット</th>
-                <th style={thStyle}>金額（USD）</th>
-                <th style={thStyle}>手数料率</th>
-                <th style={thStyle}>手数料額</th>
-                <th style={thStyle}>理由</th>
-                <th style={thStyle}>作成日時</th>
-                <th style={thStyle}>ステータス</th>
-                <th style={thStyle}>アクション</th>
+                <th style={thStyle}>{t('colUser')}</th>
+                <th style={thStyle}>{t('colOperation')}</th>
+                <th style={thStyle}>{t('colAsset')}</th>
+                <th style={thStyle}>{t('colAmountUsd')}</th>
+                <th style={thStyle}>{t('colFeeRate')}</th>
+                <th style={thStyle}>{t('colFeeAmount')}</th>
+                <th style={thStyle}>{t('colReason')}</th>
+                <th style={thStyle}>{t('colCreatedAt')}</th>
+                <th style={thStyle}>{t('colStatus')}</th>
+                <th style={thStyle}>{t('colAction')}</th>
               </tr>
             </thead>
             <tbody>
               {proposals.map((p) => (
                 <tr key={p.id} style={{ borderBottom: '1px solid #374151' }}>
                   <td style={tdStyle}>{p.username ?? `UID:${p.user_id}`}</td>
-                  <td style={tdStyle}>{OPERATION_LABELS[p.operation] ?? p.operation}</td>
+                  <td style={tdStyle}>{t(`op_${p.operation}` as Parameters<typeof t>[0]) ?? p.operation}</td>
                   <td style={tdStyle}>{p.asset}</td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
                     ${Number(p.amount_usd).toFixed(2)}
@@ -330,7 +318,7 @@ export default function PartnerProposalsPage() {
                   <td style={tdStyle}>{new Date(p.created_at).toLocaleString('ja-JP')}</td>
                   <td style={tdStyle}>
                     <span style={statusBadgeStyle(p.status)}>
-                      {STATUS_LABELS[p.status] ?? p.status}
+                      {t(`status_${p.status}` as Parameters<typeof t>[0]) ?? p.status}
                     </span>
                   </td>
                   <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
@@ -339,34 +327,38 @@ export default function PartnerProposalsPage() {
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-green-500 text-green-700 hover:bg-green-50" disabled={actionLoading === p.id}>
-                              {actionLoading === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><CheckCircle className="h-3 w-3 mr-1" />承認</>}
+                              {actionLoading === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><CheckCircle className="h-3 w-3 mr-1" />{t('actionApprove')}</>}
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle className="flex items-center gap-2">
                                 <CheckCircle className="h-5 w-5 text-green-600" />
-                                提案を承認しますか？
+                                {t('confirmApproveTitle')}
                               </AlertDialogTitle>
                               <AlertDialogDescription asChild>
                                 <div>
                                   <p>
-                                    {p.username ?? `ユーザーID: ${p.user_id}`} の{' '}
-                                    {OPERATION_LABELS[p.operation] ?? p.operation} ({p.asset}・${Number(p.amount_usd).toFixed(2)}) を承認してAave操作を実行します。
+                                    {t('confirmApproveDesc', {
+                                      username: p.username ?? `ユーザーID: ${p.user_id}`,
+                                      operation: t(`op_${p.operation}` as Parameters<typeof t>[0]),
+                                      asset: p.asset,
+                                      amount: Number(p.amount_usd).toFixed(2),
+                                    })}
                                   </p>
                                   {p.fee_rate != null && p.fee_amount != null && (
                                     <div style={{ marginTop: 8, padding: '8px 10px', background: 'rgba(37,99,235,0.08)', borderRadius: 6, fontSize: 13 }}>
-                                      <div>手数料: ${Number(p.fee_amount).toFixed(2)}（{Number(p.fee_rate).toFixed(2)}%）</div>
-                                      <div>実行金額: ${(Number(p.amount_usd) - Number(p.fee_amount)).toFixed(2)}（手数料控除後）</div>
+                                      <div>{t('confirmApproveDetails', { fee: Number(p.fee_amount).toFixed(2), feeRate: Number(p.fee_rate).toFixed(2) })}</div>
+                                      <div>{t('confirmApproveNet', { net: (Number(p.amount_usd) - Number(p.fee_amount)).toFixed(2) })}</div>
                                     </div>
                                   )}
                                 </div>
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                              <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                               <AlertDialogAction onClick={() => handleApprove(p.id)} className="bg-green-600 hover:bg-green-700 text-white">
-                                承認する
+                                {t('confirmApproveBtn')}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -375,24 +367,28 @@ export default function PartnerProposalsPage() {
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-red-400 text-red-600 hover:bg-red-50" disabled={actionLoading === p.id}>
-                              {actionLoading === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><XCircle className="h-3 w-3 mr-1" />拒否</>}
+                              {actionLoading === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><XCircle className="h-3 w-3 mr-1" />{t('actionReject')}</>}
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle className="flex items-center gap-2 text-red-600">
                                 <XCircle className="h-5 w-5" />
-                                提案を拒否しますか？
+                                {t('confirmRejectTitle')}
                               </AlertDialogTitle>
                               <AlertDialogDescription>
-                                {p.username ?? `ユーザーID: ${p.user_id}`} の{' '}
-                                {OPERATION_LABELS[p.operation] ?? p.operation} ({p.asset}・${Number(p.amount_usd).toFixed(2)}) を拒否します。この操作は取り消せません。
+                                {t('confirmRejectDesc', {
+                                  username: p.username ?? `ユーザーID: ${p.user_id}`,
+                                  operation: t(`op_${p.operation}` as Parameters<typeof t>[0]),
+                                  asset: p.asset,
+                                  amount: Number(p.amount_usd).toFixed(2),
+                                })}
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                              <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                               <AlertDialogAction onClick={() => handleReject(p.id)} className="bg-red-600 hover:bg-red-700 text-white">
-                                拒否する
+                                {t('confirmRejectBtn')}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -415,17 +411,17 @@ export default function PartnerProposalsPage() {
             disabled={page <= 1}
             style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #374151', cursor: page <= 1 ? 'default' : 'pointer', opacity: page <= 1 ? 0.4 : 1 }}
           >
-            前へ
+            {t('paginationPrev')}
           </button>
           <span style={{ padding: '6px 12px', fontSize: 13, color: '#666' }}>
-            {page} / {totalPages} ページ（全{total}件）
+            {t('paginationInfo', { page, totalPages, total })}
           </span>
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
             style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #374151', cursor: page >= totalPages ? 'default' : 'pointer', opacity: page >= totalPages ? 0.4 : 1 }}
           >
-            次へ
+            {t('paginationNext')}
           </button>
         </div>
       )}
