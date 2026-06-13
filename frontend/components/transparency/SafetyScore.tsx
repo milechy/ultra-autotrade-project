@@ -4,6 +4,7 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { SafetyScoreData } from './types'
 
@@ -49,41 +50,42 @@ function getColorSet(score: number | string): ColorSet {
   }
 }
 
-function getJapaneseLabel(score: number | string): string {
-  const n = Number(score ?? 0)
-  if (n >= 90) return 'とても安全'
-  if (n >= 80) return '安全'
-  if (n >= 70) return 'やや安全'
-  if (n >= 50) return '注意'
-  return '危険'
-}
-
 export function SafetyScore({ data, className }: SafetyScoreProps) {
+  const t = useTranslations('TransparencySafetyScore')
   const [expanded, setExpanded] = useState(false)
   if (!data || typeof data !== 'object') return null
 
   const colors = getColorSet(data.total_score)
-  const label = getJapaneseLabel(data.total_score)
   const scoreInt = Math.round(Number(data.total_score ?? 0))
+
+  const getLabel = (score: number): string => {
+    if (score >= 90) return t('labelVerySafe')
+    if (score >= 80) return t('labelSafe')
+    if (score >= 70) return t('labelSlightlySafe')
+    if (score >= 50) return t('labelCaution')
+    return t('labelDanger')
+  }
+
+  const label = getLabel(scoreInt)
 
   return (
     <Card className={cn('border', colors.border, colors.bg, className)}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">安全スコア</CardTitle>
+        <CardTitle className="text-base">{t('title')}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {/* Main score: large number + Japanese label */}
+        {/* Main score: large number + label */}
         <div className="flex flex-col gap-2">
           <div className="flex items-baseline gap-2">
             <span className={cn('text-4xl font-bold', colors.text)}>
-              {scoreInt}点
+              {scoreInt}{t('scoreUnit')}
             </span>
             <span className={cn('text-xl font-semibold', colors.text)}>
               {label}
             </span>
           </div>
           <p className={cn('text-sm font-medium', colors.text)}>
-            {scoreInt}点：{label}
+            {scoreInt}{t('scoreUnit')}: {label}
           </p>
           <div className="h-2 w-full rounded-full bg-white dark:bg-gray-900/60 overflow-hidden">
             <div
@@ -103,7 +105,7 @@ export function SafetyScore({ data, className }: SafetyScoreProps) {
               onClick={() => setExpanded(!expanded)}
               className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              <span>詳細を{expanded ? '閉じる' : '見る'}</span>
+              <span>{expanded ? t('collapse') : t('expand')}</span>
               <svg
                 className={cn('h-4 w-4 transition-transform duration-200', expanded && 'rotate-180')}
                 fill="none"
@@ -126,10 +128,10 @@ export function SafetyScore({ data, className }: SafetyScoreProps) {
                         <div className="flex items-center gap-2">
                           <span>{item.name}</span>
                           <span className="text-xs text-muted-foreground">
-                            (重み {Math.round(item.weight * 100)}%)
+                            ({t('weight')} {Math.round(item.weight * 100)}%)
                           </span>
                         </div>
-                        <span className={cn('font-medium', itemColors.text)}>{itemScore}点</span>
+                        <span className={cn('font-medium', itemColors.text)}>{itemScore}{t('scoreUnit')}</span>
                       </div>
                       <div className="h-1.5 w-full rounded-full bg-white dark:bg-gray-900/60 overflow-hidden">
                         <div

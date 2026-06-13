@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { apiFetch } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 import { Info } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -67,22 +68,16 @@ function actionEmoji(action: string): string {
   return '⏸️'
 }
 
-function actionLabel(action: string): string {
-  if (action === 'BUY') return '買い'
-  if (action === 'SELL') return '売り'
-  return '様子見'
-}
-
-function formatRelativeTime(iso: string): string {
+function formatRelativeTime(iso: string, labels: { justNow: string; minutesAgo: string; hoursAgo: string }): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000)
-  if (diff < 1) return 'たった今'
-  if (diff < 60) return `${diff}分前`
-  return `${Math.floor(diff / 60)}時間前`
+  if (diff < 1) return labels.justNow
+  if (diff < 60) return labels.minutesAgo.replace('{n}', String(diff))
+  return labels.hoursAgo.replace('{n}', String(Math.floor(diff / 60)))
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function MetricBar({ label, value, threshold }: ParsedMetric) {
+function MetricBar({ label, value, threshold, requiredLabel }: ParsedMetric & { requiredLabel: string }) {
   const pct = Math.min(value, 100)
   const meetsThreshold = threshold != null ? value >= threshold : null
 
@@ -102,7 +97,7 @@ function MetricBar({ label, value, threshold }: ParsedMetric) {
         >
           {value}%
           {threshold != null && (
-            <span className="ml-1 text-zinc-500 font-normal">/ {threshold}% 必要</span>
+            <span className="ml-1 text-zinc-500 font-normal">/ {threshold}% {requiredLabel}</span>
           )}
         </span>
       </div>
@@ -126,6 +121,7 @@ function MetricBar({ label, value, threshold }: ParsedMetric) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AiTransparencyCard({ className }: { className?: string }) {
+  const t = useTranslations('TransparencyAiCard')
   const [decision, setDecision] = useState<AIDecisionResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -154,7 +150,7 @@ export function AiTransparencyCard({ className }: { className?: string }) {
     return (
       <Card className={cn('border-zinc-800 bg-zinc-900', className)}>
         <CardContent className="p-4">
-          <p className="text-xs text-zinc-500">判定データを取得できません</p>
+          <p className="text-xs text-zinc-500">{t('noData')}</p>
         </CardContent>
       </Card>
     )
@@ -164,6 +160,18 @@ export function AiTransparencyCard({ className }: { className?: string }) {
   const metrics = reason ? parseReasonMetrics(reason) : []
   const hasMetrics = metrics.length > 0
 
+  const relativeTimeLabels = {
+    justNow: t('justNow'),
+    minutesAgo: t('minutesAgo'),
+    hoursAgo: t('hoursAgo'),
+  }
+
+  const actionLabels: Record<string, string> = {
+    BUY: t('actionBuy'),
+    SELL: t('actionSell'),
+    HOLD: t('actionHold'),
+  }
+
   return (
     <Card
       className={cn('border-zinc-800 bg-zinc-900', className)}
@@ -172,7 +180,7 @@ export function AiTransparencyCard({ className }: { className?: string }) {
       <CardHeader className="pb-2 pt-4 px-4">
         <CardTitle className="text-sm font-semibold text-zinc-400 flex items-center gap-1.5">
           <Info className="h-3.5 w-3.5" />
-          AI 判断の透明性
+          {t('cardTitle')}
         </CardTitle>
       </CardHeader>
       <CardContent className="px-4 pb-4 space-y-4">
@@ -189,11 +197,11 @@ export function AiTransparencyCard({ className }: { className?: string }) {
             >
               <span>{actionEmoji(action)}</span>
               <span>{action}</span>
-              <span className="font-normal text-xs opacity-70">({actionLabel(action)})</span>
+              <span className="font-normal text-xs opacity-70">({actionLabels[action] ?? action})</span>
             </span>
           </div>
           <div className="text-right">
-            <p className="text-xs text-zinc-500">確信度</p>
+            <p className="text-xs text-zinc-500">{t('confidence')}</p>
             <p
               data-testid="transparency-confidence"
               className="text-xl font-bold text-zinc-100"
@@ -207,7 +215,7 @@ export function AiTransparencyCard({ className }: { className?: string }) {
         <div className="space-y-1">
           <div className="flex justify-between text-xs text-zinc-500">
             <span>0%</span>
-            <span className="font-medium text-zinc-400">確信度バー</span>
+            <span className="font-medium text-zinc-400">{t('confidenceBar')}</span>
             <span>100%</span>
           </div>
           <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
@@ -232,9 +240,9 @@ export function AiTransparencyCard({ className }: { className?: string }) {
             data-testid="transparency-metrics"
             className="space-y-2.5 rounded-lg bg-zinc-800/50 p-3"
           >
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">判断根拠の内訳</p>
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">{t('metricsTitle')}</p>
             {metrics.map((m, i) => (
-              <MetricBar key={i} {...m} />
+              <MetricBar key={i} {...m} requiredLabel={t('required')} />
             ))}
           </div>
         )}
@@ -245,7 +253,7 @@ export function AiTransparencyCard({ className }: { className?: string }) {
             data-testid="transparency-reason"
             className="rounded-lg bg-zinc-800/30 px-3 py-2.5 border border-zinc-700/50"
           >
-            <p className="text-xs text-zinc-500 mb-1">詳細理由</p>
+            <p className="text-xs text-zinc-500 mb-1">{t('detailReason')}</p>
             <p className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">{reason}</p>
           </div>
         )}
@@ -272,12 +280,12 @@ export function AiTransparencyCard({ className }: { className?: string }) {
                     : 'bg-yellow-900/50 text-yellow-400'
                 )}
               >
-                {agreed ? '両者一致' : '意見相違'}
+                {agreed ? t('agreed') : t('disagreed')}
               </span>
             </>
           )}
           <span className="text-[10px] text-zinc-600 ml-auto">
-            {formatRelativeTime(created_at)}
+            {formatRelativeTime(created_at, relativeTimeLabels)}
           </span>
         </div>
       </CardContent>

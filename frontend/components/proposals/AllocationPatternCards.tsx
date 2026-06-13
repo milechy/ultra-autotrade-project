@@ -3,6 +3,7 @@
 'use client'
 
 import { Shield, BarChart3, Rocket, Lock } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -19,18 +20,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
  * or 担保レバレッジで得るもので、単純 supply では Standard の差別化にならない。
  */
 
-const PLACEHOLDER_NOTE = '現在有効な運用先が追加され次第、内容を更新します'
-
 interface AllocationPattern {
   id: 'conservative' | 'standard' | 'aggressive'
   icon: React.ElementType
-  name: string
-  subtitle: string
-  /** 執行有効なら本文。無効パターンでは undefined（スケルトン表示）。 */
-  description?: string
-  venue?: string
-  apyLabel?: string
-  riskLabel?: string
+  nameKey: string
+  subtitleKey: string
+  /** 執行有効なら本文キー。無効パターンでは undefined（スケルトン表示）。 */
+  descriptionKey?: string
+  venueKey?: string
+  apyLabelKey?: string
+  riskLabelKey?: string
   riskColor?: string
   /** 執行可能か。false の場合は UI 枠のみで実行不可。 */
   enabled: boolean
@@ -40,33 +39,33 @@ const PATTERNS: AllocationPattern[] = [
   {
     id: 'conservative',
     icon: Shield,
-    name: 'Conservative（保守）',
-    subtitle: '安定供給戦略',
-    description:
-      'USDC を Base V3（Aave）に供給し、安定した貸出利息を獲得します。価格変動リスクを取らず、ヘルスファクター監視のもとで運用します。',
-    venue: 'Base V3 USDC supply',
-    apyLabel: '約 3.4%',
-    riskLabel: '低',
+    nameKey: 'conservativeName',
+    subtitleKey: 'conservativeSubtitle',
+    descriptionKey: 'conservativeDescription',
+    venueKey: 'conservativeVenue',
+    apyLabelKey: 'conservativeApyLabel',
+    riskLabelKey: 'riskLow',
     riskColor: 'bg-green-500/20 text-green-400 border-green-500/30',
     enabled: true,
   },
   {
     id: 'standard',
     icon: BarChart3,
-    name: 'Standard（標準）',
-    subtitle: '準備中',
+    nameKey: 'standardName',
+    subtitleKey: 'comingSoon',
     enabled: false,
   },
   {
     id: 'aggressive',
     icon: Rocket,
-    name: 'Aggressive（積極）',
-    subtitle: '準備中',
+    nameKey: 'aggressiveName',
+    subtitleKey: 'comingSoon',
     enabled: false,
   },
 ]
 
 function PatternCard({ pattern }: { pattern: AllocationPattern }) {
+  const t = useTranslations('ProposalsAllocationCards')
   const Icon = pattern.icon
 
   if (!pattern.enabled) {
@@ -81,11 +80,11 @@ function PatternCard({ pattern }: { pattern: AllocationPattern }) {
                   <Icon className="h-5 w-5 text-zinc-500" />
                 </div>
                 <div>
-                  <CardTitle className="text-base text-zinc-300">{pattern.name}</CardTitle>
-                  <p className="mt-0.5 text-xs text-zinc-500">{pattern.subtitle}</p>
+                  <CardTitle className="text-base text-zinc-300">{t(pattern.nameKey)}</CardTitle>
+                  <p className="mt-0.5 text-xs text-zinc-500">{t(pattern.subtitleKey)}</p>
                 </div>
               </div>
-              <Badge className="border-zinc-600/40 bg-zinc-700/40 text-zinc-400">準備中</Badge>
+              <Badge className="border-zinc-600/40 bg-zinc-700/40 text-zinc-400">{t('comingSoon')}</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -94,7 +93,7 @@ function PatternCard({ pattern }: { pattern: AllocationPattern }) {
               <div className="h-3 w-3/4 rounded bg-zinc-800" />
               <div className="h-3 w-2/3 rounded bg-zinc-800" />
             </div>
-            <p className="text-sm leading-relaxed text-zinc-500">{PLACEHOLDER_NOTE}</p>
+            <p className="text-sm leading-relaxed text-zinc-500">{t('placeholderNote')}</p>
             <button
               type="button"
               disabled
@@ -102,7 +101,7 @@ function PatternCard({ pattern }: { pattern: AllocationPattern }) {
               className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/60 py-2 text-sm font-medium text-zinc-500"
             >
               <Lock className="h-4 w-4" />
-              現在選択できません
+              {t('notAvailable')}
             </button>
           </CardContent>
         </Card>
@@ -121,31 +120,39 @@ function PatternCard({ pattern }: { pattern: AllocationPattern }) {
                 <Icon className="h-5 w-5 text-emerald-400" />
               </div>
               <div>
-                <CardTitle className="text-base text-zinc-100">{pattern.name}</CardTitle>
-                <p className="mt-0.5 text-xs text-zinc-500">{pattern.subtitle}</p>
+                <CardTitle className="text-base text-zinc-100">{t(pattern.nameKey)}</CardTitle>
+                <p className="mt-0.5 text-xs text-zinc-500">{t(pattern.subtitleKey)}</p>
               </div>
             </div>
-            <Badge className="border-green-500/30 bg-green-500/20 text-green-400">執行有効</Badge>
+            <Badge className="border-green-500/30 bg-green-500/20 text-green-400">{t('execEnabled')}</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm leading-relaxed text-zinc-400">{pattern.description}</p>
+          {pattern.descriptionKey && (
+            <p className="text-sm leading-relaxed text-zinc-400">{t(pattern.descriptionKey)}</p>
+          )}
 
           <div className="flex items-center gap-6">
-            <div>
-              <p className="text-xs text-zinc-500">運用先</p>
-              <p className="mt-0.5 text-sm font-semibold text-zinc-100">{pattern.venue}</p>
-            </div>
-            <div>
-              <p className="text-xs text-zinc-500">推定APY</p>
-              <p className="mt-0.5 text-sm font-semibold text-zinc-100">{pattern.apyLabel}</p>
-            </div>
-            <div>
-              <p className="text-xs text-zinc-500">リスク</p>
-              <Badge variant="outline" className={`mt-0.5 text-xs ${pattern.riskColor}`}>
-                {pattern.riskLabel}
-              </Badge>
-            </div>
+            {pattern.venueKey && (
+              <div>
+                <p className="text-xs text-zinc-500">{t('venue')}</p>
+                <p className="mt-0.5 text-sm font-semibold text-zinc-100">{t(pattern.venueKey)}</p>
+              </div>
+            )}
+            {pattern.apyLabelKey && (
+              <div>
+                <p className="text-xs text-zinc-500">{t('estimatedApy')}</p>
+                <p className="mt-0.5 text-sm font-semibold text-zinc-100">{t(pattern.apyLabelKey)}</p>
+              </div>
+            )}
+            {pattern.riskLabelKey && (
+              <div>
+                <p className="text-xs text-zinc-500">{t('risk')}</p>
+                <Badge variant="outline" className={`mt-0.5 text-xs ${pattern.riskColor}`}>
+                  {t(pattern.riskLabelKey)}
+                </Badge>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

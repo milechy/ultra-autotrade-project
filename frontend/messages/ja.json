@@ -3218,5 +3218,107 @@
     "nextRunSoon": "まもなく実行予定",
     "nextRunHours": "約{hours}時間後（4時間ごとに自動実行）",
     "description": "AIが市場を分析中です。BUYまたはSELL判定が出た場合に提案が作成されます。HOLD判定の場合は提案は作成されません。"
+  },
+  "SettingsRiskMode": {
+    "title": "リスクモード設定",
+    "description": "運用スタイルに合わせてAIの判定基準が変わります。デフォルトは「保守」です。",
+    "currentBadge": "現在",
+    "maxUtilization": "最大利用率",
+    "minHealthFactor": "最小 Health Factor",
+    "minConfidence": "必要信頼度",
+    "allowedAssets": "対象資産",
+    "successMessage": "リスクモードを「{label}」に変更しました",
+    "aggressiveNote": "「積極」モードは信頼度40%以上でAIが提案するため取引頻度が増えます。リスクを十分に理解した上でお選びください。"
+  },
+  "PartnerReferralTab": {
+    "title": "紹介プログラム",
+    "description": "招待リンクを発行して新しいユーザーを紹介できます。紹介したユーザーの取引履歴（種別/金額/日時）を確認できます。",
+    "manageLink": "招待リンクを管理"
+  },
+  "PwaInstallBanner": {
+    "title": "ホーム画面に追加",
+    "description": "アプリとしてインストールするとすばやくアクセスできます",
+    "dismissAriaLabel": "閉じる",
+    "installButton": "インストール",
+    "laterButton": "後で"
+  },
+  "PwaUpdatePrompt": {
+    "title": "アプリを更新できます",
+    "description": "新しいバージョンが利用可能です",
+    "updateButton": "更新"
+  },
+  "TransparencyImpactCard": {
+    "cardTitle": "{actionType} ${amount} の影響",
+    "labelBefore": "実行しない場合",
+    "labelAfter": "実行した場合",
+    "deposit": "預け入れ",
+    "borrow": "借入",
+    "annualRate": "年利",
+    "annualYield": "年間収益",
+    "healthFactor": "健全度",
+    "perYear": "/ 年"
+  },
+  "TransparencyAiCard": {
+    "cardTitle": "AI 判断の透明性",
+    "noData": "判定データを取得できません",
+    "confidence": "確信度",
+    "confidenceBar": "確信度バー",
+    "metricsTitle": "判断根拠の内訳",
+    "required": "必要",
+    "detailReason": "詳細理由",
+    "agreed": "両者一致",
+    "disagreed": "意見相違",
+    "actionBuy": "買い",
+    "actionSell": "売り",
+    "actionHold": "様子見",
+    "justNow": "たった今",
+    "minutesAgo": "{n}分前",
+    "hoursAgo": "{n}時間前"
+  },
+  "SharedStatusBadge": {
+    "NORMAL": "正常",
+    "SAFE_MODE": "セーフモード",
+    "HARD_STOP": "緊急停止",
+    "PAUSED": "一時停止"
+  },
+  "TransparencySafetyScore": {
+    "title": "安全スコア",
+    "scoreUnit": "点",
+    "labelVerySafe": "とても安全",
+    "labelSafe": "安全",
+    "labelSlightlySafe": "やや安全",
+    "labelCaution": "注意",
+    "labelDanger": "危険",
+    "expand": "詳細を見る",
+    "collapse": "詳細を閉じる",
+    "weight": "重み"
+  },
+  "LayoutUserLayout": {
+    "emergencyStopSuccess": "緊急停止を実行しました",
+    "emergencyStopError": "緊急停止の実行に失敗しました"
+  },
+  "ProposalsAllocationCards": {
+    "conservativeName": "Conservative（保守）",
+    "conservativeSubtitle": "安定供給戦略",
+    "conservativeDescription": "USDC を Base V3（Aave）に供給し、安定した貸出利息を獲得します。価格変動リスクを取らず、ヘルスファクター監視のもとで運用します。",
+    "conservativeVenue": "Base V3 USDC supply",
+    "standardName": "Standard（標準）",
+    "aggressiveName": "Aggressive（積極）",
+    "comingSoon": "準備中",
+    "placeholderNote": "現在有効な運用先が追加され次第、内容を更新します",
+    "notAvailable": "現在選択できません",
+    "execEnabled": "執行有効",
+    "venue": "運用先",
+    "estimatedApy": "推定APY",
+    "risk": "リスク",
+    "riskLow": "低",
+    "conservativeApyLabel": "約 3.4%"
+  },
+  "TransparencyPerformanceCard": {
+    "title": "過去実績（{days}日間）",
+    "proposalSummary": "{total}回提案、{positive}回でプラス",
+    "totalGain": "累計損益",
+    "avgPerTrade": "平均 {sign}¥{amount} / 回",
+    "disclaimer": "※ 実績であり保証ではありません。過去の成績は将来の結果を保証しません。"
   }
 }

@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { ImpactData, PortfolioState } from './types'
 
@@ -24,6 +25,7 @@ function PortfolioColumn({
   label: string
   highlighted?: boolean
 }) {
+  const t = useTranslations('TransparencyImpactCard')
   if (!state || typeof state !== 'object') return null
   return (
     <div
@@ -35,24 +37,24 @@ function PortfolioColumn({
       <p className={cn('text-sm font-semibold', highlighted && 'text-primary')}>{label}</p>
       <div className="flex flex-col gap-1 text-sm">
         <div className="flex justify-between">
-          <span className="text-muted-foreground">預け入れ</span>
+          <span className="text-muted-foreground">{t('deposit')}</span>
           <span>${Number(state.deposit_usd ?? 0).toLocaleString()}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">借入</span>
+          <span className="text-muted-foreground">{t('borrow')}</span>
           <span>${Number(state.borrow_usd ?? 0).toLocaleString()}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">年利</span>
+          <span className="text-muted-foreground">{t('annualRate')}</span>
           <span>{Number(state.net_apy ?? 0).toFixed(2)}%</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">年間収益</span>
+          <span className="text-muted-foreground">{t('annualYield')}</span>
           <span>¥{formatJpy(state.yield_annual_jpy)}</span>
         </div>
         {state.health_factor !== null && (
           <div className="flex justify-between">
-            <span className="text-muted-foreground">健全度</span>
+            <span className="text-muted-foreground">{t('healthFactor')}</span>
             <span>{Number(state.health_factor ?? 0).toFixed(2)}</span>
           </div>
         )}
@@ -62,6 +64,7 @@ function PortfolioColumn({
 }
 
 export function ImpactCard({ data, className }: ImpactCardProps) {
+  const t = useTranslations('TransparencyImpactCard')
   if (!data) return null
   const diffPositive = Number(data.diff_yield_annual_jpy ?? 0) >= 0
 
@@ -69,19 +72,19 @@ export function ImpactCard({ data, className }: ImpactCardProps) {
     <Card className={className}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">
-          {data.action_type} ${Number(data.amount_usd ?? 0).toLocaleString()} の影響
+          {t('cardTitle', { actionType: data.action_type, amount: Number(data.amount_usd ?? 0).toLocaleString() })}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {data.before != null && <PortfolioColumn state={data.before} label="実行しない場合" />}
-          {data.after != null && <PortfolioColumn state={data.after} label="実行した場合" highlighted />}
+          {data.before != null && <PortfolioColumn state={data.before} label={t('labelBefore')} />}
+          {data.after != null && <PortfolioColumn state={data.after} label={t('labelAfter')} highlighted />}
         </div>
 
         {/* Diff summary */}
         <div className="rounded-lg bg-muted p-3 flex flex-col gap-1">
           <p className={cn('text-lg font-bold', diffPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
-            {diffPositive ? '+' : ''}¥{formatJpy(data.diff_yield_annual_jpy)} / 年
+            {diffPositive ? '+' : ''}¥{formatJpy(data.diff_yield_annual_jpy)} {t('perYear')}
           </p>
           <p className="text-sm text-muted-foreground">{data.metaphor}</p>
         </div>

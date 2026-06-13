@@ -4,11 +4,13 @@
 
 import { useState } from 'react'
 import { Download, X } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useInstallPrompt } from '@/lib/pwa/useInstallPrompt'
 
 const DISMISSED_KEY = 'pwa-install-dismissed'
 
 export function InstallBanner() {
+  const t = useTranslations('PwaInstallBanner')
   const { isInstallable, isInstalled, promptInstall } = useInstallPrompt()
   const [dismissed, setDismissed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false
@@ -34,15 +36,13 @@ export function InstallBanner() {
           <Download className="h-5 w-5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-zinc-100">ホーム画面に追加</p>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            アプリとしてインストールするとすばやくアクセスできます
-          </p>
+          <p className="text-sm font-semibold text-zinc-100">{t('title')}</p>
+          <p className="text-xs text-zinc-400 mt-0.5">{t('description')}</p>
         </div>
         <button
           onClick={handleDismiss}
           className="text-zinc-500 hover:text-zinc-300 shrink-0"
-          aria-label="閉じる"
+          aria-label={t('dismissAriaLabel')}
         >
           <X className="h-4 w-4" />
         </button>
@@ -52,13 +52,13 @@ export function InstallBanner() {
           onClick={handleInstall}
           className="flex-1 rounded-lg bg-blue-600 hover:bg-blue-500 px-3 py-2 text-sm font-medium text-white transition-colors"
         >
-          インストール
+          {t('installButton')}
         </button>
         <button
           onClick={handleDismiss}
           className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
         >
-          後で
+          {t('laterButton')}
         </button>
       </div>
     </div>

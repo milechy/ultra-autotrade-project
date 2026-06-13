@@ -3218,5 +3218,107 @@
     "nextRunSoon": "Running soon",
     "nextRunHours": "In approx. {hours}h (auto-runs every 4h)",
     "description": "AI is analyzing the market. A proposal is created when a BUY or SELL decision is made. No proposal is created for HOLD decisions."
+  },
+  "SettingsRiskMode": {
+    "title": "Risk Mode Settings",
+    "description": "The AI judgment criteria change according to your trading style. The default is \"Conservative\".",
+    "currentBadge": "Current",
+    "maxUtilization": "Max Utilization",
+    "minHealthFactor": "Min Health Factor",
+    "minConfidence": "Min Confidence",
+    "allowedAssets": "Allowed Assets",
+    "successMessage": "Risk mode changed to \"{label}\"",
+    "aggressiveNote": "\"Aggressive\" mode increases trade frequency as AI proposes with 40%+ confidence. Please understand the risks before selecting."
+  },
+  "PartnerReferralTab": {
+    "title": "Referral Program",
+    "description": "Issue invite links to refer new users. You can view the trade history (type/amount/date) of referred users.",
+    "manageLink": "Manage Invite Links"
+  },
+  "PwaInstallBanner": {
+    "title": "Add to Home Screen",
+    "description": "Install as an app for quick access",
+    "dismissAriaLabel": "Close",
+    "installButton": "Install",
+    "laterButton": "Later"
+  },
+  "PwaUpdatePrompt": {
+    "title": "App update available",
+    "description": "A new version is available",
+    "updateButton": "Update"
+  },
+  "TransparencyImpactCard": {
+    "cardTitle": "Impact of {actionType} ${amount}",
+    "labelBefore": "Without execution",
+    "labelAfter": "With execution",
+    "deposit": "Deposit",
+    "borrow": "Borrow",
+    "annualRate": "Annual Rate",
+    "annualYield": "Annual Yield",
+    "healthFactor": "Health Factor",
+    "perYear": "/ year"
+  },
+  "TransparencyAiCard": {
+    "cardTitle": "AI Decision Transparency",
+    "noData": "Unable to fetch decision data",
+    "confidence": "Confidence",
+    "confidenceBar": "Confidence Bar",
+    "metricsTitle": "Decision Breakdown",
+    "required": "required",
+    "detailReason": "Detailed Reason",
+    "agreed": "Both Agree",
+    "disagreed": "Disagree",
+    "actionBuy": "Buy",
+    "actionSell": "Sell",
+    "actionHold": "Hold",
+    "justNow": "Just now",
+    "minutesAgo": "{n}m ago",
+    "hoursAgo": "{n}h ago"
+  },
+  "SharedStatusBadge": {
+    "NORMAL": "Normal",
+    "SAFE_MODE": "Safe Mode",
+    "HARD_STOP": "Emergency Stop",
+    "PAUSED": "Paused"
+  },
+  "TransparencySafetyScore": {
+    "title": "Safety Score",
+    "scoreUnit": "pts",
+    "labelVerySafe": "Very Safe",
+    "labelSafe": "Safe",
+    "labelSlightlySafe": "Mostly Safe",
+    "labelCaution": "Caution",
+    "labelDanger": "Danger",
+    "expand": "Show details",
+    "collapse": "Hide details",
+    "weight": "Weight"
+  },
+  "LayoutUserLayout": {
+    "emergencyStopSuccess": "Emergency stop executed",
+    "emergencyStopError": "Failed to execute emergency stop"
+  },
+  "ProposalsAllocationCards": {
+    "conservativeName": "Conservative",
+    "conservativeSubtitle": "Stable Supply Strategy",
+    "conservativeDescription": "Supply USDC to Base V3 (Aave) to earn stable lending interest. Operates without price volatility risk, under health factor monitoring.",
+    "conservativeVenue": "Base V3 USDC supply",
+    "standardName": "Standard",
+    "aggressiveName": "Aggressive",
+    "comingSoon": "Coming Soon",
+    "placeholderNote": "Content will be updated as new valid venues are added",
+    "notAvailable": "Not available yet",
+    "execEnabled": "Active",
+    "venue": "Venue",
+    "estimatedApy": "Est. APY",
+    "risk": "Risk",
+    "riskLow": "Low",
+    "conservativeApyLabel": "Approx. 3.4%"
+  },
+  "TransparencyPerformanceCard": {
+    "title": "Past Performance ({days} days)",
+    "proposalSummary": "{total} proposals, {positive} profitable",
+    "totalGain": "Total P&L",
+    "avgPerTrade": "Avg {sign}¥{amount} / trade",
+    "disclaimer": "* Past performance is not a guarantee of future results."
   }
 }
