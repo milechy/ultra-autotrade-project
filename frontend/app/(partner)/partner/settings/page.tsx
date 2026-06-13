@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,6 +31,7 @@ import { ReferralTab } from '@/components/partner/ReferralTab'
 // ---- Profile Card (email + username) ----------------------------------------
 
 function ProfileCard() {
+  const t = useTranslations('PartnerSettings')
   const { user, token } = useAuth()
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
@@ -41,7 +43,7 @@ function ProfileCard() {
     setError(null)
 
     if (!token || !user) {
-      setError('認証されていません')
+      setError(t('profileErrorNotAuthenticated'))
       return
     }
 
@@ -50,19 +52,19 @@ function ProfileCard() {
     if (username.trim()) updates.username = username.trim()
 
     if (Object.keys(updates).length === 0) {
-      setError('変更内容を入力してください')
+      setError(t('profileErrorNoChanges'))
       return
     }
 
     setIsSubmitting(true)
     try {
       await updateUser(token, user.id, updates)
-      toast.success('プロフィールを更新しました')
+      toast.success(t('profileUpdateSuccess'))
       setEmail('')
       setUsername('')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : null
-      setError(message || '更新に失敗しました')
+      setError(message || t('profileUpdateError'))
     } finally {
       setIsSubmitting(false)
     }
@@ -71,17 +73,17 @@ function ProfileCard() {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">プロフィール変更</CardTitle>
+        <CardTitle className="text-base">{t('profileCardTitle')}</CardTitle>
       </CardHeader>
       <CardContent>
         {/* Current values */}
         <div className="mb-4 space-y-1 rounded-lg bg-muted px-3 py-2 text-sm">
           <div className="flex gap-2">
-            <span className="text-muted-foreground">現在のメール:</span>
+            <span className="text-muted-foreground">{t('profileCurrentEmail')}</span>
             <span className="font-medium">{user?.email ?? '—'}</span>
           </div>
           <div className="flex gap-2">
-            <span className="text-muted-foreground">現在のユーザー名:</span>
+            <span className="text-muted-foreground">{t('profileCurrentUsername')}</span>
             <span className="font-medium">{user?.username ?? '—'}</span>
           </div>
         </div>
@@ -95,28 +97,28 @@ function ProfileCard() {
 
           <div className="space-y-1.5">
             <Label htmlFor="new-email" className="text-sm">
-              新しいメールアドレス
+              {t('profileNewEmail')}
             </Label>
             <Input
               id="new-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="変更しない場合は空欄"
+              placeholder={t('profileEmailPlaceholder')}
               autoComplete="email"
             />
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="new-username" className="text-sm">
-              新しいユーザー名
+              {t('profileNewUsername')}
             </Label>
             <Input
               id="new-username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="変更しない場合は空欄"
+              placeholder={t('profileUsernamePlaceholder')}
               autoComplete="username"
             />
           </div>
@@ -126,7 +128,7 @@ function ProfileCard() {
             disabled={isSubmitting}
             className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSubmitting ? '更新中...' : 'プロフィールを更新'}
+            {isSubmitting ? t('profileSubmitting') : t('profileSubmitButton')}
           </button>
         </form>
       </CardContent>
@@ -138,41 +140,36 @@ function ProfileCard() {
 
 type ExecutionPolicyValue = 'auto_execute' | 'require_approval' | 'proposal_only'
 
-const EXECUTION_POLICY_LABELS: Record<ExecutionPolicyValue, string> = {
-  auto_execute: '自動実行',
-  require_approval: '手動承認',
-  proposal_only: '提案のみ',
-}
-
-const EXECUTION_POLICY_DESCRIPTIONS: Record<ExecutionPolicyValue, string> = {
-  auto_execute: 'AIの判定を自動で実行（承認不要）',
-  require_approval: 'AIの提案をレビューしてから承認',
-  proposal_only: '提案の表示のみ（実行しない）',
-}
-
-const EXECUTION_POLICY_DIALOG: Record<ExecutionPolicyValue, string> = {
-  auto_execute:
-    '自動実行に切り替えると、AIの判定が自動的に実行されます。安全装置（HF<1.6自動停止、取引上限10%、日次上限30%）は引き続き有効です。よろしいですか？',
-  require_approval: '手動承認に切り替えますか？以降のAI提案は承認が必要になります。',
-  proposal_only: '提案のみモードに切り替えますか？AIの提案を確認できますが実行はされません。',
-}
-
-interface UserSettingsData {
-  user_mode: string
-  execution_policy: string
-}
-
 function ExecutionModeCard() {
+  const t = useTranslations('PartnerSettings')
   const { user } = useAuth()
   const token = getStoredToken()
   const [currentPolicy, setCurrentPolicy] = useState<ExecutionPolicyValue | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [pendingPolicy, setPendingPolicy] = useState<ExecutionPolicyValue | null>(null)
 
+  const EXECUTION_POLICY_LABELS: Record<ExecutionPolicyValue, string> = {
+    auto_execute: t('policyLabelAutoExecute'),
+    require_approval: t('policyLabelRequireApproval'),
+    proposal_only: t('policyLabelProposalOnly'),
+  }
+
+  const EXECUTION_POLICY_DESCRIPTIONS: Record<ExecutionPolicyValue, string> = {
+    auto_execute: t('policyDescAutoExecute'),
+    require_approval: t('policyDescRequireApproval'),
+    proposal_only: t('policyDescProposalOnly'),
+  }
+
+  const EXECUTION_POLICY_DIALOG: Record<ExecutionPolicyValue, string> = {
+    auto_execute: t('policyDialogAutoExecute'),
+    require_approval: t('policyDialogRequireApproval'),
+    proposal_only: t('policyDialogProposalOnly'),
+  }
+
   // useAuth().user.execution_policy をベースに初期値を設定
   useEffect(() => {
     const policy = user?.execution_policy
-    if (policy && policy in EXECUTION_POLICY_LABELS) {
+    if (policy && (policy === 'auto_execute' || policy === 'require_approval' || policy === 'proposal_only')) {
       setCurrentPolicy(policy as ExecutionPolicyValue)
     } else {
       setCurrentPolicy('auto_execute')
@@ -183,16 +180,17 @@ function ExecutionModeCard() {
     if (!token || !pendingPolicy) return
     setIsSaving(true)
     try {
-      const data = await putJson<UserSettingsData>('/api/user/settings', {
+      const data = await putJson<{ user_mode: string; execution_policy: string }>('/api/user/settings', {
         execution_policy: pendingPolicy,
       }, {
         headers: { Authorization: `Bearer ${token}` },
       })
       const updated = data.execution_policy as ExecutionPolicyValue
-      setCurrentPolicy(updated in EXECUTION_POLICY_LABELS ? updated : 'auto_execute')
-      toast.success(`${EXECUTION_POLICY_LABELS[pendingPolicy]}モードに切り替えました`)
+      const validPolicies: ExecutionPolicyValue[] = ['auto_execute', 'require_approval', 'proposal_only']
+      setCurrentPolicy(validPolicies.includes(updated) ? updated : 'auto_execute')
+      toast.success(t('policySwitchSuccess', { mode: EXECUTION_POLICY_LABELS[pendingPolicy] }))
     } catch {
-      toast.error('設定の更新に失敗しました')
+      toast.error(t('policySwitchError'))
     } finally {
       setIsSaving(false)
       setPendingPolicy(null)
@@ -204,15 +202,15 @@ function ExecutionModeCard() {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">運用モード</CardTitle>
+        <CardTitle className="text-base">{t('executionModeCardTitle')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {currentPolicy === null ? (
-          <p className="text-sm text-muted-foreground">読み込み中...</p>
+          <p className="text-sm text-muted-foreground">{t('executionModeLoading')}</p>
         ) : (
           <>
             <div className="mb-2 text-sm text-muted-foreground">
-              現在のモード:{' '}
+              {t('executionModeCurrentLabel')}{' '}
               <span className="font-semibold text-foreground">
                 {EXECUTION_POLICY_LABELS[currentPolicy]}
               </span>
@@ -243,19 +241,19 @@ function ExecutionModeCard() {
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>
-                          {EXECUTION_POLICY_LABELS[policy]}モードに切り替えますか？
+                          {t('policyDialogTitle', { mode: EXECUTION_POLICY_LABELS[policy] })}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                           {EXECUTION_POLICY_DIALOG[policy]}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                        <AlertDialogCancel>{t('policyDialogCancel')}</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => { void handleConfirm() }}
                           className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
-                          切り替える
+                          {t('policyDialogConfirm')}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -265,7 +263,7 @@ function ExecutionModeCard() {
             </div>
 
             <p className="text-xs text-muted-foreground pt-1">
-              安全装置（HF&lt;1.6自動停止、取引上限10%、日次上限30%）はいずれのモードでも有効です。
+              {t('executionModeFootnote')}
             </p>
           </>
         )}
@@ -277,9 +275,10 @@ function ExecutionModeCard() {
 // ---- Page -------------------------------------------------------------------
 
 export default function PartnerSettingsPage() {
+  const t = useTranslations('PartnerSettings')
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-2xl font-bold">設定</h1>
+      <h1 className="text-2xl font-bold">{t('pageTitle')}</h1>
       <WalletConnectCard />
       <ReferralTab />
       <ExecutionModeCard />
