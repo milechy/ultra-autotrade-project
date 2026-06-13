@@ -1821,5 +1821,32 @@
     "historyHeading": "Query History (last {max})",
     "historyEntryMeta": "top_k={topK} / threshold={threshold} / {resultCount} results / {responseMs}ms",
     "btnRerun": "Re-run"
+  },
+  "AdminExchange": {
+    "pageTitle": "Exchange Management",
+    "htmlTitle": "Exchange Management - Ultra AutoTrade",
+    "lastUpdated": "Last updated: {time} (auto-refresh every 30s)",
+    "fetchError": "Data fetch error: {msg}",
+    "loading": "Loading...",
+    "connectionSectionTitle": "Connection Status",
+    "cardConnectionLabel": "Exchange Connection",
+    "statusConnected": "Connected",
+    "statusDisconnected": "Disconnected",
+    "modeSandbox": "Sandbox Mode",
+    "modeProduction": "Production Mode",
+    "cardBalanceLabel": "USDT Balance",
+    "cardLastTradeLabel": "Last Trade Time",
+    "dailyLimitSectionTitle": "Daily Trade Limit",
+    "dailyLimitUsedOver": "Used / Limit",
+    "dailyLimitUsedPct": "{pct}% used",
+    "settingsSectionTitle": "Exchange Settings",
+    "currentExchangeTypeLabel": "Current Exchange Type",
+    "exchangeDummy": "Dummy (for testing)",
+    "exchangeTypeChangeHint": "To change the exchange type, update the EXCHANGE_TYPE environment variable and restart the backend.",
+    "connectionTestSectionTitle": "Connection Test",
+    "testButton": "Test Connection",
+    "testButtonLoading": "Checking...",
+    "testSuccessConnected": "Test successful — Exchange connection is healthy",
+    "testSuccessDisconnected": "Test successful — Exchange is in disconnected state"
   }
 }
