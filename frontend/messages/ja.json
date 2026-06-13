@@ -1360,5 +1360,32 @@
     "noRecentApprovals": "承認履歴はありません",
     "statusSuccess": "成功",
     "statusFailed": "失敗"
+  },
+  "AdminExchange": {
+    "pageTitle": "取引所管理",
+    "htmlTitle": "取引所管理 - Ultra AutoTrade",
+    "lastUpdated": "最終更新: {time}（30秒自動更新）",
+    "fetchError": "データ取得エラー: {msg}",
+    "loading": "取得中...",
+    "connectionSectionTitle": "接続状態",
+    "cardConnectionLabel": "取引所接続",
+    "statusConnected": "接続中",
+    "statusDisconnected": "切断",
+    "modeSandbox": "サンドボックスモード",
+    "modeProduction": "本番モード",
+    "cardBalanceLabel": "USDT 残高",
+    "cardLastTradeLabel": "前回取引日時",
+    "dailyLimitSectionTitle": "日次取引制限",
+    "dailyLimitUsedOver": "使用済み / 上限",
+    "dailyLimitUsedPct": "{pct}% 使用",
+    "settingsSectionTitle": "取引所設定",
+    "currentExchangeTypeLabel": "現在の取引所タイプ",
+    "exchangeDummy": "Dummy（テスト用）",
+    "exchangeTypeChangeHint": "取引所タイプの変更は環境変数 EXCHANGE_TYPE を更新し、バックエンドを再起動してください。",
+    "connectionTestSectionTitle": "接続テスト",
+    "testButton": "接続テスト",
+    "testButtonLoading": "確認中...",
+    "testSuccessConnected": "テスト成功 — 取引所へ正常に接続できました",
+    "testSuccessDisconnected": "テスト成功 — 取引所が切断状態です"
   }
 }
