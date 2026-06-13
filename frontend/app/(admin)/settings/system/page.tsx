@@ -4,6 +4,7 @@
 
 // frontend/app/(admin)/settings/system/page.tsx
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { fetchAutomationStatus } from "@/lib/api/automation";
@@ -29,6 +30,7 @@ type ConfirmTarget =
 
 function SystemSettingsContent() {
   const { token } = useAuth();
+  const t = useTranslations("AdminSettingsSystem");
 
   // Remote data
   const [automationStatus, setAutomationStatus] = useState<AutomationStatus | null>(null);
@@ -70,12 +72,12 @@ function SystemSettingsContent() {
       setAutomationStatus(auto);
       setExchangeStatus(exch);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "データの取得に失敗しました";
+      const message = err instanceof Error ? err.message : t("fetchErrorFallback");
       setFetchError(message);
     } finally {
       setLoadingData(false);
     }
-  }, [token]);
+  }, [token, t]);
 
   useEffect(() => {
     loadData();
@@ -113,10 +115,10 @@ function SystemSettingsContent() {
       if (target === "slack_notify") setSlackEnabled(pendingSlack);
       if (target === "line_notify") setLineEnabled(pendingLine);
 
-      setFieldSuccess((prev) => ({ ...prev, [target]: "設定を保存しました" }));
+      setFieldSuccess((prev) => ({ ...prev, [target]: t("saveSuccess") }));
       setConfirmTarget(null);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "保存に失敗しました";
+      const message = err instanceof Error ? err.message : t("saveError");
       setFieldError((prev) => ({ ...prev, [target]: message }));
     } finally {
       setSaving(false);
@@ -126,7 +128,7 @@ function SystemSettingsContent() {
   if (loadingData) {
     return (
       <div style={{ padding: 40, textAlign: "center", color: "#888" }}>
-        読み込み中...
+        {t("loading")}
       </div>
     );
   }
@@ -135,100 +137,100 @@ function SystemSettingsContent() {
 
   return (
     <>
-      <title>システム設定 - Ultra AutoTrade</title>
+      <title>{t("pageTitle")}</title>
 
-      <h1 style={{ marginBottom: 6 }}>システム設定</h1>
+      <h1 style={{ marginBottom: 6 }}>{t("heading")}</h1>
       <p style={{ marginTop: 0, color: "#555" }}>
-        AI・取引所・Aave・通知の設定を確認・変更できます。
+        {t("description")}
       </p>
 
       {fetchError && (
         <div style={errorBannerStyle}>
-          データ取得エラー: {fetchError}
-          <button onClick={loadData} style={retryBtnStyle}>再試行</button>
+          {t("fetchError", { message: fetchError })}
+          <button onClick={loadData} style={retryBtnStyle}>{t("retry")}</button>
         </div>
       )}
 
       {/* ── Section 1: AI設定 ── */}
       <section style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>AI設定</h2>
+        <h2 style={sectionTitleStyle}>{t("sections.ai")}</h2>
 
         <div style={fieldRowStyle}>
-          <span style={labelStyle}>Shadow Mode</span>
+          <span style={labelStyle}>{t("fields.shadowMode")}</span>
           <span style={valueStyle}>
             <span style={shadowModeActive ? badgeActiveStyle : badgeInactiveStyle}>
               {shadowModeActive ? "ON" : "OFF"}
             </span>
             {automationStatus?.emergency_reason && (
               <span style={{ marginLeft: 8, fontSize: 12, color: "#c62828" }}>
-                ({automationStatus.emergency_reason})
+                {t("fields.shadowModeReason", { reason: automationStatus.emergency_reason })}
               </span>
             )}
           </span>
-          <span style={readOnlyHintStyle}>読み取り専用</span>
+          <span style={readOnlyHintStyle}>{t("readOnly")}</span>
         </div>
 
         <div style={fieldRowStyle}>
-          <span style={labelStyle}>プロンプトバージョン</span>
+          <span style={labelStyle}>{t("fields.promptVersion")}</span>
           <span style={valueStyle}>v2.0</span>
-          <span style={readOnlyHintStyle}>読み取り専用</span>
+          <span style={readOnlyHintStyle}>{t("readOnly")}</span>
         </div>
 
         <div style={{ ...fieldRowStyle, borderBottom: "none" }}>
-          <span style={labelStyle}>フォールバックモデル</span>
+          <span style={labelStyle}>{t("fields.fallbackModel")}</span>
           <span style={valueStyle}>gpt-4o</span>
-          <span style={readOnlyHintStyle}>読み取り専用</span>
+          <span style={readOnlyHintStyle}>{t("readOnly")}</span>
         </div>
       </section>
 
       {/* ── Section 2: Exchange設定 ── */}
       <section style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>Exchange設定</h2>
+        <h2 style={sectionTitleStyle}>{t("sections.exchange")}</h2>
 
         <div style={fieldRowStyle}>
-          <span style={labelStyle}>Phase</span>
+          <span style={labelStyle}>{t("fields.phase")}</span>
           <span style={valueStyle}>Phase A</span>
-          <span style={readOnlyHintStyle}>読み取り専用</span>
+          <span style={readOnlyHintStyle}>{t("readOnly")}</span>
         </div>
 
         <div style={fieldRowStyle}>
-          <span style={labelStyle}>Sandbox</span>
+          <span style={labelStyle}>{t("fields.sandbox")}</span>
           <span style={valueStyle}>
             {exchangeStatus == null ? (
               <span style={{ color: "#888" }}>—</span>
             ) : (
               <span style={exchangeStatus.sandbox_mode ? badgeWarningStyle : badgeActiveStyle}>
-                {exchangeStatus.sandbox_mode ? "ON (Sandbox)" : "OFF (本番)"}
+                {exchangeStatus.sandbox_mode ? t("fields.sandboxOn") : t("fields.sandboxOff")}
               </span>
             )}
           </span>
-          <span style={readOnlyHintStyle}>読み取り専用</span>
+          <span style={readOnlyHintStyle}>{t("readOnly")}</span>
         </div>
 
         <div style={{ ...fieldRowStyle, borderBottom: "none" }}>
-          <span style={labelStyle}>取引上限 / 日</span>
+          <span style={labelStyle}>{t("fields.dailyTradeLimit")}</span>
           <span style={valueStyle}>
             {exchangeStatus == null ? (
               <span style={{ color: "#888" }}>—</span>
             ) : (
-              <span>{exchangeStatus.daily_trade_limit} 回</span>
+              <span>{t("fields.dailyTradeLimitValue", { count: exchangeStatus.daily_trade_limit })}</span>
             )}
           </span>
-          <span style={readOnlyHintStyle}>読み取り専用</span>
+          <span style={readOnlyHintStyle}>{t("readOnly")}</span>
         </div>
       </section>
 
       {/* ── Section 3: Aave設定 ── */}
       <section style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>Aave設定</h2>
+        <h2 style={sectionTitleStyle}>{t("sections.aave")}</h2>
 
         {/* HF閾値 */}
         <div style={fieldRowStyle}>
-          <span style={labelStyle}>HF閾値</span>
+          <span style={labelStyle}>{t("fields.hfThreshold")}</span>
           <span style={valueStyle}>{hfThreshold}</span>
           {confirmTarget !== "hf_threshold" && (
             <button style={editBtnStyle} onClick={() => openConfirm("hf_threshold")}>
-              変更
+              {t("edit")}
             </button>
           )}
         </div>
@@ -240,7 +242,7 @@ function SystemSettingsContent() {
         )}
         {confirmTarget === "hf_threshold" && (
           <div style={confirmBoxStyle}>
-            <label style={inputLabelStyle}>新しいHF閾値</label>
+            <label style={inputLabelStyle}>{t("fields.hfThresholdNew")}</label>
             <input
               type="number"
               step="0.1"
@@ -250,17 +252,17 @@ function SystemSettingsContent() {
               onChange={(e) => setPendingHf(parseFloat(e.target.value))}
               style={inputStyle}
             />
-            <p style={confirmTextStyle}>この設定を変更しますか？</p>
+            <p style={confirmTextStyle}>{t("confirmQuestion")}</p>
             <div style={confirmButtonRowStyle}>
               <button
                 style={confirmBtnStyle}
                 onClick={() => handleConfirm("hf_threshold")}
                 disabled={saving}
               >
-                {saving ? "保存中..." : "確認"}
+                {saving ? t("saving") : t("confirm")}
               </button>
               <button style={cancelBtnStyle} onClick={cancelConfirm} disabled={saving}>
-                キャンセル
+                {t("cancel")}
               </button>
             </div>
           </div>
@@ -268,11 +270,11 @@ function SystemSettingsContent() {
 
         {/* クールダウン */}
         <div style={fieldRowStyle}>
-          <span style={labelStyle}>クールダウン</span>
-          <span style={valueStyle}>{cooldownMinutes} 分</span>
+          <span style={labelStyle}>{t("fields.cooldown")}</span>
+          <span style={valueStyle}>{t("fields.cooldownValue", { minutes: cooldownMinutes })}</span>
           {confirmTarget !== "cooldown" && (
             <button style={editBtnStyle} onClick={() => openConfirm("cooldown")}>
-              変更
+              {t("edit")}
             </button>
           )}
         </div>
@@ -284,7 +286,7 @@ function SystemSettingsContent() {
         )}
         {confirmTarget === "cooldown" && (
           <div style={confirmBoxStyle}>
-            <label style={inputLabelStyle}>新しいクールダウン（分）</label>
+            <label style={inputLabelStyle}>{t("fields.cooldownNew")}</label>
             <input
               type="number"
               step="1"
@@ -294,17 +296,17 @@ function SystemSettingsContent() {
               onChange={(e) => setPendingCooldown(parseInt(e.target.value, 10))}
               style={inputStyle}
             />
-            <p style={confirmTextStyle}>この設定を変更しますか？</p>
+            <p style={confirmTextStyle}>{t("confirmQuestion")}</p>
             <div style={confirmButtonRowStyle}>
               <button
                 style={confirmBtnStyle}
                 onClick={() => handleConfirm("cooldown")}
                 disabled={saving}
               >
-                {saving ? "保存中..." : "確認"}
+                {saving ? t("saving") : t("confirm")}
               </button>
               <button style={cancelBtnStyle} onClick={cancelConfirm} disabled={saving}>
-                キャンセル
+                {t("cancel")}
               </button>
             </div>
           </div>
@@ -312,13 +314,13 @@ function SystemSettingsContent() {
 
         {/* Operation Mode */}
         <div style={{ ...fieldRowStyle, borderBottom: "none" }}>
-          <span style={labelStyle}>Operation Mode</span>
+          <span style={labelStyle}>{t("fields.operationMode")}</span>
           <span style={valueStyle}>
             <span style={opModeBadgeStyle(operationMode)}>{operationMode}</span>
           </span>
           {confirmTarget !== "operation_mode" && (
             <button style={editBtnStyle} onClick={() => openConfirm("operation_mode")}>
-              変更
+              {t("edit")}
             </button>
           )}
         </div>
@@ -330,7 +332,7 @@ function SystemSettingsContent() {
         )}
         {confirmTarget === "operation_mode" && (
           <div style={confirmBoxStyle}>
-            <label style={inputLabelStyle}>Operation Mode を選択</label>
+            <label style={inputLabelStyle}>{t("fields.operationModeSelect")}</label>
             <select
               value={pendingOpMode}
               onChange={(e) =>
@@ -342,17 +344,17 @@ function SystemSettingsContent() {
               <option value="shadow">shadow</option>
               <option value="emergency">emergency</option>
             </select>
-            <p style={confirmTextStyle}>この設定を変更しますか？</p>
+            <p style={confirmTextStyle}>{t("confirmQuestion")}</p>
             <div style={confirmButtonRowStyle}>
               <button
                 style={confirmBtnStyle}
                 onClick={() => handleConfirm("operation_mode")}
                 disabled={saving}
               >
-                {saving ? "保存中..." : "確認"}
+                {saving ? t("saving") : t("confirm")}
               </button>
               <button style={cancelBtnStyle} onClick={cancelConfirm} disabled={saving}>
-                キャンセル
+                {t("cancel")}
               </button>
             </div>
           </div>
@@ -361,11 +363,11 @@ function SystemSettingsContent() {
 
       {/* ── Section 4: 通知設定 ── */}
       <section style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>通知設定</h2>
+        <h2 style={sectionTitleStyle}>{t("sections.notifications")}</h2>
 
         {/* Slack通知 */}
         <div style={fieldRowStyle}>
-          <span style={labelStyle}>Slack通知</span>
+          <span style={labelStyle}>{t("fields.slackNotify")}</span>
           <span style={valueStyle}>
             <span style={slackEnabled ? badgeActiveStyle : badgeInactiveStyle}>
               {slackEnabled ? "ON" : "OFF"}
@@ -373,7 +375,7 @@ function SystemSettingsContent() {
           </span>
           {confirmTarget !== "slack_notify" && (
             <button style={editBtnStyle} onClick={() => openConfirm("slack_notify")}>
-              変更
+              {t("edit")}
             </button>
           )}
         </div>
@@ -386,7 +388,7 @@ function SystemSettingsContent() {
         {confirmTarget === "slack_notify" && (
           <div style={confirmBoxStyle}>
             <label style={toggleRowStyle}>
-              <span style={inputLabelStyle}>Slack通知</span>
+              <span style={inputLabelStyle}>{t("fields.slackNotify")}</span>
               <input
                 type="checkbox"
                 checked={pendingSlack}
@@ -397,17 +399,17 @@ function SystemSettingsContent() {
                 {pendingSlack ? "ON" : "OFF"}
               </span>
             </label>
-            <p style={confirmTextStyle}>この設定を変更しますか？</p>
+            <p style={confirmTextStyle}>{t("confirmQuestion")}</p>
             <div style={confirmButtonRowStyle}>
               <button
                 style={confirmBtnStyle}
                 onClick={() => handleConfirm("slack_notify")}
                 disabled={saving}
               >
-                {saving ? "保存中..." : "確認"}
+                {saving ? t("saving") : t("confirm")}
               </button>
               <button style={cancelBtnStyle} onClick={cancelConfirm} disabled={saving}>
-                キャンセル
+                {t("cancel")}
               </button>
             </div>
           </div>
@@ -415,7 +417,7 @@ function SystemSettingsContent() {
 
         {/* LINE通知 */}
         <div style={{ ...fieldRowStyle, borderBottom: "none" }}>
-          <span style={labelStyle}>LINE通知</span>
+          <span style={labelStyle}>{t("fields.lineNotify")}</span>
           <span style={valueStyle}>
             <span style={lineEnabled ? badgeActiveStyle : badgeInactiveStyle}>
               {lineEnabled ? "ON" : "OFF"}
@@ -423,7 +425,7 @@ function SystemSettingsContent() {
           </span>
           {confirmTarget !== "line_notify" && (
             <button style={editBtnStyle} onClick={() => openConfirm("line_notify")}>
-              変更
+              {t("edit")}
             </button>
           )}
         </div>
@@ -436,7 +438,7 @@ function SystemSettingsContent() {
         {confirmTarget === "line_notify" && (
           <div style={confirmBoxStyle}>
             <label style={toggleRowStyle}>
-              <span style={inputLabelStyle}>LINE通知</span>
+              <span style={inputLabelStyle}>{t("fields.lineNotify")}</span>
               <input
                 type="checkbox"
                 checked={pendingLine}
@@ -447,17 +449,17 @@ function SystemSettingsContent() {
                 {pendingLine ? "ON" : "OFF"}
               </span>
             </label>
-            <p style={confirmTextStyle}>この設定を変更しますか？</p>
+            <p style={confirmTextStyle}>{t("confirmQuestion")}</p>
             <div style={confirmButtonRowStyle}>
               <button
                 style={confirmBtnStyle}
                 onClick={() => handleConfirm("line_notify")}
                 disabled={saving}
               >
-                {saving ? "保存中..." : "確認"}
+                {saving ? t("saving") : t("confirm")}
               </button>
               <button style={cancelBtnStyle} onClick={cancelConfirm} disabled={saving}>
-                キャンセル
+                {t("cancel")}
               </button>
             </div>
           </div>
