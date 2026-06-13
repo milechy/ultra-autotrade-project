@@ -1460,5 +1460,33 @@
     "section8Body": "本ポリシーは事前通知のうえ変更されることがあります。重要な変更がある場合は、本サービス上でお知らせします。変更後も本サービスを継続して利用された場合、変更後のポリシーに同意したものとみなします。",
     "section9Title": "9. 問い合わせ先",
     "section9Body": "本ポリシーに関するご質問・ご要望は、本サービスのサポートチームまでお問い合わせください。お問い合わせの際は、ウォレットアドレスおよびご要望の内容をお伝えください。"
+  },
+  "AdminProtocols": {
+    "pageTitle": "プロトコルヘルスモニター",
+    "pageDescription": "各プロトコルのリアルタイム稼働状況を監視します（30秒自動更新）",
+    "lastUpdated": "最終更新: {time}",
+    "refresh": "更新",
+    "loadError": "プロトコルヘルス情報の取得に失敗しました（GET /api/protocols/health）。再読み込みしてください。",
+    "noData": "データなし",
+    "protocolNameAave": "Aave V3",
+    "protocolNameLido": "Lido stETH",
+    "protocolNamePendle": "Pendle PT/YT",
+    "phaseAave": "Phase 1 · 稼働中",
+    "phaseLido": "Phase 2 · Coming Soon",
+    "phasePendle": "Phase 2 · Coming Soon",
+    "riskLabel_low": "リスク: 低",
+    "riskLabel_medium": "リスク: 中",
+    "riskLabel_high": "リスク: 高",
+    "riskLabel_critical": "リスク: 危険",
+    "operational": "稼働中",
+    "stopped": "停止中",
+    "statOperational": "稼働状況",
+    "statTvl": "TVL",
+    "statTvlChange24h": "24時間 TVL 変化",
+    "statRiskLevel": "リスクレベル",
+    "alerts": "アラート",
+    "noAlerts": "アラートなし",
+    "lastChecked": "最終チェック: {time}",
+    "pendlePositionTitle": "Pendle ポジション詳細"
   }
 }
