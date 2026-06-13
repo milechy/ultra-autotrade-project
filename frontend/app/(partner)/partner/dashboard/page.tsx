@@ -5,6 +5,7 @@
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { DollarSign, TrendingUp, Users, Target } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -92,14 +93,7 @@ function returnTrend(v: number | undefined): 'up' | 'down' | 'flat' {
   return v > 0 ? 'up' : 'down'
 }
 
-// Tier ラベル辞書 (backend TIER_JP_LABELS と整合 — app/auth/models.py)
-// GENERAL は v9 互換 (LOWER と同義、F-13 で削除予定)
-const TIER_LABELS: Record<string, string> = {
-  LOWER: '一般',
-  MIDDLE: 'ミドル',
-  UPPER: 'アッパー',
-  GENERAL: '一般',
-}
+// Tier ラベル辞書はコンポーネント内で useTranslations('PartnerDashboard').raw('tierLabels') から取得
 
 function tierBadgeClass(tier: string): string {
   if (tier === 'UPPER') {
@@ -122,8 +116,10 @@ function tierCardClass(tier: string): string {
 }
 
 function TierBadge({ tier }: { tier?: string }) {
+  const t = useTranslations('PartnerDashboard')
   if (!tier) return <span className="text-muted-foreground text-xs">—</span>
-  const label = TIER_LABELS[tier] ?? tier
+  const tierLabels = t.raw('tierLabels') as Record<string, string>
+  const label = tierLabels[tier] ?? tier
   return (
     <span
       data-testid={`tier-badge-${tier}`}
@@ -137,6 +133,7 @@ function TierBadge({ tier }: { tier?: string }) {
 // ---- Page ----
 
 export default function PartnerDashboardPage() {
+  const t = useTranslations('PartnerDashboard')
   const { user: currentUser } = useAuth()
   // GENERAL は LOWER 同義 (v9 互換)
   const currentTier = currentUser?.tier === 'GENERAL' ? 'LOWER' : currentUser?.tier
@@ -193,7 +190,7 @@ export default function PartnerDashboardPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-      <h1 className="text-2xl font-bold">パートナーダッシュボード</h1>
+      <h1 className="text-2xl font-bold">{t('title')}</h1>
 
       {/* AI アクティビティ — 最新判定サマリー（常設・60秒ポーリング） */}
       <AiActivityCard />
@@ -211,7 +208,7 @@ export default function PartnerDashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">割り振り比率</CardTitle>
+            <CardTitle className="text-base">{t('allocationRatio')}</CardTitle>
           </CardHeader>
           <CardContent>
             {allocationsLoading ? (
@@ -232,19 +229,19 @@ export default function PartnerDashboardPage() {
         ) : (
           <>
             <KPICard
-              label="今月の運用金額"
+              label={t('monthlyAum')}
               value={fmtUsd(stats?.total_aum)}
               prefix="$"
               icon={DollarSign}
             />
             <KPICard
-              label="昨日の運用金額"
+              label={t('yesterdayAum')}
               value={fmtUsd(stats?.yesterday_aum)}
               prefix="$"
               icon={DollarSign}
             />
             <KPICard
-              label="今月の利回り"
+              label={t('monthlyReturn')}
               value={fmtPct(stats?.month_return_pct)}
               suffix="%"
               trend={returnTrend(stats?.month_return_pct)}
@@ -252,7 +249,7 @@ export default function PartnerDashboardPage() {
               icon={TrendingUp}
             />
             <KPICard
-              label="昨日の利回り"
+              label={t('yesterdayReturn')}
               value={fmtPct(stats?.yesterday_return_pct)}
               suffix="%"
               trend={returnTrend(stats?.yesterday_return_pct)}
@@ -267,7 +264,7 @@ export default function PartnerDashboardPage() {
       <section>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">手数料体系</CardTitle>
+            <CardTitle className="text-base">{t('feeSchedule')}</CardTitle>
           </CardHeader>
           <CardContent>
             {feeLoading ? (
@@ -293,7 +290,7 @@ export default function PartnerDashboardPage() {
                               data-testid="current-tier-label"
                               className="text-[10px] font-semibold uppercase tracking-wider text-primary"
                             >
-                              あなたのティア
+                              {t('yourTier')}
                             </span>
                           )}
                         </div>
@@ -308,7 +305,7 @@ export default function PartnerDashboardPage() {
                 <p className="text-xs text-muted-foreground">{feeSchedule.note}</p>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">データなし</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{t('noData')}</p>
             )}
           </CardContent>
         </Card>
@@ -318,7 +315,7 @@ export default function PartnerDashboardPage() {
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">月別運用実績</CardTitle>
+            <CardTitle className="text-base">{t('monthlyPerformance')}</CardTitle>
           </CardHeader>
           <CardContent>
             {monthlyLoading ? (
@@ -333,7 +330,7 @@ export default function PartnerDashboardPage() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Target className="h-4 w-4" />
-              AI 的中率
+              {t('aiAccuracy')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -345,25 +342,25 @@ export default function PartnerDashboardPage() {
                   <span className="text-4xl font-bold text-blue-600">
                     {Number(accuracy.accuracy_pct).toFixed(1)}%
                   </span>
-                  <span className="text-sm text-muted-foreground mt-1">全体的中率</span>
+                  <span className="text-sm text-muted-foreground mt-1">{t('overallAccuracy')}</span>
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-muted px-4 py-2">
-                  <span className="text-sm text-muted-foreground">直近30日</span>
+                  <span className="text-sm text-muted-foreground">{t('last30Days')}</span>
                   <span className="text-sm font-semibold">
                     {Number(accuracy.last_30d_accuracy_pct).toFixed(1)}%
                   </span>
                 </div>
                 <div className="flex items-center justify-between px-1">
                   <span className="text-xs text-muted-foreground">
-                    総判定数: {accuracy.total_decisions.toLocaleString()} 回
+                    {t('totalDecisions', { count: accuracy.total_decisions.toLocaleString() })}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    的中: {accuracy.correct_count.toLocaleString()} 回
+                    {t('correctCount', { count: accuracy.correct_count.toLocaleString() })}
                   </span>
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">データなし</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t('noData')}</p>
             )}
           </CardContent>
         </Card>
@@ -371,7 +368,7 @@ export default function PartnerDashboardPage() {
 
       {/* AI 判断透明性カード */}
       <section>
-        <h2 className="text-base font-semibold mb-3">最新 AI 判断</h2>
+        <h2 className="text-base font-semibold mb-3">{t('latestAiDecision')}</h2>
         <AiTransparencyCard />
       </section>
 
@@ -381,7 +378,7 @@ export default function PartnerDashboardPage() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="h-4 w-4" />
-              配下ユーザー一覧
+              {t('userList')}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -392,19 +389,19 @@ export default function PartnerDashboardPage() {
                 ))}
               </div>
             ) : users.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">ユーザーがいません</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t('noUsers')}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">名前</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">メール</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">登録日</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">運用金額</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">利回り</th>
-                      <th className="text-center px-4 py-3 font-medium text-muted-foreground">ティア</th>
-                      <th className="text-center px-4 py-3 font-medium text-muted-foreground">ステータス</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('colName')}</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('colEmail')}</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('colJoinedAt')}</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t('colAum')}</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t('colReturn')}</th>
+                      <th className="text-center px-4 py-3 font-medium text-muted-foreground">{t('colTier')}</th>
+                      <th className="text-center px-4 py-3 font-medium text-muted-foreground">{t('colStatus')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -471,7 +468,7 @@ export default function PartnerDashboardPage() {
 
       {/* Disclaimer */}
       <p className="text-xs text-muted-foreground text-center pb-4">
-        ※表示される利回りは参考値であり、将来の収益を保証するものではありません
+        {t('disclaimer')}
       </p>
     </div>
   )
