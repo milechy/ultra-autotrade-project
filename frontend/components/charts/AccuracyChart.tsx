@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import {
   LineChart,
   Line,
@@ -38,6 +39,7 @@ function formatLabel(iso: string): string {
 }
 
 export default function AccuracyChart({ data }: Props) {
+  const t = useTranslations("SharedAccuracyChart");
   const byDay: Record<string, { total: number; agreed: number }> = {};
   for (const p of data) {
     if (!p.phase_b) continue;
@@ -55,7 +57,7 @@ export default function AccuracyChart({ data }: Props) {
   if (chartData.length === 0) {
     return (
       <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0", textAlign: "center" }}>
-        Two-Phase判定データがありません
+        {t("noData")}
       </div>
     );
   }
@@ -78,10 +80,10 @@ export default function AccuracyChart({ data }: Props) {
           y={80}
           stroke="#f59e0b"
           strokeDasharray="4 4"
-          label={{ value: "目標80%", fontSize: 10, fill: "#f59e0b" }}
+          label={{ value: t("targetLabel"), fontSize: 10, fill: "#f59e0b" }}
         />
         <Tooltip
-          formatter={(v: number) => [`${v}%`, "Two-Phase一致率"]}
+          formatter={(v: number) => [`${v}%`, t("agreementRate")]}
           labelStyle={{ fontSize: 12 }}
           contentStyle={{ fontSize: 12 }}
         />
@@ -91,7 +93,7 @@ export default function AccuracyChart({ data }: Props) {
           stroke="#2563eb"
           strokeWidth={2}
           dot={{ r: 4 }}
-          name="Two-Phase一致率"
+          name={t("agreementRate")}
         />
       </LineChart>
     </ResponsiveContainer>

@@ -4,6 +4,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { useTranslations, NextIntlClientProvider } from 'next-intl'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
 import { Toaster } from 'sonner'
@@ -11,6 +12,7 @@ import { fetchAutomationStatus } from '@/lib/api/automation'
 import { PrivyRootClient } from '@/lib/wallet/PrivyRootClient'
 import { PrivySessionGuard } from '@/components/PrivySessionGuard'
 import type { AutomationStatus } from '@/lib/types'
+import jaMessages from '@/messages/ja.json'
 
 const isPrivyConfigured =
   !!process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
@@ -43,7 +45,8 @@ function toSystemStatus(s: AutomationStatus): SystemStatus {
 /** UserGuard を適用しないパス（Privy オンボーディング経路） */
 const GUARD_EXEMPT_PATHS = ['/connect']
 
-function UserGuard({ children }: { children: React.ReactNode }) {
+function UserGuardInner({ children }: { children: React.ReactNode }) {
+  const t = useTranslations('ProvidersUser')
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
@@ -58,12 +61,20 @@ function UserGuard({ children }: { children: React.ReactNode }) {
   }, [isLoading, isAuthenticated, router, isExempt])
 
   if (isLoading) {
-    return <div style={{ padding: 40, textAlign: 'center' }}>読み込み中...</div>
+    return <div style={{ padding: 40, textAlign: 'center' }}>{t('loading')}</div>
   }
   if (!isExempt && !isAuthenticated) {
     return null
   }
   return <>{children}</>
+}
+
+function UserGuard({ children }: { children: React.ReactNode }) {
+  return (
+    <NextIntlClientProvider locale="ja" messages={{ ProvidersUser: jaMessages.ProvidersUser }}>
+      <UserGuardInner>{children}</UserGuardInner>
+    </NextIntlClientProvider>
+  )
 }
 
 export function AutomationStatusProvider({ children }: { children: React.ReactNode }) {

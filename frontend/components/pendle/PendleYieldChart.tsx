@@ -5,6 +5,7 @@
 //   dynamic(() => import('./PendleYieldChart'), { ssr: false })
 // to prevent SSR crash (recharts は SSR 非対応)
 
+import { useTranslations } from 'next-intl'
 import {
   LineChart,
   Line,
@@ -40,10 +41,11 @@ function formatDate(isoDate: string): string {
 }
 
 export default function PendleYieldChart({ data, title }: Props) {
+  const t = useTranslations("PendleYieldChart")
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-40 text-sm text-zinc-500">
-        APYデータなし
+        {t("noData")}
       </div>
     )
   }

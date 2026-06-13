@@ -1,9 +1,12 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
+'use client'
 import React from "react";
+import { useTranslations } from "next-intl";
 import type { AutomationReportSummary } from "../../lib/types";
 
 export default function ReportSummaryPanel({ report }: { report: AutomationReportSummary }) {
+  const t = useTranslations("DashboardReportSummary");
   return (
     <section style={sectionStyle}>
       <header style={headerStyle}>
@@ -13,14 +16,14 @@ export default function ReportSummaryPanel({ report }: { report: AutomationRepor
 
       <div style={{ marginTop: 10 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-          <Card title="期間">{String(report.period ?? "N/A")}</Card>
-          <Card title="生成日時">{String(report.generated_at ?? "N/A")}</Card>
+          <Card title={t("cardPeriod")}>{String(report.period ?? "N/A")}</Card>
+          <Card title={t("cardGeneratedAt")}>{String(report.generated_at ?? "N/A")}</Card>
         </div>
       </div>
 
       {Array.isArray(report.highlights) && report.highlights.length > 0 ? (
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>ハイライト</div>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>{t("highlights")}</div>
           <ul style={{ marginTop: 0 }}>
             {report.highlights.map((h, idx) => (
               <li key={idx} style={{ marginBottom: 6 }}>{h}</li>
@@ -30,7 +33,7 @@ export default function ReportSummaryPanel({ report }: { report: AutomationRepor
       ) : null}
 
       <details style={{ marginTop: 12 }}>
-        <summary style={{ cursor: "pointer" }}>生データ（JSON）</summary>
+        <summary style={{ cursor: "pointer" }}>{t("rawData")}</summary>
         <pre style={preStyle}>{JSON.stringify(report, null, 2)}</pre>
       </details>
     </section>

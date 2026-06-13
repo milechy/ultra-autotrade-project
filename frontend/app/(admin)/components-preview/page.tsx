@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import { DollarSign } from 'lucide-react'
 import AuthGuard from '@/components/AuthGuard'
 import {
@@ -18,29 +19,30 @@ import {
 } from '@/components/shared'
 
 export default function ComponentsPreviewPage() {
+  const t = useTranslations('AdminComponentsPreview')
   return (
     <AuthGuard adminOnly>
     <div className="container mx-auto p-8 space-y-10">
-      <h1 className="text-3xl font-bold">共通コンポーネントプレビュー</h1>
+      <h1 className="text-3xl font-bold">{t('title')}</h1>
 
       {/* HealthFactorGauge */}
       <section className="space-y-4">
         <h2 className="text-xl font-semibold border-b pb-2">HealthFactorGauge</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="p-4 border rounded-lg space-y-2">
-            <p className="text-xs text-muted-foreground">size=sm, 安全 (2.5)</p>
+            <p className="text-xs text-muted-foreground">{t('hfSm')}</p>
             <HealthFactorGauge value={2.5} size="sm" />
           </div>
           <div className="p-4 border rounded-lg space-y-2">
-            <p className="text-xs text-muted-foreground">size=md, 注意 (1.8)</p>
+            <p className="text-xs text-muted-foreground">{t('hfMd')}</p>
             <HealthFactorGauge value={1.8} size="md" />
           </div>
           <div className="p-4 border rounded-lg space-y-2">
-            <p className="text-xs text-muted-foreground">size=lg, 危険 (1.3)</p>
+            <p className="text-xs text-muted-foreground">{t('hfLg')}</p>
             <HealthFactorGauge value={1.3} size="lg" />
           </div>
           <div className="p-4 border rounded-lg space-y-2">
-            <p className="text-xs text-muted-foreground">value=null (借入なし)</p>
+            <p className="text-xs text-muted-foreground">{t('hfNull')}</p>
             <HealthFactorGauge value={null} />
           </div>
         </div>
@@ -72,19 +74,19 @@ export default function ComponentsPreviewPage() {
         <h2 className="text-xl font-semibold border-b pb-2">ConfidenceBar</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div className="p-4 border rounded-lg space-y-2">
-            <p className="text-xs text-muted-foreground">85% (閾値70以上=緑)</p>
+            <p className="text-xs text-muted-foreground">{t('cbHigh')}</p>
             <ConfidenceBar value={85} />
           </div>
           <div className="p-4 border rounded-lg space-y-2">
-            <p className="text-xs text-muted-foreground">45% (閾値70未満=青)</p>
+            <p className="text-xs text-muted-foreground">{t('cbLow')}</p>
             <ConfidenceBar value={45} />
           </div>
           <div className="p-4 border rounded-lg space-y-2">
-            <p className="text-xs text-muted-foreground">showLabel=false</p>
+            <p className="text-xs text-muted-foreground">{t('cbNoLabel')}</p>
             <ConfidenceBar value={60} showLabel={false} />
           </div>
           <div className="p-4 border rounded-lg space-y-2">
-            <p className="text-xs text-muted-foreground">threshold=50, value=55</p>
+            <p className="text-xs text-muted-foreground">{t('cbThreshold')}</p>
             <ConfidenceBar value={55} threshold={50} />
           </div>
         </div>
@@ -104,7 +106,7 @@ export default function ComponentsPreviewPage() {
             />
           </div>
           <p className="text-xs text-muted-foreground italic">
-            ※ floating variant は画面右下に固定表示されます
+            {t('floatingNote')}
           </p>
         </div>
       </section>
@@ -148,7 +150,7 @@ export default function ComponentsPreviewPage() {
         <h2 className="text-xl font-semibold border-b pb-2">KPICard</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KPICard
-            label="総資産"
+            label={t('kpiTotalAsset')}
             value="12,345"
             prefix="$"
             trend="up"
@@ -156,23 +158,23 @@ export default function ComponentsPreviewPage() {
             icon={DollarSign}
           />
           <KPICard
-            label="本日の損益"
+            label={t('kpiDailyPnl')}
             value="-234"
             prefix="$"
             trend="down"
             trendValue="-1.8%"
           />
           <KPICard
-            label="勝率"
+            label={t('kpiWinRate')}
             value="68.4"
             suffix="%"
             trend="flat"
             trendValue="±0%"
           />
           <KPICard
-            label="取引回数"
+            label={t('kpiTradeCount')}
             value={42}
-            suffix="回"
+            suffix={t('kpiTradeCountSuffix')}
           />
         </div>
       </section>
@@ -182,11 +184,11 @@ export default function ComponentsPreviewPage() {
         <h2 className="text-xl font-semibold border-b pb-2">WalletAddressMask</h2>
         <div className="flex flex-wrap gap-6">
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">デフォルト (chars=6)</p>
+            <p className="text-xs text-muted-foreground">{t('walletDefaultChars')}</p>
             <WalletAddressMask address="0x742d35Cc6634C0532925a3b844Bc454e4438f44e" />
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">chars=10</p>
+            <p className="text-xs text-muted-foreground">{t('walletChars10')}</p>
             <WalletAddressMask address="0x742d35Cc6634C0532925a3b844Bc454e4438f44e" chars={10} />
           </div>
         </div>
@@ -197,11 +199,11 @@ export default function ComponentsPreviewPage() {
         <h2 className="text-xl font-semibold border-b pb-2">DateRangeFilter</h2>
         <div className="space-y-4">
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">presets=true (デフォルト)</p>
+            <p className="text-xs text-muted-foreground">{t('datePresetsOn')}</p>
             <DateRangeFilter onChange={(range) => console.log('range:', range)} />
           </div>
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">presets=false (カスタム入力のみ)</p>
+            <p className="text-xs text-muted-foreground">{t('datePresetsOff')}</p>
             <DateRangeFilter onChange={(range) => console.log('range:', range)} presets={false} />
           </div>
         </div>

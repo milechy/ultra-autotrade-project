@@ -20,6 +20,7 @@
 
 import { useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { useLiffTermsGate } from "@/hooks/useLiffTermsGate"
 import { getAuthToken } from "@/lib/auth/token-key"
 
@@ -30,6 +31,7 @@ const GATE_EXEMPT_PATHS = ["/user/terms-accept"]
 const BROWSER_ACCEPTED_VERSIONS: readonly string[] = ["liff-v3", "2.0"]
 
 export function BrowserTermsGate({ children }: { children: React.ReactNode }) {
+  const t = useTranslations("UserBrowserTermsGate")
   const pathname = usePathname()
   const router = useRouter()
 
@@ -52,7 +54,7 @@ export function BrowserTermsGate({ children }: { children: React.ReactNode }) {
   if (gateState === "loading") {
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
-        <p className="text-zinc-400">読み込み中...</p>
+        <p className="text-zinc-400">{t("loading")}</p>
       </div>
     )
   }
