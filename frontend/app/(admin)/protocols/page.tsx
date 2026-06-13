@@ -4,6 +4,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import AuthGuard from '@/components/AuthGuard'
 import {
   fetchProtocolsHealth,
@@ -18,14 +19,14 @@ import PendlePositionCard from '@/components/pendle/PendlePositionCard'
 
 interface ProtocolMeta {
   protocol: string // API の protocol キー (aave / lido / pendle)
-  name: string
-  phase: string
+  nameKey: string
+  phaseKey: string
 }
 
 const PROTOCOL_META: ProtocolMeta[] = [
-  { protocol: 'aave', name: 'Aave V3', phase: 'Phase 1 · 稼働中' },
-  { protocol: 'lido', name: 'Lido stETH', phase: 'Phase 2 · Coming Soon' },
-  { protocol: 'pendle', name: 'Pendle PT/YT', phase: 'Phase 2 · Coming Soon' },
+  { protocol: 'aave', nameKey: 'protocolNameAave', phaseKey: 'phaseAave' },
+  { protocol: 'lido', nameKey: 'protocolNameLido', phaseKey: 'phaseLido' },
+  { protocol: 'pendle', nameKey: 'protocolNamePendle', phaseKey: 'phasePendle' },
 ]
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -77,26 +78,11 @@ function riskTextClass(risk: RiskLevel | null): string {
   }
 }
 
-function riskLabel(risk: RiskLevel | null): string {
-  switch (risk) {
-    case 'low':
-      return 'リスク: 低'
-    case 'medium':
-      return 'リスク: 中'
-    case 'high':
-      return 'リスク: 高'
-    case 'critical':
-      return 'リスク: 危険'
-    default:
-      return 'データなし'
-  }
-}
-
 // tvl_usd は Decimal 文字列。Number() でラップし、"0" / 空 / NaN は「データなし」。
-function formatTvl(tvlUsd: string | undefined): string {
-  if (tvlUsd === undefined || tvlUsd === '') return 'データなし'
+function formatTvl(tvlUsd: string | undefined, noData: string): string {
+  if (tvlUsd === undefined || tvlUsd === '') return noData
   const n = Number(tvlUsd)
-  if (!Number.isFinite(n) || n === 0) return 'データなし'
+  if (!Number.isFinite(n) || n === 0) return noData
   if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
   if (n >= 1_000) return `$${(n / 1_000).toFixed(2)}K`
@@ -104,10 +90,13 @@ function formatTvl(tvlUsd: string | undefined): string {
 }
 
 // tvl_change_24h_pct (Decimal 文字列) を符号付きで整形。取得不能時は「データなし」。
-function formatTvlChange(pct: string | undefined): { text: string; cls: string } {
-  if (pct === undefined || pct === '') return { text: 'データなし', cls: 'text-zinc-500' }
+function formatTvlChange(
+  pct: string | undefined,
+  noData: string,
+): { text: string; cls: string } {
+  if (pct === undefined || pct === '') return { text: noData, cls: 'text-zinc-500' }
   const n = Number(pct)
-  if (!Number.isFinite(n)) return { text: 'データなし', cls: 'text-zinc-500' }
+  if (!Number.isFinite(n)) return { text: noData, cls: 'text-zinc-500' }
   const sign = n > 0 ? '+' : ''
   const cls = n > 0 ? 'text-green-400' : n < 0 ? 'text-red-400' : 'text-zinc-300'
   return { text: `${sign}${n.toFixed(2)}%`, cls }
@@ -137,10 +126,12 @@ function ProtocolCardHeader({
   name,
   phase,
   risk,
+  riskLabelText,
 }: {
   name: string
   phase: string
   risk: RiskLevel | null
+  riskLabelText: string
 }) {
   return (
     <div className="flex items-center justify-between mb-4">
@@ -150,7 +141,7 @@ function ProtocolCardHeader({
       </div>
       <div className="flex items-center gap-2">
         <span className={`inline-flex h-2 w-2 rounded-full ${riskDotClass(risk)}`} />
-        <span className={`text-xs font-medium ${riskTextClass(risk)}`}>{riskLabel(risk)}</span>
+        <span className={`text-xs font-medium ${riskTextClass(risk)}`}>{riskLabelText}</span>
       </div>
     </div>
   )
@@ -158,11 +149,21 @@ function ProtocolCardHeader({
 
 // ── Operational Badge ──────────────────────────────────────────────────────
 
-function OperationalBadge({ isOperational }: { isOperational: boolean | null }) {
+function OperationalBadge({
+  isOperational,
+  labelNoData,
+  labelOperational,
+  labelStopped,
+}: {
+  isOperational: boolean | null
+  labelNoData: string
+  labelOperational: string
+  labelStopped: string
+}) {
   if (isOperational === null) {
     return (
       <span className="inline-flex items-center rounded-full border border-zinc-600/40 bg-zinc-700/20 px-2 py-0.5 text-xs font-semibold text-zinc-400">
-        データなし
+        {labelNoData}
       </span>
     )
   }
@@ -174,41 +175,69 @@ function OperationalBadge({ isOperational }: { isOperational: boolean | null }) 
           : 'border-red-500/30 bg-red-500/20 text-red-400'
       }`}
     >
-      {isOperational ? '稼働中' : '停止中'}
+      {isOperational ? labelOperational : labelStopped}
     </span>
   )
 }
 
 // ── Protocol Card ──────────────────────────────────────────────────────────
 
-function ProtocolCard({ meta, health }: { meta: ProtocolMeta; health: ProtocolHealth | null }) {
+function ProtocolCard({
+  meta,
+  health,
+  t,
+}: {
+  meta: ProtocolMeta
+  health: ProtocolHealth | null
+  t: ReturnType<typeof useTranslations<'AdminProtocols'>>
+}) {
   const risk = health?.risk_level ?? null
-  const change = formatTvlChange(health?.tvl_change_24h_pct)
+  const noData = t('noData')
+  const change = formatTvlChange(health?.tvl_change_24h_pct, noData)
   const alerts = health?.alerts ?? []
+
+  const riskLabelText = risk
+    ? t(`riskLabel_${risk}` as Parameters<typeof t>[0])
+    : noData
 
   return (
     <div className={`rounded-xl border p-5 ${riskBorderClass(risk)}`}>
-      <ProtocolCardHeader name={meta.name} phase={meta.phase} risk={risk} />
+      <ProtocolCardHeader
+        name={t(meta.nameKey as Parameters<typeof t>[0])}
+        phase={t(meta.phaseKey as Parameters<typeof t>[0])}
+        risk={risk}
+        riskLabelText={riskLabelText}
+      />
 
-      <StatRow label="稼働状況" value={<OperationalBadge isOperational={health?.is_operational ?? null} />} />
       <StatRow
-        label="TVL"
-        value={<span className="text-zinc-200">{formatTvl(health?.tvl_usd)}</span>}
+        label={t('statOperational')}
+        value={
+          <OperationalBadge
+            isOperational={health?.is_operational ?? null}
+            labelNoData={noData}
+            labelOperational={t('operational')}
+            labelStopped={t('stopped')}
+          />
+        }
       />
       <StatRow
-        label="24時間 TVL 変化"
+        label={t('statTvl')}
+        value={<span className="text-zinc-200">{formatTvl(health?.tvl_usd, noData)}</span>}
+      />
+      <StatRow
+        label={t('statTvlChange24h')}
         value={<span className={change.cls}>{change.text}</span>}
       />
       <StatRow
-        label="リスクレベル"
-        value={<span className={riskTextClass(risk)}>{riskLabel(risk)}</span>}
+        label={t('statRiskLevel')}
+        value={<span className={riskTextClass(risk)}>{riskLabelText}</span>}
       />
 
-      {/* アラート一覧（日本語、API 由来）。なければ「アラートなし」 */}
+      {/* アラート一覧（API 由来）。なければ「アラートなし」 */}
       <div className="mt-3">
-        <p className="text-xs font-medium text-zinc-500 mb-1.5">アラート</p>
+        <p className="text-xs font-medium text-zinc-500 mb-1.5">{t('alerts')}</p>
         {alerts.length === 0 ? (
-          <p className="text-xs text-zinc-600">アラートなし</p>
+          <p className="text-xs text-zinc-600">{t('noAlerts')}</p>
         ) : (
           <ul className="space-y-1">
             {alerts.map((alert, i) => (
@@ -224,7 +253,7 @@ function ProtocolCard({ meta, health }: { meta: ProtocolMeta; health: ProtocolHe
       </div>
 
       <p className="mt-3 text-[11px] text-zinc-600">
-        最終チェック: {formatTime(health?.last_checked)}
+        {t('lastChecked', { time: formatTime(health?.last_checked) })}
       </p>
     </div>
   )
@@ -233,6 +262,8 @@ function ProtocolCard({ meta, health }: { meta: ProtocolMeta; health: ProtocolHe
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function ProtocolsPage() {
+  const t = useTranslations('AdminProtocols')
+
   // protocol キー → ProtocolHealth の map
   const [healthMap, setHealthMap] = useState<Record<string, ProtocolHealth>>({})
   const [lastUpdated, setLastUpdated] = useState<string>('')
@@ -277,14 +308,16 @@ export default function ProtocolsPage() {
           }}
         >
           <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>プロトコルヘルスモニター</h1>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{t('pageTitle')}</h1>
             <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: 14 }}>
-              各プロトコルのリアルタイム稼働状況を監視します（30秒自動更新）
+              {t('pageDescription')}
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
             {lastUpdated && (
-              <span style={{ fontSize: 12, color: '#9ca3af' }}>最終更新: {lastUpdated}</span>
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>
+                {t('lastUpdated', { time: lastUpdated })}
+              </span>
             )}
             <button
               onClick={fetchHealth}
@@ -302,7 +335,7 @@ export default function ProtocolsPage() {
               }}
             >
               <RefreshCw size={14} />
-              更新
+              {t('refresh')}
             </button>
           </div>
         </div>
@@ -320,21 +353,26 @@ export default function ProtocolsPage() {
               color: '#991b1b',
             }}
           >
-            プロトコルヘルス情報の取得に失敗しました（GET /api/protocols/health）。再読み込みしてください。
+            {t('loadError')}
           </div>
         )}
 
         {/* Protocol cards grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {PROTOCOL_META.map((meta) => (
-            <ProtocolCard key={meta.protocol} meta={meta} health={healthMap[meta.protocol] ?? null} />
+            <ProtocolCard
+              key={meta.protocol}
+              meta={meta}
+              health={healthMap[meta.protocol] ?? null}
+              t={t}
+            />
           ))}
         </div>
 
         {/* Pendle PT/YT ポジション詳細セクション (#624 統合) */}
         <div style={{ marginTop: 24 }}>
           <h2 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600 }}>
-            Pendle ポジション詳細
+            {t('pendlePositionTitle')}
           </h2>
           <PendlePositionCard />
         </div>

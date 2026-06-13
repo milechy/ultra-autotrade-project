@@ -2112,5 +2112,33 @@
     "sentimentLabel_positive": "Positive",
     "sentimentLabel_negative": "Negative",
     "sentimentLabel_neutral": "Neutral"
+  },
+  "AdminProtocols": {
+    "pageTitle": "Protocol Health Monitor",
+    "pageDescription": "Monitor real-time operational status of each protocol (auto-refresh every 30s)",
+    "lastUpdated": "Last updated: {time}",
+    "refresh": "Refresh",
+    "loadError": "Failed to fetch protocol health data (GET /api/protocols/health). Please reload the page.",
+    "noData": "No data",
+    "protocolNameAave": "Aave V3",
+    "protocolNameLido": "Lido stETH",
+    "protocolNamePendle": "Pendle PT/YT",
+    "phaseAave": "Phase 1 · Active",
+    "phaseLido": "Phase 2 · Coming Soon",
+    "phasePendle": "Phase 2 · Coming Soon",
+    "riskLabel_low": "Risk: Low",
+    "riskLabel_medium": "Risk: Medium",
+    "riskLabel_high": "Risk: High",
+    "riskLabel_critical": "Risk: Critical",
+    "operational": "Operational",
+    "stopped": "Stopped",
+    "statOperational": "Status",
+    "statTvl": "TVL",
+    "statTvlChange24h": "24h TVL Change",
+    "statRiskLevel": "Risk Level",
+    "alerts": "Alerts",
+    "noAlerts": "No alerts",
+    "lastChecked": "Last checked: {time}",
+    "pendlePositionTitle": "Pendle Position Details"
   }
 }
