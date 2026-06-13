@@ -3,12 +3,23 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React from 'react'
+import { useTranslations } from 'next-intl'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type TranslateFn = (key: string) => string
 
 interface ErrorBoundaryState {
   hasError: boolean
   error?: Error
+}
+
+interface ErrorBoundaryClassProps {
+  children: React.ReactNode
+  fallback?: React.ReactNode
+  t: TranslateFn
 }
 
 interface ErrorBoundaryProps {
@@ -16,11 +27,13 @@ interface ErrorBoundaryProps {
   fallback?: React.ReactNode
 }
 
-export class ErrorBoundary extends React.Component<
-  ErrorBoundaryProps,
+// ─── Class component (receives t as prop) ─────────────────────────────────────
+
+class ErrorBoundaryClass extends React.Component<
+  ErrorBoundaryClassProps,
   ErrorBoundaryState
 > {
-  constructor(props: ErrorBoundaryProps) {
+  constructor(props: ErrorBoundaryClassProps) {
     super(props)
     this.state = { hasError: false }
   }
@@ -34,13 +47,14 @@ export class ErrorBoundary extends React.Component<
   }
 
   render() {
+    const { t } = this.props
     if (this.state.hasError) {
       if (this.props.fallback) {
         return this.props.fallback
       }
       return (
         <Alert variant="destructive" className="m-4">
-          <AlertTitle>エラーが発生しました</AlertTitle>
+          <AlertTitle>{t('title')}</AlertTitle>
           <AlertDescription>
             <p className="mb-2">{this.state.error?.message}</p>
             <Button
@@ -48,7 +62,7 @@ export class ErrorBoundary extends React.Component<
               size="sm"
               onClick={() => this.setState({ hasError: false })}
             >
-              再試行
+              {t('retry')}
             </Button>
           </AlertDescription>
         </Alert>
@@ -57,4 +71,15 @@ export class ErrorBoundary extends React.Component<
 
     return this.props.children
   }
+}
+
+// ─── Public export: function component wraps class with translation hook ───────
+
+export function ErrorBoundary({ children, fallback }: ErrorBoundaryProps) {
+  const t = useTranslations('SharedErrorBoundary')
+  return (
+    <ErrorBoundaryClass t={t as TranslateFn} fallback={fallback}>
+      {children}
+    </ErrorBoundaryClass>
+  )
 }

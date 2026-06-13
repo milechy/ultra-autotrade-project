@@ -2140,5 +2140,60 @@
     "noAlerts": "アラートなし",
     "lastChecked": "最終チェック: {time}",
     "pendlePositionTitle": "Pendle ポジション詳細"
+  },
+  "AdminUserTable": {
+    "colWallet": "ウォレットアドレス",
+    "colRegistered": "登録日",
+    "colAum": "AUM (USD)",
+    "colLastActivity": "最終アクティビティ",
+    "colRiskMode": "リスクモード",
+    "colStatus": "ステータス",
+    "riskConservative": "保守",
+    "riskBalanced": "バランス",
+    "riskAggressive": "積極",
+    "statusNormal": "正常",
+    "statusWarning": "警告",
+    "statusDanger": "危険"
+  },
+  "SharedEmergencyStopButton": {
+    "buttonLabel": "緊急停止",
+    "dialogTitle": "本当に全ての運用を停止しますか？",
+    "dialogDescription": "全ての自動取引が即時停止されます。再開には管理者の操作が必要です。",
+    "cancelButton": "キャンセル",
+    "stopButton": "停止する",
+    "stoppingButton": "停止中..."
+  },
+  "UserErrorBoundary": {
+    "unexpectedError": "予期しないエラーが発生しました",
+    "reload": "ページを再読み込み",
+    "goToLogin": "ログイン画面へ"
+  },
+  "SharedErrorBoundary": {
+    "title": "エラーが発生しました",
+    "retry": "再試行"
+  },
+  "Charts": {
+    "noData": "データがありません"
+  },
+  "SharedWalletAddressMask": {
+    "copied": "アドレスをコピーしました",
+    "copyError": "コピーに失敗しました"
+  },
+  "PendlePositionCard": {
+    "title": "Pendle PT/YT ポジション",
+    "comingSoon": "Phase 2 · Coming Soon",
+    "totalValue": "合計評価額",
+    "loading": "読み込み中...",
+    "apiNotImplemented": "APIが未実装のため、ポジションデータを取得できません（GET /api/protocols/pendle/positions）",
+    "noPositions": "ポジションデータなし",
+    "maturity": "満期: {date}",
+    "daysRemaining": "残存 {days} 日",
+    "ptLabel": "PT (元本トークン)",
+    "ytLabel": "YT (利回りトークン)",
+    "noData": "データなし",
+    "unitPrice": "単価: ${price}",
+    "valuation": "評価額: ${value}",
+    "estimatedApy": "推定APY",
+    "apyChartTitle": "APY推移 (30日)"
   }
 }
