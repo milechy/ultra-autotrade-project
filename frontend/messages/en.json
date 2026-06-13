@@ -1041,7 +1041,7 @@
       "bullet3": "View all details of AI decisions"
     }
   },
-    "Help": {
+  "Help": {
     "pageTitle": "FAQ",
     "pageSubtitle": "Frequently asked questions about Ultra AutoTrade",
     "faqs": {
@@ -1304,5 +1304,39 @@
     "noRecentApprovals": "No approval history",
     "statusSuccess": "Success",
     "statusFailed": "Failed"
+  },
+  "PartnerDashboard": {
+    "title": "Partner Dashboard",
+    "allocationRatio": "Allocation Ratio",
+    "monthlyAum": "Monthly AUM",
+    "yesterdayAum": "Yesterday AUM",
+    "monthlyReturn": "Monthly Return",
+    "yesterdayReturn": "Yesterday Return",
+    "feeSchedule": "Fee Schedule",
+    "yourTier": "Your Tier",
+    "noData": "No data",
+    "monthlyPerformance": "Monthly Performance",
+    "aiAccuracy": "AI Accuracy",
+    "overallAccuracy": "Overall Accuracy",
+    "last30Days": "Last 30 days",
+    "totalDecisions": "Total decisions: {count}",
+    "correctCount": "Correct: {count}",
+    "latestAiDecision": "Latest AI Decision",
+    "userList": "User List",
+    "noUsers": "No users",
+    "colName": "Name",
+    "colEmail": "Email",
+    "colJoinedAt": "Joined",
+    "colAum": "AUM",
+    "colReturn": "Return",
+    "colTier": "Tier",
+    "colStatus": "Status",
+    "disclaimer": "* Displayed returns are indicative and do not guarantee future earnings",
+    "tierLabels": {
+      "LOWER": "General",
+      "MIDDLE": "Middle",
+      "UPPER": "Upper",
+      "GENERAL": "General"
+    }
   }
 }
