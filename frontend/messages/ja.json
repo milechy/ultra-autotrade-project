@@ -1570,5 +1570,27 @@
       "executeError": "実行エラー: {message}"
     },
     "documentTitle": "Aave リバランス - Ultra AutoTrade"
+  },
+  "AdminEvents": {
+    "browserTitle": "監視イベントログ - Ultra AutoTrade",
+    "pageTitle": "監視イベントログ",
+    "pageSubtitle": "システムの監視イベントをリアルタイムで表示します",
+    "lastUpdated": "最終更新: {time}（30秒自動更新）",
+    "mockDataNotice": "※ モックデータ表示中",
+    "filterLevel": "レベル:",
+    "filterComponent": "コンポーネント:",
+    "componentAll": "すべて",
+    "filterDateRange": "期間:",
+    "loading": "読み込み中...",
+    "resultCount": "{count} 件のイベント",
+    "noResults": "条件に一致するイベントがありません",
+    "detailTitle": "イベント詳細",
+    "detailFieldId": "ID",
+    "detailFieldTimestamp": "タイムスタンプ",
+    "detailFieldLevel": "レベル",
+    "detailFieldComponent": "コンポーネント",
+    "detailFieldMessage": "メッセージ",
+    "detailFieldMetricId": "メトリクスID",
+    "detailFieldMetricValue": "メトリクス値"
   }
 }

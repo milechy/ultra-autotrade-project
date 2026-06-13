@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useEffect, useState, useMemo } from 'react'
+import { useTranslations } from 'next-intl'
 import AuthGuard from '@/components/AuthGuard'
 import { useAuth } from '@/lib/auth'
 import { fetchDashboardSnapshot } from '@/lib/api/automation'
@@ -187,6 +188,7 @@ function extractEvents(data: unknown): MonitoringEvent[] {
 // -----------------------------------------------------------------------
 
 function EventsContent() {
+  const t = useTranslations('AdminEvents')
   const { token } = useAuth()
 
   const [events, setEvents] = useState<MonitoringEvent[]>([])
@@ -262,22 +264,24 @@ function EventsContent() {
   }
 
   return (
+    <>
+      <title>{t('browserTitle')}</title>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">監視イベントログ</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('pageTitle')}</h1>
           <p className="mt-1 text-sm text-gray-500">
-            システムの監視イベントをリアルタイムで表示します
+            {t('pageSubtitle')}
           </p>
         </div>
         <div className="text-right text-xs text-gray-400">
           {lastUpdated && (
-            <span>最終更新: {lastUpdated.toLocaleTimeString('ja-JP')}（30秒自動更新）</span>
+            <span>{t('lastUpdated', { time: lastUpdated.toLocaleTimeString('ja-JP') })}</span>
           )}
           {usingMock && (
             <div className="mt-1 rounded bg-yellow-50 px-2 py-1 text-yellow-600">
-              ※ モックデータ表示中
+              {t('mockDataNotice')}
             </div>
           )}
         </div>
@@ -287,7 +291,7 @@ function EventsContent() {
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm space-y-4">
         {/* Level checkboxes */}
         <div className="flex flex-wrap items-center gap-4">
-          <span className="text-sm font-medium text-gray-700 min-w-[4rem]">レベル:</span>
+          <span className="text-sm font-medium text-gray-700 min-w-[4rem]">{t('filterLevel')}</span>
           {ALL_LEVELS.map((level) => {
             const style = LEVEL_STYLES[level]
             return (
@@ -311,7 +315,7 @@ function EventsContent() {
         {/* Component select + Date range */}
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700">コンポーネント:</span>
+            <span className="text-sm font-medium text-gray-700">{t('filterComponent')}</span>
             <Select value={selectedComponent} onValueChange={setSelectedComponent}>
               <SelectTrigger className="h-8 w-48 text-xs">
                 <SelectValue />
@@ -319,7 +323,7 @@ function EventsContent() {
               <SelectContent>
                 {components.map((c) => (
                   <SelectItem key={c} value={c} className="text-xs">
-                    {c === 'ALL' ? 'すべて' : c}
+                    {c === 'ALL' ? t('componentAll') : c}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -327,7 +331,7 @@ function EventsContent() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700">期間:</span>
+            <span className="text-sm font-medium text-gray-700">{t('filterDateRange')}</span>
             <DateRangeFilter onChange={setDateRange} presets />
           </div>
         </div>
@@ -335,7 +339,7 @@ function EventsContent() {
 
       {/* Results count */}
       <div className="text-sm text-gray-500">
-        {loading ? '読み込み中...' : `${filteredEvents.length} 件のイベント`}
+        {loading ? t('loading') : t('resultCount', { count: filteredEvents.length })}
       </div>
 
       {/* Timeline */}
@@ -343,12 +347,12 @@ function EventsContent() {
         <div className="flex items-center justify-center py-16 text-gray-400">
           <div className="text-center space-y-2">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 dark:border-gray-700 border-t-blue-500 mx-auto" />
-            <p className="text-sm">読み込み中...</p>
+            <p className="text-sm">{t('loading')}</p>
           </div>
         </div>
       ) : filteredEvents.length === 0 ? (
         <div className="flex items-center justify-center py-16 text-gray-400">
-          <p className="text-sm">条件に一致するイベントがありません</p>
+          <p className="text-sm">{t('noResults')}</p>
         </div>
       ) : (
         <div className="relative">
@@ -419,7 +423,7 @@ function EventsContent() {
                   >
                     {LEVEL_STYLES[selectedEvent.level].label}
                   </Badge>
-                  <span>イベント詳細</span>
+                  <span>{t('detailTitle')}</span>
                 </>
               )}
             </DialogTitle>
@@ -428,31 +432,31 @@ function EventsContent() {
           {selectedEvent && (
             <div className="space-y-4 text-sm">
               <div className="grid grid-cols-[7rem_1fr] gap-y-3 gap-x-2">
-                <span className="font-medium text-gray-500">ID</span>
+                <span className="font-medium text-gray-500">{t('detailFieldId')}</span>
                 <span className="font-mono text-xs text-gray-700">{selectedEvent.id}</span>
 
-                <span className="font-medium text-gray-500">タイムスタンプ</span>
+                <span className="font-medium text-gray-500">{t('detailFieldTimestamp')}</span>
                 <span className="text-gray-700">{formatTimestamp(selectedEvent.timestamp)}</span>
 
-                <span className="font-medium text-gray-500">レベル</span>
+                <span className="font-medium text-gray-500">{t('detailFieldLevel')}</span>
                 <span className="text-gray-700">{selectedEvent.level}</span>
 
-                <span className="font-medium text-gray-500">コンポーネント</span>
+                <span className="font-medium text-gray-500">{t('detailFieldComponent')}</span>
                 <span className="text-gray-700">{selectedEvent.component}</span>
 
-                <span className="font-medium text-gray-500">メッセージ</span>
+                <span className="font-medium text-gray-500">{t('detailFieldMessage')}</span>
                 <span className="text-gray-700 whitespace-pre-wrap">{selectedEvent.message}</span>
 
                 {selectedEvent.metric_id && (
                   <>
-                    <span className="font-medium text-gray-500">メトリクスID</span>
+                    <span className="font-medium text-gray-500">{t('detailFieldMetricId')}</span>
                     <span className="font-mono text-xs text-gray-700">{selectedEvent.metric_id}</span>
                   </>
                 )}
 
                 {selectedEvent.metric_value != null && (
                   <>
-                    <span className="font-medium text-gray-500">メトリクス値</span>
+                    <span className="font-medium text-gray-500">{t('detailFieldMetricValue')}</span>
                     <span className="font-mono font-semibold text-gray-700">
                       {selectedEvent.metric_value}
                       {selectedEvent.metric_unit ? ` ${selectedEvent.metric_unit}` : ''}
@@ -465,16 +469,14 @@ function EventsContent() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   )
 }
 
 export default function EventsPage() {
   return (
     <AuthGuard adminOnly>
-      <>
-        <title>監視イベントログ - Ultra AutoTrade</title>
-        <EventsContent />
-      </>
+      <EventsContent />
     </AuthGuard>
   )
 }

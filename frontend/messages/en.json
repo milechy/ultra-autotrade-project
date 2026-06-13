@@ -1570,5 +1570,27 @@
       "executeError": "Execution error: {message}"
     },
     "documentTitle": "Aave Rebalance - Ultra AutoTrade"
+  },
+  "AdminEvents": {
+    "browserTitle": "Monitoring Event Log - Ultra AutoTrade",
+    "pageTitle": "Monitoring Event Log",
+    "pageSubtitle": "Real-time display of system monitoring events",
+    "lastUpdated": "Last updated: {time} (auto-refresh every 30s)",
+    "mockDataNotice": "* Displaying mock data",
+    "filterLevel": "Level:",
+    "filterComponent": "Component:",
+    "componentAll": "All",
+    "filterDateRange": "Period:",
+    "loading": "Loading...",
+    "resultCount": "{count} event(s)",
+    "noResults": "No events match the current filters",
+    "detailTitle": "Event Detail",
+    "detailFieldId": "ID",
+    "detailFieldTimestamp": "Timestamp",
+    "detailFieldLevel": "Level",
+    "detailFieldComponent": "Component",
+    "detailFieldMessage": "Message",
+    "detailFieldMetricId": "Metric ID",
+    "detailFieldMetricValue": "Metric Value"
   }
 }

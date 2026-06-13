@@ -3,7 +3,6 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useEffect, useState, useCallback } from "react";
-import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import {
@@ -24,6 +23,12 @@ function getHfColor(hf: number): string {
   return "#dc2626";
 }
 
+function getHfBadge(hf: number): { label: string; bg: string; color: string } {
+  if (hf >= 1.8) return { label: "安全", bg: "#dcfce7", color: "#16a34a" };
+  if (hf >= 1.6) return { label: "注意", bg: "#fef9c3", color: "#ca8a04" };
+  return { label: "危険", bg: "#fee2e2", color: "#dc2626" };
+}
+
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
@@ -39,7 +44,6 @@ function getStatusBadge(status: string): { bg: string; color: string } {
 }
 
 function RebalanceContent() {
-  const t = useTranslations("AdminRebalance");
   const { token } = useAuth();
   const [statusData, setStatusData] = useState<RebalanceStatusResponse | null>(null);
   const [simulationResult, setSimulationResult] = useState<RebalanceProposal | null>(null);
@@ -63,9 +67,9 @@ function RebalanceContent() {
       setError(null);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(t("errors.fetchError", { message: msg }));
+      setError(`データ取得エラー: ${msg}`);
     }
-  }, [token, t]);
+  }, [token]);
 
   useEffect(() => {
     fetchData();
@@ -83,7 +87,7 @@ function RebalanceContent() {
       setSimulationResult(res.proposal);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(t("errors.simulationError", { message: msg }));
+      setError(`シミュレーションエラー: ${msg}`);
     } finally {
       setIsSimulating(false);
     }
@@ -92,7 +96,7 @@ function RebalanceContent() {
   const handleExecute = async () => {
     if (!token || !simulationResult) return;
     if (!simulationResult.confirmation_token) {
-      setError(t("errors.noConfirmationToken"));
+      setError("確認トークンがありません");
       return;
     }
     setIsExecuting(true);
@@ -104,7 +108,7 @@ function RebalanceContent() {
       await fetchData();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(t("errors.executeError", { message: msg }));
+      setError(`実行エラー: ${msg}`);
     } finally {
       setIsExecuting(false);
     }
@@ -120,32 +124,14 @@ function RebalanceContent() {
   const cooldownMinutes = Math.floor(cooldown / 60);
   const cooldownSeconds = cooldown % 60;
 
-  const hfBadgeLabel = (hf: number) => {
-    if (hf >= 1.8) return t("hfBadge.safe");
-    if (hf >= 1.6) return t("hfBadge.caution");
-    return t("hfBadge.danger");
-  };
-
-  const hfBadgeBg = (hf: number) => {
-    if (hf >= 1.8) return "#dcfce7";
-    if (hf >= 1.6) return "#fef9c3";
-    return "#fee2e2";
-  };
-
-  const hfBadgeColor = (hf: number) => {
-    if (hf >= 1.8) return "#16a34a";
-    if (hf >= 1.6) return "#ca8a04";
-    return "#dc2626";
-  };
-
   return (
     <>
-      {/* Header */}
+      {/* ヘッダー */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <h1 style={{ margin: 0 }}>{t("pageTitle")}</h1>
+        <h1 style={{ margin: 0 }}>Aave リバランス</h1>
         {lastUpdated && (
           <span style={{ fontSize: 12, color: "#888" }}>
-            {t("lastUpdated", { time: lastUpdated.toLocaleTimeString("ja-JP") })}
+            最終更新: {lastUpdated.toLocaleTimeString("ja-JP")}（30秒自動更新）
           </span>
         )}
       </div>
@@ -156,14 +142,14 @@ function RebalanceContent() {
         </div>
       )}
 
-      {/* Status section */}
+      {/* ステータスセクション */}
       <section style={{ marginTop: 16 }}>
-        <h2 style={{ fontSize: 16, marginBottom: 12 }}>{t("status.heading")}</h2>
+        <h2 style={{ fontSize: 16, marginBottom: 12 }}>ステータス</h2>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
 
-          {/* HF card */}
+          {/* HF カード */}
           <div style={cardStyle}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{t("status.hfCardLabel")}</div>
+            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Aave Health Factor</div>
             {hfNum != null && !isNaN(hfNum) ? (
               <>
                 <div style={{ fontSize: 40, fontWeight: 700, color: getHfColor(hfNum), lineHeight: 1.1 }}>
@@ -176,22 +162,22 @@ function RebalanceContent() {
                   borderRadius: 999,
                   fontSize: 12,
                   fontWeight: 600,
-                  background: hfBadgeBg(hfNum),
-                  color: hfBadgeColor(hfNum),
+                  background: getHfBadge(hfNum).bg,
+                  color: getHfBadge(hfNum).color,
                 }}>
-                  {hfBadgeLabel(hfNum)}
+                  {getHfBadge(hfNum).label}
                 </span>
               </>
             ) : (
-              <div style={{ fontSize: 24, color: "#9ca3af" }}>{t("status.loading")}</div>
+              <div style={{ fontSize: 24, color: "#9ca3af" }}>取得中...</div>
             )}
           </div>
 
-          {/* Total assets card */}
+          {/* 総資産カード */}
           <div style={cardStyle}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{t("status.totalAssetsLabel")}</div>
+            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>総資産 (USD)</div>
             <div style={{ fontSize: 36, fontWeight: 700, color: "#111" }}>
-              {statusData ? `$${parseFloat(statusData.total_value_usd).toFixed(2)}` : <span style={{ color: "#9ca3af", fontSize: 24 }}>{t("status.loading")}</span>}
+              {statusData ? `$${parseFloat(statusData.total_value_usd).toFixed(2)}` : <span style={{ color: "#9ca3af", fontSize: 24 }}>取得中...</span>}
             </div>
             {statusData && (
               <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -204,45 +190,45 @@ function RebalanceContent() {
                   background: statusData.needs_rebalance ? "#fee2e2" : "#dcfce7",
                   color: statusData.needs_rebalance ? "#dc2626" : "#16a34a",
                 }}>
-                  {statusData.needs_rebalance ? t("status.needsRebalance") : t("status.balanced")}
+                  {statusData.needs_rebalance ? "リバランス必要" : "バランス良好"}
                 </span>
               </div>
             )}
           </div>
 
-          {/* Cooldown card */}
+          {/* クールダウンカード */}
           <div style={cardStyle}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{t("status.cooldownLabel")}</div>
+            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>クールダウン</div>
             {cooldown > 0 ? (
               <>
                 <div style={{ fontSize: 28, fontWeight: 700, color: "#ca8a04" }}>
                   {cooldownMinutes}:{String(cooldownSeconds).padStart(2, "0")}
                 </div>
-                <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>{t("status.cooldownRemaining")}</div>
+                <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>残り秒数</div>
               </>
             ) : (
-              <div style={{ fontSize: 24, fontWeight: 700, color: "#16a34a" }}>{t("status.cooldownReady")}</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#16a34a" }}>実行可能</div>
             )}
             {statusData?.last_rebalance_at && (
               <div style={{ fontSize: 12, color: "#888", marginTop: 8 }}>
-                {t("status.previousRebalance", { time: formatDateTime(statusData.last_rebalance_at) })}
+                前回: {formatDateTime(statusData.last_rebalance_at)}
               </div>
             )}
           </div>
         </div>
 
-        {/* Allocation table */}
+        {/* 配分テーブル */}
         {statusData && statusData.current_allocations.length > 0 && (
           <div style={{ marginTop: 20 }}>
-            <h3 style={{ fontSize: 14, marginBottom: 8, color: "#374151" }}>{t("status.allocationHeading")}</h3>
+            <h3 style={{ fontSize: 14, marginBottom: 8, color: "#374151" }}>現在 vs 目標配分</h3>
             <table style={{ ...tableStyle, maxWidth: 700 }}>
               <thead>
                 <tr>
-                  <th style={thStyle}>{t("status.colAsset")}</th>
-                  <th style={{ ...thStyle, textAlign: "right" }}>{t("status.colCurrentUsd")}</th>
-                  <th style={{ ...thStyle, textAlign: "right" }}>{t("status.colCurrentPct")}</th>
-                  <th style={{ ...thStyle, textAlign: "right" }}>{t("status.colTargetPct")}</th>
-                  <th style={{ ...thStyle, textAlign: "right" }}>{t("status.colDeviation")}</th>
+                  <th style={thStyle}>アセット</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>現在 (USD)</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>現在 (%)</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>目標 (%)</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>乖離 (%)</th>
                 </tr>
               </thead>
               <tbody>
@@ -269,9 +255,9 @@ function RebalanceContent() {
         )}
       </section>
 
-      {/* Actions section */}
+      {/* アクションセクション */}
       <section style={{ marginTop: 32 }}>
-        <h2 style={{ fontSize: 16, marginBottom: 12 }}>{t("actions.heading")}</h2>
+        <h2 style={{ fontSize: 16, marginBottom: 12 }}>アクション</h2>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
           <button
             onClick={handleSimulate}
@@ -287,7 +273,7 @@ function RebalanceContent() {
               cursor: isSimulating ? "not-allowed" : "pointer",
             }}
           >
-            {isSimulating ? t("actions.simulating") : t("actions.simulate")}
+            {isSimulating ? "シミュレーション中..." : "シミュレーション"}
           </button>
           <button
             onClick={() => setShowConfirmDialog(true)}
@@ -303,18 +289,18 @@ function RebalanceContent() {
               cursor: (!simulationResult || !simulationResult.is_executable) ? "not-allowed" : "pointer",
             }}
           >
-            {t("actions.execute")}
+            実行
           </button>
         </div>
       </section>
 
-      {/* Simulation result section */}
+      {/* シミュレーション結果セクション */}
       {simulationResult && (
         <section style={{ marginTop: 32 }}>
-          <h2 style={{ fontSize: 16, marginBottom: 12 }}>{t("simulation.heading")}</h2>
+          <h2 style={{ fontSize: 16, marginBottom: 12 }}>シミュレーション結果</h2>
           <div style={{ ...cardStyle, maxWidth: 700 }}>
 
-            {/* Executable badge */}
+            {/* 実行可否バッジ */}
             <div style={{ marginBottom: 12 }}>
               <span style={{
                 display: "inline-block",
@@ -325,32 +311,32 @@ function RebalanceContent() {
                 background: simulationResult.is_executable ? "#dcfce7" : "#fee2e2",
                 color: simulationResult.is_executable ? "#16a34a" : "#dc2626",
               }}>
-                {simulationResult.is_executable ? t("simulation.executable") : t("simulation.notExecutable")}
+                {simulationResult.is_executable ? "実行可能" : "実行不可"}
               </span>
             </div>
 
-            {/* Rejection reasons */}
+            {/* 拒否理由 */}
             {simulationResult.rejection_reasons.length > 0 && (
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#dc2626", marginBottom: 4 }}>{t("simulation.rejectionReasonsHeading")}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#dc2626", marginBottom: 4 }}>拒否理由:</div>
                 {simulationResult.rejection_reasons.map((reason, i) => (
                   <div key={i} style={{ fontSize: 13, color: "#dc2626", paddingLeft: 12 }}>• {reason}</div>
                 ))}
               </div>
             )}
 
-            {/* Estimated HF */}
+            {/* 推定HF */}
             {estHfNum != null && !isNaN(estHfNum) && (
               <div style={{ marginBottom: 16, display: "flex", gap: 24, alignItems: "center" }}>
                 <div>
-                  <div style={{ fontSize: 12, color: "#666" }}>{t("simulation.currentHf")}</div>
+                  <div style={{ fontSize: 12, color: "#666" }}>現在のHF</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: hfNum != null ? getHfColor(hfNum) : "#111" }}>
                     {hfNum != null ? hfNum.toFixed(2) : "—"}
                   </div>
                 </div>
                 <div style={{ fontSize: 20, color: "#9ca3af" }}>→</div>
                 <div>
-                  <div style={{ fontSize: 12, color: "#666" }}>{t("simulation.estimatedHf")}</div>
+                  <div style={{ fontSize: 12, color: "#666" }}>推定HF (実行後)</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: getHfColor(estHfNum) }}>
                     {estHfNum.toFixed(2)}
                   </div>
@@ -358,17 +344,17 @@ function RebalanceContent() {
               </div>
             )}
 
-            {/* Proposed operations */}
+            {/* 提案オペレーション */}
             {simulationResult.operations.length > 0 && (
               <>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8 }}>{t("simulation.proposedOpsHeading")}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8 }}>提案オペレーション:</div>
                 <table style={tableStyle}>
                   <thead>
                     <tr>
-                      <th style={thStyle}>{t("simulation.colAsset")}</th>
-                      <th style={thStyle}>{t("simulation.colOperation")}</th>
-                      <th style={{ ...thStyle, textAlign: "right" }}>{t("simulation.colAmountUsd")}</th>
-                      <th style={thStyle}>{t("simulation.colReason")}</th>
+                      <th style={thStyle}>アセット</th>
+                      <th style={thStyle}>操作</th>
+                      <th style={{ ...thStyle, textAlign: "right" }}>金額 (USD)</th>
+                      <th style={thStyle}>理由</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -400,7 +386,7 @@ function RebalanceContent() {
         </section>
       )}
 
-      {/* Confirm dialog */}
+      {/* 確認ダイアログ */}
       {showConfirmDialog && simulationResult && (
         <div style={{
           position: "fixed",
@@ -419,24 +405,24 @@ function RebalanceContent() {
             width: "90%",
             boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
           }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 18 }}>{t("confirmDialog.heading")}</h3>
+            <h3 style={{ margin: "0 0 16px", fontSize: 18 }}>リバランス実行確認</h3>
 
             <div style={{ marginBottom: 16, fontSize: 14, color: "#374151" }}>
               <div style={{ marginBottom: 8 }}>
-                <span style={{ color: "#666" }}>{t("confirmDialog.proposalId")} </span>
+                <span style={{ color: "#666" }}>提案ID: </span>
                 <span style={{ fontFamily: "monospace", fontSize: 12 }}>{simulationResult.proposal_id}</span>
               </div>
               <div style={{ marginBottom: 8 }}>
-                <span style={{ color: "#666" }}>{t("confirmDialog.totalAssets")} </span>
+                <span style={{ color: "#666" }}>総資産: </span>
                 <strong>${parseFloat(simulationResult.total_value_usd).toFixed(2)}</strong>
               </div>
               <div style={{ marginBottom: 8 }}>
-                <span style={{ color: "#666" }}>{t("confirmDialog.opCount")} </span>
-                <strong>{t("confirmDialog.opCountUnit", { count: simulationResult.operations.length })}</strong>
+                <span style={{ color: "#666" }}>オペレーション数: </span>
+                <strong>{simulationResult.operations.length} 件</strong>
               </div>
               {estHfNum != null && !isNaN(estHfNum) && (
                 <div style={{ marginBottom: 8 }}>
-                  <span style={{ color: "#666" }}>{t("confirmDialog.estimatedHf")} </span>
+                  <span style={{ color: "#666" }}>推定HF (実行後): </span>
                   <strong style={{ color: getHfColor(estHfNum) }}>{estHfNum.toFixed(2)}</strong>
                 </div>
               )}
@@ -451,7 +437,7 @@ function RebalanceContent() {
               fontSize: 13,
               color: "#92400e",
             }}>
-              {t("confirmDialog.warning")}
+              この操作はAaveへの実際の取引を実行します。内容を確認の上、実行してください。
             </div>
 
             <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
@@ -469,7 +455,7 @@ function RebalanceContent() {
                   cursor: isExecuting ? "not-allowed" : "pointer",
                 }}
               >
-                {t("confirmDialog.cancel")}
+                キャンセル
               </button>
               <button
                 onClick={handleExecute}
@@ -485,27 +471,27 @@ function RebalanceContent() {
                   cursor: isExecuting ? "not-allowed" : "pointer",
                 }}
               >
-                {isExecuting ? t("confirmDialog.executing") : t("confirmDialog.execute")}
+                {isExecuting ? "実行中..." : "実行"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* History section */}
+      {/* 履歴テーブルセクション */}
       <section style={{ marginTop: 32, marginBottom: 40 }}>
-        <h2 style={{ fontSize: 16, marginBottom: 12 }}>{t("history.heading")}</h2>
+        <h2 style={{ fontSize: 16, marginBottom: 12 }}>リバランス履歴</h2>
         {history.length > 0 ? (
           <table style={{ ...tableStyle, maxWidth: 900 }}>
             <thead>
               <tr>
-                <th style={thStyle}>{t("history.colProposalId")}</th>
-                <th style={thStyle}>{t("history.colCreatedAt")}</th>
-                <th style={thStyle}>{t("history.colExecutedAt")}</th>
-                <th style={thStyle}>{t("history.colStatus")}</th>
-                <th style={{ ...thStyle, textAlign: "right" }}>{t("history.colOpCount")}</th>
-                <th style={{ ...thStyle, textAlign: "right" }}>{t("history.colHfBefore")}</th>
-                <th style={{ ...thStyle, textAlign: "right" }}>{t("history.colHfAfter")}</th>
+                <th style={thStyle}>提案ID</th>
+                <th style={thStyle}>作成日時</th>
+                <th style={thStyle}>実行日時</th>
+                <th style={thStyle}>ステータス</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>オペレーション数</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>HF (前)</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>HF (後)</th>
               </tr>
             </thead>
             <tbody>
@@ -546,7 +532,7 @@ function RebalanceContent() {
             </tbody>
           </table>
         ) : (
-          <div style={{ color: "#9ca3af", fontSize: 14 }}>{t("history.noHistory")}</div>
+          <div style={{ color: "#9ca3af", fontSize: 14 }}>履歴がありません</div>
         )}
       </section>
     </>
@@ -557,7 +543,7 @@ export default function RebalancePage() {
   return (
     <AuthGuard adminOnly>
       <>
-        <title>Aave Rebalance - Ultra AutoTrade</title>
+        <title>Aave リバランス - Ultra AutoTrade</title>
         <RebalanceContent />
       </>
     </AuthGuard>
