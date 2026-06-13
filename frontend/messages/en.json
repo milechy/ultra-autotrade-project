@@ -1041,7 +1041,7 @@
       "bullet3": "View all details of AI decisions"
     }
   },
-    "Help": {
+  "Help": {
     "pageTitle": "FAQ",
     "pageSubtitle": "Frequently asked questions about Ultra AutoTrade",
     "faqs": {
@@ -1460,5 +1460,32 @@
     "section8Body": "This policy may be changed with prior notice. If there are significant changes, we will notify you on the Service. If you continue to use the Service after changes are made, you will be deemed to have agreed to the revised policy.",
     "section9Title": "9. Contact Information",
     "section9Body": "For questions or requests regarding this policy, please contact the Service's support team. When contacting us, please provide your wallet address and the content of your request."
+  },
+  "AdminExchange": {
+    "pageTitle": "Exchange Management",
+    "htmlTitle": "Exchange Management - Ultra AutoTrade",
+    "lastUpdated": "Last updated: {time} (auto-refresh every 30s)",
+    "fetchError": "Data fetch error: {msg}",
+    "loading": "Loading...",
+    "connectionSectionTitle": "Connection Status",
+    "cardConnectionLabel": "Exchange Connection",
+    "statusConnected": "Connected",
+    "statusDisconnected": "Disconnected",
+    "modeSandbox": "Sandbox Mode",
+    "modeProduction": "Production Mode",
+    "cardBalanceLabel": "USDT Balance",
+    "cardLastTradeLabel": "Last Trade Time",
+    "dailyLimitSectionTitle": "Daily Trade Limit",
+    "dailyLimitUsedOver": "Used / Limit",
+    "dailyLimitUsedPct": "{pct}% used",
+    "settingsSectionTitle": "Exchange Settings",
+    "currentExchangeTypeLabel": "Current Exchange Type",
+    "exchangeDummy": "Dummy (for testing)",
+    "exchangeTypeChangeHint": "To change the exchange type, update the EXCHANGE_TYPE environment variable and restart the backend.",
+    "connectionTestSectionTitle": "Connection Test",
+    "testButton": "Test Connection",
+    "testButtonLoading": "Checking...",
+    "testSuccessConnected": "Test successful — Exchange connection is healthy",
+    "testSuccessDisconnected": "Test successful — Exchange is in disconnected state"
   }
 }
