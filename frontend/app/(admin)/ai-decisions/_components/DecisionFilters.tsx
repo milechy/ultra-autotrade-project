@@ -110,7 +110,7 @@ export function DecisionFilters({ filters, onChange }: DecisionFiltersProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">ALL</SelectItem>
+              <SelectItem value="ALL">{t('agreeAll')}</SelectItem>
               <SelectItem value="agreed">{t('agreeAgreedOnly')}</SelectItem>
               <SelectItem value="disagreed">{t('agreeDisagreedOnly')}</SelectItem>
             </SelectContent>

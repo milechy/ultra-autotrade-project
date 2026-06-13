@@ -50,7 +50,7 @@ export function FeeConfigCard() {
         <div className="flex items-center gap-3">
           <CardTitle className="text-base text-zinc-100">{t('title')}</CardTitle>
           {config?.is_active && (
-            <Badge className="bg-emerald-600 text-white text-xs">Active</Badge>
+            <Badge className="bg-emerald-600 text-white text-xs">{t('activeBadge')}</Badge>
           )}
         </div>
         {config && (
@@ -77,7 +77,7 @@ export function FeeConfigCard() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-zinc-500 text-xs border-b border-zinc-800">
-                      <th className="text-left py-1.5 pr-4">Tier</th>
+                      <th className="text-left py-1.5 pr-4">{t('colTier')}</th>
                       <th className="text-left py-1.5 pr-4">{t('colDepositMin')}</th>
                       <th className="text-right py-1.5 pr-4">{t('colFeeRate')}</th>
                       <th className="text-right py-1.5">{t('colMonthlyYieldCap')}</th>

@@ -2886,7 +2886,9 @@
     "expenseMarkup": "Expense Markup",
     "affiliateRate": "Referral Campaign Rate",
     "disabled": "Disabled",
-    "writeNote": "* Configuration changes require direct DB update + script re-run (UI write not supported / Phase 1)"
+    "writeNote": "* Configuration changes require direct DB update + script re-run (UI write not supported / Phase 1)",
+    "activeBadge": "Active",
+    "colTier": "Tier"
   },
   "AdminNotification": {
     "title": "Notification Settings",
@@ -2915,7 +2917,8 @@
     "labelAgreeFilter": "Agreement",
     "agreeAgreedOnly": "Agreed only",
     "agreeDisagreedOnly": "Disagreed only",
-    "resetFilters": "Reset filters"
+    "resetFilters": "Reset filters",
+    "agreeAll": "All"
   },
   "AdminManualTrigger": {
     "title": "Manual Trigger",

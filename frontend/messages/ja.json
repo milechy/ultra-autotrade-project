@@ -2886,7 +2886,9 @@
     "expenseMarkup": "経費マークアップ",
     "affiliateRate": "紹介キャンペーン報酬率",
     "disabled": "無効",
-    "writeNote": "* 設定変更は DB 直接 + スクリプト再投入が必要です（UI 書き込み非対応 / Phase 1）"
+    "writeNote": "* 設定変更は DB 直接 + スクリプト再投入が必要です（UI 書き込み非対応 / Phase 1）",
+    "activeBadge": "アクティブ",
+    "colTier": "Tier"
   },
   "AdminNotification": {
     "title": "通知設定",
@@ -2915,7 +2917,8 @@
     "labelAgreeFilter": "一致/不一致",
     "agreeAgreedOnly": "一致のみ",
     "agreeDisagreedOnly": "不一致のみ",
-    "resetFilters": "フィルターをリセット"
+    "resetFilters": "フィルターをリセット",
+    "agreeAll": "全件"
   },
   "AdminManualTrigger": {
     "title": "手動判定実行",
