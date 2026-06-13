@@ -1165,6 +1165,39 @@
     "fundError": "入金処理中にエラーが発生しました。もう一度お試しください。",
     "footerNote": "入金はPrivyの入金アドレス経由で処理され、別チェーンの USDC は自動でブリッジされます。ネットワーク・ブリッジ手数料がかかる場合があります。"
   },
+  "Strategies": {
+    "pageTitle": "戦略選択",
+    "pageSubtitle": "運用戦略を選択してください",
+    "loading": "プロトコル情報を取得中...",
+    "estimatedApy": "推定APY",
+    "risk": "リスク",
+    "noData": "データなし",
+    "currentYield": "（現在の想定利回り）",
+    "comingSoon": "近日公開",
+    "operational": "正常",
+    "abnormal": "異常",
+    "active": "稼働中",
+    "phase2Note": "Phase 2 予定:",
+    "phase2NoteText": "Lido stETH・Pendle PT/YT戦略は現在開発中です。正式リリース後に選択可能になります。",
+    "risk_low": "低",
+    "risk_medium": "中",
+    "risk_high": "高",
+    "risk_critical": "最高",
+    "risk_medium_high": "中〜高",
+    "aave": {
+      "subtitle": "レンディング戦略",
+      "description": "USDCをAave V3プロトコルに供給し、安定した貸出利息を獲得します。ヘルスファクター監視と自動リバランスで安全に運用します。",
+      "apyRange": "3〜5%"
+    },
+    "lido": {
+      "subtitle": "リキッドステーキング",
+      "description": "ETHをLidoプロトコルでリキッドステーキングし、stETHとして保有します。バリデーター報酬を受け取りながら流動性を維持できます。"
+    },
+    "pendle": {
+      "subtitle": "イールドトレーディング",
+      "description": "Pendleプロトコルでトークン化された利回りを売買します。元本トークン（PT）と利回りトークン（YT）を活用した高度なイールド最適化戦略です。"
+    }
+  },
   "WalletOnboarding": {
     "headerTitle": "はじめに",
     "headerSubtitle": "Ultra AutoTradeで資産運用を始めるための4つのステップ",
