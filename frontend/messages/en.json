@@ -1241,6 +1241,7 @@
     "op_SUPPLY": "Supply",
     "op_WITHDRAW": "Withdraw",
     "op_BORROW": "Borrow",
-    "op_REPAY": "Repay"
+    "op_REPAY": "Repay",
+    "userIdFallback": "User ID: {id}"
   }
 }

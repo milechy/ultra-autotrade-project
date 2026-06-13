@@ -29,10 +29,11 @@ import {
   type AdminProposal,
   type AdminProposalStats,
 } from '@/lib/api/admin-proposals'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 
 export default function PartnerProposalsPage() {
   const t = useTranslations('PartnerProposals')
+  const locale = useLocale()
 
   const FILTER_OPTIONS = [
     { value: '', label: t('filterAll') },
@@ -300,7 +301,8 @@ export default function PartnerProposalsPage() {
             <tbody>
               {proposals.map((p) => (
                 <tr key={p.id} style={{ borderBottom: '1px solid #374151' }}>
-                  <td style={tdStyle}>{p.username ?? `UID:${p.user_id}`}</td>
+                  <td style={tdStyle}>{p.username ?? t('userIdFallback', { id: p.user_id })}</td>
+                  {/* dynamic key: op_SUPPLY / op_WITHDRAW / op_BORROW / op_REPAY — fallback to raw value for unknown operations */}
                   <td style={tdStyle}>{t(`op_${p.operation}` as Parameters<typeof t>[0]) ?? p.operation}</td>
                   <td style={tdStyle}>{p.asset}</td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -315,8 +317,9 @@ export default function PartnerProposalsPage() {
                   <td style={{ ...tdStyle, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {p.reason}
                   </td>
-                  <td style={tdStyle}>{new Date(p.created_at).toLocaleString('ja-JP')}</td>
+                  <td style={tdStyle}>{new Date(p.created_at).toLocaleString(locale)}</td>
                   <td style={tdStyle}>
+                    {/* dynamic key: status_pending / status_approved / status_rejected / status_executed / status_expired */}
                     <span style={statusBadgeStyle(p.status)}>
                       {t(`status_${p.status}` as Parameters<typeof t>[0]) ?? p.status}
                     </span>
@@ -340,7 +343,7 @@ export default function PartnerProposalsPage() {
                                 <div>
                                   <p>
                                     {t('confirmApproveDesc', {
-                                      username: p.username ?? `ユーザーID: ${p.user_id}`,
+                                      username: p.username ?? t('userIdFallback', { id: p.user_id }),
                                       operation: t(`op_${p.operation}` as Parameters<typeof t>[0]),
                                       asset: p.asset,
                                       amount: Number(p.amount_usd).toFixed(2),
@@ -378,7 +381,7 @@ export default function PartnerProposalsPage() {
                               </AlertDialogTitle>
                               <AlertDialogDescription>
                                 {t('confirmRejectDesc', {
-                                  username: p.username ?? `ユーザーID: ${p.user_id}`,
+                                  username: p.username ?? t('userIdFallback', { id: p.user_id }),
                                   operation: t(`op_${p.operation}` as Parameters<typeof t>[0]),
                                   asset: p.asset,
                                   amount: Number(p.amount_usd).toFixed(2),

@@ -1241,6 +1241,7 @@
     "op_SUPPLY": "預入（SUPPLY）",
     "op_WITHDRAW": "引出（WITHDRAW）",
     "op_BORROW": "借入（BORROW）",
-    "op_REPAY": "返済（REPAY）"
+    "op_REPAY": "返済（REPAY）",
+    "userIdFallback": "ユーザーID: {id}"
   }
 }
