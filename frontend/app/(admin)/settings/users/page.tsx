@@ -4,6 +4,7 @@
 
 // frontend/app/(admin)/settings/users/page.tsx
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ export default function UsersManagementPage() {
 }
 
 function UsersManagementContent() {
+  const t = useTranslations("AdminSettingsUsers");
   const { user: currentUser, token } = useAuth();
 
   const [users, setUsers] = useState<UserResponse[]>([]);
@@ -47,12 +49,12 @@ function UsersManagementContent() {
       const data = await listUsers(token);
       setUsers(data);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "ユーザーの読み込みに失敗しました";
+      const msg = err instanceof Error ? err.message : t("errorLoadUsers");
       setError(msg);
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [token, t]);
 
   useEffect(() => {
     loadUsers();
@@ -78,7 +80,7 @@ function UsersManagementContent() {
       await updateUser(token, user.id, { is_active: !user.is_active });
       loadUsers();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "操作に失敗しました";
+      const msg = err instanceof Error ? err.message : t("errorGeneric");
       setError(msg);
     }
   };
@@ -89,7 +91,7 @@ function UsersManagementContent() {
       await updateUser(token, user.id, { role: newRole });
       loadUsers();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "ロール変更に失敗しました";
+      const msg = err instanceof Error ? err.message : t("errorRoleChange");
       setError(msg);
     }
   };
@@ -117,21 +119,21 @@ function UsersManagementContent() {
 
   return (
     <>
-      <title>ユーザー管理 - Ultra AutoTrade</title>
+      <title>{t("pageTitle")}</title>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
         <div>
-          <h1 style={{ marginBottom: 6 }}>ユーザー管理</h1>
+          <h1 style={{ marginBottom: 6 }}>{t("heading")}</h1>
           <p style={{ marginTop: 0, color: "#555" }}>
-            ユーザーアカウントと権限を管理します。
+            {t("description")}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <Button variant="outline" size="sm" onClick={() => setShowInviteModal(true)}>
-            招待
+            {t("inviteButton")}
           </Button>
           <Button size="sm" onClick={() => setShowCreateModal(true)}>
-            + ユーザー作成
+            {t("createButton")}
           </Button>
         </div>
       </div>
@@ -139,19 +141,19 @@ function UsersManagementContent() {
       {error && <div style={errorStyle}>{error}</div>}
 
       {isLoading ? (
-        <div style={{ padding: 40, textAlign: "center", color: "#666" }}>読み込み中...</div>
+        <div style={{ padding: 40, textAlign: "center", color: "#666" }}>{t("loading")}</div>
       ) : (
         <section style={tableContainerStyle}>
           <table style={tableStyle}>
             <thead>
               <tr>
                 <th style={thStyle}>ID</th>
-                <th style={thStyle}>メールアドレス</th>
-                <th style={thStyle}>ユーザー名</th>
-                <th style={thStyle}>ロール</th>
-                <th style={thStyle}>ステータス</th>
-                <th style={thStyle}>最終ログイン</th>
-                <th style={thStyle}>操作</th>
+                <th style={thStyle}>{t("colEmail")}</th>
+                <th style={thStyle}>{t("colUsername")}</th>
+                <th style={thStyle}>{t("colRole")}</th>
+                <th style={thStyle}>{t("colStatus")}</th>
+                <th style={thStyle}>{t("colLastLogin")}</th>
+                <th style={thStyle}>{t("colActions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -165,7 +167,7 @@ function UsersManagementContent() {
                     {user.email}
                     {user.id === currentUser.id && (
                       <Badge variant="outline" className="ml-2" style={{ fontSize: 10 }}>
-                        あなた
+                        {t("youBadge")}
                       </Badge>
                     )}
                   </td>
@@ -182,12 +184,12 @@ function UsersManagementContent() {
                             handleQuickRoleChange(user, e.target.value as "admin" | "partner" | "editor" | "viewer")
                           }
                           style={roleSelectStyle}
-                          title="ロールを変更"
+                          title={t("roleChangeTitle")}
                         >
-                          <option value="viewer">閲覧者</option>
-                          <option value="editor">編集者</option>
-                          <option value="partner">パートナー</option>
-                          <option value="admin">管理者</option>
+                          <option value="viewer">{t("roles.viewer")}</option>
+                          <option value="editor">{t("roles.editor")}</option>
+                          <option value="partner">{t("roles.partner")}</option>
+                          <option value="admin">{t("roles.admin")}</option>
                         </select>
                       </div>
                     )}
@@ -195,7 +197,7 @@ function UsersManagementContent() {
                   <td style={tdStyle}>
                     <StatusBadge isActive={user.is_active} />
                   </td>
-                  <td style={{ ...tdStyle, color: "#999", fontSize: 13 }}>不明</td>
+                  <td style={{ ...tdStyle, color: "#999", fontSize: 13 }}>{t("lastLoginUnknown")}</td>
                   <td style={tdStyle}>
                     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                       <Button
@@ -203,7 +205,7 @@ function UsersManagementContent() {
                         size="sm"
                         onClick={() => setEditingUser(user)}
                       >
-                        編集
+                        {t("editButton")}
                       </Button>
                       {user.id !== currentUser.id && (
                         <Button
@@ -215,7 +217,7 @@ function UsersManagementContent() {
                               : handleToggleActive(user)
                           }
                         >
-                          {user.is_active ? "無効化" : "有効化"}
+                          {user.is_active ? t("disableButton") : t("enableButton")}
                         </Button>
                       )}
                     </div>
@@ -230,7 +232,7 @@ function UsersManagementContent() {
       {/* Create User Modal */}
       {showCreateModal && (
         <UserFormModal
-          title="新規ユーザー作成"
+          title={t("createModalTitle")}
           onSubmit={(data) => handleCreateUser(data as CreateUserRequest)}
           onClose={() => setShowCreateModal(false)}
         />
@@ -239,7 +241,7 @@ function UsersManagementContent() {
       {/* Edit User Modal */}
       {editingUser && (
         <UserFormModal
-          title="ユーザー編集"
+          title={t("editModalTitle")}
           user={editingUser}
           isCurrentUser={editingUser.id === currentUser.id}
           onSubmit={(data) => handleUpdateUser(editingUser.id, data as UpdateUserRequest)}
@@ -278,21 +280,23 @@ function UsersManagementContent() {
 
 // Role Badge Component
 function RoleBadge({ role }: { role: "admin" | "partner" | "editor" | "viewer" }) {
-  const config: Record<"admin" | "partner" | "editor" | "viewer", { variant: "destructive" | "default" | "secondary"; label: string }> = {
-    admin: { variant: "destructive", label: "管理者" },
-    partner: { variant: "default", label: "パートナー" },
-    editor: { variant: "default", label: "編集者" },
-    viewer: { variant: "secondary", label: "閲覧者" },
+  const t = useTranslations("AdminSettingsUsers");
+  const variantMap: Record<"admin" | "partner" | "editor" | "viewer", "destructive" | "default" | "secondary"> = {
+    admin: "destructive",
+    partner: "default",
+    editor: "default",
+    viewer: "secondary",
   };
-  const { variant, label } = config[role] ?? config.viewer;
-  return <Badge variant={variant}>{label}</Badge>;
+  const variant = variantMap[role] ?? variantMap.viewer;
+  return <Badge variant={variant}>{t(`roles.${role}`)}</Badge>;
 }
 
 // Status Badge Component
 function StatusBadge({ isActive }: { isActive: boolean }) {
+  const t = useTranslations("AdminSettingsUsers");
   return (
     <Badge variant={isActive ? "default" : "outline"}>
-      {isActive ? "有効" : "無効"}
+      {isActive ? t("statusActive") : t("statusInactive")}
     </Badge>
   );
 }
@@ -307,6 +311,7 @@ interface UserFormModalProps {
 }
 
 function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFormModalProps) {
+  const t = useTranslations("AdminSettingsUsers");
   const [email, setEmail] = useState(user?.email ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
   const [password, setPassword] = useState("");
@@ -335,14 +340,14 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
         await onSubmit(data);
       } else {
         if (!password || password.length < 8) {
-          setError("パスワードは8文字以上必要です");
+          setError(t("errorPasswordLength"));
           setIsSubmitting(false);
           return;
         }
         await onSubmit({ email, username, password, role });
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "操作に失敗しました";
+      const msg = err instanceof Error ? err.message : t("errorGeneric");
       setError(msg);
     } finally {
       setIsSubmitting(false);
@@ -358,7 +363,7 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
           {error && <div style={errorStyle}>{error}</div>}
 
           <div style={{ marginBottom: 12 }}>
-            <label style={inputLabelStyle}>メールアドレス</label>
+            <label style={inputLabelStyle}>{t("fieldEmail")}</label>
             <input
               type="email"
               value={email}
@@ -369,7 +374,7 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <label style={inputLabelStyle}>ユーザー名</label>
+            <label style={inputLabelStyle}>{t("fieldUsername")}</label>
             <input
               type="text"
               value={username}
@@ -381,7 +386,7 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
 
           <div style={{ marginBottom: 12 }}>
             <label style={inputLabelStyle}>
-              {isEditing ? "新しいパスワード（変更しない場合は空欄）" : "パスワード"}
+              {isEditing ? t("fieldPasswordEdit") : t("fieldPassword")}
             </label>
             <input
               type="password"
@@ -396,16 +401,16 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
           {!isCurrentUser && (
             <>
               <div style={{ marginBottom: 12 }}>
-                <label style={inputLabelStyle}>ロール</label>
+                <label style={inputLabelStyle}>{t("fieldRole")}</label>
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value as "admin" | "partner" | "editor" | "viewer")}
                   style={inputStyle}
                 >
-                  <option value="viewer">閲覧者</option>
-                  <option value="editor">編集者</option>
-                  <option value="partner">パートナー</option>
-                  <option value="admin">管理者</option>
+                  <option value="viewer">{t("roles.viewer")}</option>
+                  <option value="editor">{t("roles.editor")}</option>
+                  <option value="partner">{t("roles.partner")}</option>
+                  <option value="admin">{t("roles.admin")}</option>
                 </select>
               </div>
 
@@ -417,7 +422,7 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
                       checked={isActive}
                       onChange={(e) => setIsActive(e.target.checked)}
                     />
-                    <span style={{ fontSize: 14 }}>有効</span>
+                    <span style={{ fontSize: 14 }}>{t("fieldActive")}</span>
                   </label>
                 </div>
               )}
@@ -426,10 +431,10 @@ function UserFormModal({ title, user, isCurrentUser, onSubmit, onClose }: UserFo
 
           <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "保存中..." : "保存"}
+              {isSubmitting ? t("saving") : t("save")}
             </Button>
             <Button type="button" variant="outline" onClick={onClose}>
-              キャンセル
+              {t("cancel")}
             </Button>
           </div>
         </form>
@@ -446,6 +451,7 @@ interface DisableConfirmModalProps {
 }
 
 function DisableConfirmModal({ user, onConfirm, onClose }: DisableConfirmModalProps) {
+  const t = useTranslations("AdminSettingsUsers");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -455,7 +461,7 @@ function DisableConfirmModal({ user, onConfirm, onClose }: DisableConfirmModalPr
     try {
       await onConfirm();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "操作に失敗しました";
+      const msg = err instanceof Error ? err.message : t("errorGeneric");
       setError(msg);
       setIsProcessing(false);
     }
@@ -464,23 +470,23 @@ function DisableConfirmModal({ user, onConfirm, onClose }: DisableConfirmModalPr
   return (
     <div style={modalOverlayStyle} onClick={onClose}>
       <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ marginTop: 0 }}>ユーザー無効化</h2>
+        <h2 style={{ marginTop: 0 }}>{t("disableModalTitle")}</h2>
 
         <p>
-          ユーザー <strong>{user.username}</strong>（{user.email}）を無効化しますか？
+          {t("disableConfirmText", { username: user.username, email: user.email })}
         </p>
         <p style={{ color: "#c62828", fontSize: 14 }}>
-          無効化されたユーザーはログインできなくなります。後から有効化することも可能です。
+          {t("disableWarning")}
         </p>
 
         {error && <div style={errorStyle}>{error}</div>}
 
         <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
           <Button variant="destructive" onClick={handleConfirm} disabled={isProcessing}>
-            {isProcessing ? "処理中..." : "無効化"}
+            {isProcessing ? t("processing") : t("disableButton")}
           </Button>
           <Button variant="outline" onClick={onClose}>
-            キャンセル
+            {t("cancel")}
           </Button>
         </div>
       </div>
@@ -495,6 +501,7 @@ interface InviteUserModalProps {
 }
 
 function InviteUserModal({ onSubmit, onClose }: InviteUserModalProps) {
+  const t = useTranslations("AdminSettingsUsers");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -506,7 +513,7 @@ function InviteUserModal({ onSubmit, onClose }: InviteUserModalProps) {
     try {
       await onSubmit(email);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "招待に失敗しました";
+      const msg = err instanceof Error ? err.message : t("errorInvite");
       setError(msg);
       setIsSubmitting(false);
     }
@@ -515,16 +522,16 @@ function InviteUserModal({ onSubmit, onClose }: InviteUserModalProps) {
   return (
     <div style={modalOverlayStyle} onClick={onClose}>
       <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ marginTop: 0 }}>ユーザー招待</h2>
+        <h2 style={{ marginTop: 0 }}>{t("inviteModalTitle")}</h2>
         <p style={{ color: "#555", fontSize: 14, marginTop: 0 }}>
-          メールアドレスを入力してください。一時パスワードが自動生成されます。
+          {t("inviteModalDescription")}
         </p>
 
         <form onSubmit={handleSubmit}>
           {error && <div style={errorStyle}>{error}</div>}
 
           <div style={{ marginBottom: 16 }}>
-            <label style={inputLabelStyle}>メールアドレス</label>
+            <label style={inputLabelStyle}>{t("fieldEmail")}</label>
             <input
               type="email"
               value={email}
@@ -538,10 +545,10 @@ function InviteUserModal({ onSubmit, onClose }: InviteUserModalProps) {
 
           <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "招待中..." : "招待する"}
+              {isSubmitting ? t("inviting") : t("inviteSubmit")}
             </Button>
             <Button type="button" variant="outline" onClick={onClose}>
-              キャンセル
+              {t("cancel")}
             </Button>
           </div>
         </form>
@@ -558,6 +565,7 @@ interface InviteResultModalProps {
 }
 
 function InviteResultModal({ email, tempPassword, onClose }: InviteResultModalProps) {
+  const t = useTranslations("AdminSettingsUsers");
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -573,10 +581,9 @@ function InviteResultModal({ email, tempPassword, onClose }: InviteResultModalPr
   return (
     <div style={modalOverlayStyle} onClick={onClose}>
       <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ marginTop: 0 }}>招待完了</h2>
+        <h2 style={{ marginTop: 0 }}>{t("inviteResultTitle")}</h2>
         <p style={{ fontSize: 14, color: "#333" }}>
-          <strong>{email}</strong> のアカウントを作成しました。
-          以下の一時パスワードをユーザーに共有してください。
+          {t("inviteResultText", { email })}
         </p>
 
         <div style={{
@@ -594,15 +601,15 @@ function InviteResultModal({ email, tempPassword, onClose }: InviteResultModalPr
             {tempPassword}
           </code>
           <Button variant="ghost" size="sm" onClick={handleCopy} style={{ flexShrink: 0 }}>
-            {copied ? "コピー済" : "コピー"}
+            {copied ? t("copiedButton") : t("copyButton")}
           </Button>
         </div>
 
         <p style={{ fontSize: 12, color: "#c62828", margin: "0 0 16px" }}>
-          このパスワードは再表示できません。今すぐ控えてください。
+          {t("passwordWarning")}
         </p>
 
-        <Button onClick={onClose}>閉じる</Button>
+        <Button onClick={onClose}>{t("closeButton")}</Button>
       </div>
     </div>
   );
