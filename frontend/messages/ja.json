@@ -1680,5 +1680,49 @@
     "copiedButton": "コピー済",
     "passwordWarning": "このパスワードは再表示できません。今すぐ控えてください。",
     "closeButton": "閉じる"
+  },
+  "AdminSettingsSystem": {
+    "pageTitle": "システム設定 - Ultra AutoTrade",
+    "heading": "システム設定",
+    "description": "AI・取引所・Aave・通知の設定を確認・変更できます。",
+    "loading": "読み込み中...",
+    "fetchError": "データ取得エラー: {message}",
+    "retry": "再試行",
+    "readOnly": "読み取り専用",
+    "edit": "変更",
+    "cancel": "キャンセル",
+    "confirmQuestion": "この設定を変更しますか？",
+    "saving": "保存中...",
+    "confirm": "確認",
+    "saveSuccess": "設定を保存しました",
+    "saveError": "保存に失敗しました",
+    "fetchErrorFallback": "データの取得に失敗しました",
+    "sections": {
+      "ai": "AI設定",
+      "exchange": "Exchange設定",
+      "aave": "Aave設定",
+      "notifications": "通知設定"
+    },
+    "fields": {
+      "shadowMode": "Shadow Mode",
+      "shadowModeReason": "({reason})",
+      "promptVersion": "プロンプトバージョン",
+      "fallbackModel": "フォールバックモデル",
+      "phase": "Phase",
+      "sandbox": "Sandbox",
+      "sandboxOn": "ON (Sandbox)",
+      "sandboxOff": "OFF (本番)",
+      "dailyTradeLimit": "取引上限 / 日",
+      "dailyTradeLimitValue": "{count} 回",
+      "hfThreshold": "HF閾値",
+      "hfThresholdNew": "新しいHF閾値",
+      "cooldown": "クールダウン",
+      "cooldownValue": "{minutes} 分",
+      "cooldownNew": "新しいクールダウン（分）",
+      "operationMode": "Operation Mode",
+      "operationModeSelect": "Operation Mode を選択",
+      "slackNotify": "Slack通知",
+      "lineNotify": "LINE通知"
+    }
   }
 }
