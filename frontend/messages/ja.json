@@ -2140,5 +2140,40 @@
     "noAlerts": "アラートなし",
     "lastChecked": "最終チェック: {time}",
     "pendlePositionTitle": "Pendle ポジション詳細"
+  },
+  "Login": {
+    "title": "ログイン - Ultra AutoTrade",
+    "cardDescription": "運用ダッシュボード",
+    "emailLabel": "メールアドレス",
+    "passwordLabel": "パスワード",
+    "submitButton": "ログイン",
+    "submittingButton": "ログイン中...",
+    "loading": "読み込み中...",
+    "loginFailedDefault": "ログインに失敗しました",
+    "noAccountText": "アカウントをお持ちでない方は",
+    "signupLink": "新規登録",
+    "contactAdminText": "初期設定が必要な場合は管理者にお問い合わせください。"
+  },
+  "Signup": {
+    "title": "新規登録 - Ultra AutoTrade",
+    "cardDescription": "新規アカウント登録",
+    "emailLabel": "メールアドレス",
+    "usernameLabel": "表示名",
+    "passwordLabel": "パスワード",
+    "passwordHint": "8文字以上で入力してください",
+    "termsLink": "利用規約",
+    "privacyLink": "プライバシーポリシー",
+    "consentAnd": "および",
+    "consentSuffix": "に同意します",
+    "submitButton": "アカウントを作成",
+    "submittingButton": "登録中...",
+    "consentRequired": "利用規約・プライバシーポリシーへの同意が必要です",
+    "registrationFailed": "登録に失敗しました",
+    "hasAccountText": "すでにアカウントをお持ちの方は",
+    "loginLink": "ログイン",
+    "comingSoonDescription": "新規アカウント登録",
+    "comingSoonMessage": "一般登録は現在準備中です。招待をお持ちの方は招待リンクからご登録ください。",
+    "comingSoonLoginButton": "ログインへ",
+    "consentPrefix": ""
   }
 }

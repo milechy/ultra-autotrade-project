@@ -8,6 +8,7 @@
 // 公開は NEXT_PUBLIC_PUBLIC_REGISTRATION_ENABLED フラグで gate（既定 false）。
 import { useRouter } from 'next/navigation'
 import { useState, FormEvent } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,6 +21,7 @@ import { setAuthToken } from "@/lib/auth/token-key"
 
 function SignupForm() {
   const router = useRouter()
+  const t = useTranslations('Signup')
 
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
@@ -31,7 +33,7 @@ function SignupForm() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!consent) {
-      setError('利用規約・プライバシーポリシーへの同意が必要です')
+      setError(t('consentRequired'))
       return
     }
     setError(null)
@@ -50,7 +52,7 @@ function SignupForm() {
       const message =
         err && typeof err === 'object' && 'message' in err
           ? String((err as { message: string }).message)
-          : '登録に失敗しました'
+          : t('registrationFailed')
       setError(message)
     } finally {
       setSubmitting(false)
@@ -62,7 +64,7 @@ function SignupForm() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Ultra AutoTrade</CardTitle>
-          <CardDescription>新規アカウント登録</CardDescription>
+          <CardDescription>{t('cardDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={(e) => { void handleSubmit(e) }} className="space-y-4">
@@ -74,7 +76,7 @@ function SignupForm() {
             )}
 
             <div className="space-y-1.5">
-              <Label htmlFor="email">メールアドレス</Label>
+              <Label htmlFor="email">{t('emailLabel')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -88,7 +90,7 @@ function SignupForm() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="username">表示名</Label>
+              <Label htmlFor="username">{t('usernameLabel')}</Label>
               <Input
                 id="username"
                 type="text"
@@ -102,7 +104,7 @@ function SignupForm() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password">パスワード</Label>
+              <Label htmlFor="password">{t('passwordLabel')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -113,7 +115,7 @@ function SignupForm() {
                 autoComplete="new-password"
                 disabled={submitting}
               />
-              <p className="text-xs text-muted-foreground">8文字以上で入力してください</p>
+              <p className="text-xs text-muted-foreground">{t('passwordHint')}</p>
             </div>
 
             {/* 利用規約・プライバシーポリシー同意 */}
@@ -128,26 +130,27 @@ function SignupForm() {
                 className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
               />
               <Label htmlFor="consent" className="text-xs leading-relaxed cursor-pointer">
+                {t('consentPrefix')}
                 <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-primary">
-                  利用規約
+                  {t('termsLink')}
                 </a>
-                および
+                {t('consentAnd')}
                 <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-primary">
-                  プライバシーポリシー
+                  {t('privacyLink')}
                 </a>
-                に同意します
+                {t('consentSuffix')}
               </Label>
             </div>
 
             <Button type="submit" className="w-full" disabled={submitting || !consent}>
-              {submitting ? '登録中...' : 'アカウントを作成'}
+              {submitting ? t('submittingButton') : t('submitButton')}
             </Button>
           </form>
 
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            すでにアカウントをお持ちの方は
+            {t('hasAccountText')}
             <a href="/login" className="underline underline-offset-4 hover:text-primary ml-1">
-              ログイン
+              {t('loginLink')}
             </a>
           </p>
         </CardContent>
@@ -157,22 +160,23 @@ function SignupForm() {
 }
 
 function ComingSoon() {
+  const t = useTranslations('Signup')
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Ultra AutoTrade</CardTitle>
-          <CardDescription>新規アカウント登録</CardDescription>
+          <CardDescription>{t('comingSoonDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              一般登録は現在準備中です。招待をお持ちの方は招待リンクからご登録ください。
+              {t('comingSoonMessage')}
             </AlertDescription>
           </Alert>
           <Button variant="outline" className="w-full" onClick={() => { window.location.href = '/login' }}>
-            ログインへ
+            {t('comingSoonLoginButton')}
           </Button>
         </CardContent>
       </Card>
@@ -181,10 +185,11 @@ function ComingSoon() {
 }
 
 export default function SignupPage() {
+  const t = useTranslations('Signup')
   const enabled = isPublicRegistrationEnabled()
   return (
     <>
-      <title>新規登録 - Ultra AutoTrade</title>
+      <title>{t('title')}</title>
       {enabled ? <SignupForm /> : <ComingSoon />}
     </>
   )
