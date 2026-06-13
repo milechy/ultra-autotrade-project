@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { getJson, postJson } from "@/lib/api/http";
@@ -154,12 +155,20 @@ function HfStat({ label, value }: { label: string; value: number | null }) {
 }
 
 function MetricsTable({ rows }: { rows: MetricAggregate[] }) {
-  if (rows.length === 0) return <p style={{ fontSize: 13, color: "#9ca3af" }}>メトリクスデータなし</p>;
+  const t = useTranslations("AdminReports");
+  if (rows.length === 0) return <p style={{ fontSize: 13, color: "#9ca3af" }}>{t("metricsNoData")}</p>;
   return (
     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
       <thead>
         <tr style={{ background: "#f9fafb" }}>
-          {["メトリクスID", "件数", "最小", "最大", "平均", "単位"].map((h) => (
+          {([
+            t("metricsColId"),
+            t("metricsColCount"),
+            t("metricsColMin"),
+            t("metricsColMax"),
+            t("metricsColAvg"),
+            t("metricsColUnit"),
+          ] as string[]).map((h) => (
             <th key={h} style={thS}>{h}</th>
           ))}
         </tr>
@@ -189,7 +198,8 @@ function ReportCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const periodLabel = report.period_type === "weekly" ? "週次" : "日次";
+  const t = useTranslations("AdminReports");
+  const periodLabel = report.period_type === "weekly" ? t("periodWeekly") : t("periodDaily");
   const periodColor = report.period_type === "weekly" ? "#6d28d9" : "#0284c7";
   const periodBg   = report.period_type === "weekly" ? "#ede9fe" : "#e0f2fe";
 
@@ -232,9 +242,9 @@ function ReportCard({
             )}
           </div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <HfStat label="HF最小" value={report.hf_min} />
-            <HfStat label="HF最大" value={report.hf_max} />
-            <HfStat label="HF最終" value={report.hf_last} />
+            <HfStat label={t("hfMin")} value={report.hf_min} />
+            <HfStat label={t("hfMax")} value={report.hf_max} />
+            <HfStat label={t("hfLast")} value={report.hf_last} />
           </div>
         </div>
 
@@ -245,7 +255,7 @@ function ReportCard({
             fontSize: 12, fontWeight: 700,
             background: "#fee2e2", color: "#dc2626",
           }}>
-            緊急停止
+            {t("emergencyBadge")}
           </span>
         )}
 
@@ -267,9 +277,9 @@ function ReportCard({
             }}>
               <span style={{ fontSize: 18 }}>⚠️</span>
               <div>
-                <strong style={{ color: "#dc2626", fontSize: 13 }}>緊急停止が発生しました</strong>
+                <strong style={{ color: "#dc2626", fontSize: 13 }}>{t("emergencyBannerTitle")}</strong>
                 <p style={{ margin: 0, fontSize: 13, color: "#b91c1c", marginTop: 2 }}>
-                  このレポート期間中に緊急停止（EMERGENCY）イベントが記録されています。ログを確認し、原因を調査してください。
+                  {t("emergencyBannerBody")}
                 </p>
               </div>
             </div>
@@ -277,7 +287,7 @@ function ReportCard({
 
           {/* Metric aggregates table */}
           <h3 style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 10, marginTop: 0 }}>
-            メトリクス集計
+            {t("metricsHeading")}
           </h3>
           <MetricsTable rows={report.metric_aggregates} />
 
@@ -285,7 +295,7 @@ function ReportCard({
           {report.notes && (
             <div style={{ marginTop: 16 }}>
               <h3 style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 6, marginTop: 0 }}>
-                メモ
+                {t("notesHeading")}
               </h3>
               <p style={{ fontSize: 13, color: "#555", margin: 0, lineHeight: 1.6 }}>{report.notes}</p>
             </div>
@@ -293,7 +303,7 @@ function ReportCard({
 
           {/* Footer meta */}
           <div style={{ marginTop: 16, fontSize: 12, color: "#9ca3af" }}>
-            レポートID: {report.id} ／ 生成日時: {formatJst(report.created_at)}
+            {t("reportFooter", { id: report.id, datetime: formatJst(report.created_at) })}
           </div>
         </div>
       )}
@@ -314,6 +324,7 @@ function ConfirmDialog({
   onConfirm: () => void;
   loading: boolean;
 }) {
+  const t = useTranslations("AdminReports");
   if (!open) return null;
   return (
     <div style={{
@@ -325,10 +336,9 @@ function ConfirmDialog({
         background: "#fff", borderRadius: 14, padding: 32,
         maxWidth: 440, width: "90%", boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
       }}>
-        <h2 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 700 }}>レポートを生成しますか？</h2>
+        <h2 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 700 }}>{t("dialogTitle")}</h2>
         <p style={{ fontSize: 14, color: "#555", margin: "0 0 24px" }}>
-          最新データを元に新しいレポートを生成します。
-          生成には数秒かかる場合があります。
+          {t("dialogBody")}
         </p>
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button
@@ -339,7 +349,7 @@ function ConfirmDialog({
               background: "#fff", cursor: "pointer", fontSize: 14, color: "#374151",
             }}
           >
-            キャンセル
+            {t("dialogCancel")}
           </button>
           <button
             onClick={onConfirm}
@@ -351,7 +361,7 @@ function ConfirmDialog({
               fontSize: 14, fontWeight: 600,
             }}
           >
-            {loading ? "生成中..." : "生成する"}
+            {loading ? t("dialogGenerating") : t("dialogConfirm")}
           </button>
         </div>
       </div>
@@ -391,6 +401,7 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 function ReportViewerContent() {
+  const t = useTranslations("AdminReports");
   const { token, isAdmin } = useAuth();
   const [reports, setReports] = React.useState<ReportDetail[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -410,11 +421,11 @@ function ReportViewerContent() {
     } catch {
       // Fallback to mock data
       setReports(MOCK_REPORTS);
-      setFetchError("APIからの取得に失敗しました。モックデータを表示しています。");
+      setFetchError(t("fetchError"));
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, t]);
 
   React.useEffect(() => {
     loadReports();
@@ -426,12 +437,12 @@ function ReportViewerContent() {
       const init = token ? { headers: { Authorization: `Bearer ${token}` } } : undefined;
       await postJson("/api/reports/generate", {}, init);
       setShowConfirm(false);
-      setToast({ message: "レポートを生成しました", type: "success" });
+      setToast({ message: t("toastSuccess"), type: "success" });
       await loadReports();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? "生成に失敗しました";
+      const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? t("generateFailed");
       setShowConfirm(false);
-      setToast({ message: `エラー: ${msg}`, type: "error" });
+      setToast({ message: t("toastErrorPrefix", { msg }), type: "error" });
     } finally {
       setGenerating(false);
     }
@@ -443,14 +454,14 @@ function ReportViewerContent() {
 
   return (
     <>
-      <title>レポートビューア - Ultra AutoTrade</title>
+      <title>{t("pageTitle")}</title>
 
       {/* Page Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>レポートビューア</h1>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{t("heading")}</h1>
           <p style={{ margin: "6px 0 0", color: "#6b7280", fontSize: 14 }}>
-            自動化レポートの確認・管理。カードをクリックして詳細を展開できます。
+            {t("description")}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -463,7 +474,7 @@ function ReportViewerContent() {
               fontSize: 13, color: "#374151",
             }}
           >
-            {loading ? "読み込み中..." : "更新"}
+            {loading ? t("loadingButton") : t("refreshButton")}
           </button>
           {isAdmin && (
             <button
@@ -476,7 +487,7 @@ function ReportViewerContent() {
                 fontSize: 13, fontWeight: 600,
               }}
             >
-              レポート生成
+              {t("generateButton")}
             </button>
           )}
         </div>
@@ -495,7 +506,7 @@ function ReportViewerContent() {
       {/* Report list */}
       {reports.length === 0 && !loading ? (
         <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: 14 }}>
-          レポートがありません
+          {t("noReports")}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

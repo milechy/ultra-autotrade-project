@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useEffect, useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { fetchExchangeStatus } from "@/lib/api/exchange";
@@ -15,6 +16,7 @@ function formatDateTime(iso: string | null): string {
 
 function ExchangeContent() {
   const { token } = useAuth();
+  const t = useTranslations("AdminExchange");
   const [status, setStatus] = useState<ExchangeStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,11 +32,11 @@ function ExchangeContent() {
       setError(null);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(`データ取得エラー: ${msg}`);
+      setError(t("fetchError", { msg }));
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [token, t]);
 
   useEffect(() => {
     fetchData();
@@ -52,10 +54,10 @@ function ExchangeContent() {
     <>
       {/* ヘッダー */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <h1 style={{ margin: 0 }}>取引所管理</h1>
+        <h1 style={{ margin: 0 }}>{t("pageTitle")}</h1>
         {lastUpdated && (
           <span style={{ fontSize: 12, color: "#888" }}>
-            最終更新: {lastUpdated.toLocaleTimeString("ja-JP")}（30秒自動更新）
+            {t("lastUpdated", { time: lastUpdated.toLocaleTimeString("ja-JP") })}
           </span>
         )}
       </div>
@@ -68,12 +70,12 @@ function ExchangeContent() {
 
       {/* ステータスセクション */}
       <section style={{ marginTop: 16 }}>
-        <h2 style={{ fontSize: 16, marginBottom: 12 }}>接続状態</h2>
+        <h2 style={{ fontSize: 16, marginBottom: 12 }}>{t("connectionSectionTitle")}</h2>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
 
           {/* 接続状態カード */}
           <div style={cardStyle}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>取引所接続</div>
+            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{t("cardConnectionLabel")}</div>
             {status ? (
               <>
                 <span style={{
@@ -85,7 +87,7 @@ function ExchangeContent() {
                   background: status.connected ? "#dcfce7" : "#fee2e2",
                   color: status.connected ? "#16a34a" : "#dc2626",
                 }}>
-                  {status.connected ? "接続中" : "切断"}
+                  {status.connected ? t("statusConnected") : t("statusDisconnected")}
                 </span>
                 <div style={{ marginTop: 12 }}>
                   <span style={{
@@ -97,33 +99,33 @@ function ExchangeContent() {
                     background: status.sandbox_mode ? "#fef9c3" : "#dcfce7",
                     color: status.sandbox_mode ? "#ca8a04" : "#16a34a",
                   }}>
-                    {status.sandbox_mode ? "サンドボックスモード" : "本番モード"}
+                    {status.sandbox_mode ? t("modeSandbox") : t("modeProduction")}
                   </span>
                 </div>
               </>
             ) : (
-              <div style={{ fontSize: 16, color: "#9ca3af" }}>取得中...</div>
+              <div style={{ fontSize: 16, color: "#9ca3af" }}>{t("loading")}</div>
             )}
           </div>
 
           {/* 残高カード */}
           <div style={cardStyle}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>USDT 残高</div>
+            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{t("cardBalanceLabel")}</div>
             <div style={{ fontSize: 36, fontWeight: 700, color: "#111" }}>
               {status
                 ? status.balance_usdt != null
                   ? `$${parseFloat(status.balance_usdt).toFixed(2)}`
                   : "—"
-                : <span style={{ color: "#9ca3af", fontSize: 24 }}>取得中...</span>
+                : <span style={{ color: "#9ca3af", fontSize: 24 }}>{t("loading")}</span>
               }
             </div>
           </div>
 
           {/* 前回取引カード */}
           <div style={cardStyle}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>前回取引日時</div>
+            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{t("cardLastTradeLabel")}</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
-              {status ? formatDateTime(status.last_trade_at) : <span style={{ color: "#9ca3af" }}>取得中...</span>}
+              {status ? formatDateTime(status.last_trade_at) : <span style={{ color: "#9ca3af" }}>{t("loading")}</span>}
             </div>
           </div>
         </div>
@@ -131,10 +133,10 @@ function ExchangeContent() {
 
       {/* 日次取引制限セクション */}
       <section style={{ marginTop: 32 }}>
-        <h2 style={{ fontSize: 16, marginBottom: 12 }}>日次取引制限</h2>
+        <h2 style={{ fontSize: 16, marginBottom: 12 }}>{t("dailyLimitSectionTitle")}</h2>
         <div style={{ ...cardStyle, maxWidth: 480 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 14 }}>
-            <span style={{ color: "#374151" }}>使用済み / 上限</span>
+            <span style={{ color: "#374151" }}>{t("dailyLimitUsedOver")}</span>
             <span style={{ fontWeight: 700, color: "#111" }}>
               {status ? `${status.daily_trades_used} / ${status.daily_trade_limit}` : "—"}
             </span>
@@ -150,16 +152,16 @@ function ExchangeContent() {
             }} />
           </div>
           <div style={{ marginTop: 6, fontSize: 12, color: "#666", textAlign: "right" }}>
-            {dailyUsedPct.toFixed(1)}% 使用
+            {t("dailyLimitUsedPct", { pct: dailyUsedPct.toFixed(1) })}
           </div>
         </div>
       </section>
 
       {/* 取引所タイプセクション */}
       <section style={{ marginTop: 32 }}>
-        <h2 style={{ fontSize: 16, marginBottom: 12 }}>取引所設定</h2>
+        <h2 style={{ fontSize: 16, marginBottom: 12 }}>{t("settingsSectionTitle")}</h2>
         <div style={{ ...cardStyle, maxWidth: 480 }}>
-          <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>現在の取引所タイプ</div>
+          <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{t("currentExchangeTypeLabel")}</div>
           <div style={{ marginBottom: 12 }}>
             <select
               disabled
@@ -177,7 +179,7 @@ function ExchangeContent() {
               <option value="bybit">Bybit</option>
               <option value="okx">OKX</option>
               <option value="kraken">Kraken</option>
-              <option value="dummy">Dummy（テスト用）</option>
+              <option value="dummy">{t("exchangeDummy")}</option>
             </select>
           </div>
           <div style={{
@@ -188,14 +190,14 @@ function ExchangeContent() {
             fontSize: 13,
             color: "#92400e",
           }}>
-            取引所タイプの変更は環境変数 <code style={{ fontFamily: "monospace" }}>EXCHANGE_TYPE</code> を更新し、バックエンドを再起動してください。
+            {t("exchangeTypeChangeHint")}
           </div>
         </div>
       </section>
 
       {/* 接続テストセクション */}
       <section style={{ marginTop: 32 }}>
-        <h2 style={{ fontSize: 16, marginBottom: 12 }}>接続テスト</h2>
+        <h2 style={{ fontSize: 16, marginBottom: 12 }}>{t("connectionTestSectionTitle")}</h2>
         <div style={{ display: "flex", alignItems: "center" }}>
           <button
             onClick={fetchData}
@@ -211,13 +213,13 @@ function ExchangeContent() {
               cursor: "not-allowed",
             }}
           >
-            {isLoading ? "確認中..." : "接続テスト"}
+            {isLoading ? t("testButtonLoading") : t("testButton")}
           </button>
           <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full ml-2">Coming Soon</span>
         </div>
         {status && !error && (
           <div style={{ marginTop: 12, color: "#16a34a", fontSize: 14, fontWeight: 600 }}>
-            テスト成功 — {status.connected ? "取引所へ正常に接続できました" : "取引所が切断状態です"}
+            {status.connected ? t("testSuccessConnected") : t("testSuccessDisconnected")}
           </div>
         )}
       </section>
@@ -226,10 +228,11 @@ function ExchangeContent() {
 }
 
 export default function ExchangePage() {
+  const t = useTranslations("AdminExchange");
   return (
     <AuthGuard adminOnly>
       <>
-        <title>取引所管理 - Ultra AutoTrade</title>
+        <title>{t("htmlTitle")}</title>
         <ExchangeContent />
       </>
     </AuthGuard>
