@@ -1096,6 +1096,30 @@
     "holdTitle": "何もしない",
     "holdBadge": "ホールド"
   },
+  "Trade": {
+    "pageTitle": "取引承認",
+    "refreshAriaLabel": "更新",
+    "botDisabledLabel": "⚠️ Bot売買は現在無効です（Coming Soon）",
+    "botDisabledDesc": "AI判定結果は参考情報として表示しています",
+    "shadowModeActive": "Shadow Mode が有効です。承認ボタンは無効化されています。",
+    "loadingText": "読み込み中...",
+    "noPendingTitle": "承認待ちの取引はありません",
+    "noPendingDesc": "AI判定が完了すると、ここに表示されます",
+    "fetchError": "取得エラー",
+    "approveSuccess": "{symbol} {action} を承認しました",
+    "skipSuccess": "{symbol} をスキップしました",
+    "orderError": "注文エラー: {msg}",
+    "confirmDialogTitle": "取引を承認しますか？",
+    "tradingPairLabel": "通貨ペア",
+    "actionLabel": "アクション",
+    "quantityLabel": "数量",
+    "estimatedPriceLabel": "推定価格",
+    "cancelButton": "キャンセル",
+    "approveAndExecuteButton": "承認して実行",
+    "confidenceLabel": "信頼度",
+    "shadowModeWarning": "Shadow Mode中は実際の取引は行われません",
+    "skipButton": "スキップ"
+  },
   "Wallet": {
     "pageTitle": "ウォレット接続",
     "pageSubtitle": "Base メインネットに接続してください",
@@ -1196,5 +1220,145 @@
     "errorReason_badAddress": "アドレス不正",
     "errorReason_badAmount": "数量不正",
     "errorReason_unknown": "エラー"
+  },
+  "Strategies": {
+    "pageTitle": "戦略選択",
+    "pageSubtitle": "運用戦略を選択してください",
+    "loading": "プロトコル情報を取得中...",
+    "estimatedApy": "推定APY",
+    "risk": "リスク",
+    "noData": "データなし",
+    "currentYield": "（現在の想定利回り）",
+    "comingSoon": "近日公開",
+    "operational": "正常",
+    "abnormal": "異常",
+    "active": "稼働中",
+    "phase2Note": "Phase 2 予定:",
+    "phase2NoteText": "Lido stETH・Pendle PT/YT戦略は現在開発中です。正式リリース後に選択可能になります。",
+    "risk_low": "低",
+    "risk_medium": "中",
+    "risk_high": "高",
+    "risk_critical": "最高",
+    "risk_medium_high": "中〜高",
+    "aave": {
+      "subtitle": "レンディング戦略",
+      "description": "USDCをAave V3プロトコルに供給し、安定した貸出利息を獲得します。ヘルスファクター監視と自動リバランスで安全に運用します。",
+      "apyRange": "3〜5%"
+    },
+    "lido": {
+      "subtitle": "リキッドステーキング",
+      "description": "ETHをLidoプロトコルでリキッドステーキングし、stETHとして保有します。バリデーター報酬を受け取りながら流動性を維持できます。"
+    },
+    "pendle": {
+      "subtitle": "イールドトレーディング",
+      "description": "Pendleプロトコルでトークン化された利回りを売買します。元本トークン（PT）と利回りトークン（YT）を活用した高度なイールド最適化戦略です。"
+    }
+  },
+  "WalletOnboarding": {
+    "headerTitle": "はじめに",
+    "headerSubtitle": "Ultra AutoTradeで資産運用を始めるための4つのステップ",
+    "prevBtn": "← 前のステップ",
+    "nextBtn": "次のステップ →",
+    "stepBadge": "STEP {id}",
+    "steps": {
+      "wallet": {
+        "title": "ウォレットを準備する",
+        "description": "MetaMaskをインストールして、ウォレットを作成します。",
+        "tip": "MetaMaskの代わりにRabby WalletやCoinbase Walletも使えます。",
+        "details": {
+          "metamask": "MetaMask公式サイトにアクセス",
+          "chrome": "Chrome拡張機能をインストール",
+          "create": "「新しいウォレットを作成」を選択",
+          "password": "パスワードを設定（強力なものを使用）",
+          "seed": "シードフレーズを安全な場所に保管"
+        },
+        "seedWarning": "シードフレーズは絶対に誰にも教えないでください"
+      },
+      "network": {
+        "title": "ネットワークを追加する",
+        "description": "Base Sepoliaネットワークをウォレットに追加します。",
+        "tip": "ChainListを使うと、ネットワーク情報を手入力する必要がありません。",
+        "details": {
+          "chainlist": "ChainListにアクセス",
+          "search": "「Base Sepolia」を検索して「Add to MetaMask」をクリック",
+          "approve": "MetaMaskのポップアップで「承認」を選択",
+          "confirm": "MetaMaskの上部ネットワーク欄が「Base Sepolia」になっていることを確認"
+        }
+      },
+      "testEth": {
+        "title": "テスト用ETHを入手する",
+        "description": "ガス代用のテストETH（SepoliaETH）をウォレットに送金します。",
+        "tip": "テストネットのため、実際の資産は不要です。フォーセットから無料でテストETHが取得できます。",
+        "details": {
+          "faucet": "Coinbase Faucetにアクセス",
+          "input": "ウォレットアドレスを入力してテストETHを受け取る",
+          "confirm": "MetaMaskに「Base Sepolia ETH」が届いたことを確認"
+        }
+      },
+      "connect": {
+        "title": "Ultra AutoTradeに接続する",
+        "description": "ウォレットをUltra AutoTradeに接続して運用を開始します。",
+        "tip": "接続はウォレットアドレスの読み取りのみです。当社が秘密鍵を聞くことは一切ありません。",
+        "details": {
+          "login": "Ultra AutoTradeにログイン",
+          "click": "「ウォレット接続」ボタンをクリック",
+          "approve": "MetaMaskのポップアップで接続を承認",
+          "sign": "AIの提案を確認し、実行する場合は署名して承認"
+        }
+      }
+    },
+    "safety": {
+      "title": "🛡️ あなたの資産を守る仕組み",
+      "nonCustodial": "ノンカストディアル",
+      "nonCustodialDesc": "— あなたの秘密鍵は当社が管理しません",
+      "signRequired": "署名が必須",
+      "signRequiredDesc": "— AIの提案を実行するにはあなたの承認が必要です",
+      "emergencyStop": "緊急停止",
+      "emergencyStopDesc": "— Health Factorが危険水準になると自動ブレーキが作動",
+      "fourAgents": "4つのAIエージェント",
+      "fourAgentsDesc": "— 市場・リスク・マクロ・行動パターンを常時監視"
+    },
+    "faq": {
+      "title": "よくある質問",
+      "minAmount": {
+        "q": "最低いくらから始められますか？",
+        "a": "最低金額の制限はありませんが、ガス代を考慮すると100 USDC以上を推奨します。少額だとガス代の比率が高くなり、利回りが相殺される可能性があります。"
+      },
+      "lossRisk": {
+        "q": "損失のリスクはありますか？",
+        "a": "はい。暗号資産のDeFi運用には元本を失うリスクがあります。AIが最適な判断を支援しますが、市場リスク・スマートコントラクトリスク・清算リスクなどがあります。詳しくはリスク開示書をお読みください。"
+      },
+      "aiAutoTrade": {
+        "q": "AIが勝手に取引しますか？",
+        "a": "いいえ。AIは「提案」するだけです。実際の預け入れ・引き出しには、必ずあなたのMetaMaskでの署名（承認）が必要です。署名しない限り資産は動きません。"
+      },
+      "howToStop": {
+        "q": "やめたいときはどうすればいいですか？",
+        "a": "いつでも資産をAaveから引き出せます。Ultra AutoTradeを解除した後も、資産はあなたのウォレットに残ります。引き出しに必要なのはガス代のみです。"
+      }
+    },
+    "ctaBtn": "ウォレットを接続して始める →"
+  },
+  "ProposalCard": {
+    "hfChangeLabel": "ヘルスファクター変化",
+    "estimatedGasLabel": "推定ガス代",
+    "slippageWarning": "スリッページが高めです（{pct}%）",
+    "processingButton": "処理中...",
+    "approveButton": "承認",
+    "rejectButton": "却下"
+  },
+  "TransactionStatus": {
+    "requestingSignature": "署名をリクエスト中...",
+    "waitingConfirmation": "確認待ち...",
+    "txSuccess": "トランザクション完了",
+    "txFailed": "トランザクション失敗",
+    "retryHint": "再度「承認」ボタンを押してください"
+  },
+  "RecentApprovals": {
+    "recentTitle": "最近の承認履歴",
+    "viewAllHistory": "全履歴を見る →",
+    "noRecentApprovals": "承認履歴はありません",
+    "statusSuccess": "成功",
+    "statusFailed": "失敗"
   }
 }

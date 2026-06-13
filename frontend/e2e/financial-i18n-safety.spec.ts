@@ -4,14 +4,16 @@
  * Asana: financial batch A / PR Group A
  *
  * 検証範囲:
- *   TC1: /protocols ページが 404/5xx を返さない
- *   TC2: /protocols ページに "緊急停止" テキストが存在する（EmergencyStop.sectionTitle）
+ *   TC1: /user/settings ページが 404/5xx を返さない
+ *   TC2: /user/settings ページに "緊急停止" テキストが存在する（EmergencyStop.sectionTitle）
  *        認証ゲートで到達できない場合は gracefully skip
- *   TC3: /protocols ページに "リスクモード" テキストが存在する（RiskModeSelector.title）
+ *   TC3: /user/settings ページに "リスクモード" テキストが存在する（RiskModeSelector.title）
  *        認証ゲートで到達できない場合は gracefully skip
  *
  * NOTE:
- *   - app/(admin)/protocols/page.tsx → URL は /protocols（route group は URL に含まれない）
+ *   - EmergencyStop は app/user/settings/page.tsx L483 に配置（live ツリー: /user/settings）
+ *   - RiskModeSelector は app/user/settings/page.tsx L322 に配置
+ *   - /protocols（admin）には両コンポーネントは存在しない（修正: PR #307 教訓の再発を修正）
  *   - baseURL は playwright.config.ts (STAGING_URL || https://app.ultra-auto-trade.com)
  *   - 認証ゲートで UI に到達不能な場合は test.skip で gracefully skip する
  *   - Gate 1-3: ja/en key parity は python3 スクリプトで別途検証済み
@@ -19,22 +21,21 @@
 
 import { test, expect } from '@playwright/test'
 
-const PROTOCOLS_URL = '/protocols'
+const SETTINGS_URL = '/user/settings'
 
 test.describe('[financial-i18n-A] EmergencyStop + RiskModeSelector - i18n smoke', () => {
-  test('TC1: /protocols が 404/5xx を返さない', async ({ page }) => {
-    const res = await page.goto(PROTOCOLS_URL, { waitUntil: 'domcontentloaded' })
+  test('TC1: /user/settings が 404/5xx を返さない', async ({ page }) => {
+    const res = await page.goto(SETTINGS_URL, { waitUntil: 'domcontentloaded' })
     expect(res, 'navigation response should exist').not.toBeNull()
-    // 404 を見逃さないために status も明示チェック
-    expect(res!.status(), '/protocols は 404 / 5xx であってはならない').not.toBe(404)
-    expect(res!.status(), '/protocols は 5xx であってはならない').toBeLessThan(500)
+    expect(res!.status(), '/user/settings は 404 / 5xx であってはならない').not.toBe(404)
+    expect(res!.status(), '/user/settings は 5xx であってはならない').toBeLessThan(500)
   })
 
-  test('TC2: /protocols に EmergencyStop.sectionTitle "緊急停止" が表示される', async ({ page }) => {
-    const res = await page.goto(PROTOCOLS_URL, { waitUntil: 'domcontentloaded' })
-    // 認証ゲートやリダイレクトで /protocols に留まらない場合は skip
-    if (!res || res.status() >= 400 || !page.url().includes('/protocols')) {
-      test.skip(true, '認証ゲートで /protocols に到達不能のため skip')
+  test('TC2: /user/settings に EmergencyStop.sectionTitle "緊急停止" が表示される', async ({ page }) => {
+    const res = await page.goto(SETTINGS_URL, { waitUntil: 'domcontentloaded' })
+    // 認証ゲートやリダイレクトで /user/settings に留まらない場合は skip
+    if (!res || res.status() >= 400 || !page.url().includes('/user/settings')) {
+      test.skip(true, '認証ゲートで /user/settings に到達不能のため skip')
       return
     }
 
@@ -44,10 +45,10 @@ test.describe('[financial-i18n-A] EmergencyStop + RiskModeSelector - i18n smoke'
     await expect(emergencyStopText).toBeVisible()
   })
 
-  test('TC3: /protocols に RiskModeSelector.title "リスクモード" が表示される', async ({ page }) => {
-    const res = await page.goto(PROTOCOLS_URL, { waitUntil: 'domcontentloaded' })
-    if (!res || res.status() >= 400 || !page.url().includes('/protocols')) {
-      test.skip(true, '認証ゲートで /protocols に到達不能のため skip')
+  test('TC3: /user/settings に RiskModeSelector.title "リスクモード" が表示される', async ({ page }) => {
+    const res = await page.goto(SETTINGS_URL, { waitUntil: 'domcontentloaded' })
+    if (!res || res.status() >= 400 || !page.url().includes('/user/settings')) {
+      test.skip(true, '認証ゲートで /user/settings に到達不能のため skip')
       return
     }
 
