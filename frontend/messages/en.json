@@ -3097,9 +3097,10 @@
     "sectionTxHash": "Tx Hash"
   },
   "AdminAILearningCharts": {
-    "feedbackHeading": "Feedback Count Breakdown (30d)",
-    "sourceHeading": "Source Breakdown",
-    "noData": "No data"
+    "unitCount": "{value}",
+    "labelManual": "Manual",
+    "labelAutoHowl": "Auto (HOWL)",
+    "labelAutoOutcome": "Auto (Outcome)"
   },
   "AdminKnowledgeSearch": {
     "pageTitle": "RAG Search - Knowledge Hub - Ultra AutoTrade",
@@ -3451,5 +3452,30 @@
   "SharedConfidenceBar": {
     "label": "Confidence",
     "threshold": "Threshold: {pct}%"
+  },
+  "AdminIncomeChart": {
+    "labelSubscription": "Subscription",
+    "labelFee": "Performance fee",
+    "labelYieldExcess": "Excess yield"
+  },
+  "AdminSentimentCharts": {
+    "score": "Score",
+    "sentimentScore": "Sentiment score",
+    "aiDecision": "AI decision"
+  },
+  "AdminRateLimitsChart": {
+    "usageRate": "Usage rate"
+  },
+  "AdminActionDistChartRecharts": {
+    "unitCount": "{value}"
+  },
+  "SharedActionDistChart": {
+    "totalCount": "{total}",
+    "unitCountWithPct": "{value} ({pct}%)"
+  },
+  "LiffLogin": {
+    "loading": "Loading...",
+    "authorizing": "Authorizing...",
+    "openInLine": "Please open in the LINE app"
   }
 }

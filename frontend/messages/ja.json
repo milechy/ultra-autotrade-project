@@ -3097,9 +3097,10 @@
     "sectionTxHash": "Tx Hash"
   },
   "AdminAILearningCharts": {
-    "feedbackHeading": "フィードバック件数内訳（30日）",
-    "sourceHeading": "ソース内訳",
-    "noData": "データなし"
+    "unitCount": "{value}件",
+    "labelManual": "手動",
+    "labelAutoHowl": "自動(HOWL)",
+    "labelAutoOutcome": "自動(実績)"
   },
   "AdminKnowledgeSearch": {
     "pageTitle": "RAG検索 - ナレッジ Hub - Ultra AutoTrade",
@@ -3451,5 +3452,30 @@
   "SharedConfidenceBar": {
     "label": "信頼度",
     "threshold": "閾値: {pct}%"
+  },
+  "AdminIncomeChart": {
+    "labelSubscription": "サブスク",
+    "labelFee": "成果報酬",
+    "labelYieldExcess": "超過利益"
+  },
+  "AdminSentimentCharts": {
+    "score": "スコア",
+    "sentimentScore": "センチメントスコア",
+    "aiDecision": "AI判定"
+  },
+  "AdminRateLimitsChart": {
+    "usageRate": "使用率"
+  },
+  "AdminActionDistChartRecharts": {
+    "unitCount": "{value}件"
+  },
+  "SharedActionDistChart": {
+    "totalCount": "{total}件",
+    "unitCountWithPct": "{value}件 ({pct}%)"
+  },
+  "LiffLogin": {
+    "loading": "読み込み中...",
+    "authorizing": "認証中...",
+    "openInLine": "LINEアプリから開いてください"
   }
 }
