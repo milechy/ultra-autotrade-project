@@ -1989,7 +1989,10 @@
     "dialogConfirm": "Generate",
     "toastSuccess": "Report generated successfully",
     "toastErrorPrefix": "Error: {msg}",
-    "generateFailed": "Failed to generate report"
+    "generateFailed": "Failed to generate report",
+    "mockNote1": "Normal operation. HF stable throughout.",
+    "mockNote2": "HF dropped below 1.6, triggering emergency stop. Auto-recovered at 03:14 JST. Operator notified.",
+    "mockNote3": "Weekly summary. Includes emergency stop on 3/20. Overall HF is satisfactory."
   },
   "Terms": {
     "back": "Back",
@@ -2043,7 +2046,16 @@
     "detailFieldComponent": "Component",
     "detailFieldMessage": "Message",
     "detailFieldMetricId": "Metric ID",
-    "detailFieldMetricValue": "Metric Value"
+    "detailFieldMetricValue": "Metric Value",
+    "mockMsg1": "Emergency stop triggered. Health Factor fell below threshold.",
+    "mockMsg2": "Health Factor reached critical level. Immediate action required.",
+    "mockMsg3": "Daily trade limit at 80%. Watch remaining trade capacity.",
+    "mockMsg4": "GPT-4o cross-validation timeout. Proceeded with Claude decision only.",
+    "mockMsg5": "BUY signal executed. Order sent to Bybit Sandbox.",
+    "mockMsg6": "Knowledge base update complete. 12 new chunks added.",
+    "mockMsg7": "Aave operation skipped due to cooldown period.",
+    "mockMsg8": "Rebalance complete: deposited USDC 500 into Aave V3.",
+    "mockUnit": ""
   },
   "AdminTrades": {
     "pageTitle": "Trade History",
@@ -2406,7 +2418,10 @@
     "sampleData": "Sample data",
     "chartConfidence": "Confidence Trend (Last 7 days)",
     "chartActionDist": "Action Distribution",
-    "chartTwoPhase": "Two-Phase Agreement Rate"
+    "chartTwoPhase": "Two-Phase Agreement Rate",
+    "mockReason1": "Bullish trend continues. RSI not overheated.",
+    "mockReason2": "Health Factor 1.62 — approaching threshold, on hold.",
+    "mockReason3": "Phase mismatch detected. Adopted safer HOLD decision."
   },
   "UserDetailPanel": {
     "dialogTitle": "User Detail",
@@ -2613,7 +2628,8 @@
     "riskAggressive": "Aggressive",
     "statusNormal": "Normal",
     "statusWarning": "Warning",
-    "statusDanger": "Danger"
+    "statusDanger": "Danger",
+    "suspendedTooltip": "Suspended"
   },
   "SharedEmergencyStopButton": {
     "buttonLabel": "Emergency Stop",
@@ -3392,5 +3408,15 @@
     "walletChars10": "chars=10",
     "datePresetsOn": "presets=true (default)",
     "datePresetsOff": "presets=false (custom input only)"
+  },
+  "AdminProposalKPIs": {
+    "pending": "Pending Approval",
+    "todayApproved": "Approved Today",
+    "todayRejected": "Rejected Today",
+    "timeout": "Timed Out",
+    "countSuffix": ""
+  },
+  "AdminUserPositions": {
+    "noPositions": "No positions"
   }
 }

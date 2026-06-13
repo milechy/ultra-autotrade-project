@@ -42,88 +42,8 @@ interface MonitoringEvent {
 }
 
 // -----------------------------------------------------------------------
-// Mock data (fallback when API is unavailable)
+// Mock data builder (message strings resolved at render time via t())
 // -----------------------------------------------------------------------
-
-const MOCK_EVENTS: MonitoringEvent[] = [
-  {
-    id: 'evt-001',
-    timestamp: '2026-03-22T10:45:00Z',
-    level: 'EMERGENCY',
-    component: 'RuleEngine',
-    message: '緊急停止フラグが発動しました。Health Factor が閾値を下回りました。',
-    metric_id: 'health_factor',
-    metric_value: 1.42,
-    metric_unit: '',
-  },
-  {
-    id: 'evt-002',
-    timestamp: '2026-03-22T10:30:00Z',
-    level: 'CRITICAL',
-    component: 'AaveClient',
-    message: 'Health Factor が危険水準に到達しました。即時対応が必要です。',
-    metric_id: 'health_factor',
-    metric_value: 1.55,
-    metric_unit: '',
-  },
-  {
-    id: 'evt-003',
-    timestamp: '2026-03-22T09:15:00Z',
-    level: 'ALERT',
-    component: 'ExchangeService',
-    message: '1日の取引制限の80%に到達しました。残りの取引枠に注意してください。',
-    metric_id: 'daily_trades_used',
-    metric_value: 24,
-    metric_unit: '件',
-  },
-  {
-    id: 'evt-004',
-    timestamp: '2026-03-22T08:50:00Z',
-    level: 'WARNING',
-    component: 'AIJudge',
-    message: 'GPT-4o クロス検証タイムアウト。Claude の判断のみで実行しました。',
-    metric_id: 'latency_ms',
-    metric_value: 5200,
-    metric_unit: 'ms',
-  },
-  {
-    id: 'evt-005',
-    timestamp: '2026-03-22T08:00:00Z',
-    level: 'INFO',
-    component: 'AutomationWorkflow',
-    message: 'BUY シグナルを実行しました。Bybit Sandbox に注文を送信しました。',
-    metric_id: 'order_usd',
-    metric_value: 150,
-    metric_unit: 'USD',
-  },
-  {
-    id: 'evt-006',
-    timestamp: '2026-03-22T07:30:00Z',
-    level: 'INFO',
-    component: 'KnowledgeService',
-    message: 'ナレッジベースの更新が完了しました。新規チャンク 12 件を追加しました。',
-    metric_id: 'chunks_added',
-    metric_value: 12,
-    metric_unit: '件',
-  },
-  {
-    id: 'evt-007',
-    timestamp: '2026-03-21T23:00:00Z',
-    level: 'WARNING',
-    component: 'RuleEngine',
-    message: 'クールダウン期間中のため、Aave 操作をスキップしました。',
-  },
-  {
-    id: 'evt-008',
-    timestamp: '2026-03-21T18:45:00Z',
-    level: 'INFO',
-    component: 'AaveClient',
-    message: 'リバランス完了: USDC 500 を Aave V3 に預入しました。',
-    metric_id: 'deposited_usdc',
-    metric_value: 500,
-    metric_unit: 'USDC',
-  },
-]
 
 // -----------------------------------------------------------------------
 // Level styles
@@ -190,6 +110,86 @@ function extractEvents(data: unknown): MonitoringEvent[] {
 function EventsContent() {
   const t = useTranslations('AdminEvents')
   const { token } = useAuth()
+
+  const MOCK_EVENTS: MonitoringEvent[] = [
+    {
+      id: 'evt-001',
+      timestamp: '2026-03-22T10:45:00Z',
+      level: 'EMERGENCY',
+      component: 'RuleEngine',
+      message: t('mockMsg1'),
+      metric_id: 'health_factor',
+      metric_value: 1.42,
+      metric_unit: '',
+    },
+    {
+      id: 'evt-002',
+      timestamp: '2026-03-22T10:30:00Z',
+      level: 'CRITICAL',
+      component: 'AaveClient',
+      message: t('mockMsg2'),
+      metric_id: 'health_factor',
+      metric_value: 1.55,
+      metric_unit: '',
+    },
+    {
+      id: 'evt-003',
+      timestamp: '2026-03-22T09:15:00Z',
+      level: 'ALERT',
+      component: 'ExchangeService',
+      message: t('mockMsg3'),
+      metric_id: 'daily_trades_used',
+      metric_value: 24,
+      metric_unit: t('mockUnit'),
+    },
+    {
+      id: 'evt-004',
+      timestamp: '2026-03-22T08:50:00Z',
+      level: 'WARNING',
+      component: 'AIJudge',
+      message: t('mockMsg4'),
+      metric_id: 'latency_ms',
+      metric_value: 5200,
+      metric_unit: 'ms',
+    },
+    {
+      id: 'evt-005',
+      timestamp: '2026-03-22T08:00:00Z',
+      level: 'INFO',
+      component: 'AutomationWorkflow',
+      message: t('mockMsg5'),
+      metric_id: 'order_usd',
+      metric_value: 150,
+      metric_unit: 'USD',
+    },
+    {
+      id: 'evt-006',
+      timestamp: '2026-03-22T07:30:00Z',
+      level: 'INFO',
+      component: 'KnowledgeService',
+      message: t('mockMsg6'),
+      metric_id: 'chunks_added',
+      metric_value: 12,
+      metric_unit: t('mockUnit'),
+    },
+    {
+      id: 'evt-007',
+      timestamp: '2026-03-21T23:00:00Z',
+      level: 'WARNING',
+      component: 'RuleEngine',
+      message: t('mockMsg7'),
+    },
+    {
+      id: 'evt-008',
+      timestamp: '2026-03-21T18:45:00Z',
+      level: 'INFO',
+      component: 'AaveClient',
+      message: t('mockMsg8'),
+      metric_id: 'deposited_usdc',
+      metric_value: 500,
+      metric_unit: 'USDC',
+    },
+  ]
 
   const [events, setEvents] = useState<MonitoringEvent[]>([])
   const [loading, setLoading] = useState(true)

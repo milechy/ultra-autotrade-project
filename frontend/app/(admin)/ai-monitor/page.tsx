@@ -63,43 +63,7 @@ function mapApiDecisionToRecord(d: ApiDecisionItem): AiDecisionRecord {
   };
 }
 
-// ─── Mock data (shown when API returns 404) ───────────────────────────────────
-
-const MOCK_RECORDS: AiDecisionRecord[] = [
-  {
-    id: 1,
-    timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    pair: "BTC/USDT",
-    phase_a: "BUY",
-    phase_b: "BUY",
-    final_decision: "BUY",
-    confidence: 0.87,
-    executed: true,
-    reason: "強気トレンド継続。RSI過熱なし。",
-  },
-  {
-    id: 2,
-    timestamp: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
-    pair: "ETH/USDT",
-    phase_a: "HOLD",
-    phase_b: null,
-    final_decision: "HOLD",
-    confidence: 0.72,
-    executed: false,
-    reason: "Health Factor 1.62 — 閾値接近のため保留。",
-  },
-  {
-    id: 3,
-    timestamp: new Date(Date.now() - 1000 * 60 * 65).toISOString(),
-    pair: "BTC/USDT",
-    phase_a: "SELL",
-    phase_b: "HOLD",
-    final_decision: "HOLD",
-    confidence: 0.61,
-    executed: false,
-    reason: "フェーズ間で不一致。安全側のHOLDを採用。",
-  },
-];
+// ─── Mock data builder (reason strings resolved at render time via t()) ──────
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -166,6 +130,43 @@ const POLL_INTERVAL_SEC = 30;
 function AiMonitorContent() {
   const t = useTranslations("AiMonitor");
   const { token } = useAuth();
+
+  const MOCK_RECORDS: AiDecisionRecord[] = [
+    {
+      id: 1,
+      timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+      pair: "BTC/USDT",
+      phase_a: "BUY",
+      phase_b: "BUY",
+      final_decision: "BUY",
+      confidence: 0.87,
+      executed: true,
+      reason: t("mockReason1"),
+    },
+    {
+      id: 2,
+      timestamp: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
+      pair: "ETH/USDT",
+      phase_a: "HOLD",
+      phase_b: null,
+      final_decision: "HOLD",
+      confidence: 0.72,
+      executed: false,
+      reason: t("mockReason2"),
+    },
+    {
+      id: 3,
+      timestamp: new Date(Date.now() - 1000 * 60 * 65).toISOString(),
+      pair: "BTC/USDT",
+      phase_a: "SELL",
+      phase_b: "HOLD",
+      final_decision: "HOLD",
+      confidence: 0.61,
+      executed: false,
+      reason: t("mockReason3"),
+    },
+  ];
+
   const [records, setRecords] = useState<AiDecisionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

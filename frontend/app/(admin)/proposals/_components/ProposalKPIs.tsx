@@ -4,12 +4,14 @@
 
 import { useEffect, useState } from 'react'
 import { Clock, CheckCircle, XCircle, Timer } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { KPICard } from '@/components/shared/KPICard'
 import { useAuth } from '@/lib/auth'
 import { fetchAdminProposalStats } from '@/lib/api/admin-proposals'
 import type { AdminProposalStats } from '@/lib/api/admin-proposals'
 
 export function ProposalKPIs() {
+  const t = useTranslations('AdminProposalKPIs')
   const { token } = useAuth()
   const [stats, setStats] = useState<AdminProposalStats | null>(null)
 
@@ -29,10 +31,10 @@ export function ProposalKPIs() {
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-      <KPICard label="承認待ち" value={pending} suffix="件" icon={Clock} />
-      <KPICard label="本日承認" value={todayApproved} suffix="件" icon={CheckCircle} />
-      <KPICard label="本日拒否" value={todayRejected} suffix="件" icon={XCircle} />
-      <KPICard label="タイムアウト" value={expired} suffix="件" icon={Timer} />
+      <KPICard label={t('pending')} value={pending} suffix={t('countSuffix')} icon={Clock} />
+      <KPICard label={t('todayApproved')} value={todayApproved} suffix={t('countSuffix')} icon={CheckCircle} />
+      <KPICard label={t('todayRejected')} value={todayRejected} suffix={t('countSuffix')} icon={XCircle} />
+      <KPICard label={t('timeout')} value={expired} suffix={t('countSuffix')} icon={Timer} />
     </div>
   )
 }

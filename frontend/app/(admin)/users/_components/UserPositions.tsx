@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
+
 interface Position {
   asset: string
   supplied: number
@@ -23,9 +25,10 @@ function formatUSD(value: number): string {
 }
 
 export function UserPositions({ positions }: UserPositionsProps) {
+  const t = useTranslations('AdminUserPositions')
   if (positions.length === 0) {
     return (
-      <div className="text-sm text-gray-500 py-3 text-center">ポジションなし</div>
+      <div className="text-sm text-gray-500 py-3 text-center">{t('noPositions')}</div>
     )
   }
 

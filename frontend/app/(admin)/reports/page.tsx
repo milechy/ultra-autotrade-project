@@ -43,11 +43,12 @@ interface ReportDetail {
 }
 
 // ── Mock Data ──────────────────────────────────────────────────────────────
+// (note strings resolved at render time via t() — see buildMockReports())
 
-const MOCK_REPORTS: ReportDetail[] = [
+const MOCK_REPORT_TEMPLATES = [
   {
     id: "rpt-001",
-    period_type: "daily",
+    period_type: "daily" as const,
     period_start: "2026-03-21T00:00:00+09:00",
     period_end: "2026-03-21T23:59:59+09:00",
     event_counts: { INFO: 42, WARNING: 3, ALERT: 1, CRITICAL: 0, EMERGENCY: 0 },
@@ -55,7 +56,7 @@ const MOCK_REPORTS: ReportDetail[] = [
     hf_max: 2.15,
     hf_last: 2.01,
     emergency_occurred: false,
-    notes: "通常運用。HFは安定して推移。",
+    noteKey: "mockNote1" as const,
     metric_aggregates: [
       { metric_id: "health_factor", count: 288, min_value: 1.72, max_value: 2.15, avg_value: 1.94, unit: null },
       { metric_id: "usdc_balance", count: 288, min_value: 9800.0, max_value: 10200.0, avg_value: 10020.5, unit: "USDC" },
@@ -64,7 +65,7 @@ const MOCK_REPORTS: ReportDetail[] = [
   },
   {
     id: "rpt-002",
-    period_type: "daily",
+    period_type: "daily" as const,
     period_start: "2026-03-20T00:00:00+09:00",
     period_end: "2026-03-20T23:59:59+09:00",
     event_counts: { INFO: 38, WARNING: 8, ALERT: 4, CRITICAL: 2, EMERGENCY: 1 },
@@ -72,7 +73,7 @@ const MOCK_REPORTS: ReportDetail[] = [
     hf_max: 1.98,
     hf_last: 1.71,
     emergency_occurred: true,
-    notes: "HFが1.6を下回り緊急停止が発動。03:14 JST に自動復旧。担当者への通知済み。",
+    noteKey: "mockNote2" as const,
     metric_aggregates: [
       { metric_id: "health_factor", count: 288, min_value: 1.48, max_value: 1.98, avg_value: 1.68, unit: null },
       { metric_id: "usdc_balance", count: 288, min_value: 9200.0, max_value: 10100.0, avg_value: 9710.3, unit: "USDC" },
@@ -82,7 +83,7 @@ const MOCK_REPORTS: ReportDetail[] = [
   },
   {
     id: "rpt-003",
-    period_type: "weekly",
+    period_type: "weekly" as const,
     period_start: "2026-03-14T00:00:00+09:00",
     period_end: "2026-03-20T23:59:59+09:00",
     event_counts: { INFO: 310, WARNING: 21, ALERT: 7, CRITICAL: 2, EMERGENCY: 1 },
@@ -90,7 +91,7 @@ const MOCK_REPORTS: ReportDetail[] = [
     hf_max: 2.31,
     hf_last: 1.71,
     emergency_occurred: true,
-    notes: "週次まとめ。3/20の緊急停止を含む。全体的なHFは良好。",
+    noteKey: "mockNote3" as const,
     metric_aggregates: [
       { metric_id: "health_factor", count: 2016, min_value: 1.48, max_value: 2.31, avg_value: 1.92, unit: null },
       { metric_id: "usdc_balance", count: 2016, min_value: 9200.0, max_value: 10500.0, avg_value: 10045.8, unit: "USDC" },
@@ -411,6 +412,11 @@ function ReportViewerContent() {
   const [generating, setGenerating] = React.useState(false);
   const [toast, setToast] = React.useState<{ message: string; type: "success" | "error" } | null>(null);
 
+  const mockReports: ReportDetail[] = MOCK_REPORT_TEMPLATES.map((tmpl) => ({
+    ...tmpl,
+    notes: t(tmpl.noteKey),
+  }));
+
   const loadReports = React.useCallback(async () => {
     setLoading(true);
     setFetchError(null);
@@ -420,11 +426,12 @@ function ReportViewerContent() {
       setReports(data);
     } catch {
       // Fallback to mock data
-      setReports(MOCK_REPORTS);
+      setReports(mockReports);
       setFetchError(t("fetchError"));
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, t]);
 
   React.useEffect(() => {
