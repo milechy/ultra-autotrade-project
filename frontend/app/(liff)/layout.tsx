@@ -12,7 +12,6 @@ import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
 import { PrivyRootClient } from '@/lib/wallet/PrivyRootClient'
 import { getAuthToken } from '@/lib/auth/token-key'
 import jaMessages from '@/messages/ja.json'
-import enMessages from '@/messages/en.json'
 
 // degrade ガードを適用しない経路。
 // - liff-login : ログイン導線そのもの (未ログインで来る前提)
