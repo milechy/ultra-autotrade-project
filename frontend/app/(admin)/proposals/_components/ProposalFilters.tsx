@@ -67,10 +67,10 @@ export function ProposalFilters({ filters, onChange }: ProposalFiltersProps) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL" className="text-xs">{t('operationAll')}</SelectItem>
-            <SelectItem value="SUPPLY" className="text-xs">SUPPLY</SelectItem>
-            <SelectItem value="WITHDRAW" className="text-xs">WITHDRAW</SelectItem>
-            <SelectItem value="BORROW" className="text-xs">BORROW</SelectItem>
-            <SelectItem value="REPAY" className="text-xs">REPAY</SelectItem>
+            <SelectItem value="SUPPLY" className="text-xs">{t('opSupply')}</SelectItem>
+            <SelectItem value="WITHDRAW" className="text-xs">{t('opWithdraw')}</SelectItem>
+            <SelectItem value="BORROW" className="text-xs">{t('opBorrow')}</SelectItem>
+            <SelectItem value="REPAY" className="text-xs">{t('opRepay')}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -84,7 +84,7 @@ export function ProposalFilters({ filters, onChange }: ProposalFiltersProps) {
 
         {/* Date from */}
         <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-500 whitespace-nowrap">From</span>
+          <span className="text-xs text-gray-500 whitespace-nowrap">{t('dateFrom')}</span>
           <Input
             type="date"
             value={filters.dateFrom}
@@ -95,7 +95,7 @@ export function ProposalFilters({ filters, onChange }: ProposalFiltersProps) {
 
         {/* Date to */}
         <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-500 whitespace-nowrap">To</span>
+          <span className="text-xs text-gray-500 whitespace-nowrap">{t('dateTo')}</span>
           <Input
             type="date"
             value={filters.dateTo}

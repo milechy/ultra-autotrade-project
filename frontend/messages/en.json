@@ -3063,7 +3063,13 @@
     "operationPlaceholder": "Operation Type",
     "operationAll": "All Operations",
     "userSearchPlaceholder": "Search by username / email...",
-    "reset": "Reset"
+    "reset": "Reset",
+    "opSupply": "Supply",
+    "opWithdraw": "Withdraw",
+    "opBorrow": "Borrow",
+    "opRepay": "Repay",
+    "dateFrom": "From",
+    "dateTo": "To"
   },
   "AdminProposalDetailModal": {
     "titlePrefix": "Proposal Detail — #",

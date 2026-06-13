@@ -3063,7 +3063,13 @@
     "operationPlaceholder": "操作種別",
     "operationAll": "すべての操作",
     "userSearchPlaceholder": "ユーザー名 / メールで検索...",
-    "reset": "リセット"
+    "reset": "リセット",
+    "opSupply": "供給",
+    "opWithdraw": "引き出し",
+    "opBorrow": "借入",
+    "opRepay": "返済",
+    "dateFrom": "開始日",
+    "dateTo": "終了日"
   },
   "AdminProposalDetailModal": {
     "titlePrefix": "提案詳細 — #",
