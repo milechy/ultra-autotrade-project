@@ -1304,5 +1304,49 @@
     "noRecentApprovals": "No approval history",
     "statusSuccess": "Success",
     "statusFailed": "Failed"
+  },
+  "AdminSettingsSystem": {
+    "pageTitle": "System Settings - Ultra AutoTrade",
+    "heading": "System Settings",
+    "description": "View and change AI, Exchange, Aave, and notification settings.",
+    "loading": "Loading...",
+    "fetchError": "Data fetch error: {message}",
+    "retry": "Retry",
+    "readOnly": "Read-only",
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "confirmQuestion": "Do you want to change this setting?",
+    "saving": "Saving...",
+    "confirm": "Confirm",
+    "saveSuccess": "Settings saved",
+    "saveError": "Failed to save",
+    "fetchErrorFallback": "Failed to fetch data",
+    "sections": {
+      "ai": "AI Settings",
+      "exchange": "Exchange Settings",
+      "aave": "Aave Settings",
+      "notifications": "Notification Settings"
+    },
+    "fields": {
+      "shadowMode": "Shadow Mode",
+      "shadowModeReason": "({reason})",
+      "promptVersion": "Prompt Version",
+      "fallbackModel": "Fallback Model",
+      "phase": "Phase",
+      "sandbox": "Sandbox",
+      "sandboxOn": "ON (Sandbox)",
+      "sandboxOff": "OFF (Production)",
+      "dailyTradeLimit": "Daily Trade Limit",
+      "dailyTradeLimitValue": "{count} times",
+      "hfThreshold": "HF Threshold",
+      "hfThresholdNew": "New HF Threshold",
+      "cooldown": "Cooldown",
+      "cooldownValue": "{minutes} min",
+      "cooldownNew": "New Cooldown (minutes)",
+      "operationMode": "Operation Mode",
+      "operationModeSelect": "Select Operation Mode",
+      "slackNotify": "Slack Notifications",
+      "lineNotify": "LINE Notifications"
+    }
   }
 }
