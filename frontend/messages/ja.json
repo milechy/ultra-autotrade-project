@@ -2160,6 +2160,11 @@
       "15min": "15分",
       "1hour": "1時間",
       "24hour": "24時間"
+    },
+    "statusLevel": {
+      "critical": "危険",
+      "warning": "警告",
+      "ok": "正常"
     }
   },
   "AdminSettingsAccount": {
@@ -2207,6 +2212,11 @@
     "mobileAmount": "金額",
     "paginationPrev": "前へ",
     "paginationNext": "次へ",
-    "paginationInfo": "{page} / {totalPages}（全 {total} 件）"
+    "paginationInfo": "{page} / {totalPages}（全 {total} 件）",
+    "opSupply": "供給",
+    "opWithdraw": "引き出し",
+    "opBorrow": "借入",
+    "opRepay": "返済",
+    "opNA": "N/A"
   }
 }

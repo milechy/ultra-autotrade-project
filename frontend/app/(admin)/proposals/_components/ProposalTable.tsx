@@ -32,11 +32,11 @@ const STATUS_CLASS: Record<string, string> = {
   expired: 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400',
 }
 
-const OP_CONFIG: Record<string, { label: string; className: string }> = {
-  SUPPLY: { label: 'SUPPLY', className: 'bg-green-100 text-green-800 border-green-200' },
-  WITHDRAW: { label: 'WITHDRAW', className: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  BORROW: { label: 'BORROW', className: 'bg-orange-100 text-orange-800 border-orange-200' },
-  REPAY: { label: 'REPAY', className: 'bg-blue-100 text-blue-800 border-blue-200' },
+const OP_CLASS: Record<string, string> = {
+  SUPPLY: 'bg-green-100 text-green-800 border-green-200',
+  WITHDRAW: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  BORROW: 'bg-orange-100 text-orange-800 border-orange-200',
+  REPAY: 'bg-blue-100 text-blue-800 border-blue-200',
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -59,10 +59,18 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function OperationBadge({ operation }: { operation: string }) {
-  const cfg = OP_CONFIG[operation] ?? { label: operation, className: '' }
+  const t = useTranslations('ProposalTable')
+  const className = OP_CLASS[operation] ?? ''
+  const opKeyMap: Record<string, 'opSupply' | 'opWithdraw' | 'opBorrow' | 'opRepay'> = {
+    SUPPLY: 'opSupply',
+    WITHDRAW: 'opWithdraw',
+    BORROW: 'opBorrow',
+    REPAY: 'opRepay',
+  }
+  const label = opKeyMap[operation] ? t(opKeyMap[operation]) : t('opNA')
   return (
-    <Badge variant="outline" className={`text-xs px-2 py-0.5 ${cfg.className}`}>
-      {cfg.label}
+    <Badge variant="outline" className={`text-xs px-2 py-0.5 ${className}`}>
+      {label}
     </Badge>
   )
 }

@@ -2160,6 +2160,11 @@
       "15min": "15 min",
       "1hour": "1 hour",
       "24hour": "24 hours"
+    },
+    "statusLevel": {
+      "critical": "CRITICAL",
+      "warning": "WARNING",
+      "ok": "OK"
     }
   },
   "AdminSettingsAccount": {
@@ -2207,6 +2212,11 @@
     "mobileAmount": "Amount",
     "paginationPrev": "Prev",
     "paginationNext": "Next",
-    "paginationInfo": "{page} / {totalPages} ({total} total)"
+    "paginationInfo": "{page} / {totalPages} ({total} total)",
+    "opSupply": "Supply",
+    "opWithdraw": "Withdraw",
+    "opBorrow": "Borrow",
+    "opRepay": "Repay",
+    "opNA": "N/A"
   }
 }

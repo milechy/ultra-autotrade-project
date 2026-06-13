@@ -221,7 +221,7 @@ function RateLimitsContent() {
                     {api.current.toLocaleString()} / {api.limit.toLocaleString()}
                   </span>
                   <span style={{ fontSize: 11, color: api.usage_pct >= 90 ? "#dc2626" : api.usage_pct >= 80 ? "#ca8a04" : "#9ca3af" }}>
-                    {api.usage_pct >= 90 ? "CRITICAL" : api.usage_pct >= 80 ? "WARNING" : "OK"}
+                    {api.usage_pct >= 90 ? t('statusLevel.critical') : api.usage_pct >= 80 ? t('statusLevel.warning') : t('statusLevel.ok')}
                   </span>
                 </div>
               </div>
