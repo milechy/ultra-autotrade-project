@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { getJson } from "@/lib/api/http";
@@ -71,12 +72,6 @@ function sentimentBg(label: SentimentLabel): string {
   return "#f3f4f6";
 }
 
-function sentimentLabel(label: SentimentLabel): string {
-  if (label === "positive") return "ポジティブ";
-  if (label === "negative") return "ネガティブ";
-  return "ニュートラル";
-}
-
 function scoreToGaugeAngle(score: number): number {
   // -1.0 → -90deg, 0 → 0deg, +1.0 → +90deg
   return score * 90;
@@ -84,7 +79,7 @@ function scoreToGaugeAngle(score: number): number {
 
 // ─── Gauge Component ─────────────────────────────────────────────────────────
 
-function SentimentGauge({ score, label }: { score: number; label: SentimentLabel }) {
+function SentimentGauge({ score, label, labelText }: { score: number; label: SentimentLabel; labelText: string }) {
   const angle = scoreToGaugeAngle(score);
   const color = sentimentColor(label);
   const pct = Math.round((score + 1) / 2 * 100);
@@ -122,7 +117,7 @@ function SentimentGauge({ score, label }: { score: number; label: SentimentLabel
         fontWeight: 600,
         marginTop: 6,
       }}>
-        {sentimentLabel(label)}
+        {labelText}
       </div>
     </div>
   );
@@ -141,6 +136,7 @@ export default function SentimentPage() {
 const POLL_INTERVAL_SEC = 60;
 
 function SentimentContent() {
+  const t = useTranslations("AdminSentiment");
   const { token } = useAuth();
   const [data, setData] = useState<SentimentHistoryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -162,11 +158,11 @@ function SentimentContent() {
       setLastUpdated(new Date());
       setCountdown(POLL_INTERVAL_SEC);
     } catch (e: unknown) {
-      setError(`データ取得エラー: ${e instanceof Error ? e.message : String(e)}`);
+      setError(t("fetchError", { message: e instanceof Error ? e.message : String(e) }));
     } finally {
       setIsLoading(false);
     }
-  }, [token, hours]);
+  }, [token, hours, t]);
 
   useEffect(() => {
     fetchData();
@@ -195,16 +191,20 @@ function SentimentContent() {
     label: dp.ai_action ?? "HOLD",
   }));
 
+  const sentimentLabelText = (label: SentimentLabel): string => {
+    return t(`sentimentLabel_${label}` as Parameters<typeof t>[0]);
+  };
+
   return (
     <>
-      <title>Xセンチメント分析 - Ultra AutoTrade</title>
+      <title>{t("pageTitle")}</title>
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap" as const, gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0 }}>Xセンチメント分析</h1>
+          <h1 style={{ margin: 0 }}>{t("heading")}</h1>
           <p style={{ margin: "4px 0 0", color: "#666", fontSize: 13 }}>
-            X（Twitter）の暗号通貨関連投稿のセンチメント分析
+            {t("description")}
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
@@ -213,25 +213,25 @@ function SentimentContent() {
             onChange={(e) => setHours(Number(e.target.value))}
             style={{ padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 13 }}
           >
-            <option value={6}>直近6時間</option>
-            <option value={24}>直近24時間</option>
-            <option value={72}>直近3日</option>
-            <option value={168}>直近1週間</option>
+            <option value={6}>{t("last6h")}</option>
+            <option value={24}>{t("last24h")}</option>
+            <option value={72}>{t("last3d")}</option>
+            <option value={168}>{t("last1w")}</option>
           </select>
           {lastUpdated && (
             <span style={{ fontSize: 12, color: "#888" }}>
-              最終更新: {lastUpdated.toLocaleTimeString("ja-JP")} （{countdown}秒後に自動更新）
+              {t("lastUpdated", { time: lastUpdated.toLocaleTimeString("ja-JP"), countdown })}
             </span>
           )}
           <button onClick={fetchData} disabled={isLoading} style={outlineBtnStyle}>
-            {isLoading ? "読み込み中..." : "今すぐ更新"}
+            {isLoading ? t("loading") : t("refreshNow")}
           </button>
         </div>
       </div>
 
       {data?.is_mock && (
         <div style={{ padding: "12px 16px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, color: "#92400e", fontSize: 13, marginBottom: 16 }}>
-          <strong>準備中:</strong> X API未設定のため、サンプルデータを表示しています。
+          <strong>{t("mockWarningTitle")}</strong> {t("mockWarningBody")}
         </div>
       )}
 
@@ -242,19 +242,23 @@ function SentimentContent() {
         <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 20, marginBottom: 24, alignItems: "start" }}>
           {/* Gauge */}
           <div style={cardStyle}>
-            <h2 style={sectionTitleStyle}>現在のセンチメント</h2>
-            <SentimentGauge score={data.current_score} label={data.current_label} />
+            <h2 style={sectionTitleStyle}>{t("currentSentiment")}</h2>
+            <SentimentGauge
+              score={data.current_score}
+              label={data.current_label}
+              labelText={sentimentLabelText(data.current_label)}
+            />
           </div>
           {/* Stats */}
           <div style={cardStyle}>
-            <h2 style={sectionTitleStyle}>統計</h2>
+            <h2 style={sectionTitleStyle}>{t("stats")}</h2>
             <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 12, marginTop: 8 }}>
               {[
-                { label: "データポイント", value: String(data.data_points.length), color: "#374151" },
-                { label: "ポジティブ", value: String(data.data_points.filter(d => d.label === "positive").length), color: "#16a34a" },
-                { label: "ネガティブ", value: String(data.data_points.filter(d => d.label === "negative").length), color: "#dc2626" },
-                { label: "ニュートラル", value: String(data.data_points.filter(d => d.label === "neutral").length), color: "#6b7280" },
-                { label: "平均スコア", value: data.data_points.length > 0 ? (data.data_points.reduce((s, d) => s + d.score, 0) / data.data_points.length).toFixed(3) : "—", color: "#374151" },
+                { label: t("statDataPoints"), value: String(data.data_points.length), color: "#374151" },
+                { label: t("statPositive"), value: String(data.data_points.filter(d => d.label === "positive").length), color: "#16a34a" },
+                { label: t("statNegative"), value: String(data.data_points.filter(d => d.label === "negative").length), color: "#dc2626" },
+                { label: t("statNeutral"), value: String(data.data_points.filter(d => d.label === "neutral").length), color: "#6b7280" },
+                { label: t("statAvgScore"), value: data.data_points.length > 0 ? (data.data_points.reduce((s, d) => s + d.score, 0) / data.data_points.length).toFixed(3) : "—", color: "#374151" },
               ].map(({ label, value, color }) => (
                 <div key={label} style={{ padding: "12px 20px", border: "1px solid #e5e7eb", borderRadius: 10, background: "#fafafa", textAlign: "center" as const, minWidth: 90 }}>
                   <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1.2 }}>{value}</div>
@@ -268,9 +272,9 @@ function SentimentContent() {
 
       {/* Trend Chart */}
       <div style={{ ...cardStyle, marginBottom: 20 }}>
-        <h2 style={sectionTitleStyle}>センチメントスコア推移（直近{hours}時間）</h2>
+        <h2 style={sectionTitleStyle}>{t("trendChartTitle", { hours })}</h2>
         {chartData.length === 0 ? (
-          <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0", textAlign: "center" as const }}>データがありません</div>
+          <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0", textAlign: "center" as const }}>{t("noData")}</div>
         ) : (
           <SentimentTrendChart data={chartData} />
         )}
@@ -279,9 +283,9 @@ function SentimentContent() {
       {/* Correlation: Sentiment vs AI Action */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20, marginBottom: 20 }}>
         <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>センチメント × AI判定 相関</h2>
+          <h2 style={sectionTitleStyle}>{t("correlationTitle")}</h2>
           {correlationData.length === 0 ? (
-            <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0", textAlign: "center" as const }}>データがありません</div>
+            <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0", textAlign: "center" as const }}>{t("noData")}</div>
           ) : (
             <SentimentCorrelationChart data={correlationData} />
           )}
@@ -289,9 +293,9 @@ function SentimentContent() {
 
         {/* Latest X Posts */}
         <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>最新Xポスト（直近10件）</h2>
+          <h2 style={sectionTitleStyle}>{t("latestPostsTitle")}</h2>
           {(data?.latest_posts ?? []).length === 0 ? (
-            <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0", textAlign: "center" as const }}>データがありません</div>
+            <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0", textAlign: "center" as const }}>{t("noData")}</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column" as const, gap: 8, maxHeight: 280, overflowY: "auto" as const }}>
               {(data?.latest_posts ?? []).map((post) => (
