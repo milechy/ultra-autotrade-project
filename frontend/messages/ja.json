@@ -1494,5 +1494,81 @@
       "UPPER": "アッパー",
       "GENERAL": "一般"
     }
+  },
+  "AdminRebalance": {
+    "pageTitle": "Aave リバランス",
+    "lastUpdated": "最終更新: {time}（30秒自動更新）",
+    "status": {
+      "heading": "ステータス",
+      "hfCardLabel": "Aave Health Factor",
+      "loading": "取得中...",
+      "totalAssetsLabel": "総資産 (USD)",
+      "needsRebalance": "リバランス必要",
+      "balanced": "バランス良好",
+      "cooldownLabel": "クールダウン",
+      "cooldownRemaining": "残り秒数",
+      "cooldownReady": "実行可能",
+      "previousRebalance": "前回: {time}",
+      "allocationHeading": "現在 vs 目標配分",
+      "colAsset": "アセット",
+      "colCurrentUsd": "現在 (USD)",
+      "colCurrentPct": "現在 (%)",
+      "colTargetPct": "目標 (%)",
+      "colDeviation": "乖離 (%)"
+    },
+    "hfBadge": {
+      "safe": "安全",
+      "caution": "注意",
+      "danger": "危険"
+    },
+    "actions": {
+      "heading": "アクション",
+      "simulate": "シミュレーション",
+      "simulating": "シミュレーション中...",
+      "execute": "実行"
+    },
+    "simulation": {
+      "heading": "シミュレーション結果",
+      "executable": "実行可能",
+      "notExecutable": "実行不可",
+      "rejectionReasonsHeading": "拒否理由:",
+      "currentHf": "現在のHF",
+      "estimatedHf": "推定HF (実行後)",
+      "proposedOpsHeading": "提案オペレーション:",
+      "colAsset": "アセット",
+      "colOperation": "操作",
+      "colAmountUsd": "金額 (USD)",
+      "colReason": "理由"
+    },
+    "confirmDialog": {
+      "heading": "リバランス実行確認",
+      "proposalId": "提案ID:",
+      "totalAssets": "総資産:",
+      "opCount": "オペレーション数:",
+      "opCountUnit": "{count} 件",
+      "estimatedHf": "推定HF (実行後):",
+      "warning": "この操作はAaveへの実際の取引を実行します。内容を確認の上、実行してください。",
+      "cancel": "キャンセル",
+      "executing": "実行中...",
+      "execute": "実行"
+    },
+    "history": {
+      "heading": "リバランス履歴",
+      "noHistory": "履歴がありません",
+      "colProposalId": "提案ID",
+      "colCreatedAt": "作成日時",
+      "colExecutedAt": "実行日時",
+      "colStatus": "ステータス",
+      "colOpCount": "オペレーション数",
+      "colHfBefore": "HF (前)",
+      "colHfAfter": "HF (後)"
+    },
+    "errors": {
+      "fetchError": "データ取得エラー: {message}",
+      "simulationError": "シミュレーションエラー: {message}",
+      "noConfirmationToken": "確認トークンがありません",
+      "executeError": "実行エラー: {message}"
+    },
+    "documentTitle": "Aave リバランス - Ultra AutoTrade"
   }
 }
