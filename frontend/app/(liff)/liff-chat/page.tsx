@@ -77,6 +77,12 @@ export default function LiffChatPage() {
   const [unreadCount] = useState(0)
   const [reasonOpen, setReasonOpen] = useState(false)
 
+  // ── 緊急停止 state
+  const [paused, setPaused] = useState(false)
+  const [stopConfirmOpen, setStopConfirmOpen] = useState(false)
+  const [stopLoading, setStopLoading] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+
   // ── データ取得
   useEffect(() => {
     const token =
@@ -89,15 +95,17 @@ export default function LiffChatPage() {
     const headers = { Authorization: `Bearer ${token}` }
 
     // 資産サマリー（/api/user/settings から balance を読む）
+    // 併せて is_active=false（運用停止中）を読んで緊急停止バーの初期状態に反映する。
     fetch(`${API_BASE}/api/user/settings`, { headers })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: Record<string, string> | null) => {
+      .then((d: (Record<string, string> & { is_active?: boolean }) | null) => {
         if (d) {
           const current = parseFloat(d.balance ?? "0")
           const initial = parseFloat(d.initial_balance ?? d.balance ?? "0")
           const pnlUsd = current - initial
           const pnlPct = initial > 0 ? (pnlUsd / initial) * 100 : 0
           setAssetData({ current_usd: current, initial_usd: initial, pnl_usd: pnlUsd, pnl_pct: pnlPct })
+          if (d.is_active === false) setPaused(true)
         }
       })
       .catch(() => {})
@@ -126,6 +134,33 @@ export default function LiffChatPage() {
   }
   function handleReject() {
     setAiJudgment(null)
+  }
+
+  // ── 緊急停止: POST /api/user/pause（require_active_user / consumer 可）
+  // backend の OR ロジック安全装置は変更せず、ユーザーの is_active フラグを落とすだけ。
+  async function handleEmergencyStop() {
+    const token =
+      typeof window !== "undefined"
+        ? (localStorage.getItem("auth_token") ?? "")
+        : ""
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
+    if (!token) return
+    setStopLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/user/pause`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setPaused(true)
+      setStopConfirmOpen(false)
+      setToast(t("home.stopSuccess"))
+    } catch {
+      setToast(t("home.stopFailed"))
+    } finally {
+      setStopLoading(false)
+      setTimeout(() => setToast(null), 2800)
+    }
   }
 
   // ── AI カード色設定
@@ -347,10 +382,79 @@ export default function LiffChatPage() {
         </div>
       </main>
 
+      {/* ── 緊急停止バー（下部固定 / safe-area 対応） */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-30 w-[375px] mx-auto px-4 pt-2 ax-safe-bottom
+                   bg-gradient-to-t from-zinc-950 via-zinc-950/95 to-transparent"
+      >
+        {paused ? (
+          <div
+            role="status"
+            className="w-full py-3 rounded-xl border border-red-500/60 bg-red-500/10
+                       text-red-300 text-sm font-semibold flex items-center justify-center gap-2"
+          >
+            <span className="w-2 h-2 rounded-full bg-red-500" />
+            {t("home.stoppedStatus")}
+          </div>
+        ) : (
+          <button
+            onClick={() => setStopConfirmOpen(true)}
+            className="w-full py-3 rounded-xl bg-red-600 active:bg-red-700 text-white font-bold
+                       shadow-lg transition-colors"
+            aria-label={t("home.emergencyStopAriaLabel")}
+          >
+            {t("home.emergencyStop")}
+          </button>
+        )}
+      </div>
+
+      {/* 緊急停止 確認ダイアログ */}
+      {stopConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => !stopLoading && setStopConfirmOpen(false)}
+          />
+          <div className="relative w-[375px] mx-auto bg-zinc-900 rounded-t-2xl p-5 ax-safe-bottom">
+            <h3 className="text-white font-bold text-lg mb-1">{t("home.stopConfirmTitle")}</h3>
+            <p className="text-zinc-400 text-sm mb-4 leading-relaxed">
+              {t("home.stopConfirmDesc")}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStopConfirmOpen(false)}
+                disabled={stopLoading}
+                className="flex-1 py-3 rounded-xl border border-zinc-600 text-zinc-300 font-semibold disabled:opacity-40"
+              >
+                {t("home.stopCancel")}
+              </button>
+              <button
+                onClick={handleEmergencyStop}
+                disabled={stopLoading}
+                className="flex-1 py-3 rounded-xl bg-red-600 active:bg-red-700 text-white font-bold disabled:opacity-50"
+              >
+                {stopLoading ? t("home.stopping") : t("home.stopConfirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* トースト */}
+      {toast && (
+        <div
+          role="status"
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-xl bg-zinc-800
+                     border border-zinc-700 text-white text-sm shadow-lg whitespace-nowrap"
+        >
+          {toast}
+        </div>
+      )}
+
       {/* ── FAB（右下固定） */}
       <button
         onClick={() => setChatOpen(true)}
-        className="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full shadow-lg
+        className="fixed bottom-24 right-6 z-40 w-14 h-14 rounded-full shadow-lg
                    flex items-center justify-center active:scale-95 transition-transform
                    bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0]"
         aria-label={t("home.openChatAriaLabel")}

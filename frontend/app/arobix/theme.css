@@ -175,3 +175,15 @@
 .arobix-root .border-zinc-800 { border-color: #e5ddd0 !important; }
 .arobix-root .border-zinc-700 { border-color: #d8cfc4 !important; }
 .arobix-root .border-zinc-600 { border-color: #cfc5b8 !important; }
+
+/* ================================================================
+ * Safe area (Android edge-to-edge / iOS home indicator)
+ * 2026-03-09 以降の Android LINE は edge-to-edge 表示になり、下部固定 CTA が
+ * システムナビバーに埋没する。下部固定要素に .ax-safe-bottom を当てて
+ * env(safe-area-inset-bottom) ぶんの余白を確保する。個別ハックの乱発を避け、
+ * 下部 inset はこの 1 クラスに集約する（theme.css は (liff)/layout.tsx で
+ * 読み込まれ全 liff 画面に適用される）。
+ * ================================================================ */
+.ax-safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+}
