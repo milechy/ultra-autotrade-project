@@ -2790,5 +2790,42 @@
   },
   "DemoBanner": {
     "notice": "⚠️ DEMO environment — All displayed data is sample data. This is not the production environment."
+  },
+  "AdminDashboard": {
+    "pageTitle": "Operations Dashboard",
+    "loading": "Loading...",
+    "statusStopped": "Stopped",
+    "statusRunning": "Running",
+    "fetchFailed": "Failed to fetch",
+    "tradeCount": "{count} trades",
+    "cardSystemStatus": "System Status",
+    "cardHealthFactor": "Health Factor",
+    "cardDailyTrades": "Today's Trades",
+    "cardTotalAum": "Total AUM"
+  },
+  "AdminDashboardAutomation": {
+    "browserTitle": "Automation - Ultra AutoTrade",
+    "pageTitle": "Automation Status",
+    "pageSubtitle": "Read-only operations view. See docs/19_operations_runbook.md §2.4.",
+    "lookbackLabel": "Time Range",
+    "lookbackOption": "{hours}h",
+    "loading": "Loading...",
+    "refreshButton": "Refresh",
+    "fetchFailed": "Load failed",
+    "runbookHeading": "Operations Actions (Runbook)",
+    "runbookItem1": "If is_trading_paused = true, follow the Runbook 'Emergency Stop' procedure.",
+    "runbookItem2": "If last_health_factor is low, follow the Runbook 'Aave HF Drop' procedure.",
+    "runbookItem3": "If errors persist, check backend logs and dependency status."
+  },
+  "AdminDashboardReports": {
+    "browserTitle": "Reports - Ultra AutoTrade",
+    "pageTitle": "Latest Report",
+    "pageSubtitle": "Summary view aligned with Runbook report review.",
+    "loading": "Loading...",
+    "refreshButton": "Refresh",
+    "fetchFailed": "Load failed",
+    "runbookHeading": "Operations Actions (Runbook)",
+    "runbookItem1": "Review highlights and confirm there are no unresolved warnings.",
+    "runbookItem2": "If report generation fails, check ReportingService logs and dependencies."
   }
 }

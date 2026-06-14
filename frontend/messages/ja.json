@@ -2790,5 +2790,42 @@
   },
   "DemoBanner": {
     "notice": "⚠️ DEMO 環境 — 表示データはすべてサンプルです。本番環境ではありません。"
+  },
+  "AdminDashboard": {
+    "pageTitle": "運用ダッシュボード",
+    "loading": "読み込み中...",
+    "statusStopped": "停止中",
+    "statusRunning": "稼働中",
+    "fetchFailed": "取得失敗",
+    "tradeCount": "{count}件",
+    "cardSystemStatus": "システムステータス",
+    "cardHealthFactor": "Health Factor",
+    "cardDailyTrades": "本日の取引",
+    "cardTotalAum": "総AUM"
+  },
+  "AdminDashboardAutomation": {
+    "browserTitle": "自動売買 - Ultra AutoTrade",
+    "pageTitle": "自動売買ステータス",
+    "pageSubtitle": "運用読み取り専用ビュー。docs/19_operations_runbook.md §2.4 に準拠。",
+    "lookbackLabel": "参照時間",
+    "lookbackOption": "{hours}時間",
+    "loading": "読み込み中...",
+    "refreshButton": "更新",
+    "fetchFailed": "読み込み失敗",
+    "runbookHeading": "運用アクション（Runbook）",
+    "runbookItem1": "is_trading_paused = true の場合、Runbook「緊急停止状態」の確認手順に従う。",
+    "runbookItem2": "last_health_factor が低い場合、Runbook「Aave HF 低下」の確認手順に従う。",
+    "runbookItem3": "エラーが継続する場合、バックエンドログと依存関係の状態を確認。"
+  },
+  "AdminDashboardReports": {
+    "browserTitle": "レポート - Ultra AutoTrade",
+    "pageTitle": "最新レポート",
+    "pageSubtitle": "Runbook のレポート確認に沿ったサマリービュー。",
+    "loading": "読み込み中...",
+    "refreshButton": "更新",
+    "fetchFailed": "読み込み失敗",
+    "runbookHeading": "運用アクション（Runbook）",
+    "runbookItem1": "highlights を確認し、未解決の警告がないことを確認。",
+    "runbookItem2": "レポート生成が失敗した場合、ReportingService のログと依存関係を確認。"
   }
 }
