@@ -2,6 +2,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import {
   Dialog,
   DialogContent,
@@ -33,14 +34,6 @@ function formatDateTime(iso: string | null): string {
   }
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: '保留中',
-  approved: '承認済み',
-  rejected: '拒否',
-  executed: '実行済み',
-  expired: '期限切れ',
-}
-
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-4 py-1.5 border-b border-gray-100 dark:border-gray-800 last:border-0">
@@ -51,12 +44,22 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export function ProposalDetailModal({ proposal, onClose }: ProposalDetailModalProps) {
+  const t = useTranslations('AdminProposalDetailModal')
+
+  const STATUS_LABEL: Record<string, string> = {
+    pending: t('statusPending'),
+    approved: t('statusApproved'),
+    rejected: t('statusRejected'),
+    executed: t('statusExecuted'),
+    expired: t('statusExpired'),
+  }
+
   return (
     <Dialog open={proposal !== null} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
         <DialogHeader>
           <DialogTitle className="text-gray-900 dark:text-gray-100">
-            提案詳細 — #{proposal?.id}
+            {t('titlePrefix')}{proposal?.id}
           </DialogTitle>
           <DialogDescription className="text-gray-500">
             {proposal?.username ?? `user_${proposal?.user_id}`}
@@ -76,26 +79,26 @@ export function ProposalDetailModal({ proposal, onClose }: ProposalDetailModalPr
 
             {/* Core fields */}
             <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-0.5">
-              <Row label="金額" value={`${Number(proposal.amount).toLocaleString('ja-JP', { maximumFractionDigits: 6 })} ${proposal.asset}`} />
-              <Row label="USD換算" value={`$${Number(proposal.amount_usd).toLocaleString('ja-JP', { maximumFractionDigits: 2 })}`} />
+              <Row label={t('rowAmount')} value={`${Number(proposal.amount).toLocaleString('ja-JP', { maximumFractionDigits: 6 })} ${proposal.asset}`} />
+              <Row label={t('rowAmountUsd')} value={`$${Number(proposal.amount_usd).toLocaleString('ja-JP', { maximumFractionDigits: 2 })}`} />
               {proposal.expected_hf_after && (
-                <Row label="予想HF" value={Number(proposal.expected_hf_after).toFixed(4)} />
+                <Row label={t('rowExpectedHf')} value={Number(proposal.expected_hf_after).toFixed(4)} />
               )}
               {proposal.estimated_gas_usd && (
-                <Row label="推定ガス代" value={`$${Number(proposal.estimated_gas_usd).toFixed(4)}`} />
+                <Row label={t('rowEstimatedGas')} value={`$${Number(proposal.estimated_gas_usd).toFixed(4)}`} />
               )}
-              <Row label="AI Decision ID" value={proposal.ai_decision_id ?? '—'} />
-              <Row label="作成日時" value={formatDateTime(proposal.created_at)} />
-              <Row label="期限" value={formatDateTime(proposal.expires_at)} />
-              {proposal.approved_at && <Row label="承認日時" value={formatDateTime(proposal.approved_at)} />}
-              {proposal.rejected_at && <Row label="拒否日時" value={formatDateTime(proposal.rejected_at)} />}
-              {proposal.executed_at && <Row label="実行日時" value={formatDateTime(proposal.executed_at)} />}
+              <Row label={t('rowAiDecisionId')} value={proposal.ai_decision_id ?? '—'} />
+              <Row label={t('rowCreatedAt')} value={formatDateTime(proposal.created_at)} />
+              <Row label={t('rowExpires')} value={formatDateTime(proposal.expires_at)} />
+              {proposal.approved_at && <Row label={t('rowApprovedAt')} value={formatDateTime(proposal.approved_at)} />}
+              {proposal.rejected_at && <Row label={t('rowRejectedAt')} value={formatDateTime(proposal.rejected_at)} />}
+              {proposal.executed_at && <Row label={t('rowExecutedAt')} value={formatDateTime(proposal.executed_at)} />}
             </div>
 
             {/* Reason */}
             <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
               <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                AI判定理由
+                {t('sectionReason')}
               </p>
               <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
                 {proposal.reason}
@@ -106,7 +109,7 @@ export function ProposalDetailModal({ proposal, onClose }: ProposalDetailModalPr
             {proposal.tx_hash && (
               <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
                 <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                  Tx Hash
+                  {t('sectionTxHash')}
                 </p>
                 <code className="text-xs text-blue-600 dark:text-blue-400 break-all">
                   {proposal.tx_hash}

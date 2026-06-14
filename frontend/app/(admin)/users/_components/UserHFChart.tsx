@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import {
   LineChart,
   Line,
@@ -23,10 +24,12 @@ interface UserHFChartProps {
 }
 
 export function UserHFChart({ data }: UserHFChartProps) {
+  const t = useTranslations('AdminUserHFChart')
+
   if (data.length === 0) {
     return (
       <div className="h-40 flex items-center justify-center text-gray-500 text-sm">
-        データなし
+        {t('noData')}
       </div>
     )
   }
@@ -63,7 +66,7 @@ export function UserHFChart({ data }: UserHFChartProps) {
           itemStyle={{ color: '#60a5fa' }}
           formatter={(value: number) => [value.toFixed(2), 'HF']}
         />
-        <ReferenceLine y={1.6} stroke="#ef4444" strokeDasharray="4 2" label={{ value: '危険', fill: '#ef4444', fontSize: 10 }} />
+        <ReferenceLine y={1.6} stroke="#ef4444" strokeDasharray="4 2" label={{ value: t('dangerLabel'), fill: '#ef4444', fontSize: 10 }} />
         <Line
           type="monotone"
           dataKey="hf"

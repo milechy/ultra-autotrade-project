@@ -3042,5 +3042,80 @@
     "cancel": "Cancel",
     "save": "Save",
     "saving": "Saving..."
+  },
+  "AdminProposals": {
+    "pageTitle": "Proposal Management - Ultra AutoTrade",
+    "heading": "Proposal Management",
+    "description": "View all user AI proposals and approval status",
+    "reload": "Reload",
+    "loading": "Loading...",
+    "fetchError": "Failed to fetch proposals"
+  },
+  "AdminProposalFilters": {
+    "heading": "Filters",
+    "statusPlaceholder": "Status",
+    "statusAll": "All",
+    "statusPending": "Pending",
+    "statusApproved": "Approved",
+    "statusRejected": "Rejected",
+    "statusExecuted": "Executed",
+    "statusExpired": "Expired",
+    "operationPlaceholder": "Operation Type",
+    "operationAll": "All Operations",
+    "userSearchPlaceholder": "Search by username / email...",
+    "reset": "Reset",
+    "opSupply": "Supply",
+    "opWithdraw": "Withdraw",
+    "opBorrow": "Borrow",
+    "opRepay": "Repay",
+    "dateFrom": "From",
+    "dateTo": "To"
+  },
+  "AdminProposalDetailModal": {
+    "titlePrefix": "Proposal Detail — #",
+    "statusPending": "Pending",
+    "statusApproved": "Approved",
+    "statusRejected": "Rejected",
+    "statusExecuted": "Executed",
+    "statusExpired": "Expired",
+    "rowAmount": "Amount",
+    "rowAmountUsd": "USD Value",
+    "rowExpectedHf": "Expected HF",
+    "rowEstimatedGas": "Estimated Gas",
+    "rowAiDecisionId": "AI Decision ID",
+    "rowCreatedAt": "Created At",
+    "rowExpires": "Expires",
+    "rowApprovedAt": "Approved At",
+    "rowRejectedAt": "Rejected At",
+    "rowExecutedAt": "Executed At",
+    "sectionReason": "AI Reason",
+    "sectionTxHash": "Tx Hash"
+  },
+  "AdminAILearningCharts": {
+    "feedbackHeading": "Feedback Count Breakdown (30d)",
+    "sourceHeading": "Source Breakdown",
+    "noData": "No data"
+  },
+  "AdminKnowledgeSearch": {
+    "pageTitle": "RAG Search - Knowledge Hub - Ultra AutoTrade",
+    "pageHeading": "RAG Search",
+    "pageDescription": "Search registered knowledge using vector similarity.",
+    "navBack": "← Knowledge List",
+    "queryLabel": "Search Query",
+    "queryPlaceholder": "e.g. Tell me bullish signs for BTC",
+    "countLabel": "Count",
+    "countUnit": "{n} items",
+    "searchBtn": "Search",
+    "searching": "Searching...",
+    "resultHeading": "Search Results",
+    "resultSummary": "\"{query}\" — {count} items",
+    "noResults": "No matching knowledge found.",
+    "similarity": "Similarity {pct}%",
+    "noTitle": "(no title)",
+    "chunkInfo": "Chunk ID: {chunkId} / Document ID: {docId}"
+  },
+  "AdminUserHFChart": {
+    "noData": "No data",
+    "dangerLabel": "Danger"
   }
 }
