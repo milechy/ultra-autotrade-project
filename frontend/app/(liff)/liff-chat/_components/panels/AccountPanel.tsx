@@ -18,6 +18,7 @@ import {
 import { useTranslations } from "next-intl"
 import { useLanguage } from "@/lib/useLanguage"
 import { getAuthToken, clearAuthToken } from "@/lib/auth/token-key"
+import { useWallet } from "@/hooks/useWallet"
 import { liffFetch } from "@/lib/liff/liff-fetch"
 
 interface UserData {
@@ -51,6 +52,10 @@ export function AccountPanel() {
   const { language } = useLanguage()
   const router = useRouter()
   const { logout: privyLogout, authenticated } = usePrivy()
+  // ウォレット表示の単一情報源化: backend の wallet_address が未記録でも、
+  // Privy embedded（または injected）ウォレットのアドレスを useWallet から拾って
+  // 「未連携」誤表示を防ぐ（Asana 1215576087505209）。
+  const { address: liveWalletAddress } = useWallet()
   // 認証状態。未ログイン時に「ログアウト」/「アカウント削除」等の操作系を出さないためのガード。
   // backend JWT (getAuthToken) か Privy authenticated のどちらかがあれば「ログイン済み」とみなす
   // (UserHeader.tsx の {(user||token)&&…} ガード = commit 5c42868 を LIFF v3 にポート)。
@@ -162,9 +167,10 @@ export function AccountPanel() {
     return t("defaultUser")
   }
 
-  // ウォレットアドレス短縮表示
+  // ウォレットアドレス短縮表示。backend の wallet_address を優先し、
+  // 未記録時は Privy/injected の実ウォレット（liveWalletAddress）にフォールバック。
   const getShortAddress = () => {
-    const addr = userData?.wallet_address
+    const addr = userData?.wallet_address ?? liveWalletAddress
     if (!addr) return null
     return `${addr.slice(0, 6)}…${addr.slice(-4)}`
   }
@@ -187,9 +193,9 @@ export function AccountPanel() {
     return t("modeUnknown")
   }
 
-  // ウォレットアドレスコピー
+  // ウォレットアドレスコピー（表示と同じ単一情報源を使う）
   const handleCopyWallet = async () => {
-    const addr = userData?.wallet_address
+    const addr = userData?.wallet_address ?? liveWalletAddress
     if (!addr) return
     try {
       await navigator.clipboard.writeText(addr)
