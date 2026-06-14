@@ -10,7 +10,7 @@
  *   TC4: EN 切替後、Liff.home.approve の英語訳 "Approve" が DOM に現れる
  *        （認証ゲートで到達できない場合は gracefully skip）
  *   TC5: EN モード時、localStorage["lang"] が "en" になる
- *   TC6: EN モードで入金/出金パネルを開けた場合、MoonPay ウィジェット ("Buy with card") が表示される
+ *   TC6: EN モードで入金パネルに MoonPay "Buy with card" は表示されない（Privy Deposit へ一本化）
  *   TC7: JP モードで入金/出金パネルを開いた場合、MoonPay ウィジェット ("クレジットカードで購入") は非表示
  *   TC8: localStorage["lang"]="en" を事前設定してリロードすると EN モードが維持される
  *
@@ -138,7 +138,7 @@ test.describe('[LIFF Chat] i18n JP/EN トグル + MoonPay 言語制御', () => {
     expect(lang, 'localStorage["lang"] は "en" であるべき').toBe('en')
   })
 
-  test('TC6: EN モードで入金パネル内に MoonPay ウィジェット "Buy with card" が表示される', async ({ page }) => {
+  test('TC6: EN モードで入金パネルに MoonPay "Buy with card" は表示されない（Privy Deposit へ一本化）', async ({ page }) => {
     const reachable = await visitLiffChat(page)
     test.skip(!reachable, 'LIFF/Privy 認証ゲートで /liff-chat に到達不能のため skip')
 
@@ -153,9 +153,10 @@ test.describe('[LIFF Chat] i18n JP/EN トグル + MoonPay 言語制御', () => {
     const opened = await openDepositPanel(page)
     test.skip(!opened, '入金/出金パネルを開けない環境のため skip')
 
-    // EN モード時: MoonPayWidget の "Buy with card" テキストが表示される
+    // MoonPay 廃止: Privy fundWallet の "Deposit" ボタンが入金導線を一括で担うため、
+    // 重複していた MoonPay "Buy with card" ウィジェットは EN モードでも表示しない。
     const moonpayText = page.getByText('Buy with card', { exact: false }).first()
-    await expect(moonpayText).toBeVisible({ timeout: 5_000 })
+    await expect(moonpayText).not.toBeVisible({ timeout: 3_000 })
   })
 
   test('TC7: JP モードで入金パネル内に MoonPay ウィジェットが表示されない', async ({ page }) => {
