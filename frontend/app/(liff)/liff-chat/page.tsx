@@ -382,25 +382,24 @@ export default function LiffChatPage() {
         </div>
       </main>
 
-      {/* ── 緊急停止バー（下部固定 / safe-area 対応） */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-30 w-[375px] mx-auto px-4 pt-2 ax-safe-bottom
-                   bg-gradient-to-t from-zinc-950 via-zinc-950/95 to-transparent"
-      >
+      {/* ── 緊急停止バー（下部固定 / safe-area 対応）
+          Arobix warm-light に馴染むよう、黒背景グラデーションは廃し、
+          細めの赤アウトライン（薄赤フィル）にして主張を抑える。 */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 w-[375px] mx-auto px-4 pt-2 ax-safe-bottom">
         {paused ? (
           <div
             role="status"
-            className="w-full py-3 rounded-xl border border-red-500/60 bg-red-500/10
-                       text-red-300 text-sm font-semibold flex items-center justify-center gap-2"
+            className="w-full py-2 rounded-lg border border-red-400/50 bg-red-500/10
+                       text-red-500 text-xs font-medium flex items-center justify-center gap-1.5"
           >
-            <span className="w-2 h-2 rounded-full bg-red-500" />
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
             {t("home.stoppedStatus")}
           </div>
         ) : (
           <button
             onClick={() => setStopConfirmOpen(true)}
-            className="w-full py-3 rounded-xl bg-red-600 active:bg-red-700 text-white font-bold
-                       shadow-lg transition-colors"
+            className="w-full py-2 rounded-lg border border-red-400 bg-red-500/10
+                       text-red-600 text-sm font-semibold active:bg-red-500/20 transition-colors"
             aria-label={t("home.emergencyStopAriaLabel")}
           >
             {t("home.emergencyStop")}
@@ -431,7 +430,7 @@ export default function LiffChatPage() {
               <button
                 onClick={handleEmergencyStop}
                 disabled={stopLoading}
-                className="flex-1 py-3 rounded-xl bg-red-600 active:bg-red-700 text-white font-bold disabled:opacity-50"
+                className="flex-1 py-3 rounded-xl bg-red-500 active:bg-red-600 text-white font-bold disabled:opacity-50"
               >
                 {stopLoading ? t("home.stopping") : t("home.stopConfirm")}
               </button>
