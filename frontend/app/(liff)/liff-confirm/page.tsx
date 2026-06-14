@@ -7,9 +7,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { CheckCircle, ChevronDown, ExternalLink } from "lucide-react"
-
-const getToken = () =>
-  typeof window !== "undefined" ? (localStorage.getItem("auth_token") ?? "") : ""
+import { getAuthToken } from "@/lib/auth/token-key"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
@@ -23,13 +21,16 @@ export default function LiffConfirmPage() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const allChecked = ITEM_IDS.every((id) => checked[id])
   const checkedCount = Object.values(checked).filter(Boolean).length
 
   // terms_agreed_at チェック: 既に同意済みなら /liff-chat へリダイレクト
   useEffect(() => {
-    const token = getToken()
+    // 正準/旧キー両対応の getAuthToken を使う（liff-confirm だけ直読みで
+    // 旧キー保存セッションを取りこぼし、terms-agree が 401 で「押しても無反応」になっていた）。
+    const token = getAuthToken()
     if (!token) {
       setLoading(false)
       return
@@ -53,23 +54,36 @@ export default function LiffConfirmPage() {
   const handleSubmit = async () => {
     if (!allChecked || submitting) return
     setSubmitting(true)
+    setError(null)
 
-    const token = getToken()
+    const token = getAuthToken()
+    // 未認証で叩くと terms-agree が 401 を返し「押しても無反応」になるため、
+    // トークンが無ければ黙って失敗させず再ログインへ誘導する。
+    if (!token) {
+      router.replace("/liff-login")
+      return
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/user/terms-agree`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token ?? ""}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       })
       if (res.ok) {
         router.replace("/liff-chat")
+      } else if (res.status === 401) {
+        // セッション切れ — 再ログインへ誘導
+        router.replace("/liff-login")
       } else {
+        // それ以外の失敗は黙らせず明示（沈黙の失敗を防ぐ）
+        setError(t("submitError"))
         setSubmitting(false)
       }
     } catch {
+      setError(t("submitError"))
       setSubmitting(false)
     }
   }
@@ -206,6 +220,11 @@ export default function LiffConfirmPage() {
             {t("privacyLink")} <ExternalLink className="w-3 h-3" />
           </a>
         </div>
+        {error && (
+          <p role="alert" className="text-red-400 text-sm text-center">
+            {error}
+          </p>
+        )}
         <button
           disabled={!allChecked || submitting}
           onClick={handleSubmit}
