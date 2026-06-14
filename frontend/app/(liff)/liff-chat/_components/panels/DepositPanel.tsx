@@ -9,7 +9,6 @@ import { liffFetch } from "@/lib/liff/liff-fetch"
 import { useFundWallet } from "@privy-io/react-auth"
 import { base, baseSepolia } from "wagmi/chains"
 import { useWallet } from "@/hooks/useWallet"
-import { MoonPayWidget } from "./MoonPayWidget"
 
 // ---- 型定義 ---------------------------------------------------------------
 
@@ -159,11 +158,16 @@ export function DepositPanel() {
     if (!address) return
     setIsFunding(true)
     try {
+      // 入力単位は言語で異なる: 英語=USD（USDC と 1:1）/ 日本語=¥（÷155 で USDC 換算）。
+      // Privy fundWallet の amount は USDC 建てのため、ここで USDC へ正規化する
+      // （旧実装は ¥ 値をそのまま USDC として渡していた不具合を修正）。
+      const num = parseFloat(depositAmount) || 0
+      const usdc = language === "en" ? num : num / JPY_PER_USDC
       await fundWallet({
         address,
         options: {
           chain: chainId === 84532 ? baseSepolia : base,
-          amount: depositAmount || "200",
+          amount: usdc > 0 ? usdc.toFixed(2) : "200",
           asset: "USDC",
         },
       })
@@ -176,7 +180,7 @@ export function DepositPanel() {
       setIsFunding(false)
       void fetchBalance()
     }
-  }, [address, chainId, depositAmount, fetchBalance, fundWallet])
+  }, [address, chainId, depositAmount, language, fetchBalance, fundWallet])
 
   // ---- 出金可能額上限（全額ボタン用） ----------------------------------------
 
@@ -187,6 +191,9 @@ export function DepositPanel() {
   const withdrawNum = parseFloat(withdrawAmount) || 0
   const receiveAmount = Math.max(0, withdrawNum - WITHDRAW_FEE)
   const depositNum = parseFloat(depositAmount) || 0
+  // 入力単位: 英語=USD（≈USDC 1:1）/ 日本語=¥（÷155 で USDC 換算）
+  const isEn = language === "en"
+  const depositUsdc = isEn ? depositNum : depositNum / JPY_PER_USDC
 
   // ---- タブ切替 ------------------------------------------------------------
 
@@ -286,7 +293,7 @@ export function DepositPanel() {
           <div>
             <label className="block text-xs text-zinc-400 mb-1">{t("depositAmountLabel")}</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">¥</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">{isEn ? "$" : "¥"}</span>
               <input
                 type="number"
                 min="0"
@@ -300,22 +307,22 @@ export function DepositPanel() {
             </div>
             {depositNum > 0 && (
               <p className="text-xs text-zinc-500 mt-1">
-                ≈ ${(depositNum / JPY_PER_USDC).toFixed(2)} USDC
+                ≈ ${depositUsdc.toFixed(2)} USDC
               </p>
             )}
           </div>
 
           {/* クイックボタン */}
           <div className="grid grid-cols-4 gap-2">
-            {[10000, 30000, 50000, 100000].map((amt) => (
+            {(isEn ? [100, 300, 500, 1000] : [10000, 30000, 50000, 100000]).map((amt) => (
               <button
                 key={amt}
                 onClick={() => setDepositAmount(String(amt))}
                 className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs py-2 rounded-lg
                            border border-zinc-700 transition-colors"
               >
-                {language === "en"
-                  ? `¥${amt.toLocaleString()}`
+                {isEn
+                  ? `$${amt.toLocaleString()}`
                   : `¥${(amt / 10000).toFixed(0)}${t('unitMan')}`}
               </button>
             ))}
@@ -334,12 +341,9 @@ export function DepositPanel() {
             </ul>
           </div>
 
-          {/* MoonPay ウィジェット（英語モード時のみ表示） */}
-          {language === "en" && (
-            <MoonPayWidget />
-          )}
-
-          {/* 入金ボタン（Privy fundWallet モーダルを開く） */}
+          {/* 入金ボタン（Privy fundWallet モーダルを開く。
+              Privy fundWallet がカード購入・送金・ネットワーク選択を一括で扱うため、
+              旧 MoonPay ウィジェットは重複として削除し、本ボタンに一本化した） */}
           <button
             onClick={() => { void handleFundWallet() }}
             disabled={!address || isFunding}

@@ -688,7 +688,7 @@
         "withdrawableBalance": "Available balance",
         "balanceLoading": "Loading...",
         "network": "USDC · Base Mainnet",
-        "depositAmountLabel": "Enter amount (JPY estimate)",
+        "depositAmountLabel": "Enter amount (USD)",
         "depositAmountPlaceholder": "Enter amount",
         "depositMethodTitle": "How to deposit",
         "depositMethodDesc": "Tap \"Deposit\" to reveal your deposit address. Send USDC from your exchange (e.g. SBI VC Trade) or wallet.",
