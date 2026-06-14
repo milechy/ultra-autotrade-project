@@ -16,6 +16,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useLiff } from "@/hooks/useLiff";
 
@@ -24,14 +25,6 @@ type StepResult = {
   status: "pending" | "running" | "pass" | "fail";
   detail?: string;
 };
-
-const STEPS: StepResult[] = [
-  { step: "1. LIFF初期化", status: "pending" },
-  { step: "2. isInClient確認", status: "pending" },
-  { step: "3. Privy初期化", status: "pending" },
-  { step: "4. Embedded Wallet取得", status: "pending" },
-  { step: "5. eth_signMessage (無料)", status: "pending" },
-];
 
 function statusColor(s: StepResult["status"]) {
   switch (s) {
@@ -60,9 +53,18 @@ function statusIcon(s: StepResult["status"]) {
 }
 
 export default function LiffSignPocPage() {
+  const t = useTranslations("LiffSignPoc");
   const { isReady, isLoggedIn, isInClient, error: liffError } = useLiff();
   const { ready: privyReady, authenticated } = usePrivy();
   const { wallets } = useWallets();
+
+  const STEPS: StepResult[] = [
+    { step: t("step1"), status: "pending" },
+    { step: t("step2"), status: "pending" },
+    { step: t("step3"), status: "pending" },
+    { step: t("step4"), status: "pending" },
+    { step: t("step5"), status: "pending" },
+  ];
 
   const [steps, setSteps] = useState<StepResult[]>(STEPS.map((s) => ({ ...s })));
   const [running, setRunning] = useState(false);
@@ -91,11 +93,11 @@ export default function LiffSignPocPage() {
     // Step 1: LIFF init
     updateStep(0, "running");
     if (!isReady) {
-      updateStep(0, "fail", `LIFF未初期化: ${liffError ?? "timeout"}`);
+      updateStep(0, "fail", t("step1FailDetail", { error: liffError ?? "timeout" }));
       setRunning(false);
       return;
     }
-    updateStep(0, "pass", `isLoggedIn=${isLoggedIn}`);
+    updateStep(0, "pass", t("step1PassDetail", { isLoggedIn: String(isLoggedIn) }));
 
     // Step 2: isInClient
     updateStep(1, "running");
@@ -103,21 +105,21 @@ export default function LiffSignPocPage() {
       updateStep(
         1,
         "fail",
-        "isInClient=false — LINEアプリ外で開いています。LINEアプリのリッチメニューから開いてください。"
+        t("step2FailDetail")
       );
       // Continue anyway for browser testing
     } else {
-      updateStep(1, "pass", "isInClient=true (LINEアプリ内確認)");
+      updateStep(1, "pass", t("step2PassDetail"));
     }
 
     // Step 3: Privy init
     updateStep(2, "running");
     if (!privyReady) {
-      updateStep(2, "fail", "Privy SDK 未初期化 — PrivyProvider が見当たりません");
+      updateStep(2, "fail", t("step3FailDetail"));
       setRunning(false);
       return;
     }
-    updateStep(2, "pass", `authenticated=${authenticated}`);
+    updateStep(2, "pass", t("step3PassDetail", { authenticated: String(authenticated) }));
 
     // Step 4: Embedded wallet
     updateStep(3, "running");
@@ -127,20 +129,20 @@ export default function LiffSignPocPage() {
         updateStep(
           3,
           "fail",
-          "Privy 未ログイン — 「Privyログイン」ボタンで先にログインしてください"
+          t("step4FailNotAuth")
         );
       } else {
         updateStep(
           3,
           "fail",
-          "Embedded wallet が見つかりません。Privy ダッシュボードで embedded wallet が有効か確認してください。"
+          t("step4FailNoWallet")
         );
       }
       setRunning(false);
       return;
     }
     setPrivyWalletAddress(privyWallet.address);
-    updateStep(3, "pass", `address=${privyWallet.address.slice(0, 8)}...`);
+    updateStep(3, "pass", t("step4PassDetail", { address: privyWallet.address.slice(0, 8) }));
 
     // Step 5: eth_signMessage
     updateStep(4, "running");
@@ -158,20 +160,20 @@ export default function LiffSignPocPage() {
         params: [msgHex, privyWallet.address],
       })) as string;
       if (!signature || !signature.startsWith("0x")) {
-        updateStep(4, "fail", `署名が空またはinvalid: ${signature}`);
+        updateStep(4, "fail", t("step5FailInvalid", { signature }));
       } else {
         updateStep(
           4,
           "pass",
-          `署名成功: ${signature.slice(0, 16)}... — LIFF内Privy署名は動作します ✓`
+          t("step5PassDetail", { signature: signature.slice(0, 16) })
         );
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("User rejected") || msg.includes("user rejected")) {
-        updateStep(4, "fail", "ユーザーがキャンセルしました (正常操作)");
+        updateStep(4, "fail", t("step5FailCancelled"));
       } else {
-        updateStep(4, "fail", `署名失敗: ${msg}`);
+        updateStep(4, "fail", t("step5FailError", { msg }));
       }
     }
 
@@ -181,46 +183,46 @@ export default function LiffSignPocPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 px-4 py-6 max-w-md mx-auto">
       <h1 className="text-lg font-bold mb-2 text-center">
-        LIFF × Privy 署名 PoC
+        {t("title")}
       </h1>
       <p className="text-xs text-zinc-500 text-center mb-6">
-        技術検証専用ページ — 本番機能ではありません
+        {t("subtitle")}
       </p>
 
       {/* Environment info */}
       <div className="bg-zinc-900 rounded-lg p-3 mb-4 space-y-1 text-xs">
-        <div className="text-zinc-400 font-medium mb-1">環境情報</div>
+        <div className="text-zinc-400 font-medium mb-1">{t("envInfo")}</div>
         <div>
-          <span className="text-zinc-500">UserAgent: </span>
+          <span className="text-zinc-500">{t("envUserAgent")}: </span>
           <span className="text-zinc-300 break-all">{userAgent.slice(0, 80)}...</span>
         </div>
         <div>
-          <span className="text-zinc-500">LIFF ready: </span>
+          <span className="text-zinc-500">{t("envLiffReady")}: </span>
           <span className={isReady ? "text-green-400" : "text-yellow-400"}>
             {isReady ? "true" : "false"}
           </span>
         </div>
         <div>
-          <span className="text-zinc-500">isInClient: </span>
+          <span className="text-zinc-500">{t("envIsInClient")}: </span>
           <span className={isInClient ? "text-green-400" : "text-red-400"}>
             {isReady ? String(isInClient) : "—"}
           </span>
         </div>
         <div>
-          <span className="text-zinc-500">Privy ready: </span>
+          <span className="text-zinc-500">{t("envPrivyReady")}: </span>
           <span className={privyReady ? "text-green-400" : "text-yellow-400"}>
             {privyReady ? "true" : "false"}
           </span>
         </div>
         <div>
-          <span className="text-zinc-500">Privy auth: </span>
+          <span className="text-zinc-500">{t("envPrivyAuth")}: </span>
           <span className={authenticated ? "text-green-400" : "text-zinc-400"}>
             {authenticated ? "true" : "false"}
           </span>
         </div>
         {privyWalletAddress && (
           <div>
-            <span className="text-zinc-500">Wallet: </span>
+            <span className="text-zinc-500">{t("envWallet")}: </span>
             <span className="text-blue-400 font-mono">
               {privyWalletAddress.slice(0, 8)}...{privyWalletAddress.slice(-4)}
             </span>
@@ -235,7 +237,7 @@ export default function LiffSignPocPage() {
 
       {/* Steps */}
       <div className="bg-zinc-900 rounded-lg p-3 mb-4 space-y-3">
-        <div className="text-zinc-400 font-medium text-xs mb-2">検証ステップ</div>
+        <div className="text-zinc-400 font-medium text-xs mb-2">{t("stepsTitle")}</div>
         {steps.map((s, i) => (
           <div key={i} className="flex gap-2 items-start">
             <span className="text-base leading-tight">{statusIcon(s.status)}</span>
@@ -260,11 +262,11 @@ export default function LiffSignPocPage() {
         className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed
                    text-white font-semibold py-3 rounded-lg transition-colors text-sm mb-3"
       >
-        {running ? "検証中..." : isReady ? "PoC 検証実行" : "LIFF初期化中..."}
+        {running ? t("runButtonRunning") : isReady ? t("runButton") : t("runButtonInitializing")}
       </button>
 
       <p className="text-xs text-zinc-600 text-center">
-        LINEアプリのリッチメニューから /liff-sign-poc を開いて実行してください
+        {t("hint")}
       </p>
     </div>
   );
@@ -272,13 +274,14 @@ export default function LiffSignPocPage() {
 
 // Privy login button — rendered only when not authenticated
 function PrivyLoginButton() {
+  const t = useTranslations("LiffSignPoc");
   const { login } = usePrivy();
   return (
     <button
       onClick={() => login()}
       className="w-full bg-violet-700 hover:bg-violet-600 text-white font-semibold py-2.5 rounded-lg text-sm mb-4"
     >
-      Privyでログイン (Step 3-5 に必要)
+      {t("privyLoginButton")}
     </button>
   );
 }

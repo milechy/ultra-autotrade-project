@@ -1,8 +1,11 @@
 // frontend/components/DemoBanner.tsx
 // Shown only when NEXT_PUBLIC_MOCK_MODE=true. Warns users this is a demo environment.
 
-export function DemoBanner() {
+import { getTranslations } from 'next-intl/server'
+
+export async function DemoBanner() {
   if (process.env.NEXT_PUBLIC_MOCK_MODE !== "true") return null;
+  const t = await getTranslations('DemoBanner');
   return (
     <div
       role="banner"
@@ -21,7 +24,7 @@ export function DemoBanner() {
         zIndex: 9999,
       }}
     >
-      ⚠️ DEMO 環境 — 表示データはすべてサンプルです。本番環境ではありません。
+      {t('notice')}
     </div>
   );
 }

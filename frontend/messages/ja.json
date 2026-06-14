@@ -617,17 +617,7 @@
       "operatingCoins": "運用中コイン",
       "noCoins": "運用中のコインがありません",
       "openChatAriaLabel": "チャットを開く",
-      "assetChartLoading": "グラフを読み込み中...",
-      "emergencyStop": "緊急停止",
-      "emergencyStopAriaLabel": "自律売買を緊急停止する",
-      "stoppedStatus": "自律売買は停止中です",
-      "stopConfirmTitle": "自律売買を停止しますか？",
-      "stopConfirmDesc": "停止すると、AIによる自動の判断・実行が止まります。再開はサポートにご連絡ください。",
-      "stopCancel": "キャンセル",
-      "stopConfirm": "停止する",
-      "stopping": "停止中...",
-      "stopSuccess": "自律売買を停止しました",
-      "stopFailed": "停止に失敗しました。時間をおいて再度お試しください"
+      "assetChartLoading": "グラフを読み込み中..."
     },
     "panels": {
       "assetHistory": "資産推移",
@@ -2726,5 +2716,79 @@
     "labelCooldown": "クールダウン",
     "suffixPercent": "%",
     "suffixSeconds": "秒"
+  },
+  "LiffHistory": {
+    "loading": "読み込み中...",
+    "liffInitError": "LIFF初期化エラー: {error}",
+    "reauthing": "再認証中...",
+    "title": "取引履歴",
+    "totalCount": "全 {total} 件",
+    "fetchError": "データ取得に失敗しました",
+    "noHistory": "取引履歴がありません",
+    "confidence": "信頼度 {value}%",
+    "agreed": "合意済",
+    "prevPage": "← 前へ",
+    "nextPage": "次へ →"
+  },
+  "LiffFeeApprove": {
+    "loading": "読み込み中...",
+    "liffInitError": "LIFF初期化エラー: {error}",
+    "reauthing": "再認証中...",
+    "title": "手数料承認",
+    "description": "月次手数料の自動徴収を有効にするための承認を行います"
+  },
+  "LiffSignPoc": {
+    "title": "LIFF × Privy 署名 PoC",
+    "subtitle": "技術検証専用ページ — 本番機能ではありません",
+    "envInfo": "環境情報",
+    "envUserAgent": "UserAgent",
+    "envLiffReady": "LIFF ready",
+    "envIsInClient": "isInClient",
+    "envPrivyReady": "Privy ready",
+    "envPrivyAuth": "Privy auth",
+    "envWallet": "Wallet",
+    "stepsTitle": "検証ステップ",
+    "step1": "1. LIFF初期化",
+    "step2": "2. isInClient確認",
+    "step3": "3. Privy初期化",
+    "step4": "4. Embedded Wallet取得",
+    "step5": "5. eth_signMessage (無料)",
+    "step1FailDetail": "LIFF未初期化: {error}",
+    "step1PassDetail": "isLoggedIn={isLoggedIn}",
+    "step2FailDetail": "isInClient=false — LINEアプリ外で開いています。LINEアプリのリッチメニューから開いてください。",
+    "step2PassDetail": "isInClient=true (LINEアプリ内確認)",
+    "step3FailDetail": "Privy SDK 未初期化 — PrivyProvider が見当たりません",
+    "step3PassDetail": "authenticated={authenticated}",
+    "step4FailNotAuth": "Privy 未ログイン — 「Privyログイン」ボタンで先にログインしてください",
+    "step4FailNoWallet": "Embedded wallet が見つかりません。Privy ダッシュボードで embedded wallet が有効か確認してください。",
+    "step4PassDetail": "address={address}...",
+    "step5FailInvalid": "署名が空またはinvalid: {signature}",
+    "step5PassDetail": "署名成功: {signature}... — LIFF内Privy署名は動作します ✓",
+    "step5FailCancelled": "ユーザーがキャンセルしました (正常操作)",
+    "step5FailError": "署名失敗: {msg}",
+    "runButton": "PoC 検証実行",
+    "runButtonRunning": "検証中...",
+    "runButtonInitializing": "LIFF初期化中...",
+    "hint": "LINEアプリのリッチメニューから /liff-sign-poc を開いて実行してください",
+    "privyLoginButton": "Privyでログイン (Step 3-5 に必要)"
+  },
+  "LiffBrowserLoginPrompt": {
+    "title": "ログインが必要です",
+    "description": "ご自身のウォレットでログインすると、提案の確認と承認ができます。",
+    "loginButton": "ウォレットでログイン",
+    "signingIn": "ログイン中...",
+    "lineAppHint": "LINEアプリからご利用の場合は、メニューから開き直してください。"
+  },
+  "LiffLayout": {
+    "reauthing": "セッションを復元しています..."
+  },
+  "NotFound": {
+    "title": "ページが見つかりません",
+    "description": "お探しのページは存在しないか、移動または削除された可能性があります。URLをご確認の上、もう一度お試しください。",
+    "suggestion": "AI-powered DeFi 自動運用プラットフォーム",
+    "homeButton": "ホームへ戻る"
+  },
+  "DemoBanner": {
+    "notice": "⚠️ DEMO 環境 — 表示データはすべてサンプルです。本番環境ではありません。"
   }
 }

@@ -4,8 +4,11 @@
 import Link from 'next/link'
 import { AlertTriangle, Home } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { getTranslations } from 'next-intl/server'
 
-export default function NotFound() {
+export default async function NotFound() {
+  const t = await getTranslations('NotFound')
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center justify-center px-4">
       <div className="max-w-md w-full text-center space-y-8">
@@ -20,11 +23,10 @@ export default function NotFound() {
         <div>
           <p className="text-6xl font-bold text-blue-500 mb-2">404</p>
           <h1 className="text-2xl font-bold text-white mb-3">
-            ページが見つかりません
+            {t('title')}
           </h1>
           <p className="text-gray-400 text-sm leading-relaxed">
-            お探しのページは存在しないか、移動または削除された可能性があります。
-            URLをご確認の上、もう一度お試しください。
+            {t('description')}
           </p>
         </div>
 
@@ -37,7 +39,7 @@ export default function NotFound() {
             Ultra AutoTrade
           </p>
           <p className="text-xs text-gray-600">
-            AI-powered DeFi 自動運用プラットフォーム
+            {t('suggestion')}
           </p>
         </div>
 
@@ -49,7 +51,7 @@ export default function NotFound() {
         >
           <Link href="/">
             <Home className="mr-2 h-4 w-4" />
-            ホームへ戻る
+            {t('homeButton')}
           </Link>
         </Button>
       </div>

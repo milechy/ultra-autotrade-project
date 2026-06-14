@@ -6,17 +6,19 @@
 //
 // F-S6 non-custodial: LIFF 内からアクセスする手数料 allowance 承認ページ
 
+import { useTranslations } from 'next-intl'
 import { useLiff } from '@/hooks/useLiff'
 import { FeeApproveCard } from '@/components/user/FeeApproveCard'
 import { BrowserLoginPrompt } from '../_components/BrowserLoginPrompt'
 
 export default function LiffFeeApprovePage() {
+  const t = useTranslations('LiffFeeApprove')
   const { isReady, error, liffConfigured } = useLiff()
 
   if (!isReady) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-zinc-950">
-        <p className="text-zinc-400 text-sm">読み込み中...</p>
+        <p className="text-zinc-400 text-sm">{t('loading')}</p>
       </div>
     )
   }
@@ -26,7 +28,7 @@ export default function LiffFeeApprovePage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
         <p className="text-red-400 text-sm text-center">
-          LIFF初期化エラー: {error}
+          {t('liffInitError', { error })}
         </p>
       </div>
     )
@@ -44,7 +46,7 @@ export default function LiffFeeApprovePage() {
       }
       return (
         <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
-          <p className="text-zinc-400 text-sm">再認証中...</p>
+          <p className="text-zinc-400 text-sm">{t('reauthing')}</p>
         </div>
       )
     }
@@ -55,9 +57,9 @@ export default function LiffFeeApprovePage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 px-4 py-6 max-w-md mx-auto">
       <div className="mb-6">
-        <h1 className="text-xl font-bold">手数料承認</h1>
+        <h1 className="text-xl font-bold">{t('title')}</h1>
         <p className="text-sm text-zinc-400 mt-1">
-          月次手数料の自動徴収を有効にするための承認を行います
+          {t('description')}
         </p>
       </div>
       <FeeApproveCard />

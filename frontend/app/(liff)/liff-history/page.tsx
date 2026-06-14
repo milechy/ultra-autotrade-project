@@ -5,6 +5,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useLiff } from "@/hooks/useLiff";
 import { BrowserLoginPrompt } from "../_components/BrowserLoginPrompt";
 
@@ -30,6 +31,7 @@ type DecisionListResponse = {
 };
 
 export default function LiffHistoryPage() {
+  const t = useTranslations("LiffHistory");
   const { isReady, error, liffConfigured } = useLiff();
   const [items, setItems] = useState<Decision[]>([]);
   const [total, setTotal] = useState(0);
@@ -65,17 +67,17 @@ export default function LiffHistoryPage() {
       })
       .catch((err: unknown) =>
         setFetchError(
-          err instanceof Error ? err.message : "データ取得に失敗しました"
+          err instanceof Error ? err.message : t("fetchError")
         )
       )
       .finally(() => setLoading(false));
-  }, [isReady, token, offset]);
+  }, [isReady, token, offset, t]);
 
   // --- Loading state ---
   if (!isReady) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-zinc-950">
-        <p className="text-zinc-400 text-sm">読み込み中...</p>
+        <p className="text-zinc-400 text-sm">{t("loading")}</p>
       </div>
     );
   }
@@ -85,7 +87,7 @@ export default function LiffHistoryPage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
         <p className="text-red-400 text-sm text-center">
-          LIFF初期化エラー: {error}
+          {t("liffInitError", { error })}
         </p>
       </div>
     );
@@ -101,7 +103,7 @@ export default function LiffHistoryPage() {
       }
       return (
         <div className="flex items-center justify-center min-h-screen bg-zinc-950 px-4">
-          <p className="text-zinc-400 text-sm">再認証中...</p>
+          <p className="text-zinc-400 text-sm">{t("reauthing")}</p>
         </div>
       );
     }
@@ -114,11 +116,11 @@ export default function LiffHistoryPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 px-4 py-6 max-w-md mx-auto">
-      <h1 className="text-xl font-bold mb-2 text-center">取引履歴</h1>
-      <p className="text-zinc-500 text-xs text-center mb-6">全 {total} 件</p>
+      <h1 className="text-xl font-bold mb-2 text-center">{t("title")}</h1>
+      <p className="text-zinc-500 text-xs text-center mb-6">{t("totalCount", { total })}</p>
 
       {loading && (
-        <p className="text-zinc-400 text-sm text-center py-8">読み込み中...</p>
+        <p className="text-zinc-400 text-sm text-center py-8">{t("loading")}</p>
       )}
 
       {fetchError && (
@@ -127,7 +129,7 @@ export default function LiffHistoryPage() {
 
       {!loading && !fetchError && items.length === 0 && (
         <p className="text-zinc-400 text-sm text-center py-8">
-          取引履歴がありません
+          {t("noHistory")}
         </p>
       )}
 
@@ -160,7 +162,7 @@ export default function LiffHistoryPage() {
                       {item.action}
                     </span>
                     <span className="text-zinc-400 text-xs">
-                      信頼度 {item.confidence}%
+                      {t("confidence", { value: item.confidence })}
                     </span>
                   </div>
                   <span className="text-zinc-500 text-xs">
@@ -187,7 +189,7 @@ export default function LiffHistoryPage() {
                   </span>
                   {item.agreed && (
                     <span className="text-zinc-400 text-xs bg-zinc-800 px-2 py-0.5 rounded">
-                      合意済
+                      {t("agreed")}
                     </span>
                   )}
                 </div>
@@ -206,7 +208,7 @@ export default function LiffHistoryPage() {
             className="text-zinc-400 disabled:opacity-30 text-sm px-3 py-2 rounded-lg
                        border border-zinc-700 hover:border-zinc-500 transition-colors"
           >
-            ← 前へ
+            {t("prevPage")}
           </button>
 
           <span className="text-zinc-500 text-xs">
@@ -219,7 +221,7 @@ export default function LiffHistoryPage() {
             className="text-zinc-400 disabled:opacity-30 text-sm px-3 py-2 rounded-lg
                        border border-zinc-700 hover:border-zinc-500 transition-colors"
           >
-            次へ →
+            {t("nextPage")}
           </button>
         </div>
       )}
