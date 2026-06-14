@@ -121,7 +121,7 @@ export function UserTable({ users, onSelectUser }: UserTableProps) {
               <TableCell className="py-3">
                 <div className="flex items-center gap-2">
                   {user.isPaused && (
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-400 flex-shrink-0" title="停止中" />
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-400 flex-shrink-0" title={t('suspendedTooltip')} />
                   )}
                   <WalletAddressMask address={user.address} chars={6} />
                 </div>

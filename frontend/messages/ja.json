@@ -1989,7 +1989,10 @@
     "dialogConfirm": "生成する",
     "toastSuccess": "レポートを生成しました",
     "toastErrorPrefix": "エラー: {msg}",
-    "generateFailed": "生成に失敗しました"
+    "generateFailed": "生成に失敗しました",
+    "mockNote1": "通常運用。HFは安定して推移。",
+    "mockNote2": "HFが1.6を下回り緊急停止が発動。03:14 JST に自動復旧。担当者への通知済み。",
+    "mockNote3": "週次まとめ。3/20の緊急停止を含む。全体的なHFは良好。"
   },
   "Terms": {
     "back": "戻る",
@@ -2043,7 +2046,16 @@
     "detailFieldComponent": "コンポーネント",
     "detailFieldMessage": "メッセージ",
     "detailFieldMetricId": "メトリクスID",
-    "detailFieldMetricValue": "メトリクス値"
+    "detailFieldMetricValue": "メトリクス値",
+    "mockMsg1": "緊急停止フラグが発動しました。Health Factor が閾値を下回りました。",
+    "mockMsg2": "Health Factor が危険水準に到達しました。即時対応が必要です。",
+    "mockMsg3": "1日の取引制限の80%に到達しました。残りの取引枠に注意してください。",
+    "mockMsg4": "GPT-4o クロス検証タイムアウト。Claude の判断のみで実行しました。",
+    "mockMsg5": "BUY シグナルを実行しました。Bybit Sandbox に注文を送信しました。",
+    "mockMsg6": "ナレッジベースの更新が完了しました。新規チャンク 12 件を追加しました。",
+    "mockMsg7": "クールダウン期間中のため、Aave 操作をスキップしました。",
+    "mockMsg8": "リバランス完了: USDC 500 を Aave V3 に預入しました。",
+    "mockUnit": "件"
   },
   "AdminTrades": {
     "pageTitle": "取引履歴",
@@ -2406,7 +2418,10 @@
     "sampleData": "サンプルデータ",
     "chartConfidence": "信頼度トレンド（直近7日）",
     "chartActionDist": "判定アクション分布",
-    "chartTwoPhase": "Two-Phase一致率"
+    "chartTwoPhase": "Two-Phase一致率",
+    "mockReason1": "強気トレンド継続。RSI過熱なし。",
+    "mockReason2": "Health Factor 1.62 — 閾値接近のため保留。",
+    "mockReason3": "フェーズ間で不一致。安全側のHOLDを採用。"
   },
   "UserDetailPanel": {
     "dialogTitle": "ユーザー詳細",
@@ -2613,7 +2628,8 @@
     "riskAggressive": "積極",
     "statusNormal": "正常",
     "statusWarning": "警告",
-    "statusDanger": "危険"
+    "statusDanger": "危険",
+    "suspendedTooltip": "停止中"
   },
   "SharedEmergencyStopButton": {
     "buttonLabel": "緊急停止",
@@ -3392,5 +3408,15 @@
     "walletChars10": "chars=10",
     "datePresetsOn": "presets=true (デフォルト)",
     "datePresetsOff": "presets=false (カスタム入力のみ)"
+  },
+  "AdminProposalKPIs": {
+    "pending": "承認待ち",
+    "todayApproved": "本日承認",
+    "todayRejected": "本日拒否",
+    "timeout": "タイムアウト",
+    "countSuffix": "件"
+  },
+  "AdminUserPositions": {
+    "noPositions": "ポジションなし"
   }
 }
