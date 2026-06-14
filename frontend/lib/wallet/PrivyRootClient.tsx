@@ -38,8 +38,10 @@ export function PrivyRootClient({ children }: { children: ReactNode }) {
         // 外部 wallet 不要で onboarding できるようにする。LINE は OAuth 設定別途必要 (別 Lane)。
         loginMethods: ['email', 'google', 'apple', 'wallet'],
         appearance: {
+          // Arobix ブランド統一: アプリの primary CTA（紫系グラデ）に合わせ、
+          // Privy モーダルの accentColor を Arobix purple に揃える。
           theme: 'dark',
-          accentColor: '#6366f1',
+          accentColor: '#6e56cf',
         },
         supportedChains: [base, baseSepolia],
         defaultChain,
