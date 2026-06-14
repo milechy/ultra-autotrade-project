@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 export interface HealthFactorGaugeProps {
   value: number | null
@@ -27,17 +28,19 @@ const sizeMap = {
 } as const
 
 export function HealthFactorGauge({ value, size = 'md', className }: HealthFactorGaugeProps) {
+  const t = useTranslations('SharedHealthFactorGauge')
+
   function getHealthLabel(v: number): string {
-    if (v >= 2.0) return '安全'
-    if (v >= 1.6) return '注意'
-    return '危険'
+    if (v >= 2.0) return t('safe')
+    if (v >= 1.6) return t('caution')
+    return t('danger')
   }
 
   if (value === null) {
     return (
       <div className={cn('flex flex-col gap-1', className)}>
         <span className="text-sm text-muted-foreground">Health Factor</span>
-        <span className="text-sm font-medium text-muted-foreground truncate">借入なし</span>
+        <span className="text-sm font-medium text-muted-foreground truncate">{t('noBorrow')}</span>
       </div>
     )
   }
