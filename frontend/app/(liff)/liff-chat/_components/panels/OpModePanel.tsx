@@ -6,6 +6,7 @@ import { Bot, MousePointer2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { getAuthToken } from "@/lib/auth/token-key"
 import { liffFetch } from "@/lib/liff/liff-fetch"
+import { track, EV } from "@/lib/posthog"
 
 type UserMode = "managed" | "active"
 
@@ -78,6 +79,7 @@ export function OpModePanel() {
         body: JSON.stringify({ user_mode: newMode }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      track(EV.OPMODE_CHANGE, { mode: newMode })
       setToast(t("toastSwitched", { mode: MODE_LABEL[newMode] }))
       setTimeout(() => setToast(null), 2500)
     } catch {

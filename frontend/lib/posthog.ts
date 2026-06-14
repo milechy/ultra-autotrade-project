@@ -27,8 +27,12 @@ export const EV = {
   JUDGMENT_REJECT:     "liff_judgment_reject",
   EMERGENCY_STOP:      "liff_emergency_stop",
   CHAT_OPEN:           "liff_chat_open",
+  CHAT_QUESTION:       "liff_chat_question",
   LANGUAGE_TOGGLE:     "liff_language_toggle",
   ACCOUNT_OPEN:        "liff_account_open",
+  OPMODE_CHANGE:       "liff_opmode_change",
+  DEPOSIT_FUND:        "liff_deposit_fund",
+  WITHDRAW_SUBMIT:     "liff_withdraw_submit",
 } as const
 
 export type EventName = typeof EV[keyof typeof EV]

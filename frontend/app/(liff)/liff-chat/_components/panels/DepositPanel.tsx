@@ -9,6 +9,7 @@ import { liffFetch } from "@/lib/liff/liff-fetch"
 import { useFundWallet } from "@privy-io/react-auth"
 import { base, baseSepolia } from "wagmi/chains"
 import { useWallet } from "@/hooks/useWallet"
+import { track, EV } from "@/lib/posthog"
 
 // ---- 型定義 ---------------------------------------------------------------
 
@@ -156,6 +157,7 @@ export function DepositPanel() {
 
   const handleFundWallet = useCallback(async () => {
     if (!address) return
+    track(EV.DEPOSIT_FUND)
     setIsFunding(true)
     try {
       // 入力単位は言語で異なる: 英語=USD（USDC と 1:1）/ 日本語=¥（÷155 で USDC 換算）。
@@ -226,6 +228,7 @@ export function DepositPanel() {
         throw new Error(detail?.detail ?? t("withdrawFailed"))
       }
       setConfirmOpen(false)
+      track(EV.WITHDRAW_SUBMIT)
       setSuccessMsg(t("successMsg"))
       setWithdrawAmount("")
       void fetchBalance()

@@ -1,6 +1,6 @@
 'use client'
 
-import { AuthGuard } from '@/components/AuthGuard'
+import AuthGuard from '@/components/AuthGuard'
 import { POSTHOG_KEY, POSTHOG_HOST, EV } from '@/lib/posthog'
 
 const EVENT_DESCRIPTIONS: Record<string, string> = {
