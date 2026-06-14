@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React, { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -47,6 +48,9 @@ interface MaskedInputProps {
   onTest: () => void
   testLabel: string
   testLoading: boolean
+  sendingLabel: string
+  revealLabel: string
+  hideLabel: string
 }
 
 function MaskedInput({
@@ -56,6 +60,9 @@ function MaskedInput({
   onTest,
   testLabel,
   testLoading,
+  sendingLabel,
+  revealLabel,
+  hideLabel,
 }: MaskedInputProps) {
   const [revealed, setRevealed] = useState(false)
 
@@ -75,7 +82,7 @@ function MaskedInput({
             onClick={() => setRevealed((r) => !r)}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
           >
-            {revealed ? '隠す' : '表示'}
+            {revealed ? hideLabel : revealLabel}
           </button>
         </div>
         {!revealed && value && (
@@ -90,7 +97,7 @@ function MaskedInput({
           disabled={testLoading || !value}
           className="border-gray-700 text-gray-300 hover:bg-gray-800 shrink-0"
         >
-          {testLoading ? '送信中...' : testLabel}
+          {testLoading ? sendingLabel : testLabel}
         </Button>
       </div>
     </div>
@@ -98,6 +105,7 @@ function MaskedInput({
 }
 
 export function NotificationSection({ settings, onChange }: NotificationSectionProps) {
+  const t = useTranslations('AdminNotification')
   const [slackTesting, setSlackTesting] = useState(false)
   const [lineTesting, setLineTesting] = useState(false)
 
@@ -113,7 +121,7 @@ export function NotificationSection({ settings, onChange }: NotificationSectionP
     try {
       // TODO: POST /api/settings/notifications/test/slack
       await new Promise<void>((resolve) => setTimeout(resolve, 800))
-      alert('Slack テスト送信しました（モック）')
+      alert(t('slackTestSent'))
     } finally {
       setSlackTesting(false)
     }
@@ -124,7 +132,7 @@ export function NotificationSection({ settings, onChange }: NotificationSectionP
     try {
       // TODO: POST /api/settings/notifications/test/line
       await new Promise<void>((resolve) => setTimeout(resolve, 800))
-      alert('LINE テスト送信しました（モック）')
+      alert(t('lineTestSent'))
     } finally {
       setLineTesting(false)
     }
@@ -133,7 +141,7 @@ export function NotificationSection({ settings, onChange }: NotificationSectionP
   return (
     <Card className="bg-gray-900 border-gray-800">
       <CardHeader className="pb-3">
-        <CardTitle className="text-gray-100 text-base font-semibold">通知設定</CardTitle>
+        <CardTitle className="text-gray-100 text-base font-semibold">{t('title')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
         {/* TODO: PUT /api/settings/notifications */}
@@ -142,21 +150,27 @@ export function NotificationSection({ settings, onChange }: NotificationSectionP
           value={settings.slackWebhookUrl}
           onChange={(v) => update('slackWebhookUrl', v)}
           onTest={handleSlackTest}
-          testLabel="テスト送信"
+          testLabel={t('testSendBtn')}
           testLoading={slackTesting}
+          sendingLabel={t('sendingBtn')}
+          revealLabel={t('revealBtn')}
+          hideLabel={t('hideBtn')}
         />
         <MaskedInput
-          label="LINE トークン"
+          label={t('lineTokenLabel')}
           value={settings.lineToken}
           onChange={(v) => update('lineToken', v)}
           onTest={handleLineTest}
-          testLabel="テスト送信"
+          testLabel={t('testSendBtn')}
           testLoading={lineTesting}
+          sendingLabel={t('sendingBtn')}
+          revealLabel={t('revealBtn')}
+          hideLabel={t('hideBtn')}
         />
 
         {/* 通知レベル閾値 */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-          <Label className="text-gray-400 text-sm w-36 shrink-0">通知レベル閾値</Label>
+          <Label className="text-gray-400 text-sm w-36 shrink-0">{t('labelNotificationLevel')}</Label>
           <Select
             value={settings.notificationLevel}
             onValueChange={(v) => update('notificationLevel', v)}

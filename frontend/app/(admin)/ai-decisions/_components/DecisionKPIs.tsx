@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
 
+import { useTranslations } from 'next-intl'
 import { Brain, BarChart2, Percent } from 'lucide-react'
 import { KPICard } from '@/components/shared/KPICard'
 import type { AiDecision } from '../mock-data'
@@ -11,6 +12,7 @@ interface DecisionKPIsProps {
 }
 
 export function DecisionKPIs({ decisions }: DecisionKPIsProps) {
+  const t = useTranslations('AdminDecisionKPIs')
   const today = new Date().toDateString()
   const todayCount = decisions.filter(
     (d) => new Date(d.timestamp).toDateString() === today
@@ -35,18 +37,18 @@ export function DecisionKPIs({ decisions }: DecisionKPIsProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <KPICard
-        label="本日の判定数"
+        label={t('labelTodayCount')}
         value={todayCount}
-        suffix="件"
+        suffix={t('suffixCount')}
         icon={Brain}
       />
       <KPICard
-        label="BUY/SELL比率"
+        label={t('labelBuySellRatio')}
         value={`BUY ${buyPct}% / SELL ${sellPct}% / HOLD ${holdPct}%`}
         icon={BarChart2}
       />
       <KPICard
-        label="平均信頼度"
+        label={t('labelAvgConfidence')}
         value={avgConfidence}
         suffix="%"
         icon={Percent}

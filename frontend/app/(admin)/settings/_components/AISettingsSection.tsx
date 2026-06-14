@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import React from 'react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
@@ -26,15 +27,17 @@ interface AISettingsSectionProps {
   onChange: (settings: AISettings) => void
 }
 
-const FREQUENCY_OPTIONS = [
-  { value: '1h', label: '1時間' },
-  { value: '2h', label: '2時間' },
-  { value: '4h', label: '4時間' },
-  { value: '8h', label: '8時間' },
-  { value: 'manual', label: '手動のみ' },
-]
-
 export function AISettingsSection({ settings, onChange }: AISettingsSectionProps) {
+  const t = useTranslations('AdminAISettings')
+
+  const FREQUENCY_OPTIONS = [
+    { value: '1h', label: t('freq1h') },
+    { value: '2h', label: t('freq2h') },
+    { value: '4h', label: t('freq4h') },
+    { value: '8h', label: t('freq8h') },
+    { value: 'manual', label: t('freqManual') },
+  ]
+
   const update = <K extends keyof AISettings>(key: K, value: AISettings[K]) => {
     onChange({ ...settings, [key]: value })
   }
@@ -42,12 +45,12 @@ export function AISettingsSection({ settings, onChange }: AISettingsSectionProps
   return (
     <Card className="bg-gray-900 border-gray-800">
       <CardHeader className="pb-3">
-        <CardTitle className="text-gray-100 text-base font-semibold">AI判定設定</CardTitle>
+        <CardTitle className="text-gray-100 text-base font-semibold">{t('title')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
         {/* 判定頻度 */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-          <Label className="text-gray-400 text-sm w-36 shrink-0">判定頻度</Label>
+          <Label className="text-gray-400 text-sm w-36 shrink-0">{t('labelFrequency')}</Label>
           <Select
             value={settings.frequency}
             onValueChange={(v) => update('frequency', v)}
@@ -73,7 +76,7 @@ export function AISettingsSection({ settings, onChange }: AISettingsSectionProps
         {/* 信頼度閾値 */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <Label className="text-gray-400 text-sm">信頼度閾値</Label>
+            <Label className="text-gray-400 text-sm">{t('labelConfidenceThreshold')}</Label>
             <span className="text-gray-200 text-sm font-semibold tabular-nums">
               {settings.confidenceThreshold}
             </span>
@@ -95,7 +98,7 @@ export function AISettingsSection({ settings, onChange }: AISettingsSectionProps
 
         {/* クロス検証 */}
         <div className="flex items-center gap-4">
-          <Label className="text-gray-400 text-sm w-36 shrink-0">クロス検証</Label>
+          <Label className="text-gray-400 text-sm w-36 shrink-0">{t('labelCrossVerification')}</Label>
           <div className="flex items-center gap-3">
             <Switch
               checked={settings.crossVerification}

@@ -5,6 +5,7 @@
 // frontend/app/(admin)/settings/config/page.tsx
 
 import React, { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import AuthGuard from '@/components/AuthGuard'
 import {
   OperationModeSection,
@@ -53,6 +54,7 @@ export default function SettingsPage() {
 }
 
 function SettingsContent() {
+  const t = useTranslations('AdminSettingsConfig')
   const [mode, setMode] = useState<OperationMode>(MOCK_SETTINGS.mode)
   const [aiSettings, setAiSettings] = useState<AISettings>(MOCK_SETTINGS.ai)
   const [riskSettings, setRiskSettings] = useState<RiskSettings>(MOCK_SETTINGS.risk)
@@ -68,13 +70,13 @@ function SettingsContent() {
 
   return (
     <>
-      <title>システム設定 - Ultra AutoTrade</title>
+      <title>{t('pageTitle')}</title>
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-100">システム設定</h1>
+          <h1 className="text-xl font-bold text-gray-100">{t('heading')}</h1>
           <p className="mt-1 text-sm text-gray-500">
-            運用モード・AI判定・Risk Engine・通知・APIキーを管理します。
+            {t('subheading')}
           </p>
         </div>
 
