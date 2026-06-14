@@ -12,6 +12,7 @@ import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
 import { PrivyRootClient } from '@/lib/wallet/PrivyRootClient'
 import { getAuthToken } from '@/lib/auth/token-key'
 import jaMessages from '@/messages/ja.json'
+import { PostHogProvider } from '@/components/PostHogProvider'
 
 // Inline provider helpers for layout-level strings that live outside the liff-chat IntlWrapper.
 // These wrappers each supply the minimum messages needed so useTranslations works without a parent provider.
@@ -173,10 +174,12 @@ export default function LiffLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="arobix-root">
-      <PrivyRootClient>
-        <SessionExpiryBanner loginHref="/liff-login" />
-        {children}
-      </PrivyRootClient>
+      <PostHogProvider>
+        <PrivyRootClient>
+          <SessionExpiryBanner loginHref="/liff-login" />
+          {children}
+        </PrivyRootClient>
+      </PostHogProvider>
     </div>
   )
 }
