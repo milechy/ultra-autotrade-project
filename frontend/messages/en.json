@@ -918,7 +918,8 @@
           "title": "You confirm you are 18 or older",
           "detail": "You must be 18 or older to use this service. Users under 18 are not permitted."
         }
-      }
+      },
+      "submitError": "Failed to save. Please try again later."
     },
     "history": {
       "headerTitle": "Chat History",
