@@ -230,7 +230,7 @@ export default function LiffConfirmPage() {
           onClick={handleSubmit}
           className={`w-full py-4 rounded-xl font-semibold text-base transition-all duration-200 ${
             allChecked && !submitting
-              ? "bg-[#1D9E75] text-white hover:bg-[#1D9E75]/90 active:scale-95"
+              ? "bg-gradient-to-r from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] text-[#2a2440] hover:brightness-95 active:scale-95"
               : "bg-zinc-800 text-zinc-600 cursor-not-allowed"
           }`}
         >
