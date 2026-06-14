@@ -6,8 +6,6 @@ import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
 import { PWAProvider, InstallBanner, UpdatePrompt } from '@/components/pwa'
 import { DemoBanner } from '@/components/DemoBanner'
-import { getLocale, getMessages } from 'next-intl/server'
-import { NextIntlClientProvider } from 'next-intl'
 
 export const metadata: Metadata = {
   title: 'Ultra AutoTrade',
