@@ -11,6 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
+import { useTranslations } from 'next-intl'
 
 export interface IncomeChartEntry {
   month: string
@@ -30,6 +31,7 @@ function yFmt(v: number) {
 }
 
 export function IncomeChartRecharts({ data }: IncomeChartRechartsProps) {
+  const t = useTranslations('AdminIncomeChart')
   return (
     <ResponsiveContainer width="100%" height={260}>
       <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
@@ -49,9 +51,9 @@ export function IncomeChartRecharts({ data }: IncomeChartRechartsProps) {
         <Tooltip
           formatter={(value: number, name: string) => {
             const labels: Record<string, string> = {
-              subscription: 'サブスク',
-              fee: '成果報酬',
-              yield_excess: '超過利益',
+              subscription: t('labelSubscription'),
+              fee: t('labelFee'),
+              yield_excess: t('labelYieldExcess'),
             }
             return [`¥${Math.round(value).toLocaleString()}`, labels[name] ?? name]
           }}
@@ -62,9 +64,9 @@ export function IncomeChartRecharts({ data }: IncomeChartRechartsProps) {
         <Legend
           formatter={(value: string) => {
             const labels: Record<string, string> = {
-              subscription: 'サブスク',
-              fee: '成果報酬',
-              yield_excess: '超過利益',
+              subscription: t('labelSubscription'),
+              fee: t('labelFee'),
+              yield_excess: t('labelYieldExcess'),
             }
             return <span style={{ color: '#a1a1aa', fontSize: 12 }}>{labels[value] ?? value}</span>
           }}

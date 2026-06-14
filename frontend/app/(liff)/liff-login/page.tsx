@@ -4,6 +4,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { useLiff } from "@/hooks/useLiff";
 import { BrowserLoginPrompt } from "../_components/BrowserLoginPrompt";
 import { getAuthToken } from "@/lib/auth/token-key";
@@ -11,6 +12,7 @@ import { getAuthToken } from "@/lib/auth/token-key";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function LiffLoginPage() {
+  const t = useTranslations("LiffLogin");
   const { isReady, isLoggedIn, profile, idToken, error, liffConfigured } =
     useLiff();
 
@@ -64,7 +66,7 @@ export default function LiffLoginPage() {
   if (!isReady) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-muted-foreground">Loading...</p>
+        <p className="text-muted-foreground">{t("loading")}</p>
       </div>
     );
   }
@@ -81,7 +83,7 @@ export default function LiffLoginPage() {
     if (getAuthToken()) {
       return (
         <div className="flex items-center justify-center min-h-screen">
-          <p className="text-muted-foreground">読み込み中...</p>
+          <p className="text-muted-foreground">{t("loading")}</p>
         </div>
       );
     }
@@ -105,7 +107,7 @@ export default function LiffLoginPage() {
   return (
     <div className="flex items-center justify-center min-h-screen">
       <p className="text-muted-foreground">
-        {isLoggedIn ? "認証中..." : "LINEアプリから開いてください"}
+        {isLoggedIn ? t("authorizing") : t("openInLine")}
       </p>
     </div>
   );

@@ -11,6 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
+import { useTranslations } from 'next-intl'
 
 export interface PieEntry {
   name: string
@@ -30,6 +31,7 @@ const PIE_COLORS: Record<string, string> = {
 export function ActionDistributionChartRecharts({
   pieData,
 }: ActionDistributionChartRechartsProps) {
+  const t = useTranslations('AdminActionDistChartRecharts')
   return (
     <ResponsiveContainer width="100%" height={220}>
       <PieChart>
@@ -52,7 +54,7 @@ export function ActionDistributionChartRecharts({
           ))}
         </Pie>
         <Tooltip
-          formatter={(value: number, name: string) => [`${value}件`, name]}
+          formatter={(value: number, name: string) => [t('unitCount', { value }), name]}
         />
         <Legend />
       </PieChart>

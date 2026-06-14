@@ -34,6 +34,7 @@ type Props = {
 
 export default function ActionDistributionChart({ data }: Props) {
   const t = useTranslations("Charts");
+  const tShared = useTranslations("SharedActionDistChart");
   const [period, setPeriod] = useState<Period>("7d");
 
   const cutoff = new Date(Date.now() - PERIOD_DAYS[period] * 24 * 60 * 60 * 1000);
@@ -75,7 +76,7 @@ export default function ActionDistributionChart({ data }: Props) {
           </button>
         ))}
         <span style={{ fontSize: 12, color: "#9ca3af", alignSelf: "center" }}>
-          {total}件
+          {tShared("totalCount", { total })}
         </span>
       </div>
 
@@ -102,7 +103,10 @@ export default function ActionDistributionChart({ data }: Props) {
             </Pie>
             <Tooltip
               formatter={(value: number, name: string) => [
-                `${value}件 (${chartData.find((d) => d.name === name)?.pct ?? ""}%)`,
+                tShared("unitCountWithPct", {
+                  value,
+                  pct: chartData.find((d) => d.name === name)?.pct ?? "",
+                }),
                 name,
               ]}
               contentStyle={{ fontSize: 12 }}
