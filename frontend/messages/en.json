@@ -2945,5 +2945,102 @@
   "AdminActionDistributionChart": {
     "title": "BUY/SELL/HOLD Distribution",
     "noData": "No data"
+  },
+  "PartnerNotifications": {
+    "pageTitle": "Notification Log",
+    "filterLabel": "Severity:",
+    "filterAll": "All",
+    "totalCount": "{total} total",
+    "cardTitle": "Notifications",
+    "noNotifications": "No notifications",
+    "colDate": "Date",
+    "colSeverity": "Severity",
+    "colTitle": "Title",
+    "colBody": "Body",
+    "colChannel": "Channel",
+    "prevPage": "Previous",
+    "nextPage": "Next"
+  },
+  "PartnerMonthlyChart": {
+    "noData": "No data",
+    "tooltipLabel": "Monthly Return"
+  },
+  "PartnerPerformanceKPI": {
+    "currentBalance": "Current Balance",
+    "totalPnl": "Total P&L",
+    "testerCount": "Testers",
+    "testerUnit": "users",
+    "healthFactor": "Health Factor",
+    "hfSafe": "Safe",
+    "hfWarning": "Warning",
+    "hfDanger": "Danger",
+    "walletBalance": "Wallet Balance (Base)",
+    "walletFallbackAlert": "Price or RPC fetch failed (using fallback)"
+  },
+  "PartnerAllocationTable": {
+    "cardTitle": "Fund Allocation List",
+    "readOnlyBadge": "Read-only (deprecated)",
+    "noData": "No allocation data",
+    "colName": "Name",
+    "colPrincipal": "Principal (USD)",
+    "colCurrent": "Current (USD)",
+    "colPnl": "P&L (USD)",
+    "colReturn": "Return",
+    "colTier": "Tier",
+    "colDate": "Allocated At",
+    "tierLower": "General",
+    "tierMiddle": "Middle",
+    "tierUpper": "Upper"
+  },
+  "PartnerAllocationChart": {
+    "noData": "No data",
+    "tooltipLabel": "Allocation Amount"
+  },
+  "PartnerUserDetail": {
+    "backToList": "Back to tester list",
+    "pageTitle": "Tester Details",
+    "kpiTodayBalance": "Today's Balance",
+    "kpiMonthReturn": "Monthly Return",
+    "kpiYesterdayReturn": "Yesterday's Return",
+    "aiHistoryTitle": "AI Decision History (Last 5)",
+    "noData": "No data",
+    "colDecision": "Decision",
+    "colConfidence": "Confidence",
+    "colDate": "Date",
+    "disclaimer": "* Returns shown are for reference only and do not guarantee future performance."
+  },
+  "PartnerReferralDetail": {
+    "backToList": "Back to referral list",
+    "pageTitle": "Operation Details",
+    "kpiTodayBalance": "Today's Balance",
+    "kpiMonthReturn": "Monthly Return",
+    "transactionTitle": "Transaction History",
+    "noData": "No data",
+    "colType": "Type",
+    "colAmount": "Amount",
+    "colDate": "Date",
+    "typeDeposit": "Deposit",
+    "typeWithdraw": "Withdraw",
+    "typeBorrow": "Borrow",
+    "typeRepay": "Repay",
+    "typeSupply": "Supply"
+  },
+  "PartnerUserEditModal": {
+    "title": "Edit Login Info",
+    "description": "Update account information for {username}",
+    "labelEmail": "Email Address",
+    "labelUsername": "Username",
+    "labelPassword": "New Password",
+    "passwordPlaceholder": "Leave blank to keep unchanged",
+    "passwordHint": "At least 8 characters. Leave blank to keep current password.",
+    "labelStatus": "Status",
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "noChanges": "No changes",
+    "updateFailed": "Update failed",
+    "saved": "Saved",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving..."
   }
 }

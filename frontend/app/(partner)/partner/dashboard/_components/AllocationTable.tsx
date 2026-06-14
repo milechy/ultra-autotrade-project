@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -32,15 +33,6 @@ function fmtUsd(v: number): string {
   }).format(v)
 }
 
-// Tier ラベル辞書 (backend TIER_JP_LABELS と整合 — app/auth/models.py)
-// GENERAL は v9 互換 (LOWER と同義、F-13 で削除予定)
-const TIER_LABELS: Record<string, string> = {
-  LOWER: '一般',
-  MIDDLE: 'ミドル',
-  UPPER: 'アッパー',
-  GENERAL: '一般',
-}
-
 function tierBadgeClass(tier: string): string {
   if (tier === 'UPPER') {
     return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
@@ -51,9 +43,9 @@ function tierBadgeClass(tier: string): string {
   return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
 }
 
-function TierBadge({ tier }: { tier?: string }) {
+function TierBadge({ tier, tierLabels }: { tier?: string; tierLabels: Record<string, string> }) {
   if (!tier) return <span className="text-muted-foreground text-xs">—</span>
-  const label = TIER_LABELS[tier] ?? tier
+  const label = tierLabels[tier] ?? tier
   return (
     <span
       data-testid={`tier-badge-${tier}`}
@@ -65,8 +57,18 @@ function TierBadge({ tier }: { tier?: string }) {
 }
 
 export default function AllocationTable({ performanceMap = {}, tierMap = {} }: Props) {
+  const t = useTranslations('PartnerAllocationTable')
   const [allocations, setAllocations] = useState<Allocation[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Tier ラベル辞書 (backend TIER_JP_LABELS と整合 — app/auth/models.py)
+  // GENERAL は v9 互換 (LOWER と同義、F-13 で削除予定)
+  const tierLabels: Record<string, string> = {
+    LOWER: t('tierLower'),
+    MIDDLE: t('tierMiddle'),
+    UPPER: t('tierUpper'),
+    GENERAL: t('tierLower'),
+  }
 
   const load = useCallback(async () => {
     const token = getStoredToken()
@@ -89,9 +91,9 @@ export default function AllocationTable({ performanceMap = {}, tierMap = {} }: P
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base">資金割り振り一覧</CardTitle>
+        <CardTitle className="text-base">{t('cardTitle')}</CardTitle>
         <span className="inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-          閲覧のみ（廃止予定）
+          {t('readOnlyBadge')}
         </span>
       </CardHeader>
       <CardContent className="p-0">
@@ -103,20 +105,20 @@ export default function AllocationTable({ performanceMap = {}, tierMap = {} }: P
           </div>
         ) : allocations.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
-            割り振りデータがありません
+            {t('noData')}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">名前</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">元本 (USD)</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">現在値 (USD)</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">損益 (USD)</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">利回り</th>
-                  <th className="text-center px-4 py-3 font-medium text-muted-foreground">ティア</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">割当日</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('colName')}</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t('colPrincipal')}</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t('colCurrent')}</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t('colPnl')}</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t('colReturn')}</th>
+                  <th className="text-center px-4 py-3 font-medium text-muted-foreground">{t('colTier')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('colDate')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -144,7 +146,7 @@ export default function AllocationTable({ performanceMap = {}, tierMap = {} }: P
                           : '—'}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <TierBadge tier={tier} />
+                        <TierBadge tier={tier} tierLabels={tierLabels} />
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {new Date(item.allocated_at).toLocaleDateString('ja-JP')}
