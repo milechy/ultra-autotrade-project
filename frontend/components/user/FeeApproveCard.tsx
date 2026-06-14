@@ -12,6 +12,7 @@
 //   - app/(liff)/liff-fee-approve/page.tsx (LIFF)
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { useWallets } from '@privy-io/react-auth'
 import { ethers } from 'ethers'
 import { CheckCircle2, AlertTriangle, ExternalLink, Loader2 } from 'lucide-react'
@@ -122,6 +123,7 @@ interface FeeApproveCardProps {
 }
 
 export function FeeApproveCard({ onApproved }: FeeApproveCardProps) {
+  const t = useTranslations('UserFeeApproveCard')
   const { wallets } = useWallets()
   const wallet = wallets[0] ?? null
 
@@ -139,7 +141,7 @@ export function FeeApproveCard({ onApproved }: FeeApproveCardProps) {
     apiFetch<AllowanceInfo>('/api/v1/fees/allowance-info')
       .then((data) => setInfo(data))
       .catch((err: unknown) => {
-        setErrorMsg(err instanceof Error ? err.message : 'バックエンドとの通信に失敗しました')
+        setErrorMsg(err instanceof Error ? err.message : t('errorBackend'))
         setState('error')
       })
       .finally(() => setInfoLoading(false))
@@ -171,7 +173,7 @@ export function FeeApproveCard({ onApproved }: FeeApproveCardProps) {
 
         setState(current >= recommended ? 'already_approved' : 'needs_approve')
       } catch (err: unknown) {
-        setErrorMsg(err instanceof Error ? err.message : 'allowance の確認に失敗しました')
+        setErrorMsg(err instanceof Error ? err.message : t('errorAllowanceCheck'))
         setState('error')
       }
     })()
@@ -202,11 +204,11 @@ export function FeeApproveCard({ onApproved }: FeeApproveCardProps) {
       setState('approved')
       onApproved?.(tx.hash)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '承認に失敗しました'
+      const msg = err instanceof Error ? err.message : t('errorApprove')
       // ユーザーキャンセルは error ではなく通知のみ
       if (msg.includes('rejected') || msg.includes('denied') || msg.includes('cancel')) {
         setState('needs_approve')
-        setErrorMsg('署名がキャンセルされました')
+        setErrorMsg(t('errorSignatureCancelled'))
       } else {
         setErrorMsg(msg)
         setState('error')
@@ -223,7 +225,7 @@ export function FeeApproveCard({ onApproved }: FeeApproveCardProps) {
       <Card className="border-zinc-800 bg-zinc-900/60">
         <CardContent className="pt-6 pb-6 flex items-center justify-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
-          <span className="text-sm text-zinc-400">情報を取得中...</span>
+          <span className="text-sm text-zinc-400">{t('loadingInfo')}</span>
         </CardContent>
       </Card>
     )
@@ -235,7 +237,7 @@ export function FeeApproveCard({ onApproved }: FeeApproveCardProps) {
         <CardContent className="pt-4 pb-4">
           <div className="flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-red-300">{errorMsg ?? '情報の取得に失敗しました'}</p>
+            <p className="text-sm text-red-300">{errorMsg ?? t('fetchError')}</p>
           </div>
         </CardContent>
       </Card>
@@ -246,7 +248,7 @@ export function FeeApproveCard({ onApproved }: FeeApproveCardProps) {
     return (
       <Card className="border-zinc-800 bg-zinc-900/60">
         <CardContent className="pt-4 pb-4">
-          <p className="text-sm text-zinc-400">手数料承認機能は現在準備中です</p>
+          <p className="text-sm text-zinc-400">{t('notConfigured')}</p>
         </CardContent>
       </Card>
     )
@@ -258,7 +260,7 @@ export function FeeApproveCard({ onApproved }: FeeApproveCardProps) {
         <CardContent className="pt-4 pb-4">
           <div className="flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-yellow-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-yellow-300">ウォレットを接続してください</p>
+            <p className="text-sm text-yellow-300">{t('connectWallet')}</p>
           </div>
         </CardContent>
       </Card>
@@ -268,32 +270,32 @@ export function FeeApproveCard({ onApproved }: FeeApproveCardProps) {
   return (
     <Card className="border-zinc-800 bg-zinc-900/60">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">手数料承認</CardTitle>
+        <CardTitle className="text-base">{t('cardTitle')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* 承認情報 */}
         <div className="space-y-2 text-sm">
           <InfoRow
-            label="承認先 (operator)"
+            label={t('labelOperator')}
             value={truncateAddr(info.operator_address)}
           />
           <InfoRow
-            label="承認額"
+            label={t('labelAmount')}
             value={`${Number(info.recommended_allowance_usdc).toFixed(2)} USDC`}
           />
           {aTokenAddress && (
             <InfoRow
-              label="aToken"
+              label={t('labelAToken')}
               value={truncateAddr(aTokenAddress)}
             />
           )}
           <InfoRow
-            label="ネットワーク"
-            value={info.chain_id === 84532 ? 'Base Sepolia (testnet)' : 'Base メインネット'}
+            label={t('labelNetwork')}
+            value={info.chain_id === 84532 ? t('networkTestnet') : t('networkMainnet')}
           />
           {currentAllowanceFmt !== null && (
             <InfoRow
-              label="現在の allowance"
+              label={t('labelCurrentAllowance')}
               value={`${currentAllowanceFmt} USDC`}
             />
           )}
@@ -301,23 +303,21 @@ export function FeeApproveCard({ onApproved }: FeeApproveCardProps) {
 
         {/* 注意書き */}
         <p className="text-xs text-zinc-500 leading-relaxed">
-          月次手数料の自動徴収を有効にするため、aToken の承認が必要です。
-          承認額は上限付きです（無制限承認ではありません）。
-          いつでも取り消し可能です。
+          {t('noticeText')}
         </p>
 
         {/* 状態別 UI */}
         {state === 'checking' && (
           <div className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
-            <span className="text-sm text-zinc-400">承認状況を確認中...</span>
+            <span className="text-sm text-zinc-400">{t('checkingStatus')}</span>
           </div>
         )}
 
         {state === 'already_approved' && (
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
-            <span className="text-sm text-emerald-400 font-medium">承認済み</span>
+            <span className="text-sm text-emerald-400 font-medium">{t('alreadyApproved')}</span>
           </div>
         )}
 
@@ -326,14 +326,14 @@ export function FeeApproveCard({ onApproved }: FeeApproveCardProps) {
             className="w-full bg-blue-600 hover:bg-blue-500 text-white"
             onClick={handleApprove}
           >
-            承認する
+            {t('approveButton')}
           </Button>
         )}
 
         {state === 'approving' && (
           <Button className="w-full" disabled>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            署名待ち...
+            {t('waitingSignature')}
           </Button>
         )}
 
@@ -341,7 +341,7 @@ export function FeeApproveCard({ onApproved }: FeeApproveCardProps) {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
-              <span className="text-sm text-emerald-400 font-medium">承認完了</span>
+              <span className="text-sm text-emerald-400 font-medium">{t('approvedLabel')}</span>
             </div>
             {txHash && (
               <a
@@ -351,7 +351,7 @@ export function FeeApproveCard({ onApproved }: FeeApproveCardProps) {
                 className="flex items-center gap-1 text-xs text-blue-400 hover:underline"
               >
                 <ExternalLink className="h-3 w-3" />
-                basescan で確認
+                {t('viewOnBasescan')}
               </a>
             )}
           </div>

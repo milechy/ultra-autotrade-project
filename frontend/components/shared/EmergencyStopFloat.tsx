@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { OctagonX, Loader2, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,6 +22,7 @@ import { useAuth } from '@/lib/auth'
 import { useAutomationStatus } from '@/components/user/UserProviders'
 
 export function EmergencyStopFloat() {
+  const t = useTranslations('SharedEmergencyStopFloat')
   const { token, isAdmin, isPartner } = useAuth()
   const { isStopped, refreshStatus } = useAutomationStatus()
   const [isLoading, setIsLoading] = useState(false)
@@ -59,7 +61,7 @@ export function EmergencyStopFloat() {
       return (
         <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white text-center text-sm font-semibold py-2 px-4 flex items-center justify-center gap-3">
           <OctagonX className="h-4 w-4 shrink-0" />
-          <span>運用を停止中です</span>
+          <span>{t('stoppedBannerAdmin')}</span>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
@@ -73,7 +75,7 @@ export function EmergencyStopFloat() {
                 ) : (
                   <>
                     <Play className="h-3 w-3 mr-1" />
-                    再開
+                    {t('resumeButton')}
                   </>
                 )}
               </Button>
@@ -82,14 +84,14 @@ export function EmergencyStopFloat() {
               <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center gap-2">
                   <Play className="h-5 w-5 text-green-600" />
-                  運用を再開しますか？
+                  {t('resumeDialogTitle')}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  自動取引を再開します。再開後は新しい取引が行われるようになります。
+                  {t('resumeDialogDescription')}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={isLoading}>キャンセル</AlertDialogCancel>
+                <AlertDialogCancel disabled={isLoading}>{t('cancelButton')}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleResume}
                   className="bg-green-600 hover:bg-green-700 text-white"
@@ -98,10 +100,10 @@ export function EmergencyStopFloat() {
                   {isLoading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      再開中...
+                      {t('resumingButton')}
                     </>
                   ) : (
-                    '再開する'
+                    t('resumeConfirmButton')
                   )}
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -114,7 +116,7 @@ export function EmergencyStopFloat() {
     return (
       <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white text-center text-sm font-semibold py-2 px-4 flex items-center justify-center gap-3">
         <OctagonX className="h-4 w-4 shrink-0" />
-        <span>運用を停止中です（再開は管理者のみ）</span>
+        <span>{t('stoppedBannerPartner')}</span>
       </div>
     )
   }
@@ -129,7 +131,7 @@ export function EmergencyStopFloat() {
         <button
           className="fixed bottom-4 right-4 z-50 w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 active:bg-red-800 text-white shadow-lg flex items-center justify-center transition-colors disabled:opacity-60"
           disabled={isLoading}
-          aria-label="緊急停止"
+          aria-label={t('ariaLabelStop')}
           data-testid="emergency-stop-float"
         >
           {isLoading ? (
@@ -143,14 +145,14 @@ export function EmergencyStopFloat() {
         <AlertDialogHeader>
           <AlertDialogTitle className="text-red-600 dark:text-red-400 flex items-center gap-2">
             <OctagonX className="h-5 w-5" />
-            本当に運用を停止しますか？
+            {t('stopDialogTitle')}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            停止中は新しい取引が行われません。再開はいつでも可能です。
+            {t('stopDialogDescription')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoading}>キャンセル</AlertDialogCancel>
+          <AlertDialogCancel disabled={isLoading}>{t('cancelButton')}</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleStop}
             className="bg-red-600 hover:bg-red-700 text-white"
@@ -159,10 +161,10 @@ export function EmergencyStopFloat() {
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                停止中...
+                {t('stoppingButton')}
               </>
             ) : (
-              '停止する'
+              t('stopConfirmButton')
             )}
           </AlertDialogAction>
         </AlertDialogFooter>
