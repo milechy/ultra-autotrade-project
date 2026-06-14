@@ -4,6 +4,8 @@ import type { Metadata, Viewport } from 'next'
 import '../styles/globals.css'
 import { PWAProvider, InstallBanner, UpdatePrompt } from '@/components/pwa'
 import { DemoBanner } from '@/components/DemoBanner'
+import { getLocale, getMessages } from 'next-intl/server'
+import { NextIntlClientProvider } from 'next-intl'
 
 export const metadata: Metadata = {
   title: 'Ultra AutoTrade',
@@ -31,13 +33,15 @@ export const viewport: Viewport = {
   userScalable: false,
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const locale = await getLocale()
+  const messages = await getMessages()
   return (
-    <html lang="ja" className="dark">
+    <html lang={locale} className="dark">
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#1E40AF" />
@@ -49,12 +53,14 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
       </head>
       <body className="bg-background text-foreground antialiased">
-        <DemoBanner />
-        <PWAProvider>
-          {children}
-          <InstallBanner />
-          <UpdatePrompt />
-        </PWAProvider>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <DemoBanner />
+          <PWAProvider>
+            {children}
+            <InstallBanner />
+            <UpdatePrompt />
+          </PWAProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   )

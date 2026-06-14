@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -39,6 +40,7 @@ const modeColor: Record<string, string> = {
 };
 
 export default function RiskModeSelector() {
+  const t = useTranslations("SettingsRiskMode");
   const [data, setData] = useState<RiskModeData | null>(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
@@ -74,7 +76,7 @@ export default function RiskModeSelector() {
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
       const label = data.options.find((o) => o.mode === mode)?.label ?? mode;
       setData({ ...data, mode });
-      setSuccess(`リスクモードを「${label}」に変更しました`);
+      setSuccess(t("successMessage", { label }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -87,10 +89,8 @@ export default function RiskModeSelector() {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-bold text-zinc-100">リスクモード設定</h3>
-        <p className="text-sm text-zinc-400 mt-1">
-          運用スタイルに合わせてAIの判定基準が変わります。デフォルトは「保守」です。
-        </p>
+        <h3 className="text-lg font-bold text-zinc-100">{t("title")}</h3>
+        <p className="text-sm text-zinc-400 mt-1">{t("description")}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -112,26 +112,26 @@ export default function RiskModeSelector() {
                 <span className="font-bold text-zinc-100">{opt.label}</span>
                 {isActive && (
                   <span className="ml-auto text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
-                    現在
+                    {t("currentBadge")}
                   </span>
                 )}
               </div>
               <p className="text-sm text-zinc-400 mb-3">{opt.description}</p>
               <div className="space-y-1 text-xs text-zinc-500">
                 <div className="flex justify-between">
-                  <span>最大利用率</span>
+                  <span>{t("maxUtilization")}</span>
                   <span className="text-zinc-300">{opt.max_utilization}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>最小 Health Factor</span>
+                  <span>{t("minHealthFactor")}</span>
                   <span className="text-zinc-300">{opt.min_health_factor}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>必要信頼度</span>
+                  <span>{t("minConfidence")}</span>
                   <span className="text-zinc-300">{opt.min_confidence}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>対象資産</span>
+                  <span>{t("allowedAssets")}</span>
                   <span className="text-zinc-300 text-right">{opt.allowed_assets.join(", ")}</span>
                 </div>
               </div>
@@ -153,7 +153,7 @@ export default function RiskModeSelector() {
 
       <div className="rounded-lg bg-zinc-800/50 border border-zinc-700 p-4">
         <p className="text-xs text-zinc-500">
-          💡 「積極」モードは信頼度40%以上でAIが提案するため取引頻度が増えます。リスクを十分に理解した上でお選びください。
+          💡 {t("aggressiveNote")}
         </p>
       </div>
     </div>

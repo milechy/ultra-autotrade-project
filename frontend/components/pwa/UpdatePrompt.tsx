@@ -4,8 +4,10 @@
 
 import { useState, useEffect } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 export function UpdatePrompt() {
+  const t = useTranslations('PwaUpdatePrompt')
   const [showUpdate, setShowUpdate] = useState(false)
 
   useEffect(() => {
@@ -21,14 +23,14 @@ export function UpdatePrompt() {
       <div className="flex items-center gap-3">
         <RefreshCw className="h-5 w-5 text-blue-400 shrink-0" />
         <div className="flex-1">
-          <p className="text-sm font-semibold text-blue-100">アプリを更新できます</p>
-          <p className="text-xs text-blue-400 mt-0.5">新しいバージョンが利用可能です</p>
+          <p className="text-sm font-semibold text-blue-100">{t('title')}</p>
+          <p className="text-xs text-blue-400 mt-0.5">{t('description')}</p>
         </div>
         <button
           onClick={() => window.location.reload()}
           className="rounded-lg bg-blue-600 hover:bg-blue-500 px-3 py-1.5 text-xs font-medium text-white transition-colors"
         >
-          更新
+          {t('updateButton')}
         </button>
       </div>
     </div>

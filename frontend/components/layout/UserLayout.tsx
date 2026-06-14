@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { useAuth } from '@/lib/auth'
+import { useTranslations } from 'next-intl'
 import { EmergencyStopButton } from '@/components/shared'
 import { UserHeader } from './UserHeader'
 import { BottomNav } from './BottomNav'
@@ -15,6 +16,7 @@ interface UserLayoutProps {
 }
 
 export function UserLayout({ children, pendingCount }: UserLayoutProps) {
+  const t = useTranslations('LayoutUserLayout')
   const { token } = useAuth()
 
   const handleEmergencyStop = async () => {
@@ -23,9 +25,9 @@ export function UserLayout({ children, pendingCount }: UserLayoutProps) {
       await postJson('/automation/emergency-stop', {}, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      toast.success('緊急停止を実行しました')
+      toast.success(t('emergencyStopSuccess'))
     } catch {
-      toast.error('緊急停止の実行に失敗しました')
+      toast.error(t('emergencyStopError'))
     }
   }
 
