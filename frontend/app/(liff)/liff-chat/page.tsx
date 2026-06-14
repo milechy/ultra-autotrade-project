@@ -8,6 +8,7 @@ import dynamic from "next/dynamic"
 import { Menu, User, MessageCircle } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useLanguage } from "@/lib/useLanguage"
+import { track, EV } from "@/lib/posthog"
 import { HamburgerMenu } from "./_components/HamburgerMenu"
 import { SlideUpPanel } from "./_components/SlideUpPanel"
 import { MyWalletPanel } from "./_components/panels/MyWalletPanel"
@@ -130,9 +131,11 @@ export default function LiffChatPage() {
   // ── 承認・見送りハンドラ（BUY/SELL）
   function handleApprove() {
     // liff-approve に遷移せずパネルで完結させる想定（Phase 5 以降）
+    track(EV.JUDGMENT_APPROVE, { action: aiJudgment?.action })
     setAiJudgment(null)
   }
   function handleReject() {
+    track(EV.JUDGMENT_REJECT, { action: aiJudgment?.action })
     setAiJudgment(null)
   }
 
@@ -188,7 +191,7 @@ export default function LiffChatPage() {
       {/* ── ヘッダー */}
       <header className="h-14 bg-[#1a3d2e] flex items-center justify-between px-4 flex-shrink-0">
         <button
-          onClick={() => setMenuOpen(true)}
+          onClick={() => { setMenuOpen(true); track(EV.MENU_OPEN) }}
           className="text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
           aria-label={t("header.menuAriaLabel")}
         >
@@ -222,7 +225,7 @@ export default function LiffChatPage() {
         <div className="flex items-center gap-1">
           {/* JP/EN トグルボタン */}
           <button
-            onClick={() => setLanguage(language === "ja" ? "en" : "ja")}
+            onClick={() => { const next = language === "ja" ? "en" : "ja"; setLanguage(next); track(EV.LANGUAGE_TOGGLE, { language: next }) }}
             aria-label={t("header.langToggleAriaLabel")}
             className="text-zinc-300 text-xs font-semibold px-2 py-1 rounded-md
                        hover:bg-white/10 transition-colors border border-zinc-600"
@@ -230,7 +233,7 @@ export default function LiffChatPage() {
             {language === "ja" ? "EN" : "JP"}
           </button>
           <button
-            onClick={() => setActivePanel("account")}
+            onClick={() => { setActivePanel("account"); track(EV.ACCOUNT_OPEN) }}
             className="text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
             aria-label={t("header.accountAriaLabel")}
           >
@@ -244,7 +247,7 @@ export default function LiffChatPage() {
 
         {/* CURRENT ASSET カード（タップでグラフパネル） */}
         <button
-          onClick={() => setGraphOpen(true)}
+          onClick={() => { setGraphOpen(true); track(EV.ASSET_GRAPH_OPEN) }}
           className="bg-[#1a3d2e] rounded-2xl mx-4 mt-4 p-4 text-left w-[calc(100%-2rem)]
                      active:brightness-90 transition-all"
         >
@@ -327,7 +330,7 @@ export default function LiffChatPage() {
 
           {/* なぜ{action}？理由トグル（BUY/SELL/HOLD 共通） */}
           <button
-            onClick={() => setReasonOpen((v) => !v)}
+            onClick={() => { const next = !reasonOpen; setReasonOpen(next); track(EV.REASON_TOGGLE, { action, open: next }) }}
             className="mt-2 text-zinc-500 text-xs underline"
             aria-expanded={reasonOpen}
           >
@@ -452,7 +455,7 @@ export default function LiffChatPage() {
 
       {/* ── FAB（右下固定） */}
       <button
-        onClick={() => setChatOpen(true)}
+        onClick={() => { setChatOpen(true); track(EV.CHAT_OPEN) }}
         className="fixed bottom-24 right-6 z-40 w-14 h-14 rounded-full shadow-lg
                    flex items-center justify-center active:scale-95 transition-transform
                    bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0]"
@@ -483,7 +486,7 @@ export default function LiffChatPage() {
           {(["1M", "3M", "6M", "1Y"] as const).map((p) => (
             <button
               key={p}
-              onClick={() => setGraphPeriod(p)}
+              onClick={() => { setGraphPeriod(p); track(EV.GRAPH_PERIOD_CHANGE, { period: p }) }}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 graphPeriod === p
                   ? "bg-[#1D9E75] text-white"
@@ -530,7 +533,7 @@ export default function LiffChatPage() {
       <HamburgerMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        onPanelOpen={(id) => setActivePanel(id)}
+        onPanelOpen={(id) => { setActivePanel(id); track(EV.PANEL_OPEN, { panel: id }) }}
       />
 
       {/* ── 各パネル（既存維持） */}

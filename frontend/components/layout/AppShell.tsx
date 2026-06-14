@@ -22,6 +22,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { href: "/ai-learning", label: t('adminNav.aiLearning') },
     { href: "/protocols", label: t('adminNav.protocols') },
     { href: "/events", label: t('adminNav.events') },
+    { href: "/analytics", label: t('adminNav.analytics') },
     { href: "/trades", label: t('adminNav.trades') },
     { href: "/proposals", label: t('adminNav.proposals') },
     { href: "/fee-management", label: t('adminNav.feeManagement') },
