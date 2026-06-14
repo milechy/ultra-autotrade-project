@@ -617,7 +617,17 @@
       "operatingCoins": "Active Holdings",
       "noCoins": "No active holdings",
       "openChatAriaLabel": "Open chat",
-      "assetChartLoading": "Loading chart..."
+      "assetChartLoading": "Loading chart...",
+      "emergencyStop": "Emergency Stop",
+      "emergencyStopAriaLabel": "Emergency stop autonomous trading",
+      "stoppedStatus": "Autonomous trading is stopped",
+      "stopConfirmTitle": "Stop autonomous trading?",
+      "stopConfirmDesc": "Stopping halts the AI's automatic decisions and execution. To resume, please contact support.",
+      "stopCancel": "Cancel",
+      "stopConfirm": "Stop",
+      "stopping": "Stopping...",
+      "stopSuccess": "Autonomous trading stopped",
+      "stopFailed": "Failed to stop. Please try again later."
     },
     "panels": {
       "assetHistory": "Asset History",
