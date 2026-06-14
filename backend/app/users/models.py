@@ -94,3 +94,54 @@ class UserSettings(Base):
 
     def __repr__(self) -> str:
         return f"<UserSettings(user_id={self.user_id}, risk_mode={self.risk_mode})>"
+
+
+# アカウント削除申請の status 値（models.py を唯一の真実源とする / CHECK は migration 内で独自定義しない）
+ACCOUNT_DELETION_STATUS_PENDING = "pending"
+ACCOUNT_DELETION_STATUS_PROCESSED = "processed"
+ACCOUNT_DELETION_STATUS_CANCELLED = "cancelled"
+
+
+class AccountDeletionRequest(Base):
+    """アカウント削除申請テーブル。
+
+    ユーザーからの削除申請を耐久的に記録する（APPI / 個人情報保護法対応）。
+    本モジュールは main.py から import され、Base.metadata.create_all() 時に
+    テーブルが自動作成される。status は application-layer で制御する
+    （'pending' / 'processed' / 'cancelled'）。CHECK 制約を migration 内で
+    独自定義しない（models.py が唯一の真実源）。
+
+    手動 CREATE TABLE SQL (新規環境・DB 再構築時):
+        CREATE TABLE IF NOT EXISTS account_deletion_requests (
+            id           SERIAL PRIMARY KEY,
+            user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            status       VARCHAR(20) NOT NULL DEFAULT 'pending',
+            requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            processed_at TIMESTAMPTZ
+        );
+        CREATE INDEX IF NOT EXISTS ix_account_deletion_requests_user_id
+            ON account_deletion_requests (user_id);
+    """
+
+    __tablename__ = "account_deletion_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=ACCOUNT_DELETION_STATUS_PENDING
+    )
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+    processed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+
+    def __repr__(self) -> str:
+        return f"<AccountDeletionRequest(user_id={self.user_id}, status={self.status})>"

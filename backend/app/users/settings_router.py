@@ -16,6 +16,7 @@ from app.database import get_db
 from app.partner import allocation_service
 from app.partner.allocation_schemas import MyAllocationResponse
 
+from .models import ACCOUNT_DELETION_STATUS_PENDING, AccountDeletionRequest
 from .settings_schemas import UserSettingsResponse, UserSettingsUpdate
 
 logger = logging.getLogger(__name__)
@@ -215,3 +216,45 @@ def resume_user(
     db.add(current_user)
     db.commit()
     return {"message": "resumed", "is_active": True}
+
+
+@router.post("/delete-request", summary="アカウント削除申請")
+def request_account_deletion(
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """アカウント削除を申請する（APPI / 個人情報保護法対応 / 冪等）。
+
+    削除申請を account_deletion_requests に記録する。既に pending の申請が
+    あればそれを返す（二重申請を防ぐ）。実際の削除データ処理はバックオフィスで
+    行うため、本エンドポイントは「申請の受付」までを担う。
+    """
+    existing = (
+        db.query(AccountDeletionRequest)
+        .filter(
+            AccountDeletionRequest.user_id == current_user.id,
+            AccountDeletionRequest.status == ACCOUNT_DELETION_STATUS_PENDING,
+        )
+        .first()
+    )
+    if existing is not None:
+        return {
+            "status": existing.status,
+            "requested_at": existing.requested_at.isoformat(),
+            "already_requested": True,
+        }
+
+    req = AccountDeletionRequest(user_id=current_user.id, status=ACCOUNT_DELETION_STATUS_PENDING)
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+    logger.info(
+        "User %s requested account deletion (req_id=%s)",
+        current_user.email,
+        req.id,
+    )
+    return {
+        "status": req.status,
+        "requested_at": req.requested_at.isoformat(),
+        "already_requested": False,
+    }

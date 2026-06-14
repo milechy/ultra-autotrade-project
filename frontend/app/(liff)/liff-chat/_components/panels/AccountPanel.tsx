@@ -387,11 +387,9 @@ export function AccountPanel() {
   }
 
   // アカウント削除申請
-  // TODO: backend に削除申請エンドポイントが未実装（grep で
-  //       /api/user/delete-request は存在せず）。現状は申請 stub として POST し、
-  //       404/405 は「サポートへ誘導」へ graceful fallback する。
-  //       backend 実装後（例 POST /api/user/delete-request、残高チェックは
-  //       サーバ側で行い 409 等を返す）に正式フローへ差し替える。
+  // backend: POST /api/user/delete-request（require_active_user / 冪等）。
+  // 申請は account_deletion_requests に記録される。成功時のみ受付完了を表示し、
+  // 失敗（404 含む）は誤魔化さず実エラーを表示する（押せるのに黙って失敗を防ぐ）。
   const handleDeleteRequest = async () => {
     const token = getAuthToken() ?? ""
     setDeleteSubmitting(true)
@@ -404,20 +402,19 @@ export function AccountPanel() {
         },
       })
       if (res.ok) {
+        // 新規申請・既存 pending（already_requested）いずれも受付済みとして扱う
         showToast(t("toastDeleteRequested"))
         setDeleteSheet(false)
       } else if (res.status === 409) {
-        // 残高ありなどサーバ側拒否（将来仕様）
+        // 残高ありなどサーバ側拒否（将来仕様）— シートは開いたまま理由を見せる
         showToast(t("toastDeleteBalanceError"))
-      } else if (res.status === 404 || res.status === 405) {
-        showToast(t("toastDeleteContactSupport"))
-        setDeleteSheet(false)
       } else {
+        // 404/5xx 等は実エラーとして扱う（成功偽装で dismiss しない）
         showToast(t("toastDeleteError"))
       }
     } catch {
-      showToast(t("toastDeleteContactSupport"))
-      setDeleteSheet(false)
+      // ネットワークエラー — 実エラー表示
+      showToast(t("toastDeleteError"))
     } finally {
       setDeleteSubmitting(false)
     }
