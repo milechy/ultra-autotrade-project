@@ -4,12 +4,15 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations, NextIntlClientProvider } from 'next-intl'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import AppShell from '@/components/layout/AppShell'
 import { SessionExpiryBanner } from '@/components/SessionExpiryBanner'
 import { Toaster } from 'sonner'
+import jaMessages from '@/messages/ja.json'
 
-function AdminGuard({ children }: { children: React.ReactNode }) {
+function AdminGuardInner({ children }: { children: React.ReactNode }) {
+  const t = useTranslations('ProvidersAdmin')
   const { isAuthenticated, isAdmin, isPartner, isLoading } = useAuth()
   const router = useRouter()
 
@@ -25,12 +28,20 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
   }, [isLoading, isAuthenticated, isAdmin, isPartner, router])
 
   if (isLoading) {
-    return <div style={{ padding: 40, textAlign: 'center' }}>読み込み中...</div>
+    return <div style={{ padding: 40, textAlign: 'center' }}>{t('loading')}</div>
   }
   if (!isAuthenticated || !isAdmin) {
     return null
   }
   return <>{children}</>
+}
+
+function AdminGuard({ children }: { children: React.ReactNode }) {
+  return (
+    <NextIntlClientProvider locale="ja" messages={{ ProvidersAdmin: jaMessages.ProvidersAdmin }}>
+      <AdminGuardInner>{children}</AdminGuardInner>
+    </NextIntlClientProvider>
+  )
 }
 
 export function AdminProviders({ children }: { children: React.ReactNode }) {

@@ -11,6 +11,7 @@
 
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useSessionMonitor } from "@/hooks/useSessionMonitor";
 import { describeSessionState } from "@/lib/auth/session-monitor";
 
@@ -27,6 +28,7 @@ export type SessionExpiryBannerProps = {
 export function SessionExpiryBanner({
   loginHref = "/login",
 }: SessionExpiryBannerProps) {
+  const t = useTranslations("SharedSessionExpiry");
   const snapshot = useSessionMonitor();
   const message = describeSessionState(snapshot);
 
@@ -72,7 +74,7 @@ export function SessionExpiryBanner({
           textDecoration: "none",
         }}
       >
-        再ログイン
+        {t("relogin")}
       </a>
     </div>
   );

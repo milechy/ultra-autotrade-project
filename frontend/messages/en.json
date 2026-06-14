@@ -2780,7 +2780,12 @@
     "lineAppHint": "If you are using the LINE app, please reopen from the menu."
   },
   "LiffLayout": {
-    "reauthing": "Restoring session..."
+    "liffInitError": "LIFF init error: {error}",
+    "loadingInit": "Loading...",
+    "reauthing": "Restoring session...",
+    "lineAppOnly": "Please open in LINE app",
+    "loadingRedirect": "Loading...",
+    "loadingTerms": "Loading..."
   },
   "NotFound": {
     "title": "Page Not Found",
@@ -3320,5 +3325,72 @@
     "totalGain": "Total P&L",
     "avgPerTrade": "Avg {sign}¥{amount} / trade",
     "disclaimer": "* Past performance is not a guarantee of future results."
+  },
+  "SharedAccuracyChart": {
+    "noData": "No Two-Phase data available",
+    "targetLabel": "Target 80%",
+    "agreementRate": "Two-Phase Agreement Rate"
+  },
+  "SharedTradeActionBadge": {
+    "labelBuy": "Buy",
+    "labelSell": "Sell",
+    "labelHold": "HOLD"
+  },
+  "SharedSessionExpiry": {
+    "relogin": "Re-login"
+  },
+  "PendleYieldChart": {
+    "noData": "No APY data"
+  },
+  "DashboardReportSummary": {
+    "cardPeriod": "Period",
+    "cardGeneratedAt": "Generated At",
+    "highlights": "Highlights",
+    "rawData": "Raw Data (JSON)"
+  },
+  "DashboardStatusPanel": {
+    "rawData": "Raw Data (JSON)"
+  },
+  "ProvidersPartner": {
+    "loading": "Loading..."
+  },
+  "ProvidersUser": {
+    "loading": "Loading..."
+  },
+  "DashboardKpiCards": {
+    "tradingStatus": "Trading Status",
+    "stopped": "Stopped",
+    "running": "Running",
+    "safetyScore": "Safety Score",
+    "portfolio24h": "Portfolio 24h",
+    "latestEventLevel": "Latest Event Level",
+    "snapshotGeneratedAt": "Snapshot Generated At"
+  },
+  "UserBrowserTermsGate": {
+    "loading": "Loading..."
+  },
+  "ProvidersAdmin": {
+    "loading": "Loading..."
+  },
+  "AdminComponentsPreview": {
+    "title": "Shared Components Preview",
+    "hfSm": "size=sm, Safe (2.5)",
+    "hfMd": "size=md, Warning (1.8)",
+    "hfLg": "size=lg, Danger (1.3)",
+    "hfNull": "value=null (no borrow)",
+    "cbHigh": "85% (threshold 70+ = green)",
+    "cbLow": "45% (threshold 70- = blue)",
+    "cbNoLabel": "showLabel=false",
+    "cbThreshold": "threshold=50, value=55",
+    "floatingNote": "※ floating variant is fixed at bottom right",
+    "kpiTotalAsset": "Total Assets",
+    "kpiDailyPnl": "Today's P&L",
+    "kpiWinRate": "Win Rate",
+    "kpiTradeCount": "Trade Count",
+    "kpiTradeCountSuffix": "",
+    "walletDefaultChars": "Default (chars=6)",
+    "walletChars10": "chars=10",
+    "datePresetsOn": "presets=true (default)",
+    "datePresetsOff": "presets=false (custom input only)"
   }
 }

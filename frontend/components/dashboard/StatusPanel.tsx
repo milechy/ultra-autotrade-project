@@ -1,9 +1,12 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
+'use client'
 import React from "react";
+import { useTranslations } from "next-intl";
 import type { AutomationStatus } from "../../lib/types";
 
 export default function StatusPanel({ status }: { status: AutomationStatus }) {
+  const t = useTranslations("DashboardStatusPanel");
   return (
     <section style={sectionStyle}>
       <header style={headerStyle}>
@@ -16,7 +19,7 @@ export default function StatusPanel({ status }: { status: AutomationStatus }) {
       </div>
 
       <details style={{ marginTop: 12 }}>
-        <summary style={{ cursor: "pointer" }}>生データ（JSON）</summary>
+        <summary style={{ cursor: "pointer" }}>{t("rawData")}</summary>
         <pre style={preStyle}>{JSON.stringify(status, null, 2)}</pre>
       </details>
     </section>
