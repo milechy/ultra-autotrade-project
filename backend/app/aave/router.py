@@ -16,10 +16,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth.dependencies import require_admin, require_viewer
 from app.auth.models import User
 
+from .borrow_optimizer import make_borrow_optimizer_from_env
 from .schemas import (
     AaveMonitorStatus,
     AaveRebalanceRequest,
     AaveRebalanceResponse,
+    BorrowRateComparison,
     ClaimableReward,
     OracleStatusResponse,
     PoolDeficitInfoResponse,
@@ -453,3 +455,34 @@ def claim_rewards(
         claimed_but_not_resupplied=result.get("claimed_but_not_resupplied", []),
         error=result.get("error"),
     )
+
+
+@router.get(
+    "/borrow-rates",
+    response_model=BorrowRateComparison,
+    summary="GHO / USDC 借入金利を比較して最適借入通貨を推奨する",
+)
+def get_borrow_rates(
+    current_user: User = Depends(require_viewer),
+) -> BorrowRateComparison:
+    """
+    AaveProtocolDataProvider.getReserveData() で GHO / USDC の変動借入 APR を取得し、
+    stkAAVE 保有量に基づく GHO 割引を考慮して最適借入通貨を返す。
+
+    AAVE_DATA_PROVIDER_ADDRESS / AAVE_GHO_ADDRESS / AAVE_STK_AAVE_ADDRESS 等が
+    未設定の場合は fail-open で USDC デフォルト推奨を返す（500 にならない）。
+    """
+    from decimal import Decimal  # noqa: PLC0415
+
+    optimizer = make_borrow_optimizer_from_env()
+    if optimizer is None:
+        # 環境変数未設定 → fail-open で USDC デフォルト返却
+        return BorrowRateComparison(
+            usdc_apr=Decimal("0"),
+            gho_variable_apr=Decimal("0"),
+            gho_effective_apr=Decimal("0"),
+            recommendation="USDC",
+            annual_savings_usd=Decimal("0"),
+            error="AAVE_DATA_PROVIDER_ADDRESS 等の環境変数が未設定です。",
+        )
+    return optimizer.compare_borrow_rates()

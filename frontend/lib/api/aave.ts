@@ -7,6 +7,7 @@
  * - getPoolHealth(): GET /api/aave/pool-health
  * - getRewards(): GET /api/aave/rewards
  * - claimRewards(): POST /api/aave/rewards/claim
+ * - getBorrowRates(): GET /api/aave/borrow-rates
  */
 
 import { getJson, postJson } from "./http";
@@ -97,4 +98,30 @@ export async function getRewards(): Promise<RewardsResponse> {
  */
 export async function claimRewards(): Promise<ClaimRewardsResponse> {
   return postJson<ClaimRewardsResponse>("/api/aave/rewards/claim", {});
+}
+
+// ---------------------------------------------------------------------------
+// GHO 借入金利比較
+// ---------------------------------------------------------------------------
+
+export interface BorrowRateComparison {
+  /** USDC 変動借入 APR（年率、Decimal 文字列） */
+  usdc_apr: string;
+  /** GHO 変動借入 APR（割引前、年率、Decimal 文字列） */
+  gho_variable_apr: string;
+  /** GHO 実効借入 APR（stkAAVE 割引後、年率、Decimal 文字列） */
+  gho_effective_apr: string;
+  /** 推奨借入通貨: "GHO" | "USDC" */
+  recommendation: string;
+  /** GHO 推奨時の年間節約額試算（USD、Decimal 文字列）。USDC 推奨時は "0" */
+  annual_savings_usd: string;
+  /** RPC 失敗時のエラーメッセージ。null = 正常取得 */
+  error: string | null;
+}
+
+/**
+ * GET /aave/borrow-rates — GHO / USDC 借入金利比較と最適借入通貨推奨を取得する（viewer 以上）
+ */
+export async function getBorrowRates(): Promise<BorrowRateComparison> {
+  return getJson<BorrowRateComparison>("/api/aave/borrow-rates");
 }
