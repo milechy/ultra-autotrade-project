@@ -915,7 +915,8 @@
         "testNotificationSending": "Sending...",
         "testNotificationSent": "Test notification sent",
         "testNotificationFailed": "Failed to send (API may not be implemented)",
-        "testNotificationError": "Failed to send"
+        "testNotificationError": "Failed to send",
+        "saveError": "Failed to save settings"
       },
       "terms": {
         "title": "Terms",
