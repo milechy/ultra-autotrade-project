@@ -273,8 +273,8 @@ def test_get_api_referral_earnings_with_referred_users(
     assert len(body["referred_users"]) == 2
 
     statuses = {u["name"]: u["status"] for u in body["referred_users"]}
-    assert statuses["notxuser"] == "登録済み"
-    assert statuses["hastxuser"] == "運用中"
+    assert statuses["notxuser"] == "registered"
+    assert statuses["hastxuser"] == "active"
 
     for u in body["referred_users"]:
         assert "joined_at" in u

@@ -351,8 +351,8 @@
     "pausedDescAlt": "AI分析と提案を停止中です。手動で再開してください"
   },
   "OperationMode": {
-    "managedLabel": "フルオート",
-    "managedDesc": "AIが全自動で判断・実行。初心者向け。",
+    "managedLabel": "おまかせ",
+    "managedDesc": "AIが市場を分析し提案を表示します。自動売買・自動リバランスは準備中です（v4提供予定）。",
     "activeLabel": "セミオート",
     "activeDesc": "AIが提案→ユーザーが承認→実行。中級者向け。",
     "proLabel": "マニュアル",
@@ -834,7 +834,9 @@
         "toastLineShareFallback": "LINEシェア非対応環境 — テキストをコピーしました",
         "toastShareFailed": "シェアに失敗しました",
         "shareTextBody": "【UATaのご紹介】\nAIが自動で資産運用してくれるサービスです。\n紹介コード「{code}」を使ってアカウント登録できます。\n▼ アカウント開設はこちら\n{url}",
-        "mailSubject": "【UATaのご紹介】AI自動資産運用サービス"
+        "mailSubject": "【UATaのご紹介】AI自動資産運用サービス",
+        "statusActive": "運用中",
+        "statusRegistered": "登録済み"
       },
       "opMode": {
         "title": "運用モード切替",
@@ -842,8 +844,8 @@
         "loadingMode": "読み込み中...",
         "modeUnset": "未設定",
         "activeBadge": "設定中",
-        "managedLabel": "完全おまかせ",
-        "managedDesc": "AIが自動で判断・実行。承認不要。実行後にLINEで通知。",
+        "managedLabel": "おまかせ",
+        "managedDesc": "AIが市場を分析し提案を表示します。自動売買・自動リバランスは準備中です（v4提供予定）。",
         "activeLabel": "アクティブ",
         "activeDesc": "AIが提案。自分で承認してから実行。",
         "toastSwitched": "「{mode}」に切り替えました",
