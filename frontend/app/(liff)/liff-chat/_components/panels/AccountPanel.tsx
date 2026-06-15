@@ -431,7 +431,7 @@ export function AccountPanel() {
   return (
     <div className="space-y-4">
       {/* プロフィールカード */}
-      <div className="bg-[#1a3d2e] rounded-2xl p-4">
+      <div className="bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] rounded-2xl p-4">
         <div className="flex items-center gap-3">
           {/* アバター（画像 or イニシャル）＋ 変更ボタン */}
           <div className="relative flex-shrink-0">
@@ -439,7 +439,7 @@ export function AccountPanel() {
               type="button"
               onClick={handlePickAvatar}
               aria-label={t("changeIconAriaLabel")}
-              className="w-14 h-14 rounded-full overflow-hidden bg-[#1D9E75]/20 border border-[#1D9E75] flex items-center justify-center text-[#4ade9a] text-xl font-bold"
+              className="w-14 h-14 rounded-full overflow-hidden bg-[#1D9E75]/20 border border-[#1D9E75] flex items-center justify-center text-[#1D9E75] text-xl font-bold"
             >
               {avatarData ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -475,7 +475,7 @@ export function AccountPanel() {
                   maxLength={40}
                   placeholder={t("editNamePlaceholder")}
                   aria-label={t("editNameAriaLabel")}
-                  className="flex-1 min-w-0 bg-zinc-800 text-white px-2.5 py-1.5 rounded-lg text-sm outline-none focus:ring-1 focus:ring-[#1D9E75]"
+                  className="flex-1 min-w-0 ax-card-warm text-[#1c1a27] px-2.5 py-1.5 rounded-lg text-sm outline-none focus:ring-1 focus:ring-[#1D9E75]"
                 />
                 <button
                   type="button"
@@ -491,39 +491,39 @@ export function AccountPanel() {
                   onClick={() => setEditingName(false)}
                   disabled={nameSaving}
                   aria-label={t("cancelEditAriaLabel")}
-                  className="w-7 h-7 rounded-lg bg-zinc-800 flex items-center justify-center disabled:opacity-40"
+                  className="w-7 h-7 rounded-lg ax-card-warm flex items-center justify-center disabled:opacity-40"
                 >
-                  <X className="w-4 h-4 text-zinc-400" />
+                  <X className="w-4 h-4 text-[#736f7e]" />
                 </button>
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
-                <p className="text-white font-semibold truncate">{getDisplayName()}</p>
+                <p className="text-[#1c1a27] font-semibold truncate">{getDisplayName()}</p>
                 <button
                   type="button"
                   onClick={handleStartEditName}
                   aria-label={t("editNameEditAriaLabel")}
-                  className="flex-shrink-0 text-zinc-500 hover:text-[#4ade9a] transition-colors"
+                  className="flex-shrink-0 text-[#736f7e] hover:text-[#1D9E75] transition-colors"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}
             {userData?.email && (
-              <p className="text-zinc-300 text-sm truncate">{userData.email}</p>
+              <p className="text-[#736f7e] text-sm truncate">{userData.email}</p>
             )}
             {avatarData && !editingName && (
               <button
                 type="button"
                 onClick={handleClearAvatar}
-                className="text-zinc-500 hover:text-zinc-300 text-xs mt-1 transition-colors"
+                className="text-[#736f7e] hover:text-[#1c1a27] text-xs mt-1 transition-colors"
               >
                 {t("resetIcon")}
               </button>
             )}
             {/* ログイン方法バッジ（LIFF = LINE ログイン） */}
             <div className="flex flex-wrap gap-1 mt-1">
-              <span className="bg-zinc-800 text-zinc-300 text-xs px-2 py-0.5 rounded-full">
+              <span className="ax-card-warm text-[#1c1a27] text-xs px-2 py-0.5 rounded-full">
                 {t("lineLoginBadge")}
               </span>
             </div>
@@ -532,64 +532,64 @@ export function AccountPanel() {
       </div>
 
       {/* 運用情報セクション */}
-      <div className="bg-zinc-900 rounded-xl overflow-hidden">
+      <div className="ax-card-warm rounded-xl overflow-hidden">
         {/* 運用開始日 */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-          <span className="text-zinc-400 text-sm">{t("startedAt")}</span>
-          <span className="text-white text-sm">{getStartedAt()}</span>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#1c1a27]/15">
+          <span className="text-[#736f7e] text-sm">{t("startedAt")}</span>
+          <span className="text-[#1c1a27] text-sm">{getStartedAt()}</span>
         </div>
 
         {/* 運用モード */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-          <span className="text-zinc-400 text-sm">{t("opMode")}</span>
-          <span className="text-white text-sm">{getModeLabel()}</span>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#1c1a27]/15">
+          <span className="text-[#736f7e] text-sm">{t("opMode")}</span>
+          <span className="text-[#1c1a27] text-sm">{getModeLabel()}</span>
         </div>
 
         {/* ウォレットアドレス */}
         <div className="flex items-center justify-between px-4 py-3">
-          <span className="text-zinc-400 text-sm">{t("wallet")}</span>
+          <span className="text-[#736f7e] text-sm">{t("wallet")}</span>
           {shortAddress ? (
             <button
               onClick={handleCopyWallet}
-              className="flex items-center gap-1.5 text-zinc-300 text-sm"
+              className="flex items-center gap-1.5 text-[#1c1a27] text-sm"
             >
               <span className="font-mono text-xs">{shortAddress}</span>
               {copied ? (
-                <Check className="w-3.5 h-3.5 text-[#4ade9a]" />
+                <Check className="w-3.5 h-3.5 text-[#1D9E75]" />
               ) : (
-                <Copy className="w-3.5 h-3.5 text-zinc-500" />
+                <Copy className="w-3.5 h-3.5 text-[#736f7e]" />
               )}
             </button>
           ) : (
-            <span className="text-zinc-600 text-sm">{t("walletNotLinked")}</span>
+            <span className="text-[#736f7e] text-sm">{t("walletNotLinked")}</span>
           )}
         </div>
       </div>
 
       {/* 法人情報セクション（アコーディオン） */}
-      <div className="bg-zinc-900 rounded-xl overflow-hidden">
+      <div className="ax-card-warm rounded-xl overflow-hidden">
         <button
           onClick={() => setCorpExpanded((v) => !v)}
           className="flex items-center justify-between w-full px-4 py-3.5"
         >
           <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-zinc-400" />
-            <span className="text-zinc-300 text-sm font-medium">{t("corpSectionTitle")}</span>
+            <Building2 className="w-4 h-4 text-[#736f7e]" />
+            <span className="text-[#1c1a27] text-sm font-medium">{t("corpSectionTitle")}</span>
           </div>
           <ChevronDown
-            className={`w-4 h-4 text-zinc-500 transition-transform duration-200 ${
+            className={`w-4 h-4 text-[#736f7e] transition-transform duration-200 ${
               corpExpanded ? "rotate-180" : ""
             }`}
           />
         </button>
 
         {corpExpanded && (
-          <div className="px-4 pb-4 space-y-3 border-t border-zinc-800 pt-3">
+          <div className="px-4 pb-4 space-y-3 border-t border-[#1c1a27]/15 pt-3">
             <input
               placeholder={t("corpNamePlaceholder")}
               value={corpForm.name}
               onChange={(e) => setCorpForm((p) => ({ ...p, name: e.target.value }))}
-              className="w-full bg-zinc-800 text-white px-3 py-2.5 rounded-lg text-sm placeholder-zinc-500 outline-none focus:ring-1 focus:ring-[#1D9E75]"
+              className="w-full ax-card-warm-soft text-[#1c1a27] px-3 py-2.5 rounded-lg text-sm placeholder-[#736f7e] border border-[#1c1a27]/15 outline-none focus:ring-1 focus:ring-[#1D9E75]"
             />
             <input
               placeholder={t("corpNumberPlaceholder")}
@@ -597,18 +597,18 @@ export function AccountPanel() {
               onChange={(e) => setCorpForm((p) => ({ ...p, number: e.target.value }))}
               maxLength={13}
               inputMode="numeric"
-              className="w-full bg-zinc-800 text-white px-3 py-2.5 rounded-lg text-sm placeholder-zinc-500 outline-none focus:ring-1 focus:ring-[#1D9E75]"
+              className="w-full ax-card-warm-soft text-[#1c1a27] px-3 py-2.5 rounded-lg text-sm placeholder-[#736f7e] border border-[#1c1a27]/15 outline-none focus:ring-1 focus:ring-[#1D9E75]"
             />
             <input
               placeholder={t("corpRepPlaceholder")}
               value={corpForm.rep}
               onChange={(e) => setCorpForm((p) => ({ ...p, rep: e.target.value }))}
-              className="w-full bg-zinc-800 text-white px-3 py-2.5 rounded-lg text-sm placeholder-zinc-500 outline-none focus:ring-1 focus:ring-[#1D9E75]"
+              className="w-full ax-card-warm-soft text-[#1c1a27] px-3 py-2.5 rounded-lg text-sm placeholder-[#736f7e] border border-[#1c1a27]/15 outline-none focus:ring-1 focus:ring-[#1D9E75]"
             />
 
             {/* 決算月グリッド */}
             <div>
-              <p className="text-zinc-400 text-xs mb-2">{t("corpFiscalMonthLabel")}</p>
+              <p className="text-[#736f7e] text-xs mb-2">{t("corpFiscalMonthLabel")}</p>
               <div className="grid grid-cols-6 gap-1.5">
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                   <button
@@ -617,7 +617,7 @@ export function AccountPanel() {
                     className={`py-2 rounded-lg text-sm font-medium transition-colors ${
                       corpForm.month === m
                         ? "bg-[#1D9E75] text-white"
-                        : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                        : "ax-card-warm-soft text-[#736f7e] border border-[#1c1a27]/15 hover:bg-black/5"
                     }`}
                   >
                     {t("corpFiscalMonthUnit", { m })}
@@ -643,17 +643,17 @@ export function AccountPanel() {
           {/* ログアウトボタン */}
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-4 bg-zinc-900 rounded-xl hover:bg-zinc-800 transition-colors"
+            className="flex items-center gap-3 w-full px-4 py-4 ax-card-warm rounded-xl hover:bg-black/5 transition-colors"
           >
-            <LogOut className="w-5 h-5 text-red-400" />
-            <span className="text-red-400 font-medium">{t("logoutBtn")}</span>
+            <LogOut className="w-5 h-5 text-red-600" />
+            <span className="text-red-600 font-medium">{t("logoutBtn")}</span>
           </button>
 
           {/* アカウント削除ボタン */}
           <div className="flex justify-center pb-2">
             <button
               onClick={() => setDeleteSheet(true)}
-              className="flex items-center gap-2 px-4 py-2 text-zinc-600 hover:text-zinc-400 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-[#736f7e] hover:text-[#1c1a27] transition-colors"
             >
               <Trash2 className="w-4 h-4" />
               <span className="text-xs">{t("deleteAccountBtn")}</span>
@@ -670,25 +670,25 @@ export function AccountPanel() {
             onClick={() => setDeleteSheet(false)}
           />
           <div
-            className="fixed bottom-0 left-0 right-0 z-[70] bg-zinc-900 rounded-t-2xl px-4 pb-8 pt-4
+            className="fixed bottom-0 left-0 right-0 z-[70] ax-card-warm rounded-t-2xl px-4 pb-8 pt-4
                         animate-in slide-in-from-bottom duration-300"
           >
-            <div className="mx-auto mb-4 h-1 w-8 rounded-full bg-zinc-700" />
-            <h3 className="text-white font-semibold mb-2">{t("deleteSheetTitle")}</h3>
-            <p className="text-zinc-400 text-sm mb-6">
+            <div className="mx-auto mb-4 h-1 w-8 rounded-full bg-[#1c1a27]/10" />
+            <h3 className="text-[#1c1a27] font-semibold mb-2">{t("deleteSheetTitle")}</h3>
+            <p className="text-[#736f7e] text-sm mb-6">
               {t("deleteSheetDesc")}
             </p>
             <button
               onClick={handleDeleteRequest}
               disabled={deleteSubmitting}
-              className="w-full py-3.5 bg-red-600/20 border border-red-600 text-red-400 rounded-xl font-medium mb-3 disabled:opacity-50"
+              className="w-full py-3.5 bg-red-600/20 border border-red-600 text-red-600 rounded-xl font-medium mb-3 disabled:opacity-50"
             >
               {deleteSubmitting ? t("deleteSubmittingBtn") : t("deleteSubmitBtn")}
             </button>
             <button
               onClick={() => setDeleteSheet(false)}
               disabled={deleteSubmitting}
-              className="w-full py-3.5 border border-zinc-700 text-zinc-400 rounded-xl font-medium disabled:opacity-50"
+              className="w-full py-3.5 border border-[#1c1a27]/15 text-[#736f7e] rounded-xl font-medium disabled:opacity-50"
             >
               {t("deleteCancelBtn")}
             </button>
@@ -698,7 +698,7 @@ export function AccountPanel() {
 
       {/* トースト */}
       {toastMsg && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[80] bg-zinc-700 text-white px-4 py-2 rounded-full text-sm whitespace-nowrap">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[80] bg-[#1b1a23] text-[#fbf7f0] px-4 py-2 rounded-full text-sm whitespace-nowrap">
           {toastMsg}
         </div>
       )}

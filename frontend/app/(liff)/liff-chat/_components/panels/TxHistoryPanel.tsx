@@ -114,22 +114,22 @@ function TxDetailPanel({ tx, onClose }: TxDetailPanelProps) {
   if (tx.tx_hash) detailRows.push({ label: t("detailTxHash"), value: `${tx.tx_hash.slice(0, 8)}...${tx.tx_hash.slice(-6)}` })
 
   return (
-    <div className="fixed inset-0 z-[60] bg-zinc-900 flex flex-col animate-in slide-in-from-right duration-200 w-[375px] mx-auto">
+    <div className="fixed inset-0 z-[60] ax-bg-app flex flex-col animate-in slide-in-from-right duration-200 w-[375px] mx-auto">
       {/* ヘッダー */}
-      <div className="flex items-center bg-[#1a3d2e] px-4 py-3 flex-shrink-0">
-        <button onClick={onClose} className="text-white mr-2">
+      <div className="flex items-center bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] px-4 py-3 flex-shrink-0">
+        <button onClick={onClose} className="text-[#1c1a27] mr-2">
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <h2 className="text-white font-semibold text-base">{t("detailTitle")}</h2>
+        <h2 className="text-[#1c1a27] font-semibold text-base">{t("detailTitle")}</h2>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-8">
         {/* 金額カード */}
-        <div className="bg-[#1a3d2e] rounded-2xl p-4 mt-4 mb-6">
-          <div className={`text-3xl font-bold ${isSupply ? "text-[#4ade9a]" : "text-orange-400"}`}>
+        <div className="ax-card-warm rounded-2xl p-4 mt-4 mb-6">
+          <div className={`text-3xl font-bold ${isSupply ? "text-[#1D9E75]" : "text-orange-400"}`}>
             {amountDisplay}
           </div>
-          <div className="text-zinc-300 text-sm mt-1">
+          <div className="text-[#736f7e] text-sm mt-1">
             {tx.operation} · {tx.asset}
           </div>
         </div>
@@ -137,9 +137,9 @@ function TxDetailPanel({ tx, onClose }: TxDetailPanelProps) {
         {/* 詳細行 */}
         <div className="space-y-0">
           {detailRows.map((row) => (
-            <div key={row.label} className="flex justify-between items-start py-3 border-b border-zinc-800">
-              <span className="text-zinc-500 text-sm">{row.label}</span>
-              <span className="text-zinc-100 text-sm text-right max-w-[60%] break-all">{row.value}</span>
+            <div key={row.label} className="flex justify-between items-start py-3 border-b border-[#1c1a27]/15">
+              <span className="text-[#736f7e] text-sm">{row.label}</span>
+              <span className="text-[#1c1a27] text-sm text-right max-w-[60%] break-all">{row.value}</span>
             </div>
           ))}
         </div>
@@ -150,7 +150,7 @@ function TxDetailPanel({ tx, onClose }: TxDetailPanelProps) {
             href={`https://basescan.org/tx/${tx.tx_hash}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-6 flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors text-sm"
+            className="mt-6 flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-[#1c1a27]/15 text-[#736f7e] hover:bg-black/5 transition-colors text-sm"
           >
             <ExternalLink className="w-4 h-4" />
             {t("detailBasescanBtn")}
@@ -258,8 +258,8 @@ export function TxHistoryPanel() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
-        <Loader2 className="w-6 h-6 mb-3 text-zinc-600 animate-spin" />
+      <div className="flex flex-col items-center justify-center py-12 text-[#736f7e]">
+        <Loader2 className="w-6 h-6 mb-3 text-[#736f7e] animate-spin" />
         <p className="text-sm">{t("loading")}</p>
       </div>
     )
@@ -269,8 +269,8 @@ export function TxHistoryPanel() {
   if (authExpired) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-        <p className="text-sm text-zinc-300 mb-1">{t("authExpiredTitle")}</p>
-        <p className="text-xs text-zinc-500 mb-5">
+        <p className="text-sm text-[#736f7e] mb-1">{t("authExpiredTitle")}</p>
+        <p className="text-xs text-[#736f7e] mb-5">
           {t("authExpiredDesc")}
         </p>
         <button
@@ -289,8 +289,8 @@ export function TxHistoryPanel() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
-        <p className="text-sm text-red-400">{error}</p>
+      <div className="flex flex-col items-center justify-center py-12 text-[#736f7e]">
+        <p className="text-sm text-red-600">{error}</p>
       </div>
     )
   }
@@ -301,7 +301,7 @@ export function TxHistoryPanel() {
       <div className="flex justify-end">
         <button
           onClick={handleCsvDownload}
-          className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs px-3 py-1.5 rounded-lg transition-colors"
+          className="flex items-center gap-1.5 ax-card-warm hover:bg-black/5 text-[#736f7e] text-xs px-3 py-1.5 rounded-lg transition-colors"
         >
           <Download className="w-3.5 h-3.5" />
           {t("csvBtn")}
@@ -314,10 +314,10 @@ export function TxHistoryPanel() {
           {coinSummaries.map((coin) => (
             <div
               key={coin.asset}
-              className="flex-shrink-0 bg-zinc-800 rounded-xl px-3 py-2 min-w-[100px]"
+              className="flex-shrink-0 ax-card-warm rounded-xl px-3 py-2 min-w-[100px]"
             >
-              <div className="text-xs text-zinc-400 font-medium mb-0.5">{coin.asset}</div>
-              <div className="text-[#4ade9a] text-xs">+${coin.total_supply}</div>
+              <div className="text-xs text-[#736f7e] font-medium mb-0.5">{coin.asset}</div>
+              <div className="text-[#1D9E75] text-xs">+${coin.total_supply}</div>
               <div className="text-orange-400 text-xs">-${coin.total_withdraw}</div>
             </div>
           ))}
@@ -333,7 +333,7 @@ export function TxHistoryPanel() {
             className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full transition-colors ${
               filter === f.id
                 ? "bg-[#1D9E75] text-white"
-                : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                : "ax-card-warm text-[#736f7e] hover:bg-black/5"
             }`}
           >
             {f.label}
@@ -343,7 +343,7 @@ export function TxHistoryPanel() {
 
       {/* 取引リスト */}
       {filteredTxs.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
+        <div className="flex flex-col items-center justify-center py-12 text-[#736f7e]">
           <p className="text-sm">{t("noTxs")}</p>
         </div>
       ) : (
@@ -351,7 +351,7 @@ export function TxHistoryPanel() {
           {grouped.map(({ month, items }) => (
             <div key={month}>
               {/* 月ヘッダー */}
-              <div className="text-zinc-500 text-xs font-semibold py-2 pt-4">
+              <div className="text-[#736f7e] text-xs font-semibold py-2 pt-4">
                 {month}
               </div>
               {/* 行 */}
@@ -361,12 +361,12 @@ export function TxHistoryPanel() {
                   <button
                     key={tx.id}
                     onClick={() => setSelectedTx(tx)}
-                    className="flex items-center w-full py-3 border-b border-zinc-800 text-left hover:bg-zinc-800/50 transition-colors -mx-1 px-1 rounded"
+                    className="flex items-center w-full py-3 border-b border-[#1c1a27]/15 text-left hover:bg-black/5 transition-colors -mx-1 px-1 rounded"
                   >
                     {/* 種別アイコン */}
-                    <div className="mr-3 w-8 h-8 rounded-full flex items-center justify-center bg-zinc-800 flex-shrink-0">
+                    <div className="mr-3 w-8 h-8 rounded-full flex items-center justify-center ax-card-warm flex-shrink-0">
                       {isSupply ? (
-                        <ArrowDown className="w-4 h-4 text-[#4ade9a]" />
+                        <ArrowDown className="w-4 h-4 text-[#1D9E75]" />
                       ) : (
                         <ArrowUp className="w-4 h-4 text-orange-400" />
                       )}
@@ -374,21 +374,21 @@ export function TxHistoryPanel() {
                     {/* 情報 */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-white text-sm font-medium">
+                        <span className="text-[#1c1a27] text-sm font-medium">
                           {tx.operation}
                         </span>
-                        <span className="bg-zinc-700 text-zinc-300 text-xs px-1.5 py-0.5 rounded">
+                        <span className="bg-[#1c1a27]/10 text-[#736f7e] text-xs px-1.5 py-0.5 rounded">
                           {tx.asset}
                         </span>
                       </div>
-                      <div className="text-zinc-500 text-xs mt-0.5">{formatDate(tx.created_at)}</div>
+                      <div className="text-[#736f7e] text-xs mt-0.5">{formatDate(tx.created_at)}</div>
                     </div>
                     {/* 金額 */}
                     <div className="text-right flex-shrink-0 ml-2">
-                      <div className={`font-medium text-sm ${isSupply ? "text-[#4ade9a]" : "text-orange-400"}`}>
+                      <div className={`font-medium text-sm ${isSupply ? "text-[#1D9E75]" : "text-orange-400"}`}>
                         {formatAmountUsd(tx.amount_usd, tx.operation)}
                       </div>
-                      <div className="text-zinc-500 text-xs mt-0.5">{statusLabel(tx.status)}</div>
+                      <div className="text-[#736f7e] text-xs mt-0.5">{statusLabel(tx.status)}</div>
                     </div>
                   </button>
                 )
