@@ -16,6 +16,7 @@ import {
   PnlChart,
 } from './_components'
 import { useAuthFetch } from '@/hooks/useAuthFetch'
+import { RewardsCard } from '@/components/dashboard/RewardsCard'
 
 // Note: PortfolioSummary, SafetyScore, AiAccuracyCard are used by ActiveDashboard only
 
@@ -27,6 +28,7 @@ type RiskMode = 'conservative' | 'balanced' | 'aggressive'
 interface UserSettings {
   user_mode: UserMode
   execution_policy?: string
+  role?: string
 }
 
 interface RiskModeData {
@@ -215,7 +217,7 @@ function RecentOpsCard() {
   )
 }
 
-function ManagedDashboard() {
+function ManagedDashboard({ isAdmin }: { isAdmin: boolean }) {
   const t = useTranslations('Dashboard')
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
@@ -234,13 +236,17 @@ function ManagedDashboard() {
       <section>
         <RecentOpsCard />
       </section>
+
+      <section>
+        <RewardsCard isAdmin={isAdmin} />
+      </section>
     </div>
   )
 }
 
 // ---- Full (active / pro) Dashboard ----
 
-function ActiveDashboard() {
+function ActiveDashboard({ isAdmin }: { isAdmin: boolean }) {
   const t = useTranslations('Dashboard')
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
@@ -285,6 +291,10 @@ function ActiveDashboard() {
         <AiAccuracyCard />
       </section>
 
+      <section>
+        <RewardsCard isAdmin={isAdmin} />
+      </section>
+
       {/* Disclaimer */}
       <p className="text-center text-xs text-zinc-600">
         {t('disclaimer')}
@@ -314,9 +324,11 @@ export default function DashboardPage() {
     )
   }
 
+  const isAdmin = settings?.role === 'admin'
+
   if (userMode === 'managed') {
-    return <ManagedDashboard />
+    return <ManagedDashboard isAdmin={isAdmin} />
   }
 
-  return <ActiveDashboard />
+  return <ActiveDashboard isAdmin={isAdmin} />
 }
