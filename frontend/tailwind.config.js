@@ -76,16 +76,16 @@ module.exports = {
           "33%": { backgroundPosition: "100% 0" },
           "100%": { backgroundPosition: "100% 0" },
         },
-        // ウルトラマン カラータイマー: 3回点滅(1.5s) → 3秒休止 = 4.5s サイクル
+        // カラータイマー: 3秒グレー休止 → 3回赤点滅(1.5s) = 4.5s サイクル
         "color-timer": {
-          "0%":   { opacity: "1" },
-          "6%":   { opacity: "0.1" },
-          "11%":  { opacity: "1" },
-          "17%":  { opacity: "0.1" },
-          "22%":  { opacity: "1" },
-          "28%":  { opacity: "0.1" },
-          "33%":  { opacity: "1" },
-          "100%": { opacity: "1" },
+          "0%":   { opacity: "0" },
+          "67%":  { opacity: "0" },
+          "72%":  { opacity: "1" },
+          "78%":  { opacity: "0" },
+          "83%":  { opacity: "1" },
+          "89%":  { opacity: "0" },
+          "94%":  { opacity: "1" },
+          "100%": { opacity: "0" },
         },
       },
       animation: {
