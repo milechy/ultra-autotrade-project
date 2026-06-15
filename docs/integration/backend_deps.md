@@ -5,6 +5,19 @@
 
 ---
 
+## PR #763 (yield optimizer 配線漏れ修正): yield_optimizer_router 配線 (2026-06-16)
+
+### 変更: yield_optimizer_router を main.py に include_router
+- **対象凍結ファイル**: `backend/app/main.py`
+- **変更内容**:
+  - `from app.yield_optimizer.router import router as yield_optimizer_router` を import 追加
+  - `app.include_router(yield_optimizer_router)` を追加（自前 prefix `/api/yield-optimizer`、portfolio_router と同型）
+- **理由**: #750（Privy Earn / Morpho yield optimizer）が router を追加したが main.py への include_router を忘れた孤立 router。`launch_gate` L5（wiring lint）が検知して本番デプロイを BLOCK していたため配線を補完する。
+- **影響範囲**: ルーター登録のみ。起動シーケンス・既存エンドポイントへの影響なし。`/api/yield-optimizer/*` が有効化される。
+- **承認**: fix/yield-optimizer-router-wiring → main の通常フロー経由（PR #763）
+
+---
+
 ## PR #581 (admin users API): admin_users_router 配線 (2026-06-08)
 
 ### 変更: admin_users_router を main.py に include_router

@@ -94,6 +94,7 @@ from app.users.router import router as users_router
 from app.users.settings_router import router as user_settings_router
 from app.users.withdrawals_router import router as user_withdrawals_router
 from app.webhook.router import router as webhook_router
+from app.yield_optimizer.router import router as yield_optimizer_router
 
 logger = logging.getLogger(__name__)
 # Ensure app.* loggers output at INFO level regardless of root logger config
@@ -277,6 +278,9 @@ def create_app() -> FastAPI:
     app.include_router(admin_users_router)  # Admin Users API
     app.include_router(proposals_router)  # Proposals API
     app.include_router(portfolio_router)  # Portfolio History API
+    app.include_router(
+        yield_optimizer_router
+    )  # Yield Optimizer (Privy Earn / Morpho) — #750 配線漏れ修正
     app.include_router(user_settings_router)  # User Settings API
     # P4 withdraw EP は money を動かす経路のため default-off で配線ガードする。
     # ENABLE_WITHDRAWALS=1/true のときのみ route 登録。未登録時 POST /api/users/withdrawals=404
