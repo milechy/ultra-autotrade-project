@@ -63,7 +63,7 @@ class ReferredUserDetail(BaseModel):
 
     name: str
     joined_at: datetime
-    status: str  # "運用中" | "登録済み"
+    status: str  # "active" | "registered"
     reward_jpy: str  # ¥1,500 bonus は別タスク: 現在は常に "0"
 
 

@@ -151,7 +151,7 @@ export function ReferralPanel() {
   const monthlyReward = Number(displayInfo.current_month_reward_jpy).toLocaleString("ja-JP")
 
   const operatingCount = displayInfo.referred_users.filter(
-    (u) => u.status === "運用中"
+    (u) => u.status === "active"
   ).length
 
   return (
@@ -380,7 +380,7 @@ function ReferredUserRow({
   user: { name: string; joined_at: string; status: string; reward_jpy: string }
   tPanel: TFn
 }) {
-  const isActive = user.status === "運用中"
+  const isActive = user.status === "active"
   const initial = user.name ? user.name.charAt(0).toUpperCase() : "?"
   const joinedDate = user.joined_at ? user.joined_at.slice(0, 10) : ""
   const rewardJpy = Number(user.reward_jpy).toLocaleString("ja-JP")
@@ -408,7 +408,9 @@ function ReferredUserRow({
               : "text-zinc-400 border-zinc-700"
           }`}
         >
-          {user.status}
+          {user.status === "active"
+            ? tPanel("statusActive")
+            : tPanel("statusRegistered")}
         </span>
         <span className="text-zinc-300 text-xs">¥{rewardJpy}</span>
       </div>

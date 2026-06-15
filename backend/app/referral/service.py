@@ -35,9 +35,9 @@ logger = logging.getLogger(__name__)
 # /referral/users/{id}/transactions が返す operation 値のホワイトリスト。
 _ALLOWED_TX_TYPES = ("deposit", "withdraw", "borrow", "repay")
 
-# get_api_referral_info で返す referred_users の status 値
-_STATUS_ACTIVE = "運用中"
-_STATUS_REGISTERED = "登録済み"
+# get_api_referral_info で返す referred_users の status 値 ("active" | "registered")
+_STATUS_ACTIVE = "active"
+_STATUS_REGISTERED = "registered"
 
 
 def _share_base_url() -> str:

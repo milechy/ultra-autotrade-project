@@ -834,7 +834,9 @@
         "toastLineShareFallback": "LINE share unavailable — text copied",
         "toastShareFailed": "Share failed",
         "shareTextBody": "[Introducing UATa]\nUATa is an AI-powered automated asset management service.\nRegister with referral code \"{code}\":\n{url}",
-        "mailSubject": "[Introducing UATa] AI Automated Asset Management"
+        "mailSubject": "[Introducing UATa] AI Automated Asset Management",
+        "statusActive": "Active",
+        "statusRegistered": "Registered"
       },
       "opMode": {
         "title": "Operation Mode",

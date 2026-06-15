@@ -834,7 +834,9 @@
         "toastLineShareFallback": "LINEシェア非対応環境 — テキストをコピーしました",
         "toastShareFailed": "シェアに失敗しました",
         "shareTextBody": "【UATaのご紹介】\nAIが自動で資産運用してくれるサービスです。\n紹介コード「{code}」を使ってアカウント登録できます。\n▼ アカウント開設はこちら\n{url}",
-        "mailSubject": "【UATaのご紹介】AI自動資産運用サービス"
+        "mailSubject": "【UATaのご紹介】AI自動資産運用サービス",
+        "statusActive": "運用中",
+        "statusRegistered": "登録済み"
       },
       "opMode": {
         "title": "運用モード切替",
