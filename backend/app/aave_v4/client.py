@@ -214,6 +214,7 @@ class DummyAaveV4Client(AaveV4ClientBase):
 # --------------------------------------------------------------------------- #
 # 本体スタブ (具象実装 — Phase 2 以降)
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
 
 
 class AaveV4EthereumHubClient(AaveV4ClientBase):
@@ -264,4 +265,19 @@ class AaveV4EthereumHubClient(AaveV4ClientBase):
         """V4 withdraw は Phase 3 (HUMAN-REVIEW 承認後) に実装。"""
         raise NotImplementedError(
             "V4 withdraw は Ethereum Hub アドレス/SDK 確定後に実装 (docs/55 §5 Phase 3)"
+        )
+
+    def get_user_emode(self, wallet_address: str) -> int:
+        """V4 eMode 取得。Phase 2 以降に実装予定。"""
+        raise NotImplementedError("V4 get_user_emode は Ethereum Hub API 確定後に実装 (docs/55)")
+
+    def build_set_emode_tx(
+        self,
+        category_id: int,
+        wallet_address: str,
+        dry_run: bool = False,
+    ) -> "dict[str, object]":
+        """V4 setUserEMode は Phase 3 (HUMAN-REVIEW 承認後) に実装。"""
+        raise NotImplementedError(
+            "V4 build_set_emode_tx は Ethereum Hub アドレス/SDK 確定後に実装 (docs/55 §5 Phase 3)"
         )
