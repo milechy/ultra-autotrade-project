@@ -760,6 +760,8 @@
         "depositAddressNote": "このアドレスに USDC を送金してください。着金後、自動で Aave 運用に反映されます。",
         "depositNoWallet": "ウォレットアドレスが登録されていません",
         "depositBtn": "入金する",
+        "moonpayTitle": "クレジットカードで購入",
+        "moonpayDesc": "MoonPay を使って、クレジットカードまたはデビットカードで USDC を購入できます。",
         "withdrawAmountLabel": "金額を入力（USDC）",
         "withdrawAmountPlaceholder": "金額を入力",
         "withdrawDestLabel": "出金先",
