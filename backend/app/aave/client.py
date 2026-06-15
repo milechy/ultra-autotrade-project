@@ -314,6 +314,25 @@ class AaveClientError(Exception):
     """Aave クライアントの基底例外。"""
 
 
+class AaveBlocklistedAssetError(AaveClientError):
+    """
+    ブラックリスト登録済みアセットへの deposit を試みた場合に raise される。
+
+    2026-06 rsETH/srsETH/wrsETH エクスプロイト再発防止。
+    config.BLOCKLISTED_COLLATERAL に登録されたシンボルが対象。
+    大文字小文字非依存 (rseth/RSETH 等も含む)。
+    """
+
+
+class OracleDeviationHardStopError(AaveClientError):
+    """
+    Oracle 多重検証で price deviation >= 閾値 (デフォルト 2%) を検知した場合に raise される。
+
+    3価格 (Chainlink / Pyth / Uniswap V3 TWAP) が全て揃った状態で乖離超過時のみ発動。
+    価格ソースが 2 件以下の場合は fail-open（従来通り継続）。
+    """
+
+
 # 後方互換: 旧コードが AaveTransactionError を参照している箇所のため維持
 class AaveTransactionError(AaveClientError):
     """トランザクション送信・実行エラー。"""
@@ -711,6 +730,47 @@ class Web3AaveClient(AaveClientBase):
         """
         if Web3 is None:
             raise AaveClientError("web3 package is required")
+
+        # ブラックリストチェック（rsETH/srsETH/wrsETH エクスプロイト再発防止 2026-06）
+        # 大文字小文字非依存: asset.upper() を BLOCKLISTED_COLLATERAL_UPPER と比較。
+        # rseth / RSETH / Rseth 等も確実にブロックする。
+        from .config import BLOCKLISTED_COLLATERAL_UPPER  # noqa: PLC0415
+
+        _check_sym = asset_symbol or (asset_address if not asset_address.startswith("0x") else "")
+        if _check_sym and _check_sym.upper() in BLOCKLISTED_COLLATERAL_UPPER:
+            raise AaveBlocklistedAssetError(
+                f"asset '{_check_sym}' はブラックリスト登録済みのため deposit 不可"
+            )
+
+        # Oracle 乖離チェック（S-1: 3ソース全揃いで乖離 >= 2% の場合のみ HARD_STOP）
+        # シンボルが確定している場合（asset_symbol または非0x文字列 asset_address）のみ実行。
+        if _check_sym:
+            _oracle_cfg = _load_oracle_config_for_asset(_check_sym)
+            if _oracle_cfg is not None:
+                from .oracle_checker import check_price_deviation  # noqa: PLC0415
+
+                _oracle_result = check_price_deviation(
+                    asset=_check_sym,
+                    chainlink_feed_address=_oracle_cfg.get("chainlink_feed"),
+                    rpc_url=_oracle_cfg.get("rpc_url"),
+                    pyth_api_url=_oracle_cfg.get("pyth_api_url"),
+                    pyth_price_id=_oracle_cfg.get("pyth_price_id"),
+                    uniswap_pool_address=_oracle_cfg.get("uniswap_pool"),
+                )
+                _available = sum(
+                    1
+                    for p in [
+                        _oracle_result.chainlink_price,
+                        _oracle_result.pyth_price,
+                        _oracle_result.twap_price,
+                    ]
+                    if p is not None
+                )
+                if _oracle_result.level == "HARD_STOP" and _available >= 3:  # noqa: PLR2004
+                    raise OracleDeviationHardStopError(
+                        f"[{_check_sym}] Oracle 価格乖離 {_oracle_result.max_deviation_pct:.4f}% "
+                        "が閾値を超過 (3ソース確認済) — deposit HARD_STOP"
+                    )
 
         # 後方互換: asset_symbol キーワード引数で呼ばれた場合
         if asset_symbol:
@@ -1110,6 +1170,47 @@ class Web3AaveClient(AaveClientBase):
         if not wallet_address:
             raise AaveClientError("wallet_address は必須です (partner 署名)")
 
+        # ブラックリストチェック（rsETH/srsETH/wrsETH エクスプロイト再発防止 2026-06）
+        # deposit() と同じチェックを build_deposit_txs() にも適用（パートナー署名フロー経路）。
+        # 大文字小文字非依存: .upper() で正規化して比較。
+        from .config import BLOCKLISTED_COLLATERAL_UPPER  # noqa: PLC0415
+
+        if asset_symbol.upper() in BLOCKLISTED_COLLATERAL_UPPER:
+            raise AaveBlocklistedAssetError(
+                f"asset '{asset_symbol}' はブラックリスト登録済みのため deposit 不可"
+            )
+
+        # Oracle 乖離チェック（S-1: 3ソース全揃いで乖離 >= 2% の場合のみ HARD_STOP）
+        # fail-open 方針: 価格ソースが 2 件以下の場合はブロックせず継続。
+        # 3ソース揃って乖離超過した場合のみ OracleDeviationHardStopError を raise する。
+        _oracle_cfg = _load_oracle_config_for_asset(asset_symbol)
+        if _oracle_cfg is not None:
+            from .oracle_checker import check_price_deviation  # noqa: PLC0415
+
+            _oracle_result = check_price_deviation(
+                asset=asset_symbol,
+                chainlink_feed_address=_oracle_cfg.get("chainlink_feed"),
+                rpc_url=_oracle_cfg.get("rpc_url"),
+                pyth_api_url=_oracle_cfg.get("pyth_api_url"),
+                pyth_price_id=_oracle_cfg.get("pyth_price_id"),
+                uniswap_pool_address=_oracle_cfg.get("uniswap_pool"),
+            )
+            # 3ソース全揃いで HARD_STOP の場合のみブロック（fail-open 遵守）
+            _available = sum(
+                1
+                for p in [
+                    _oracle_result.chainlink_price,
+                    _oracle_result.pyth_price,
+                    _oracle_result.twap_price,
+                ]
+                if p is not None
+            )
+            if _oracle_result.level == "HARD_STOP" and _available >= 3:  # noqa: PLR2004
+                raise OracleDeviationHardStopError(
+                    f"[{asset_symbol}] Oracle 価格乖離 {_oracle_result.max_deviation_pct:.4f}% "
+                    "が閾値を超過 (3ソース確認済) — deposit HARD_STOP"
+                )
+
         # asset_symbol → address 解決
         if not hasattr(self, "token_addresses"):
             raise AaveClientError(f"Unknown asset: {asset_symbol}")
@@ -1269,6 +1370,28 @@ class Web3AaveClient(AaveClientBase):
     def _from_wei(self, amount: int, decimals: int) -> Decimal:
         """Wei（最小単位）→ Decimal 変換。"""
         return Decimal(amount) / Decimal(10**decimals)
+
+
+def _load_oracle_config_for_asset(asset_symbol: str) -> "dict[str, Any] | None":
+    """
+    AAVE_ORACLE_ASSETS_JSON 環境変数から対象 asset のオラクル設定を返す。
+
+    設定がない場合や JSON パースエラー時は None を返す (fail-open)。
+    build_deposit_txs() のオラクル乖離チェックで使用する。
+    """
+    import json  # noqa: PLC0415
+    import os  # noqa: PLC0415
+
+    raw = os.getenv("AAVE_ORACLE_ASSETS_JSON", "[]")
+    try:
+        configs: list[dict[str, Any]] = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+    for cfg in configs:
+        if isinstance(cfg, dict) and cfg.get("asset", "").upper() == asset_symbol.upper():
+            return cfg
+    return None
 
 
 def make_aave_client(

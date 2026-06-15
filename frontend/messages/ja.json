@@ -2152,7 +2152,21 @@
     "alerts": "アラート",
     "noAlerts": "アラートなし",
     "lastChecked": "最終チェック: {time}",
-    "pendlePositionTitle": "Pendle ポジション詳細"
+    "pendlePositionTitle": "Pendle ポジション詳細",
+    "oracleStatusTitle": "Oracle 多重検証ステータス",
+    "oracleStatusDescription": "Chainlink / Pyth / Uniswap V3 TWAP の3価格乖離を監視します",
+    "oracleLoadError": "Oracle ステータスの取得に失敗しました",
+    "oracleNoAssets": "監視対象アセットが設定されていません（AAVE_ORACLE_ASSETS_JSON 未設定）",
+    "oracleLevelOk": "正常",
+    "oracleLevelWarn": "警告",
+    "oracleLevelHardStop": "停止",
+    "oracleAsset": "アセット",
+    "oracleDeviation": "最大乖離率",
+    "oracleChainlink": "Chainlink",
+    "oraclePyth": "Pyth",
+    "oracleTwap": "TWAP (30分)",
+    "oracleCheckedAt": "検証日時",
+    "oracleDetail": "詳細"
   },
   "Register": {
     "title": "アカウント登録 - Ultra AutoTrade",

@@ -245,6 +245,265 @@ def check_sequencer_uptime(
     return True
 
 
+######################################################################
+# Multi-Source Price Deviation Check (Pyth + Uniswap V3 TWAP)
+# 2026-06 rsETH/srsETH exploit 再発防止
+######################################################################
+
+# Uniswap V3 Pool ABI — slot0 + observe の最小セット
+_UNISWAP_V3_POOL_ABI = [
+    {
+        "inputs": [],
+        "name": "slot0",
+        "outputs": [
+            {"internalType": "uint160", "name": "sqrtPriceX96", "type": "uint160"},
+            {"internalType": "int24", "name": "tick", "type": "int24"},
+            {"internalType": "uint16", "name": "observationIndex", "type": "uint16"},
+            {"internalType": "uint16", "name": "observationCardinality", "type": "uint16"},
+            {"internalType": "uint16", "name": "observationCardinalityNext", "type": "uint16"},
+            {"internalType": "uint8", "name": "feeProtocol", "type": "uint8"},
+            {"internalType": "bool", "name": "unlocked", "type": "bool"},
+        ],
+        "stateMutability": "view",
+        "type": "function",
+    },
+    {
+        "inputs": [{"internalType": "uint32[]", "name": "secondsAgos", "type": "uint32[]"}],
+        "name": "observe",
+        "outputs": [
+            {"internalType": "int56[]", "name": "tickCumulatives", "type": "int56[]"},
+            {
+                "internalType": "uint160[]",
+                "name": "secondsPerLiquidityCumulativeX128s",
+                "type": "uint160[]",
+            },
+        ],
+        "stateMutability": "view",
+        "type": "function",
+    },
+]
+
+
+def _get_chainlink_price(feed_address: str, rpc_url: str) -> Optional[Decimal]:
+    """
+    Chainlink AggregatorV3 から最新価格を取得する。
+
+    Returns None on any error (fail-open for multi-source check).
+    金融計算は全て Decimal — float 使用禁止。
+    """
+    try:
+        from web3 import Web3  # noqa: PLC0415
+    except ImportError:
+        return None
+
+    try:
+        w3 = Web3(Web3.HTTPProvider(rpc_url))
+        feed = w3.eth.contract(
+            address=Web3.to_checksum_address(feed_address),
+            abi=_AGGREGATOR_ABI,
+        )
+        _round_id, answer, _started_at, _updated_at, _answered_in_round = (
+            feed.functions.latestRoundData().call()
+        )
+        # Chainlink USD feeds: 8 decimals
+        return Decimal(str(answer)) / Decimal("100000000")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "[oracle_checker] Chainlink price fetch failed for %s: %s", feed_address, exc
+        )
+        return None
+
+
+def _get_pyth_price(pyth_api_url: str, price_id: str) -> Optional[Decimal]:
+    """
+    Pyth Network REST API から最新価格を取得する。
+
+    Pyth API 例: https://hermes.pyth.network/api/latest_price_feeds?ids[]=<price_id>
+    失敗時は None を返す (fail-open)。
+    金融計算は全て Decimal — float 使用禁止。
+    """
+    try:
+        import json  # noqa: PLC0415
+        import urllib.request  # noqa: PLC0415
+
+        # SSRF 低減: https:// スキームのみ許可（m-2）
+        if not pyth_api_url.startswith("https://"):
+            logger.warning(
+                "[oracle_checker] Pyth API URL must start with https://: %s",
+                pyth_api_url[:30],
+            )
+            return None
+
+        url = f"{pyth_api_url.rstrip('/')}/api/latest_price_feeds?ids[]={price_id}"
+        with urllib.request.urlopen(url, timeout=5) as resp:  # noqa: S310
+            data = json.loads(resp.read())
+
+        if not data or not isinstance(data, list):
+            logger.warning("[oracle_checker] Pyth API returned unexpected format for %s", price_id)
+            return None
+
+        feed = data[0]
+        price_info = feed.get("price", {})
+        raw_price = price_info.get("price")
+        expo = price_info.get("expo")
+        if raw_price is None or expo is None:
+            return None
+
+        # Pyth: price * 10^expo
+        # expo は通常負数 (例: -8)。Decimal で計算。
+        price = Decimal(str(raw_price)) * (Decimal("10") ** int(expo))
+        return price
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[oracle_checker] Pyth price fetch failed for %s: %s", price_id, exc)
+        return None
+
+
+def _get_uniswap_v3_twap(
+    pool_address: str,
+    rpc_url: str,
+    twap_seconds: int = 1800,
+) -> Optional[Decimal]:
+    """
+    Uniswap V3 Pool の observe() を使って TWAP 価格を取得する。
+
+    twap_seconds: TWAP 計算期間（デフォルト 30分 = 1800秒）。
+    tick から sqrtPrice を復元し token0/token1 の価格比を Decimal で返す。
+    失敗時は None を返す (fail-open)。
+    金融計算は全て Decimal — float 使用禁止。
+    """
+    try:
+        from web3 import Web3  # noqa: PLC0415
+    except ImportError:
+        return None
+
+    try:
+        w3 = Web3(Web3.HTTPProvider(rpc_url))
+        pool = w3.eth.contract(
+            address=Web3.to_checksum_address(pool_address),
+            abi=_UNISWAP_V3_POOL_ABI,
+        )
+        # observe([twap_seconds, 0]) → tickCumulatives at T-twap_seconds and T=now
+        tick_cumulatives, _ = pool.functions.observe([twap_seconds, 0]).call()
+        tick_avg = (tick_cumulatives[1] - tick_cumulatives[0]) // twap_seconds
+
+        # tick → price: price = Decimal("1.0001") ** tick_int
+        # Security Rule #11: 金融計算は Decimal のみ — float / math.log / math.exp 禁止。
+        # Uniswap V3 の tick は [-887272, 887272] の整数範囲。
+        # Decimal("1.0001") ** tick_int は Python の Decimal 整数べき乗（繰り返し二乗法）で
+        # O(log |tick|) 精度保持。丸め誤差は最大 1e-12 程度でHARD_STOP判定閾値(2%)より
+        # 十分小さい。tick_int が 0 の場合は price = Decimal("1")。
+        tick_int = int(tick_avg)
+        price = Decimal("1.0001") ** tick_int
+        return price
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "[oracle_checker] Uniswap V3 TWAP fetch failed for pool %s: %s", pool_address, exc
+        )
+        return None
+
+
+def _max_deviation_pct(prices: list[Decimal]) -> Decimal:
+    """
+    価格リストの最大乖離率 (%) を Decimal で返す。
+
+    乖離率 = |max - min| / min * 100
+    リストが2件未満の場合は Decimal("0") を返す。
+    金融計算は全て Decimal — float 使用禁止。
+    """
+    valid = [p for p in prices if p is not None and p > Decimal("0")]
+    if len(valid) < 2:  # noqa: PLR2004
+        return Decimal("0")
+    price_min = min(valid)
+    price_max = max(valid)
+    return (price_max - price_min) / price_min * Decimal("100")
+
+
+@dataclass
+class OracleMultiSourceResult:
+    """check_price_deviation() の戻り値。"""
+
+    asset: str
+    level: str  # "OK" | "WARN" | "HARD_STOP"
+    max_deviation_pct: Optional[Decimal]
+    chainlink_price: Optional[Decimal]
+    pyth_price: Optional[Decimal]
+    twap_price: Optional[Decimal]
+    detail: Optional[str]
+    checked_at: str
+
+
+def check_price_deviation(
+    asset: str,
+    chainlink_feed_address: Optional[str],
+    rpc_url: Optional[str],
+    pyth_api_url: Optional[str] = None,
+    pyth_price_id: Optional[str] = None,
+    uniswap_pool_address: Optional[str] = None,
+    deviation_threshold_pct: Decimal = Decimal("2"),
+) -> OracleMultiSourceResult:
+    """
+    Chainlink / Pyth / Uniswap V3 TWAP の3価格を比較し、乖離率が閾値超過なら HARD_STOP を返す。
+
+    - 3価格のうち取得失敗したものは除外（fail-open: Chainlinkのみでも継続）
+    - 2価格以上が揃わない場合は level="WARN"
+    - 乖離率 >= deviation_threshold_pct(デフォルト2%) → level="HARD_STOP"
+    - 乖離率 < deviation_threshold_pct → level="OK"
+
+    金融計算は全て Decimal — float 使用禁止。
+    """
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    checked_at = datetime.now(timezone.utc).isoformat()
+
+    chainlink_price: Optional[Decimal] = None
+    pyth_price: Optional[Decimal] = None
+    twap_price: Optional[Decimal] = None
+
+    if chainlink_feed_address and rpc_url:
+        chainlink_price = _get_chainlink_price(chainlink_feed_address, rpc_url)
+    if pyth_api_url and pyth_price_id:
+        pyth_price = _get_pyth_price(pyth_api_url, pyth_price_id)
+    if uniswap_pool_address and rpc_url:
+        twap_price = _get_uniswap_v3_twap(uniswap_pool_address, rpc_url)
+
+    available_prices: list[Decimal] = []
+    for p in [chainlink_price, pyth_price, twap_price]:
+        if p is not None and p > Decimal("0"):
+            available_prices.append(p)
+
+    if len(available_prices) < 2:  # noqa: PLR2004
+        level = "WARN"
+        max_dev: Optional[Decimal] = None
+        detail = (
+            f"[{asset}] 価格取得可能ソースが{len(available_prices)}件のみ。"
+            "2件以上必要 (fail-open 継続)"
+        )
+        logger.warning("[oracle_checker] %s", detail)
+    else:
+        max_dev = _max_deviation_pct(available_prices)
+        if max_dev >= deviation_threshold_pct:
+            level = "HARD_STOP"
+            detail = (
+                f"[{asset}] Oracle 価格乖離 {max_dev:.4f}% が閾値 "
+                f"{deviation_threshold_pct}% を超過 — HARD_STOP"
+            )
+            logger.error("[oracle_checker] %s", detail)
+        else:
+            level = "OK"
+            detail = None
+
+    return OracleMultiSourceResult(
+        asset=asset,
+        level=level,
+        max_deviation_pct=max_dev,
+        chainlink_price=chainlink_price,
+        pyth_price=pyth_price,
+        twap_price=twap_price,
+        detail=detail,
+        checked_at=checked_at,
+    )
+
+
 def is_oracle_fresh(
     feed_address: Optional[str] = None,
     rpc_url: Optional[str] = None,

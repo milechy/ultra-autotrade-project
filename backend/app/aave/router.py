@@ -16,7 +16,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth.dependencies import require_admin, require_viewer
 from app.auth.models import User
 
-from .schemas import AaveMonitorStatus, AaveRebalanceRequest, AaveRebalanceResponse
+from .schemas import (
+    AaveMonitorStatus,
+    AaveRebalanceRequest,
+    AaveRebalanceResponse,
+    OracleStatusResponse,
+)
 from .service import AaveService, MultiChainAaveService
 
 router = APIRouter(prefix="/aave", tags=["aave"])
@@ -115,6 +120,76 @@ def get_health_factor(
 
     hf = _get_hf()
     return {"health_factor": str(hf) if hf is not None else None}
+
+
+@router.get(
+    "/oracle-status",
+    response_model=OracleStatusResponse,
+    summary="Chainlink / Pyth / Uniswap V3 TWAP 三重 Oracle 検証結果を返す",
+)
+def get_oracle_status(
+    current_user: User = Depends(require_viewer),
+) -> OracleStatusResponse:
+    """
+    AAVE_ORACLE_ASSETS_JSON 環境変数で定義されたアセットごとに
+    check_price_deviation() を実行し、乖離状況を返す。
+
+    環境変数未設定時は空リストを返す（fail-open）。
+
+    AAVE_ORACLE_ASSETS_JSON のフォーマット（JSON 配列）:
+    [
+      {
+        "asset": "USDC",
+        "chainlink_feed": "0x...",
+        "rpc_url": "https://...",
+        "pyth_api_url": "https://hermes.pyth.network",
+        "pyth_price_id": "0x...",
+        "uniswap_pool": "0x..."
+      }
+    ]
+    """
+    import json  # noqa: PLC0415
+    import os  # noqa: PLC0415
+    from decimal import Decimal  # noqa: PLC0415
+
+    from .oracle_checker import check_price_deviation  # noqa: PLC0415
+    from .schemas import OracleAlert  # noqa: PLC0415
+
+    raw = os.getenv("AAVE_ORACLE_ASSETS_JSON", "[]")
+    try:
+        assets_config = json.loads(raw)
+    except json.JSONDecodeError:
+        assets_config = []
+
+    alerts: list[OracleAlert] = []
+    for cfg in assets_config:
+        result = check_price_deviation(
+            asset=cfg.get("asset", "UNKNOWN"),
+            chainlink_feed_address=cfg.get("chainlink_feed"),
+            rpc_url=cfg.get("rpc_url"),
+            pyth_api_url=cfg.get("pyth_api_url"),
+            pyth_price_id=cfg.get("pyth_price_id"),
+            uniswap_pool_address=cfg.get("uniswap_pool"),
+            deviation_threshold_pct=Decimal(str(cfg.get("deviation_threshold_pct", "2"))),
+        )
+        alerts.append(
+            OracleAlert(
+                asset=result.asset,
+                level=result.level,
+                max_deviation_pct=(
+                    str(result.max_deviation_pct) if result.max_deviation_pct is not None else None
+                ),
+                chainlink_price=(
+                    str(result.chainlink_price) if result.chainlink_price is not None else None
+                ),
+                pyth_price=(str(result.pyth_price) if result.pyth_price is not None else None),
+                twap_price=(str(result.twap_price) if result.twap_price is not None else None),
+                detail=result.detail,
+                checked_at=result.checked_at,
+            )
+        )
+
+    return OracleStatusResponse(alerts=alerts)
 
 
 @router.get(

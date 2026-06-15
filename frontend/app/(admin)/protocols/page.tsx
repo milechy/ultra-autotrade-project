@@ -12,6 +12,7 @@ import {
   type RiskLevel,
 } from '@/lib/api/protocols'
 import PendlePositionCard from '@/components/pendle/PendlePositionCard'
+import OracleStatusPanel from '@/components/admin/OracleStatusPanel'
 
 // ── Static protocol metadata (表示順 / 表示名 / フェーズ) ──────────────────
 // risk_level / tvl_usd / is_operational / alerts は API から取得する。
@@ -376,6 +377,9 @@ export default function ProtocolsPage() {
           </h2>
           <PendlePositionCard />
         </div>
+
+        {/* Oracle 多重検証ステータスパネル（rsETH/srsETH 再発防止） */}
+        <OracleStatusPanel />
       </div>
     </AuthGuard>
   )
