@@ -191,6 +191,25 @@ class DummyAaveV4Client(AaveV4ClientBase):
             "V4 withdraw は Ethereum Hub アドレス/SDK 確定後に実装 (docs/55 §5 Phase 3)"
         )
 
+    def get_user_emode(self, wallet_address: str = "") -> int:
+        """ダミー: V4 eMode は未実装のため 0 (eMode なし) を返す。"""
+        logger.info("DummyAaveV4Client.get_user_emode called (no RPC, V4 scaffold)")
+        return 0
+
+    def build_set_emode_tx(
+        self,
+        category_id: int = 0,
+        wallet_address: str = "",
+        dry_run: bool = False,
+    ) -> "dict[str, object]":
+        """ダミー: V4 setUserEMode は Phase 3 実装。dry_run 時のみ結果を返す。"""
+        logger.info("DummyAaveV4Client.build_set_emode_tx called (no tx sent, V4 scaffold)")
+        if dry_run:
+            return {"category_id": category_id, "dry_run": True}
+        raise NotImplementedError(
+            "V4 build_set_emode_tx は Ethereum Hub アドレス/SDK 確定後に実装 (docs/55 §5 Phase 3)"
+        )
+
 
 # --------------------------------------------------------------------------- #
 # 本体スタブ (具象実装 — Phase 2 以降)
