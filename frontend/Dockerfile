@@ -44,6 +44,15 @@ ARG NEXT_PUBLIC_LIFF_ID
 ENV NEXT_PUBLIC_LIFF_ID=${NEXT_PUBLIC_LIFF_ID}
 ARG NEXT_PUBLIC_PRIVY_APP_ID
 ENV NEXT_PUBLIC_PRIVY_APP_ID=${NEXT_PUBLIC_PRIVY_APP_ID}
+# PostHog (build-time 埋め込み)。#732 で docker-compose の build.args には追加されたが
+# Dockerfile 側の ARG/ENV が欠落しており、キーがビルドに渡らず PostHog が無効化していた不具合を修正。
+ARG NEXT_PUBLIC_POSTHOG_KEY
+ENV NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
+ARG NEXT_PUBLIC_POSTHOG_HOST
+ENV NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
+# デプロイ版識別子（git short SHA 等）。PostHog 全イベントに app_version として付与し版間比較を可能にする。
+ARG NEXT_PUBLIC_APP_VERSION
+ENV NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

@@ -3,6 +3,9 @@ import posthog from "posthog-js"
 
 export const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY ?? ""
 export const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com"
+// デプロイごとの版識別子（デプロイ時に git short SHA を埋め込む。未設定時は "dev"）。
+// 全イベントに super property として付与し、バージョン間の行動比較を可能にする。
+export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"
 
 export function initPostHog() {
   if (typeof window === "undefined" || !POSTHOG_KEY) return
@@ -14,6 +17,8 @@ export function initPostHog() {
     autocapture: false,
     persistence: "localStorage",
   })
+  // 以降の全イベントに app_version を付与（UI改善・バージョンアップ時の版間比較用）。
+  posthog.register({ app_version: APP_VERSION })
 }
 
 // ── イベント名定数 ────────────────────────────────
