@@ -3,6 +3,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { apiFetch, apiPost } from '@/lib/api/client'
@@ -73,6 +74,8 @@ type ProposalState = {
 }
 
 export default function ApprovePage() {
+  const t = useTranslations('Approve')
+  const tCommon = useTranslations('Common')
   const { isAuthenticated, isLoading: authLoading, isPartner } = useAuth()
   const router = useRouter()
   const [proposals, setProposals] = useState<Proposal[]>([])
@@ -97,7 +100,7 @@ export default function ApprovePage() {
       setProposals(active)
       setRecentApprovals(historyRes.items.map(mapToRecentApproval))
     } catch {
-      setError('データを取得できません')
+      setError(t('fetchError'))
     } finally {
       setLoading(false)
     }
@@ -128,7 +131,7 @@ export default function ApprovePage() {
       }, 2000)
     } catch {
       setProposalStates((prev) => ({ ...prev, [id]: { status: 'pending' } }))
-      setError('承認に失敗しました')
+      setError(t('approveFailed'))
     }
   }, [])
 
@@ -142,7 +145,7 @@ export default function ApprovePage() {
         return next
       })
     } catch {
-      setError('拒否に失敗しました')
+      setError(t('rejectFailed'))
     }
   }, [])
 
@@ -170,15 +173,15 @@ export default function ApprovePage() {
         <div className="flex items-center gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold">取引承認</h1>
+              <h1 className="text-xl font-bold">{t('title')}</h1>
               {pendingCount > 0 && (
                 <Badge className="bg-orange-500 hover:bg-orange-500 text-white text-xs px-2 py-0.5">
-                  {pendingCount}件待ち
+                  {t('pendingBadge', { count: pendingCount })}
                 </Badge>
               )}
             </div>
             <p className="text-sm text-muted-foreground mt-0.5">
-              AIが提案した取引を確認・承認してください
+              {t('description')}
             </p>
           </div>
         </div>
@@ -187,7 +190,7 @@ export default function ApprovePage() {
         {error && (
           <div className="rounded-lg border border-red-800 bg-red-950 p-3">
             <p className="text-sm text-red-400">{error}</p>
-            <button onClick={fetchData} className="text-xs text-blue-400 underline mt-1">再試行</button>
+            <button onClick={fetchData} className="text-xs text-blue-400 underline mt-1">{tCommon('retry')}</button>
           </div>
         )}
 

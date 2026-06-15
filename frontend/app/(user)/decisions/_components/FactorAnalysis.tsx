@@ -3,6 +3,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
 
 interface Factor {
   score: number
@@ -20,21 +21,22 @@ interface FactorAnalysisProps {
   factors: Factors
 }
 
-const FACTOR_LABELS: Record<keyof Factors, string> = {
-  technical: 'テクニカル',
-  macro: 'マクロ経済',
-  geopolitical: '地政学',
-  sentiment: 'センチメント',
-}
-
 export function FactorAnalysis({ factors }: FactorAnalysisProps) {
+  const t = useTranslations('Decisions')
   const entries = Object.entries(factors) as [keyof Factors, Factor][]
+
+  const FACTOR_LABEL_KEYS: Record<keyof Factors, Parameters<typeof t>[0]> = {
+    technical: 'factorTechnical',
+    macro: 'factorMacro',
+    geopolitical: 'factorGeopolitical',
+    sentiment: 'factorSentiment',
+  }
 
   return (
     <Card className="dark:bg-gray-900 dark:border-gray-800">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold text-gray-900 dark:text-gray-100">
-          要因分析
+          {t('factorAnalysisTitle')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -46,7 +48,7 @@ export function FactorAnalysis({ factors }: FactorAnalysisProps) {
             <div key={key} className="space-y-1">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-700 dark:text-gray-300">
-                  {FACTOR_LABELS[key]}
+                  {t(FACTOR_LABEL_KEYS[key])}
                 </span>
                 <span
                   className={cn(
