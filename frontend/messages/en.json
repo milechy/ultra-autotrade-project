@@ -682,6 +682,7 @@
       "statsCurrent": "Current",
       "statsProfit": "Profit",
       "statsYield": "Yield",
+      "assetHistoryEmpty": "No asset data yet",
       "account": {
         "title": "Account",
         "editNamePlaceholder": "Username",
