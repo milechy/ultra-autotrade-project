@@ -2213,7 +2213,21 @@
     "oraclePyth": "Pyth",
     "oracleTwap": "TWAP (30 min)",
     "oracleCheckedAt": "Verified at",
-    "oracleDetail": "Details"
+    "oracleDetail": "Details",
+    "poolHealthTitle": "Aave Pool Deficit Monitor"
+  },
+  "PoolHealthPanel": {
+    "title": "Pool Deficit Monitor (getReserveDeficit)",
+    "alertActive": "Alert Active",
+    "chain": "Chain",
+    "totalDeficit": "Total Deficit (approx.)",
+    "noDeficits": "No deficits",
+    "assetBreakdown": "Asset Breakdown",
+    "alert": "Alert",
+    "loading": "Loading...",
+    "loadError": "Failed to load pool health data. Please reload.",
+    "noData": "No data",
+    "autoRefresh": "Auto-refreshes every 60 seconds"
   },
   "Register": {
     "title": "Account Registration - Ultra AutoTrade",

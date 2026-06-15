@@ -13,6 +13,7 @@ import {
 } from '@/lib/api/protocols'
 import PendlePositionCard from '@/components/pendle/PendlePositionCard'
 import OracleStatusPanel from '@/components/admin/OracleStatusPanel'
+import PoolHealthPanel from '@/components/admin/PoolHealthPanel'
 
 // ── Static protocol metadata (表示順 / 表示名 / フェーズ) ──────────────────
 // risk_level / tvl_usd / is_operational / alerts は API から取得する。
@@ -380,6 +381,14 @@ export default function ProtocolsPage() {
 
         {/* Oracle 多重検証ステータスパネル（rsETH/srsETH 再発防止） */}
         <OracleStatusPanel />
+
+        {/* Aave プール赤字監視（LiquidationSentinel） */}
+        <div style={{ marginTop: 24 }}>
+          <h2 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600 }}>
+            {t('poolHealthTitle')}
+          </h2>
+          <PoolHealthPanel />
+        </div>
       </div>
     </AuthGuard>
   )
