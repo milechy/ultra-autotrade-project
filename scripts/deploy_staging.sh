@@ -51,12 +51,14 @@ FRONTEND_PORT=3001
 
 UPSTREAM_CONF="${PROJECT_ROOT}/docker/nginx/upstream.staging.conf"
 LOCK_FILE="${PROJECT_ROOT}/.deploy-staging.lock"
+LOG_FILE="${PROJECT_ROOT}/logs/deploy_staging.log"
 
 # ───────────────────────────────────────────────
 # ヘルパー
 # ───────────────────────────────────────────────
-log()  { echo "[deploy-staging] $*"; }
-err()  { echo "[deploy-staging] ERROR: $*" >&2; }
+mkdir -p "$(dirname "${LOG_FILE}")"
+log()  { echo "[deploy-staging] $*" | tee -a "${LOG_FILE}"; }
+err()  { echo "[deploy-staging] ERROR: $*" | tee -a "${LOG_FILE}" >&2; }
 
 slack_notify() {
   local msg="$1"
