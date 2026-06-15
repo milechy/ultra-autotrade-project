@@ -168,7 +168,7 @@ export default function LiffChatPage() {
   }
 
   // ── AI カード色設定
-  const action = aiJudgment?.action ?? "HOLD"
+  const action = aiJudgment?.action
   const confidence = aiJudgment?.confidence ?? 0
   const isBuy = action === "BUY"
   const isSell = action === "SELL"
@@ -306,7 +306,7 @@ export default function LiffChatPage() {
               isBuy ? "text-[#4ade9a]" : isSell ? "text-red-400" : "text-white"
             }`}
           >
-            {action}
+            {aiJudgment ? action : t("home.noSignal")}
           </div>
 
           {/* BUY / SELL 時: 承認・見送りボタン */}
@@ -329,18 +329,22 @@ export default function LiffChatPage() {
             </div>
           )}
 
-          {/* なぜ{action}？理由トグル（BUY/SELL/HOLD 共通） */}
-          <button
-            onClick={() => { const next = !reasonOpen; setReasonOpen(next); track(EV.REASON_TOGGLE, { action, open: next }) }}
-            className="mt-2 text-zinc-500 text-xs underline"
-            aria-expanded={reasonOpen}
-          >
-            {t("home.whyAction", { action })}
-          </button>
-          {reasonOpen && (
-            <p className="mt-2 text-zinc-400 text-xs leading-relaxed whitespace-pre-wrap">
-              {aiJudgment?.reason ?? t("home.noReason")}
-            </p>
+          {/* なぜ{action}？理由トグル（aiJudgment がある場合のみ表示） */}
+          {aiJudgment && (
+            <>
+              <button
+                onClick={() => { const next = !reasonOpen; setReasonOpen(next); track(EV.REASON_TOGGLE, { action, open: next }) }}
+                className="mt-2 text-zinc-500 text-xs underline"
+                aria-expanded={reasonOpen}
+              >
+                {t("home.whyAction", { action })}
+              </button>
+              {reasonOpen && (
+                <p className="mt-2 text-zinc-400 text-xs leading-relaxed whitespace-pre-wrap">
+                  {aiJudgment.reason ?? t("home.noReason")}
+                </p>
+              )}
+            </>
           )}
         </div>
 
