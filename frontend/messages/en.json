@@ -760,6 +760,8 @@
         "depositAddressNote": "Send USDC to this address. It will be automatically deposited into Aave once received.",
         "depositNoWallet": "No wallet address registered",
         "depositBtn": "Deposit",
+        "moonpayTitle": "Buy with card",
+        "moonpayDesc": "Purchase USDC with a credit or debit card via MoonPay.",
         "withdrawAmountLabel": "Enter amount (USDC)",
         "withdrawAmountPlaceholder": "Enter amount",
         "withdrawDestLabel": "Destination",

@@ -10,6 +10,7 @@ import { useFundWallet } from "@privy-io/react-auth"
 import { base, baseSepolia } from "wagmi/chains"
 import { useWallet } from "@/hooks/useWallet"
 import { useUsdcBalance } from "@/hooks/useUsdcBalance"
+import { MoonPayWidget } from "./MoonPayWidget"
 import { track, EV } from "@/lib/posthog"
 
 // ---- 型定義 ---------------------------------------------------------------
@@ -324,9 +325,8 @@ export function DepositPanel() {
             </ul>
           </div>
 
-          {/* 入金ボタン（Privy fundWallet モーダルを開く。
-              Privy fundWallet がカード購入・送金・ネットワーク選択を一括で扱うため、
-              旧 MoonPay ウィジェットは重複として削除し、本ボタンに一本化した） */}
+          {/* 入金ボタン（Privy fundWallet モーダルを開く。カード購入・送金・
+              ネットワーク選択を一括で扱う。EN モードでは下に MoonPay on-ramp も提示する） */}
           <button
             onClick={() => { void handleFundWallet() }}
             disabled={!address || isFunding}
@@ -337,6 +337,18 @@ export function DepositPanel() {
             {isFunding && <Loader2 className="w-4 h-4 animate-spin" />}
             {t("depositBtn")}
           </button>
+
+          {/* MoonPay on-ramp — EN モードのみ（Privy fundWallet の代替経路） */}
+          {isEn && (
+            <>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-px bg-zinc-700" />
+                <span className="text-xs text-zinc-500">or</span>
+                <div className="flex-1 h-px bg-zinc-700" />
+              </div>
+              <MoonPayWidget />
+            </>
+          )}
         </div>
       )}
 
