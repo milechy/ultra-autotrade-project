@@ -22,6 +22,13 @@ const JPY_PER_USDC = 155
 // 出金ネットワーク手数料概算 (USDC)
 const WITHDRAW_FEE = 0.08
 
+// v3: 出金 UI は非表示。資金はユーザー自身の非カストディアルウォレットにあるが、
+// embedded wallet(EOA) の USDC 送金にはガス用 ETH が必要で、現状ガススポンサー(paymaster)が
+// 本番未配線のため ETH 未保有の一般ユーザーは出金 tx が失敗する。v4 で paymaster
+// (feat/erc20-paymaster-with-approval-ui の sendUserOpWithPaymaster) と共に有効化する
+// （true に切り替えるだけで出金タブが復活する）。
+const WITHDRAW_ENABLED: boolean = false
+
 // ---- 確認シート（出金専用） -------------------------------------------------
 
 interface ConfirmSheetProps {
@@ -218,23 +225,25 @@ export function DepositPanel() {
 
   return (
     <div className="pb-2">
-      {/* タブ */}
-      <div className="flex border-b border-zinc-800 mb-4">
-        {(["deposit", "withdraw"] as Tab[]).map((tabKey) => (
-          <button
-            key={tabKey}
-            onClick={() => handleTabChange(tabKey)}
-            className={[
-              "flex-1 py-2 text-sm font-medium transition-colors",
-              tab === tabKey
-                ? "border-b-2 border-[#1D9E75] text-[#1D9E75]"
-                : "text-zinc-400",
-            ].join(" ")}
-          >
-            {tabKey === "deposit" ? t("tabDeposit") : t("tabWithdraw")}
-          </button>
-        ))}
-      </div>
+      {/* タブ（v3 は出金非表示。WITHDRAW_ENABLED=false の間はタブ自体を出さず入金のみ） */}
+      {WITHDRAW_ENABLED && (
+        <div className="flex border-b border-zinc-800 mb-4">
+          {(["deposit", "withdraw"] as Tab[]).map((tabKey) => (
+            <button
+              key={tabKey}
+              onClick={() => handleTabChange(tabKey)}
+              className={[
+                "flex-1 py-2 text-sm font-medium transition-colors",
+                tab === tabKey
+                  ? "border-b-2 border-[#1D9E75] text-[#1D9E75]"
+                  : "text-zinc-400",
+              ].join(" ")}
+            >
+              {tabKey === "deposit" ? t("tabDeposit") : t("tabWithdraw")}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* 残高カード */}
       <div className="bg-[#1a3d2e] rounded-xl px-4 py-4 mb-4">
@@ -331,8 +340,8 @@ export function DepositPanel() {
         </div>
       )}
 
-      {/* ====== 出金タブ ====== */}
-      {tab === "withdraw" && (
+      {/* ====== 出金タブ（v3 非表示 / v4 で paymaster と共に有効化） ====== */}
+      {WITHDRAW_ENABLED && tab === "withdraw" && (
         <div className="space-y-4">
           {/* 金額入力 */}
           <div>
