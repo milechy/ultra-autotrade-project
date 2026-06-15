@@ -3587,5 +3587,30 @@
     "fetchError": "Failed to fetch rewards",
     "threshold": "Claims when $5+ unclaimed",
     "supplyTxHash": "Reinvestment TX"
+  },
+  "IdleYieldCard": {
+    "title": "Idle Capital Management (Morpho Vaults)",
+    "idleBalance": "Idle Balance",
+    "bestApy": "Best APY",
+    "activePosition": "Active Position",
+    "earnedInterest": "Earned Interest",
+    "depositButton": "Deposit to Morpho",
+    "withdrawButton": "Withdraw",
+    "depositing": "Depositing...",
+    "withdrawing": "Withdrawing...",
+    "noVaults": "No vaults available",
+    "noPosition": "No position",
+    "fetchError": "Unable to fetch data",
+    "depositSuccess": "Deposit submitted (TX: {txHash})",
+    "depositError": "Deposit failed: {error}",
+    "withdrawSuccess": "Withdrawal submitted (TX: {txHash})",
+    "withdrawError": "Withdrawal failed: {error}",
+    "deployRecommended": "Deploy recommended",
+    "idleLabel": "Idle",
+    "deployedLabel": "Deployed",
+    "thresholdNote": "Deposit recommended when idle balance exceeds $100",
+    "adminOnly": "Deposit and withdrawal are admin-only",
+    "amountPlaceholder": "USDC amount",
+    "vaultAddressPlaceholder": "Vault address"
   }
 }
