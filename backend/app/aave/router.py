@@ -331,3 +331,115 @@ def get_pool_health(
         alert_triggered=report.alert_triggered,
         error=report.error,
     )
+
+
+@router.get(
+    "/rewards",
+    summary="未請求 Aave リワードを取得する",
+)
+def get_rewards(
+    current_user: User = Depends(require_viewer),
+) -> dict[str, object]:
+    """
+    UiIncentiveDataProviderV3 から未請求リワード一覧と合計 USD を返す。
+
+    AAVE_UI_INCENTIVE_PROVIDER_ADDRESS / AAVE_REWARDS_CONTROLLER_ADDRESS /
+    AAVE_POOL_ADDRESSES_PROVIDER が未設定の場合は空リストを返す (fail-open)。
+    """
+    import os  # noqa: PLC0415
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    from .reward_claimer import make_reward_claimer_from_env  # noqa: PLC0415
+
+    claimer = make_reward_claimer_from_env()
+    wallet_address = os.getenv("AAVE_WALLET_ADDRESS", "")
+
+    if claimer is None or not wallet_address:
+        return {
+            "rewards": [],
+            "total_usd": "0",
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "note": "AAVE_UI_INCENTIVE_PROVIDER_ADDRESS または AAVE_WALLET_ADDRESS が未設定",
+        }
+
+    raw_rewards = claimer.get_claimable_rewards(wallet_address)
+    from decimal import Decimal  # noqa: PLC0415
+
+    total_usd = sum((r["amount_usd"] for r in raw_rewards), Decimal("0"))
+
+    serialized = [
+        {
+            "asset_name": r["asset_name"],
+            "reward_token_address": r["reward_token_address"],
+            "amount": str(r["amount"]),
+            "amount_usd": str(r["amount_usd"]),
+        }
+        for r in raw_rewards
+    ]
+
+    return {
+        "rewards": serialized,
+        "total_usd": str(total_usd),
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post(
+    "/rewards/claim",
+    summary="未請求 Aave リワードを手動 Claim する (admin のみ)",
+)
+def claim_rewards(
+    current_user: User = Depends(require_admin),
+) -> dict[str, object]:
+    """
+    未請求リワードを Claim し、閾値 ($5) 以上なら Aave に再供給する。
+
+    HUMAN-REVIEW-REQUIRED: 本エンドポイントはオンチェーン tx を送信するため、
+    本番での実行は人間承認後に AAVE_WALLET_PRIVATE_KEY が設定された状態で行うこと。
+    """
+    import os  # noqa: PLC0415
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    from .reward_claimer import make_reward_claimer_from_env  # noqa: PLC0415
+
+    claimer = make_reward_claimer_from_env()
+    wallet_address = os.getenv("AAVE_WALLET_ADDRESS", "")
+    private_key = os.getenv("AAVE_WALLET_PRIVATE_KEY", "")
+
+    if claimer is None or not wallet_address:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AAVE_UI_INCENTIVE_PROVIDER_ADDRESS または AAVE_WALLET_ADDRESS が未設定",
+        )
+
+    if not private_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AAVE_WALLET_PRIVATE_KEY が未設定 — 管理者設定が必要です",
+        )
+
+    result = claimer.auto_claim_if_worthy(
+        wallet_address=wallet_address,
+        private_key=private_key,
+        dry_run=False,
+    )
+
+    serialized_rewards = [
+        {
+            "asset_name": r["asset_name"],
+            "reward_token_address": r["reward_token_address"],
+            "amount": str(r["amount"]),
+            "amount_usd": str(r["amount_usd"]),
+        }
+        for r in result.get("rewards", [])
+    ]
+
+    return {
+        "claimed": result["claimed"],
+        "total_usd": result["total_usd"],
+        "rewards": serialized_rewards,
+        "supply_tx_hash": result.get("supply_tx_hash"),
+        "skip_reason": result.get("skip_reason"),
+        "error": result.get("error"),
+        "claimed_at": datetime.now(timezone.utc).isoformat() if result["claimed"] else None,
+    }

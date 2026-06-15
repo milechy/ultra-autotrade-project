@@ -5,9 +5,11 @@
  * Aave 関連 API クライアント
  * - getStressTest(): GET /api/aave/stress-test
  * - getPoolHealth(): GET /api/aave/pool-health
+ * - getRewards(): GET /api/aave/rewards
+ * - claimRewards(): POST /api/aave/rewards/claim
  */
 
-import { getJson } from "./http";
+import { getJson, postJson } from "./http";
 
 // ---------------------------------------------------------------------------
 // ストレステスト
@@ -53,4 +55,46 @@ export interface PoolHealthResult {
 
 export async function getPoolHealth(): Promise<PoolHealthResult> {
   return getJson<PoolHealthResult>("/api/aave/pool-health");
+}
+
+// ---------------------------------------------------------------------------
+// リワード
+// ---------------------------------------------------------------------------
+
+export interface ClaimableReward {
+  asset_name: string;
+  reward_token_address: string;
+  amount: string;
+  amount_usd: string;
+}
+
+export interface RewardsResponse {
+  rewards: ClaimableReward[];
+  total_usd: string;
+  fetched_at: string;
+  note?: string;
+}
+
+export interface ClaimRewardsResponse {
+  claimed: boolean;
+  total_usd: string;
+  rewards: ClaimableReward[];
+  supply_tx_hash: string | null;
+  skip_reason: string | null;
+  error: string | null;
+  claimed_at: string | null;
+}
+
+/**
+ * GET /aave/rewards — 未請求リワードを取得する（viewer 以上）
+ */
+export async function getRewards(): Promise<RewardsResponse> {
+  return getJson<RewardsResponse>("/api/aave/rewards");
+}
+
+/**
+ * POST /aave/rewards/claim — リワードを手動 Claim する（admin のみ）
+ */
+export async function claimRewards(): Promise<ClaimRewardsResponse> {
+  return postJson<ClaimRewardsResponse>("/api/aave/rewards/claim", {});
 }
