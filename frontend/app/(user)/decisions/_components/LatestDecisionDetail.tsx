@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { TradeActionBadge, ConfidenceBar } from '@/components/shared'
 import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
 
 interface LatestDecision {
   action: 'BUY' | 'SELL' | 'HOLD'
@@ -34,11 +35,12 @@ function formatTimestamp(ts: string): string {
 }
 
 export function LatestDecisionDetail({ decision }: LatestDecisionDetailProps) {
+  const t = useTranslations('Decisions')
   return (
     <Card className="dark:bg-gray-900 dark:border-gray-800">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold text-gray-900 dark:text-gray-100">
-          最新AI判定
+          {t('latestDecisionTitle')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -51,7 +53,7 @@ export function LatestDecisionDetail({ decision }: LatestDecisionDetailProps) {
               className="flex items-center gap-1 bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
             >
               <CheckCircle className="h-3 w-3" />
-              判定一致 ✓
+              {t('decisionAgreed')}
             </Badge>
           ) : (
             <Badge
@@ -59,7 +61,7 @@ export function LatestDecisionDetail({ decision }: LatestDecisionDetailProps) {
               className="flex items-center gap-1 bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800"
             >
               <AlertTriangle className="h-3 w-3" />
-              判定不一致（安全のためHOLD）
+              {t('decisionDisagreed')}
             </Badge>
           )}
         </div>

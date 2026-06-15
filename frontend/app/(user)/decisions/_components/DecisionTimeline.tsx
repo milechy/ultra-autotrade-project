@@ -4,6 +4,7 @@
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TradeActionBadge } from '@/components/shared'
+import { useTranslations } from 'next-intl'
 
 interface HistoryItem {
   id: string
@@ -29,17 +30,18 @@ function formatTimestamp(ts: string): string {
 }
 
 export function DecisionTimeline({ history }: DecisionTimelineProps) {
+  const t = useTranslations('Decisions')
   return (
     <Card className="dark:bg-gray-900 dark:border-gray-800">
       <CardHeader className="pb-3 flex flex-row items-center justify-between">
         <CardTitle className="text-base font-semibold text-gray-900 dark:text-gray-100">
-          判定履歴
+          {t('historyTitle')}
         </CardTitle>
         <Link
           href="/history"
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
         >
-          全履歴を見る →
+          {t('viewAllHistory')}
         </Link>
       </CardHeader>
       <CardContent className="p-0">
