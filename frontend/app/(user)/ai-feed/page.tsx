@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import AuthGuard from "@/components/AuthGuard";
 import { useAuth } from "@/lib/auth";
 import { getJson } from "@/lib/api/http";
@@ -69,6 +70,7 @@ export default function AiFeedPage() {
 }
 
 function AiFeedContent() {
+  const t = useTranslations("AiFeed");
   const router = useRouter();
   const { token, isAuthenticated, isLoading: authLoading } = useAuth();
   const [decisions, setDecisions] = useState<AiDecisionItem[]>([]);
@@ -108,23 +110,23 @@ function AiFeedContent() {
 
   if (authLoading) {
     return (
-      <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0" }}>認証確認中...</div>
+      <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0" }}>{t("authChecking")}</div>
     );
   }
 
   return (
     <>
-      <title>AIシグナルフィード - Ultra AutoTrade</title>
+      <title>{t("heading")} - Ultra AutoTrade</title>
 
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ margin: 0 }}>AIシグナルフィード</h1>
+        <h1 style={{ margin: 0 }}>{t("heading")}</h1>
         <p style={{ margin: "4px 0 0", color: "#666", fontSize: 13 }}>
-          AI判定の信頼度トレンド（直近7日間）
+          {t("headingSubtitle")}
         </p>
       </div>
 
       {isLoading && (
-        <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0" }}>読み込み中...</div>
+        <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0" }}>{t("loadingText")}</div>
       )}
 
       {!isLoading && overallAvg !== null && (
@@ -140,7 +142,7 @@ function AiFeedContent() {
           gap: 20,
         }}>
           <div>
-            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>7日間平均信頼度</div>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>{t("avgConfidence7d")}</div>
             <div style={{ fontSize: 36, fontWeight: 700, color: "#1d4ed8", lineHeight: 1 }}>
               {overallAvg}
               <span style={{ fontSize: 18, fontWeight: 400, color: "#6b7280" }}>%</span>
@@ -170,7 +172,7 @@ function AiFeedContent() {
         }}>
           <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6" }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
-              日別平均信頼度
+              {t("dailyAvgTitle")}
             </span>
           </div>
           {dailyAverages.map((day) => {
@@ -208,7 +210,7 @@ function AiFeedContent() {
                   {day.avg}%
                 </span>
                 <span style={{ fontSize: 11, color: "#9ca3af", minWidth: 32 }}>
-                  {day.count}件
+                  {t("countUnit", { count: day.count })}
                 </span>
               </div>
             );
@@ -218,7 +220,7 @@ function AiFeedContent() {
 
       {!isLoading && dailyAverages.length === 0 && (
         <div style={{ color: "#9ca3af", fontSize: 13, padding: "24px 0", textAlign: "center" }}>
-          表示するデータがありません。
+          {t("noData")}
         </div>
       )}
     </>

@@ -329,7 +329,14 @@
     "pageTitle": "AI Decision Feed",
     "pageSubtitle": "Latest AI decisions (updates every 60s)",
     "noHistory": "No AI decision history",
-    "fetchError": "Fetch error"
+    "fetchError": "Fetch error",
+    "authChecking": "Checking authentication...",
+    "heading": "AI Signal Feed",
+    "headingSubtitle": "AI decision confidence trend (last 7 days)",
+    "loadingText": "Loading...",
+    "avgConfidence7d": "7-day average confidence",
+    "dailyAvgTitle": "Daily average confidence",
+    "countUnit": "{count} entries"
   },
   "Landing": {
     "tagline": "AI protecting your assets 24/7",
