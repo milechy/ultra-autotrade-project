@@ -104,7 +104,31 @@ def get_health_factor(wallet_address: Optional[str] = None) -> Optional[Decimal]
         logger.info("[monitor] HF is Infinity (no borrow position); returning None")
         return None
 
+    # HF < 1.8 で LINE Push 通知（fail-open: 通知失敗でも HF 返却を止めない）
+    if raw is not None and raw < Decimal("1.8"):
+        _notify_hf_warning(raw)
+
     return raw
+
+
+def _notify_hf_warning(hf: Decimal) -> None:
+    """HF 警告通知を LINE Push で送信する（fail-open）。
+
+    templates.health_factor_warning でテキストを整形し、push_text で送信する。
+    HF < 1.8 のとき呼ばれる。通知失敗時は例外を握りつぶしてログに残す。
+
+    Args:
+        hf: 現在の Health Factor 値。
+    """
+    try:
+        from app.notifications.line_push import push_text  # noqa: PLC0415
+        from app.notifications.templates import health_factor_warning  # noqa: PLC0415
+
+        payload = health_factor_warning(hf)
+        push_text("", payload.body)
+        logger.warning("[monitor] HF warning 通知送信: hf=%s", hf)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[monitor] HF warning 通知送信失敗 (fail-open): %s", exc)
 
 
 def get_aave_balance(wallet_address: Optional[str] = None) -> AaveBalanceInfo:

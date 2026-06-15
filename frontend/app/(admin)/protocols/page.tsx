@@ -14,6 +14,8 @@ import {
 import PendlePositionCard from '@/components/pendle/PendlePositionCard'
 import OracleStatusPanel from '@/components/admin/OracleStatusPanel'
 import PoolHealthPanel from '@/components/admin/PoolHealthPanel'
+import BorrowRatesPanel from '@/components/admin/BorrowRatesPanel'
+import EModePanel from '@/components/admin/EModePanel'
 
 // ── Static protocol metadata (表示順 / 表示名 / フェーズ) ──────────────────
 // risk_level / tvl_usd / is_operational / alerts は API から取得する。
@@ -389,6 +391,14 @@ export default function ProtocolsPage() {
           </h2>
           <PoolHealthPanel />
         </div>
+
+        {/* GHO / USDC 借入金利比較パネル */}
+        <div style={{ marginTop: 24 }}>
+          <BorrowRatesPanel />
+        </div>
+
+        {/* Aave eMode 最適化パネル */}
+        <EModePanel />
       </div>
     </AuthGuard>
   )

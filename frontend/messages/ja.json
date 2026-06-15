@@ -915,7 +915,8 @@
         "testNotificationSending": "送信中...",
         "testNotificationSent": "テスト通知を送信しました",
         "testNotificationFailed": "送信に失敗しました（API未実装の可能性があります）",
-        "testNotificationError": "送信に失敗しました"
+        "testNotificationError": "送信に失敗しました",
+        "saveError": "設定の保存に失敗しました"
       },
       "terms": {
         "title": "利用規約",
@@ -2214,7 +2215,29 @@
     "oracleTwap": "TWAP (30分)",
     "oracleCheckedAt": "検証日時",
     "oracleDetail": "詳細",
-    "poolHealthTitle": "Aave プール赤字監視"
+    "poolHealthTitle": "Aave プール赤字監視",
+    "emodeTitle": "Aave eMode 最適化",
+    "emodeCurrentLabel": "現在の eMode",
+    "emodeRecommendedLabel": "推奨 eMode",
+    "emodeLtvLabel": "実効 LTV",
+    "emodeImprovementLabel": "LTV 改善率",
+    "emodeReasonLabel": "推奨理由",
+    "emodeCollateralLabel": "担保資産",
+    "emodeSwitchButton": "eMode を切替",
+    "emodeSwitchConfirmTitle": "eMode 切替の確認",
+    "emodeSwitchConfirmDesc": "Aave の eMode を変更します。LTV と清算閾値が変化します。実行してよいですか？",
+    "emodeConfirmButton": "切替実行",
+    "emodeCancelButton": "キャンセル",
+    "emodeSwitching": "切替中...",
+    "emodeSwitchSuccess": "eMode 切替 tx を構築しました。管理者が署名・送信してください。",
+    "emodeSwitchError": "eMode 切替に失敗しました",
+    "emodeFetchError": "eMode 情報の取得に失敗しました",
+    "emodeNoChange": "現在の設定が最適です（変更不要）",
+    "emodeDryRun": "dry_run モード（送信なし）",
+    "emodeCategory0": "eMode なし",
+    "emodeCategory1": "ステーブルコイン",
+    "emodeCategory2": "ETH 相関",
+    "emodeBps": "{bps}bps ({pct}%)"
   },
   "PoolHealthPanel": {
     "title": "プール赤字監視（getReserveDeficit）",
@@ -2228,6 +2251,23 @@
     "loadError": "プール赤字情報の取得に失敗しました。再読み込みしてください。",
     "noData": "データなし",
     "autoRefresh": "60秒ごとに自動更新"
+  },
+  "BorrowRatesPanel": {
+    "title": "GHO / USDC 借入金利比較",
+    "description": "stkAAVE 割引を考慮した最適借入通貨をリアルタイムで表示します（60秒自動更新）",
+    "recommendGho": "GHO 推奨",
+    "recommendUsdc": "USDC 推奨",
+    "usdcApr": "USDC 変動 APR",
+    "ghoVariableApr": "GHO 変動 APR（割引前）",
+    "ghoEffectiveApr": "GHO 実効 APR（stkAAVE 割引後）",
+    "annualSavings": "GHO で借入した場合の年間節約額試算: 約 ${amount} USD",
+    "fetchError": "借入金利データの取得に失敗しました（GET /api/aave/borrow-rates）。再読み込みしてください。",
+    "apiError": "データ取得エラー: {message}",
+    "loading": "読み込み中...",
+    "chartLabelUsdc": "USDC APR",
+    "chartLabelGhoVariable": "GHO APR（割引前）",
+    "chartLabelGhoEffective": "GHO APR（割引後）",
+    "chartYAxisLabel": "APR (%)"
   },
   "Register": {
     "title": "アカウント登録 - Ultra AutoTrade",

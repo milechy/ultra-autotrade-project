@@ -915,7 +915,8 @@
         "testNotificationSending": "Sending...",
         "testNotificationSent": "Test notification sent",
         "testNotificationFailed": "Failed to send (API may not be implemented)",
-        "testNotificationError": "Failed to send"
+        "testNotificationError": "Failed to send",
+        "saveError": "Failed to save settings"
       },
       "terms": {
         "title": "Terms",
@@ -2214,7 +2215,29 @@
     "oracleTwap": "TWAP (30 min)",
     "oracleCheckedAt": "Verified at",
     "oracleDetail": "Details",
-    "poolHealthTitle": "Aave Pool Deficit Monitor"
+    "poolHealthTitle": "Aave Pool Deficit Monitor",
+    "emodeTitle": "Aave eMode Optimization",
+    "emodeCurrentLabel": "Current eMode",
+    "emodeRecommendedLabel": "Recommended eMode",
+    "emodeLtvLabel": "Effective LTV",
+    "emodeImprovementLabel": "LTV Improvement",
+    "emodeReasonLabel": "Recommendation Reason",
+    "emodeCollateralLabel": "Collateral Assets",
+    "emodeSwitchButton": "Switch eMode",
+    "emodeSwitchConfirmTitle": "Confirm eMode Switch",
+    "emodeSwitchConfirmDesc": "This will change your Aave eMode, affecting LTV and liquidation threshold. Continue?",
+    "emodeConfirmButton": "Confirm Switch",
+    "emodeCancelButton": "Cancel",
+    "emodeSwitching": "Switching...",
+    "emodeSwitchSuccess": "eMode switch tx built. Please have an admin sign and submit.",
+    "emodeSwitchError": "Failed to switch eMode",
+    "emodeFetchError": "Failed to fetch eMode information",
+    "emodeNoChange": "Current setting is optimal (no change needed)",
+    "emodeDryRun": "dry_run mode (not submitted)",
+    "emodeCategory0": "No eMode",
+    "emodeCategory1": "Stablecoins",
+    "emodeCategory2": "ETH Correlated",
+    "emodeBps": "{bps}bps ({pct}%)"
   },
   "PoolHealthPanel": {
     "title": "Pool Deficit Monitor (getReserveDeficit)",
@@ -3612,5 +3635,22 @@
     "adminOnly": "Deposit and withdrawal are admin-only",
     "amountPlaceholder": "USDC amount",
     "vaultAddressPlaceholder": "Vault address"
+  },
+  "BorrowRatesPanel": {
+    "title": "GHO / USDC Borrow Rate Comparison",
+    "description": "Displays the optimal borrowing currency considering stkAAVE discounts in real time (auto-refreshed every 60s)",
+    "recommendGho": "GHO recommended",
+    "recommendUsdc": "USDC recommended",
+    "usdcApr": "USDC Variable APR",
+    "ghoVariableApr": "GHO Variable APR (before discount)",
+    "ghoEffectiveApr": "GHO Effective APR (after stkAAVE discount)",
+    "annualSavings": "Estimated annual savings when borrowing in GHO: ~${amount} USD",
+    "fetchError": "Failed to fetch borrow rate data (GET /api/aave/borrow-rates). Please reload.",
+    "apiError": "Data fetch error: {message}",
+    "loading": "Loading...",
+    "chartLabelUsdc": "USDC APR",
+    "chartLabelGhoVariable": "GHO APR (before discount)",
+    "chartLabelGhoEffective": "GHO APR (after discount)",
+    "chartYAxisLabel": "APR (%)"
   }
 }
