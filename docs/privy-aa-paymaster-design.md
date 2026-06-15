@@ -20,6 +20,22 @@ ERC-4337 Account Abstraction (AA) + paymaster を導入することで:
 
 ---
 
+## 1.5 不変条件（ノンカストディアル原則）
+
+AA + Smart Wallet 移行においても以下の不変条件を**絶対に破らない**こと。
+session key / SCW owner 設計次第でカストディが silent に移る security-critical なリスクがあるため、明示宣言する。
+
+1. **ユーザー EOA が UserOp の唯一の署名者であり続ける**
+   Smart Wallet (SCW) の owner 権限はユーザー EOA が保持する。UATa のサーバー鍵が owner に設定されてはならない。
+
+2. **UATa はガス代スポンサー（paymaster）のみを担う**
+   UATa はユーザー秘密鍵・SCW owner 権限を一切保持しない。paymaster policy ポリシーによってガス代を負担するが、tx への署名権限はユーザー EOA のみが持つ。
+
+3. **スライス4 の SmartWalletsProvider 配線でこの不変条件を破らないことを承認ゲートに含める**
+   `PrivyRootClient.tsx` への SmartWalletsProvider 配線時に、owner 権限設定・session key 設計が本原則に違反していないことを hkobayashi が確認してから着手すること。
+
+---
+
 ## 2. 現状の実装（実コード確認済み）
 
 ### 2.1 build-tx エンドポイント（`backend/app/proposals/router.py:716`）
@@ -45,7 +61,7 @@ ERC-4337 Account Abstraction (AA) + paymaster を導入することで:
 - **SmartWalletsProvider**: 未配線（通常の EOA embedded wallet のみ）
 - **署名経路 3 箇所**:
   - `frontend/app/(partner)/partner/proposals/page.tsx:108`
-  - `frontend/app/(liff)/liff-approve/ApproveConfirmSheet.tsx:103`
+  - `frontend/app/(liff)/liff-approve/_components/ApproveConfirmSheet.tsx:103`
   - `frontend/app/(user)/withdraw/page.tsx:395`
 - **注意**: `frontend/app/arobix/onboarding/page.tsx:47` に "Smart Wallet" テキストが存在するが実装ゼロ
 
@@ -191,7 +207,7 @@ paymaster 移行完了後、以下を明文化する:
 |---|---|---|---|
 | スライス2 | UserOp receipt 検証 helper 新規 + submit-tx 配線 | `backend/app/proposals/router.py`（L834 `_verify_on_chain_receipt`）、`backend/app/aave/client.py`（L1451/L1473） | 🛑 DeFi 安全装置の変更 |
 | スライス3 | `onBehalfOf` → Smart Wallet address 対応 + `users.smart_wallet_address` migration | `backend/app/proposals/router.py`、`backend/migrations/versions/*.py`（新規）、`backend/app/database.py` | 🛑 Tier S（migration） |
-| スライス4 | フロント SmartWalletsProvider 配線 + sponsored UserOp 送信 | `frontend/lib/wallet/PrivyRootClient.tsx`、`frontend/app/(partner)/partner/proposals/page.tsx`、`frontend/app/(liff)/liff-approve/ApproveConfirmSheet.tsx`、`frontend/app/(user)/withdraw/page.tsx` | 🛑 Aave tx 経路変更（全署名経路 3 箇所） |
+| スライス4 | フロント SmartWalletsProvider 配線 + sponsored UserOp 送信 | `frontend/lib/wallet/PrivyRootClient.tsx`、`frontend/app/(partner)/partner/proposals/page.tsx`、`frontend/app/(liff)/liff-approve/_components/ApproveConfirmSheet.tsx`、`frontend/app/(user)/withdraw/page.tsx` | 🛑 Aave tx 経路変更（全署名経路 3 箇所） |
 | スライス5 | 依存追加（paymaster SDK） | `frontend/package.json`、`frontend/package-lock.json` | 🛑 Tier S（package.json） |
 | スライス6 | F-9 expense_jpy 再設計・二重計上防止 | `backend/app/automation/workflow.py`（L817）、`backend/app/api/v1/fees.py`（L360） | 🛑 金融計算・Decimal 変更 |
 
@@ -218,6 +234,7 @@ paymaster 移行完了後、以下を明文化する:
 - [ ] SmartWalletsProvider 配線箇所（`PrivyRootClient.tsx`）の変更を承認
 - [ ] 署名経路 3 箇所（proposals / liff-approve / withdraw）の変更を承認
 - [ ] PoC（スライス7）の結果（Base Sepolia status=1 確認）を前提条件とすること
+- [ ] **non-custodial 維持の確認**（ユーザー EOA が SCW の唯一の signer / UATa に owner 権限なし）— セクション 1.5 不変条件に違反していないことを確認
 
 ### スライス5 承認ゲート
 
@@ -253,7 +270,7 @@ paymaster 移行完了後、以下を明文化する:
 | `backend/app/api/v1/fees.py` | L360（F-9 参照） | スライス6 で変更 |
 | `frontend/lib/wallet/PrivyRootClient.tsx` | SmartWalletsProvider 未配線 | スライス4/5 で変更 |
 | `frontend/app/(partner)/partner/proposals/page.tsx` | L108（署名経路） | スライス4 で変更 |
-| `frontend/app/(liff)/liff-approve/ApproveConfirmSheet.tsx` | L103（署名経路） | スライス4 で変更 |
+| `frontend/app/(liff)/liff-approve/_components/ApproveConfirmSheet.tsx` | L103（署名経路） | スライス4 で変更 |
 | `frontend/app/(user)/withdraw/page.tsx` | L395（署名経路） | スライス4 で変更 |
 | `frontend/package.json` | `@privy-io/react-auth ^3.29.2` | スライス5 で変更（Tier S） |
 
