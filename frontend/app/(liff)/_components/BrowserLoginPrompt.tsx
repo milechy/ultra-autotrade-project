@@ -29,12 +29,12 @@ export function BrowserLoginPrompt({ onSuccess }: BrowserLoginPromptProps) {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-dvh bg-zinc-950 px-6 text-center">
-      <Wallet className="h-10 w-10 text-green-500 mb-4" />
-      <h2 className="text-zinc-100 text-base font-semibold mb-2">
+    <div className="flex flex-col items-center justify-center min-h-dvh ax-bg-app px-6 text-center">
+      <Wallet className="h-10 w-10 text-[#1D9E75] mb-4" />
+      <h2 className="ax-text-primary text-base font-semibold mb-2">
         {t("title")}
       </h2>
-      <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
+      <p className="ax-text-secondary text-sm mb-6 leading-relaxed">
         {t("description")}
       </p>
 
@@ -42,7 +42,7 @@ export function BrowserLoginPrompt({ onSuccess }: BrowserLoginPromptProps) {
         onClick={handleLogin}
         disabled={signingIn}
         className="w-full max-w-xs flex items-center justify-center gap-2
-                   bg-green-600 hover:bg-green-500 disabled:opacity-50
+                   bg-[#1D9E75] hover:bg-[#1a8f6a] disabled:opacity-50
                    disabled:cursor-not-allowed text-white font-semibold
                    py-3 rounded-xl transition-colors"
       >
@@ -54,9 +54,9 @@ export function BrowserLoginPrompt({ onSuccess }: BrowserLoginPromptProps) {
         {signingIn ? t("signingIn") : t("loginButton")}
       </button>
 
-      {error && <p className="text-red-400 text-xs mt-3 max-w-xs">{error}</p>}
+      {error && <p className="text-red-600 text-xs mt-3 max-w-xs">{error}</p>}
 
-      <p className="text-zinc-600 text-xs mt-6 leading-relaxed">
+      <p className="ax-text-secondary opacity-70 text-xs mt-6 leading-relaxed">
         {t("lineAppHint")}
       </p>
     </div>
