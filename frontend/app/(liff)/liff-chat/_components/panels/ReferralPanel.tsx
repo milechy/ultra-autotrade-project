@@ -159,10 +159,10 @@ export function ReferralPanel() {
       {/* トースト */}
       {toast && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[60]
-                        flex items-center gap-2 bg-zinc-800 border border-zinc-700
-                        text-zinc-100 text-sm px-4 py-2 rounded-xl shadow-lg
+                        flex items-center gap-2 bg-[#1b1a23] border border-[#1c1a27]/15
+                        text-[#fbf7f0] text-sm px-4 py-2 rounded-xl shadow-lg
                         animate-in fade-in duration-200">
-          <CheckCircle className="w-4 h-4 text-[#4ade9a]" />
+          <CheckCircle className="w-4 h-4 text-[#1D9E75]" />
           {toast}
         </div>
       )}
@@ -176,23 +176,23 @@ export function ReferralPanel() {
       )}
 
       {/* 報酬サマリーカード */}
-      <div className="bg-[#1a3d2e] rounded-2xl p-5">
+      <div className="bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] rounded-2xl p-5">
         {loading ? (
           <div className="h-20 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-[#4ade9a] border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-[#1c1a27] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <>
-            <p className="text-zinc-400 text-xs mb-1">{t("totalRewardLabel")}</p>
-            <p className="text-[#4ade9a] text-3xl font-bold mb-1">
+            <p className="text-[#1c1a27] text-xs mb-1">{t("totalRewardLabel")}</p>
+            <p className="text-[#1c1a27] text-3xl font-bold mb-1">
               ¥{totalReward}
             </p>
-            <p className="text-zinc-400 text-xs mb-5">
+            <p className="text-[#1c1a27] text-xs mb-5">
               {displayInfo.referral_count}{t("referralCountLabel")}
             </p>
 
             {/* 統計 3つ */}
-            <div className="grid grid-cols-3 gap-2 pt-4 border-t border-white/10">
+            <div className="grid grid-cols-3 gap-2 pt-4 border-t border-[#1c1a27]/15">
               <StatCard
                 icon={<Users className="w-4 h-4" />}
                 label={t("statsReferralCount")}
@@ -215,11 +215,11 @@ export function ReferralPanel() {
 
       {/* 紹介コード */}
       <div className="space-y-2">
-        <p className="text-zinc-400 text-xs font-medium px-1">{t("referralCodeLabel")}</p>
+        <p className="text-[#736f7e] text-xs font-medium px-1">{t("referralCodeLabel")}</p>
         {displayInfo.referral_code ? (
           <div className="flex items-center gap-2">
-            <div className="flex-1 bg-zinc-800 rounded-xl px-4 py-3 flex items-center">
-              <span className="text-white font-mono text-2xl tracking-widest">
+            <div className="flex-1 ax-card-warm rounded-xl px-4 py-3 flex items-center">
+              <span className="text-[#1c1a27] font-mono text-2xl tracking-widest">
                 {displayInfo.referral_code}
               </span>
             </div>
@@ -249,7 +249,7 @@ export function ReferralPanel() {
       {/* シェアボタン */}
       {displayInfo.referral_code && (
         <div className="space-y-2">
-          <p className="text-zinc-400 text-xs font-medium px-1">{t("shareSectionLabel")}</p>
+          <p className="text-[#736f7e] text-xs font-medium px-1">{t("shareSectionLabel")}</p>
           <div className="space-y-2">
             <button
               onClick={handleLineShare}
@@ -275,8 +275,8 @@ export function ReferralPanel() {
 
             <button
               onClick={handleCopyLink}
-              className="w-full flex items-center gap-3 bg-zinc-700 hover:bg-zinc-600
-                         text-white font-semibold py-3 px-4 rounded-xl
+              className="w-full flex items-center gap-3 bg-[#1b1a23] hover:bg-[#2a2833]
+                         text-[#fbf7f0] font-semibold py-3 px-4 rounded-xl
                          transition-colors"
             >
               <Copy className="w-5 h-5" />
@@ -289,8 +289,8 @@ export function ReferralPanel() {
 
       {/* 報酬の仕組み */}
       <div className="space-y-2">
-        <p className="text-zinc-400 text-xs font-medium px-1">{t("howItWorksLabel")}</p>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-4">
+        <p className="text-[#736f7e] text-xs font-medium px-1">{t("howItWorksLabel")}</p>
+        <div className="ax-card-warm border border-[#1c1a27]/15 rounded-2xl p-4 space-y-4">
           <HowItWorksStep
             step={1}
             text={t("howItWorksStep1")}
@@ -310,7 +310,7 @@ export function ReferralPanel() {
       {/* 紹介した友達リスト */}
       {displayInfo.referred_users.length > 0 && (
         <div className="space-y-2">
-          <p className="text-zinc-400 text-xs font-medium px-1">{t("referredUsersLabel")}</p>
+          <p className="text-[#736f7e] text-xs font-medium px-1">{t("referredUsersLabel")}</p>
           <div className="space-y-2">
             {displayInfo.referred_users.map((user, i) => (
               <ReferredUserRow key={i} user={user} tPanel={t} />
@@ -320,7 +320,7 @@ export function ReferralPanel() {
       )}
 
       {!loading && displayInfo.referred_users.length === 0 && displayInfo.referral_code && (
-        <div className="text-center py-8 text-zinc-600 text-sm">
+        <div className="text-center py-8 text-[#736f7e] text-sm">
           {t("noReferredUsers")}
         </div>
       )}
@@ -339,9 +339,9 @@ function StatCard({
 }) {
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="text-[#4ade9a]">{icon}</div>
-      <p className="text-white font-semibold text-sm">{value}</p>
-      <p className="text-zinc-500 text-[10px]">{label}</p>
+      <div className="text-[#1c1a27]">{icon}</div>
+      <p className="text-[#1c1a27] font-semibold text-sm">{value}</p>
+      <p className="text-[#736f7e] text-[10px]">{label}</p>
     </div>
   )
 }
@@ -357,14 +357,14 @@ function HowItWorksStep({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="w-6 h-6 rounded-full bg-[#1a3d2e] border border-[#1D9E75]
+      <div className="w-6 h-6 rounded-full bg-[#1D9E75]/10 border border-[#1D9E75]
                       flex items-center justify-center flex-shrink-0 mt-0.5">
-        <span className="text-[#4ade9a] text-xs font-bold">{step}</span>
+        <span className="text-[#1D9E75] text-xs font-bold">{step}</span>
       </div>
       <div className="flex-1">
-        <p className="text-white text-sm">{text}</p>
+        <p className="text-[#1c1a27] text-sm">{text}</p>
         {reward && (
-          <p className="text-[#4ade9a] text-xs font-semibold mt-0.5">
+          <p className="text-[#1D9E75] text-xs font-semibold mt-0.5">
             → {reward}
           </p>
         )}
@@ -386,17 +386,17 @@ function ReferredUserRow({
   const rewardJpy = Number(user.reward_jpy).toLocaleString("ja-JP")
 
   return (
-    <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
+    <div className="flex items-center gap-3 ax-card-warm border border-[#1c1a27]/15 rounded-xl px-4 py-3">
       {/* アバター */}
-      <div className="w-9 h-9 rounded-full bg-[#1a3d2e] border border-[#1D9E75]
+      <div className="w-9 h-9 rounded-full bg-[#1D9E75]/10 border border-[#1D9E75]
                       flex items-center justify-center flex-shrink-0">
-        <span className="text-[#4ade9a] text-sm font-bold">{initial}</span>
+        <span className="text-[#1D9E75] text-sm font-bold">{initial}</span>
       </div>
 
       {/* 名前・日付 */}
       <div className="flex-1 min-w-0">
-        <p className="text-white text-sm font-medium truncate">{user.name}</p>
-        <p className="text-zinc-500 text-xs mt-0.5">{tPanel("joinedDateLabel")} {joinedDate}</p>
+        <p className="text-[#1c1a27] text-sm font-medium truncate">{user.name}</p>
+        <p className="text-[#736f7e] text-xs mt-0.5">{tPanel("joinedDateLabel")} {joinedDate}</p>
       </div>
 
       {/* ステータス・報酬 */}
@@ -404,15 +404,15 @@ function ReferredUserRow({
         <span
           className={`text-xs border rounded-full px-2 py-0.5 ${
             isActive
-              ? "text-[#4ade9a] border-[#1D9E75]"
-              : "text-zinc-400 border-zinc-700"
+              ? "text-[#1D9E75] border-[#1D9E75]"
+              : "text-[#736f7e] border-[#1c1a27]/15"
           }`}
         >
           {user.status === "active"
             ? tPanel("statusActive")
             : tPanel("statusRegistered")}
         </span>
-        <span className="text-zinc-300 text-xs">¥{rewardJpy}</span>
+        <span className="text-[#736f7e] text-xs">¥{rewardJpy}</span>
       </div>
     </div>
   )

@@ -92,15 +92,15 @@ export function MyWalletPanel() {
 
   // アドレスの先頭4文字・末尾4文字をハイライト表示
   function renderAddress(addr: string) {
-    if (addr.length <= 8) return <span className="text-[#4ade9a]">{addr}</span>
+    if (addr.length <= 8) return <span className="text-[#1D9E75]">{addr}</span>
     const start = addr.slice(0, 4)
     const mid = addr.slice(4, addr.length - 4)
     const end = addr.slice(-4)
     return (
       <>
-        <span className="text-[#4ade9a]">{start}</span>
-        <span className="text-zinc-300">{mid}</span>
-        <span className="text-[#4ade9a]">{end}</span>
+        <span className="text-[#1D9E75]">{start}</span>
+        <span className="text-[#736f7e]">{mid}</span>
+        <span className="text-[#1D9E75]">{end}</span>
       </>
     )
   }
@@ -108,16 +108,16 @@ export function MyWalletPanel() {
   return (
     <div className="space-y-4">
       {/* ウォレットカード */}
-      <div className="bg-[#1a3d2e] rounded-2xl p-4 space-y-3">
+      <div className="bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] rounded-2xl p-4 space-y-3">
         {/* Non-Custodial バッジ + Base Mainnet */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-[#4ade9a]" />
-            <span className="text-[#4ade9a] text-xs font-semibold">{t("nonCustodial")}</span>
+            <ShieldCheck className="w-4 h-4 text-[#1D9E75]" />
+            <span className="text-[#1D9E75] text-xs font-semibold">{t("nonCustodial")}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#1D9E75] inline-block" />
-            <span className="text-zinc-300 text-xs">{t("baseMainnet")}</span>
+            <span className="text-[#736f7e] text-xs">{t("baseMainnet")}</span>
           </div>
         </div>
 
@@ -127,26 +127,26 @@ export function MyWalletPanel() {
             {renderAddress(address)}
           </div>
         ) : fetchState === "loading" ? (
-          <div className="flex items-center gap-2 text-zinc-500 text-xs">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#4ade9a]" />
+          <div className="flex items-center gap-2 text-[#736f7e] text-xs">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#1D9E75]" />
             <span>{t("addressLoading")}</span>
           </div>
         ) : fetchState === "error" ? (
           // fail-visible: 永久ローディングにせずエラー + リトライ
           <div className="space-y-2">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-[#e24b4a] flex-shrink-0 mt-0.5" />
-              <p className="text-[#e24b4a] text-xs leading-relaxed">
+              <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-red-600 text-xs leading-relaxed">
                 {t("addressError")}
               </p>
             </div>
             <button
               onClick={() => linked.refetch()}
               className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl
-                         bg-zinc-800/60 hover:bg-zinc-700/60 active:bg-zinc-600/60
-                         transition-colors text-xs text-zinc-200"
+                         bg-[#1b1a23]/80 hover:bg-[#1b1a23] active:bg-[#1b1a23]
+                         transition-colors text-xs text-[#fbf7f0]"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-[#4ade9a]" />
+              <RefreshCw className="w-3.5 h-3.5 text-[#1D9E75]" />
               {t("retryBtn")}
             </button>
           </div>
@@ -154,13 +154,13 @@ export function MyWalletPanel() {
           // empty: 認証済みだがウォレット未接続 → 接続誘導 UI
           <div className="space-y-3 py-1">
             <div className="flex flex-col items-center text-center gap-2">
-              <div className="w-11 h-11 rounded-full bg-zinc-800/60 flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-[#4ade9a]" />
+              <div className="w-11 h-11 rounded-full bg-[#1b1a23]/80 flex items-center justify-center">
+                <Wallet className="w-5 h-5 text-[#1D9E75]" />
               </div>
-              <p className="text-zinc-200 text-sm font-medium">
+              <p className="text-[#1c1a27] text-sm font-medium">
                 {t("walletNotConnected")}
               </p>
-              <p className="text-zinc-500 text-xs leading-relaxed">
+              <p className="text-[#736f7e] text-xs leading-relaxed">
                 {t("walletNotConnectedDesc")}
               </p>
             </div>
@@ -177,10 +177,10 @@ export function MyWalletPanel() {
             <button
               onClick={() => linked.refetch()}
               className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl
-                         bg-zinc-800/40 hover:bg-zinc-700/50 active:bg-zinc-600/50
-                         transition-colors text-xs text-zinc-400"
+                         bg-[#1b1a23]/70 hover:bg-[#1b1a23] active:bg-[#1b1a23]
+                         transition-colors text-xs text-[#fbf7f0]"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
+              <RefreshCw className="w-3.5 h-3.5 text-[#fbf7f0]" />
               {t("reloadBtn")}
             </button>
           </div>
@@ -192,48 +192,48 @@ export function MyWalletPanel() {
             onClick={handleCopy}
             disabled={!address}
             className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl
-                       bg-zinc-800/60 hover:bg-zinc-700/60 active:bg-zinc-600/60
+                       bg-[#1b1a23]/80 hover:bg-[#1b1a23] active:bg-[#1b1a23]
                        disabled:opacity-40 disabled:cursor-not-allowed
                        transition-colors"
           >
-            <Copy className="w-4 h-4 text-[#4ade9a]" />
-            <span className="text-[10px] text-zinc-300">{t("copyLabel")}</span>
+            <Copy className="w-4 h-4 text-[#1D9E75]" />
+            <span className="text-[10px] text-[#fbf7f0]">{t("copyLabel")}</span>
           </button>
 
           <button
             onClick={() => setQrExpanded((v) => !v)}
             disabled={!address}
             className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl
-                       bg-zinc-800/60 hover:bg-zinc-700/60 active:bg-zinc-600/60
+                       bg-[#1b1a23]/80 hover:bg-[#1b1a23] active:bg-[#1b1a23]
                        disabled:opacity-40 disabled:cursor-not-allowed
                        transition-colors"
           >
-            <QrCode className="w-4 h-4 text-[#4ade9a]" />
-            <span className="text-[10px] text-zinc-300">{t("qrLabel")}</span>
+            <QrCode className="w-4 h-4 text-[#1D9E75]" />
+            <span className="text-[10px] text-[#fbf7f0]">{t("qrLabel")}</span>
           </button>
 
           <button
             onClick={handleBasescan}
             disabled={!address}
             className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl
-                       bg-zinc-800/60 hover:bg-zinc-700/60 active:bg-zinc-600/60
+                       bg-[#1b1a23]/80 hover:bg-[#1b1a23] active:bg-[#1b1a23]
                        disabled:opacity-40 disabled:cursor-not-allowed
                        transition-colors"
           >
-            <ExternalLink className="w-4 h-4 text-[#4ade9a]" />
-            <span className="text-[10px] text-zinc-300">{t("basescanLabel")}</span>
+            <ExternalLink className="w-4 h-4 text-[#1D9E75]" />
+            <span className="text-[10px] text-[#fbf7f0]">{t("basescanLabel")}</span>
           </button>
         </div>
       </div>
 
       {/* QRコードセクション */}
       {qrExpanded && address && (
-        <div className="bg-zinc-900 rounded-2xl p-4 space-y-3 border border-zinc-800">
-          <p className="text-zinc-300 text-sm font-medium text-center">{t("qrTitle")}</p>
+        <div className="ax-card-warm rounded-2xl p-4 space-y-3 border border-[#1c1a27]/15">
+          <p className="text-[#736f7e] text-sm font-medium text-center">{t("qrTitle")}</p>
           <div className="flex justify-center">
             <canvas ref={canvasRef} className="rounded-xl bg-white p-2" />
           </div>
-          <p className="text-zinc-500 text-xs text-center">
+          <p className="text-[#736f7e] text-xs text-center">
             {t("qrNote")}
           </p>
         </div>
@@ -241,15 +241,15 @@ export function MyWalletPanel() {
 
       {/* セキュリティ注意書き */}
       <div className="flex items-start gap-2 px-1">
-        <Shield className="w-4 h-4 text-zinc-500 flex-shrink-0 mt-0.5" />
-        <p className="text-zinc-500 text-xs leading-relaxed">
+        <Shield className="w-4 h-4 text-[#736f7e] flex-shrink-0 mt-0.5" />
+        <p className="text-[#736f7e] text-xs leading-relaxed">
           {t("securityNote")}
         </p>
       </div>
 
       {/* トースト */}
       {toastMsg && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-zinc-800 text-white px-4 py-2 rounded-full text-sm z-[60] shadow-lg">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-[#1b1a23] text-[#fbf7f0] px-4 py-2 rounded-full text-sm z-[60] shadow-lg">
           {toastMsg}
         </div>
       )}

@@ -52,19 +52,19 @@ function ConfirmSheet({ open, title, executeLabel, cancelLabel, rows, onConfirm,
         className="fixed inset-0 z-[60] bg-black/60"
         onClick={!busy ? onCancel : undefined}
       />
-      <div className="fixed bottom-0 left-0 right-0 z-[70] bg-zinc-900 rounded-t-2xl border-t border-zinc-800 px-4 pb-8 pt-3 animate-in slide-in-from-bottom duration-300">
-        <div className="mx-auto mb-4 h-1 w-8 rounded-full bg-zinc-700" />
-        <h2 className="text-base font-semibold text-zinc-100 mb-4">{title}</h2>
+      <div className="fixed bottom-0 left-0 right-0 z-[70] ax-card-warm rounded-t-2xl border-t border-[#1c1a27]/15 px-4 pb-8 pt-3 animate-in slide-in-from-bottom duration-300">
+        <div className="mx-auto mb-4 h-1 w-8 rounded-full bg-[#1c1a27]/10" />
+        <h2 className="text-base font-semibold text-[#1c1a27] mb-4">{title}</h2>
         <div className="space-y-3 mb-6">
           {rows.map((r) => (
             <div key={r.label} className="flex justify-between items-baseline gap-2">
-              <span className="text-xs text-zinc-500 shrink-0">{r.label}</span>
-              <span className="text-sm text-zinc-100 text-right">{r.value}</span>
+              <span className="text-xs text-[#736f7e] shrink-0">{r.label}</span>
+              <span className="text-sm text-[#1c1a27] text-right">{r.value}</span>
             </div>
           ))}
         </div>
         {error && (
-          <div className="flex items-start gap-2 mb-3 text-red-400 text-xs">
+          <div className="flex items-start gap-2 mb-3 text-red-600 text-xs">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
@@ -82,8 +82,8 @@ function ConfirmSheet({ open, title, executeLabel, cancelLabel, rows, onConfirm,
         <button
           onClick={onCancel}
           disabled={busy}
-          className="mt-2 w-full py-3 rounded-xl border border-zinc-600 text-zinc-300
-                     hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed
+          className="mt-2 w-full py-3 rounded-xl border border-[#1c1a27]/15 text-[#736f7e]
+                     hover:bg-black/5 disabled:opacity-50 disabled:cursor-not-allowed
                      text-sm font-medium transition-colors"
         >
           {cancelLabel}
@@ -228,7 +228,7 @@ export function DepositPanel() {
     <div className="pb-2">
       {/* タブ（v3 は出金非表示。WITHDRAW_ENABLED=false の間はタブ自体を出さず入金のみ） */}
       {WITHDRAW_ENABLED && (
-        <div className="flex border-b border-zinc-800 mb-4">
+        <div className="flex border-b border-[#1c1a27]/15 mb-4">
           {(["deposit", "withdraw"] as Tab[]).map((tabKey) => (
             <button
               key={tabKey}
@@ -237,7 +237,7 @@ export function DepositPanel() {
                 "flex-1 py-2 text-sm font-medium transition-colors",
                 tab === tabKey
                   ? "border-b-2 border-[#1D9E75] text-[#1D9E75]"
-                  : "text-zinc-400",
+                  : "text-[#736f7e]",
               ].join(" ")}
             >
               {tabKey === "deposit" ? t("tabDeposit") : t("tabWithdraw")}
@@ -247,25 +247,25 @@ export function DepositPanel() {
       )}
 
       {/* 残高カード */}
-      <div className="bg-[#1a3d2e] rounded-xl px-4 py-4 mb-4">
-        <p className="text-xs text-zinc-400 mb-1">{balanceLabel}</p>
+      <div className="bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] rounded-xl px-4 py-4 mb-4">
+        <p className="text-xs text-[#736f7e] mb-1">{balanceLabel}</p>
         {balanceLoading ? (
           <div className="flex items-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
-            <span className="text-zinc-400 text-sm">{t("balanceLoading")}</span>
+            <Loader2 className="w-4 h-4 animate-spin text-[#736f7e]" />
+            <span className="text-[#736f7e] text-sm">{t("balanceLoading")}</span>
           </div>
         ) : (
-          <p className="text-2xl font-bold text-white">
+          <p className="text-2xl font-bold text-[#1c1a27]">
             {balance != null ? `$${balance.toFixed(2)}` : "---"}
-            <span className="text-sm font-normal text-zinc-400 ml-2">USDC</span>
+            <span className="text-sm font-normal text-[#736f7e] ml-2">USDC</span>
           </p>
         )}
-        <p className="text-xs text-zinc-500 mt-1">{t("network")}</p>
+        <p className="text-xs text-[#736f7e] mt-1">{t("network")}</p>
       </div>
 
       {/* 成功メッセージ */}
       {successMsg && (
-        <div className="bg-[#1a3d2e] border border-[#1D9E75] rounded-xl px-4 py-3 mb-4 text-sm text-[#4ade9a]">
+        <div className="ax-card-warm border border-[#1D9E75] rounded-xl px-4 py-3 mb-4 text-sm text-[#1D9E75]">
           {successMsg}
         </div>
       )}
@@ -275,22 +275,22 @@ export function DepositPanel() {
         <div className="space-y-4">
           {/* 金額入力（送金額の目安） */}
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">{t("depositAmountLabel")}</label>
+            <label className="block text-xs text-[#736f7e] mb-1">{t("depositAmountLabel")}</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">{isEn ? "$" : "¥"}</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#736f7e] text-sm">{isEn ? "$" : "¥"}</span>
               <input
                 type="number"
                 min="0"
                 placeholder={t("depositAmountPlaceholder")}
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
-                className="w-full bg-zinc-800 text-white text-lg pl-7 pr-4 py-3 rounded-xl
-                           border border-zinc-700 focus:border-[#1D9E75] focus:outline-none
-                           placeholder-zinc-600"
+                className="w-full ax-card-warm text-[#1c1a27] text-lg pl-7 pr-4 py-3 rounded-xl
+                           border border-[#1c1a27]/15 focus:border-[#1D9E75] focus:outline-none
+                           placeholder-[#736f7e]"
               />
             </div>
             {depositNum > 0 && (
-              <p className="text-xs text-zinc-500 mt-1">
+              <p className="text-xs text-[#736f7e] mt-1">
                 ≈ ${depositUsdc.toFixed(2)} USDC
               </p>
             )}
@@ -302,8 +302,8 @@ export function DepositPanel() {
               <button
                 key={amt}
                 onClick={() => setDepositAmount(String(amt))}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs py-2 rounded-lg
-                           border border-zinc-700 transition-colors"
+                className="ax-card-warm hover:bg-black/5 text-[#1c1a27] text-xs py-2 rounded-lg
+                           border border-[#1c1a27]/15 transition-colors"
               >
                 {isEn
                   ? `$${amt.toLocaleString()}`
@@ -313,12 +313,12 @@ export function DepositPanel() {
           </div>
 
           {/* 入金方法の案内 */}
-          <div className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 space-y-2">
-            <p className="text-xs font-medium text-zinc-300">{t("depositMethodTitle")}</p>
-            <p className="text-xs text-zinc-400 leading-relaxed">
+          <div className="ax-card-warm border border-[#1c1a27]/15 rounded-xl px-4 py-3 space-y-2">
+            <p className="text-xs font-medium text-[#1c1a27]">{t("depositMethodTitle")}</p>
+            <p className="text-xs text-[#736f7e] leading-relaxed">
               {t("depositMethodDesc")}
             </p>
-            <ul className="text-xs text-zinc-500 leading-relaxed space-y-0.5 list-disc list-inside">
+            <ul className="text-xs text-[#736f7e] leading-relaxed space-y-0.5 list-disc list-inside">
               <li>{t("depositMethodNote1")}</li>
               <li>{t("depositMethodNote2")}</li>
               <li>{t("depositMethodNote3")}</li>
@@ -357,9 +357,9 @@ export function DepositPanel() {
         <div className="space-y-4">
           {/* 金額入力 */}
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">{t("withdrawAmountLabel")}</label>
+            <label className="block text-xs text-[#736f7e] mb-1">{t("withdrawAmountLabel")}</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#736f7e] text-sm">$</span>
               <input
                 type="number"
                 min="0"
@@ -367,9 +367,9 @@ export function DepositPanel() {
                 placeholder={t("withdrawAmountPlaceholder")}
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                className="w-full bg-zinc-800 text-white text-lg pl-7 pr-4 py-3 rounded-xl
-                           border border-zinc-700 focus:border-[#1D9E75] focus:outline-none
-                           placeholder-zinc-600"
+                className="w-full ax-card-warm text-[#1c1a27] text-lg pl-7 pr-4 py-3 rounded-xl
+                           border border-[#1c1a27]/15 focus:border-[#1D9E75] focus:outline-none
+                           placeholder-[#736f7e]"
               />
             </div>
           </div>
@@ -380,16 +380,16 @@ export function DepositPanel() {
               <button
                 key={amt}
                 onClick={() => setWithdrawAmount(String(amt))}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs py-2 rounded-lg
-                           border border-zinc-700 transition-colors"
+                className="ax-card-warm hover:bg-black/5 text-[#1c1a27] text-xs py-2 rounded-lg
+                           border border-[#1c1a27]/15 transition-colors"
               >
                 ${amt}
               </button>
             ))}
             <button
               onClick={() => setWithdrawAmount(maxWithdraw > 0 ? maxWithdraw.toFixed(2) : "")}
-              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs py-2 rounded-lg
-                         border border-zinc-700 transition-colors"
+              className="ax-card-warm hover:bg-black/5 text-[#1c1a27] text-xs py-2 rounded-lg
+                         border border-[#1c1a27]/15 transition-colors"
             >
               {t("quickMax")}
             </button>
@@ -397,33 +397,33 @@ export function DepositPanel() {
 
           {/* 出金先（変更不可） */}
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">{t("withdrawDestLabel")}</label>
-            <div className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3">
-              <p className="text-sm text-zinc-300 font-mono">
+            <label className="block text-xs text-[#736f7e] mb-1">{t("withdrawDestLabel")}</label>
+            <div className="ax-card-warm border border-[#1c1a27]/15 rounded-xl px-4 py-3">
+              <p className="text-sm text-[#1c1a27] font-mono">
                 {walletAddress
                   ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
                   : t("withdrawDestDefault")}
               </p>
-              <p className="text-xs text-zinc-500 mt-0.5">{t("withdrawDestImmutable")}</p>
+              <p className="text-xs text-[#736f7e] mt-0.5">{t("withdrawDestImmutable")}</p>
             </div>
           </div>
 
           {/* 手数料・受取予定額 */}
-          <div className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 space-y-2">
-            <div className="flex justify-between text-xs text-zinc-400">
+          <div className="ax-card-warm border border-[#1c1a27]/15 rounded-xl px-4 py-3 space-y-2">
+            <div className="flex justify-between text-xs text-[#736f7e]">
               <span>{t("networkFeeLabel")}</span>
               <span>≈ ${WITHDRAW_FEE.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm font-semibold">
-              <span className="text-zinc-300">{t("receiveAmountLabel")}</span>
-              <span className="text-white">
+              <span className="text-[#736f7e]">{t("receiveAmountLabel")}</span>
+              <span className="text-[#1c1a27]">
                 {withdrawNum > 0 ? `$${receiveAmount.toFixed(2)} USDC` : "---"}
               </span>
             </div>
           </div>
 
           {/* 警告 */}
-          <div className="flex items-start gap-2 text-yellow-400 text-xs">
+          <div className="flex items-start gap-2 text-yellow-600 text-xs">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
             <p>
               {t("withdrawWarning")}

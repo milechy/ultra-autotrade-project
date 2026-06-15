@@ -54,7 +54,7 @@ function Toggle({
 }) {
   // track 色: ON は緑(#1D9E75)、OFF はグレー。disabled は opacity で薄める
   // (track 自体の色は checked 状態を維持して「ON 固定」が一目で判る見た目にする)。
-  const trackColor = checked ? "bg-[#1D9E75]" : "bg-zinc-700"
+  const trackColor = checked ? "bg-[#1D9E75]" : "bg-[#1c1a27]/15"
   return (
     <button
       type="button"
@@ -84,7 +84,7 @@ function Toggle({
 
 function SectionHeader({ label }: { label: string }) {
   return (
-    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 mt-5 first:mt-0">
+    <p className="text-xs font-semibold text-[#736f7e] uppercase tracking-wider mb-2 mt-5 first:mt-0">
       {label}
     </p>
   )
@@ -110,12 +110,12 @@ function NotificationRow({
   badge?: React.ReactNode
 }) {
   return (
-    <div className="flex items-center justify-between bg-zinc-800 rounded-xl px-4 py-3 mb-2">
+    <div className="flex items-center justify-between ax-card-warm rounded-xl px-4 py-3 mb-2">
       <div className="flex items-center gap-3">
-        <div className="text-[#4ade9a]">{icon}</div>
+        <div className="text-[#1D9E75]">{icon}</div>
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-white text-sm">{label}</span>
+            <span className="text-[#1c1a27] text-sm">{label}</span>
             {badge}
           </div>
         </div>
@@ -235,9 +235,9 @@ export function NotificationPanel() {
 
   const pushBadge =
     pushPermission === "granted" ? (
-      <span className="text-[10px] text-[#4ade9a] font-semibold">{t("pushGranted")}</span>
+      <span className="text-[10px] text-[#1D9E75] font-semibold">{t("pushGranted")}</span>
     ) : (
-      <span className="text-[10px] text-yellow-400 font-semibold">{t("pushNotGranted")}</span>
+      <span className="text-[10px] text-yellow-600 font-semibold">{t("pushNotGranted")}</span>
     )
 
   return (
@@ -246,12 +246,12 @@ export function NotificationPanel() {
       <SectionHeader label={t("channelSection")} />
 
       {/* LINE 通知 */}
-      <div className="flex items-center justify-between bg-zinc-800 rounded-xl px-4 py-3 mb-2">
+      <div className="flex items-center justify-between ax-card-warm rounded-xl px-4 py-3 mb-2">
         <div className="flex items-center gap-3">
-          <MessageCircle className="w-5 h-5 text-[#4ade9a]" />
+          <MessageCircle className="w-5 h-5 text-[#1D9E75]" />
           <div>
-            <div className="text-white text-sm">{t("lineNotification")}</div>
-            <div className="text-[#4ade9a] text-xs">{t("lineConnected")}</div>
+            <div className="text-[#1c1a27] text-sm">{t("lineNotification")}</div>
+            <div className="text-[#1D9E75] text-xs">{t("lineConnected")}</div>
           </div>
         </div>
         <Toggle
@@ -261,12 +261,12 @@ export function NotificationPanel() {
       </div>
 
       {/* PWA プッシュ通知 */}
-      <div className="flex items-center justify-between bg-zinc-800 rounded-xl px-4 py-3 mb-2">
+      <div className="flex items-center justify-between ax-card-warm rounded-xl px-4 py-3 mb-2">
         <div className="flex items-center gap-3">
-          <Bell className="w-5 h-5 text-[#4ade9a]" />
+          <Bell className="w-5 h-5 text-[#1D9E75]" />
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-white text-sm">{t("pushNotification")}</span>
+              <span className="text-[#1c1a27] text-sm">{t("pushNotification")}</span>
               {pushBadge}
             </div>
           </div>
@@ -302,13 +302,13 @@ export function NotificationPanel() {
         checked={settings.preferences.health_factor_warning}
         onChange={(v) => updatePref("health_factor_warning", v)}
       />
-      <div className="flex items-center justify-between bg-zinc-800 rounded-xl px-4 py-3 mb-2">
+      <div className="flex items-center justify-between ax-card-warm rounded-xl px-4 py-3 mb-2">
         <div className="flex items-center gap-3">
-          <ShieldAlert className="w-5 h-5 text-[#4ade9a]" />
+          <ShieldAlert className="w-5 h-5 text-[#1D9E75]" />
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-white text-sm">{t("emergencyStopLabel")}</span>
-              <span className="text-[10px] text-zinc-400 font-semibold bg-zinc-700 px-1.5 py-0.5 rounded">
+              <span className="text-[#1c1a27] text-sm">{t("emergencyStopLabel")}</span>
+              <span className="text-[10px] text-[#fbf7f0] font-semibold bg-[#1b1a23] px-1.5 py-0.5 rounded">
                 {t("immutableBadge")}
               </span>
             </div>
@@ -342,13 +342,13 @@ export function NotificationPanel() {
         type="button"
         onClick={handleTestNotification}
         disabled={testSending}
-        className="w-full py-3 border border-zinc-700 text-zinc-300 rounded-xl text-sm hover:bg-zinc-800 transition-colors mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full py-3 border border-[#1c1a27]/15 text-[#1c1a27] rounded-xl text-sm hover:bg-black/5 transition-colors mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {testSending ? t("testNotificationSending") : t("testNotificationBtn")}
       </button>
 
       {testMessage && (
-        <p className="text-center text-xs mt-2 text-zinc-400">{testMessage}</p>
+        <p className="text-center text-xs mt-2 text-[#736f7e]">{testMessage}</p>
       )}
     </div>
   )

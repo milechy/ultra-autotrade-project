@@ -84,7 +84,7 @@ function MessageBubble({ message }: { message: Message }) {
       <div
         className={`max-w-[78%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
           isAI
-            ? "bg-zinc-800 text-white rounded-tl-none"
+            ? "ax-card-warm text-[#1c1a27] rounded-tl-none"
             : "bg-[#1D9E75] text-white rounded-tr-none"
         }`}
       >
@@ -219,36 +219,36 @@ export function ChatPanel({ onClose }: Props) {
 
       {/* パネル本体 */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-950
+        className="fixed bottom-0 left-0 right-0 z-50 ax-bg-app
                    h-[88vh] rounded-t-2xl flex flex-col
                    animate-in slide-in-from-bottom duration-300"
       >
         {/* ドラッグハンドル */}
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-          <div className="w-8 h-1 rounded-full bg-zinc-700" />
+          <div className="w-8 h-1 rounded-full bg-[#1c1a27]/10" />
         </div>
 
         {/* ヘッダー */}
-        <div className="flex items-center bg-[#1a3d2e] px-4 py-3 flex-shrink-0">
+        <div className="flex items-center bg-gradient-to-r from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] px-4 py-3 flex-shrink-0">
           <button
             onClick={onClose}
-            className="text-white mr-3 p-0.5 hover:bg-white/10 rounded transition-colors"
+            className="text-[#1c1a27] mr-3 p-0.5 hover:bg-black/5 rounded transition-colors"
             aria-label={t("closeAriaLabel")}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="flex-1 min-w-0">
-            <div className="text-white font-semibold text-base leading-none">
+            <div className="text-[#1c1a27] font-semibold text-base leading-none">
               {t("panelTitle")}
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#4ade9a]" />
-              <span className="text-zinc-400 text-xs">{t("onlineStatus")}</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-[#1D9E75]" />
+              <span className="text-[#2a2440]/70 text-xs">{t("onlineStatus")}</span>
             </div>
           </div>
           <button
             onClick={handleHistoryOpen}
-            className="text-zinc-400 p-1 hover:text-zinc-200 hover:bg-white/10 rounded transition-colors"
+            className="text-[#2a2440]/70 p-1 hover:text-[#1c1a27] hover:bg-black/5 rounded transition-colors"
             aria-label={t("historyAriaLabel")}
           >
             <History className="w-5 h-5" />
@@ -267,12 +267,12 @@ export function ChatPanel({ onClose }: Props) {
               <div className="w-7 h-7 rounded-full flex items-center justify-center text-[#2a2440] text-xs font-bold mr-2 mt-0.5 flex-shrink-0" style={{background: 'linear-gradient(135deg, #b9a4f2 0%, #ecaccd 52%, #fbd9a0 100%)'}}>
                 AI
               </div>
-              <div className="bg-zinc-800 rounded-2xl rounded-tl-none px-4 py-2.5 max-w-[80%]">
+              <div className="ax-card-warm rounded-2xl rounded-tl-none px-4 py-2.5 max-w-[80%]">
                 <div className="flex gap-1 items-center h-4">
                   {[0, 1, 2].map((i) => (
                     <div
                       key={i}
-                      className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce"
+                      className="w-1.5 h-1.5 rounded-full bg-[#736f7e] animate-bounce"
                       style={{ animationDelay: `${i * 0.15}s` }}
                     />
                   ))}
@@ -285,8 +285,8 @@ export function ChatPanel({ onClose }: Props) {
         </div>
 
         {/* サジェストボタン（固定底部）*/}
-        <div className="flex-shrink-0 px-4 pt-3 border-t border-zinc-800 ax-safe-bottom">
-          <p className="text-zinc-600 text-xs mb-2">{t("suggestLabel")}</p>
+        <div className="flex-shrink-0 px-4 pt-3 border-t border-[#1c1a27]/15 ax-safe-bottom">
+          <p className="text-[#736f7e] text-xs mb-2">{t("suggestLabel")}</p>
           <div className="grid grid-cols-2 gap-2">
             {SUGGEST_CONFIG.map((cfg) => {
               const label = t(cfg.labelKey)
@@ -296,9 +296,9 @@ export function ChatPanel({ onClose }: Props) {
                   key={cfg.id}
                   onClick={() => handleSuggest({ id: cfg.id, label, prompt, placeholderKey: cfg.placeholderKey })}
                   disabled={loading}
-                  className="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 disabled:opacity-40
-                             text-zinc-100 text-xs px-3 py-2.5 rounded-xl text-left transition-colors
-                             border border-zinc-700 hover:border-zinc-600"
+                  className="ax-card-warm hover:bg-black/5 active:bg-black/5 disabled:opacity-40
+                             text-[#1c1a27] text-xs px-3 py-2.5 rounded-xl text-left transition-colors
+                             border border-[#1c1a27]/15 hover:border-[#1c1a27]/15"
                 >
                   {label}
                 </button>

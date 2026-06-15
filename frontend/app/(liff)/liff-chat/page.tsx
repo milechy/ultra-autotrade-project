@@ -28,7 +28,7 @@ const AssetChart = dynamic(() => import("./_components/AssetChart"), {
   ssr: false,
   loading: () => (
     <div className="h-[200px] w-full flex items-center justify-center">
-      <span className="text-zinc-600 text-xs" id="chart-loading-placeholder" />
+      <span className="text-[#736f7e] text-xs" id="chart-loading-placeholder" />
     </div>
   ),
 })
@@ -165,13 +165,13 @@ export default function LiffChatPage() {
   }
 
   return (
-    <div className="w-[375px] mx-auto h-dvh bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden relative">
+    <div className="w-[375px] mx-auto h-dvh ax-bg-app text-[#1c1a27] flex flex-col overflow-hidden relative">
 
-      {/* ── ヘッダー */}
-      <header className="h-14 bg-[#1a3d2e] flex items-center justify-between px-4 flex-shrink-0">
+      {/* ── ヘッダー（arobix グラデ） */}
+      <header className="h-14 bg-gradient-to-r from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] flex items-center justify-between px-4 flex-shrink-0">
         <button
           onClick={() => { setMenuOpen(true); track(EV.MENU_OPEN) }}
-          className="text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
+          className="text-[#1c1a27] p-1 hover:bg-black/5 rounded-lg transition-colors"
           aria-label={t("header.menuAriaLabel")}
         >
           <Menu className="w-6 h-6" />
@@ -206,14 +206,14 @@ export default function LiffChatPage() {
           <button
             onClick={() => { const next = language === "ja" ? "en" : "ja"; setLanguage(next); track(EV.LANGUAGE_TOGGLE, { language: next }) }}
             aria-label={t("header.langToggleAriaLabel")}
-            className="text-zinc-300 text-xs font-semibold px-2 py-1 rounded-md
-                       hover:bg-white/10 transition-colors border border-zinc-600"
+            className="text-[#1c1a27] text-xs font-semibold px-2 py-1 rounded-md
+                       hover:bg-black/5 transition-colors border border-[#1c1a27]/30"
           >
             {language === "ja" ? "EN" : "JP"}
           </button>
           <button
             onClick={() => { setActivePanel("account"); track(EV.ACCOUNT_OPEN) }}
-            className="text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
+            className="text-[#1c1a27] p-1 hover:bg-black/5 rounded-lg transition-colors"
             aria-label={t("header.accountAriaLabel")}
           >
             <User className="w-6 h-6" />
@@ -227,11 +227,11 @@ export default function LiffChatPage() {
         {/* CURRENT ASSET カード（タップでグラフパネル） */}
         <button
           onClick={() => { setGraphOpen(true); track(EV.ASSET_GRAPH_OPEN) }}
-          className="bg-[#1a3d2e] rounded-2xl mx-4 mt-4 p-4 text-left w-[calc(100%-2rem)]
-                     active:brightness-90 transition-all"
+          className="bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] rounded-2xl mx-4 mt-4 p-4 text-left w-[calc(100%-2rem)]
+                     active:brightness-95 transition-all"
         >
-          <div className="text-zinc-400 text-xs mb-1">{t("home.currentAsset")}</div>
-          <div className="text-white text-3xl font-bold">
+          <div className="text-[#2a2440]/70 text-xs mb-1">{t("home.currentAsset")}</div>
+          <div className="text-[#1c1a27] text-3xl font-bold">
             {balanceUsd != null
               ? `$${balanceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
               : "—"}
@@ -242,10 +242,10 @@ export default function LiffChatPage() {
         <div
           className={`rounded-2xl mx-4 mt-4 p-4 transition-all
             ${isBuy
-              ? "bg-zinc-900 border-2 border-[#1D9E75] [animation:pulse_0.8s_ease-in-out_2]"
+              ? "ax-card-warm border-2 border-[#1D9E75] [animation:pulse_0.8s_ease-in-out_2]"
               : isSell
-              ? "bg-zinc-900 border-2 border-red-500 [animation:pulse_0.8s_ease-in-out_2]"
-              : "bg-zinc-900"
+              ? "ax-card-warm border-2 border-red-500 [animation:pulse_0.8s_ease-in-out_2]"
+              : "ax-card-warm"
             }`}
         >
           {/* ヘッダー行 */}
@@ -256,25 +256,25 @@ export default function LiffChatPage() {
                   ? "bg-[#1D9E75] [animation:ping_0.5s_ease-in-out_4]"
                   : isSell
                   ? "bg-red-500"
-                  : "bg-zinc-500"
+                  : "bg-[#736f7e]"
               }`}
             />
             <span
               className={`text-xs font-medium ${
-                isBuy ? "text-[#4ade9a]" : isSell ? "text-red-400" : "text-zinc-400"
+                isBuy ? "text-[#1D9E75]" : isSell ? "text-red-600" : "text-[#736f7e]"
               }`}
             >
               {t("home.aiJudgment")}
             </span>
             {confidence > 0 && (
-              <span className="ml-auto text-zinc-500 text-xs">{confidence}% {t("home.confidenceLabel")}</span>
+              <span className="ml-auto text-[#736f7e] text-xs">{confidence}% {t("home.confidenceLabel")}</span>
             )}
           </div>
 
           {/* アクション表示 */}
           <div
             className={`font-bold text-2xl ${
-              isBuy ? "text-[#4ade9a]" : isSell ? "text-red-400" : "text-white"
+              isBuy ? "text-[#1D9E75]" : isSell ? "text-red-600" : "text-[#1c1a27]"
             }`}
           >
             {aiJudgment ? action : t("home.noSignal")}
@@ -285,13 +285,13 @@ export default function LiffChatPage() {
             <>
               <button
                 onClick={() => { const next = !reasonOpen; setReasonOpen(next); track(EV.REASON_TOGGLE, { action, open: next }) }}
-                className="mt-2 text-zinc-500 text-xs underline"
+                className="mt-2 text-[#736f7e] text-xs underline"
                 aria-expanded={reasonOpen}
               >
                 {t("home.whyAction", { action })}
               </button>
               {reasonOpen && (
-                <p className="mt-2 text-zinc-400 text-xs leading-relaxed whitespace-pre-wrap">
+                <p className="mt-2 text-[#736f7e] text-xs leading-relaxed whitespace-pre-wrap">
                   {aiJudgment.reason ?? t("home.noReason")}
                 </p>
               )}
@@ -301,29 +301,29 @@ export default function LiffChatPage() {
 
         {/* 運用中コイン一覧 */}
         <div className="mx-4 mt-4">
-          <h3 className="text-zinc-400 text-xs font-semibold mb-3">{t("home.operatingCoins")}</h3>
+          <h3 className="text-[#736f7e] text-xs font-semibold mb-3">{t("home.operatingCoins")}</h3>
           <div className="space-y-2">
             {coins.map((coin) => (
               <button
                 key={coin.asset}
-                className="flex items-center w-full bg-zinc-900 rounded-xl px-4 py-3 active:brightness-75 transition-all"
+                className="flex items-center w-full ax-card-warm rounded-xl px-4 py-3 active:brightness-95 transition-all"
               >
                 {/* コインアバター */}
                 <div
-                  className="w-8 h-8 rounded-full bg-[#1D9E75]/20 text-[#4ade9a]
+                  className="w-8 h-8 rounded-full bg-[#1D9E75]/15 text-[#1D9E75]
                                flex items-center justify-center text-xs font-bold mr-3 flex-shrink-0"
                 >
                   {coin.asset.slice(0, 2)}
                 </div>
                 <div className="flex-1 text-left">
-                  <div className="text-white text-sm font-medium">{coin.asset}</div>
-                  <div className="text-zinc-500 text-xs">{coin.protocol}</div>
+                  <div className="text-[#1c1a27] text-sm font-medium">{coin.asset}</div>
+                  <div className="text-[#736f7e] text-xs">{coin.protocol}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-white text-sm">${coin.amount_usd.toLocaleString()}</div>
+                  <div className="text-[#1c1a27] text-sm">${coin.amount_usd.toLocaleString()}</div>
                   <div
                     className={`text-xs ${
-                      coin.apy_pct >= 0 ? "text-[#4ade9a]" : "text-red-400"
+                      coin.apy_pct >= 0 ? "text-[#1D9E75]" : "text-red-600"
                     }`}
                   >
                     {coin.apy_pct >= 0 ? "+" : ""}
@@ -333,7 +333,7 @@ export default function LiffChatPage() {
               </button>
             ))}
             {coins.length === 0 && (
-              <div className="text-center py-6 text-zinc-600 text-sm">
+              <div className="text-center py-6 text-[#736f7e] text-sm">
                 {t("home.noCoins")}
               </div>
             )}
@@ -373,16 +373,16 @@ export default function LiffChatPage() {
             className="absolute inset-0 bg-black/60"
             onClick={() => !stopLoading && setStopConfirmOpen(false)}
           />
-          <div className="relative w-[375px] mx-auto bg-zinc-900 rounded-t-2xl p-5 ax-safe-bottom">
-            <h3 className="text-white font-bold text-lg mb-1">{t("home.stopConfirmTitle")}</h3>
-            <p className="text-zinc-400 text-sm mb-4 leading-relaxed">
+          <div className="relative w-[375px] mx-auto ax-card-warm rounded-t-2xl p-5 ax-safe-bottom">
+            <h3 className="text-[#1c1a27] font-bold text-lg mb-1">{t("home.stopConfirmTitle")}</h3>
+            <p className="text-[#736f7e] text-sm mb-4 leading-relaxed">
               {t("home.stopConfirmDesc")}
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setStopConfirmOpen(false)}
                 disabled={stopLoading}
-                className="flex-1 py-3 rounded-xl border border-zinc-600 text-zinc-300 font-semibold disabled:opacity-40"
+                className="flex-1 py-3 rounded-xl border border-[#1c1a27]/20 text-[#1c1a27] font-semibold disabled:opacity-40"
               >
                 {t("home.stopCancel")}
               </button>
@@ -402,8 +402,8 @@ export default function LiffChatPage() {
       {toast && (
         <div
           role="status"
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-xl bg-zinc-800
-                     border border-zinc-700 text-white text-sm shadow-lg whitespace-nowrap"
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-xl bg-[#1b1a23]
+                     text-[#fbf7f0] text-sm shadow-lg whitespace-nowrap"
         >
           {toast}
         </div>
@@ -446,7 +446,7 @@ export default function LiffChatPage() {
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 graphPeriod === p
                   ? "bg-[#1D9E75] text-white"
-                  : "bg-zinc-800 text-zinc-400"
+                  : "bg-[#1c1a27]/5 text-[#736f7e]"
               }`}
             >
               {p}
@@ -482,9 +482,9 @@ export default function LiffChatPage() {
               value: "—",
             },
           ].map((s) => (
-            <div key={s.label} className="bg-zinc-800 rounded-xl p-3">
-              <div className="text-zinc-500 text-xs">{s.label}</div>
-              <div className="text-white font-semibold mt-0.5">{s.value}</div>
+            <div key={s.label} className="ax-card-warm rounded-xl p-3">
+              <div className="text-[#736f7e] text-xs">{s.label}</div>
+              <div className="text-[#1c1a27] font-semibold mt-0.5">{s.value}</div>
             </div>
           ))}
         </div>
