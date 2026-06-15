@@ -351,8 +351,8 @@
     "pausedDescAlt": "AI analysis and proposals are paused. Resume manually."
   },
   "OperationMode": {
-    "managedLabel": "Full Auto",
-    "managedDesc": "AI makes and executes all decisions automatically. For beginners.",
+    "managedLabel": "Automated",
+    "managedDesc": "AI analyzes the market and displays proposals. Automated trading and rebalancing are coming soon (available in v4).",
     "activeLabel": "Semi Auto",
     "activeDesc": "AI proposes, you approve, then it executes. For intermediate users.",
     "proLabel": "Manual",
@@ -842,8 +842,8 @@
         "loadingMode": "Loading...",
         "modeUnset": "Not set",
         "activeBadge": "Active",
-        "managedLabel": "Fully Automated",
-        "managedDesc": "AI decides and executes automatically. No approval needed. Notified via LINE after execution.",
+        "managedLabel": "Automated",
+        "managedDesc": "AI analyzes the market and displays proposals. Automated trading and rebalancing are coming soon (available in v4).",
         "activeLabel": "Active",
         "activeDesc": "AI proposes. You approve before execution.",
         "toastSwitched": "Switched to \"{mode}\"",
