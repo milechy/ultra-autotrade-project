@@ -463,3 +463,35 @@ class PoolHealthResponse(BaseModel):
     total_deficit_usd: str = Field(description="総赤字額（概算 USD、Decimal 文字列）。")
     alert_triggered: bool = Field(description="いずれかのアセットでアラートが発火したか。")
     error: Optional[str] = Field(None, description="エラーが発生した場合のメッセージ。")
+
+
+# ===== GHO 借入最適化 =====
+
+
+class BorrowRateComparison(BaseModel):
+    """
+    GHO / USDC 変動借入金利の比較結果。
+
+    - usdc_apr: USDC の変動借入 APR（年率、0〜1 の Decimal 文字列）
+    - gho_variable_apr: GHO の変動借入 APR（割引前）
+    - gho_effective_apr: GHO の実効 APR（stkAAVE 割引後）
+    - recommendation: 推奨借入通貨 ("GHO" or "USDC")
+    - annual_savings_usd: GHO 推奨時の年間節約額試算（USD、Decimal 文字列）
+    - error: fail-open 時のエラーメッセージ（None = 正常取得）
+    """
+
+    usdc_apr: Decimal = Field(description="USDC 変動借入 APR（年率）。")
+    gho_variable_apr: Decimal = Field(description="GHO 変動借入 APR（割引前、年率）。")
+    gho_effective_apr: Decimal = Field(description="GHO 実効借入 APR（stkAAVE 割引後、年率）。")
+    recommendation: str = Field(description="推奨借入通貨。'GHO' または 'USDC'。")
+    annual_savings_usd: Decimal = Field(
+        ge=0, description="GHO 推奨時の年間節約額試算（USD）。USDC 推奨時は 0。"
+    )
+    error: Optional[str] = Field(
+        None, description="RPC 失敗時のエラーメッセージ。None = 正常取得。"
+    )
+
+    @field_serializer("usdc_apr", "gho_variable_apr", "gho_effective_apr", "annual_savings_usd")
+    @classmethod
+    def _serialize_decimal(cls, v: Decimal) -> str:
+        return str(v)

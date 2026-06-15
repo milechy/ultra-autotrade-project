@@ -3609,5 +3609,22 @@
     "fetchError": "Failed to fetch rewards",
     "threshold": "Claims when $5+ unclaimed",
     "supplyTxHash": "Reinvestment TX"
+  },
+  "BorrowRatesPanel": {
+    "title": "GHO / USDC Borrow Rate Comparison",
+    "description": "Displays the optimal borrowing currency considering stkAAVE discounts in real time (auto-refreshed every 60s)",
+    "recommendGho": "GHO recommended",
+    "recommendUsdc": "USDC recommended",
+    "usdcApr": "USDC Variable APR",
+    "ghoVariableApr": "GHO Variable APR (before discount)",
+    "ghoEffectiveApr": "GHO Effective APR (after stkAAVE discount)",
+    "annualSavings": "Estimated annual savings when borrowing in GHO: ~${amount} USD",
+    "fetchError": "Failed to fetch borrow rate data (GET /api/aave/borrow-rates). Please reload.",
+    "apiError": "Data fetch error: {message}",
+    "loading": "Loading...",
+    "chartLabelUsdc": "USDC APR",
+    "chartLabelGhoVariable": "GHO APR (before discount)",
+    "chartLabelGhoEffective": "GHO APR (after discount)",
+    "chartYAxisLabel": "APR (%)"
   }
 }

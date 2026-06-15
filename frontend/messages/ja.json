@@ -2251,6 +2251,23 @@
     "noData": "データなし",
     "autoRefresh": "60秒ごとに自動更新"
   },
+  "BorrowRatesPanel": {
+    "title": "GHO / USDC 借入金利比較",
+    "description": "stkAAVE 割引を考慮した最適借入通貨をリアルタイムで表示します（60秒自動更新）",
+    "recommendGho": "GHO 推奨",
+    "recommendUsdc": "USDC 推奨",
+    "usdcApr": "USDC 変動 APR",
+    "ghoVariableApr": "GHO 変動 APR（割引前）",
+    "ghoEffectiveApr": "GHO 実効 APR（stkAAVE 割引後）",
+    "annualSavings": "GHO で借入した場合の年間節約額試算: 約 ${amount} USD",
+    "fetchError": "借入金利データの取得に失敗しました（GET /api/aave/borrow-rates）。再読み込みしてください。",
+    "apiError": "データ取得エラー: {message}",
+    "loading": "読み込み中...",
+    "chartLabelUsdc": "USDC APR",
+    "chartLabelGhoVariable": "GHO APR（割引前）",
+    "chartLabelGhoEffective": "GHO APR（割引後）",
+    "chartYAxisLabel": "APR (%)"
+  },
   "Register": {
     "title": "アカウント登録 - Ultra AutoTrade",
     "cardDescription": "アカウント登録",
