@@ -8,6 +8,7 @@ import dynamic from "next/dynamic"
 import { Menu, User, MessageCircle } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useLanguage } from "@/lib/useLanguage"
+import { useUsdcBalance } from "@/hooks/useUsdcBalance"
 import { track, EV } from "@/lib/posthog"
 import { HamburgerMenu } from "./_components/HamburgerMenu"
 import { SlideUpPanel } from "./_components/SlideUpPanel"
@@ -36,13 +37,6 @@ const AssetChart = dynamic(() => import("./_components/AssetChart"), {
 // 型定義
 // ────────────────────────────────────────────
 
-interface AssetData {
-  current_usd: number
-  initial_usd: number
-  pnl_usd: number
-  pnl_pct: number
-}
-
 interface AiJudgment {
   action: "BUY" | "SELL" | "HOLD"
   confidence: number
@@ -64,12 +58,14 @@ export default function LiffChatPage() {
   const t = useTranslations("Liff")
   const { language, setLanguage } = useLanguage()
 
+  // 現在資産 = ユーザー自身のウォレットの USDC オンチェーン残高（非カストディアル）。
+  const { balanceUsd } = useUsdcBalance()
+
   // ── 既存 state（ハンバーガー）
   const [menuOpen, setMenuOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<string | null>(null)
 
   // ── 新規 state（ホームコンテンツ）
-  const [assetData, setAssetData] = useState<AssetData | null>(null)
   const [aiJudgment, setAiJudgment] = useState<AiJudgment | null>(null)
   const [coins, setCoins] = useState<CoinHolding[]>([])
   const [graphPeriod, setGraphPeriod] = useState<"1M" | "3M" | "6M" | "1Y">("3M")
@@ -95,19 +91,12 @@ export default function LiffChatPage() {
 
     const headers = { Authorization: `Bearer ${token}` }
 
-    // 資産サマリー（/api/user/settings から balance を読む）
-    // 併せて is_active=false（運用停止中）を読んで緊急停止バーの初期状態に反映する。
+    // 運用停止状態（is_active=false）を読んで緊急停止バーの初期状態に反映する。
+    // 現在資産はオンチェーン残高（useUsdcBalance）で取得するため、ここでは balance を読まない。
     fetch(`${API_BASE}/api/user/settings`, { headers })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: (Record<string, string> & { is_active?: boolean }) | null) => {
-        if (d) {
-          const current = parseFloat(d.balance ?? "0")
-          const initial = parseFloat(d.initial_balance ?? d.balance ?? "0")
-          const pnlUsd = current - initial
-          const pnlPct = initial > 0 ? (pnlUsd / initial) * 100 : 0
-          setAssetData({ current_usd: current, initial_usd: initial, pnl_usd: pnlUsd, pnl_pct: pnlPct })
-          if (d.is_active === false) setPaused(true)
-        }
+      .then((d: { is_active?: boolean } | null) => {
+        if (d?.is_active === false) setPaused(true)
       })
       .catch(() => {})
 
@@ -243,16 +232,9 @@ export default function LiffChatPage() {
         >
           <div className="text-zinc-400 text-xs mb-1">{t("home.currentAsset")}</div>
           <div className="text-white text-3xl font-bold">
-            ${assetData?.current_usd?.toLocaleString() ?? "—"}
-          </div>
-          <div
-            className={`text-sm mt-1 ${
-              (assetData?.pnl_pct ?? 0) >= 0 ? "text-[#4ade9a]" : "text-red-400"
-            }`}
-          >
-            {(assetData?.pnl_pct ?? 0) >= 0 ? "+" : ""}
-            {assetData?.pnl_pct?.toFixed(2) ?? "—"}%
-            <span className="text-zinc-500 ml-2">{t("home.lastMonthComparison")}</span>
+            {balanceUsd != null
+              ? `$${balanceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : "—"}
           </div>
         </button>
 
@@ -478,21 +460,26 @@ export default function LiffChatPage() {
         {/* 統計グリッド */}
         <div className="grid grid-cols-2 gap-3 mt-4">
           {[
+            // v3: 取得原価ベースの基準値が無いため初期額/損益/利回りは「—」。
+            // 現在額のみオンチェーン残高（useUsdcBalance）で表示する。
             {
               label: t("panels.statsStart"),
-              value: `$${assetData?.initial_usd?.toLocaleString() ?? "—"}`,
+              value: "—",
             },
             {
               label: t("panels.statsCurrent"),
-              value: `$${assetData?.current_usd?.toLocaleString() ?? "—"}`,
+              value:
+                balanceUsd != null
+                  ? `$${balanceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : "—",
             },
             {
               label: t("panels.statsProfit"),
-              value: `$${assetData?.pnl_usd?.toLocaleString() ?? "—"}`,
+              value: "—",
             },
             {
               label: t("panels.statsYield"),
-              value: `${assetData?.pnl_pct?.toFixed(2) ?? "—"}%`,
+              value: "—",
             },
           ].map((s) => (
             <div key={s.label} className="bg-zinc-800 rounded-xl p-3">
