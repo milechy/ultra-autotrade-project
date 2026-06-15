@@ -1565,6 +1565,10 @@ async def reward_auto_claim_loop(
             await asyncio.sleep(600)
 
 
+# アイドル資本チェックループのデフォルト間隔 (ScheduledTaskManager が参照)
+IDLE_CAPITAL_CHECK_INTERVAL_SECONDS = 900  # 15 分
+
+
 class ScheduledTaskManager:
     """
     スケジュールタスクのライフサイクル管理。
@@ -1597,6 +1601,7 @@ class ScheduledTaskManager:
         # 二重起動を防ぐために is_pool_health_check_running を確認してから start を呼ぶこと。
         self._pool_health_check_task: Optional[asyncio.Task[None]] = None
         self._reward_auto_claim_task: Optional[asyncio.Task[None]] = None
+        self._idle_capital_check_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -1684,6 +1689,13 @@ class ScheduledTaskManager:
     def is_reward_auto_claim_running(self) -> bool:
         """リワード自動 Claim タスクが動作中かどうか。"""
         return self._reward_auto_claim_task is not None and not self._reward_auto_claim_task.done()
+
+    @property
+    def is_idle_capital_check_running(self) -> bool:
+        """アイドル資本チェックタスクが動作中かどうか。"""
+        return (
+            self._idle_capital_check_task is not None and not self._idle_capital_check_task.done()
+        )
 
     async def start_monthly_line_report(
         self,
@@ -2601,6 +2613,44 @@ class ScheduledTaskManager:
         self._reward_auto_claim_task = None
         logger.info("Reward auto-claim task stopped")
 
+    async def start_idle_capital_check(
+        self,
+        *,
+        interval_seconds: int = IDLE_CAPITAL_CHECK_INTERVAL_SECONDS,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """アイドル資本チェックタスクを開始する (ENABLE_IDLE_CAPITAL_CHECK=1)。"""
+        if self.is_idle_capital_check_running:
+            raise RuntimeError("Idle capital check already running")
+
+        logger.info("Starting idle capital check task")
+        self._idle_capital_check_task = asyncio.create_task(
+            idle_capital_check_loop(interval_seconds=interval_seconds, on_error=on_error)
+        )
+        logger.info("Idle capital check task started")
+
+    async def stop_idle_capital_check(self, timeout: float = 5.0) -> None:
+        """アイドル資本チェックタスクを停止する。"""
+        if not self.is_idle_capital_check_running:
+            logger.debug("Idle capital check not running - nothing to stop")
+            return
+
+        logger.info("Stopping idle capital check task")
+        assert self._idle_capital_check_task is not None  # noqa: S101
+        self._idle_capital_check_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._idle_capital_check_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Idle capital check task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning("Idle capital check task did not stop within %.1fs timeout", timeout)
+        except Exception as exc:
+            logger.error("Error while stopping idle capital check task: %s", exc)
+
+        self._idle_capital_check_task = None
+        logger.info("Idle capital check task stopped")
+
     async def stop_all(self, timeout: float = 5.0) -> None:
         """
         全てのスケジュールタスクを停止する。
@@ -2628,10 +2678,119 @@ class ScheduledTaskManager:
             self.stop_expiry_reminder(timeout=timeout),
             self.stop_pool_health_check(timeout=timeout),
             self.stop_reward_auto_claim(timeout=timeout),
+            self.stop_idle_capital_check(timeout=timeout),
             return_exceptions=True,
         )
 
         logger.info("All scheduled tasks stopped")
+
+
+# ---- idle_capital_check_loop (Privy Earn / Morpho Vaults アイドル資本チェック) ----
+
+
+async def idle_capital_check_loop(
+    *,
+    interval_seconds: int = IDLE_CAPITAL_CHECK_INTERVAL_SECONDS,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """
+    アイドル資本チェックの定期実行ループ。
+
+    15 分ごとに IdleCapitalDetector.build_report() を実行し、
+    デプロイ推奨時は INFO ログを出力する。
+    ENABLE_IDLE_CAPITAL_CHECK=1 で main.py から起動される。
+
+    NOTE (Tier S ゲート): main.py の startup_scheduled_tasks への配線は
+    人間によるレビュー後に以下を追加すること:
+
+      # backend/app/main.py 内 startup_scheduled_tasks
+      if os.getenv("ENABLE_IDLE_CAPITAL_CHECK", "0") == "1":
+          try:
+              from app.yield_optimizer.idle_detector import IdleCapitalDetector  # noqa: PLC0415
+              await scheduled_manager.start_idle_capital_check(
+                  on_error=_make_scheduler_error_handler("idle_capital_check_loop"),
+              )
+              logger.info("idle_capital_check_loop started")
+          except BaseException as exc:
+              logger.error("Failed to start idle capital check: %s", exc)
+
+    Args:
+        interval_seconds: 実行間隔（秒）。デフォルト 900 秒（15 分）
+        on_error: エラー発生時のコールバック
+    """
+    logger.info("Starting idle capital check loop (interval: %ds)", interval_seconds)
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+
+            def _run_check() -> dict[str, object]:
+                try:
+                    from app.yield_optimizer.idle_detector import (  # noqa: PLC0415
+                        IdleCapitalDetector,
+                        get_idle_threshold,
+                    )
+                    from app.yield_optimizer.morpho_client import MorphoClient  # noqa: PLC0415
+
+                    try:
+                        from app.exchange.client import BybitSandboxClient  # noqa: PLC0415
+                        from app.exchange.config import (  # noqa: PLC0415
+                            get_exchange_settings,
+                        )
+
+                        exchange_client: object = BybitSandboxClient(
+                            settings=get_exchange_settings()
+                        )
+                    except Exception as exc_inner:
+                        logger.warning(
+                            "idle_capital_check_loop: exchange client init failed (fail-open): %s",
+                            exc_inner,
+                        )
+                        exchange_client = None
+
+                    detector = IdleCapitalDetector(
+                        exchange_client=exchange_client,
+                        morpho_client=MorphoClient(),
+                        idle_threshold=get_idle_threshold(),
+                    )
+                    report = detector.build_report()
+                    return {
+                        "idle_amount": report.idle_amount,
+                        "should_deploy": report.should_deploy,
+                        "reason": report.reason,
+                    }
+                except Exception as exc_inner:
+                    logger.warning(
+                        "idle_capital_check_loop: check failed (fail-open): %s",
+                        exc_inner,
+                    )
+                    return {"idle_amount": "0", "should_deploy": False, "reason": str(exc_inner)}
+
+            result = await asyncio.to_thread(_run_check)
+            if result.get("should_deploy"):
+                logger.info(
+                    "idle_capital_check_loop: deploy recommended — idle=%s USDC",
+                    result.get("idle_amount"),
+                )
+            else:
+                logger.debug(
+                    "idle_capital_check_loop: no action — idle=%s reason=%s",
+                    result.get("idle_amount"),
+                    result.get("reason"),
+                )
+
+        except asyncio.CancelledError:
+            logger.info("idle_capital_check_loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in idle capital check loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+            await asyncio.sleep(interval_seconds)
 
 
 # グローバルなタスクマネージャインスタンス

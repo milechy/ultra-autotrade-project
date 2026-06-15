@@ -17,6 +17,7 @@ import {
 } from './_components'
 import { useAuthFetch } from '@/hooks/useAuthFetch'
 import { RewardsCard } from '@/components/dashboard/RewardsCard'
+import { IdleYieldCard } from '@/components/dashboard/IdleYieldCard'
 
 // Note: PortfolioSummary, SafetyScore, AiAccuracyCard are used by ActiveDashboard only
 
@@ -240,6 +241,11 @@ function ManagedDashboard({ isAdmin }: { isAdmin: boolean }) {
       <section>
         <RewardsCard isAdmin={isAdmin} />
       </section>
+
+      {/* アイドル資本 Morpho 運用 */}
+      <section>
+        <IdleYieldCard isAdmin={isAdmin} />
+      </section>
     </div>
   )
 }
@@ -293,6 +299,11 @@ function ActiveDashboard({ isAdmin }: { isAdmin: boolean }) {
 
       <section>
         <RewardsCard isAdmin={isAdmin} />
+      </section>
+
+      {/* アイドル資本 Morpho 運用 */}
+      <section>
+        <IdleYieldCard isAdmin={isAdmin} />
       </section>
 
       {/* Disclaimer */}

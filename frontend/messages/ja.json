@@ -3629,5 +3629,30 @@
     "fetchError": "リワード情報を取得できません",
     "threshold": "閾値 $5以上でClaimします",
     "supplyTxHash": "再投資TX"
+  },
+  "IdleYieldCard": {
+    "title": "アイドル資本運用（Morpho Vaults）",
+    "idleBalance": "アイドル残高",
+    "bestApy": "最高APY",
+    "activePosition": "運用中残高",
+    "earnedInterest": "獲得利息",
+    "depositButton": "Morpho入金",
+    "withdrawButton": "引き出し",
+    "depositing": "入金中...",
+    "withdrawing": "引き出し中...",
+    "noVaults": "利用可能なVaultがありません",
+    "noPosition": "ポジションなし",
+    "fetchError": "データを取得できません",
+    "depositSuccess": "入金を送信しました (TX: {txHash})",
+    "depositError": "入金失敗: {error}",
+    "withdrawSuccess": "引き出しを送信しました (TX: {txHash})",
+    "withdrawError": "引き出し失敗: {error}",
+    "deployRecommended": "デプロイ推奨",
+    "idleLabel": "アイドル",
+    "deployedLabel": "運用中",
+    "thresholdNote": "アイドル残高$100以上で入金を推奨します",
+    "adminOnly": "入金・引き出しはadminのみ実行できます",
+    "amountPlaceholder": "USDC数量",
+    "vaultAddressPlaceholder": "Vault アドレス"
   }
 }
