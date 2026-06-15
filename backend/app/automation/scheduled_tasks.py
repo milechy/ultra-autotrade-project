@@ -1479,7 +1479,9 @@ async def reward_auto_claim_loop(
     Aave リワード自動 Claim + 複利再投資の定期実行ループ。
 
     毎日 03:00 UTC に RewardClaimer.auto_claim_if_worthy() を実行する。
-    ENABLE_REWARD_AUTO_CLAIM=1 で main.py から起動される。
+
+    NOTE: main.py への startup 配線は HUMAN-REVIEW-REQUIRED (Tier S 別 PR 必須)。
+    有効化手順は ScheduledTaskManager.start_reward_auto_claim() のコードブロックを参照。
 
     AAVE_UI_INCENTIVE_PROVIDER_ADDRESS / AAVE_REWARDS_CONTROLLER_ADDRESS /
     AAVE_POOL_ADDRESSES_PROVIDER が未設定の場合は warn ログのみで継続 (fail-open)。

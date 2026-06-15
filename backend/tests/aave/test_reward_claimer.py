@@ -379,6 +379,154 @@ class TestAutoClaimIfWorthy:
 
 
 # ---------------------------------------------------------------------------
+# テスト: make_reward_claimer_from_env()
+# ---------------------------------------------------------------------------
+
+
+class TestMakeRewardClaimerFromEnv:
+    """make_reward_claimer_from_env() の env 分岐テスト。"""
+
+    def test_returns_none_when_required_envs_missing(self, monkeypatch: object) -> None:
+        """必須 env が未設定の場合は None を返す (fail-open)。"""
+        import os  # noqa: PLC0415
+
+        # 必須 env を全て未設定にする
+        for key in [
+            "AAVE_RPC_URL",
+            "AAVE_UI_INCENTIVE_PROVIDER_ADDRESS",
+            "AAVE_REWARDS_CONTROLLER_ADDRESS",
+            "AAVE_POOL_ADDRESSES_PROVIDER",
+        ]:
+            if isinstance(monkeypatch, object) and hasattr(monkeypatch, "delenv"):
+                monkeypatch.delenv(key, raising=False)  # type: ignore[union-attr]
+
+        # monkeypatch が pytest fixture の場合のみ動作
+        # 直接環境変数を操作して検証する
+        original = {}
+        for key in [
+            "AAVE_RPC_URL",
+            "AAVE_UI_INCENTIVE_PROVIDER_ADDRESS",
+            "AAVE_REWARDS_CONTROLLER_ADDRESS",
+            "AAVE_POOL_ADDRESSES_PROVIDER",
+        ]:
+            original[key] = os.environ.pop(key, None)
+
+        try:
+            from app.aave.reward_claimer import make_reward_claimer_from_env  # noqa: PLC0415
+
+            result = make_reward_claimer_from_env()
+            assert result is None, "必須 env 未設定時は None を返すべき"
+        finally:
+            # 環境変数を元に戻す
+            for key, val in original.items():
+                if val is not None:
+                    os.environ[key] = val
+
+    def test_returns_none_when_rpc_url_only_missing(self) -> None:
+        """AAVE_RPC_URL のみ未設定でも None を返す。"""
+        import os  # noqa: PLC0415
+
+        original_rpc = os.environ.pop("AAVE_RPC_URL", None)
+        # 他の必須 env は設定
+        for key, val in [
+            ("AAVE_UI_INCENTIVE_PROVIDER_ADDRESS", "0x" + "a" * 40),
+            ("AAVE_REWARDS_CONTROLLER_ADDRESS", "0x" + "b" * 40),
+            ("AAVE_POOL_ADDRESSES_PROVIDER", "0x" + "c" * 40),
+        ]:
+            os.environ[key] = val
+
+        try:
+            from app.aave.reward_claimer import make_reward_claimer_from_env  # noqa: PLC0415
+
+            result = make_reward_claimer_from_env()
+            assert result is None
+        finally:
+            if original_rpc is not None:
+                os.environ["AAVE_RPC_URL"] = original_rpc
+            for key in [
+                "AAVE_UI_INCENTIVE_PROVIDER_ADDRESS",
+                "AAVE_REWARDS_CONTROLLER_ADDRESS",
+                "AAVE_POOL_ADDRESSES_PROVIDER",
+            ]:
+                os.environ.pop(key, None)
+
+    def test_returns_none_when_web3_unavailable(self) -> None:
+        """web3 が未インストールの場合は None を返す (fail-open)。"""
+        import sys  # noqa: PLC0415
+
+        # web3 モジュールを一時的に隠す
+        original_web3 = sys.modules.get("web3")
+        sys.modules["web3"] = None  # type: ignore[assignment]
+
+        try:
+            # reward_claimer を再読み込みして web3=None の状態をシミュレート
+            import app.aave.reward_claimer as rcmod  # noqa: PLC0415
+
+            original_w3 = rcmod.Web3
+            rcmod.Web3 = None  # type: ignore[assignment]
+            try:
+                result = rcmod.make_reward_claimer_from_env()
+                assert result is None, "web3 未インストール時は None を返すべき"
+            finally:
+                rcmod.Web3 = original_w3
+        finally:
+            if original_web3 is None:
+                sys.modules.pop("web3", None)
+            else:
+                sys.modules["web3"] = original_web3
+
+    def test_factory_passes_network_to_make_aave_client(self) -> None:
+        """MAJOR #4: network と pool_address が make_aave_client() に渡される。"""
+        import os  # noqa: PLC0415
+        from unittest.mock import MagicMock, patch  # noqa: PLC0415
+
+        # 必須 env を設定
+        env_patch = {
+            "AAVE_RPC_URL": "http://localhost:8545",
+            "AAVE_UI_INCENTIVE_PROVIDER_ADDRESS": "0x" + "a" * 40,
+            "AAVE_REWARDS_CONTROLLER_ADDRESS": "0x" + "b" * 40,
+            "AAVE_POOL_ADDRESSES_PROVIDER": "0x" + "c" * 40,
+            "AAVE_CLIENT_TYPE": "dummy",
+            "AAVE_NETWORK": "base_sepolia",
+            "AAVE_POOL_ADDRESS": "0x" + "d" * 40,
+        }
+        original = {k: os.environ.get(k) for k in env_patch}
+        for k, v in env_patch.items():
+            os.environ[k] = v
+
+        try:
+            mock_client = MagicMock()
+            mock_w3_instance = MagicMock()
+
+            with (
+                patch("app.aave.client.make_aave_client", return_value=mock_client) as mock_factory,
+                patch("app.aave.reward_claimer.Web3") as mock_w3_cls,
+            ):
+                mock_w3_cls.return_value = mock_w3_instance
+                mock_w3_cls.HTTPProvider = MagicMock()
+
+                from app.aave.reward_claimer import make_reward_claimer_from_env  # noqa: PLC0415
+
+                make_reward_claimer_from_env()
+
+                # make_aave_client が network と pool_address を受け取ったか確認
+                mock_factory.assert_called_once()
+                call_kwargs = mock_factory.call_args.kwargs
+                assert call_kwargs.get("network") == "base_sepolia", (
+                    f"network が渡されていない: {call_kwargs}"
+                )
+                assert call_kwargs.get("pool_address") == "0x" + "d" * 40, (
+                    f"pool_address が渡されていない: {call_kwargs}"
+                )
+        finally:
+            for k, v in original.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+
+# ---------------------------------------------------------------------------
 # テスト: float 混入チェック
 # ---------------------------------------------------------------------------
 
