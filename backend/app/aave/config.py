@@ -18,9 +18,14 @@ from app.utils.config import get_env
 from .risk_limiter import get_effective_limits
 
 # 2026年4-5月 rsETH/srsETH エクスプロイト再発防止のためブラックリスト登録。
-# deposit() はこのセットに含まれるシンボルを受け付けない。
+# deposit() / build_deposit_txs() はこのセットに含まれるシンボルを受け付けない。
 # 追加するときは必ずここを編集し、test_blocklist.py のテストも更新すること。
-BLOCKLISTED_COLLATERAL: frozenset[str] = frozenset({"rsETH", "srsETH"})
+# wrsETH は chains.py:90 に登録されており同エクスプロイト対象のため同時追加。
+BLOCKLISTED_COLLATERAL: frozenset[str] = frozenset({"rsETH", "srsETH", "wrsETH"})
+
+# 大文字小文字非依存の比較用セット（rseth / RSETH 等も確実にブロック）。
+# チェック側は asset.upper() と本セットを比較する。
+BLOCKLISTED_COLLATERAL_UPPER: frozenset[str] = frozenset(s.upper() for s in BLOCKLISTED_COLLATERAL)
 
 
 @dataclass

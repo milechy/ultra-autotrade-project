@@ -326,6 +326,14 @@ def _get_pyth_price(pyth_api_url: str, price_id: str) -> Optional[Decimal]:
         import json  # noqa: PLC0415
         import urllib.request  # noqa: PLC0415
 
+        # SSRF 低減: https:// スキームのみ許可（m-2）
+        if not pyth_api_url.startswith("https://"):
+            logger.warning(
+                "[oracle_checker] Pyth API URL must start with https://: %s",
+                pyth_api_url[:30],
+            )
+            return None
+
         url = f"{pyth_api_url.rstrip('/')}/api/latest_price_feeds?ids[]={price_id}"
         with urllib.request.urlopen(url, timeout=5) as resp:  # noqa: S310
             data = json.loads(resp.read())
@@ -378,19 +386,14 @@ def _get_uniswap_v3_twap(
         tick_cumulatives, _ = pool.functions.observe([twap_seconds, 0]).call()
         tick_avg = (tick_cumulatives[1] - tick_cumulatives[0]) // twap_seconds
 
-        # tick → price: price = 1.0001 ^ tick
-        # 精度確保のため対数近似: Decimal で log1.0001 を近似計算
-        # ln(1.0001) ≈ 0.00009999500033...
-        # price_ratio = exp(tick * ln(1.0001))
-        # Python の math は使わず Decimal で近似する
-        # tick が小さければ Decimal("1.0001") ** tick も実用的だが
-        # |tick| > 100000 では遅いため繰り返し二乗法を使う
-        import math  # noqa: PLC0415
-
-        # math.exp/math.log は金融計算ではなくUI表示補助の変換用に限定使用。
-        # 最終価格は Decimal に変換して返す。
-        log_price = int(tick_avg) * math.log(1.0001)
-        price = Decimal(str(round(math.exp(log_price), 12)))
+        # tick → price: price = Decimal("1.0001") ** tick_int
+        # Security Rule #11: 金融計算は Decimal のみ — float / math.log / math.exp 禁止。
+        # Uniswap V3 の tick は [-887272, 887272] の整数範囲。
+        # Decimal("1.0001") ** tick_int は Python の Decimal 整数べき乗（繰り返し二乗法）で
+        # O(log |tick|) 精度保持。丸め誤差は最大 1e-12 程度でHARD_STOP判定閾値(2%)より
+        # 十分小さい。tick_int が 0 の場合は price = Decimal("1")。
+        tick_int = int(tick_avg)
+        price = Decimal("1.0001") ** tick_int
         return price
     except Exception as exc:  # noqa: BLE001
         logger.warning(
