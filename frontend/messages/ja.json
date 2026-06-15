@@ -682,6 +682,7 @@
       "statsCurrent": "現在",
       "statsProfit": "利益",
       "statsYield": "利回り",
+      "assetHistoryEmpty": "まだ運用データがありません",
       "account": {
         "title": "アカウント",
         "editNamePlaceholder": "ユーザー名",

@@ -22,23 +22,10 @@ interface DataPoint {
   value: number
 }
 
-function makePlaceholder(count: number): DataPoint[] {
-  return Array.from({ length: count }, (_, i) => ({
-    date: `Day${i + 1}`,
-    value: 10000 + Math.sin(i / 5) * 500 + i * 10,
-  }))
-}
-
-const PERIOD_DAYS: Record<Props["period"], number> = {
-  "1M": 30,
-  "3M": 90,
-  "6M": 180,
-  "1Y": 365,
-}
-
 export default function AssetChart({ period }: Props) {
   const t = useTranslations("Liff.panels")
   const [data, setData] = useState<DataPoint[]>([])
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     const token =
@@ -55,13 +42,23 @@ export default function AssetChart({ period }: Props) {
         if (d?.data && d.data.length > 0) {
           setData(d.data)
         } else {
-          setData(makePlaceholder(PERIOD_DAYS[period]))
+          setData([])
         }
+        setLoaded(true)
       })
       .catch(() => {
-        setData(makePlaceholder(10))
+        setData([])
+        setLoaded(true)
       })
   }, [period])
+
+  if (loaded && data.length === 0) {
+    return (
+      <div className="h-[200px] w-full flex items-center justify-center">
+        <p className="text-sm text-gray-400">{t("assetHistoryEmpty")}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="h-[200px] w-full">
