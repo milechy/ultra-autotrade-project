@@ -2152,7 +2152,21 @@
     "alerts": "Alerts",
     "noAlerts": "No alerts",
     "lastChecked": "Last checked: {time}",
-    "pendlePositionTitle": "Pendle Position Details"
+    "pendlePositionTitle": "Pendle Position Details",
+    "oracleStatusTitle": "Oracle Multi-Source Verification Status",
+    "oracleStatusDescription": "Monitors price deviation across Chainlink / Pyth / Uniswap V3 TWAP",
+    "oracleLoadError": "Failed to fetch Oracle status",
+    "oracleNoAssets": "No monitored assets configured (AAVE_ORACLE_ASSETS_JSON not set)",
+    "oracleLevelOk": "OK",
+    "oracleLevelWarn": "Warning",
+    "oracleLevelHardStop": "HARD STOP",
+    "oracleAsset": "Asset",
+    "oracleDeviation": "Max Deviation",
+    "oracleChainlink": "Chainlink",
+    "oraclePyth": "Pyth",
+    "oracleTwap": "TWAP (30 min)",
+    "oracleCheckedAt": "Verified at",
+    "oracleDetail": "Details"
   },
   "Register": {
     "title": "Account Registration - Ultra AutoTrade",
