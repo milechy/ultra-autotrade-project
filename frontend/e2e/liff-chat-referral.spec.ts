@@ -33,13 +33,13 @@ const MOCK_EARNINGS = {
     {
       name: '山田太郎',
       joined_at: '2026-05-01T00:00:00+00:00',
-      status: '運用中',
+      status: 'active',
       reward_jpy: '3000',
     },
     {
       name: '佐藤花子',
       joined_at: '2026-05-20T00:00:00+00:00',
-      status: '登録済み',
+      status: 'registered',
       reward_jpy: '1500',
     },
   ],
