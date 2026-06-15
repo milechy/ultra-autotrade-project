@@ -203,6 +203,8 @@ def expiry_reminder_notification(
 def health_factor_warning(hf: Decimal) -> NotificationPayload:
     """HF 警告通知（HF < 1.8 レベル）。
 
+    配線先: backend/app/aave/monitor._notify_hf_warning() — HF<1.8 のとき自動呼び出し済み。
+
     Args:
         hf: 現在の Health Factor 値。
 
@@ -219,6 +221,9 @@ def health_factor_warning(hf: Decimal) -> NotificationPayload:
 
 def trade_executed(action: str, amount: Decimal, token: str) -> NotificationPayload:
     """取引実行完了の能動的通知。
+
+    配線先（未配線・フォローアップ）: 取引実行フロー（automation/workflow.py など）
+    への配線は、取引実行 PR 着地時に別 PR で行う。
 
     Args:
         action: "BUY" | "SELL" などの取引種別
@@ -237,6 +242,8 @@ def trade_executed(action: str, amount: Decimal, token: str) -> NotificationPayl
 def morpho_apy_alert(apy: Decimal) -> NotificationPayload:
     """Morpho APY アラート通知。
 
+    配線先（未配線・フォローアップ）: W4-1 Morpho APY モニタリングフック着地時に配線。
+
     Args:
         apy: 現在の APY（例: Decimal("5.2") = 5.2%）
 
@@ -251,24 +258,28 @@ def morpho_apy_alert(apy: Decimal) -> NotificationPayload:
 def monthly_report(metrics: dict[str, Decimal | str | int]) -> NotificationPayload:
     """月次レポート通知（Flex Message 用ペイロード生成）。
 
+    配線先（未配線・フォローアップ）: scheduled_tasks.py の月次 job（Tier S）への
+    配線は別 PR で人間承認後に実施。
+
     Args:
         metrics: レポート指標 dict。期待キー:
             - period: str          対象月（例: "2026年6月"）
-            - net_profit: Decimal  純損益 JPY
-            - fee_amount: Decimal  手数料合計 JPY
-            - win_rate: Decimal    勝率 (0〜100)
+            - net_profit: Decimal  純損益 JPY（int/float も Decimal に自動変換）
+            - fee_amount: Decimal  手数料合計 JPY（同上）
+            - win_rate: Decimal    勝率 0〜100（同上）
             - total_trades: int    取引回数
 
     Returns:
         NotificationPayload (severity=info)
     """
     period = str(metrics.get("period", "---"))
-    net_profit = metrics.get("net_profit", Decimal("0"))
-    fee_amount = metrics.get("fee_amount", Decimal("0"))
-    win_rate = metrics.get("win_rate", Decimal("0"))
+    # int / float / str で来ても Decimal に変換してから整形（TypeError 防止）
+    net_profit = Decimal(str(metrics.get("net_profit", 0)))
+    fee_amount = Decimal(str(metrics.get("fee_amount", 0)))
+    win_rate = Decimal(str(metrics.get("win_rate", 0)))
     total_trades = int(metrics.get("total_trades", 0))
 
-    profit_sign = "+" if Decimal(str(net_profit)) >= 0 else ""
+    profit_sign = "+" if net_profit >= 0 else ""
     title = f"📊 月次レポート {period}"
     body = (
         f"純損益: {profit_sign}{net_profit} JPY\n"
@@ -280,6 +291,8 @@ def monthly_report(metrics: dict[str, Decimal | str | int]) -> NotificationPaylo
 
 def oracle_alert(deviation_pct: Decimal) -> NotificationPayload:
     """オラクル価格乖離アラート通知。
+
+    配線先（未配線・フォローアップ）: W1-1 オラクル監視フック着地時に配線。
 
     Args:
         deviation_pct: 価格乖離率 (例: Decimal("3.5") = 3.5%)

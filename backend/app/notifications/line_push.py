@@ -59,7 +59,8 @@ def push_text(user_line_id: str, message: str) -> bool:
 
     # マスクログ（トークン先頭6 + 末尾4のみ）
     masked = token[:6] + "****" + token[-4:] if len(token) > 10 else "****"
-    logger.debug("[line_push] push_text: target=%s..., token=%s", target[:8], masked)
+    masked_target = target[:6] + "****" + target[-4:] if len(target) > 10 else "****"
+    logger.debug("[line_push] push_text: target=%s, token=%s", masked_target, masked)
 
     sender = LINEFlexMessageSender(
         channel_access_token=token,

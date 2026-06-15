@@ -114,6 +114,7 @@ def get_health_factor(wallet_address: Optional[str] = None) -> Optional[Decimal]
 def _notify_hf_warning(hf: Decimal) -> None:
     """HF 警告通知を LINE Push で送信する（fail-open）。
 
+    templates.health_factor_warning でテキストを整形し、push_text で送信する。
     HF < 1.8 のとき呼ばれる。通知失敗時は例外を握りつぶしてログに残す。
 
     Args:
@@ -121,12 +122,10 @@ def _notify_hf_warning(hf: Decimal) -> None:
     """
     try:
         from app.notifications.line_push import push_text  # noqa: PLC0415
+        from app.notifications.templates import health_factor_warning  # noqa: PLC0415
 
-        msg = (
-            f"[HF WARNING] Health Factor が {hf:.3f} に低下しました。"
-            "ポジションの確認を推奨します（警戒閾値: 1.800）。"
-        )
-        push_text("", msg)
+        payload = health_factor_warning(hf)
+        push_text("", payload.body)
         logger.warning("[monitor] HF warning 通知送信: hf=%s", hf)
     except Exception as exc:  # noqa: BLE001
         logger.warning("[monitor] HF warning 通知送信失敗 (fail-open): %s", exc)

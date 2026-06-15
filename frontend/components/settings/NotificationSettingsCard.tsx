@@ -87,7 +87,8 @@ export function NotificationSettingsCard({
     // health_factor_warning も安全上 true 固定
     if (field === 'health_factor_warning') return
 
-    // optimistic update
+    // optimistic update — 変更前の状態をキャプチャしてロールバック用に保持
+    const previous = settings
     const next: NotificationSettings =
       field === 'line_enabled' || field === 'push_enabled'
         ? { ...settings, [field]: value }
@@ -100,9 +101,9 @@ export function NotificationSettingsCard({
     try {
       await updateNotificationSettings(token, next)
     } catch {
-      // ロールバック
-      setSettings((prev) => prev)
-      toast.error('設定の保存に失敗しました')
+      // API 失敗 → 変更前状態にロールバック
+      setSettings(previous)
+      toast.error(t('saveError'))
     }
   }
 

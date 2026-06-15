@@ -283,3 +283,80 @@ class TestNewTemplates:
         payload = trade_executed("SELL", amount, "ETH")
         # Decimal の文字列表現が本文に含まれる
         assert str(amount) in payload.body
+
+    def test_monthly_report_accepts_int_inputs(self) -> None:
+        """monthly_report が int 値を受け取っても TypeError を起こさない。"""
+        from app.notifications.templates import monthly_report
+
+        metrics = {
+            "period": "2026年6月",
+            "net_profit": 12345,  # int
+            "fee_amount": 500,  # int
+            "win_rate": 65,  # int (小数なし)
+            "total_trades": 42,
+        }
+        payload = monthly_report(metrics)
+        assert "12345" in payload.body
+        assert "65" in payload.body
+        assert payload.severity == "info"
+
+    def test_monthly_report_accepts_zero_values(self) -> None:
+        """monthly_report がゼロ値（int 0）を受け取っても正常動作する。"""
+        from app.notifications.templates import monthly_report
+
+        metrics: dict[str, object] = {
+            "period": "2026年1月",
+            "net_profit": 0,
+            "fee_amount": 0,
+            "win_rate": 0,
+            "total_trades": 0,
+        }
+        payload = monthly_report(metrics)
+        assert "2026年1月" in payload.title
+        assert payload.severity == "info"
+
+    def test_health_factor_warning_body_used_in_monitor(self) -> None:
+        """_notify_hf_warning が templates.health_factor_warning の body を push_text に渡す。
+
+        monitor._notify_hf_warning → templates.health_factor_warning → push_text の
+        配線が正しく繋がっていることを確認する。
+        """
+        from app.notifications.templates import health_factor_warning
+
+        hf = Decimal("1.75")
+        payload = health_factor_warning(hf)
+        # body に HF 値が含まれる（monitor が push_text に渡すテキストと一致）
+        assert "1.750" in payload.body
+        assert "1.800" in payload.body  # 警戒閾値の記述
+        assert payload.severity == "warning"
+
+    def test_monitor_notify_uses_template_body(self) -> None:
+        """monitor._notify_hf_warning が templates.health_factor_warning の body を使う。"""
+        captured_msg: list[str] = []
+
+        def fake_push_text(user_id: str, msg: str) -> bool:
+            captured_msg.append(msg)
+            return True
+
+        with (
+            patch(
+                "app.aave.monitor._client_type",
+                return_value="dummy",
+            ),
+            patch(
+                "app.aave.client.DummyAaveClient.get_health_factor",
+                return_value=Decimal("1.72"),
+            ),
+            patch(
+                "app.notifications.line_push.push_text",
+                side_effect=fake_push_text,
+            ),
+        ):
+            from app.aave import monitor
+
+            monitor.get_health_factor("0xABCD")
+
+        assert len(captured_msg) == 1
+        # templates.health_factor_warning の body 文言が含まれる
+        assert "1.720" in captured_msg[0]
+        assert "警戒閾値" in captured_msg[0]

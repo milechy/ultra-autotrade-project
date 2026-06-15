@@ -915,7 +915,8 @@
         "testNotificationSending": "送信中...",
         "testNotificationSent": "テスト通知を送信しました",
         "testNotificationFailed": "送信に失敗しました（API未実装の可能性があります）",
-        "testNotificationError": "送信に失敗しました"
+        "testNotificationError": "送信に失敗しました",
+        "saveError": "設定の保存に失敗しました"
       },
       "terms": {
         "title": "利用規約",
