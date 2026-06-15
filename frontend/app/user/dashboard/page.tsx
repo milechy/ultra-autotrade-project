@@ -217,7 +217,7 @@ function RecentOpsCard() {
   )
 }
 
-function ManagedDashboard() {
+function ManagedDashboard({ isAdmin }: { isAdmin: boolean }) {
   const t = useTranslations('Dashboard')
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
@@ -238,7 +238,7 @@ function ManagedDashboard() {
       </section>
 
       <section>
-        <RewardsCard isAdmin={false} />
+        <RewardsCard isAdmin={isAdmin} />
       </section>
     </div>
   )
@@ -246,7 +246,7 @@ function ManagedDashboard() {
 
 // ---- Full (active / pro) Dashboard ----
 
-function ActiveDashboard() {
+function ActiveDashboard({ isAdmin }: { isAdmin: boolean }) {
   const t = useTranslations('Dashboard')
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
@@ -292,7 +292,7 @@ function ActiveDashboard() {
       </section>
 
       <section>
-        <RewardsCard isAdmin={false} />
+        <RewardsCard isAdmin={isAdmin} />
       </section>
 
       {/* Disclaimer */}
@@ -324,9 +324,11 @@ export default function DashboardPage() {
     )
   }
 
+  const isAdmin = settings?.role === 'admin'
+
   if (userMode === 'managed') {
-    return <ManagedDashboard />
+    return <ManagedDashboard isAdmin={isAdmin} />
   }
 
-  return <ActiveDashboard />
+  return <ActiveDashboard isAdmin={isAdmin} />
 }

@@ -235,25 +235,21 @@ class TestAutoClaimIfWorthy:
 
         assert result["claimed"] is True
         assert result["error"] is None
-        # supply が呼ばれたことを確認
+        # supply が reward_token_address で呼ばれたことを確認 (CRITICAL #2 修正の検証)
         mock_client.deposit.assert_called_once()
         supply_call_kwargs = mock_client.deposit.call_args
-        # amount は Decimal でなければならない
-        amount_arg = (
-            supply_call_kwargs.kwargs.get("amount") or supply_call_kwargs.args[1]
-            if supply_call_kwargs.args
-            else None
+        # asset_address は reward_token_address であるべき (USDC でない)
+        token_addr_arg = supply_call_kwargs.kwargs.get("asset_address")
+        assert token_addr_arg == "0x" + "e" * 40, (
+            f"asset_address should be reward token, got {token_addr_arg}"
         )
-        if amount_arg is None:
-            # keyword引数を探す
-            for k, v in (supply_call_kwargs.kwargs or {}).items():
-                if k == "amount":
-                    amount_arg = v
-                    break
-        if amount_arg is not None:
-            assert isinstance(amount_arg, Decimal), (
-                f"amount must be Decimal, got {type(amount_arg)}"
-            )
+        # amount は Decimal で実トークン量 (total_usd でない)
+        amount_arg = supply_call_kwargs.kwargs.get("amount")
+        assert isinstance(amount_arg, Decimal), f"amount must be Decimal, got {type(amount_arg)}"
+        # 0.05 AAVE (total_usd = $5.00 ではなくトークン量)
+        assert amount_arg == Decimal("0.05"), (
+            f"amount should be token quantity 0.05, got {amount_arg}"
+        )
 
     def test_fail_open_on_unexpected_exception(self) -> None:
         """予期しない例外が発生しても例外は伝播せず error キーに記録される。"""
@@ -275,6 +271,111 @@ class TestAutoClaimIfWorthy:
 
         # fail-open: エラーは result["error"] or result["skip_reason"] に格納
         assert result["claimed"] is False
+
+    def test_claim_success_supply_failure_records_error(self) -> None:
+        """MINOR #7(a): claim 成功 + supply 失敗時に claimed==True かつ error が記録される。"""
+        mock_w3 = MagicMock()
+        mock_client = MagicMock()
+
+        # $5.00 のリワード: 0.05 AAVE @ $100/AAVE
+        rewards_data = [
+            {
+                "symbol": "AAVE",
+                "token_addr": "0x" + "e" * 40,
+                "unclaimed_raw": int(Decimal("0.05") * Decimal(10**18)),
+                "decimals": 18,
+                "price_feed": int(Decimal("100") * Decimal(10**8)),
+                "price_decimals": 8,
+            }
+        ]
+        claimer, _, mock_rewards_ctrl = _make_claimer(
+            mock_w3, mock_client, unclaimed_rewards=rewards_data
+        )
+
+        # claimAllRewards は成功するようモック設定
+        mock_rewards_ctrl.functions.claimAllRewards.return_value.build_transaction.return_value = {}
+        mock_w3.eth.get_transaction_count.return_value = 0
+        mock_w3.eth.gas_price = 1000000000
+        mock_w3.eth.chain_id = 8453
+        mock_w3.eth.estimate_gas.return_value = 200000
+        mock_w3.eth.account.sign_transaction.return_value = MagicMock(raw_transaction=b"signed_tx")
+        mock_w3.eth.send_raw_transaction.return_value = b"\x00" * 32
+        mock_w3.eth.wait_for_transaction_receipt.return_value = {"transactionHash": b"\x00" * 32}
+
+        # deposit は失敗するよう設定（Aave 未対応トークンを想定）
+        mock_client.deposit.side_effect = ValueError("Unknown asset: AAVE not in pool")
+
+        result = claimer.auto_claim_if_worthy(
+            wallet_address="0x" + "f" * 40,
+            private_key="0x" + "a" * 64,
+            dry_run=False,
+        )
+
+        # Claim は成功しているはず
+        assert result["claimed"] is True
+        # エラーが記録されているはず
+        assert result["error"] is not None
+        assert "supply" in result["error"].lower() or "AAVE" in result["error"]
+        # supply_tx_hash は None のまま
+        assert result["supply_tx_hash"] is None
+        # claimed_but_not_resupplied に記録されているはず
+        assert isinstance(result.get("claimed_but_not_resupplied"), list)
+        assert len(result["claimed_but_not_resupplied"]) > 0
+
+    def test_no_double_claim_on_re_execution(self) -> None:
+        """MINOR #7(b): 二重実行時に claimAllRewards が 2 回呼ばれないことを確認する。
+
+        閾値確認後に get_claimable_rewards が 0 を返すようになれば、
+        2回目は skip_reason が設定されて Claim がスキップされる。
+        """
+        mock_w3 = MagicMock()
+        mock_client = MagicMock()
+
+        # 1回目: $5.00 のリワードが存在
+        rewards_data = [
+            {
+                "symbol": "AAVE",
+                "token_addr": "0x" + "e" * 40,
+                "unclaimed_raw": int(Decimal("0.05") * Decimal(10**18)),
+                "decimals": 18,
+                "price_feed": int(Decimal("100") * Decimal(10**8)),
+                "price_decimals": 8,
+            }
+        ]
+        claimer, mock_ui, mock_rewards_ctrl = _make_claimer(
+            mock_w3, mock_client, unclaimed_rewards=rewards_data
+        )
+
+        # claimAllRewards の tx 送信をモック化
+        mock_rewards_ctrl.functions.claimAllRewards.return_value.build_transaction.return_value = {}
+        mock_w3.eth.get_transaction_count.return_value = 0
+        mock_w3.eth.gas_price = 1000000000
+        mock_w3.eth.chain_id = 8453
+        mock_w3.eth.estimate_gas.return_value = 200000
+        mock_w3.eth.account.sign_transaction.return_value = MagicMock(raw_transaction=b"signed_tx")
+        mock_w3.eth.send_raw_transaction.return_value = b"\x00" * 32
+        mock_w3.eth.wait_for_transaction_receipt.return_value = {"transactionHash": b"\x00" * 32}
+        mock_client.deposit.return_value = {"tx_hash": "0x" + "1" * 64}
+
+        # 1回目の実行 → Claim される
+        result1 = claimer.auto_claim_if_worthy(
+            wallet_address="0x" + "f" * 40,
+            private_key="0x" + "a" * 64,
+            dry_run=False,
+        )
+        assert result1["claimed"] is True
+
+        # 2回目: Claim 済みでリワードが 0 になったと仮定（unclaimed_raw = 0）
+        mock_ui.functions.getUserReservesIncentivesData.return_value.call.return_value = []
+
+        result2 = claimer.auto_claim_if_worthy(
+            wallet_address="0x" + "f" * 40,
+            private_key="0x" + "a" * 64,
+            dry_run=False,
+        )
+        # 2回目は閾値未満 (0 USD) のためスキップされる
+        assert result2["claimed"] is False
+        assert result2["skip_reason"] is not None
 
 
 # ---------------------------------------------------------------------------

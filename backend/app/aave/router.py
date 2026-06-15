@@ -20,7 +20,10 @@ from .schemas import (
     AaveMonitorStatus,
     AaveRebalanceRequest,
     AaveRebalanceResponse,
+    ClaimableReward,
     OracleStatusResponse,
+    RewardClaimResult,
+    RewardsListResponse,
 )
 from .service import AaveService, MultiChainAaveService
 
@@ -219,11 +222,12 @@ def get_monitor_status(
 
 @router.get(
     "/rewards",
+    response_model=RewardsListResponse,
     summary="未請求 Aave リワードを取得する",
 )
 def get_rewards(
     current_user: User = Depends(require_viewer),
-) -> dict[str, object]:
+) -> RewardsListResponse:
     """
     UiIncentiveDataProviderV3 から未請求リワード一覧と合計 USD を返す。
 
@@ -239,42 +243,42 @@ def get_rewards(
     wallet_address = os.getenv("AAVE_WALLET_ADDRESS", "")
 
     if claimer is None or not wallet_address:
-        return {
-            "rewards": [],
-            "total_usd": "0",
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
-            "note": "AAVE_UI_INCENTIVE_PROVIDER_ADDRESS または AAVE_WALLET_ADDRESS が未設定",
-        }
+        return RewardsListResponse(
+            rewards=[],
+            total_usd=Decimal("0"),
+            fetched_at=datetime.now(timezone.utc).isoformat(),
+            note="AAVE_UI_INCENTIVE_PROVIDER_ADDRESS または AAVE_WALLET_ADDRESS が未設定",
+        )
 
     raw_rewards = claimer.get_claimable_rewards(wallet_address)
-    from decimal import Decimal  # noqa: PLC0415
 
     total_usd = sum((r["amount_usd"] for r in raw_rewards), Decimal("0"))
 
-    serialized = [
-        {
-            "asset_name": r["asset_name"],
-            "reward_token_address": r["reward_token_address"],
-            "amount": str(r["amount"]),
-            "amount_usd": str(r["amount_usd"]),
-        }
+    rewards_list = [
+        ClaimableReward(
+            asset_name=r["asset_name"],
+            reward_token_address=r["reward_token_address"],
+            amount=r["amount"],
+            amount_usd=r["amount_usd"],
+        )
         for r in raw_rewards
     ]
 
-    return {
-        "rewards": serialized,
-        "total_usd": str(total_usd),
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
-    }
+    return RewardsListResponse(
+        rewards=rewards_list,
+        total_usd=total_usd,
+        fetched_at=datetime.now(timezone.utc).isoformat(),
+    )
 
 
 @router.post(
     "/rewards/claim",
+    response_model=RewardClaimResult,
     summary="未請求 Aave リワードを手動 Claim する (admin のみ)",
 )
 def claim_rewards(
     current_user: User = Depends(require_admin),
-) -> dict[str, object]:
+) -> RewardClaimResult:
     """
     未請求リワードを Claim し、閾値 ($5) 以上なら Aave に再供給する。
 
@@ -308,22 +312,28 @@ def claim_rewards(
         dry_run=False,
     )
 
-    serialized_rewards = [
-        {
-            "asset_name": r["asset_name"],
-            "reward_token_address": r["reward_token_address"],
-            "amount": str(r["amount"]),
-            "amount_usd": str(r["amount_usd"]),
-        }
+    rewards_list = [
+        ClaimableReward(
+            asset_name=r["asset_name"],
+            reward_token_address=r["reward_token_address"],
+            amount=r["amount"],
+            amount_usd=r["amount_usd"],
+        )
         for r in result.get("rewards", [])
     ]
 
-    return {
-        "claimed": result["claimed"],
-        "total_usd": result["total_usd"],
-        "rewards": serialized_rewards,
-        "supply_tx_hash": result.get("supply_tx_hash"),
-        "skip_reason": result.get("skip_reason"),
-        "error": result.get("error"),
-        "claimed_at": datetime.now(timezone.utc).isoformat() if result["claimed"] else None,
-    }
+    total_usd_str = result.get("total_usd", "0")
+    total_usd_decimal = (
+        Decimal(total_usd_str) if isinstance(total_usd_str, str) else Decimal(str(total_usd_str))
+    )
+
+    return RewardClaimResult(
+        claimed=result["claimed"],
+        total_usd=total_usd_decimal,
+        rewards=rewards_list,
+        supply_tx_hash=result.get("supply_tx_hash"),
+        skip_reason=result.get("skip_reason"),
+        claimed_at=datetime.now(timezone.utc).isoformat() if result["claimed"] else None,
+        claimed_but_not_resupplied=result.get("claimed_but_not_resupplied", []),
+        error=result.get("error"),
+    )

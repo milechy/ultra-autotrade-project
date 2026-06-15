@@ -525,12 +525,17 @@ class RewardClaimer:
         dry_run: bool = False,
     ) -> dict[str, Any]:
         """
-        未請求リワードを取得し、閾値 ($5) 以上なら Claim -> supply で再投資する。
+        未請求リワードを取得し、閾値 ($5) 以上なら Claim -> 各トークンを Aave に再 supply する。
+
+        supply は claim した各リワードトークンをそのトークンアドレス・実数量で行う。
+        USDC へのスワップは本スコープ外。supply 不可なトークンは skip して記録する。
+        total_usd は閾値判定 ($5) にのみ使用する。
 
         例外を伝播させない (fail-open)。
 
         Returns:
-            dict: claimed, total_usd, rewards, supply_tx_hash, skip_reason, error
+            dict: claimed, total_usd, rewards, supply_tx_hash, skip_reason,
+                  claimed_but_not_resupplied, error
         """
         result: dict[str, Any] = {
             "claimed": False,
@@ -538,6 +543,7 @@ class RewardClaimer:
             "rewards": [],
             "supply_tx_hash": None,
             "skip_reason": None,
+            "claimed_but_not_resupplied": [],
             "error": None,
         }
 
@@ -555,37 +561,65 @@ class RewardClaimer:
                 result["skip_reason"] = skip_msg
                 return result
 
-            _asset_addresses = asset_addresses or []
+            # MAJOR #3: get_claimable_rewards() の結果から asset_addresses を構築する。
+            # 空配列を claimAllRewards に送るとコントラクトが revert するため、
+            # リワードが 0 件なら claim 自体をスキップする。
+            reward_token_addresses = [r["reward_token_address"] for r in rewards]
+            if not reward_token_addresses:
+                result["skip_reason"] = "claimable なリワードトークンが 0 件のためスキップ"
+                return result
+
             self.claim_all_rewards(
                 wallet_address=wallet_address,
                 private_key=private_key,
-                asset_addresses=_asset_addresses,
+                asset_addresses=reward_token_addresses,
                 dry_run=dry_run,
             )
             result["claimed"] = True
 
-            _usdc_addr = usdc_asset_address or self._usdc_address
-            if _usdc_addr and not dry_run:
-                try:
-                    supply_result = self._aave_client.deposit(
-                        asset_address=_usdc_addr,
-                        amount=total_usd,
-                        wallet_address=wallet_address,
-                        private_key=private_key,
-                        dry_run=False,
-                    )
-                    if isinstance(supply_result, dict):
-                        result["supply_tx_hash"] = supply_result.get("tx_hash")
-                    logger.info(
-                        "auto_claim_if_worthy: supply 完了 total_usd=%s wallet=%s...%s",
-                        total_usd,
-                        wallet_address[:6] if wallet_address else "",
-                        wallet_address[-4:] if wallet_address else "",
-                    )
-                except Exception as supply_exc:  # noqa: BLE001
-                    logger.warning("auto_claim_if_worthy: supply 失敗 (fail-open): %s", supply_exc)
-                    result["error"] = f"supply 失敗: {supply_exc}"
-            elif dry_run:
+            # CRITICAL #2: claim した各リワードトークンをその実数量で Aave に再 supply する。
+            # total_usd を amount に使わない。supply 不可なトークンは skip して記録する。
+            if not dry_run:
+                supply_tx_hashes: list[str] = []
+                not_resupplied: list[str] = []
+                for reward in rewards:
+                    token_addr: str = reward["reward_token_address"]
+                    token_amount: Decimal = reward["amount"]  # Decimal (human-readable)
+                    asset_name: str = reward.get("asset_name", token_addr)
+                    try:
+                        supply_result = self._aave_client.deposit(
+                            asset_address=token_addr,
+                            amount=token_amount,
+                            wallet_address=wallet_address,
+                            private_key=private_key,
+                            dry_run=False,
+                        )
+                        if isinstance(supply_result, dict):
+                            tx_hash = supply_result.get("tx_hash")
+                            if tx_hash:
+                                supply_tx_hashes.append(tx_hash)
+                        logger.info(
+                            "auto_claim_if_worthy: supply 完了 asset=%s amount=%s wallet=%s...%s",
+                            asset_name,
+                            token_amount,
+                            wallet_address[:6] if wallet_address else "",
+                            wallet_address[-4:] if wallet_address else "",
+                        )
+                    except Exception as supply_exc:  # noqa: BLE001
+                        # supply 不可なトークン (Aave 未対応) は skip して記録する
+                        logger.warning(
+                            "auto_claim_if_worthy: supply スキップ asset=%s: %s",
+                            asset_name,
+                            supply_exc,
+                        )
+                        not_resupplied.append(asset_name)
+                        result["error"] = f"supply 部分失敗: {asset_name}: {supply_exc}"
+
+                if supply_tx_hashes:
+                    # 複数 tx hash がある場合はカンマ区切りで保持
+                    result["supply_tx_hash"] = ",".join(supply_tx_hashes)
+                result["claimed_but_not_resupplied"] = not_resupplied
+            else:
                 logger.info("auto_claim_if_worthy: dry_run=True のため supply スキップ")
 
             return result
@@ -621,7 +655,16 @@ def make_reward_claimer_from_env() -> Optional[RewardClaimer]:
         from .client import make_aave_client  # noqa: PLC0415
 
         client_type = os.getenv("AAVE_CLIENT_TYPE", "dummy")
-        aave_client = make_aave_client(client_type=client_type, rpc_url=rpc_url)
+        # MAJOR #4: network と pool_address を渡す。未設定時は env から解決される。
+        # ドリフトカタログ「factory が constructor 引数を供給せず」対策。
+        network = os.getenv("AAVE_NETWORK")
+        pool_address = os.getenv("AAVE_POOL_ADDRESS")
+        aave_client = make_aave_client(
+            client_type=client_type,
+            rpc_url=rpc_url,
+            network=network,
+            pool_address=pool_address if pool_address else None,
+        )
         w3 = Web3(Web3.HTTPProvider(rpc_url))
 
         return RewardClaimer(

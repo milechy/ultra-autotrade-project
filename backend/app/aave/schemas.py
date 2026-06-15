@@ -231,11 +231,29 @@ class RewardClaimResult(BaseModel):
     supply_tx_hash: Optional[str] = Field(None, description="再投資 supply の tx ハッシュ。")
     skip_reason: Optional[str] = Field(None, description="Claim スキップ理由（閾値未満など）。")
     claimed_at: Optional[str] = Field(None, description="Claim 実行日時 (ISO 8601)。")
+    claimed_but_not_resupplied: list[str] = Field(
+        default_factory=list,
+        description="Claim 済みだが Aave 未対応のため supply をスキップしたトークン名一覧。",
+    )
     error: Optional[str] = Field(None, description="エラーメッセージ（fail-open 時）。")
 
     @field_serializer("total_usd")
     @classmethod
     def _serialize_total_usd(cls, v: Decimal) -> str:
+        return str(v)
+
+
+class RewardsListResponse(BaseModel):
+    """GET /aave/rewards のレスポンス。"""
+
+    rewards: list[ClaimableReward] = Field(default_factory=list, description="未請求リワード一覧。")
+    total_usd: Decimal = Field(ge=0, description="未請求リワードの合計 USD 額。")
+    fetched_at: str = Field(description="取得日時 (ISO 8601)。")
+    note: Optional[str] = Field(None, description="補足情報（設定未完了時など）。")
+
+    @field_serializer("total_usd")
+    @classmethod
+    def _serialize_total_usd_list(cls, v: Decimal) -> str:
         return str(v)
 
 
