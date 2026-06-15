@@ -1,7 +1,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useCallback } from "react"
 import { AlertTriangle, Loader2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useLanguage } from "@/lib/useLanguage"
@@ -9,14 +9,10 @@ import { liffFetch } from "@/lib/liff/liff-fetch"
 import { useFundWallet } from "@privy-io/react-auth"
 import { base, baseSepolia } from "wagmi/chains"
 import { useWallet } from "@/hooks/useWallet"
+import { useUsdcBalance } from "@/hooks/useUsdcBalance"
 import { track, EV } from "@/lib/posthog"
 
 // ---- 型定義 ---------------------------------------------------------------
-
-interface UserSettingsResponse {
-  balance?: string | number | null
-  wallet_address?: string | null
-}
 
 type Tab = "deposit" | "withdraw"
 
@@ -99,10 +95,11 @@ export function DepositPanel() {
   // Privy ウォレット情報（useFundWallet 用）
   const { address, chainId } = useWallet()
 
-  // 残高・ウォレット
-  const [balance, setBalance] = useState<number | null>(null)
-  const [walletAddress, setWalletAddress] = useState<string | null>(null)
-  const [balanceLoading, setBalanceLoading] = useState(true)
+  // 残高 = ユーザー自身のウォレットの USDC オンチェーン残高（非カストディアル）。
+  // 出金先/入金先アドレスも settings 依存をやめ useWallet の address を正とする。
+  const { balanceUsd, loading: balanceLoading, refetch: refetchBalance } = useUsdcBalance()
+  const balance = balanceUsd
+  const walletAddress = address
 
   // 入金フォーム（金額は送金目安の表示用）
   const [depositAmount, setDepositAmount] = useState("")
@@ -118,40 +115,14 @@ export function DepositPanel() {
   const [confirmError, setConfirmError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  // ---- 残高取得 ------------------------------------------------------------
-
-  const fetchBalance = useCallback(async () => {
-    setBalanceLoading(true)
-    try {
-      // (liff) パネルは liffFetch を使う。apiFetch は (user) 側 AuthProvider が
-      // resolve する authReadyPromise を待つが、(liff) ツリーには AuthProvider が
-      // 無く永久 pending → リクエストがハングして残高スピナーが止まらない
-      // (Asana 1215524979521648)。兄弟パネルと同じ liffFetch に統一する。
-      const res = await liffFetch("/api/user/settings")
-      if (res.ok) {
-        const data = (await res.json()) as UserSettingsResponse
-        setBalance(data.balance != null ? Number(data.balance) : null)
-        setWalletAddress(data.wallet_address ?? null)
-      } else {
-        setBalance(null)
-      }
-    } catch {
-      setBalance(null)
-    } finally {
-      setBalanceLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void fetchBalance()
-  }, [fetchBalance])
+  // 残高はオンチェーン取得（useUsdcBalance が自動取得）。入金/出金後は refetchBalance() で更新する。
 
   // ---- Privy fundWallet --------------------------------------------------
 
   const { fundWallet } = useFundWallet({
     onUserExited: () => {
       setIsFunding(false)
-      void fetchBalance()
+      refetchBalance()
     },
   })
 
@@ -180,9 +151,9 @@ export function DepositPanel() {
       }
     } finally {
       setIsFunding(false)
-      void fetchBalance()
+      refetchBalance()
     }
-  }, [address, chainId, depositAmount, language, fetchBalance, fundWallet])
+  }, [address, chainId, depositAmount, language, refetchBalance, fundWallet])
 
   // ---- 出金可能額上限（全額ボタン用） ----------------------------------------
 
@@ -231,13 +202,13 @@ export function DepositPanel() {
       track(EV.WITHDRAW_SUBMIT)
       setSuccessMsg(t("successMsg"))
       setWithdrawAmount("")
-      void fetchBalance()
+      refetchBalance()
     } catch (e) {
       setConfirmError(e instanceof Error ? e.message : t("withdrawFailed"))
     } finally {
       setConfirmBusy(false)
     }
-  }, [withdrawNum, fetchBalance])
+  }, [withdrawNum, refetchBalance])
 
   // ---- 残高ラベル（タブ依存） -----------------------------------------------
 
