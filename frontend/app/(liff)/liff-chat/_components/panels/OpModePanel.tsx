@@ -24,7 +24,7 @@ export function OpModePanel() {
       label: t("managedLabel"),
       desc: t("managedDesc"),
       icon: Bot,
-      color: "text-[#4ade9a]",
+      color: "text-[#1D9E75]",
       bg: "bg-[#1D9E75]/10",
       border: "border-[#1D9E75]",
     },
@@ -33,7 +33,7 @@ export function OpModePanel() {
       label: t("activeLabel"),
       desc: t("activeDesc"),
       icon: MousePointer2,
-      color: "text-blue-400",
+      color: "text-blue-600",
       bg: "bg-blue-500/10",
       border: "border-blue-500",
     },
@@ -97,25 +97,25 @@ export function OpModePanel() {
         <div
           role="status"
           data-testid="opmode-toast"
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-xl bg-zinc-800 border border-zinc-700 text-white text-sm shadow-lg whitespace-nowrap"
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-xl bg-[#1b1a23] border border-[#1c1a27]/15 text-[#fbf7f0] text-sm shadow-lg whitespace-nowrap"
         >
           {toast}
         </div>
       )}
 
       {/* 現在のモード表示カード */}
-      <div className="bg-[#1a3d2e] rounded-2xl px-4 py-4 flex items-center justify-between">
+      <div className="bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] rounded-2xl px-4 py-4 flex items-center justify-between">
         <div>
-          <p className="text-xl font-bold text-white" data-testid="opmode-current">
+          <p className="text-xl font-bold text-[#1c1a27]" data-testid="opmode-current">
             {loading
               ? t("loadingMode")
               : currentMode
               ? MODE_LABEL[currentMode]
               : t("modeUnset")}
           </p>
-          <p className="text-zinc-300 text-sm mt-0.5">{t("currentModeLabel")}</p>
+          <p className="text-[#736f7e] text-sm mt-0.5">{t("currentModeLabel")}</p>
         </div>
-        <span className="text-xs text-[#4ade9a] border border-[#1D9E75] rounded-full px-2 py-1">
+        <span className="text-xs text-[#1D9E75] border border-[#1D9E75] rounded-full px-2 py-1">
           {t("activeBadge")}
         </span>
       </div>
@@ -142,8 +142,8 @@ export function OpModePanel() {
               <div className="flex items-center gap-3">
                 <Icon className={`w-6 h-6 shrink-0 ${mode.color}`} />
                 <div>
-                  <p className="text-white font-bold text-base">{mode.label}</p>
-                  <p className="text-zinc-300 text-sm mt-0.5">{mode.desc}</p>
+                  <p className="text-[#1c1a27] font-bold text-base">{mode.label}</p>
+                  <p className="text-[#736f7e] text-sm mt-0.5">{mode.desc}</p>
                 </div>
               </div>
             </button>

@@ -52,17 +52,17 @@ export function TermsPanel() {
           key={href}
           type="button"
           onClick={() => openExternal(href)}
-          className="flex items-center gap-3 w-full bg-zinc-800 hover:bg-zinc-700 px-4 py-4 rounded-xl transition-colors text-left"
+          className="flex items-center gap-3 w-full ax-card-warm hover:bg-black/5 px-4 py-4 rounded-xl transition-colors text-left"
         >
-          <Icon className="w-5 h-5 text-[#4ade9a] flex-shrink-0" />
+          <Icon className="w-5 h-5 text-[#1D9E75] flex-shrink-0" />
           <div className="flex-1">
-            <div className="text-white text-sm font-medium">{label}</div>
-            <div className="text-zinc-500 text-xs">{desc}</div>
+            <div className="text-[#1c1a27] text-sm font-medium">{label}</div>
+            <div className="text-[#736f7e] text-xs">{desc}</div>
           </div>
-          <ExternalLink className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+          <ExternalLink className="w-4 h-4 text-[#736f7e] flex-shrink-0" />
         </button>
       ))}
-      <p className="text-zinc-600 text-xs text-center pt-2">
+      <p className="text-[#736f7e] text-xs text-center pt-2">
         {t("footer")}
       </p>
     </div>
