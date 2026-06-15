@@ -168,10 +168,10 @@ export default function LiffChatPage() {
     <div className="w-[375px] mx-auto h-dvh ax-bg-app text-[#1c1a27] flex flex-col overflow-hidden relative">
 
       {/* ── ヘッダー（arobix グラデ） */}
-      <header className="h-14 bg-gradient-to-r from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] flex items-center justify-between px-4 flex-shrink-0">
+      <header className="h-14 bg-gradient-to-r from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] grid grid-cols-3 items-center px-4 flex-shrink-0">
         <button
           onClick={() => { setMenuOpen(true); track(EV.MENU_OPEN) }}
-          className="text-[#1c1a27] p-1 hover:bg-black/5 rounded-lg transition-colors"
+          className="text-[#1c1a27] p-1 hover:bg-black/5 rounded-lg transition-colors justify-self-start"
           aria-label={t("header.menuAriaLabel")}
         >
           <Menu className="w-6 h-6" />
@@ -181,7 +181,7 @@ export default function LiffChatPage() {
           height="36"
           viewBox="0 0 100 100"
           aria-label={t("header.logoAriaLabel")}
-          className="flex-shrink-0"
+          className="flex-shrink-0 justify-self-center"
         >
           {/* ベゼル: フラットグレー */}
           <circle cx="50" cy="50" r="49" fill="#CCCCCC" />
@@ -201,7 +201,7 @@ export default function LiffChatPage() {
             />
           </g>
         </svg>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 justify-self-end">
           {/* JP/EN トグルボタン */}
           <button
             onClick={() => { const next = language === "ja" ? "en" : "ja"; setLanguage(next); track(EV.LANGUAGE_TOGGLE, { language: next }) }}
