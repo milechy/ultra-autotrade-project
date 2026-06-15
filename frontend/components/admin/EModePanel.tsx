@@ -216,7 +216,10 @@ export default function EModePanel() {
                       ? t('emodeCategory1')
                       : t('emodeCategory2'),
                 ltv_bps: data.recommendation.recommended_ltv_bps,
-                liquidation_threshold_bps: data.current_emode.liquidation_threshold_bps,
+                // M-2 修正: 推奨カテゴリの清算閾値を正しく使用する
+                // (旧コードは data.current_emode.liquidation_threshold_bps を誤って流用していた)
+                liquidation_threshold_bps:
+                  data.recommendation.recommended_liquidation_threshold_bps,
               }}
               t={t}
             />

@@ -124,6 +124,7 @@ def recommend_emode(
         recommended_category_id=recommended_id,
         current_ltv_bps=current_ltv,
         recommended_ltv_bps=recommended_ltv,
+        recommended_liquidation_threshold_bps=recommended_info.liquidation_threshold_bps,
         ltv_improvement_pct=ltv_improvement_pct,
         reason=reason,
         collateral_assets=normalized,

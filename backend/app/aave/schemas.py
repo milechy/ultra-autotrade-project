@@ -325,13 +325,21 @@ class EModeRecommendation(BaseModel):
     recommended_category_id: int = Field(ge=0, description="推奨 eMode カテゴリ ID")
     current_ltv_bps: Decimal = Field(ge=0, description="現在の実効 LTV (bps)")
     recommended_ltv_bps: Decimal = Field(ge=0, description="推奨後の実効 LTV (bps)")
+    recommended_liquidation_threshold_bps: Decimal = Field(
+        ge=0, description="推奨 eMode の清算閾値 (bps 単位, 例: 9300 = 93%)"
+    )
     ltv_improvement_pct: Decimal = Field(description="LTV 改善率 (パーセント, 例: 20.0 = 20% 向上)")
     reason: str = Field(description="推奨理由（担保資産の構成）")
     collateral_assets: list[str] = Field(
         default_factory=list, description="現在の担保資産シンボル一覧"
     )
 
-    @field_serializer("current_ltv_bps", "recommended_ltv_bps", "ltv_improvement_pct")
+    @field_serializer(
+        "current_ltv_bps",
+        "recommended_ltv_bps",
+        "recommended_liquidation_threshold_bps",
+        "ltv_improvement_pct",
+    )
     @classmethod
     def _serialize_decimal(cls, v: Decimal) -> str:
         return str(v)
@@ -356,10 +364,22 @@ class EModeSetRequest(BaseModel):
 
 
 class EModeSetResponse(BaseModel):
-    """POST /aave/emode のレスポンス。"""
+    """POST /aave/emode のレスポンス。
+
+    dry_run=False かつ build-tx モードの場合、set_emode_tx に未署名 tx データが入る。
+    フロントエンドはこの tx をウォレットで署名・送信することで eMode を切り替える。
+    HUMAN-REVIEW-REQUIRED: setUserEMode は Aave V3 の write 操作。
+    """
 
     category_id: int = Field(description="設定した eMode カテゴリ ID")
     tx_hash: Optional[str] = Field(None, description="tx ハッシュ (dry_run=True の場合は None)")
+    set_emode_tx: Optional[dict[str, object]] = Field(
+        None,
+        description=(
+            "未署名の setUserEMode tx データ (dry_run=False 時に返る)。"
+            "フロントエンドがウォレットで署名・送信する。"
+        ),
+    )
     dry_run: bool = Field(description="ドライランかどうか")
     message: str = Field(description="結果メッセージ")
 

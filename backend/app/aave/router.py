@@ -17,6 +17,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth.dependencies import require_admin, require_viewer
 from app.auth.models import User
 
+from .client import get_default_aave_client
+from .emode_optimizer import get_emode_info, recommend_emode
 from .schemas import (
     AaveMonitorStatus,
     AaveRebalanceRequest,
@@ -411,9 +413,6 @@ def get_emode(
     import os  # noqa: PLC0415
     from datetime import datetime, timezone  # noqa: PLC0415
 
-    from .client import get_default_aave_client  # noqa: PLC0415
-    from .emode_optimizer import get_emode_info, recommend_emode  # noqa: PLC0415
-
     wallet_address = os.getenv("AAVE_WALLET_ADDRESS", "")
     current_category_id = 0
 
@@ -421,8 +420,7 @@ def get_emode(
     if wallet_address:
         try:
             client = get_default_aave_client()
-            if hasattr(client, "get_user_emode"):
-                current_category_id = client.get_user_emode(wallet_address)
+            current_category_id = client.get_user_emode(wallet_address)
         except Exception as exc:  # noqa: BLE001
             # RPC 失敗時は cat0 で継続（fail-open）
             logger.warning("get_user_emode 失敗 (fail-open): %s", exc)
@@ -536,8 +534,6 @@ def set_emode(
     """
     import os  # noqa: PLC0415
 
-    from .client import get_default_aave_client  # noqa: PLC0415
-
     wallet_address = os.getenv("AAVE_WALLET_ADDRESS", "")
 
     if not wallet_address:
@@ -548,11 +544,24 @@ def set_emode(
 
     try:
         client = get_default_aave_client()
-        if not hasattr(client, "build_set_emode_tx"):
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="現在の AAVE_CLIENT_TYPE は setUserEMode をサポートしていません。",
-            )
+
+        # CRITICAL: HF チェック (CLAUDE.md Security Rule 2 / docs/13_security_design.md)
+        # eMode 切替は LTV / 清算閾値を変更するため、HF < 1.6 の場合はブロックする。
+        # fail-open: HF 取得失敗時は継続（RPC 障害でオペレーションを止めない）
+        try:
+            hf = client.get_health_factor(wallet_address)
+            if hf is not None and hf != Decimal("inf") and hf < Decimal("1.6"):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"Health Factor が {hf} < 1.6 のため eMode 切替をブロックしました。"
+                        " ポジションを安全な状態に戻してから再試行してください。"
+                    ),
+                )
+        except HTTPException:
+            raise
+        except Exception as hf_exc:  # noqa: BLE001
+            logger.warning("HF チェック失敗 (継続): %s", hf_exc)
 
         result = client.build_set_emode_tx(
             category_id=body.category_id,
@@ -564,22 +573,25 @@ def set_emode(
             return EModeSetResponse(
                 category_id=body.category_id,
                 tx_hash=None,
+                set_emode_tx=None,
                 dry_run=True,
                 message=f"dry_run: eMode cat{body.category_id} への切替 tx を試算しました（送信なし）",
             )
 
-        # build-tx モード: 未署名 tx を返す（フロントエンドが署名して送信）
-        # 現時点は未署名 tx ログ + 成功メッセージを返す
+        # build-tx モード: 未署名 tx をレスポンスに含めてフロントエンドへ返す。
+        # フロントエンドはこの tx をウォレットで署名・送信することで eMode を切り替える。
+        # HUMAN-REVIEW-REQUIRED: setUserEMode は Aave V3 の write 操作。
+        set_emode_tx: dict[str, object] | None = result.get("set_emode_tx")
         logger.info(
-            "set_emode build_tx: wallet=%s...%s, category_id=%d, tx_data=%s",
+            "set_emode build_tx: wallet=%s...%s, category_id=%d",
             wallet_address[:6],
             wallet_address[-4:],
             body.category_id,
-            str(result)[:80],
         )
         return EModeSetResponse(
             category_id=body.category_id,
             tx_hash=None,
+            set_emode_tx=set_emode_tx,
             dry_run=False,
             message=(
                 f"eMode cat{body.category_id} への切替 tx を構築しました。"

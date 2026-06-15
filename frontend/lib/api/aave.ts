@@ -117,6 +117,7 @@ export interface EModeRecommendation {
   recommended_category_id: number;
   current_ltv_bps: string; // Decimal 文字列
   recommended_ltv_bps: string; // Decimal 文字列
+  recommended_liquidation_threshold_bps: string; // Decimal 文字列 (M-2 追加)
   ltv_improvement_pct: string; // Decimal 文字列
   reason: string;
   collateral_assets: string[];
@@ -133,9 +134,18 @@ export interface EModeSetRequest {
   dry_run?: boolean;
 }
 
+export interface EModeTxData {
+  to: string;
+  data: string;
+  from: string;
+  chainId: number;
+  value: string;
+}
+
 export interface EModeSetResponse {
   category_id: number;
   tx_hash: string | null;
+  set_emode_tx: EModeTxData | null; // C-1 修正: 未署名 tx データ (dry_run=False 時に設定)
   dry_run: boolean;
   message: string;
 }

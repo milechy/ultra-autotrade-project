@@ -319,6 +319,34 @@ class AaveClientBase(ABC):
     @abstractmethod
     def get_account_data(self, wallet_address: str) -> AccountData: ...
 
+    @abstractmethod
+    def get_user_emode(self, wallet_address: str) -> int:
+        """現在の eMode カテゴリ ID を返す (0=なし, 1=ステーブル, 2=ETH相関)。
+
+        Returns:
+            int: eMode カテゴリ ID
+        Raises:
+            AaveClientError: RPC 失敗時
+        """
+
+    @abstractmethod
+    def build_set_emode_tx(
+        self,
+        category_id: int,
+        wallet_address: str,
+        dry_run: bool = False,
+    ) -> "dict[str, Any]":
+        """
+        Pool.setUserEMode(categoryId) の未署名 tx を構築して返す。
+
+        HUMAN-REVIEW-REQUIRED: setUserEMode は Aave V3 の write 操作。
+        本番での実行は人間承認後のみ。
+
+        Returns:
+            dry_run=True:  {"category_id": int, "dry_run": True}
+            dry_run=False: {"set_emode_tx": {to, data, from, chainId, value}}
+        """
+
     def get_pool_utilization(self, asset_symbol: str) -> Optional[Decimal]:
         """プール利用率 (0-100) を返す。取得不可の場合は None。
 
@@ -387,6 +415,14 @@ class AaveClient(Protocol):
 
     def get_pool_utilization(self, asset_symbol: str) -> Optional[Decimal]:
         """プール利用率 (0-100) を返す。取得不可の場合は None。"""
+
+    def get_user_emode(self, wallet_address: str) -> int:
+        """現在のユーザー eMode カテゴリ ID を返す。"""
+
+    def build_set_emode_tx(
+        self, category_id: int, wallet_address: str, dry_run: bool = False
+    ) -> "dict[str, Any]":
+        """eMode 切替用の未署名 tx を返す（build-tx パターン）。"""
 
 
 class DummyAaveClient(AaveClientBase):
