@@ -157,6 +157,7 @@ export default function LiffChatPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setPaused(true)
       setStopConfirmOpen(false)
+      track(EV.EMERGENCY_STOP)
       setToast(t("home.stopSuccess"))
     } catch {
       setToast(t("home.stopFailed"))

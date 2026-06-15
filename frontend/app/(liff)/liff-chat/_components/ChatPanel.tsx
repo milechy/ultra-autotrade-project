@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation"
 import { ChevronLeft, History } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { getAuthToken } from "@/lib/auth/token-key"
+import { track, EV } from "@/lib/posthog"
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -147,6 +148,10 @@ export function ChatPanel({ onClose }: Props) {
     placeholderKey: PlaceholderKey
   }) => {
     if (loading) return
+
+    // 行動分析: どのサジェスト（質問カテゴリ）を押したかのみ送る。
+    // プライバシー配慮で質問本文は PostHog に送らない（本文は DB chat_messages に保存）。
+    track(EV.CHAT_QUESTION, { category: btn.id })
 
     const userMsg: Message = {
       id: `user-${Date.now()}`,

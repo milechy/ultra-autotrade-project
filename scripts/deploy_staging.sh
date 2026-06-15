@@ -325,6 +325,11 @@ log "${ENV_FILE} を読み込み（ビルド ARG 用）"
 # shellcheck disable=SC2046
 export $(grep -v '^#' "${ENV_FILE}" | grep '=' | xargs)
 
+# デプロイ版識別子: PostHog の app_version（全イベント super property）に git short SHA を埋め込む。
+# バージョンアップ前後の行動比較を可能にする。git 失敗時は dev フォールバック。
+export NEXT_PUBLIC_APP_VERSION="$(git rev-parse --short HEAD 2>/dev/null || echo dev)"
+log "NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION} を frontend build ARG に埋め込み"
+
 # ───────────────────────────────────────────────
 # モード別デプロイ
 # ───────────────────────────────────────────────
