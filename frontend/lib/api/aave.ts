@@ -8,6 +8,8 @@
  * - getRewards(): GET /api/aave/rewards
  * - claimRewards(): POST /api/aave/rewards/claim
  * - getBorrowRates(): GET /api/aave/borrow-rates
+ * - getEMode(): GET /api/aave/emode
+ * - setEMode(): POST /api/aave/emode
  */
 
 import { getJson, postJson } from "./http";
@@ -124,4 +126,67 @@ export interface BorrowRateComparison {
  */
 export async function getBorrowRates(): Promise<BorrowRateComparison> {
   return getJson<BorrowRateComparison>("/api/aave/borrow-rates");
+}
+
+// ---------------------------------------------------------------------------
+// eMode
+// ---------------------------------------------------------------------------
+
+export interface EModeInfo {
+  category_id: number;
+  label: string;
+  ltv_bps: string; // Decimal 文字列
+  liquidation_threshold_bps: string; // Decimal 文字列
+}
+
+export interface EModeRecommendation {
+  current_category_id: number;
+  recommended_category_id: number;
+  current_ltv_bps: string; // Decimal 文字列
+  recommended_ltv_bps: string; // Decimal 文字列
+  recommended_liquidation_threshold_bps: string; // Decimal 文字列 (M-2 追加)
+  ltv_improvement_pct: string; // Decimal 文字列
+  reason: string;
+  collateral_assets: string[];
+}
+
+export interface EModeGetResponse {
+  current_emode: EModeInfo;
+  recommendation: EModeRecommendation;
+  fetched_at: string;
+}
+
+export interface EModeSetRequest {
+  category_id: number;
+  dry_run?: boolean;
+}
+
+export interface EModeTxData {
+  to: string;
+  data: string;
+  from: string;
+  chainId: number;
+  value: string;
+}
+
+export interface EModeSetResponse {
+  category_id: number;
+  tx_hash: string | null;
+  set_emode_tx: EModeTxData | null; // C-1 修正: 未署名 tx データ (dry_run=False 時に設定)
+  dry_run: boolean;
+  message: string;
+}
+
+/**
+ * GET /aave/emode — 現在の eMode 設定と最適化推奨を取得する（viewer 以上）
+ */
+export async function getEMode(): Promise<EModeGetResponse> {
+  return getJson<EModeGetResponse>("/api/aave/emode");
+}
+
+/**
+ * POST /aave/emode — eMode カテゴリを切り替える（admin のみ）
+ */
+export async function setEMode(req: EModeSetRequest): Promise<EModeSetResponse> {
+  return postJson<EModeSetResponse>("/api/aave/emode", req);
 }

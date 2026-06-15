@@ -8,6 +8,7 @@ Aave 操作用の FastAPI ルーター定義。
 - POST /aave/rebalance
 """
 
+import logging
 from decimal import Decimal
 from functools import lru_cache
 
@@ -17,12 +18,17 @@ from app.auth.dependencies import require_admin, require_viewer
 from app.auth.models import User
 
 from .borrow_optimizer import make_borrow_optimizer_from_env
+from .client import get_default_aave_client
+from .emode_optimizer import get_emode_info, recommend_emode
 from .schemas import (
     AaveMonitorStatus,
     AaveRebalanceRequest,
     AaveRebalanceResponse,
     BorrowRateComparison,
     ClaimableReward,
+    EModeGetResponse,
+    EModeSetRequest,
+    EModeSetResponse,
     OracleStatusResponse,
     PoolDeficitInfoResponse,
     PoolHealthResponse,
@@ -32,6 +38,8 @@ from .schemas import (
     StressTestScenarioResponse,
 )
 from .service import AaveService, MultiChainAaveService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/aave", tags=["aave"])
 
@@ -389,6 +397,58 @@ def get_rewards(
     )
 
 
+@router.get(
+    "/emode",
+    response_model=EModeGetResponse,
+    summary="現在の eMode 設定と最適化推奨を取得する (viewer 以上)",
+)
+def get_emode(
+    current_user: User = Depends(require_viewer),
+) -> EModeGetResponse:
+    """
+    現在の eMode カテゴリと最適化推奨を返す。
+
+    - 現在の eMode カテゴリ ID は Pool.getUserEMode() から取得
+    - 推奨は担保資産構成から emode_optimizer が算出
+    - AAVE_WALLET_ADDRESS が未設定の場合は cat0 (eMode なし) を返す (fail-open)
+    """
+    import os  # noqa: PLC0415
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    wallet_address = os.getenv("AAVE_WALLET_ADDRESS", "")
+    current_category_id = 0
+
+    # fail-open: wallet 未設定や RPC エラーは cat0 を返す
+    if wallet_address:
+        try:
+            client = get_default_aave_client()
+            current_category_id = client.get_user_emode(wallet_address)
+        except Exception as exc:  # noqa: BLE001
+            # RPC 失敗時は cat0 で継続（fail-open）
+            logger.warning("get_user_emode 失敗 (fail-open): %s", exc)
+
+    current_emode = get_emode_info(current_category_id)
+
+    # 担保資産は環境変数から取得。未設定の場合は空リストで推奨なし
+    collateral_assets_env = os.getenv("AAVE_COLLATERAL_ASSETS", "")
+    collateral_assets: list[str] = (
+        [a.strip() for a in collateral_assets_env.split(",") if a.strip()]
+        if collateral_assets_env
+        else []
+    )
+
+    recommendation = recommend_emode(
+        current_collateral_assets=collateral_assets,
+        current_category_id=current_category_id,
+    )
+
+    return EModeGetResponse(
+        current_emode=current_emode,
+        recommendation=recommendation,
+        fetched_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+
 @router.post(
     "/rewards/claim",
     response_model=RewardClaimResult,
@@ -486,3 +546,101 @@ def get_borrow_rates(
             error="AAVE_DATA_PROVIDER_ADDRESS 等の環境変数が未設定です。",
         )
     return optimizer.compare_borrow_rates()
+
+
+@router.post(
+    "/emode",
+    response_model=EModeSetResponse,
+    summary="eMode カテゴリを切り替える (admin のみ)",
+)
+def set_emode(
+    body: EModeSetRequest,
+    current_user: User = Depends(require_admin),
+) -> EModeSetResponse:
+    """
+    Pool.setUserEMode(categoryId) を呼び出して eMode を切り替える。
+
+    HUMAN-REVIEW-REQUIRED: setUserEMode は Aave V3 の write 操作であり、
+    LTV / 清算閾値を変更するため、本番での実行は人間承認後に行うこと。
+
+    dry_run=True の場合はオンチェーン tx を送信せず効果試算のみ返す。
+    """
+    import os  # noqa: PLC0415
+
+    wallet_address = os.getenv("AAVE_WALLET_ADDRESS", "")
+
+    if not wallet_address:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AAVE_WALLET_ADDRESS が未設定です。管理者設定が必要です。",
+        )
+
+    try:
+        client = get_default_aave_client()
+
+        # CRITICAL: HF チェック (CLAUDE.md Security Rule 2 / docs/13_security_design.md)
+        # eMode 切替は LTV / 清算閾値を変更するため、HF < 1.6 の場合はブロックする。
+        # fail-open: HF 取得失敗時は継続（RPC 障害でオペレーションを止めない）
+        try:
+            hf = client.get_health_factor(wallet_address)
+            if hf is not None and hf != Decimal("inf") and hf < Decimal("1.6"):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"Health Factor が {hf} < 1.6 のため eMode 切替をブロックしました。"
+                        " ポジションを安全な状態に戻してから再試行してください。"
+                    ),
+                )
+        except HTTPException:
+            raise
+        except Exception as hf_exc:  # noqa: BLE001
+            logger.warning("HF チェック失敗 (継続): %s", hf_exc)
+
+        result = client.build_set_emode_tx(
+            category_id=body.category_id,
+            wallet_address=wallet_address,
+            dry_run=body.dry_run,
+        )
+
+        if body.dry_run:
+            return EModeSetResponse(
+                category_id=body.category_id,
+                tx_hash=None,
+                set_emode_tx=None,
+                dry_run=True,
+                message=f"dry_run: eMode cat{body.category_id} への切替 tx を試算しました（送信なし）",
+            )
+
+        # build-tx モード: 未署名 tx をレスポンスに含めてフロントエンドへ返す。
+        # フロントエンドはこの tx をウォレットで署名・送信することで eMode を切り替える。
+        # HUMAN-REVIEW-REQUIRED: setUserEMode は Aave V3 の write 操作。
+        set_emode_tx: dict[str, object] | None = result.get("set_emode_tx")
+        logger.info(
+            "set_emode build_tx: wallet=%s...%s, category_id=%d",
+            wallet_address[:6],
+            wallet_address[-4:],
+            body.category_id,
+        )
+        return EModeSetResponse(
+            category_id=body.category_id,
+            tx_hash=None,
+            set_emode_tx=set_emode_tx,
+            dry_run=False,
+            message=(
+                f"eMode cat{body.category_id} への切替 tx を構築しました。"
+                " HUMAN-REVIEW-REQUIRED: フロントエンドで署名・送信してください。"
+            ),
+        )
+
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="eMode 切替 tx 構築中にエラーが発生しました。",
+        ) from exc
