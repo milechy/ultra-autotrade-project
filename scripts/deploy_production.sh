@@ -373,6 +373,17 @@ if grep -qE '^AAVE_NETWORK=.*sepolia' .env.production; then
   fi
 fi
 
+# Guard 1b: NEXT_PUBLIC_PRIVY_APP_ID 検証 (フロント build に焼き込まれる build-time 値)
+# 未設定/placeholder のまま build すると PrivyRootClient が PrivyProvider を描画せず、
+# ログイン画面で usePrivy が throw → 白画面でログイン不能になる (PrivyRootClient.tsx)。
+# build 前にここで弾く (フロントを焼く full / --frontend-only の両方で必須)。
+_privy_app_id="$(grep -E '^NEXT_PUBLIC_PRIVY_APP_ID=' .env.production | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d '[:space:]' || true)"
+if [[ -z "${_privy_app_id}" || "${_privy_app_id}" == "clplaceholder000000000000000000000" ]]; then
+  echo "❌ FAIL: .env.production の NEXT_PUBLIC_PRIVY_APP_ID が未設定/placeholder"
+  echo "    → Privy ログインが白画面になります。実 App ID を設定してから deploy してください"
+  exit 1
+fi
+
 # Guard 2: 環境分離チェック (バックエンドに関わるキーのみ必須 — フロントエンドのみデプロイ時はスキップ)
 if [[ "${FRONTEND_ONLY}" == "true" ]]; then
   echo "⚠️  WARN: --frontend-only のため環境分離チェックをスキップ (バックエンド変更なし)"
