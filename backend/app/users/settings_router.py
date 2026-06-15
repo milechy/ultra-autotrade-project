@@ -46,6 +46,7 @@ def _build_settings_response(user: User) -> UserSettingsResponse:
         terms_agreed_at=user.terms_accepted_at,
         terms_version=user.terms_version,
         corporate_fiscal_month=user.corporate_fiscal_month,
+        role=user.role,
     )
 
 

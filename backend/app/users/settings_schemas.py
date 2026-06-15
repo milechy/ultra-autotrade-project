@@ -30,6 +30,8 @@ class UserSettingsResponse(BaseModel):
     terms_version: Optional[str] = None
     # 法人決算月 (1-12)。NULL=個人ユーザー。設定済みで TAX & REPORTS 法人モードを解放する。
     corporate_fiscal_month: Optional[int] = None
+    # ユーザーロール（admin / viewer / partner）。フロントエンドの権限分岐に使用する。
+    role: str = "viewer"
 
 
 class UserSettingsUpdate(BaseModel):

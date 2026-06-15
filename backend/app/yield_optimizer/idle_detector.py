@@ -132,6 +132,12 @@ class IdleCapitalDetector:
         fetch_balance() の 'used' 残高が 0 超かどうかで判定する。
         取得失敗時は True を返す (安全側に倒す)。
 
+        NOTE (制限): USDC spot の 'used' 残高でポジションを判定しているが、
+        デリバティブポジション（先物・オプション等）は fetch_positions() で
+        取得する必要がある。USDC spot 'used' のみでは先物ポジション保有中でも
+        「ポジションなし」と誤判定する可能性がある。
+        TODO: fetch_positions() に基づくデリバティブポジション判定を追加する。
+
         Returns:
             True = ポジションあり / False = ポジションなし
         """
@@ -180,7 +186,7 @@ class IdleCapitalDetector:
         idle = self.get_idle_capital()
         if idle < self._idle_threshold:
             logger.debug(
-                "should_deploy_to_morpho: idle=%.2f < threshold=%.2f → False",
+                "should_deploy_to_morpho: idle=%s < threshold=%s → False",
                 idle,
                 self._idle_threshold,
             )
@@ -191,23 +197,46 @@ class IdleCapitalDetector:
             return False
 
         logger.info(
-            "should_deploy_to_morpho: idle=%.2f >= threshold=%.2f, no open positions → True",
+            "should_deploy_to_morpho: idle=%s >= threshold=%s, no open positions → True",
             idle,
             self._idle_threshold,
         )
         return True
 
+    def _get_bybit_snapshot(self) -> tuple[Decimal, bool]:
+        """
+        fetch_balance() を1回だけ呼び出し、USDC free 残高とポジション有無を返す。
+
+        Returns:
+            (usdc_free: Decimal, has_open_positions: bool)
+            失敗時は (Decimal("0"), True) — 安全側に倒す。
+        """
+        if self._exchange_client is None:
+            return Decimal("0"), True
+
+        try:
+            balance = self._exchange_client.fetch_balance()
+            usdc_free = _decimal_free_usdc(balance)
+            usdc_entry = balance.get("USDC") or balance.get("usdc") or {}
+            used = _decimal_from_str(usdc_entry.get("used") or "0")
+            has_positions = used > Decimal("0")
+            return usdc_free, has_positions
+        except Exception as exc:
+            logger.warning("_get_bybit_snapshot: fetch_balance failed (fail-open): %s", exc)
+            return Decimal("0"), True
+
     def build_report(self) -> IdleCapitalReport:
         """
         アイドル資本レポートを生成する。
 
+        fetch_balance() は1回のみ呼び出す (TOCTOU 回避 / API コスト削減)。
+
         Returns:
             IdleCapitalReport
         """
-        bybit_free = self.get_bybit_free_usdc()
+        bybit_free, has_positions = self._get_bybit_snapshot()
         deployed = self.get_deployed_amount()
         idle = max(Decimal("0"), bybit_free - deployed)
-        has_positions = self._has_open_bybit_positions()
 
         should_deploy = idle >= self._idle_threshold and not has_positions
 

@@ -183,6 +183,14 @@ class BybitSandboxClient:
                     "used": 0.0,
                     "total": 0.1,
                 },
+                # USDC キーを追加: idle_detector の fetch_balance 依存テスト・
+                # アイドル検出 (staging/dry_run 環境) で USDC 残高 $0 として扱われる。
+                # 本番では ccxt の実残高が返るため、このエントリは参照されない。
+                "USDC": {
+                    "free": 0.0,
+                    "used": 0.0,
+                    "total": 0.0,
+                },
             }
 
         try:

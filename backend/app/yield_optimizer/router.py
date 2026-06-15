@@ -161,13 +161,13 @@ def deposit(
         logger.error("deposit: failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Privy Earn deposit failed: {exc}",
+            detail="Privy Earn deposit failed",
         ) from exc
     except Exception as exc:
         logger.error("deposit: unexpected error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Privy Earn API error: {exc}",
+            detail="Privy Earn deposit API error",
         ) from exc
 
     return result
@@ -201,13 +201,13 @@ def withdraw(
         logger.error("withdraw: failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Privy Earn withdraw failed: {exc}",
+            detail="Privy Earn withdraw failed",
         ) from exc
     except Exception as exc:
         logger.error("withdraw: unexpected error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Privy Earn API error: {exc}",
+            detail="Privy Earn withdraw API error",
         ) from exc
 
     return result

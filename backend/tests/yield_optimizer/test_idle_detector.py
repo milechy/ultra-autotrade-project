@@ -117,7 +117,7 @@ class TestShouldDeployToMorpho:
         )
         assert detector.should_deploy_to_morpho() is False
 
-    def test_should_deploy_false_when_idle_exactly_at_threshold(self) -> None:
+    def test_should_deploy_true_when_idle_exactly_at_threshold(self) -> None:
         """アイドル = 閾値 ちょうど → True (>= の境界値)。"""
         detector = _make_detector(
             bybit_free="100",
