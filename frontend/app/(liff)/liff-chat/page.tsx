@@ -128,17 +128,6 @@ export default function LiffChatPage() {
       .catch(() => {})
   }, [])
 
-  // ── 承認・見送りハンドラ（BUY/SELL）
-  function handleApprove() {
-    // liff-approve に遷移せずパネルで完結させる想定（Phase 5 以降）
-    track(EV.JUDGMENT_APPROVE, { action: aiJudgment?.action })
-    setAiJudgment(null)
-  }
-  function handleReject() {
-    track(EV.JUDGMENT_REJECT, { action: aiJudgment?.action })
-    setAiJudgment(null)
-  }
-
   // ── 緊急停止: POST /api/user/pause（require_active_user / consumer 可）
   // backend の OR ロジック安全装置は変更せず、ユーザーの is_active フラグを落とすだけ。
   async function handleEmergencyStop() {
@@ -168,7 +157,7 @@ export default function LiffChatPage() {
   }
 
   // ── AI カード色設定
-  const action = aiJudgment?.action ?? "HOLD"
+  const action = aiJudgment?.action
   const confidence = aiJudgment?.confidence ?? 0
   const isBuy = action === "BUY"
   const isSell = action === "SELL"
@@ -306,41 +295,25 @@ export default function LiffChatPage() {
               isBuy ? "text-[#4ade9a]" : isSell ? "text-red-400" : "text-white"
             }`}
           >
-            {action}
+            {aiJudgment ? action : t("home.noSignal")}
           </div>
 
-          {/* BUY / SELL 時: 承認・見送りボタン */}
-          {(isBuy || isSell) && (
-            <div className="flex gap-3 mt-3">
+          {/* なぜ{action}？理由トグル（aiJudgment がある場合のみ表示） */}
+          {aiJudgment && (
+            <>
               <button
-                onClick={handleApprove}
-                className={`flex-1 py-3 rounded-xl font-semibold text-white ${
-                  isBuy ? "bg-[#1D9E75]" : "bg-red-500"
-                }`}
+                onClick={() => { const next = !reasonOpen; setReasonOpen(next); track(EV.REASON_TOGGLE, { action, open: next }) }}
+                className="mt-2 text-zinc-500 text-xs underline"
+                aria-expanded={reasonOpen}
               >
-                {t("home.approve")}
+                {t("home.whyAction", { action })}
               </button>
-              <button
-                onClick={handleReject}
-                className="flex-1 py-3 border border-zinc-600 text-zinc-300 rounded-xl font-semibold"
-              >
-                {t("home.reject")}
-              </button>
-            </div>
-          )}
-
-          {/* なぜ{action}？理由トグル（BUY/SELL/HOLD 共通） */}
-          <button
-            onClick={() => { const next = !reasonOpen; setReasonOpen(next); track(EV.REASON_TOGGLE, { action, open: next }) }}
-            className="mt-2 text-zinc-500 text-xs underline"
-            aria-expanded={reasonOpen}
-          >
-            {t("home.whyAction", { action })}
-          </button>
-          {reasonOpen && (
-            <p className="mt-2 text-zinc-400 text-xs leading-relaxed whitespace-pre-wrap">
-              {aiJudgment?.reason ?? t("home.noReason")}
-            </p>
+              {reasonOpen && (
+                <p className="mt-2 text-zinc-400 text-xs leading-relaxed whitespace-pre-wrap">
+                  {aiJudgment.reason ?? t("home.noReason")}
+                </p>
+              )}
+            </>
           )}
         </div>
 

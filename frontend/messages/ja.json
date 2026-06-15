@@ -667,6 +667,7 @@
       "assetChartLoading": "グラフを読み込み中...",
       "emergencyStop": "緊急停止",
       "emergencyStopAriaLabel": "自律売買を緊急停止する",
+      "noSignal": "判定なし",
       "stoppedStatus": "自律売買は停止中です",
       "stopConfirmTitle": "自律売買を停止しますか？",
       "stopConfirmDesc": "停止すると、AIによる自動の判断・実行が止まります。再開はサポートにご連絡ください。",

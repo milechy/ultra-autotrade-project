@@ -667,6 +667,7 @@
       "assetChartLoading": "Loading chart...",
       "emergencyStop": "Emergency Stop",
       "emergencyStopAriaLabel": "Emergency stop autonomous trading",
+      "noSignal": "No signal",
       "stoppedStatus": "Autonomous trading is stopped",
       "stopConfirmTitle": "Stop autonomous trading?",
       "stopConfirmDesc": "Stopping halts the AI's automatic decisions and execution. To resume, please contact support.",
