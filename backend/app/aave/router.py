@@ -8,6 +8,7 @@ Aave 操作用の FastAPI ルーター定義。
 - POST /aave/rebalance
 """
 
+import logging
 from decimal import Decimal
 from functools import lru_cache
 
@@ -21,6 +22,9 @@ from .schemas import (
     AaveRebalanceRequest,
     AaveRebalanceResponse,
     ClaimableReward,
+    EModeGetResponse,
+    EModeSetRequest,
+    EModeSetResponse,
     OracleStatusResponse,
     PoolDeficitInfoResponse,
     PoolHealthResponse,
@@ -30,6 +34,8 @@ from .schemas import (
     StressTestScenarioResponse,
 )
 from .service import AaveService, MultiChainAaveService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/aave", tags=["aave"])
 
@@ -387,6 +393,62 @@ def get_rewards(
     )
 
 
+@router.get(
+    "/emode",
+    response_model=EModeGetResponse,
+    summary="現在の eMode 設定と最適化推奨を取得する (viewer 以上)",
+)
+def get_emode(
+    current_user: User = Depends(require_viewer),
+) -> EModeGetResponse:
+    """
+    現在の eMode カテゴリと最適化推奨を返す。
+
+    - 現在の eMode カテゴリ ID は Pool.getUserEMode() から取得
+    - 推奨は担保資産構成から emode_optimizer が算出
+    - AAVE_WALLET_ADDRESS が未設定の場合は cat0 (eMode なし) を返す (fail-open)
+    """
+    import os  # noqa: PLC0415
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    from .client import get_default_aave_client  # noqa: PLC0415
+    from .emode_optimizer import get_emode_info, recommend_emode  # noqa: PLC0415
+
+    wallet_address = os.getenv("AAVE_WALLET_ADDRESS", "")
+    current_category_id = 0
+
+    # fail-open: wallet 未設定や RPC エラーは cat0 を返す
+    if wallet_address:
+        try:
+            client = get_default_aave_client()
+            if hasattr(client, "get_user_emode"):
+                current_category_id = client.get_user_emode(wallet_address)
+        except Exception as exc:  # noqa: BLE001
+            # RPC 失敗時は cat0 で継続（fail-open）
+            logger.warning("get_user_emode 失敗 (fail-open): %s", exc)
+
+    current_emode = get_emode_info(current_category_id)
+
+    # 担保資産は環境変数から取得。未設定の場合は空リストで推奨なし
+    collateral_assets_env = os.getenv("AAVE_COLLATERAL_ASSETS", "")
+    collateral_assets: list[str] = (
+        [a.strip() for a in collateral_assets_env.split(",") if a.strip()]
+        if collateral_assets_env
+        else []
+    )
+
+    recommendation = recommend_emode(
+        current_collateral_assets=collateral_assets,
+        current_category_id=current_category_id,
+    )
+
+    return EModeGetResponse(
+        current_emode=current_emode,
+        recommendation=recommendation,
+        fetched_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+
 @router.post(
     "/rewards/claim",
     response_model=RewardClaimResult,
@@ -453,3 +515,87 @@ def claim_rewards(
         claimed_but_not_resupplied=result.get("claimed_but_not_resupplied", []),
         error=result.get("error"),
     )
+
+
+@router.post(
+    "/emode",
+    response_model=EModeSetResponse,
+    summary="eMode カテゴリを切り替える (admin のみ)",
+)
+def set_emode(
+    body: EModeSetRequest,
+    current_user: User = Depends(require_admin),
+) -> EModeSetResponse:
+    """
+    Pool.setUserEMode(categoryId) を呼び出して eMode を切り替える。
+
+    HUMAN-REVIEW-REQUIRED: setUserEMode は Aave V3 の write 操作であり、
+    LTV / 清算閾値を変更するため、本番での実行は人間承認後に行うこと。
+
+    dry_run=True の場合はオンチェーン tx を送信せず効果試算のみ返す。
+    """
+    import os  # noqa: PLC0415
+
+    from .client import get_default_aave_client  # noqa: PLC0415
+
+    wallet_address = os.getenv("AAVE_WALLET_ADDRESS", "")
+
+    if not wallet_address:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AAVE_WALLET_ADDRESS が未設定です。管理者設定が必要です。",
+        )
+
+    try:
+        client = get_default_aave_client()
+        if not hasattr(client, "build_set_emode_tx"):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="現在の AAVE_CLIENT_TYPE は setUserEMode をサポートしていません。",
+            )
+
+        result = client.build_set_emode_tx(
+            category_id=body.category_id,
+            wallet_address=wallet_address,
+            dry_run=body.dry_run,
+        )
+
+        if body.dry_run:
+            return EModeSetResponse(
+                category_id=body.category_id,
+                tx_hash=None,
+                dry_run=True,
+                message=f"dry_run: eMode cat{body.category_id} への切替 tx を試算しました（送信なし）",
+            )
+
+        # build-tx モード: 未署名 tx を返す（フロントエンドが署名して送信）
+        # 現時点は未署名 tx ログ + 成功メッセージを返す
+        logger.info(
+            "set_emode build_tx: wallet=%s...%s, category_id=%d, tx_data=%s",
+            wallet_address[:6],
+            wallet_address[-4:],
+            body.category_id,
+            str(result)[:80],
+        )
+        return EModeSetResponse(
+            category_id=body.category_id,
+            tx_hash=None,
+            dry_run=False,
+            message=(
+                f"eMode cat{body.category_id} への切替 tx を構築しました。"
+                " HUMAN-REVIEW-REQUIRED: フロントエンドで署名・送信してください。"
+            ),
+        )
+
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="eMode 切替 tx 構築中にエラーが発生しました。",
+        ) from exc

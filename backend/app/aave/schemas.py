@@ -300,6 +300,70 @@ class OracleStatusResponse(BaseModel):
     alerts: list[OracleAlert] = Field(default_factory=list, description="全アセットのアラート一覧")
 
 
+class EModeInfo(BaseModel):
+    """Aave V3 eMode カテゴリ情報。"""
+
+    category_id: int = Field(
+        ge=0, description="eMode カテゴリ ID (0=なし, 1=ステーブル, 2=ETH相関)"
+    )
+    label: str = Field(description="カテゴリラベル (例: 'No eMode', 'Stablecoins')")
+    ltv_bps: Decimal = Field(ge=0, description="Loan-to-Value 比率 (bps 単位, 例: 9000 = 90%)")
+    liquidation_threshold_bps: Decimal = Field(
+        ge=0, description="清算閾値 (bps 単位, 例: 9300 = 93%)"
+    )
+
+    @field_serializer("ltv_bps", "liquidation_threshold_bps")
+    @classmethod
+    def _serialize_decimal(cls, v: Decimal) -> str:
+        return str(v)
+
+
+class EModeRecommendation(BaseModel):
+    """eMode 最適化の推奨結果。"""
+
+    current_category_id: int = Field(ge=0, description="現在の eMode カテゴリ ID")
+    recommended_category_id: int = Field(ge=0, description="推奨 eMode カテゴリ ID")
+    current_ltv_bps: Decimal = Field(ge=0, description="現在の実効 LTV (bps)")
+    recommended_ltv_bps: Decimal = Field(ge=0, description="推奨後の実効 LTV (bps)")
+    ltv_improvement_pct: Decimal = Field(description="LTV 改善率 (パーセント, 例: 20.0 = 20% 向上)")
+    reason: str = Field(description="推奨理由（担保資産の構成）")
+    collateral_assets: list[str] = Field(
+        default_factory=list, description="現在の担保資産シンボル一覧"
+    )
+
+    @field_serializer("current_ltv_bps", "recommended_ltv_bps", "ltv_improvement_pct")
+    @classmethod
+    def _serialize_decimal(cls, v: Decimal) -> str:
+        return str(v)
+
+
+class EModeGetResponse(BaseModel):
+    """GET /aave/emode のレスポンス。"""
+
+    current_emode: EModeInfo = Field(description="現在の eMode 情報")
+    recommendation: EModeRecommendation = Field(description="最適化推奨")
+    fetched_at: str = Field(description="取得日時 (ISO 8601)")
+
+
+class EModeSetRequest(BaseModel):
+    """POST /aave/emode のリクエストボディ。"""
+
+    category_id: int = Field(ge=0, le=255, description="設定する eMode カテゴリ ID (uint8)")
+    dry_run: bool = Field(
+        False,
+        description="True の場合、チェーンへの tx 送信を行わず効果を試算のみ返す",
+    )
+
+
+class EModeSetResponse(BaseModel):
+    """POST /aave/emode のレスポンス。"""
+
+    category_id: int = Field(description="設定した eMode カテゴリ ID")
+    tx_hash: Optional[str] = Field(None, description="tx ハッシュ (dry_run=True の場合は None)")
+    dry_run: bool = Field(description="ドライランかどうか")
+    message: str = Field(description="結果メッセージ")
+
+
 class AaveMonitorStatus(BaseModel):
     """GET /aave/status のレスポンス。"""
 

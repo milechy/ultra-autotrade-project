@@ -115,6 +115,20 @@ _POOL_ABI_MINIMAL = [
             }
         ],
     },
+    {
+        "inputs": [{"internalType": "uint8", "name": "categoryId", "type": "uint8"}],
+        "name": "setUserEMode",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+    {
+        "inputs": [{"internalType": "address", "name": "user", "type": "address"}],
+        "name": "getUserEMode",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function",
+    },
 ]
 
 # ERC-20 totalSupply ABI（利用率計算用）
@@ -478,6 +492,31 @@ class DummyAaveClient(AaveClientBase):
     ) -> "dict[str, Any]":
         return {
             "withdraw_tx": {
+                "to": "0xDUMMY",
+                "data": "0x",
+                "from": wallet_address,
+                "chainId": 84532,
+                "value": "0x0",
+            }
+        }
+
+    def get_user_emode(self, wallet_address: str) -> int:
+        """ダミークライアント: eMode なし (cat0) を返す。"""
+        logger.info("DummyAaveClient.get_user_emode called (no RPC)")
+        return 0
+
+    def build_set_emode_tx(
+        self,
+        category_id: int,
+        wallet_address: str,
+        dry_run: bool = False,
+    ) -> "dict[str, Any]":
+        """ダミークライアント: build_set_emode_tx のスタブ。"""
+        logger.info("DummyAaveClient.build_set_emode_tx called (no tx sent)")
+        if dry_run:
+            return {"category_id": category_id, "dry_run": True}
+        return {
+            "set_emode_tx": {
                 "to": "0xDUMMY",
                 "data": "0x",
                 "from": wallet_address,
@@ -1380,6 +1419,104 @@ class Web3AaveClient(AaveClientBase):
     def _from_wei(self, amount: int, decimals: int) -> Decimal:
         """Wei（最小単位）→ Decimal 変換。"""
         return Decimal(amount) / Decimal(10**decimals)
+
+    def get_user_emode(self, wallet_address: str) -> int:
+        """
+        Pool.getUserEMode(user) を呼び出して現在の eMode カテゴリ ID を返す。
+
+        Args:
+            wallet_address: 対象ウォレットアドレス
+
+        Returns:
+            int: eMode カテゴリ ID (0=なし, 1=ステーブル, 2=ETH相関)
+
+        Raises:
+            AaveClientError: RPC 失敗時
+        """
+        if Web3 is None:
+            raise AaveClientError("web3 package is required")
+
+        if not wallet_address and hasattr(self, "account"):
+            wallet_address = self.account.address
+
+        try:
+            checksum_addr = Web3.to_checksum_address(wallet_address)
+            category_id: int = self._pool.functions.getUserEMode(checksum_addr).call()
+            logger.info(
+                "getUserEMode: wallet=%s...%s, category_id=%d",
+                wallet_address[:6] if wallet_address else "N/A",
+                wallet_address[-4:] if wallet_address else "N/A",
+                category_id,
+            )
+            return category_id
+        except AaveClientError:
+            raise
+        except Exception as exc:
+            raise AaveClientError(f"getUserEMode 失敗: {exc}") from exc
+
+    def build_set_emode_tx(
+        self,
+        category_id: int,
+        wallet_address: str,
+        dry_run: bool = False,
+    ) -> "dict[str, Any]":
+        """
+        Pool.setUserEMode(categoryId) の未署名トランザクションを構築して返す。
+
+        HUMAN-REVIEW-REQUIRED: setUserEMode は Aave V3 の write 操作。
+        資本効率（LTV）を変更するため、実行は人間承認後のみ。
+
+        既存の build_deposit_txs / build_withdraw_tx と同じ「build-tx」パターンを踏襲:
+        - dry_run=True: チェーンに送信せず効果試算のみ（{"category_id": ..., "dry_run": True}）
+        - dry_run=False: 未署名 tx dict を返す（フロントエンドまたは管理者が署名して送信）
+
+        Args:
+            category_id: 設定する eMode カテゴリ ID (uint8, 0-255)
+            wallet_address: 送信元ウォレットアドレス
+            dry_run: True の場合は tx を送信・構築せず試算結果を返す
+
+        Returns:
+            dry_run=True:  {"category_id": int, "dry_run": True}
+            dry_run=False: {"set_emode_tx": {to, data, from, chainId, value}}
+
+        Raises:
+            AaveClientError: アドレス未設定時など
+        """
+        if Web3 is None:
+            raise AaveClientError("web3 package is required")
+
+        if not wallet_address:
+            raise AaveClientError("wallet_address は必須です (setUserEMode)")
+
+        if not (0 <= category_id <= 255):
+            raise ValueError(f"category_id は 0-255 の範囲で指定してください: {category_id}")
+
+        logger.info(
+            "build_set_emode_tx: wallet=%s...%s, category_id=%d, dry_run=%s",
+            wallet_address[:6] if wallet_address else "N/A",
+            wallet_address[-4:] if wallet_address else "N/A",
+            category_id,
+            dry_run,
+        )
+
+        if dry_run:
+            return {"category_id": category_id, "dry_run": True}
+
+        checksum_wallet = Web3.to_checksum_address(wallet_address)
+        chain_id = self._w3.eth.chain_id
+
+        # web3.py v7: encode_abi (fn_name= → 位置引数)
+        set_emode_data = self._pool.encode_abi("setUserEMode", args=[category_id])
+
+        return {
+            "set_emode_tx": {
+                "to": str(self._pool.address),
+                "data": set_emode_data,
+                "from": checksum_wallet,
+                "chainId": chain_id,
+                "value": "0x0",
+            }
+        }
 
 
 def _load_oracle_config_for_asset(asset_symbol: str) -> "dict[str, Any] | None":
