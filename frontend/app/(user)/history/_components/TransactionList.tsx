@@ -4,6 +4,7 @@
 
 import { useState } from 'react'
 import { FileX } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -45,12 +46,6 @@ const STATUS_BADGE_CLASSES: Record<TransactionStatus, string> = {
   failed: 'bg-red-500/20 text-red-400 border-red-500/30',
 }
 
-const STATUS_LABELS: Record<TransactionStatus, string> = {
-  success: '成功',
-  pending: '処理中',
-  failed: '失敗',
-}
-
 function formatDateTime(iso: string): string {
   const d = new Date(iso)
   const y = d.getFullYear()
@@ -61,15 +56,17 @@ function formatDateTime(iso: string): string {
   return `${y}-${mo}-${da} ${h}:${mi}`
 }
 
-function formatRelativeTime(iso: string): string {
+type TFunc = (key: string, values?: Record<string, string | number>) => string
+
+function formatRelativeTime(iso: string, t: TFunc): string {
   const diff = Date.now() - new Date(iso).getTime()
   const minutes = Math.floor(diff / 60000)
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
-  if (days > 0) return `${days}日前`
-  if (hours > 0) return `${hours}時間前`
-  if (minutes > 0) return `${minutes}分前`
-  return 'たった今'
+  if (days > 0) return t('daysAgo', { n: days })
+  if (hours > 0) return t('hoursAgo', { n: hours })
+  if (minutes > 0) return t('minutesAgo', { n: minutes })
+  return t('justNow')
 }
 
 const PAGE_SIZE = 50
@@ -79,17 +76,24 @@ interface TransactionListProps {
 }
 
 export function TransactionList({ transactions }: TransactionListProps) {
+  const t = useTranslations('History')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   const visible = transactions.slice(0, visibleCount)
   const hasMore = transactions.length > visibleCount
 
+  const statusLabel: Record<TransactionStatus, string> = {
+    success: t('statusSuccess'),
+    pending: t('statusPending'),
+    failed: t('statusFailed'),
+  }
+
   if (transactions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-400">
         <FileX className="h-12 w-12 opacity-40" />
-        <p className="text-sm font-medium">まだ取引履歴がありません</p>
-        <p className="text-xs text-zinc-500">AI提案を承認すると、ここに取引履歴が表示されます</p>
+        <p className="text-sm font-medium">{t('noHistoryYet')}</p>
+        <p className="text-xs text-zinc-500">{t('noHistoryDesc')}</p>
       </div>
     )
   }
@@ -101,12 +105,12 @@ export function TransactionList({ transactions }: TransactionListProps) {
         <Table>
           <TableHeader>
             <TableRow className="border-zinc-800 hover:bg-transparent">
-              <TableHead className="text-zinc-400 font-medium">日時</TableHead>
-              <TableHead className="text-zinc-400 font-medium">操作</TableHead>
-              <TableHead className="text-zinc-400 font-medium">資産</TableHead>
-              <TableHead className="text-zinc-400 font-medium text-right">金額</TableHead>
-              <TableHead className="text-zinc-400 font-medium">ステータス</TableHead>
-              <TableHead className="text-zinc-400 font-medium">Tx</TableHead>
+              <TableHead className="text-zinc-400 font-medium">{t('colDate')}</TableHead>
+              <TableHead className="text-zinc-400 font-medium">{t('colOp')}</TableHead>
+              <TableHead className="text-zinc-400 font-medium">{t('colAsset')}</TableHead>
+              <TableHead className="text-zinc-400 font-medium text-right">{t('amount')}</TableHead>
+              <TableHead className="text-zinc-400 font-medium">{t('status')}</TableHead>
+              <TableHead className="text-zinc-400 font-medium">{t('colTx')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -114,7 +118,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
               <TableRow key={tx.id} className="border-zinc-800 hover:bg-zinc-900/60">
                 <TableCell className="whitespace-nowrap">
                   <div className="text-xs text-zinc-200">{formatDateTime(tx.timestamp)}</div>
-                  <div className="text-xs text-zinc-500">{formatRelativeTime(tx.timestamp)}</div>
+                  <div className="text-xs text-zinc-500">{formatRelativeTime(tx.timestamp, t)}</div>
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -140,7 +144,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
                     variant="outline"
                     className={`text-xs px-2 py-0.5 ${STATUS_BADGE_CLASSES[tx.status]}`}
                   >
-                    {STATUS_LABELS[tx.status]}
+                    {statusLabel[tx.status]}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -172,7 +176,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
             onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
             className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
           >
-            もっと読み込む ({transactions.length - visibleCount}件)
+            {t('loadMoreCount', { count: transactions.length - visibleCount })}
           </Button>
         </div>
       )}

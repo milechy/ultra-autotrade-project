@@ -2,6 +2,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AssetIcon, TxHashLink } from '@/components/shared'
@@ -17,15 +18,17 @@ function formatDateTime(iso: string): string {
   return `${y}-${mo}-${da} ${h}:${mi}`
 }
 
-function formatRelativeTime(iso: string): string {
+type TFunc = (key: string, values?: Record<string, string | number>) => string
+
+function formatRelativeTime(iso: string, t: TFunc): string {
   const diff = Date.now() - new Date(iso).getTime()
   const minutes = Math.floor(diff / 60000)
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
-  if (days > 0) return `${days}日前`
-  if (hours > 0) return `${hours}時間前`
-  if (minutes > 0) return `${minutes}分前`
-  return 'たった今'
+  if (days > 0) return t('daysAgo', { n: days })
+  if (hours > 0) return t('hoursAgo', { n: hours })
+  if (minutes > 0) return t('minutesAgo', { n: minutes })
+  return t('justNow')
 }
 
 const OPERATION_BADGE_CLASSES: Record<Transaction['type'], string> = {
@@ -35,23 +38,10 @@ const OPERATION_BADGE_CLASSES: Record<Transaction['type'], string> = {
   REPAY: 'bg-green-500/20 text-green-400 border-green-500/30',
 }
 
-const OPERATION_LABELS: Record<Transaction['type'], string> = {
-  SUPPLY: '供給',
-  WITHDRAW: '引き出し',
-  BORROW: '借入',
-  REPAY: '返済',
-}
-
 const STATUS_BADGE_CLASSES: Record<Transaction['status'], string> = {
   success: 'bg-green-500/20 text-green-400 border-green-500/30',
   pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
   failed: 'bg-red-500/20 text-red-400 border-red-500/30',
-}
-
-const STATUS_LABELS: Record<Transaction['status'], string> = {
-  success: '成功',
-  pending: '処理中',
-  failed: '失敗',
 }
 
 interface TransactionCardProps {
@@ -59,6 +49,21 @@ interface TransactionCardProps {
 }
 
 export function TransactionCard({ tx }: TransactionCardProps) {
+  const t = useTranslations('History')
+
+  const operationLabel: Record<Transaction['type'], string> = {
+    SUPPLY: t('opSupply'),
+    WITHDRAW: t('opWithdraw'),
+    BORROW: t('opBorrow'),
+    REPAY: t('opRepay'),
+  }
+
+  const statusLabel: Record<Transaction['status'], string> = {
+    success: t('statusSuccess'),
+    pending: t('statusPending'),
+    failed: t('statusFailed'),
+  }
+
   return (
     <Card className="bg-zinc-900 border-zinc-800">
       <CardContent className="p-4">
@@ -73,12 +78,12 @@ export function TransactionCard({ tx }: TransactionCardProps) {
                   variant="outline"
                   className={`text-xs px-2 py-0.5 ${OPERATION_BADGE_CLASSES[tx.type]}`}
                 >
-                  {OPERATION_LABELS[tx.type]}
+                  {operationLabel[tx.type]}
                 </Badge>
               </div>
               <div className="text-xs text-zinc-400 mt-0.5">
                 <span>{formatDateTime(tx.timestamp)}</span>
-                <span className="ml-2 text-zinc-500">({formatRelativeTime(tx.timestamp)})</span>
+                <span className="ml-2 text-zinc-500">({formatRelativeTime(tx.timestamp, t)})</span>
               </div>
             </div>
           </div>
@@ -92,7 +97,7 @@ export function TransactionCard({ tx }: TransactionCardProps) {
               variant="outline"
               className={`text-xs px-2 py-0.5 ${STATUS_BADGE_CLASSES[tx.status]}`}
             >
-              {STATUS_LABELS[tx.status]}
+              {statusLabel[tx.status]}
             </Badge>
           </div>
         </div>

@@ -4,6 +4,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import {
   StatsCards,
   TransactionFilters,
@@ -94,6 +95,7 @@ async function downloadCryptactCsv(year: number | null): Promise<void> {
 }
 
 function HistoryPageContent() {
+  const t = useTranslations('History')
   const [activeType, setActiveType] = useState<OperationType>('ALL')
   const [csvYear, setCsvYear] = useState<number>(CURRENT_YEAR)
   const [csvDownloading, setCsvDownloading] = useState(false)
@@ -105,7 +107,7 @@ function HistoryPageContent() {
     try {
       await downloadCryptactCsv(csvYear)
     } catch {
-      setCsvError('CSVのダウンロードに失敗しました')
+      setCsvError(t('csvError'))
     } finally {
       setCsvDownloading(false)
     }
@@ -160,7 +162,7 @@ function HistoryPageContent() {
       setTransactions(listRes.items.map(mapToTransaction))
       setTotalCount(listRes.total)
     } catch {
-      setError('データを取得できません')
+      setError(t('fetchError'))
     } finally {
       setLoading(false)
     }
@@ -198,23 +200,23 @@ function HistoryPageContent() {
         {/* Header */}
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold text-zinc-100">取引履歴</h1>
-            <p className="text-sm text-zinc-400 mt-0.5">Aave操作の全履歴を確認できます</p>
+            <h1 className="text-xl font-bold text-zinc-100">{t('title')}</h1>
+            <p className="text-sm text-zinc-400 mt-0.5">{t('headerDesc')}</p>
           </div>
           <Link
             href="/fees"
             className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
           >
-            手数料明細を見る →
+            {t('feeLink')}
           </Link>
         </div>
 
         {/* 税務CSV (Cryptact) ダウンロード */}
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 space-y-3">
           <div>
-            <p className="text-sm font-medium text-zinc-200">税務CSV (Cryptact形式)</p>
+            <p className="text-sm font-medium text-zinc-200">{t('csvTitle')}</p>
             <p className="text-xs text-zinc-500 mt-0.5">
-              実行済みAave操作をCryptact無料版フォーマットでエクスポートします
+              {t('csvDesc')}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -224,7 +226,7 @@ function HistoryPageContent() {
               className="text-sm bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               {Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i).map((y) => (
-                <option key={y} value={y}>{y}年</option>
+                <option key={y} value={y}>{t('csvYearUnit', { year: y })}</option>
               ))}
             </select>
             <button
@@ -232,7 +234,7 @@ function HistoryPageContent() {
               disabled={csvDownloading}
               className="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-md transition-colors"
             >
-              {csvDownloading ? 'ダウンロード中...' : 'CSVダウンロード'}
+              {csvDownloading ? t('csvDownloading') : t('csvDownload')}
             </button>
           </div>
           {csvError && (
@@ -269,7 +271,7 @@ function HistoryPageContent() {
           <div className="text-center space-y-3">
             <p className="text-sm text-red-400">{error}</p>
             <button onClick={fetchData} className="text-xs text-blue-400 underline">
-              再試行
+              {t('refresh')}
             </button>
           </div>
         ) : loading ? (
@@ -289,7 +291,7 @@ function HistoryPageContent() {
             disabled={loadingMore}
             className="w-full py-3 text-sm text-zinc-400 hover:text-zinc-300 border border-zinc-800 rounded-xl"
           >
-            {loadingMore ? '読み込み中...' : 'もっと見る'}
+            {loadingMore ? t('loadingText') : t('loadMore')}
           </button>
         )}
       </div>
