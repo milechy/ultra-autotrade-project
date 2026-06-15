@@ -1,7 +1,7 @@
 'use client'
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
-// frontend/components/dashboard/BorrowRatesPanelRecharts.tsx
+// frontend/components/admin/BorrowRatesPanelRecharts.tsx
 //
 // Recharts を分離 + SSR 無効化用ファイル。
 // 親コンポーネント BorrowRatesPanel.tsx から dynamic import される。

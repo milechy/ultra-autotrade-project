@@ -229,3 +229,67 @@ def test_signal_fail_open_on_exception() -> None:
             gho_effective_apr=Decimal("0.03"),
         )
     assert result == "recommend_usdc"
+
+
+# ============================================================================
+# stkAAVE 非ゼロ残高での割引テスト (Evaluator Nit 3 対応)
+# ============================================================================
+
+
+def _make_optimizer_with_stk_balance(
+    usdc_apr: Decimal,
+    gho_apr: Decimal,
+    stk_balance_tokens: int,
+) -> BorrowOptimizer:
+    """stkAAVE 残高が非ゼロのテスト用 BorrowOptimizer を生成する。
+
+    balanceOf は 18 decimals = stk_balance_tokens * 10^18 を返す。
+    """
+    optimizer = _make_optimizer(usdc_apr, gho_apr)
+    stk_contract = MagicMock()
+    stk_contract.functions.balanceOf.return_value.call.return_value = stk_balance_tokens * (10**18)
+    # eth.contract が stkAAVE アドレスで呼ばれたときだけ stk_contract を返す
+    original_contract_factory = optimizer._w3.eth.contract.side_effect
+
+    def contract_factory(address: str, abi: list) -> MagicMock:  # noqa: ARG001
+        if address == optimizer._stk_aave_address:
+            return stk_contract
+        if original_contract_factory is not None:
+            return original_contract_factory(address=address, abi=abi)
+        return MagicMock()
+
+    optimizer._w3.eth.contract.side_effect = contract_factory
+    return optimizer
+
+
+def test_stk_aave_nonzero_applies_discount() -> None:
+    """stkAAVE 100 トークン → 1% 割引が適用され GHO 実効 APR が低下する。"""
+    # USDC 4%, GHO 3.5% (差 0.5% = しきい値ぴったり、割引なしでは推奨されない)
+    optimizer = _make_optimizer_with_stk_balance(Decimal("0.04"), Decimal("0.035"), 100)
+    discount = optimizer.get_gho_discount_rate("0xWalletWithStkAave")
+
+    # 100 stkAAVE → 100 / 10000 = 0.01 (1%)
+    assert discount == Decimal("0.01"), f"Expected 1% discount, got {discount}"
+
+
+def test_stk_aave_discount_capped_at_20_percent() -> None:
+    """stkAAVE 3000 トークン → 割引上限 20% でキャップされる。"""
+    optimizer = _make_optimizer_with_stk_balance(Decimal("0.04"), Decimal("0.03"), 3000)
+    discount = optimizer.get_gho_discount_rate("0xWalletWithLargeStkAave")
+
+    # 3000 / 10000 = 0.30 → キャップで 0.20
+    assert discount == Decimal("0.20"), f"Expected 20% cap, got {discount}"
+
+
+def test_stk_aave_discount_reduces_effective_apr() -> None:
+    """stkAAVE 割引が compare_borrow_rates の gho_effective_apr に反映される。"""
+    # GHO 変動 APR 3%, stkAAVE 200 トークン → 2% 割引 → 実効 APR 3% * (1 - 0.02) = 2.94%
+    optimizer = _make_optimizer_with_stk_balance(Decimal("0.04"), Decimal("0.03"), 200)
+    result = optimizer.compare_borrow_rates(wallet_address="0xWalletWithStkAave")
+
+    expected_effective = Decimal("0.03") * (Decimal("1") - Decimal("0.02"))
+    assert abs(result.gho_effective_apr - expected_effective) < Decimal("1e-10"), (
+        f"Expected effective APR {expected_effective}, got {result.gho_effective_apr}"
+    )
+    # 差 = 4% - 2.94% = 1.06% > 0.5% → GHO 推奨
+    assert result.recommendation == "GHO"

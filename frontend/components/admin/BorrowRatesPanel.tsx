@@ -1,7 +1,7 @@
 'use client'
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
-// frontend/components/dashboard/BorrowRatesPanel.tsx
+// frontend/components/admin/BorrowRatesPanel.tsx
 //
 // GHO / USDC 借入金利比較パネル。
 // GET /api/aave/borrow-rates を 60 秒ごとにポーリングして表示する。
