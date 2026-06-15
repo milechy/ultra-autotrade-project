@@ -778,8 +778,6 @@
         "confirmCancelBtn": "Cancel",
         "successMsg": "Withdrawal request submitted. Please wait for confirmation.",
         "withdrawFailed": "Withdrawal failed",
-        "moonpayTitle": "Buy with card",
-        "moonpayDesc": "Purchase USDC with a credit or debit card via MoonPay.",
         "quickMax": "Max",
         "unitMan": "万"
       },

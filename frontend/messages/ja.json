@@ -778,8 +778,6 @@
         "confirmCancelBtn": "キャンセル",
         "successMsg": "出金リクエストを送信しました。反映まで少々お待ちください。",
         "withdrawFailed": "出金処理に失敗しました",
-        "moonpayTitle": "クレジットカードで購入",
-        "moonpayDesc": "MoonPay を使って、クレジットカードまたはデビットカードで USDC を購入できます。",
         "quickMax": "全額",
         "unitMan": "万"
       },
