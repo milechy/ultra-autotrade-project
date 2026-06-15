@@ -271,3 +271,60 @@ class AaveMonitorStatus(BaseModel):
     @classmethod
     def _serialize_hf(cls, v: Optional[Decimal]) -> Optional[str]:
         return str(v) if v is not None else None
+
+
+# ===== LiquidationSentinel: ストレステスト + プール赤字ヘルス =====
+
+
+class StressTestScenarioResponse(BaseModel):
+    """ストレステストの各シナリオ（価格ドロップ率）に対するレスポンス。"""
+
+    price_drop_pct: str = Field(description="価格下落率（文字列 Decimal 例: '0.10' = 10%）")
+    simulated_hf: Optional[str] = Field(
+        None, description="シミュレーション後の Health Factor。計算不能時は null。"
+    )
+    collateral_after_usd: Optional[str] = Field(
+        None, description="価格下落後の担保 USD 評価額（Decimal 文字列）。"
+    )
+
+
+class StressTestResponse(BaseModel):
+    """GET /api/aave/stress-test のレスポンス。"""
+
+    wallet_address: str = Field(description="対象ウォレットアドレス。")
+    current_hf: Optional[str] = Field(None, description="現在の Health Factor（Decimal 文字列）。")
+    current_collateral_usd: Optional[str] = Field(
+        None, description="現在の担保 USD 評価額（Decimal 文字列）。"
+    )
+    current_debt_usd: Optional[str] = Field(
+        None, description="現在の総借入 USD（Decimal 文字列）。"
+    )
+    liquidation_threshold: Optional[str] = Field(
+        None, description="清算しきい値（Decimal 文字列、例: '0.75'）。"
+    )
+    scenarios: list[StressTestScenarioResponse] = Field(
+        default_factory=list,
+        description="価格下落シナリオ（-10%, -20%）ごとのシミュレーション結果。",
+    )
+    error: Optional[str] = Field(None, description="エラーが発生した場合のメッセージ。")
+
+
+class PoolDeficitInfoResponse(BaseModel):
+    """アセット単位のプール赤字情報レスポンス。"""
+
+    asset_symbol: str = Field(description="アセットシンボル（例: USDC, WETH）。")
+    deficit_usd: str = Field(description="赤字額（概算 USD、Decimal 文字列）。")
+    alert_triggered: bool = Field(description="閾値を超えてアラートが発火したか。")
+
+
+class PoolHealthResponse(BaseModel):
+    """GET /api/aave/pool-health のレスポンス。"""
+
+    chain_name: str = Field(description="対象チェーン名。")
+    deficits: list[PoolDeficitInfoResponse] = Field(
+        default_factory=list,
+        description="アセットごとの赤字情報。",
+    )
+    total_deficit_usd: str = Field(description="総赤字額（概算 USD、Decimal 文字列）。")
+    alert_triggered: bool = Field(description="いずれかのアセットでアラートが発火したか。")
+    error: Optional[str] = Field(None, description="エラーが発生した場合のメッセージ。")

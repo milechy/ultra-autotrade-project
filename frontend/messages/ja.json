@@ -2213,7 +2213,21 @@
     "oraclePyth": "Pyth",
     "oracleTwap": "TWAP (30分)",
     "oracleCheckedAt": "検証日時",
-    "oracleDetail": "詳細"
+    "oracleDetail": "詳細",
+    "poolHealthTitle": "Aave プール赤字監視"
+  },
+  "PoolHealthPanel": {
+    "title": "プール赤字監視（getReserveDeficit）",
+    "alertActive": "アラート発火中",
+    "chain": "チェーン",
+    "totalDeficit": "総赤字額（概算）",
+    "noDeficits": "赤字なし",
+    "assetBreakdown": "アセット別内訳",
+    "alert": "アラート",
+    "loading": "読み込み中...",
+    "loadError": "プール赤字情報の取得に失敗しました。再読み込みしてください。",
+    "noData": "データなし",
+    "autoRefresh": "60秒ごとに自動更新"
   },
   "Register": {
     "title": "アカウント登録 - Ultra AutoTrade",

@@ -21,6 +21,10 @@ from .schemas import (
     AaveRebalanceRequest,
     AaveRebalanceResponse,
     OracleStatusResponse,
+    PoolDeficitInfoResponse,
+    PoolHealthResponse,
+    StressTestResponse,
+    StressTestScenarioResponse,
 )
 from .service import AaveService, MultiChainAaveService
 
@@ -214,4 +218,116 @@ def get_monitor_status(
         balance=balance,
         client_type=os.getenv("AAVE_CLIENT_TYPE", "dummy"),
         fetched_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+
+@router.get(
+    "/stress-test",
+    response_model=StressTestResponse,
+    summary="価格 -10%/-20% 時の Health Factor を事前計算する（清算リスクストレステスト）",
+)
+def get_stress_test(
+    current_user: User = Depends(require_viewer),
+) -> StressTestResponse:
+    """
+    AAVE_WALLET_ADDRESS のポジションに対して価格下落シナリオを適用し、
+    HF シミュレーション結果を返す。
+
+    - シナリオ 1: 担保価格 -10%
+    - シナリオ 2: 担保価格 -20%
+
+    金融計算はすべて Decimal で実行（float 禁止）。
+    RPC 未設定時は DummyAaveClient のデータでシミュレーションする（fail-open）。
+    """
+    import os  # noqa: PLC0415
+
+    from .liquidation_sentinel import get_stress_test as _get_stress_test  # noqa: PLC0415
+
+    wallet = os.getenv("AAVE_WALLET_ADDRESS", "")
+    if not wallet:
+        return StressTestResponse(
+            wallet_address="",
+            current_hf=None,
+            current_collateral_usd=None,
+            current_debt_usd=None,
+            liquidation_threshold=None,
+            error="AAVE_WALLET_ADDRESS が設定されていません。",
+        )
+
+    result = _get_stress_test(wallet)
+
+    from .liquidation_sentinel import _mask_address  # noqa: PLC0415
+
+    # SECURITY: ウォレットアドレスを先頭6文字+末尾4文字にマスクしてからレスポンスに含める。
+    # 生の wallet_address を API レスポンスで露出させない（docs/13_security_design.md Rule 8）。
+    masked_wallet = _mask_address(result.wallet_address)
+
+    scenarios = [
+        StressTestScenarioResponse(
+            price_drop_pct=str(sc.price_drop_pct),
+            simulated_hf=str(sc.simulated_hf) if sc.simulated_hf is not None else None,
+            collateral_after_usd=(
+                str(sc.collateral_after_usd) if sc.collateral_after_usd is not None else None
+            ),
+        )
+        for sc in result.scenarios
+    ]
+
+    return StressTestResponse(
+        wallet_address=masked_wallet,
+        current_hf=str(result.current_hf) if result.current_hf is not None else None,
+        current_collateral_usd=(
+            str(result.current_collateral_usd)
+            if result.current_collateral_usd is not None
+            else None
+        ),
+        current_debt_usd=(
+            str(result.current_debt_usd) if result.current_debt_usd is not None else None
+        ),
+        liquidation_threshold=(
+            str(result.liquidation_threshold) if result.liquidation_threshold is not None else None
+        ),
+        scenarios=scenarios,
+        error=result.error,
+    )
+
+
+@router.get(
+    "/pool-health",
+    response_model=PoolHealthResponse,
+    summary="Aave プール赤字蓄積を監視する（getReserveDeficit）",
+)
+def get_pool_health(
+    current_user: User = Depends(require_viewer),
+) -> PoolHealthResponse:
+    """
+    AAVE_ACTIVE_CHAINS の先頭チェーンに対して getReserveDeficit() を呼び出し、
+    USDC/WETH/wstETH のプール赤字を返す。
+
+    赤字が $10,000 を超えた場合は Slack アラートも発火する。
+    AAVE_CLIENT_TYPE=dummy の場合は空レポートを返す（fail-open）。
+    """
+    import os  # noqa: PLC0415
+
+    from .liquidation_sentinel import PoolHealthMonitor  # noqa: PLC0415
+
+    chain_name = os.getenv("AAVE_ACTIVE_CHAINS", "base").split(",")[0].strip()
+    monitor = PoolHealthMonitor()
+    report = monitor.check_pool_deficits(chain_name=chain_name)
+
+    deficits = [
+        PoolDeficitInfoResponse(
+            asset_symbol=d.asset_symbol,
+            deficit_usd=str(d.deficit_usd),
+            alert_triggered=d.alert_triggered,
+        )
+        for d in report.deficits
+    ]
+
+    return PoolHealthResponse(
+        chain_name=report.chain_name,
+        deficits=deficits,
+        total_deficit_usd=str(report.total_deficit_usd),
+        alert_triggered=report.alert_triggered,
+        error=report.error,
     )

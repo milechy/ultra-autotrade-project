@@ -239,6 +239,9 @@ class AccountData:
     total_debt_usd: Decimal
     available_borrows_usd: Decimal
     health_factor: Decimal
+    # currentLiquidationThreshold (BPS → ratio): result[3] / 10000
+    # DummyAaveClient は 0.80 固定。Web3AaveClient は RPC から実値を取得。
+    liquidation_threshold: Optional[Decimal] = None
 
 
 class AaveClientBase(ABC):
@@ -396,6 +399,7 @@ class DummyAaveClient(AaveClientBase):
             total_debt_usd=Decimal("3000"),
             available_borrows_usd=Decimal("5000"),
             health_factor=Decimal("2.5"),
+            liquidation_threshold=Decimal("0.80"),
         )
 
     def deposit(
@@ -691,6 +695,11 @@ class Web3AaveClient(AaveClientBase):
             total_collateral_usd = Decimal(result[0]) / _BASE
             total_debt_usd = Decimal(result[1]) / _BASE
             available_borrows_usd = Decimal(result[2]) / _BASE
+            # currentLiquidationThreshold は BPS (basis points, e.g. 8000 = 80%)
+            lt_raw: int = result[3]
+            liquidation_threshold: Optional[Decimal] = (
+                Decimal(lt_raw) / Decimal("10000") if lt_raw > 0 else Decimal("0.75")
+            )
             hf_raw: int = result[5]
             if hf_raw >= 2**256 - 1 or (hf_raw == 0 and result[1] == 0):
                 health_factor = Decimal("inf")
@@ -701,6 +710,7 @@ class Web3AaveClient(AaveClientBase):
                 total_debt_usd=total_debt_usd,
                 available_borrows_usd=available_borrows_usd,
                 health_factor=health_factor,
+                liquidation_threshold=liquidation_threshold,
             )
         except AaveClientError:
             raise

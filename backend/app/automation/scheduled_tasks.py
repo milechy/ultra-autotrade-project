@@ -47,6 +47,10 @@ RSS_FETCH_INTERVAL_SECONDS = 1800  # 30 分
 # 複合リスク監視間隔（秒）
 COMPOUND_RISK_INTERVAL_SECONDS = 600  # 10 分
 
+# プール赤字監視間隔（秒）
+# ENABLE_POOL_HEALTH_MONITOR=1 設定時のみ有効（main.py lifespan 配線は human 承認 PR が必要）
+POOL_HEALTH_CHECK_INTERVAL_SECONDS = 3600  # 1 時間
+
 # DCA 頻度→秒数マッピング
 DCA_FREQUENCY_SECONDS = {
     "hourly": 3600,
@@ -1402,6 +1406,67 @@ async def compound_risk_monitor_loop(
             await asyncio.sleep(600)
 
 
+async def pool_health_check_loop(
+    *,
+    interval_seconds: int = POOL_HEALTH_CHECK_INTERVAL_SECONDS,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """
+    Aave プール赤字（getReserveDeficit）を定期監視するバックグラウンドループ。
+
+    interval_seconds ごとに PoolHealthMonitor.check_pool_deficits() を呼び出し、
+    赤字が DEFICIT_ALERT_THRESHOLD ($10,000) を超えた場合は Slack アラートを発火する。
+
+    起動方法:
+        ScheduledTaskManager.start_pool_health_check() 経由で呼び出す。
+        直接呼び出しは禁止（二重起動防止のためマネージャ経由にすること）。
+
+    本番への配線（main.py lifespan）は ENABLE_POOL_HEALTH_MONITOR=1 設定後に
+    別途 human 承認 PR で追加すること。
+
+    現在の監視対象: USDC のみ。
+    WETH / wstETH は Aave Price Oracle 統合後に追加する（MAJOR #1 参照）。
+    """
+    logger.info("pool_health_check_loop started (interval=%ds)", interval_seconds)
+
+    while True:
+        try:
+            import os  # noqa: PLC0415
+
+            from app.aave.liquidation_sentinel import PoolHealthMonitor  # noqa: PLC0415
+
+            chain_name = os.getenv("AAVE_ACTIVE_CHAINS", "base").split(",")[0].strip()
+            monitor = PoolHealthMonitor()
+            report = monitor.check_pool_deficits(chain_name=chain_name)
+
+            if report.alert_triggered:
+                logger.warning(
+                    "pool_health_check_loop: アラート発火 chain=%s total_deficit=%s",
+                    chain_name,
+                    report.total_deficit_usd,
+                )
+            else:
+                logger.info(
+                    "pool_health_check_loop: チェック完了 chain=%s total_deficit=%s",
+                    chain_name,
+                    report.total_deficit_usd,
+                )
+
+        except asyncio.CancelledError:
+            logger.info("pool_health_check_loop cancelled")
+            raise
+        except Exception as exc:  # noqa: BLE001
+            logger.error("pool_health_check_loop エラー: %s", exc, exc_info=True)
+
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+        await asyncio.sleep(interval_seconds)
+
+
 class ScheduledTaskManager:
     """
     スケジュールタスクのライフサイクル管理。
@@ -1428,6 +1493,11 @@ class ScheduledTaskManager:
         self._monthly_fee_batch_task: Optional[asyncio.Task[None]] = None
         self._monthly_line_report_task: Optional[asyncio.Task[None]] = None
         self._expiry_reminder_task: Optional[asyncio.Task[None]] = None
+        # プール赤字監視タスク（MAJOR #3: LiquidationSentinel）
+        # 起動は main.py への startup 配線で行う（別途 human 承認 PR が必要）。
+        # env フラグ ENABLE_POOL_HEALTH_MONITOR=1 でのみ有効化すること。
+        # 二重起動を防ぐために is_pool_health_check_running を確認してから start を呼ぶこと。
+        self._pool_health_check_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -1505,6 +1575,11 @@ class ScheduledTaskManager:
     def is_expiry_reminder_running(self) -> bool:
         """期限切れリマインダータスクが動作中かどうか。"""
         return self._expiry_reminder_task is not None and not self._expiry_reminder_task.done()
+
+    @property
+    def is_pool_health_check_running(self) -> bool:
+        """プール赤字監視タスクが動作中かどうか。"""
+        return self._pool_health_check_task is not None and not self._pool_health_check_task.done()
 
     async def start_monthly_line_report(
         self,
@@ -2323,6 +2398,67 @@ class ScheduledTaskManager:
         self._expiry_reminder_task = None
         logger.info("Proposal expiry reminder task stopped")
 
+    async def start_pool_health_check(
+        self,
+        *,
+        interval_seconds: int = POOL_HEALTH_CHECK_INTERVAL_SECONDS,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """
+        プール赤字監視タスクを開始する。
+
+        Aave Pool.getReserveDeficit() を定期実行し、赤字が $10,000 を超えた場合に
+        Slack アラートを発火する。
+
+        IMPORTANT: このメソッドは main.py の lifespan からは呼ばれない。
+        起動するには以下の手順が必要:
+          1. ENABLE_POOL_HEALTH_MONITOR=1 を .env に設定する
+          2. 別途 human 承認 PR で main.py/lifespan に以下を追加する:
+               import os
+               if os.getenv("ENABLE_POOL_HEALTH_MONITOR") == "1":
+                   await manager.start_pool_health_check()
+          3. 二重起動防止のために is_pool_health_check_running を確認してから呼ぶこと。
+
+        現在の監視対象: USDC のみ（WETH/wstETH は Price Oracle 統合後に追加予定）。
+        """
+        if self.is_pool_health_check_running:
+            logger.warning(
+                "Pool health check task already running — double-start prevented. "
+                "Check ENABLE_POOL_HEALTH_MONITOR env flag and lifespan wiring."
+            )
+            return
+
+        logger.info("Starting pool health check task (interval=%ds)", interval_seconds)
+        self._pool_health_check_task = asyncio.create_task(
+            pool_health_check_loop(
+                interval_seconds=interval_seconds,
+                on_error=on_error,
+            )
+        )
+        logger.info("Pool health check task started")
+
+    async def stop_pool_health_check(self, timeout: float = 5.0) -> None:
+        """プール赤字監視タスクを停止する。"""
+        if not self.is_pool_health_check_running:
+            logger.debug("Pool health check not running - nothing to stop")
+            return
+
+        logger.info("Stopping pool health check task")
+        assert self._pool_health_check_task is not None  # noqa: S101
+        self._pool_health_check_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._pool_health_check_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Pool health check task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning("Pool health check task did not stop within %.1fs timeout", timeout)
+        except Exception as exc:
+            logger.error("Error while stopping pool health check task: %s", exc)
+
+        self._pool_health_check_task = None
+        logger.info("Pool health check task stopped")
+
     async def stop_all(self, timeout: float = 5.0) -> None:
         """
         全てのスケジュールタスクを停止する。
@@ -2348,6 +2484,7 @@ class ScheduledTaskManager:
             self.stop_monthly_fee_batch(timeout=timeout),
             self.stop_monthly_line_report(timeout=timeout),
             self.stop_expiry_reminder(timeout=timeout),
+            self.stop_pool_health_check(timeout=timeout),
             return_exceptions=True,
         )
 
