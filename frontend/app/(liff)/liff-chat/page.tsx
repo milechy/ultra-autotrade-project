@@ -128,17 +128,6 @@ export default function LiffChatPage() {
       .catch(() => {})
   }, [])
 
-  // ── 承認・見送りハンドラ（BUY/SELL）
-  function handleApprove() {
-    // liff-approve に遷移せずパネルで完結させる想定（Phase 5 以降）
-    track(EV.JUDGMENT_APPROVE, { action: aiJudgment?.action })
-    setAiJudgment(null)
-  }
-  function handleReject() {
-    track(EV.JUDGMENT_REJECT, { action: aiJudgment?.action })
-    setAiJudgment(null)
-  }
-
   // ── 緊急停止: POST /api/user/pause（require_active_user / consumer 可）
   // backend の OR ロジック安全装置は変更せず、ユーザーの is_active フラグを落とすだけ。
   async function handleEmergencyStop() {
@@ -308,26 +297,6 @@ export default function LiffChatPage() {
           >
             {aiJudgment ? action : t("home.noSignal")}
           </div>
-
-          {/* BUY / SELL 時: 承認・見送りボタン */}
-          {(isBuy || isSell) && (
-            <div className="flex gap-3 mt-3">
-              <button
-                onClick={handleApprove}
-                className={`flex-1 py-3 rounded-xl font-semibold text-white ${
-                  isBuy ? "bg-[#1D9E75]" : "bg-red-500"
-                }`}
-              >
-                {t("home.approve")}
-              </button>
-              <button
-                onClick={handleReject}
-                className="flex-1 py-3 border border-zinc-600 text-zinc-300 rounded-xl font-semibold"
-              >
-                {t("home.reject")}
-              </button>
-            </div>
-          )}
 
           {/* なぜ{action}？理由トグル（aiJudgment がある場合のみ表示） */}
           {aiJudgment && (
