@@ -3498,5 +3498,19 @@
   },
   "ReferralPage": {
     "redirecting": "Redirecting..."
+  },
+  "RewardsCard": {
+    "title": "Aave Rewards",
+    "unclaimedTotal": "Unclaimed Total",
+    "lastClaimedAt": "Last Claimed",
+    "noData": "No reward data",
+    "claimButton": "Manual Claim",
+    "claiming": "Claiming...",
+    "claimSuccess": "Claim completed",
+    "claimSkipped": "Skipped: {reason}",
+    "claimError": "Error: {error}",
+    "fetchError": "Failed to fetch rewards",
+    "threshold": "Claims when $5+ unclaimed",
+    "supplyTxHash": "Reinvestment TX"
   }
 }

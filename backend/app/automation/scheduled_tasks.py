@@ -44,6 +44,10 @@ MONTHLY_LINE_REPORT_TIME = time(10, 0)  # 毎月1日 10:00 JST (手数料バッ�
 # RSS フェッチ間隔（秒）
 RSS_FETCH_INTERVAL_SECONDS = 1800  # 30 分
 
+# リワード自動 Claim チェック間隔（秒）— 毎日 03:00 UTC
+REWARD_AUTO_CLAIM_INTERVAL_SECONDS = 86400  # 24 時間
+REWARD_AUTO_CLAIM_UTC_HOUR = 3  # 03:00 UTC
+
 # 複合リスク監視間隔（秒）
 COMPOUND_RISK_INTERVAL_SECONDS = 600  # 10 分
 
@@ -1402,6 +1406,99 @@ async def compound_risk_monitor_loop(
             await asyncio.sleep(600)
 
 
+async def reward_auto_claim_loop(
+    *,
+    interval_seconds: int = REWARD_AUTO_CLAIM_INTERVAL_SECONDS,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """
+    Aave リワード自動 Claim + 複利再投資の定期実行ループ。
+
+    毎日 03:00 UTC に RewardClaimer.auto_claim_if_worthy() を実行する。
+    ENABLE_REWARD_AUTO_CLAIM=1 で main.py から起動される。
+
+    AAVE_UI_INCENTIVE_PROVIDER_ADDRESS / AAVE_REWARDS_CONTROLLER_ADDRESS /
+    AAVE_POOL_ADDRESSES_PROVIDER が未設定の場合は warn ログのみで継続 (fail-open)。
+
+    Args:
+        interval_seconds: 実行間隔（秒）。デフォルト 86400 秒（24 時間）
+        on_error: エラー発生時のコールバック
+    """
+    import os  # noqa: PLC0415
+
+    logger.info(
+        "Starting reward auto-claim loop (interval: %ds, target: %02d:00 UTC)",
+        interval_seconds,
+        REWARD_AUTO_CLAIM_UTC_HOUR,
+    )
+
+    while True:
+        try:
+            # UTC 03:00 まで待機する（_calculate_seconds_until は JST ベースのため UTC 換算）
+            from datetime import time as _time  # noqa: PLC0415
+            from zoneinfo import ZoneInfo as _ZoneInfo  # noqa: PLC0415
+
+            utc_target = _time(REWARD_AUTO_CLAIM_UTC_HOUR, 0)
+            wait_seconds = _calculate_seconds_until(utc_target, tz=_ZoneInfo("UTC"))
+            logger.debug("reward_auto_claim_loop: waiting %.1f seconds", wait_seconds)
+            await asyncio.sleep(wait_seconds)
+
+            logger.info("reward_auto_claim_loop: Aave リワード Claim 開始")
+
+            def _run_claim() -> dict[str, object]:
+                from app.aave.reward_claimer import make_reward_claimer_from_env  # noqa: PLC0415
+
+                claimer = make_reward_claimer_from_env()
+                if claimer is None:
+                    logger.warning(
+                        "reward_auto_claim_loop: RewardClaimer が生成できません "
+                        "(env 未設定) — スキップ"
+                    )
+                    return {"claimed": False, "skip_reason": "claimer unavailable"}
+
+                wallet_address = os.getenv("AAVE_WALLET_ADDRESS", "")
+                private_key = os.getenv("AAVE_WALLET_PRIVATE_KEY", "")
+
+                if not wallet_address or not private_key:
+                    logger.warning(
+                        "reward_auto_claim_loop: AAVE_WALLET_ADDRESS or "
+                        "AAVE_WALLET_PRIVATE_KEY not set — スキップ"
+                    )
+                    return {"claimed": False, "skip_reason": "wallet/key not set"}
+
+                return claimer.auto_claim_if_worthy(
+                    wallet_address=wallet_address,
+                    private_key=private_key,
+                    dry_run=False,
+                )
+
+            result = await asyncio.to_thread(_run_claim)
+            logger.info(
+                "reward_auto_claim_loop 完了: claimed=%s, total_usd=%s, skip=%s, error=%s",
+                result.get("claimed"),
+                result.get("total_usd"),
+                result.get("skip_reason"),
+                result.get("error"),
+            )
+
+            # 重複実行防止
+            await asyncio.sleep(3600)
+
+        except asyncio.CancelledError:
+            logger.info("reward_auto_claim_loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in reward auto-claim loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            await asyncio.sleep(600)
+
+
 class ScheduledTaskManager:
     """
     スケジュールタスクのライフサイクル管理。
@@ -1428,6 +1525,7 @@ class ScheduledTaskManager:
         self._monthly_fee_batch_task: Optional[asyncio.Task[None]] = None
         self._monthly_line_report_task: Optional[asyncio.Task[None]] = None
         self._expiry_reminder_task: Optional[asyncio.Task[None]] = None
+        self._reward_auto_claim_task: Optional[asyncio.Task[None]] = None
 
     @property
     def is_daily_running(self) -> bool:
@@ -1505,6 +1603,11 @@ class ScheduledTaskManager:
     def is_expiry_reminder_running(self) -> bool:
         """期限切れリマインダータスクが動作中かどうか。"""
         return self._expiry_reminder_task is not None and not self._expiry_reminder_task.done()
+
+    @property
+    def is_reward_auto_claim_running(self) -> bool:
+        """リワード自動 Claim タスクが動作中かどうか。"""
+        return self._reward_auto_claim_task is not None and not self._reward_auto_claim_task.done()
 
     async def start_monthly_line_report(
         self,
@@ -2323,6 +2426,44 @@ class ScheduledTaskManager:
         self._expiry_reminder_task = None
         logger.info("Proposal expiry reminder task stopped")
 
+    async def start_reward_auto_claim(
+        self,
+        *,
+        interval_seconds: int = REWARD_AUTO_CLAIM_INTERVAL_SECONDS,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """リワード自動 Claim タスクを開始する。"""
+        if self.is_reward_auto_claim_running:
+            raise RuntimeError("Reward auto-claim already running")
+
+        logger.info("Starting reward auto-claim task")
+        self._reward_auto_claim_task = asyncio.create_task(
+            reward_auto_claim_loop(interval_seconds=interval_seconds, on_error=on_error)
+        )
+        logger.info("Reward auto-claim task started")
+
+    async def stop_reward_auto_claim(self, timeout: float = 5.0) -> None:
+        """リワード自動 Claim タスクを停止する。"""
+        if not self.is_reward_auto_claim_running:
+            logger.debug("Reward auto-claim not running - nothing to stop")
+            return
+
+        logger.info("Stopping reward auto-claim task")
+        assert self._reward_auto_claim_task is not None  # noqa: S101
+        self._reward_auto_claim_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._reward_auto_claim_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Reward auto-claim task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning("Reward auto-claim task did not stop within %.1fs timeout", timeout)
+        except Exception as exc:
+            logger.error("Error while stopping reward auto-claim task: %s", exc)
+
+        self._reward_auto_claim_task = None
+        logger.info("Reward auto-claim task stopped")
+
     async def stop_all(self, timeout: float = 5.0) -> None:
         """
         全てのスケジュールタスクを停止する。
@@ -2348,6 +2489,7 @@ class ScheduledTaskManager:
             self.stop_monthly_fee_batch(timeout=timeout),
             self.stop_monthly_line_report(timeout=timeout),
             self.stop_expiry_reminder(timeout=timeout),
+            self.stop_reward_auto_claim(timeout=timeout),
             return_exceptions=True,
         )
 

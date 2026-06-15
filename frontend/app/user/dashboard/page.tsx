@@ -16,6 +16,7 @@ import {
   PnlChart,
 } from './_components'
 import { useAuthFetch } from '@/hooks/useAuthFetch'
+import { RewardsCard } from '@/components/dashboard/RewardsCard'
 
 // Note: PortfolioSummary, SafetyScore, AiAccuracyCard are used by ActiveDashboard only
 
@@ -27,6 +28,7 @@ type RiskMode = 'conservative' | 'balanced' | 'aggressive'
 interface UserSettings {
   user_mode: UserMode
   execution_policy?: string
+  role?: string
 }
 
 interface RiskModeData {
@@ -234,6 +236,10 @@ function ManagedDashboard() {
       <section>
         <RecentOpsCard />
       </section>
+
+      <section>
+        <RewardsCard isAdmin={false} />
+      </section>
     </div>
   )
 }
@@ -283,6 +289,10 @@ function ActiveDashboard() {
 
       <section>
         <AiAccuracyCard />
+      </section>
+
+      <section>
+        <RewardsCard isAdmin={false} />
       </section>
 
       {/* Disclaimer */}

@@ -206,6 +206,39 @@ class AaveRebalanceResponse(BaseModel):
     )
 
 
+class ClaimableReward(BaseModel):
+    """1 トークンの未請求リワード情報。"""
+
+    asset_name: str = Field(description="リワードトークン名 (例: AAVE, GHO)。")
+    reward_token_address: str = Field(description="リワードトークンのコントラクトアドレス。")
+    amount: Decimal = Field(ge=0, description="未請求リワード量（人間単位）。")
+    amount_usd: Decimal = Field(ge=0, description="未請求リワードの USD 換算額。")
+
+    @field_serializer("amount", "amount_usd")
+    @classmethod
+    def _serialize_claimable_decimal(cls, v: Decimal) -> str:
+        return str(v)
+
+
+class RewardClaimResult(BaseModel):
+    """リワード Claim + 再投資の実行結果。"""
+
+    claimed: bool = Field(description="Claim が実行されたかどうか。")
+    total_usd: Decimal = Field(ge=0, description="Claim したリワードの合計 USD 額。")
+    rewards: list[ClaimableReward] = Field(
+        default_factory=list, description="Claim したリワード一覧。"
+    )
+    supply_tx_hash: Optional[str] = Field(None, description="再投資 supply の tx ハッシュ。")
+    skip_reason: Optional[str] = Field(None, description="Claim スキップ理由（閾値未満など）。")
+    claimed_at: Optional[str] = Field(None, description="Claim 実行日時 (ISO 8601)。")
+    error: Optional[str] = Field(None, description="エラーメッセージ（fail-open 時）。")
+
+    @field_serializer("total_usd")
+    @classmethod
+    def _serialize_total_usd(cls, v: Decimal) -> str:
+        return str(v)
+
+
 class AaveBalanceInfo(BaseModel):
     """ウォレットの Aave 関連残高情報。"""
 
