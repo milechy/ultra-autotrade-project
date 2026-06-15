@@ -1694,8 +1694,7 @@ class ScheduledTaskManager:
     def is_idle_capital_check_running(self) -> bool:
         """アイドル資本チェックタスクが動作中かどうか。"""
         return (
-            self._idle_capital_check_task is not None
-            and not self._idle_capital_check_task.done()
+            self._idle_capital_check_task is not None and not self._idle_capital_check_task.done()
         )
 
     async def start_monthly_line_report(
@@ -2645,9 +2644,7 @@ class ScheduledTaskManager:
         except asyncio.CancelledError:
             logger.info("Idle capital check task cancelled successfully")
         except asyncio.TimeoutError:
-            logger.warning(
-                "Idle capital check task did not stop within %.1fs timeout", timeout
-            )
+            logger.warning("Idle capital check task did not stop within %.1fs timeout", timeout)
         except Exception as exc:
             logger.error("Error while stopping idle capital check task: %s", exc)
 
@@ -2721,9 +2718,7 @@ async def idle_capital_check_loop(
         interval_seconds: 実行間隔（秒）。デフォルト 900 秒（15 分）
         on_error: エラー発生時のコールバック
     """
-    logger.info(
-        "Starting idle capital check loop (interval: %ds)", interval_seconds
-    )
+    logger.info("Starting idle capital check loop (interval: %ds)", interval_seconds)
 
     while True:
         try:
