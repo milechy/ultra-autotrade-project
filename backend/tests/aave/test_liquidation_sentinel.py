@@ -13,6 +13,8 @@ from decimal import Decimal
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from app.aave.liquidation_sentinel import (
     DEFICIT_ALERT_THRESHOLD,
     PoolHealthMonitor,
@@ -82,6 +84,64 @@ class TestSimulateHfAtPriceDropBasic:
         )
         assert result is not None
         assert isinstance(result, Decimal)
+
+
+class TestSimulateHfAtPriceDropGuard:
+    """price_drop_pct の入力ガードテスト（MINOR #5）。"""
+
+    def test_pct_equal_to_1_raises_value_error(self) -> None:
+        """pct=1.0 は「価格がゼロ」を意味し、範囲外なので ValueError を投げること。"""
+        with pytest.raises(ValueError, match="price_drop_pct"):
+            simulate_hf_at_price_drop(
+                collateral_usd=Decimal("10000"),
+                debt_usd=Decimal("4000"),
+                liquidation_threshold=Decimal("0.80"),
+                price_drop_pct=Decimal("1.0"),
+            )
+
+    def test_pct_greater_than_1_raises_value_error(self) -> None:
+        """pct > 1 は範囲外なので ValueError を投げること。"""
+        with pytest.raises(ValueError, match="price_drop_pct"):
+            simulate_hf_at_price_drop(
+                collateral_usd=Decimal("10000"),
+                debt_usd=Decimal("4000"),
+                liquidation_threshold=Decimal("0.80"),
+                price_drop_pct=Decimal("1.5"),
+            )
+
+    def test_pct_negative_raises_value_error(self) -> None:
+        """pct < 0 は範囲外なので ValueError を投げること。"""
+        with pytest.raises(ValueError, match="price_drop_pct"):
+            simulate_hf_at_price_drop(
+                collateral_usd=Decimal("10000"),
+                debt_usd=Decimal("4000"),
+                liquidation_threshold=Decimal("0.80"),
+                price_drop_pct=Decimal("-0.01"),
+            )
+
+    def test_pct_zero_is_valid(self) -> None:
+        """pct=0.0 は 「価格変化なし」であり有効（ValueError を投げない）。"""
+        result = simulate_hf_at_price_drop(
+            collateral_usd=Decimal("10000"),
+            debt_usd=Decimal("4000"),
+            liquidation_threshold=Decimal("0.80"),
+            price_drop_pct=Decimal("0.0"),
+        )
+        # HF = (10000 * 1.0 * 0.80) / 4000 = 2.0
+        assert result is not None
+        assert result == Decimal("2.0")
+
+    def test_pct_upper_boundary_just_below_1(self) -> None:
+        """pct=0.99 は有効（上限境界の 1 未満）。"""
+        result = simulate_hf_at_price_drop(
+            collateral_usd=Decimal("10000"),
+            debt_usd=Decimal("4000"),
+            liquidation_threshold=Decimal("0.80"),
+            price_drop_pct=Decimal("0.99"),
+        )
+        # HF = (10000 * 0.01 * 0.80) / 4000 = 80 / 4000 = 0.02
+        assert result is not None
+        assert result == Decimal("80") / Decimal("4000")
 
 
 class TestSimulateHfAtPriceDropEdge:
@@ -346,3 +406,48 @@ class TestConstants:
         """DEFICIT_ALERT_THRESHOLD は Decimal 型であること（float 禁止）。"""
         assert isinstance(DEFICIT_ALERT_THRESHOLD, Decimal)
         assert DEFICIT_ALERT_THRESHOLD == Decimal("10000")
+
+
+# ---------------------------------------------------------------------------
+# liquidation_threshold の取得テスト（MAJOR #4: DummyAaveClient 経由）
+# ---------------------------------------------------------------------------
+
+
+class TestLiquidationThresholdFromAccount:
+    """AccountData.liquidation_threshold が実際の HF 計算に使われることを検証。"""
+
+    def test_dummy_mode_uses_account_lt_from_client(self) -> None:
+        """
+        DummyAaveClient.get_account_data() は liquidation_threshold=0.80 を返す。
+        get_stress_test() でその値が -10% シナリオの HF 計算に使用されること。
+        collateral=10000, debt=3000, LT=0.80
+        -10%: HF = (10000 * 0.90 * 0.80) / 3000 = 7200 / 3000 = 2.40
+        """
+        with patch.dict("os.environ", {"AAVE_CLIENT_TYPE": "dummy"}):
+            result = get_stress_test("0xDEADBEEF1234567890abcdef1234567890abcdef")
+
+        assert result.liquidation_threshold == Decimal("0.80")
+        # -10% シナリオ
+        sc_10 = result.scenarios[0]
+        expected_hf_10 = Decimal("7200") / Decimal("3000")
+        assert sc_10.simulated_hf == expected_hf_10, (
+            f"Expected HF={expected_hf_10} for -10% drop with LT=0.80, got {sc_10.simulated_hf}"
+        )
+
+    def test_dummy_mode_lt_is_decimal_not_float(self) -> None:
+        """liquidation_threshold は Decimal 型であること（float 禁止）。"""
+        with patch.dict("os.environ", {"AAVE_CLIENT_TYPE": "dummy"}):
+            result = get_stress_test("0xDEADBEEF1234567890abcdef1234567890abcdef")
+
+        assert isinstance(result.liquidation_threshold, Decimal)
+
+    def test_default_deficit_tokens_is_usdc_only(self) -> None:
+        """
+        DEFAULT_DEFICIT_TOKENS は USDC のみであることを確認（MAJOR #1）。
+        WETH / wstETH は Price Oracle 統合後に追加する方針。
+        """
+        from app.aave.liquidation_sentinel import DEFAULT_DEFICIT_TOKENS
+
+        assert DEFAULT_DEFICIT_TOKENS == ["USDC"], (
+            "WETH/wstETH は Aave Price Oracle 統合後に追加する。今は USDC のみ。"
+        )

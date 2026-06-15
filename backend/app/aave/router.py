@@ -256,6 +256,12 @@ def get_stress_test(
 
     result = _get_stress_test(wallet)
 
+    from .liquidation_sentinel import _mask_address  # noqa: PLC0415
+
+    # SECURITY: ウォレットアドレスを先頭6文字+末尾4文字にマスクしてからレスポンスに含める。
+    # 生の wallet_address を API レスポンスで露出させない（docs/13_security_design.md Rule 8）。
+    masked_wallet = _mask_address(result.wallet_address)
+
     scenarios = [
         StressTestScenarioResponse(
             price_drop_pct=str(sc.price_drop_pct),
@@ -268,7 +274,7 @@ def get_stress_test(
     ]
 
     return StressTestResponse(
-        wallet_address=result.wallet_address,
+        wallet_address=masked_wallet,
         current_hf=str(result.current_hf) if result.current_hf is not None else None,
         current_collateral_usd=(
             str(result.current_collateral_usd)

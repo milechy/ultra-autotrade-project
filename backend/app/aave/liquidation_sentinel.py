@@ -27,7 +27,13 @@ logger = logging.getLogger(__name__)
 DEFICIT_ALERT_THRESHOLD = Decimal("10000")
 
 # 監視対象のデフォルトアセットシンボル
-DEFAULT_DEFICIT_TOKENS = ["USDC", "WETH", "wstETH"]
+# NOTE: USDC のみとしている理由:
+#   WETH / wstETH は getReserveDeficit() がトークン単位 (18 decimals) で返すが、
+#   Price Oracle 統合なしでは「1 トークン = 1 USD」と扱うことになり、
+#   実際の USD 価値（例: 1 WETH ≈ $3000）より桁違いに小さい値で閾値比較してしまい
+#   アラートが実質不発火になる安全上の問題がある。
+#   WETH / wstETH は Aave Price Oracle 統合後に追加する。（TODO: oracle integration）
+DEFAULT_DEFICIT_TOKENS = ["USDC"]
 
 
 # ---------------------------------------------------------------------------
@@ -110,11 +116,19 @@ def simulate_hf_at_price_drop(
         collateral_usd: 現在の担保 USD 評価額（Decimal）
         debt_usd: 現在の総借入 USD（Decimal）
         liquidation_threshold: 清算しきい値（例: 0.80 = 80%）
-        price_drop_pct: 価格下落率（例: 0.10 = 10%）
+        price_drop_pct: 価格下落率（0 <= pct < 1。例: 0.10 = 10%）
 
     Returns:
         Decimal: 計算後の HF。debt=0 の場合は None（清算なし）。
+
+    Raises:
+        ValueError: price_drop_pct が [0, 1) の範囲外の場合。
     """
+    if not (Decimal("0") <= price_drop_pct < Decimal("1")):
+        raise ValueError(
+            f"price_drop_pct は 0 以上 1 未満の Decimal である必要があります。got: {price_drop_pct}"
+        )
+
     if debt_usd <= Decimal("0"):
         # 借入なし = 清算リスクなし
         return None
@@ -143,6 +157,9 @@ def get_stress_test(wallet_address: str) -> StressTestResult:
 
     アカウントデータを Aave Pool から取得し、各価格シナリオで HF をシミュレーションする。
     RPC 未設定 / DUMMY モードでは dummy データを使用する（fail-open）。
+
+    AccountData.liquidation_threshold を優先使用する。
+    未設定の場合は安全側 fallback として 0.75 を使用し、ログに記録する。
 
     Args:
         wallet_address: 対象ウォレットアドレス
@@ -177,12 +194,14 @@ def get_stress_test(wallet_address: str) -> StressTestResult:
                 collateral_usd = account.total_collateral_usd
                 debt_usd = account.total_debt_usd
                 current_hf = account.health_factor
-                # Aave Pool の currentLiquidationThreshold は getUserAccountData の
-                # 4番目の出力 (raw uint256 in basis points e.g. 8000=80%)。
-                # AccountData には未追加のため安全側の 0.75 をデフォルトとする。
-                # TODO(sentinel): getUserAccountData の currentLiquidationThreshold を
-                # AccountData に追加して正確な値を取得する。
-                liquidation_threshold = Decimal("0.75")
+                # AccountData.liquidation_threshold は RPC から取得した実値 (result[3]/10000)。
+                # 取得できなかった場合（None）は安全側 fallback として 0.75 を使用する。
+                liquidation_threshold = account.liquidation_threshold or Decimal("0.75")
+                if account.liquidation_threshold is None:
+                    logger.warning(
+                        "[sentinel] liquidation_threshold 未取得、安全側 fallback 0.75 を使用 wallet=%s",
+                        masked_wallet,
+                    )
 
         if client_type != "web3":
             dummy = DummyAaveClient()
@@ -190,7 +209,7 @@ def get_stress_test(wallet_address: str) -> StressTestResult:
             collateral_usd = account.total_collateral_usd
             debt_usd = account.total_debt_usd
             current_hf = account.health_factor
-            liquidation_threshold = Decimal("0.80")
+            liquidation_threshold = account.liquidation_threshold or Decimal("0.80")
 
         logger.info(
             "[sentinel] account data wallet=%s collateral=%s debt=%s hf=%s lt=%s",
@@ -264,6 +283,9 @@ class PoolHealthMonitor:
 
     既存 monitor.py の get_health_factor / get_aave_balance と同じレイヤーで動作する。
     安全装置として fail-open 設計（RPC 障害時は空レポートを返す）。
+
+    NOTE: 監視対象は現在 USDC のみ（DEFAULT_DEFICIT_TOKENS 参照）。
+    WETH / wstETH は Aave Price Oracle 統合後に追加する。
     """
 
     def __init__(
@@ -360,8 +382,10 @@ class PoolHealthMonitor:
         Aave Pool.getReserveDeficit(asset) を呼び出して赤字 USD 相当を返す。
 
         getReserveDeficit() はプールの unbacked deficit をトークン単位 (wei) で返す。
-        ここでは簡易的に 1 トークン = 1 USD として扱い（USDC 向け設計）。
-        WETH 等は別途オラクル統合が必要な点を TODO で残す。
+        現在は USDC (6 decimals) のみを対象とし、1 USDC = 1 USD として換算する。
+
+        WETH / wstETH (18 decimals) は Price Oracle 統合後に追加する予定。
+        理由: Price Oracle なしでは 1 token = 1 USD となり、実際の USD 価値と桁違いになる。
 
         NOTE: getReserveDeficit() は Aave V3.1 以降で利用可能。
         古いプール実装では ABI missing エラーが出るため try-except で fail-open とする。
@@ -379,8 +403,8 @@ class PoolHealthMonitor:
             )
             raw_deficit: int = pool_contract.functions.getReserveDeficit(checksum_token).call()
 
-            # 簡易換算: USDC = 6 decimals, WETH/wstETH = 18 decimals
-            # TODO(sentinel): Aave Price Oracle 統合で正確な USD 換算を行う
+            # USDC = 6 decimals。他のステーブルコイン（USDbC, EURC）も 6 decimals。
+            # TODO(sentinel): Aave Price Oracle 統合で WETH/wstETH の正確な USD 換算を行う
             decimals = 6 if symbol in ("USDC", "USDbC", "EURC") else 18
             deficit_usd = Decimal(raw_deficit) / Decimal(10**decimals)
 

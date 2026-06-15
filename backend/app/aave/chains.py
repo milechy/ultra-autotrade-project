@@ -38,11 +38,6 @@ class AaveChainConfig:
     oracle_address: Optional[str] = None
     pool_addresses_provider: Optional[str] = None
     is_testnet: bool = False
-    # LiquidationDataProvider アドレス（Aave V3.1 清算リスク計算用 View Contract）
-    # TODO(sentinel): 公式アドレスが確定次第ここに設定する。
-    # 環境変数 AAVE_LIQUIDATION_DATA_PROVIDER_<CHAIN> でオーバーライド可能。
-    # 参照: https://docs.aave.com/developers/deployed-contracts/v3-mainnet
-    liquidation_data_provider_address: Optional[str] = None
 
 
 # チェーンレジストリ
@@ -181,27 +176,6 @@ def get_active_chains() -> list[AaveChainConfig]:
     raw = os.getenv("AAVE_ACTIVE_CHAINS", "base")
     chain_names = [name.strip() for name in raw.split(",") if name.strip()]
     return [get_chain_config(name) for name in chain_names]
-
-
-def get_liquidation_data_provider_address(chain: AaveChainConfig) -> Optional[str]:
-    """
-    チェーンの LiquidationDataProvider アドレスを取得する。
-
-    優先順位:
-    1. 環境変数 AAVE_LIQUIDATION_DATA_PROVIDER_<CHAIN_NAME大文字> （オーバーライド）
-    2. AaveChainConfig.liquidation_data_provider_address （ハードコード値、未設定なら None）
-
-    None の場合は LiquidationDataProvider を使った HF 計算は無効。
-    TODO(sentinel): 各チェーンの公式アドレスが確定次第、CHAIN_REGISTRY に追記する。
-
-    :param chain: 対象チェーンの AaveChainConfig
-    :return: LiquidationDataProvider アドレス文字列、未設定の場合は None
-    """
-    env_key = f"AAVE_LIQUIDATION_DATA_PROVIDER_{chain.chain_name.upper()}"
-    from_env = os.getenv(env_key)
-    if from_env:
-        return from_env
-    return chain.liquidation_data_provider_address
 
 
 def get_rpc_url_for_chain(chain: AaveChainConfig) -> str:
