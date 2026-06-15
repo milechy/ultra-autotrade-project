@@ -17,6 +17,11 @@ from app.utils.config import get_env
 
 from .risk_limiter import get_effective_limits
 
+# 2026年4-5月 rsETH/srsETH エクスプロイト再発防止のためブラックリスト登録。
+# deposit() はこのセットに含まれるシンボルを受け付けない。
+# 追加するときは必ずここを編集し、test_blocklist.py のテストも更新すること。
+BLOCKLISTED_COLLATERAL: frozenset[str] = frozenset({"rsETH", "srsETH"})
+
 
 @dataclass
 class AaveSettings:

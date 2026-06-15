@@ -314,6 +314,15 @@ class AaveClientError(Exception):
     """Aave クライアントの基底例外。"""
 
 
+class AaveBlocklistedAssetError(AaveClientError):
+    """
+    ブラックリスト登録済みアセットへの deposit を試みた場合に raise される。
+
+    2026-06 rsETH/srsETH エクスプロイト再発防止。
+    config.BLOCKLISTED_COLLATERAL に登録されたシンボルが対象。
+    """
+
+
 # 後方互換: 旧コードが AaveTransactionError を参照している箇所のため維持
 class AaveTransactionError(AaveClientError):
     """トランザクション送信・実行エラー。"""
@@ -711,6 +720,16 @@ class Web3AaveClient(AaveClientBase):
         """
         if Web3 is None:
             raise AaveClientError("web3 package is required")
+
+        # ブラックリストチェック（rsETH/srsETH エクスプロイト再発防止 2026-06）
+        # asset_symbol または asset_address（0x 始まりでない場合はシンボルとして扱う）を確認。
+        from .config import BLOCKLISTED_COLLATERAL  # noqa: PLC0415
+
+        _check_sym = asset_symbol or (asset_address if not asset_address.startswith("0x") else "")
+        if _check_sym and _check_sym in BLOCKLISTED_COLLATERAL:
+            raise AaveBlocklistedAssetError(
+                f"asset '{_check_sym}' はブラックリスト登録済みのため deposit 不可"
+            )
 
         # 後方互換: asset_symbol キーワード引数で呼ばれた場合
         if asset_symbol:

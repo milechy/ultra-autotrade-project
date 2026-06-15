@@ -219,6 +219,36 @@ class AaveBalanceInfo(BaseModel):
         return str(v)
 
 
+class OracleAlert(BaseModel):
+    """
+    多重 Oracle 検証の結果アラート。
+
+    level:
+    - "OK"        — 全 Oracle が一致（乖離 < 閾値）
+    - "WARN"      — 一部 Oracle が取得不可（fail-open 継続）
+    - "HARD_STOP" — 価格乖離が閾値超過（取引停止を推奨）
+    """
+
+    asset: str = Field(..., description="対象アセットシンボル（例: USDC）")
+    level: str = Field(..., description="アラートレベル: OK / WARN / HARD_STOP")
+    max_deviation_pct: Optional[str] = Field(
+        None, description="3価格間の最大乖離率 (%) 文字列。取得不可の場合は None"
+    )
+    chainlink_price: Optional[str] = Field(None, description="Chainlink 価格（USD建て）文字列")
+    pyth_price: Optional[str] = Field(None, description="Pyth Network 価格（USD建て）文字列")
+    twap_price: Optional[str] = Field(
+        None, description="Uniswap V3 30分 TWAP 価格（USD建て）文字列"
+    )
+    detail: Optional[str] = Field(None, description="アラート詳細メッセージ")
+    checked_at: str = Field(..., description="検証日時 (ISO 8601)")
+
+
+class OracleStatusResponse(BaseModel):
+    """GET /api/aave/oracle-status のレスポンス。"""
+
+    alerts: list[OracleAlert] = Field(default_factory=list, description="全アセットのアラート一覧")
+
+
 class AaveMonitorStatus(BaseModel):
     """GET /aave/status のレスポンス。"""
 
