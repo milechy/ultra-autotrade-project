@@ -45,23 +45,22 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-base font-semibold text-zinc-100 mb-2">{t('section4Title')}</h2>
-            <p>{t('section4Body')}</p>
+            <p>{t('section4Intro')}</p>
+            <ul className="mt-2 space-y-2 list-disc list-inside">
+              <li>
+                <span className="font-medium text-zinc-200">{t('section4Mode1Label')}</span>
+                {t('section4Mode1Body')}
+              </li>
+              <li>
+                <span className="font-medium text-zinc-200">{t('section4Mode2Label')}</span>
+                {t('section4Mode2Body')}
+              </li>
+            </ul>
           </section>
 
           <section>
             <h2 className="text-base font-semibold text-zinc-100 mb-2">{t('section5Title')}</h2>
-            <p>{t('section5Intro')}</p>
-            <ul className="mt-2 space-y-2 list-disc list-inside">
-              <li>
-                <span className="font-medium text-zinc-200">{t('section5Mode1Label')}</span>
-                {t('section5Mode1Body')}
-              </li>
-              <li>
-                <span className="font-medium text-zinc-200">{t('section5Mode2Label')}</span>
-                {t('section5Mode2Body')}
-              </li>
-            </ul>
-            <p className="mt-2">{t('section5Footer')}</p>
+            <p>{t('section5Body')}</p>
           </section>
 
           <section>
@@ -81,7 +80,14 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-base font-semibold text-zinc-100 mb-2">{t('section9Title')}</h2>
-            <p>{t('section9Body')}</p>
+            <p>{t('section9Intro')}</p>
+            <ul className="mt-2 space-y-1 list-disc list-inside">
+              <li>{t('section9Item1')}</li>
+              <li>{t('section9Item2')}</li>
+              <li>{t('section9Item3')}</li>
+              <li>{t('section9Item4')}</li>
+              <li>{t('section9Item5')}</li>
+            </ul>
           </section>
 
           <section>
