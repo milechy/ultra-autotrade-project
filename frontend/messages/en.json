@@ -965,20 +965,24 @@
       "submitting": "Saving...",
       "items": {
         "self_custody": {
-          "title": "You are responsible for your own assets",
-          "detail": "This service is non-custodial. Your wallet private key is never stored on our servers. You are solely responsible for managing your wallet and LINE account."
+          "title": "You Are Responsible for Managing Your Assets",
+          "detail": "This Service adopts a Non-Custodial model. Your digital assets remain under your own control through your personal wallet, and the Company does not hold or custody your assets. You are responsible for the management and security of your wallet and your LINE account used for login."
         },
         "defi_risk": {
-          "title": "DeFi investing carries risks",
-          "detail": "Smart contract risk, price volatility, liquidity risk, and liquidation risk all exist. You may lose your principal. This service does not constitute investment advice, and all investing is at your own risk."
+          "title": "AI-Assisted Strategy Execution Involves Risks",
+          "detail": "The digital asset market involves various risks, including price volatility, liquidity risks, and smart contract risks. There is a possibility of losing part or all of your principal. The AI-based market analysis and strategy execution provided by this Service are intended as technical support only and do not constitute investment advice or a guarantee of profits."
+        },
+        "usage_conditions": {
+          "title": "Usage Conditions (Connected Asset Range and Monthly Usage Limits)",
+          "detail": "This Service applies monthly usage limits based on the range of digital assets connected by each user. Please refer to the Service interface, Terms of Service, and related documents for the applicable conditions and limitations."
         },
         "user_responsibility": {
-          "title": "You are responsible for your account",
-          "detail": "Managing your LINE account and responding to unauthorized access is your responsibility. We are not liable for any losses or damages resulting from account loss or unauthorized use."
+          "title": "Account Management Is Your Responsibility",
+          "detail": "Users are responsible for managing their login accounts, including their LINE accounts, and for taking appropriate measures against unauthorized access. The Company shall not be responsible for losses or damages resulting from insufficient account management or unauthorized use by third parties."
         },
         "age_confirm": {
-          "title": "You confirm you are 18 or older",
-          "detail": "You must be 18 or older to use this service. Users under 18 are not permitted."
+          "title": "Eligibility Requirements",
+          "detail": "This Service is available only to users who are 18 years of age or older. Individuals under the age of 18 are not permitted to use this Service."
         }
       },
       "submitError": "Failed to save. Please try again later."

@@ -12,7 +12,7 @@ import { getAuthToken } from "@/lib/auth/token-key"
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 // 規約 ver03 — id は messages キーとして使用
-const ITEM_IDS = ["self_custody", "defi_risk", "user_responsibility", "age_confirm"] as const
+const ITEM_IDS = ["self_custody", "defi_risk", "usage_conditions", "user_responsibility", "age_confirm"] as const
 
 export default function LiffConfirmPage() {
   const router = useRouter()
@@ -102,7 +102,7 @@ export default function LiffConfirmPage() {
       <div className="bg-[#1a3d2e] px-4 py-5 flex-shrink-0">
         <h1 className="text-white font-bold text-lg">{t("title")}</h1>
         <p className="text-zinc-300 text-sm mt-1">{t("subtitle")}</p>
-        {/* ステップドット (ver03: 4 items) */}
+        {/* ステップドット (ver04: 5 items) */}
         <div className="flex gap-1.5 mt-3">
           {ITEM_IDS.map((_, i) => (
             <div
