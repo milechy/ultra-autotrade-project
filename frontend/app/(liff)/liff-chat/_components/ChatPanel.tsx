@@ -74,12 +74,28 @@ function MessageBubble({ message }: { message: Message }) {
   return (
     <div className={`flex ${isAI ? "justify-start" : "justify-end"}`}>
       {isAI && (
-        <div
-          className="w-7 h-7 rounded-full bg-[#1D9E75] flex items-center justify-center
-                     text-white text-xs font-bold mr-2 mt-0.5 flex-shrink-0"
+        <svg
+          width="36"
+          height="36"
+          viewBox="0 0 100 100"
+          aria-hidden="true"
+          className="w-9 h-9 flex-shrink-0 mr-2 mt-0.5"
         >
-          AI
-        </div>
+          <circle cx="50" cy="50" r="49" fill="#CCCCCC" />
+          <circle
+            cx="50"
+            cy="50"
+            r="41.5"
+            fill="#E8341A"
+            className="animate-color-timer motion-reduce:animate-none"
+          />
+          <g transform="translate(1.75,1.75) scale(0.965)">
+            <path
+              d="M 82.9 22.4 A 43 43 0 1 1 17.1 22.4 L 28.6 32.0 A 28 28 0 1 0 71.4 32.0 Z"
+              fill="white"
+            />
+          </g>
+        </svg>
       )}
       <div
         className={`max-w-[78%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
@@ -264,9 +280,28 @@ export function ChatPanel({ onClose }: Props) {
           {/* タイピングインジケーター */}
           {loading && (
             <div className="flex justify-start">
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[#2a2440] text-xs font-bold mr-2 mt-0.5 flex-shrink-0" style={{background: 'linear-gradient(135deg, #b9a4f2 0%, #ecaccd 52%, #fbd9a0 100%)'}}>
-                AI
-              </div>
+              <svg
+                width="36"
+                height="36"
+                viewBox="0 0 100 100"
+                aria-hidden="true"
+                className="w-9 h-9 flex-shrink-0 mr-2 mt-0.5"
+              >
+                <circle cx="50" cy="50" r="49" fill="#CCCCCC" />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="41.5"
+                  fill="#E8341A"
+                  className="animate-color-timer motion-reduce:animate-none"
+                />
+                <g transform="translate(1.75,1.75) scale(0.965)">
+                  <path
+                    d="M 82.9 22.4 A 43 43 0 1 1 17.1 22.4 L 28.6 32.0 A 28 28 0 1 0 71.4 32.0 Z"
+                    fill="white"
+                  />
+                </g>
+              </svg>
               <div className="ax-card-warm rounded-2xl rounded-tl-none px-4 py-2.5 max-w-[80%]">
                 <div className="flex gap-1 items-center h-4">
                   {[0, 1, 2].map((i) => (
