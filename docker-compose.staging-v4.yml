@@ -1,0 +1,211 @@
+version: "3.9"
+
+# ============================================================
+# docker-compose.staging-v4.yml
+# v4 開発検証用 Staging 環境（staging-v4.ultra-auto-trade.com / api-staging-v4）
+#
+# 設計方針 (2026-06-16 新設 / Asana 1215740593437797):
+#   - v3 staging (docker-compose.staging.yml) とは完全に独立した 3 つ目のスタック。
+#     v3 は今後も修正が出るため維持し、v4 は別環境で並行開発・検証する。
+#   - 【軽量構成 = 4 サービス】 postgres / backend(single) / nginx / frontend
+#       省くもの: blue/green (backend 2 本目) / loki / promtail
+#       理由: VPS RAM 空き ~3.1Gi に 3 つ目のフルスタック(7 サービス)は OOM リスク。
+#             v4 staging は zero-downtime 不要・ログは `docker logs` で十分なので
+#             運用機能(blue/green・ログ集約)を省いて ~1Gi に収める。機能開発・検証は
+#             全て single backend で可能(機能数 ≠ コンテナ数)。
+#   - Shadow Mode 専用 (AI_SHADOW_MODE=true / REBALANCE_SHADOW_MODE=true)
+#   - Base Sepolia テストネット (AAVE_NETWORK=base-sepolia)
+#   - 完全独立 DB (ultra_autotrade_staging_v4)
+#   - port は production / v3 staging と衝突しないよう 127.0.0.1 バインドで分離:
+#       frontend: 127.0.0.1:3002  (prod 3000 / v3 staging 3001)
+#       nginx   : 127.0.0.1:8083  (prod 8080 / v3 staging 8082)
+#       backend : 127.0.0.1:8030  (prod 8010/8011 / v3 staging 8020/8021)
+#       postgres: 127.0.0.1:5434  (prod 5432 / v3 staging 5433)
+#
+# デプロイ: scripts/deploy_staging_v4.sh
+# 環境変数: .env.staging-v4  (テンプレート: .env.staging-v4.example)
+# COMPOSE_PROJECT_NAME: ultra-autotrade-staging-v4  (.env.staging-v4 に定義)
+#
+# NOTE: ログ集約 (loki/promtail) は持たない。全サービス json-file logging で
+#       `docker logs <container>` で参照する。必要になったら後付けで loki を追加可能。
+# ============================================================
+
+volumes:
+  postgres-data-staging-v4:
+    name: ultra-autotrade-staging-v4_postgres-data
+    driver: local
+  ultra-state-staging-v4:
+    name: ultra-autotrade-staging-v4_ultra-state
+    driver: local
+  ultra-log-staging-v4:
+    name: ultra-autotrade-staging-v4_ultra-log
+    driver: local
+  nginx-log-staging-v4:
+    name: ultra-autotrade-staging-v4_nginx-log
+    driver: local
+
+networks:
+  staging-v4-net:
+    name: ultra-autotrade-staging-v4_default
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ultra-autotrade-postgres-staging-v4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ultra}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ultra_autotrade_staging_v4}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - postgres-data-staging-v4:/var/lib/postgresql/data
+    restart: always
+    mem_limit: 512m
+    memswap_limit: 512m
+    networks:
+      - staging-v4-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ultra} -d ${POSTGRES_DB:-ultra_autotrade_staging_v4}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===== Init: backend volume permissions =====
+  # state.json 書込のため named volume を appuser(UID=10001) 所有に揃える。
+  # (docker-compose.staging.yml と同型。idempotent で数百 ms。)
+  backend-volume-init:
+    image: alpine:3.19
+    container_name: ultra-autotrade-backend-volume-init-staging-v4
+    command: ["chown", "-R", "10001:10001", "/var/run/ultra", "/var/log/ultra-autotrade"]
+    volumes:
+      - ultra-state-staging-v4:/var/run/ultra
+      - ultra-log-staging-v4:/var/log/ultra-autotrade
+    restart: "no"
+    networks:
+      - staging-v4-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "1"
+
+  # ===== Single Backend =====
+  # v3 staging の blue/green と異なり 1 本のみ。再デプロイ時は数秒のダウンを許容する
+  # (v4 staging は zero-downtime 不要)。host port 8030 は内部検証 (/health 直接ポーリング) 用。
+  backend:
+    container_name: ultra-autotrade-backend-staging-v4
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/backend
+    command: >
+      sh -c "uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --log-level info"
+    env_file:
+      - .env.staging-v4
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ultra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ultra_autotrade_staging_v4}
+      AI_SHADOW_MODE: "true"
+      # single backend のため blue/green scheduler ガードは不要。
+      # ACTIVE_BACKEND_COLOR を空にして「自分が active」と扱わせる従来挙動と互換にする。
+      BACKEND_COLOR: "blue"
+      ACTIVE_BACKEND_COLOR: ${ACTIVE_BACKEND_COLOR:-blue}
+    mem_limit: ${BACKEND_MEM_LIMIT:-768m}
+    memswap_limit: ${BACKEND_MEM_LIMIT:-768m}
+    ports:
+      - "127.0.0.1:8030:8000"
+    volumes:
+      - ultra-state-staging-v4:/var/run/ultra:rw
+      - ./backend/data:/app/backend/data:rw
+      - ultra-log-staging-v4:/var/log/ultra-autotrade
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend-volume-init:
+        condition: service_completed_successfully
+    restart: always
+    networks:
+      - staging-v4-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===== Reverse Proxy =====
+  # nginx.conf は production/staging と共有。upstream.staging-v4.conf を
+  # /etc/nginx/conf.d/upstream.conf にマウントし single backend を指す。
+  # 127.0.0.1:8083 にバインド (prod 8080 / v3 staging 8082 と分離)。
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ultra-autotrade-nginx-staging-v4
+    ports:
+      - "127.0.0.1:8083:8080"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/upstream.staging-v4.conf:/etc/nginx/conf.d/upstream.conf:rw
+      - nginx-log-staging-v4:/var/log/nginx
+    depends_on:
+      - backend
+    restart: always
+    mem_limit: 64m
+    memswap_limit: 64m
+    networks:
+      - staging-v4-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    container_name: ultra-autotrade-frontend-staging-v4
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://api-staging-v4.ultra-auto-trade.com}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api-staging-v4.ultra-auto-trade.com}
+        NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:-}
+        NEXT_PUBLIC_DEFAULT_CHAIN: ${NEXT_PUBLIC_DEFAULT_CHAIN:-}
+        NEXT_PUBLIC_DEFAULT_CHAIN_ID: ${NEXT_PUBLIC_DEFAULT_CHAIN_ID:-84532}
+        NEXT_PUBLIC_MAINNET_RPC: ${NEXT_PUBLIC_MAINNET_RPC:-}
+        NEXT_PUBLIC_ARBITRUM_ONE_RPC: ${NEXT_PUBLIC_ARBITRUM_ONE_RPC:-}
+        NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC: ${NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC:-}
+        NEXT_PUBLIC_BASE_RPC: ${NEXT_PUBLIC_BASE_RPC:-}
+        NEXT_PUBLIC_BASE_SEPOLIA_RPC: ${NEXT_PUBLIC_BASE_SEPOLIA_RPC:-}
+        NEXT_PUBLIC_OPTIMISM_RPC: ${NEXT_PUBLIC_OPTIMISM_RPC:-}
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+        NEXT_PUBLIC_LIFF_ID: ${NEXT_PUBLIC_LIFF_ID:-}
+        NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}
+        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
+        NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-https://us.i.posthog.com}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-dev}
+        # Next.js ビルド OOM 対策 (CLAUDE.md §2026-05-19 GID 1214828243363427)
+        NODE_BUILD_MAX_OLD_SPACE_SIZE: ${NODE_BUILD_MAX_OLD_SPACE_SIZE:-4096}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api-staging-v4.ultra-auto-trade.com}
+      # SSR は Docker ネットワーク内の nginx (内部ポート 8080) 経由で backend に到達。
+      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://nginx:8080}
+    ports:
+      - "127.0.0.1:3002:3000"
+    depends_on:
+      - nginx
+    restart: always
+    mem_limit: 512m
+    memswap_limit: 512m
+    networks:
+      - staging-v4-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
