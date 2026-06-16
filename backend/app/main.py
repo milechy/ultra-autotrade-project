@@ -35,7 +35,7 @@ from app.aave.fee_router import router as fee_router
 from app.aave.rebalance_router import router as rebalance_router
 from app.aave.router import router as aave_router
 from app.aave.transparency_router import router as transparency_router
-from app.ai.decisions_router import router as ai_decisions_router
+from app.ai.decisions_router import router as ai_decisions_router, ws_router as ai_decisions_ws_router
 from app.ai.feedback_router import router as ai_feedback_router
 from app.ai.optimizer.router import router as ai_optimizer_router
 from app.ai.router import router as ai_router
@@ -270,6 +270,7 @@ def create_app() -> FastAPI:
     app.include_router(fees_v10_router, prefix="/api/v1")  # Fee Model v10 API (/api/v1/fees/*)
     app.include_router(fee_transfer_router, prefix="/api/v1")  # Fee Transfer & Allowance (Lane R)
     app.include_router(ai_decisions_router)  # AI Decisions API
+    app.include_router(ai_decisions_ws_router)  # AI Decisions WebSocket
     app.include_router(ai_feedback_router)  # AI Feedback API (Layer 4)
     app.include_router(ai_optimizer_router)  # AI Optimizer (Phase 2 / ENB)
     app.include_router(transactions_router)  # Transactions API

@@ -128,6 +128,31 @@ export default function LiffChatPage() {
       .catch(() => {})
   }, [])
 
+  // ── WebSocket: AI 判定リアルタイム受信
+  useEffect(() => {
+    const token =
+      typeof window !== "undefined"
+        ? (localStorage.getItem("auth_token") ?? "")
+        : ""
+    if (!token) return
+
+    const WS_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(
+      /^https?/,
+      (m) => (m === "https" ? "wss" : "ws"),
+    )
+    const ws = new WebSocket(`${WS_BASE}/api/ai/ws/decisions?token=${token}`)
+    ws.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data) as AiJudgment
+        setAiJudgment(data)
+      } catch {
+        // parse 失敗は無視
+      }
+    }
+    ws.onerror = () => ws.close()
+    return () => ws.close()
+  }, [])
+
   // ── 承認・見送りハンドラ（BUY/SELL）
   function handleApprove() {
     // liff-approve に遷移せずパネルで完結させる想定（Phase 5 以降）
