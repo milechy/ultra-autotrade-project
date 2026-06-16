@@ -7,20 +7,43 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin, require_editor, require_viewer
 from app.auth.models import User
+from app.auth.service import AuthService
 from app.database import get_db
 
 from .decisions_schemas import AIDecisionCreate, AIDecisionListResponse, AIDecisionResponse
 from .models import AIDecision, AiDecisionFeature
+from .ws_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ai/decisions", tags=["ai-decisions"])
+ws_router = APIRouter(prefix="/api/ai/ws", tags=["ai-ws"])
+
+
+@ws_router.websocket("/decisions")
+async def ws_ai_decisions(
+    websocket: WebSocket,
+    token: str = Query(
+        ..., description="JWT トークン（ブラウザ WS はヘッダー非対応のためクエリ渡し）"
+    ),
+) -> None:
+    """AI 判定 WebSocket エンドポイント。無効トークンは code=4001 で切断。"""
+    payload = AuthService.decode_token(token)
+    if not payload:
+        await websocket.close(code=4001)
+        return
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
 
 
 @router.get("/latest", response_model=AIDecisionResponse, summary="最新AI判定取得")

@@ -117,6 +117,32 @@ export default function LiffChatPage() {
       .catch(() => {})
   }, [])
 
+  // ── WebSocket: AI 判定リアルタイム受信
+  useEffect(() => {
+    const token =
+      typeof window !== "undefined"
+        ? (localStorage.getItem("auth_token") ?? "")
+        : ""
+    if (!token) return
+
+    const WS_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(
+      /^https?/,
+      (m) => (m === "https" ? "wss" : "ws"),
+    )
+    const ws = new WebSocket(`${WS_BASE}/api/ai/ws/decisions?token=${token}`)
+    ws.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data) as AiJudgment
+        setAiJudgment(data)
+      } catch {
+        // parse 失敗は無視
+      }
+    }
+    ws.onerror = () => ws.close()
+    return () => ws.close()
+  }, [])
+
+
   // ── 緊急停止: POST /api/user/pause（require_active_user / consumer 可）
   // backend の OR ロジック安全装置は変更せず、ユーザーの is_active フラグを落とすだけ。
   async function handleEmergencyStop() {
