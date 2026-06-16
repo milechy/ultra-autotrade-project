@@ -6,7 +6,6 @@ import QRCode from "qrcode"
 import {
   Copy,
   QrCode,
-  ExternalLink,
   ShieldCheck,
   Shield,
   Wallet,
@@ -83,11 +82,6 @@ export function MyWalletPanel() {
     } catch {
       showToast(t("toastCopyFailed"))
     }
-  }
-
-  const handleBasescan = () => {
-    if (!address) return
-    window.open(`https://basescan.org/address/${address}`, "_blank", "noopener,noreferrer")
   }
 
   // アドレスの先頭4文字・末尾4文字をハイライト表示
@@ -212,17 +206,6 @@ export function MyWalletPanel() {
             <span className="text-[10px] text-[#fbf7f0]">{t("qrLabel")}</span>
           </button>
 
-          <button
-            onClick={handleBasescan}
-            disabled={!address}
-            className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl
-                       bg-[#1b1a23]/80 hover:bg-[#1b1a23] active:bg-[#1b1a23]
-                       disabled:opacity-40 disabled:cursor-not-allowed
-                       transition-colors"
-          >
-            <ExternalLink className="w-4 h-4 text-[#1D9E75]" />
-            <span className="text-[10px] text-[#fbf7f0]">{t("basescanLabel")}</span>
-          </button>
         </div>
       </div>
 
