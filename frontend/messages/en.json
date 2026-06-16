@@ -962,6 +962,7 @@
       "termsLink": "Terms of Service",
       "privacyLink": "Privacy Policy",
       "submitBtn": "Start investing",
+      "submitBtnSub": "(Generating wallet)",
       "submitting": "Saving...",
       "items": {
         "self_custody": {
