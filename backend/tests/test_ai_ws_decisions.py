@@ -3,7 +3,7 @@
 """AI 判定 WebSocket エンドポイント・WsManager のテスト。"""
 
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
