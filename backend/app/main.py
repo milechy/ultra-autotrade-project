@@ -35,7 +35,8 @@ from app.aave.fee_router import router as fee_router
 from app.aave.rebalance_router import router as rebalance_router
 from app.aave.router import router as aave_router
 from app.aave.transparency_router import router as transparency_router
-from app.ai.decisions_router import router as ai_decisions_router, ws_router as ai_decisions_ws_router
+from app.ai.decisions_router import router as ai_decisions_router
+from app.ai.decisions_router import ws_router as ai_decisions_ws_router
 from app.ai.feedback_router import router as ai_feedback_router
 from app.ai.optimizer.router import router as ai_optimizer_router
 from app.ai.router import router as ai_router
