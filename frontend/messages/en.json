@@ -700,7 +700,7 @@
         "opMode": "Mode",
         "wallet": "Wallet",
         "walletNotLinked": "Not linked",
-        "modeManagedLabel": "Fully Automated",
+        "modeManagedLabel": "Automated",
         "modeActiveLabel": "Active",
         "modeUnknown": "—",
         "corpSectionTitle": "Use as Corporation",
