@@ -25,7 +25,7 @@ export default function PrivacyPolicyPage() {
         </Button>
 
         <h1 className="text-2xl font-bold mb-2">{t('pageTitle')}</h1>
-        <p className="text-sm text-zinc-500 mb-8">{t('lastUpdated', { date: t('lastUpdatedDate') })}</p>
+        <p className="text-sm text-zinc-500 mb-8">{t('lastUpdated')}</p>
 
         <div className="space-y-8 text-sm text-zinc-300 leading-relaxed">
           <section>
@@ -35,8 +35,9 @@ export default function PrivacyPolicyPage() {
               <li>{t('section1Item1')}</li>
               <li>{t('section1Item2')}</li>
               <li>{t('section1Item3')}</li>
+              <li>{t('section1Item4')}</li>
             </ul>
-            <p className="mt-2">{t('section1Footer')}</p>
+            <p className="mt-2 text-xs text-zinc-500">{t('section1Note')}</p>
           </section>
 
           <section>
@@ -46,46 +47,22 @@ export default function PrivacyPolicyPage() {
 
           <section>
             <h2 className="text-base font-semibold text-zinc-100 mb-2">{t('section3Title')}</h2>
-            <p>{t('section3Intro')}</p>
-            <ul className="list-disc list-inside mt-2 space-y-1">
-              <li>{t('section3Item1')}</li>
-              <li>{t('section3Item2')}</li>
-              <li>{t('section3Item3')}</li>
-            </ul>
-            <p className="mt-2">{t('section3Footer')}</p>
+            <p>{t('section3Body')}</p>
           </section>
 
           <section>
             <h2 className="text-base font-semibold text-zinc-100 mb-2">{t('section4Title')}</h2>
-            <p>{t('section4Intro')}</p>
-            <ul className="list-disc list-inside mt-2 space-y-1">
-              <li><strong className="text-zinc-100">Aave Protocol</strong>: {t('section4Item1')}</li>
-              <li><strong className="text-zinc-100">WalletConnect</strong>: {t('section4Item2')}</li>
-            </ul>
-            <p className="mt-2">{t('section4Footer')}</p>
+            <p>{t('section4Body')}</p>
           </section>
 
           <section>
             <h2 className="text-base font-semibold text-zinc-100 mb-2">{t('section5Title')}</h2>
-            <p>{t('section5Intro')}</p>
-            <ul className="list-disc list-inside mt-2 space-y-1">
-              <li>{t('section5Item1')}</li>
-              <li>{t('section5Item2')}</li>
-              <li>{t('section5Item3')}</li>
-            </ul>
-            <p className="mt-2">{t('section5Footer')}</p>
+            <p>{t('section5Body')}</p>
           </section>
 
           <section>
             <h2 className="text-base font-semibold text-zinc-100 mb-2">{t('section6Title')}</h2>
-            <p>{t('section6Intro')}</p>
-            <ul className="list-disc list-inside mt-2 space-y-1">
-              <li>{t('section6Item1')}</li>
-              <li>{t('section6Item2')}</li>
-              <li>{t('section6Item3')}</li>
-              <li>{t('section6Item4')}</li>
-            </ul>
-            <p className="mt-2">{t('section6Footer')}</p>
+            <p>{t('section6Body')}</p>
           </section>
 
           <section>
