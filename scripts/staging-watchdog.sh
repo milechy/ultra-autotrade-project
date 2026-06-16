@@ -82,7 +82,8 @@ for img in $(docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" config
 done
 if [[ -n "${missing}" ]]; then
   echo "${LOG_PREFIX} ABORT: 必須 image 欠落 →${missing}. build は誘発せず手動対応待ち。"
-  [[ "${should_notify}" == "1" ]] && notify_slack "❌ [staging-watchdog] image 欠落で自動復旧を中止(build抑止):${missing}。手動 build が必要。"
+  # image 欠落は自動復旧不可なので cooldown に関わらず毎回通知する
+  notify_slack "❌ [staging-watchdog] image 欠落で自動復旧を中止(build抑止):${missing}。手動で deploy_staging.sh を実行してください。"
   exit 1
 fi
 
