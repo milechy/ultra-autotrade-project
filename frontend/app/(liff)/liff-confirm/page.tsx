@@ -240,7 +240,12 @@ export default function LiffConfirmPage() {
               {t("submitting")}
             </span>
           ) : (
-            t("submitBtn")
+            <>
+              {t("submitBtn")}
+              <span className="block text-[9px] font-normal leading-none mt-1 opacity-75">
+                {t("submitBtnSub")}
+              </span>
+            </>
           )}
         </button>
       </div>

@@ -962,6 +962,7 @@
       "termsLink": "利用規約",
       "privacyLink": "プライバシーポリシー",
       "submitBtn": "運用を開始する",
+      "submitBtnSub": "（ウォレット生成）",
       "submitting": "保存中...",
       "items": {
         "self_custody": {
