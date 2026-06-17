@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { CheckCircle, ChevronDown, ExternalLink } from "lucide-react"
 import { getAuthToken } from "@/lib/auth/token-key"
+import { TERMS_JUST_ACCEPTED_KEY } from "@/hooks/useLiffTermsGate"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
@@ -73,6 +74,9 @@ export default function LiffConfirmPage() {
         },
       })
       if (res.ok) {
+        // terms gate の sessionStorage 高速パス: Cloudflare キャッシュやネットワーク
+        // 失敗によるループを防ぐ（useLiffTermsGate.ts と対になる）。
+        sessionStorage.setItem(TERMS_JUST_ACCEPTED_KEY, "liff-v3")
         router.replace("/liff-chat")
       } else if (res.status === 401) {
         // セッション切れ — 再ログインへ誘導
@@ -242,7 +246,7 @@ export default function LiffConfirmPage() {
           ) : (
             <>
               {t("submitBtn")}
-              <span className="block text-[9px] font-normal leading-none mt-1 opacity-75">
+              <span className="block text-[11px] font-normal leading-none mt-1 opacity-75">
                 {t("submitBtnSub")}
               </span>
             </>

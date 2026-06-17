@@ -5,6 +5,19 @@
 
 ---
 
+## PR #775 (AI判定 WebSocket): ai_decisions_ws_router 配線 (2026-06-17)
+
+### 変更: ai_decisions_ws_router を main.py に include_router
+- **対象凍結ファイル**: `backend/app/main.py`
+- **変更内容**:
+  - `from app.ai.decisions_router import ... ws_router as ai_decisions_ws_router` を import 追加
+  - `app.include_router(ai_decisions_ws_router)` を追加（prefix は router 側で `/api/ai/ws` 定義済み）
+- **理由**: AI 判定 WebSocket リアルタイム配信エンドポイント (`GET /api/ai/ws/decisions`) を有効化するため。新規 `ws_router` を decisions_router.py に定義し、main.py への配線が必要。
+- **影響範囲**: WebSocket ルーター登録のみ。既存 REST エンドポイント・スケジューラー・起動シーケンスへの影響なし。JWT クエリ認証で保護済み。
+- **承認**: feat/ws-ai-decision-realtime-v2 → main の通常フロー経由（PR #775）
+
+---
+
 ## PR #763 (yield optimizer 配線漏れ修正): yield_optimizer_router 配線 (2026-06-16)
 
 ### 変更: yield_optimizer_router を main.py に include_router

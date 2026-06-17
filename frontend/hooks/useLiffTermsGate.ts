@@ -25,6 +25,13 @@ import { getAuthToken } from "@/lib/auth/token-key"
 /** liff-confirm / settings_router (LIFF_TERMS_VERSION) と一致させること。 */
 const LIFF_TERMS_VERSION = "liff-v3"
 
+/**
+ * terms-agree POST 直後に sessionStorage へ書き込むキー。
+ * 書き込み後の最初の useLiffTermsGate 呼び出しで即 "accepted" を返し、
+ * Cloudflare キャッシュや一時ネットワーク失敗によるループを防ぐ。
+ */
+export const TERMS_JUST_ACCEPTED_KEY = "liff_terms_just_accepted"
+
 /** ブラウザ wallet 経路の同意バージョン (POST /auth/terms/accept で記録)。 */
 const BROWSER_TERMS_VERSION = "2.0"
 
@@ -62,12 +69,25 @@ export function useLiffTermsGate(
       return
     }
 
+    // terms-agree POST 直後のセッション内高速パス: ネットワーク失敗やキャッシュ返却に
+    // よるループを防ぐ。sessionStorage は同一タブのみ有効で、タブを閉じると消える。
+    const justAccepted =
+      typeof sessionStorage !== "undefined"
+        ? sessionStorage.getItem(TERMS_JUST_ACCEPTED_KEY)
+        : null
+    if (justAccepted != null && acceptedVersions.includes(justAccepted)) {
+      sessionStorage.removeItem(TERMS_JUST_ACCEPTED_KEY)
+      setState("accepted")
+      return
+    }
+
     const apiBase = process.env.NEXT_PUBLIC_API_URL ?? ""
     let cancelled = false
     setState("loading")
 
     fetch(`${apiBase}/api/user/settings`, {
       headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
     })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { terms_version?: string | null } | null) => {

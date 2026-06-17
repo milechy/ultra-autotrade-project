@@ -11,35 +11,30 @@ import { LanguageProvider, useLanguage } from "@/lib/useLanguage"
 import jaMessages from "@/messages/ja.json"
 import enMessages from "@/messages/en.json"
 
-// IntlWrapper: LanguageProvider 内側で language を参照し NextIntlClientProvider を設定する
+// IntlWrapper: LanguageProvider 内側で language を参照し NextIntlClientProvider を設定する。
+// mounted フラグをここで管理することで LanguageProvider を安定させ、
+// 「ボタンは JP（language=en）なのに表示は日本語」という不整合を防ぐ。
 function IntlWrapper({ children }: { children: ReactNode }) {
   const { language } = useLanguage()
-  const messages = language === "en" ? enMessages : jaMessages
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // mount 前は ja 固定（SSR hydration safe）
+  // mount 後は LanguageProvider の実際の言語を使う
+  const locale = mounted ? language : "ja"
+  const messages = locale === "en" ? enMessages : jaMessages
+
   return (
-    <NextIntlClientProvider locale={language} messages={messages}>
+    <NextIntlClientProvider locale={locale} messages={messages}>
       {children}
     </NextIntlClientProvider>
   )
 }
 
 export default function LiffChatLayout({ children }: { children: ReactNode }) {
-  // SSR hydration: mounted フラグで hydration mismatch を防ぐ
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    // SSR / hydration 前は ja で描画（後から正しい言語に切り替わる）
-    return (
-      <LanguageProvider>
-        <NextIntlClientProvider locale="ja" messages={jaMessages}>
-          {children}
-        </NextIntlClientProvider>
-      </LanguageProvider>
-    )
-  }
-
   return (
     <LanguageProvider>
       <IntlWrapper>{children}</IntlWrapper>

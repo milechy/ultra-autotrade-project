@@ -700,7 +700,7 @@
         "opMode": "運用モード",
         "wallet": "ウォレット",
         "walletNotLinked": "未連携",
-        "modeManagedLabel": "完全おまかせ",
+        "modeManagedLabel": "おまかせ",
         "modeActiveLabel": "アクティブ",
         "modeUnknown": "—",
         "corpSectionTitle": "法人として使う",

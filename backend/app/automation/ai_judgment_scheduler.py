@@ -756,6 +756,24 @@ async def ai_judgment_loop(
             _last_error_msg = None
             logger.info("AI judgment completed: %s", result)
 
+            # AI 判定完了後に WebSocket ブロードキャスト（fail-open / 最小変更）
+            try:
+                from app.ai.models import AIDecision as _AIDecision  # noqa: PLC0415
+                from app.ai.ws_manager import ws_manager as _ws_manager  # noqa: PLC0415
+
+                with SessionLocal() as _db:
+                    _latest = _db.query(_AIDecision).order_by(_AIDecision.created_at.desc()).first()
+                    if _latest:
+                        await _ws_manager.broadcast(
+                            {
+                                "action": _latest.action,
+                                "confidence": _latest.confidence,
+                                "reason": _latest.reason,
+                            }
+                        )
+            except Exception as _ws_exc:  # noqa: BLE001
+                logger.warning("WS broadcast skipped (non-critical): %s", _ws_exc)
+
             # AI判定直後にポートフォリオスナップショットを記録（fail-open）
             try:
                 from app.portfolio.snapshot_service import record_portfolio_snapshot  # noqa: PLC0415,I001
