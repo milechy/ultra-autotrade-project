@@ -14,6 +14,11 @@ ALTER TABLE users ADD COLUMN last_judgment_at TIMESTAMP WITH TIME ZONE NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS privy_did VARCHAR(255) NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS ix_users_privy_did ON users (privy_did) WHERE privy_did IS NOT NULL;
 
+-- smart_wallet_address: ERC-4337 Smart Wallet アドレス (Privy AA + paymaster 移行 / slice3a)。
+-- migration: swa20260618_add_smart_wallet_address。NULL=EOA / 設定済=Smart Wallet ユーザー。
+ALTER TABLE users ADD COLUMN IF NOT EXISTS smart_wallet_address VARCHAR(42) NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS ix_users_smart_wallet_address ON users (smart_wallet_address) WHERE smart_wallet_address IS NOT NULL;
+
 -- GID 1214176344039867 (P1): execution_policy CHECK + server_default 強化
 -- DB default は a1b2c3d4e5f6 で 'auto_execute' 設定済み。
 -- CheckConstraint と SQLAlchemy 側 server_default を Alembic migration で同期する。
@@ -259,6 +264,11 @@ class User(Base):
         server_default=ExecutionPolicy.REQUIRE_APPROVAL.value,
     )
     wallet_address: Mapped[Optional[str]] = mapped_column(
+        String(42), unique=True, nullable=True, index=True, default=None
+    )
+    # ERC-4337 Smart Wallet アドレス (Privy AA + paymaster 移行 / slice3a)。
+    # NULL = EOA ユーザー / 設定済 = Smart Wallet ユーザー（slice3b の submit-tx 経路判別子）。
+    smart_wallet_address: Mapped[Optional[str]] = mapped_column(
         String(42), unique=True, nullable=True, index=True, default=None
     )
     privy_did: Mapped[Optional[str]] = mapped_column(
