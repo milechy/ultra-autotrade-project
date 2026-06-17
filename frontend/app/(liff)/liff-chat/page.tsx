@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
-import { Menu, User, MessageCircle } from "lucide-react"
+import { Menu, User } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useLanguage } from "@/lib/useLanguage"
 import { useUsdcBalance } from "@/hooks/useUsdcBalance"
@@ -64,6 +64,8 @@ export default function LiffChatPage() {
   // ── 既存 state（ハンバーガー）
   const [menuOpen, setMenuOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<string | null>(null)
+  // パネルがハンバーガーメニュー由来で開かれたか（戻るでメニューに復帰するため）
+  const [panelFromMenu, setPanelFromMenu] = useState(false)
 
   // ── 新規 state（ホームコンテンツ）
   const [aiJudgment, setAiJudgment] = useState<AiJudgment | null>(null)
@@ -238,7 +240,7 @@ export default function LiffChatPage() {
             {language === "ja" ? "EN" : "JP"}
           </button>
           <button
-            onClick={() => { setActivePanel("account"); track(EV.ACCOUNT_OPEN) }}
+            onClick={() => { setActivePanel("account"); setPanelFromMenu(false); track(EV.ACCOUNT_OPEN) }}
             className="text-[#1c1a27] p-1 hover:bg-black/5 rounded-lg transition-colors"
             aria-label={t("header.accountAriaLabel")}
           >
@@ -443,7 +445,26 @@ export default function LiffChatPage() {
                    bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0]"
         aria-label={t("home.openChatAriaLabel")}
       >
-        <MessageCircle className="w-6 h-6 text-[#2a2440]" />
+        {/* QA AI ボタン = UAT アニメロゴ（ヘッダーと同一・カラータイマー点滅継続） */}
+        <svg viewBox="0 0 100 100" className="w-12 h-12" aria-hidden="true">
+          {/* ベゼル: フラットグレー */}
+          <circle cx="50" cy="50" r="49" fill="#CCCCCC" />
+          {/* 内面: 赤 — カラータイマー点滅 */}
+          <circle
+            cx="50"
+            cy="50"
+            r="41.5"
+            fill="#E8341A"
+            className="animate-color-timer motion-reduce:animate-none"
+          />
+          {/* U リング: 白 */}
+          <g transform="translate(1.75,1.75) scale(0.965)">
+            <path
+              d="M 82.9 22.4 A 43 43 0 1 1 17.1 22.4 L 28.6 32.0 A 28 28 0 1 0 71.4 32.0 Z"
+              fill="white"
+            />
+          </g>
+        </svg>
         {unreadCount > 0 && (
           <span
             className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs
@@ -520,7 +541,7 @@ export default function LiffChatPage() {
       <HamburgerMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        onPanelOpen={(id) => { setActivePanel(id); track(EV.PANEL_OPEN, { panel: id }) }}
+        onPanelOpen={(id) => { setActivePanel(id); setPanelFromMenu(true); track(EV.PANEL_OPEN, { panel: id }) }}
       />
 
       {/* ── 各パネル（既存維持） */}
@@ -528,7 +549,7 @@ export default function LiffChatPage() {
         <SlideUpPanel
           key={id}
           open={activePanel === id}
-          onClose={() => setActivePanel(null)}
+          onClose={() => { setActivePanel(null); if (panelFromMenu) { setMenuOpen(true); setPanelFromMenu(false) } }}
           title={PANEL_TITLES[id]}
         >
           {id === "myWallet"     && <MyWalletPanel />}
