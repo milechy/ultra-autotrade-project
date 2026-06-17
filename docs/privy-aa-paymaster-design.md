@@ -59,10 +59,11 @@ session key / SCW owner 設計次第でカストディが silent に移る secur
 
 - **ライブラリ**: `frontend/lib/wallet/PrivyRootClient.tsx` — `@privy-io/react-auth ^3.29.2`
 - **SmartWalletsProvider**: 未配線（通常の EOA embedded wallet のみ）
-- **署名経路 3 箇所**:
+- **署名経路 4 箇所**（2026-06-17 更新: liff-chat 消費者導線を追加）:
   - `frontend/app/(partner)/partner/proposals/page.tsx:108`
   - `frontend/app/(liff)/liff-approve/_components/ApproveConfirmSheet.tsx:103`
   - `frontend/app/(user)/withdraw/page.tsx:395`
+  - `frontend/app/(liff)/liff-chat/_components/ProposalSignSheet.tsx`（PR #787 で追加。消費者 VIEWER の build-tx→自己署名→submit-tx。スライス4 で UserOp 化対象）
 - **注意**: `frontend/app/arobix/onboarding/page.tsx:47` に "Smart Wallet" テキストが存在するが実装ゼロ
 
 ### 2.4 F-9 expense_jpy 現状
@@ -196,7 +197,7 @@ paymaster 移行完了後、以下を明文化する:
 | スライス | 内容 | ファイル | ステータス |
 |---|---|---|---|
 | スライス1 | 本設計 doc | `docs/privy-aa-paymaster-design.md` | 完了（本 doc） |
-| スライス7 | PoC テスト新規追加（Base Sepolia UserOp 確認） | `backend/tests/` または `frontend/tests/` 新規ファイル | 未着手 |
+| スライス7 | PoC harness 新規追加（Base Sepolia sponsored UserOp 確認） | `frontend/scripts/poc/paymaster-poc.mjs` | **コード実装済（2026-06-17）**。viem のみ・新規依存ゼロ。SCW counterfactual 生成 + bundler 到達まで確認済。実行は Pimlico key（小林さん）待ち |
 
 ### 6.2 HUMAN-REVIEW-REQUIRED（人間の承認後に着手）
 
@@ -207,7 +208,7 @@ paymaster 移行完了後、以下を明文化する:
 |---|---|---|---|
 | スライス2 | UserOp receipt 検証 helper 新規 + submit-tx 配線 | `backend/app/proposals/router.py`（L834 `_verify_on_chain_receipt`）、`backend/app/aave/client.py`（L1451/L1473） | 🛑 DeFi 安全装置の変更 |
 | スライス3 | `onBehalfOf` → Smart Wallet address 対応 + `users.smart_wallet_address` migration | `backend/app/proposals/router.py`、`backend/migrations/versions/*.py`（新規）、`backend/app/database.py` | 🛑 Tier S（migration） |
-| スライス4 | フロント SmartWalletsProvider 配線 + sponsored UserOp 送信 | `frontend/lib/wallet/PrivyRootClient.tsx`、`frontend/app/(partner)/partner/proposals/page.tsx`、`frontend/app/(liff)/liff-approve/_components/ApproveConfirmSheet.tsx`、`frontend/app/(user)/withdraw/page.tsx` | 🛑 Aave tx 経路変更（全署名経路 3 箇所） |
+| スライス4 | フロント SmartWalletsProvider 配線 + sponsored UserOp 送信 | `frontend/lib/wallet/PrivyRootClient.tsx`、`frontend/app/(partner)/partner/proposals/page.tsx`、`frontend/app/(liff)/liff-approve/_components/ApproveConfirmSheet.tsx`、`frontend/app/(user)/withdraw/page.tsx`、`frontend/app/(liff)/liff-chat/_components/ProposalSignSheet.tsx` | 🛑 Aave tx 経路変更（全署名経路 4 箇所） |
 | スライス5 | 依存追加（paymaster SDK） | `frontend/package.json`、`frontend/package-lock.json` | 🛑 Tier S（package.json） |
 | スライス6 | F-9 expense_jpy 再設計・二重計上防止 | `backend/app/automation/workflow.py`（L817）、`backend/app/api/v1/fees.py`（L360） | 🛑 金融計算・Decimal 変更 |
 
