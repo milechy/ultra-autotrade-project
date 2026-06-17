@@ -176,7 +176,17 @@ export default function LiffLayout({ children }: { children: React.ReactNode }) 
     <div className="arobix-root">
       <PostHogProvider>
         <PrivyRootClient>
-          <SessionExpiryBanner loginHref="/liff-login" />
+          {/* SessionExpiryBanner は子レイアウト (liff-chat/layout 等) の
+              NextIntlClientProvider の外側に居るため、自前の provider で
+              SharedSessionExpiry namespace を供給する。これが無いと
+              バナー表示時 (nearing_expiry / wiped / expired) に relogin ラベルの
+              翻訳が i18n コンテキスト不在で throw し、ページ全体が client-side crash する。 */}
+          <NextIntlClientProvider
+            locale="ja"
+            messages={{ SharedSessionExpiry: jaMessages.SharedSessionExpiry }}
+          >
+            <SessionExpiryBanner loginHref="/liff-login" />
+          </NextIntlClientProvider>
           {children}
         </PrivyRootClient>
       </PostHogProvider>
