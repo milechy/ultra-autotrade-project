@@ -33,7 +33,12 @@ export default function LiffConfirmPage() {
     // 旧キー保存セッションを取りこぼし、terms-agree が 401 で「押しても無反応」になっていた）。
     const token = getAuthToken()
     if (!token) {
-      setLoading(false)
+      // 未認証で 5 チェックを先に見せると、submit 時に getAuthToken() が null で
+      // /liff-login へ弾かれ、Privy アカウント作成後また /liff-confirm に戻って
+      // 5 チェックを再表示するループになる (Privy 作成がチェックの「後」に見える)。
+      // 正しい順序は「Privy アカウント作成 → 5 チェック → ホーム」なので、
+      // token が無ければチェックを見せず即 /liff-login (Privy) へ送る。
+      router.replace("/liff-login")
       return
     }
 
