@@ -24,6 +24,7 @@ from app.auth.dependencies import (
 from app.auth.models import User
 from app.auth.models import User as UserModel
 from app.database import get_db
+from app.policy.engine import PolicyContext, get_policy_engine
 
 from .models import Proposal
 from .schemas import (
@@ -656,7 +657,28 @@ def approve_proposal(
             detail=f"Cannot approve proposal with status '{proposal.status}'",
         )
 
-    # Step 1: 承認済みにマーク
+    # Step 1: PolicyEngine hard rule 検算（承認前に必ず通す）
+    ctx = PolicyContext(
+        user_id=proposal.user_id,
+        asset=proposal.asset,
+        operation=proposal.operation,
+        amount_usd=Decimal(str(proposal.amount_usd)),
+        expected_hf_after=Decimal(str(proposal.expected_hf_after))
+        if proposal.expected_hf_after is not None
+        else None,
+        proposal_id=proposal.id,
+    )
+    policy_result = get_policy_engine().check(ctx, db)
+    if policy_result.blocked:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "POLICY_VIOLATION",
+                "violations": policy_result.violations,
+            },
+        )
+
+    # Step 2: 承認済みにマーク
     proposal.status = "approved"
     proposal.approved_at = datetime.now(timezone.utc)
     db.commit()
