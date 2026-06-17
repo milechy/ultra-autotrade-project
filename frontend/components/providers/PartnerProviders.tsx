@@ -51,7 +51,9 @@ export function PartnerProviders({ children }: { children: React.ReactNode }) {
   return (
     <PrivyRootClient>
       <AuthProvider>
-        <SessionExpiryBanner loginHref="/login" />
+        <NextIntlClientProvider locale="ja" messages={{ SharedSessionExpiry: jaMessages.SharedSessionExpiry }}>
+          <SessionExpiryBanner loginHref="/login" />
+        </NextIntlClientProvider>
         <PartnerGuard>
           <AutomationStatusProvider>
             <AppShell>{children}</AppShell>

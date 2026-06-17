@@ -71,7 +71,7 @@ function UserGuardInner({ children }: { children: React.ReactNode }) {
 
 function UserGuard({ children }: { children: React.ReactNode }) {
   return (
-    <NextIntlClientProvider locale="ja" messages={{ ProvidersUser: jaMessages.ProvidersUser }}>
+    <NextIntlClientProvider locale="ja" messages={{ ProvidersUser: jaMessages.ProvidersUser, SharedSessionExpiry: jaMessages.SharedSessionExpiry }}>
       <UserGuardInner>{children}</UserGuardInner>
     </NextIntlClientProvider>
   )
@@ -113,7 +113,9 @@ export function UserProviders({ children }: { children: React.ReactNode }) {
   return (
     <PrivyRootClient>
       <AuthProvider>
-        <SessionExpiryBanner loginHref="/login" />
+        <NextIntlClientProvider locale="ja" messages={{ SharedSessionExpiry: jaMessages.SharedSessionExpiry }}>
+          <SessionExpiryBanner loginHref="/login" />
+        </NextIntlClientProvider>
         <UserGuard>
           <AutomationStatusProvider>
             <SessionExpiryBanner />
