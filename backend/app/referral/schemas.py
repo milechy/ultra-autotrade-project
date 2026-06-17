@@ -56,6 +56,9 @@ class ReferralEarningsResponse(BaseModel):
     total_payout_jpy: str
     campaign_rate: str  # e.g. "0.1000" (10%)
     campaign_expires_month: str | None  # "2027-01-01" 形式 or None
+    # キャンペーン状態: "active" = 報酬発生中 / "pending" = 翌月開始予定 / None = ウィンドウなし。
+    # PL10: 紹介登録直後の月は開始待ち (pending) のため、expires は埋めつつ状態で区別する。
+    campaign_status: Literal["active", "pending"] | None = None
 
 
 class ReferredUserDetail(BaseModel):
@@ -64,7 +67,7 @@ class ReferredUserDetail(BaseModel):
     name: str
     joined_at: datetime
     status: str  # "active" | "registered"
-    reward_jpy: str  # ¥1,500 bonus は別タスク: 現在は常に "0"
+    reward_jpy: str  # 友達ごとの内訳は未集計のため常に "0" (総額は earnings 側で集約)
 
 
 class ReferralInfoResponse(BaseModel):

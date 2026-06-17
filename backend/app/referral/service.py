@@ -238,7 +238,7 @@ def get_referral_earnings(db: Session, partner_id: int) -> dict[str, str | int |
     # active fee_config が無い場合の fallback は 0.10 (FeeConfigV10.affiliate_rate server_default と一致)。
     campaign_rate = active_config.affiliate_rate if active_config else Decimal("0.10")
 
-    # アクティブ ウィンドウを探して期限月を返す
+    # アクティブ ウィンドウ (報酬発生中) を優先で探す
     active_campaign = db.scalar(
         select(ReferralCampaign).where(
             ReferralCampaign.partner_id == partner_id,
@@ -247,8 +247,25 @@ def get_referral_earnings(db: Session, partner_id: int) -> dict[str, str | int |
             ReferralCampaign.reward_start_month <= current_month,
         )
     )
-    campaign_expires_month: str | None = (
-        str(active_campaign.reward_expires_month) if active_campaign else None
+    # PL10: 紹介登録直後の月は reward_start_month が翌月 (current_month 未満を満たさない) ため
+    # アクティブ判定に乗らない。この「開始待ち (pending)」ウィンドウも拾って expires を埋め、
+    # UI で「キャンペーンなし」と誤表示されないようにする (campaign_status で active と区別)。
+    pending_campaign = (
+        None
+        if active_campaign
+        else db.scalar(
+            select(ReferralCampaign).where(
+                ReferralCampaign.partner_id == partner_id,
+                ReferralCampaign.ended_early_month.is_(None),
+                ReferralCampaign.reward_expires_month >= current_month,
+                ReferralCampaign.reward_start_month > current_month,
+            )
+        )
+    )
+    campaign = active_campaign or pending_campaign
+    campaign_expires_month: str | None = str(campaign.reward_expires_month) if campaign else None
+    campaign_status: str | None = (
+        "active" if active_campaign else "pending" if pending_campaign else None
     )
 
     return {
@@ -257,6 +274,7 @@ def get_referral_earnings(db: Session, partner_id: int) -> dict[str, str | int |
         "total_payout_jpy": str(total_payout),
         "campaign_rate": str(campaign_rate),
         "campaign_expires_month": campaign_expires_month,
+        "campaign_status": campaign_status,
     }
 
 
