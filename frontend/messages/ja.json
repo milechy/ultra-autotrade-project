@@ -777,7 +777,7 @@
         "depositAmountPlaceholder": "金額を入力",
         "depositMethodTitle": "入金方法",
         "depositMethodDesc": "「入金する」を押すと入金用アドレスが表示されます。取引所（例: SBI VCトレード）やお持ちのウォレットから USDC を送金してください。",
-        "depositMethodNote1": "Ethereum など別ネットワークの USDC も自動で Base に変換されて着金します",
+        "depositMethodNote1": "【重要】必ず Base（Base Mainnet）ネットワークで USDC を送金してください。Ethereum など他のネットワークで送ると着金しません",
         "depositMethodNote2": "少額すぎると送金できない場合があります（目安: 数十ドル以上）",
         "depositMethodNote3": "入力した金額は送金額の目安です（実際の送金額はご自身で指定します）",
         "depositAddressLabel": "入金用アドレス（Base Mainnet）",
@@ -1253,12 +1253,12 @@
     "fundDesc": "取引所（例: SBI VCトレード）やお持ちのウォレットから USDC を送金して入金できます。資産はサーバーには預けられず、あなたのウォレットに直接届きます。",
     "fundBullet1": "入金先: あなた自身のウォレット（ノンカストディアル）",
     "fundBullet2": "推奨金額: ${gate} USDC 以上",
-    "fundBullet3": "着金チェーン: {chain}（別ネットワークの USDC も自動変換）",
+    "fundBullet3": "着金チェーン: {chain}（必ずこのネットワークで送金してください）",
     "processingButton": "処理中...",
     "showAddressButton": "入金アドレスを表示",
     "goToDashboard": "ダッシュボードへ",
     "fundError": "入金処理中にエラーが発生しました。もう一度お試しください。",
-    "footerNote": "入金はPrivyの入金アドレス経由で処理され、別チェーンの USDC は自動でブリッジされます。ネットワーク・ブリッジ手数料がかかる場合があります。"
+    "footerNote": "入金はPrivyの入金アドレス経由で処理されます。必ず Base ネットワークで USDC を送金してください（他チェーンで送ると着金しません）。送金時のネットワーク手数料がかかる場合があります。"
   },
   "Withdraw": {
     "pageTitle": "USDC 出金",

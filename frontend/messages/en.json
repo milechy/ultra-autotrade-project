@@ -777,7 +777,7 @@
         "depositAmountPlaceholder": "Enter amount",
         "depositMethodTitle": "How to deposit",
         "depositMethodDesc": "Tap \"Deposit\" to reveal your deposit address. Send USDC from your exchange (e.g. SBI VC Trade) or wallet.",
-        "depositMethodNote1": "USDC on other networks (e.g. Ethereum) is automatically bridged to Base",
+        "depositMethodNote1": "Important: Always send USDC on the Base (Base Mainnet) network. Funds sent on other networks (e.g. Ethereum) will NOT arrive",
         "depositMethodNote2": "Very small amounts may not transfer (recommended minimum: ~$30)",
         "depositMethodNote3": "The amount entered is an estimate; set the actual transfer amount in your wallet",
         "depositAddressLabel": "Deposit address (Base Mainnet)",
@@ -1253,12 +1253,12 @@
     "fundDesc": "Send USDC from your exchange (e.g. SBI VC Trade) or wallet. Assets are delivered directly to your wallet — never held on our server.",
     "fundBullet1": "Destination: your own wallet (non-custodial)",
     "fundBullet2": "Recommended amount: ${gate} USDC or more",
-    "fundBullet3": "Destination chain: {chain} (USDC from other networks is auto-converted)",
+    "fundBullet3": "Destination chain: {chain} (be sure to send on this network)",
     "processingButton": "Processing...",
     "showAddressButton": "Show deposit address",
     "goToDashboard": "Go to Dashboard",
     "fundError": "An error occurred during the deposit process. Please try again.",
-    "footerNote": "Deposits are processed via Privy's deposit address. USDC from other chains is automatically bridged. Network and bridge fees may apply."
+    "footerNote": "Deposits are processed via Privy's deposit address. Always send USDC on the Base network — funds sent on other chains will NOT arrive. Network fees may apply."
   },
   "Withdraw": {
     "pageTitle": "USDC Withdraw",
