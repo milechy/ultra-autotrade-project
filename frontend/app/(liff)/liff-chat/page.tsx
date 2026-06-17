@@ -64,6 +64,8 @@ export default function LiffChatPage() {
   // ── 既存 state（ハンバーガー）
   const [menuOpen, setMenuOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<string | null>(null)
+  // パネルがハンバーガーメニュー由来で開かれたか（戻るでメニューに復帰するため）
+  const [panelFromMenu, setPanelFromMenu] = useState(false)
 
   // ── 新規 state（ホームコンテンツ）
   const [aiJudgment, setAiJudgment] = useState<AiJudgment | null>(null)
@@ -238,7 +240,7 @@ export default function LiffChatPage() {
             {language === "ja" ? "EN" : "JP"}
           </button>
           <button
-            onClick={() => { setActivePanel("account"); track(EV.ACCOUNT_OPEN) }}
+            onClick={() => { setActivePanel("account"); setPanelFromMenu(false); track(EV.ACCOUNT_OPEN) }}
             className="text-[#1c1a27] p-1 hover:bg-black/5 rounded-lg transition-colors"
             aria-label={t("header.accountAriaLabel")}
           >
@@ -539,7 +541,7 @@ export default function LiffChatPage() {
       <HamburgerMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        onPanelOpen={(id) => { setActivePanel(id); track(EV.PANEL_OPEN, { panel: id }) }}
+        onPanelOpen={(id) => { setActivePanel(id); setPanelFromMenu(true); track(EV.PANEL_OPEN, { panel: id }) }}
       />
 
       {/* ── 各パネル（既存維持） */}
@@ -547,7 +549,7 @@ export default function LiffChatPage() {
         <SlideUpPanel
           key={id}
           open={activePanel === id}
-          onClose={() => setActivePanel(null)}
+          onClose={() => { setActivePanel(null); if (panelFromMenu) { setMenuOpen(true); setPanelFromMenu(false) } }}
           title={PANEL_TITLES[id]}
         >
           {id === "myWallet"     && <MyWalletPanel />}
