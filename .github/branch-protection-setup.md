@@ -140,7 +140,8 @@ gh api \
       {"context": "CI / Lint (ruff + mypy)",        "app_id": -1},
       {"context": "CI / Test (pytest + coverage)",  "app_id": -1},
       {"context": "CI / Security Check",            "app_id": -1},
-      {"context": "CI / Frontend (tsc + build)",    "app_id": -1}
+      {"context": "CI / Frontend (tsc + build)",    "app_id": -1},
+      {"context": "Secret Scan (gitleaks) / gitleaks", "app_id": -1}
     ]
   },
   "enforce_admins": true,
@@ -172,7 +173,8 @@ gh api \
       {"context": "CI / Lint (ruff + mypy)",        "app_id": -1},
       {"context": "CI / Test (pytest + coverage)",  "app_id": -1},
       {"context": "CI / Security Check",            "app_id": -1},
-      {"context": "CI / Frontend (tsc + build)",    "app_id": -1}
+      {"context": "CI / Frontend (tsc + build)",    "app_id": -1},
+      {"context": "Secret Scan (gitleaks) / gitleaks", "app_id": -1}
     ]
   },
   "enforce_admins": false,
