@@ -47,7 +47,9 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
 export function AdminProviders({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <SessionExpiryBanner loginHref="/login" />
+      <NextIntlClientProvider locale="ja" messages={{ SharedSessionExpiry: jaMessages.SharedSessionExpiry }}>
+        <SessionExpiryBanner loginHref="/login" />
+      </NextIntlClientProvider>
       <AdminGuard>
         <AppShell>
           {children}
