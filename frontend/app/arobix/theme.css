@@ -168,6 +168,12 @@
 .arobix-root .bg-red-500.text-white,
 .arobix-root .bg-red-500 .text-white { color: white !important; }
 
+/* Keep light text on intentionally DARK surfaces (ハンバーガーメニュー / ボトムナビ = bg #1b1a23).
+   上の `.text-white → #2a2440` 反転は「ライト背景前提」だが、これらは意図的にダーク面なので
+   反転を打ち消し白系を維持する（さもないとメニュー各タイトルが暗紫で読めなくなる）。 */
+.arobix-root .bg-\[\#1b1a23\] .text-white,
+.arobix-root .bg-\[\#1b1a23\].text-white { color: #fbf7f0 !important; }
+
 /* Keep text-transparent for logo-shine / bg-clip-text */
 .arobix-root .text-transparent { color: transparent !important; }
 
