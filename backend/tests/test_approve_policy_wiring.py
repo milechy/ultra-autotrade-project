@@ -81,9 +81,7 @@ class TestApprovePolicyWiring:
         token = _admin_token(client)
         pid = _create_pending_proposal(client, token)
 
-        with patch(
-            "app.proposals.router.get_policy_engine"
-        ) as mock_engine_factory:
+        with patch("app.proposals.router.get_policy_engine") as mock_engine_factory:
             mock_engine = mock_engine_factory.return_value
             mock_engine.check.return_value = PolicyResult(passed=True)
 
@@ -101,9 +99,7 @@ class TestApprovePolicyWiring:
         token = _admin_token(client)
         pid = _create_pending_proposal(client, token)
 
-        with patch(
-            "app.proposals.router.get_policy_engine"
-        ) as mock_engine_factory:
+        with patch("app.proposals.router.get_policy_engine") as mock_engine_factory:
             mock_engine = mock_engine_factory.return_value
             mock_engine.check.return_value = PolicyResult(
                 passed=False,
@@ -138,9 +134,7 @@ class TestApprovePolicyWiring:
             captured_ctx.append(ctx)
             return PolicyResult(passed=True)
 
-        with patch(
-            "app.proposals.router.get_policy_engine"
-        ) as mock_engine_factory:
+        with patch("app.proposals.router.get_policy_engine") as mock_engine_factory:
             mock_engine = mock_engine_factory.return_value
             mock_engine.check.side_effect = capture_check
 
@@ -160,9 +154,7 @@ class TestApprovePolicyWiring:
         token = _admin_token(client)
         pid = _create_pending_proposal(client, token)
 
-        with patch(
-            "app.proposals.router.get_policy_engine"
-        ) as mock_engine_factory:
+        with patch("app.proposals.router.get_policy_engine") as mock_engine_factory:
             mock_engine = mock_engine_factory.return_value
             mock_engine.check.return_value = PolicyResult(
                 passed=False,
