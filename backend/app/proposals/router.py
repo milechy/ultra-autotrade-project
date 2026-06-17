@@ -789,14 +789,20 @@ def build_partner_tx(
             detail=f"Cannot build tx for proposal with status '{proposal.status}'",
         )
 
-    # partner wallet 取得
+    # 実行ウォレット取得。
+    # Smart Wallet (AA) ユーザーは smart_wallet_address で onBehalfOf/to を構築する
+    # (Aave ポジション保有者 = SCW。slice3b)。未設定の EOA ユーザーは従来どおり wallet_address。
     user = db.scalars(select(User).where(User.id == proposal.user_id)).first()
-    if user is None or not user.wallet_address:
+    wallet_address = (
+        user.smart_wallet_address
+        if user is not None and user.smart_wallet_address
+        else (user.wallet_address if user is not None else None)
+    )
+    if user is None or not wallet_address:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Partner wallet_address が未設定です。Privy で wallet を作成してください。",
+            detail="wallet_address / smart_wallet_address が未設定です。Privy で wallet を作成してください。",
         )
-    wallet_address = user.wallet_address
 
     op_map: dict[str, str] = {"SUPPLY": "DEPOSIT", "WITHDRAW": "WITHDRAW"}
     if proposal.operation not in op_map:
@@ -1015,8 +1021,44 @@ def submit_partner_tx(
         rpc_url = None
         pool_address = None
 
-    partner_wallet = body.wallet_address
-    if rpc_url and pool_address:
+    # 実行主体の判定 (slice3b): Smart Wallet (AA) ユーザーは bundler の UserOp receipt で、
+    # EOA ユーザーは従来の on-chain tx receipt で検証する。
+    proposal_user = db.scalars(select(User).where(User.id == proposal.user_id)).first()
+    is_smart_wallet = proposal_user is not None and bool(proposal_user.smart_wallet_address)
+
+    if is_smart_wallet:
+        # AA 経路: body.tx_hash は userOpHash。bundler で success / sender(=SCW) を検証 (fail-closed)。
+        assert proposal_user is not None  # is_smart_wallet=True なら非 None
+        scw_address = proposal_user.smart_wallet_address or ""
+        bundler_url = os.getenv("BUNDLER_RPC_URL", "")
+        if not bundler_url:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="BUNDLER_RPC_URL が未設定です (Smart Wallet 実行の検証不可)。",
+            )
+        from .userop_verify import (  # noqa: PLC0415
+            UserOpVerificationError,
+            verify_userop_receipt,
+        )
+
+        try:
+            verify_userop_receipt(
+                body.tx_hash, expected_sender=scw_address, bundler_url=bundler_url
+            )
+        except UserOpVerificationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"UserOp receipt 検証失敗: {exc}",
+            ) from exc
+        partner_wallet = scw_address
+        logger.info(
+            "submit-tx: proposal %d UserOp verified via bundler chain=%s userOp=%s",
+            proposal_id,
+            chain_name,
+            body.tx_hash[:12],
+        )
+    elif rpc_url and pool_address:
+        partner_wallet = body.wallet_address
         try:
             _verify_on_chain_receipt(
                 tx_hash=body.tx_hash,
@@ -1036,6 +1078,7 @@ def submit_partner_tx(
                 detail=f"on-chain receipt 検証失敗: {exc}",
             ) from exc
     else:
+        partner_wallet = body.wallet_address
         logger.warning(
             "submit-tx: proposal %d on-chain verification skipped (RPC/chain unavailable)",
             proposal_id,
