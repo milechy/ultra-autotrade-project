@@ -21,7 +21,7 @@ from app.auth.dependencies import (
     require_partner,
     require_viewer,
 )
-from app.auth.models import User
+from app.auth.models import User, UserRole
 from app.auth.models import User as UserModel
 from app.database import get_db
 from app.policy.engine import PolicyContext, get_policy_engine
@@ -642,15 +642,25 @@ def list_proposal_history(
 @router.post("/{proposal_id}/approve", response_model=ProposalResponse, summary="提案承認・実行")
 def approve_proposal(
     proposal_id: int,
-    current_user: User = Depends(require_partner),
+    current_user: User = Depends(require_active_user),
     db: Session = Depends(get_db),
 ) -> ProposalResponse:
-    """提案を承認してAave操作を実行する（本人・admin・partner）。"""
+    """提案を承認してAave操作を実行する（本人・admin・partner）。
+
+    VIEWER (一般消費者 = liff-chat ユーザー) は自分の提案のみ承認可能。
+    admin/partner は運用代行として他ユーザーの提案も操作可能。
+    """
     stmt = select(Proposal).where(Proposal.id == proposal_id)
     proposal = db.scalars(stmt).first()
-    # admin/partner は他ユーザーの提案も操作可能。一般ユーザーは require_partner で弾かれる。
     if proposal is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    # VIEWER は自分の提案のみ。admin/partner は全提案を操作可能。
+    _is_privileged = current_user.role in (UserRole.ADMIN.value, UserRole.PARTNER.value)
+    if not _is_privileged and proposal.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this proposal",
+        )
     if proposal.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -714,15 +724,25 @@ def approve_proposal(
 @router.post("/{proposal_id}/reject", response_model=ProposalResponse, summary="提案拒否")
 def reject_proposal(
     proposal_id: int,
-    current_user: User = Depends(require_partner),
+    current_user: User = Depends(require_active_user),
     db: Session = Depends(get_db),
 ) -> ProposalResponse:
-    """提案を拒否する（本人・admin・partner）。"""
+    """提案を拒否する（本人・admin・partner）。
+
+    VIEWER (一般消費者 = liff-chat ユーザー) は自分の提案のみ拒否可能。
+    admin/partner は運用代行として他ユーザーの提案も操作可能。
+    """
     stmt = select(Proposal).where(Proposal.id == proposal_id)
     proposal = db.scalars(stmt).first()
-    # admin/partner は他ユーザーの提案も操作可能。一般ユーザーは require_partner で弾かれる。
     if proposal is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    # VIEWER は自分の提案のみ。admin/partner は全提案を操作可能。
+    _is_privileged = current_user.role in (UserRole.ADMIN.value, UserRole.PARTNER.value)
+    if not _is_privileged and proposal.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this proposal",
+        )
     if proposal.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -743,7 +763,7 @@ def reject_proposal(
 )
 def build_partner_tx(
     proposal_id: int,
-    current_user: User = Depends(require_partner),
+    current_user: User = Depends(require_active_user),
     db: Session = Depends(get_db),
 ) -> PartnerUnsignedTxs:
     """
@@ -925,7 +945,7 @@ def _verify_on_chain_receipt(
 def submit_partner_tx(
     proposal_id: int,
     body: SubmitTxRequest,
-    current_user: User = Depends(require_partner),
+    current_user: User = Depends(require_active_user),
     db: Session = Depends(get_db),
 ) -> ProposalResponse:
     """
