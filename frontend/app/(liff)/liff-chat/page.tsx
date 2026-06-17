@@ -22,6 +22,8 @@ import { NotificationPanel } from "./_components/panels/NotificationPanel"
 import { AccountPanel } from "./_components/panels/AccountPanel"
 import { TermsPanel } from "./_components/panels/TermsPanel"
 import { ChatPanel } from "./_components/ChatPanel"
+import { ProposalActionCard } from "./_components/ProposalActionCard"
+import { ProposalSignSheet, type ChatProposal } from "./_components/ProposalSignSheet"
 
 // recharts は SSR クラッシュ防止のため dynamic import
 const AssetChart = dynamic(() => import("./_components/AssetChart"), {
@@ -50,6 +52,46 @@ interface CoinHolding {
   apy_pct: number
 }
 
+// GET /api/portfolio/current の positions_json 要素 (バックエンドは List[Any] = 非構造)。
+// v4 で実投資 (Aave リバランス) が動いた際に snapshot へ書かれる想定。
+// producer が確定するまでフィールド名揺れを許容して defensive にマッピングする。
+interface PortfolioPositionRaw {
+  asset?: string
+  symbol?: string
+  protocol?: string
+  amount_usd?: number | string
+  value_usd?: number | string
+  supply_usd?: number | string
+  apy_pct?: number | string
+  apy?: number | string
+}
+
+interface PortfolioCurrentResponse {
+  positions_json?: PortfolioPositionRaw[] | null
+  has_data?: boolean
+}
+
+// positions_json (非構造) を CoinHolding[] に正規化する。
+// asset を欠く要素は捨てる。金額/APY は Decimal 文字列で来ても Number() で数値化する。
+function mapPositionsToHoldings(
+  positions: PortfolioPositionRaw[] | null | undefined,
+): CoinHolding[] {
+  if (!Array.isArray(positions)) return []
+  return positions
+    .map((p) => {
+      const asset = p.asset ?? p.symbol ?? ""
+      const amount = p.amount_usd ?? p.value_usd ?? p.supply_usd ?? 0
+      const apy = p.apy_pct ?? p.apy ?? 0
+      return {
+        asset,
+        protocol: p.protocol ?? "Aave V3",
+        amount_usd: Number(amount),
+        apy_pct: Number(apy),
+      }
+    })
+    .filter((c) => c.asset !== "" && Number.isFinite(c.amount_usd))
+}
+
 // ────────────────────────────────────────────
 // ページ本体
 // ────────────────────────────────────────────
@@ -70,6 +112,13 @@ export default function LiffChatPage() {
   // ── 新規 state（ホームコンテンツ）
   const [aiJudgment, setAiJudgment] = useState<AiJudgment | null>(null)
   const [coins, setCoins] = useState<CoinHolding[]>([])
+
+  // ── 半自動実行 state（保留中提案の承認→自己署名→submit-tx / Asana 1215743441691795）
+  const [pendingProposal, setPendingProposal] = useState<ChatProposal | null>(null)
+  const [signSheetOpen, setSignSheetOpen] = useState(false)
+  const [rejecting, setRejecting] = useState(false)
+  const authToken =
+    typeof window !== "undefined" ? (localStorage.getItem("auth_token") ?? "") : ""
   const [graphPeriod, setGraphPeriod] = useState<"1M" | "3M" | "6M" | "1Y">("3M")
   const [graphOpen, setGraphOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
@@ -110,11 +159,21 @@ export default function LiffChatPage() {
       })
       .catch(() => {})
 
-    // 運用中コイン
-    fetch(`${API_BASE}/api/user/holdings`, { headers })
+    // 運用中コイン: 最新ポートフォリオ snapshot の positions_json を表示する。
+    // /api/user/holdings は不在のため /api/portfolio/current を使う (Asana 1215723024139228)。
+    // v3 (shadow mode) は positions_json が空 → 「運用中のコインがありません」が正。
+    fetch(`${API_BASE}/api/portfolio/current`, { headers })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { items?: CoinHolding[] } | null) => {
-        if (Array.isArray(d?.items)) setCoins(d!.items!)
+      .then((d: PortfolioCurrentResponse | null) => {
+        setCoins(mapPositionsToHoldings(d?.positions_json))
+      })
+      .catch(() => {})
+
+    // 保留中の提案（最新 1 件）。あれば承認/見送りの実行導線を表示する。
+    fetch(`${API_BASE}/api/proposals/pending`, { headers })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { items?: ChatProposal[] } | null) => {
+        if (d?.items?.[0]) setPendingProposal(d.items[0])
       })
       .catch(() => {})
   }, [])
@@ -171,6 +230,35 @@ export default function LiffChatPage() {
       setStopLoading(false)
       setTimeout(() => setToast(null), 2800)
     }
+  }
+
+  // ── 提案 見送り: POST /api/proposals/{id}/reject（VIEWER は自分の提案のみ可）
+  async function handleRejectProposal() {
+    if (!pendingProposal || !authToken) return
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
+    setRejecting(true)
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/proposals/${pendingProposal.id}/reject`,
+        { method: "POST", headers: { Authorization: `Bearer ${authToken}` } },
+      )
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setPendingProposal(null)
+      setToast(t("exec.rejected"))
+    } catch {
+      setToast(t("exec.rejectFailed"))
+    } finally {
+      setRejecting(false)
+      setTimeout(() => setToast(null), 2800)
+    }
+  }
+
+  // ── 提案 実行完了（署名シートからの成功コールバック）
+  function handleProposalExecuted() {
+    setSignSheetOpen(false)
+    setPendingProposal(null)
+    setToast(t("exec.executeSuccess"))
+    setTimeout(() => setToast(null), 2800)
   }
 
   // ── AI カード色設定
@@ -327,6 +415,16 @@ export default function LiffChatPage() {
           )}
         </div>
 
+        {/* 保留中の提案（承認→自己署名→実行 / 見送り） */}
+        {pendingProposal && (
+          <ProposalActionCard
+            proposal={pendingProposal}
+            rejecting={rejecting}
+            onApprove={() => setSignSheetOpen(true)}
+            onReject={handleRejectProposal}
+          />
+        )}
+
         {/* 運用中コイン一覧 */}
         <div className="mx-4 mt-4">
           <h3 className="text-[#736f7e] text-xs font-semibold mb-3">{t("home.operatingCoins")}</h3>
@@ -474,6 +572,17 @@ export default function LiffChatPage() {
           </span>
         )}
       </button>
+
+      {/* ── 提案 署名シート（承認→Privy 自己署名→submit-tx） */}
+      {pendingProposal && (
+        <ProposalSignSheet
+          proposal={pendingProposal}
+          token={authToken}
+          open={signSheetOpen}
+          onClose={() => setSignSheetOpen(false)}
+          onExecuted={handleProposalExecuted}
+        />
+      )}
 
       {/* ── チャットパネル */}
       {chatOpen && <ChatPanel onClose={() => setChatOpen(false)} />}

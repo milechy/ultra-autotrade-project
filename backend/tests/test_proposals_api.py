@@ -338,8 +338,12 @@ class TestPartnerProposalBoundaries:
         assert r.json()["status"] in ("approved", "executed", "failed")
         assert r.json()["approved_at"] is not None
 
-    def test_viewer_cannot_approve_proposal(self, client: TestClient) -> None:
-        """viewer は POST /api/proposals/{id}/approve で 403 になる。"""
+    def test_viewer_cannot_approve_others_proposal(self, client: TestClient) -> None:
+        """viewer は他ユーザー (user_id=1=admin) の提案を承認できず 403 になる。
+
+        v4 で viewer は自分の提案のみ承認可能になったが、他人の提案は引き続き 403。
+        SAMPLE_PROPOSAL は user_id=1 (admin) 所有のため、新規 viewer は非所有者。
+        """
         admin_token = get_admin_token(client)
         create_r = client.post(
             "/api/proposals",
@@ -356,8 +360,8 @@ class TestPartnerProposalBoundaries:
         )
         assert r.status_code == 403
 
-    def test_viewer_cannot_reject_proposal(self, client: TestClient) -> None:
-        """viewer は POST /api/proposals/{id}/reject で 403 になる。"""
+    def test_viewer_cannot_reject_others_proposal(self, client: TestClient) -> None:
+        """viewer は他ユーザー (user_id=1=admin) の提案を拒否できず 403 になる。"""
         admin_token = get_admin_token(client)
         create_r = client.post(
             "/api/proposals",
@@ -373,3 +377,76 @@ class TestPartnerProposalBoundaries:
             headers={"Authorization": f"Bearer {viewer_token}"},
         )
         assert r.status_code == 403
+
+    def test_viewer_can_reject_own_proposal(self, client: TestClient) -> None:
+        """v4: viewer (liff-chat 消費者) は自分の提案を拒否できる (200)。"""
+        admin_token = get_admin_token(client)
+        viewer_r = client.post(
+            "/users",
+            json={
+                "email": "viewer_own_rej@test.com",
+                "username": "viewer_own_rej",
+                "password": "viewerpass123",
+                "role": "viewer",
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        viewer_id = viewer_r.json()["id"]
+        create_r = client.post(
+            "/api/proposals",
+            json={**SAMPLE_PROPOSAL, "user_id": viewer_id},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert create_r.status_code == 201
+        proposal_id = create_r.json()["id"]
+
+        viewer_token = client.post(
+            "/auth/login",
+            json={"email": "viewer_own_rej@test.com", "password": "viewerpass123"},
+        ).json()["access_token"]
+
+        r = client.post(
+            f"/api/proposals/{proposal_id}/reject",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["status"] == "rejected"
+
+    def test_viewer_can_approve_own_proposal(self, client: TestClient) -> None:
+        """v4: viewer (liff-chat 消費者) は自分の提案を承認できる (200)。
+
+        AUTO_EXECUTION_ENABLED=false のため status は 'approved' に遷移し、
+        非カストディアル方式2 では submit-tx で実 tx を立てる。
+        """
+        admin_token = get_admin_token(client)
+        viewer_r = client.post(
+            "/users",
+            json={
+                "email": "viewer_own_app@test.com",
+                "username": "viewer_own_app",
+                "password": "viewerpass123",
+                "role": "viewer",
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        viewer_id = viewer_r.json()["id"]
+        create_r = client.post(
+            "/api/proposals",
+            json={**SAMPLE_PROPOSAL, "user_id": viewer_id},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert create_r.status_code == 201
+        proposal_id = create_r.json()["id"]
+
+        viewer_token = client.post(
+            "/auth/login",
+            json={"email": "viewer_own_app@test.com", "password": "viewerpass123"},
+        ).json()["access_token"]
+
+        r = client.post(
+            f"/api/proposals/{proposal_id}/approve",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["status"] in ("approved", "executed", "failed")
+        assert r.json()["approved_at"] is not None

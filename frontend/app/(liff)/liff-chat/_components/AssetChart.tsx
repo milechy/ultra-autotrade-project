@@ -22,6 +22,26 @@ interface DataPoint {
   value: number
 }
 
+// バックエンド GET /api/portfolio/history のレスポンス要素 (PortfolioSnapshotResponse)。
+// Decimal は JSON では文字列で返るため value は Number() でラップする。
+interface PortfolioSnapshot {
+  total_value_usd: string | number
+  recorded_at: string
+}
+
+interface PortfolioHistoryResponse {
+  items?: PortfolioSnapshot[]
+}
+
+// UI の期間タブ (1M/3M/6M/1Y) を backend の period 値 (7d/30d/90d/all) に対応付ける。
+// backend は 7d/30d/90d/all のみ受け付けるため、6M/1Y は "all" に丸める。
+const PERIOD_MAP: Record<Props["period"], string> = {
+  "1M": "30d",
+  "3M": "90d",
+  "6M": "all",
+  "1Y": "all",
+}
+
 export default function AssetChart({ period }: Props) {
   const t = useTranslations("Liff.panels")
   const [data, setData] = useState<DataPoint[]>([])
@@ -33,14 +53,24 @@ export default function AssetChart({ period }: Props) {
         ? (localStorage.getItem("auth_token") ?? "")
         : ""
     const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
+    const backendPeriod = PERIOD_MAP[period]
 
-    fetch(`${API_BASE}/api/user/asset-history?period=${period}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
+    // 資産推移は PortfolioSnapshot の総資産額 (total_value_usd) を時系列で描く。
+    // v3 (REBALANCE_SHADOW_MODE=true) では snapshot が無く items=[] が正 → 「データなし」表示。
+    fetch(
+      `${API_BASE}/api/portfolio/history?period=${backendPeriod}&interval=daily`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+    )
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { data?: DataPoint[] } | null) => {
-        if (d?.data && d.data.length > 0) {
-          setData(d.data)
+      .then((d: PortfolioHistoryResponse | null) => {
+        const items = d?.items ?? []
+        if (items.length > 0) {
+          setData(
+            items.map((it) => ({
+              date: it.recorded_at,
+              value: Number(it.total_value_usd),
+            })),
+          )
         } else {
           setData([])
         }

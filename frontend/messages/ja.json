@@ -646,6 +646,32 @@
     "closeDetail": "閉じる"
   },
   "Liff": {
+    "exec": {
+      "operation": "操作",
+      "supply": "入金 (Supply)",
+      "withdraw": "出金 (Withdraw)",
+      "amount": "金額",
+      "hfAfter": "実行後 Health Factor",
+      "gasEstimate": "ガス概算",
+      "signConfirmTitle": "この提案を実行しますか？",
+      "processing": "処理中...",
+      "signExecute": "署名して実行",
+      "executed": "実行しました ✓",
+      "cancel": "キャンセル",
+      "requestingSignature": "ウォレットの署名を待っています...",
+      "waitingConfirmation": "トランザクションの確定を待っています...",
+      "txSuccess": "実行が完了しました",
+      "revertError": "approve トランザクションが revert しました。残高・ガス代を確認してください。",
+      "unsupportedOperation": "未対応の操作: {operation}",
+      "signFailed": "署名処理に失敗しました",
+      "signCanceled": "署名がキャンセルされました",
+      "collapse": "閉じる",
+      "expand": "もっと見る",
+      "rejecting": "見送り中...",
+      "rejected": "提案を見送りました",
+      "rejectFailed": "見送りに失敗しました。時間をおいて再度お試しください",
+      "executeSuccess": "提案を実行しました"
+    },
     "header": {
       "menuAriaLabel": "メニューを開く",
       "logoAriaLabel": "UAT",

@@ -646,6 +646,32 @@
     "closeDetail": "Close"
   },
   "Liff": {
+    "exec": {
+      "operation": "Operation",
+      "supply": "Supply",
+      "withdraw": "Withdraw",
+      "amount": "Amount",
+      "hfAfter": "Health Factor after",
+      "gasEstimate": "Est. gas",
+      "signConfirmTitle": "Execute this proposal?",
+      "processing": "Processing...",
+      "signExecute": "Sign & execute",
+      "executed": "Executed ✓",
+      "cancel": "Cancel",
+      "requestingSignature": "Waiting for wallet signature...",
+      "waitingConfirmation": "Waiting for transaction confirmation...",
+      "txSuccess": "Execution complete",
+      "revertError": "The approve transaction reverted. Please check your balance and gas.",
+      "unsupportedOperation": "Unsupported operation: {operation}",
+      "signFailed": "Signing failed",
+      "signCanceled": "Signature canceled",
+      "collapse": "Collapse",
+      "expand": "Show more",
+      "rejecting": "Dismissing...",
+      "rejected": "Proposal dismissed",
+      "rejectFailed": "Failed to dismiss. Please try again later.",
+      "executeSuccess": "Proposal executed"
+    },
     "header": {
       "menuAriaLabel": "Open menu",
       "logoAriaLabel": "UAT",
