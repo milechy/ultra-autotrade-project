@@ -1024,12 +1024,10 @@ def submit_partner_tx(
     # 実行主体の判定 (slice3b): Smart Wallet (AA) ユーザーは bundler の UserOp receipt で、
     # EOA ユーザーは従来の on-chain tx receipt で検証する。
     proposal_user = db.scalars(select(User).where(User.id == proposal.user_id)).first()
-    is_smart_wallet = proposal_user is not None and bool(proposal_user.smart_wallet_address)
+    scw_address = proposal_user.smart_wallet_address if proposal_user is not None else None
 
-    if is_smart_wallet:
+    if scw_address:
         # AA 経路: body.tx_hash は userOpHash。bundler で success / sender(=SCW) を検証 (fail-closed)。
-        assert proposal_user is not None  # is_smart_wallet=True なら非 None
-        scw_address = proposal_user.smart_wallet_address or ""
         bundler_url = os.getenv("BUNDLER_RPC_URL", "")
         if not bundler_url:
             raise HTTPException(
