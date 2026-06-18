@@ -326,3 +326,25 @@ class WalletLinkResponse(BaseModel):
     linked_at: str  # ISO8601 文字列
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SmartWalletLinkRequest(BaseModel):
+    """認証済みユーザーへの Smart Wallet (ERC-4337 SCW) アドレス登録 (POST /auth/wallet/smart-link)。
+
+    SCW はコントラクトのため EOA 署名による所有証明ができない。非カストディアル設計
+    (submit-tx の UserOp sender==登録SCW 検証 / unique 制約 / VIEWER は自己提案のみ) により、
+    JWT 認証済みユーザーが自分の SCW を登録する方式で安全 (slice4b 案a)。
+    """
+
+    smart_wallet_address: str = Field(
+        ..., min_length=42, max_length=42, description="Smart Wallet contract address (0x...)"
+    )
+
+
+class SmartWalletLinkResponse(BaseModel):
+    """Smart Wallet 登録レスポンス。"""
+
+    user_id: int
+    smart_wallet_address: str
+
+    model_config = ConfigDict(from_attributes=True)

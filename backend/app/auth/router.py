@@ -45,6 +45,8 @@ from .schemas import (
     RegisterResponse,
     RegisterWithReferralRequest,
     RiskModeUpdateRequest,
+    SmartWalletLinkRequest,
+    SmartWalletLinkResponse,
     TermsAcceptRequest,
     TermsStatusResponse,
     TokenResponse,
@@ -786,6 +788,72 @@ def wallet_link(
         wallet_address=address_lower,
         linked_at=linked_at,
     )
+
+
+@router.post(
+    "/wallet/smart-link",
+    response_model=SmartWalletLinkResponse,
+    summary="認証済みユーザーに Smart Wallet (SCW) アドレスを登録 (slice4b)",
+)
+def smart_wallet_link(
+    request: SmartWalletLinkRequest,
+    user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> SmartWalletLinkResponse:
+    """
+    JWT 認証済みユーザーに ERC-4337 Smart Wallet (SCW) アドレスを登録する (slice4b 案a)。
+
+    SCW はコントラクトで EOA 署名できないため署名検証は行わない。非カストディアル設計
+    (submit-tx の UserOp sender==登録SCW 検証 / unique 制約 / VIEWER は自己提案のみ) で安全。
+    冪等: 同一アドレス再登録は 200 で no-op。
+
+    レスポンス:
+    - 200: 登録成功 (または冪等 no-op)
+    - 401: 未認証
+    - 409: 別ユーザーが同じ smart_wallet_address を登録済み
+    - 422: アドレス形式不正
+    """
+    import re  # noqa: PLC0415
+
+    addr = request.smart_wallet_address
+    if not re.fullmatch(r"0x[0-9a-fA-F]{40}", addr):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid smart_wallet_address format",
+        )
+
+    addr_lower = addr.lower()
+
+    # 冪等: 既に自分が同一アドレスを登録済みなら no-op。
+    if user.smart_wallet_address and user.smart_wallet_address.lower() == addr_lower:
+        return SmartWalletLinkResponse(
+            user_id=user.id, smart_wallet_address=user.smart_wallet_address
+        )
+
+    # unique 制約: 別ユーザーが登録済みなら 409 (横取り防止)。
+    existing = AuthService.get_user_by_smart_wallet(db, addr_lower)
+    if existing is not None and existing.id != user.id:
+        logger.warning(
+            "Smart wallet link conflict: jwt_user=%d existing_user=%d scw=%s...",
+            user.id,
+            existing.id,
+            addr_lower[:10],
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="smart_wallet_address already linked to another user",
+        )
+
+    user.smart_wallet_address = addr_lower
+    db.commit()
+    db.refresh(user)
+    logger.info(
+        "Smart wallet linked: user_id=%d scw=%s...%s",
+        user.id,
+        addr_lower[:10],
+        addr_lower[-4:],
+    )
+    return SmartWalletLinkResponse(user_id=user.id, smart_wallet_address=user.smart_wallet_address)
 
 
 class WalletUnlinkResponse(BaseModel):
