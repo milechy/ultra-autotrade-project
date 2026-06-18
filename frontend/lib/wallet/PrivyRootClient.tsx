@@ -3,6 +3,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 
 import { PrivyProvider } from '@privy-io/react-auth'
+import { SmartWalletsProvider } from '@privy-io/react-auth/smart-wallets'
 import { base, baseSepolia } from 'wagmi/chains'
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -52,11 +53,17 @@ export function PrivyRootClient({ children }: { children: ReactNode }) {
         },
       }}
     >
-      <WagmiProvider config={wagmiConfig}>
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
-      </WagmiProvider>
+      {/* SmartWalletsProvider: Privy Smart Wallet (ERC-4337 AA) を有効化する (slice4a)。
+          bundler/paymaster は Privy ダッシュボード設定 (track C) から供給される。
+          useSmartWallets() が SCW client を返し、slice4c で署名経路が UserOp 送信に使う。
+          非カストディアル不変条件: SCW の owner はユーザー embedded EOA のみ (§1.5)。 */}
+      <SmartWalletsProvider>
+        <WagmiProvider config={wagmiConfig}>
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        </WagmiProvider>
+      </SmartWalletsProvider>
     </PrivyProvider>
   )
 }
