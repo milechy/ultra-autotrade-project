@@ -12,8 +12,8 @@ import { TERMS_JUST_ACCEPTED_KEY } from "@/hooks/useLiffTermsGate"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
-// 規約 ver03 — id は messages キーとして使用
-const ITEM_IDS = ["self_custody", "defi_risk", "usage_conditions", "user_responsibility", "age_confirm"] as const
+// 規約 ver04 — id は messages キーとして使用
+const ITEM_IDS = ["terms_full", "self_custody", "defi_risk", "usage_conditions", "user_responsibility", "age_confirm"] as const
 
 export default function LiffConfirmPage() {
   const router = useRouter()
@@ -111,7 +111,7 @@ export default function LiffConfirmPage() {
       <div className="bg-[#1a3d2e] px-4 py-5 flex-shrink-0">
         <h1 className="text-white font-bold text-lg">{t("title")}</h1>
         <p className="text-zinc-300 text-sm mt-1">{t("subtitle")}</p>
-        {/* ステップドット (ver04: 5 items) */}
+        {/* ステップドット (ver04: 6 items) */}
         <div className="flex gap-1.5 mt-3">
           {ITEM_IDS.map((_, i) => (
             <div
@@ -191,7 +191,13 @@ export default function LiffConfirmPage() {
               </button>
               {isExpanded && (
                 <div className="px-4 pb-4">
-                  <p className="text-zinc-400 text-sm leading-relaxed">{t(`items.${id}.detail`)}</p>
+                  {id === "terms_full" ? (
+                    <div className="max-h-52 overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-800/50 p-3 text-zinc-400 text-xs leading-relaxed whitespace-pre-line">
+                      {t(`items.${id}.detail`)}
+                    </div>
+                  ) : (
+                    <p className="text-zinc-400 text-sm leading-relaxed">{t(`items.${id}.detail`)}</p>
+                  )}
                   {!isChecked && (
                     <button
                       onClick={() =>
@@ -212,14 +218,6 @@ export default function LiffConfirmPage() {
       {/* 下部: リンク + ボタン */}
       <div className="px-4 pb-8 pt-4 border-t border-zinc-800 flex-shrink-0 space-y-3">
         <div className="flex gap-4 justify-center text-xs text-zinc-500">
-          <a
-            href="/terms"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 hover:text-zinc-300"
-          >
-            {t("termsLink")} <ExternalLink className="w-3 h-3" />
-          </a>
           <a
             href="/privacy-policy"
             target="_blank"

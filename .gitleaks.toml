@@ -1,0 +1,9 @@
+title = "Ultra AutoTrade gitleaks config"
+
+[allowlist]
+  description = "Allowlist false positives"
+  paths = [
+    # docs/ 配下の Asana GID 数値が asana-client-id ルールに誤ヒットするため除外。
+    # Asana GID は数値IDであり PAT（Personal Access Token）ではない。
+    '''docs/''',
+  ]

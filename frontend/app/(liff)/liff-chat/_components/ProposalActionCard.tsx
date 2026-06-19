@@ -52,11 +52,6 @@ export function ProposalActionCard({
           {isSupply ? t("exec.supply") : t("exec.withdraw")}
         </span>
         <span className="text-[#1c1a27] text-sm font-semibold">{proposal.asset}</span>
-        {(proposal.confidence ?? 0) > 0 && (
-          <span className="ml-auto text-[#736f7e] text-xs">
-            {proposal.confidence}% {t("home.confidenceLabel")}
-          </span>
-        )}
       </div>
 
       {/* amount */}
