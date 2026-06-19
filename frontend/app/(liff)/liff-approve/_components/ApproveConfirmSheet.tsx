@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { useTranslations } from "next-intl";
 import { ethers } from "ethers";
 import { Loader2, Lock } from "lucide-react";
@@ -13,6 +14,7 @@ import {
   type ProposalStatus,
 } from "@/app/user/approve/_components/TransactionStatus";
 import { buildPartnerTx, submitPartnerTx } from "@/lib/api/admin-proposals";
+import { toUserOpCall } from "@/lib/wallet/userop";
 import type { Proposal } from "./ProposalBubble";
 
 type SigningStatus = "idle" | "signing" | "confirming" | "success" | "error";
@@ -42,6 +44,8 @@ export function ApproveConfirmSheet({
 }: ApproveConfirmSheetProps) {
   const { login } = usePrivy();
   const { wallets } = useWallets();
+  // Smart Wallet (AA) client。設定済 (SCW ユーザー) なら UserOp 経路、未設定なら EOA 経路。
+  const { client: scwClient } = useSmartWallets();
   const t = useTranslations("Liff.approve.confirmSheet");
   const [signingStatus, setSigningStatus] = useState<SigningStatus>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -74,83 +78,97 @@ export function ApproveConfirmSheet({
     setSigningStatus("signing");
 
     try {
-      // embedded wallet (Privy TEE) のみ使用。外部 wallet は秘密鍵管理の懸念で除外。
-      const wallet = wallets.find((w) => w.walletClientType === "privy");
-      if (!wallet) {
-        await login();
-        setSigningStatus("idle");
-        return;
-      }
-
       // Step 1: サーバーから未署名 tx を取得。
-      // build-tx は onBehalfOf / to == partner 本人 wallet をサーバー側で検証して返す (§14a)。
+      // build-tx は onBehalfOf / to == 本人 wallet (EOA または Smart Wallet) を検証して返す (§14a)。
       const txData = await buildPartnerTx(proposal.id, token);
-
-      const eip1193 = await wallet.getEthereumProvider();
-      const ethProvider = new ethers.BrowserProvider(
-        eip1193 as unknown as ethers.Eip1193Provider
-      );
 
       let finalTxHash: string;
 
-      if (
-        txData.operation === "SUPPLY" &&
-        txData.approve_tx &&
-        txData.supply_tx
-      ) {
-        // SUPPLY: approve → supply の順に partner 本人が署名・送信。
-        const approveTxHash = (await eip1193.request({
-          method: "eth_sendTransaction",
-          params: [
-            {
-              to: txData.approve_tx.to,
-              data: txData.approve_tx.data,
-              from: txData.approve_tx.from,
-              value: "0x0",
-            },
-          ],
-        })) as string;
-
-        // approve の確定を待ってから supply を送信する。
-        const approveReceipt =
-          await ethProvider.waitForTransaction(approveTxHash);
-        if (approveReceipt === null || approveReceipt.status === 0) {
-          throw new Error(t("revertError"));
+      if (scwClient) {
+        // ── Smart Wallet (ERC-4337 AA) 経路: ガスは paymaster 肩代わり (ETH 不要)。──
+        // approve + supply は 1 UserOp にバッチ。返り値 userOpHash → submit-tx (slice3b) が
+        // bundler の eth_getUserOperationReceipt で success / sender(=SCW) を検証する。
+        let calls: ReturnType<typeof toUserOpCall>[];
+        if (txData.operation === "SUPPLY" && txData.approve_tx && txData.supply_tx) {
+          calls = [toUserOpCall(txData.approve_tx), toUserOpCall(txData.supply_tx)];
+        } else if (txData.operation === "WITHDRAW" && txData.withdraw_tx) {
+          calls = [toUserOpCall(txData.withdraw_tx)];
+        } else {
+          throw new Error(t("unsupportedOperation", { operation: txData.operation }));
         }
-
         setSigningStatus("confirming");
-        finalTxHash = (await eip1193.request({
-          method: "eth_sendTransaction",
-          params: [
-            {
-              to: txData.supply_tx.to,
-              data: txData.supply_tx.data,
-              from: txData.supply_tx.from,
-              value: "0x0",
-            },
-          ],
-        })) as string;
-      } else if (txData.operation === "WITHDRAW" && txData.withdraw_tx) {
-        finalTxHash = (await eip1193.request({
-          method: "eth_sendTransaction",
-          params: [
-            {
-              to: txData.withdraw_tx.to,
-              data: txData.withdraw_tx.data,
-              from: txData.withdraw_tx.from,
-              value: "0x0",
-            },
-          ],
-        })) as string;
+        finalTxHash = await scwClient.sendUserOperation({ calls });
       } else {
-        throw new Error(t("unsupportedOperation", { operation: txData.operation }));
+        // ── EOA 経路 (従来・unchanged): embedded wallet (Privy TEE) のみ使用。──
+        const wallet = wallets.find((w) => w.walletClientType === "privy");
+        if (!wallet) {
+          await login();
+          setSigningStatus("idle");
+          return;
+        }
+        const eip1193 = await wallet.getEthereumProvider();
+        const ethProvider = new ethers.BrowserProvider(
+          eip1193 as unknown as ethers.Eip1193Provider
+        );
+
+        if (
+          txData.operation === "SUPPLY" &&
+          txData.approve_tx &&
+          txData.supply_tx
+        ) {
+          // SUPPLY: approve → supply の順に partner 本人が署名・送信。
+          const approveTxHash = (await eip1193.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                to: txData.approve_tx.to,
+                data: txData.approve_tx.data,
+                from: txData.approve_tx.from,
+                value: "0x0",
+              },
+            ],
+          })) as string;
+
+          // approve の確定を待ってから supply を送信する。
+          const approveReceipt =
+            await ethProvider.waitForTransaction(approveTxHash);
+          if (approveReceipt === null || approveReceipt.status === 0) {
+            throw new Error(t("revertError"));
+          }
+
+          setSigningStatus("confirming");
+          finalTxHash = (await eip1193.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                to: txData.supply_tx.to,
+                data: txData.supply_tx.data,
+                from: txData.supply_tx.from,
+                value: "0x0",
+              },
+            ],
+          })) as string;
+        } else if (txData.operation === "WITHDRAW" && txData.withdraw_tx) {
+          finalTxHash = (await eip1193.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                to: txData.withdraw_tx.to,
+                data: txData.withdraw_tx.data,
+                from: txData.withdraw_tx.from,
+                value: "0x0",
+              },
+            ],
+          })) as string;
+        } else {
+          throw new Error(t("unsupportedOperation", { operation: txData.operation }));
+        }
       }
 
       setSigningStatus("confirming");
 
-      // Step 3: submit-tx で最終 tx_hash を報告。
-      // サーバーが on-chain receipt を検証する (from == partner wallet / status == 1)。
-      // 旧実装は /approve に tx_hash を投げるだけで receipt 検証を飛ばしていた弱点を塞ぐ (§7)。
+      // Step 3: submit-tx で最終 hash を報告。SCW ユーザーは userOpHash を bundler receipt、
+      // EOA ユーザーは tx_hash を on-chain receipt で検証する (slice3b の経路分岐)。
       await submitPartnerTx(
         proposal.id,
         finalTxHash,
@@ -168,7 +186,7 @@ export function ApproveConfirmSheet({
         msg.includes("rejected") ? t("signCanceled") : msg
       );
     }
-  }, [wallets, login, proposal.id, token, onApproved, t]);
+  }, [scwClient, wallets, login, proposal.id, token, onApproved, t]);
 
   function handleOpenExternal() {
     const url = `https://app.ultra-auto-trade.com/partner/proposals?proposal_id=${proposal.id}&from=liff`;
