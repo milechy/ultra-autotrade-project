@@ -683,6 +683,7 @@
       "lastMonthComparison": "vs last month",
       "aiJudgment": "AI JUDGMENT",
       "confidenceLabel": "confidence",
+      "holdWeakSignalLabel": "Holding — buy/sell signal too weak (confidence {confidence}%)",
       "approve": "Approve",
       "reject": "Dismiss",
       "whyAction": "Why {action}?",
