@@ -36,6 +36,34 @@ export default function TermsPage() {
           <section>
             <h2 className="text-base font-semibold text-zinc-100 mb-2">{t('section2Title')}</h2>
             <p>{t('section2Body')}</p>
+            <div className="mt-4">
+              <h3 className="text-sm font-semibold text-zinc-200 mb-2">{t('section2YieldTitle')}</h3>
+              <p className="mb-3">{t('section2YieldIntro')}</p>
+              <table className="w-full text-xs border-collapse mb-3">
+                <thead>
+                  <tr className="border-b border-zinc-700">
+                    <th className="text-left py-2 pr-4 text-zinc-300 font-medium">{t('section2YieldTableHeader1')}</th>
+                    <th className="text-left py-2 text-zinc-300 font-medium">{t('section2YieldTableHeader2')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-zinc-800">
+                    <td className="py-2 pr-4">{t('section2YieldRow1Asset')}</td>
+                    <td className="py-2">{t('section2YieldRow1Rate')}</td>
+                  </tr>
+                  <tr className="border-b border-zinc-800">
+                    <td className="py-2 pr-4">{t('section2YieldRow2Asset')}</td>
+                    <td className="py-2">{t('section2YieldRow2Rate')}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4">{t('section2YieldRow3Asset')}</td>
+                    <td className="py-2">{t('section2YieldRow3Rate')}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="text-xs text-zinc-500">{t('section2YieldNote1')}</p>
+              <p className="text-xs text-zinc-500 mt-1">{t('section2YieldNote2')}</p>
+            </div>
           </section>
 
           <section>
@@ -99,6 +127,11 @@ export default function TermsPage() {
             <h2 className="text-base font-semibold text-zinc-100 mb-2">{t('section11Title')}</h2>
             <p>{t('section11Body')}</p>
           </section>
+
+          <div className="pt-4 border-t border-zinc-800 text-xs text-zinc-500 space-y-1">
+            <p><span className="text-zinc-400 font-medium">{t('operatorLabel')}: </span>{t('operatorName')}</p>
+            <p>{t('operatorLocation')}</p>
+          </div>
         </div>
       </div>
     </div>
