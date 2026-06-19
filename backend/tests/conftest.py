@@ -133,6 +133,22 @@ def _mock_compound_risk_assessor(request):
         yield
 
 
+@pytest.fixture(autouse=True)
+def _reset_monitoring_state():
+    """共有 MonitoringService シングルトンをテスト毎にリセットする（状態リーク防止）。
+
+    緊急停止など global monitoring 状態を設定するテストが reset を怠ると、後続テストへ
+    リークする。スライス0-E2 で _execute_aave_for_proposal が safety gate 経由で
+    global monitoring を参照するようになり、このリークが顕在化した。
+    state.reset_state() は本用途のために提供されている（state.py docstring 参照）。
+    """
+    from app.automation.state import reset_state
+
+    reset_state()
+    yield
+    reset_state()
+
+
 @pytest.fixture(scope="module")
 def vcr_config():
     """VCR グローバル設定。APIキーをカセットから除外する。"""
