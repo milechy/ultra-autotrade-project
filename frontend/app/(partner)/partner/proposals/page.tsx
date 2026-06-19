@@ -18,8 +18,10 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { useWallets } from '@privy-io/react-auth'
+import { useSmartWallets } from '@privy-io/react-auth/smart-wallets'
 import { ethers } from 'ethers'
 import { getStoredToken } from '@/lib/auth'
+import { toUserOpCall } from '@/lib/wallet/userop'
 import {
   fetchAdminProposalStats,
   listAdminProposals,
@@ -55,6 +57,8 @@ export default function PartnerProposalsPage() {
 
   const token = getStoredToken()
   const { wallets } = useWallets()
+  // Smart Wallet (AA) client。設定済 (SCW ユーザー) なら UserOp 経路、未設定なら EOA 経路。
+  const { client: scwClient } = useSmartWallets()
 
   const loadData = useCallback(async () => {
     if (!token) return
@@ -87,13 +91,6 @@ export default function PartnerProposalsPage() {
    */
   const handleApprove = async (id: number) => {
     if (!token) return
-    // embedded wallet (Privy TEE) のみ使用。外部 wallet (MetaMask 等) は秘密鍵がサーバーに渡る
-    // 懸念があるため除外。walletClientType === 'privy' が Privy embedded wallet の識別子。
-    const wallet = wallets.find(w => w.walletClientType === 'privy') ?? null
-    if (!wallet) {
-      setError(t('noWallet'))
-      return
-    }
 
     setActionLoading(id)
     setSigningStep(null)
@@ -104,58 +101,81 @@ export default function PartnerProposalsPage() {
       setSigningStep(t('signingPrepare'))
       const txData = await buildPartnerTx(id, token)
 
-      // EIP-1193 プロバイダー取得 (Privy が署名ポップアップを表示)
-      const eip1193 = await wallet.getEthereumProvider()
-      const ethProvider = new ethers.BrowserProvider(eip1193 as ethers.Eip1193Provider)
-
       let finalTxHash: string
 
-      if (txData.operation === 'SUPPLY' && txData.approve_tx && txData.supply_tx) {
-        // SUPPLY: approve → supply の順に署名・送信
-        setSigningStep(t('signingApproveStep'))
-        const approveTxHash = await eip1193.request({
-          method: 'eth_sendTransaction',
-          params: [{
-            to: txData.approve_tx.to,
-            data: txData.approve_tx.data,
-            from: txData.approve_tx.from,
-            value: '0x0',
-          }],
-        }) as string
-
-        // approve の確認を待ってから supply を送信
-        setSigningStep(t('signingApproveConfirm'))
-        const approveReceipt = await ethProvider.waitForTransaction(approveTxHash)
-        if (approveReceipt === null || approveReceipt.status === 0) {
-          throw new Error(t('errApproveRevert'))
+      if (scwClient) {
+        // ── Smart Wallet (ERC-4337 AA) 経路: ガスは paymaster 肩代わり (ETH 不要)。──
+        // approve+supply は 1 UserOp にバッチ。userOpHash → submit-tx (slice3b) が
+        // bundler の eth_getUserOperationReceipt で success / sender(=SCW) を検証する。
+        let calls: ReturnType<typeof toUserOpCall>[]
+        if (txData.operation === 'SUPPLY' && txData.approve_tx && txData.supply_tx) {
+          calls = [toUserOpCall(txData.approve_tx), toUserOpCall(txData.supply_tx)]
+        } else if (txData.operation === 'WITHDRAW' && txData.withdraw_tx) {
+          calls = [toUserOpCall(txData.withdraw_tx)]
+        } else {
+          throw new Error(t('errUnsupportedOp', { op: txData.operation }))
         }
-
         setSigningStep(t('signingSupplyStep'))
-        finalTxHash = await eip1193.request({
-          method: 'eth_sendTransaction',
-          params: [{
-            to: txData.supply_tx.to,
-            data: txData.supply_tx.data,
-            from: txData.supply_tx.from,
-            value: '0x0',
-          }],
-        }) as string
-
-      } else if (txData.operation === 'WITHDRAW' && txData.withdraw_tx) {
-        // WITHDRAW: withdraw を署名・送信
-        setSigningStep(t('signingWithdrawStep'))
-        finalTxHash = await eip1193.request({
-          method: 'eth_sendTransaction',
-          params: [{
-            to: txData.withdraw_tx.to,
-            data: txData.withdraw_tx.data,
-            from: txData.withdraw_tx.from,
-            value: '0x0',
-          }],
-        }) as string
-
+        finalTxHash = await scwClient.sendUserOperation({ calls })
       } else {
-        throw new Error(t('errUnsupportedOp', { op: txData.operation }))
+        // ── EOA 経路 (従来・unchanged): embedded wallet (Privy TEE) のみ使用。──
+        // 外部 wallet (MetaMask 等) は秘密鍵がサーバーに渡る懸念があるため除外。
+        const wallet = wallets.find(w => w.walletClientType === 'privy') ?? null
+        if (!wallet) {
+          setError(t('noWallet'))
+          return
+        }
+        // EIP-1193 プロバイダー取得 (Privy が署名ポップアップを表示)
+        const eip1193 = await wallet.getEthereumProvider()
+        const ethProvider = new ethers.BrowserProvider(eip1193 as ethers.Eip1193Provider)
+
+        if (txData.operation === 'SUPPLY' && txData.approve_tx && txData.supply_tx) {
+          // SUPPLY: approve → supply の順に署名・送信
+          setSigningStep(t('signingApproveStep'))
+          const approveTxHash = await eip1193.request({
+            method: 'eth_sendTransaction',
+            params: [{
+              to: txData.approve_tx.to,
+              data: txData.approve_tx.data,
+              from: txData.approve_tx.from,
+              value: '0x0',
+            }],
+          }) as string
+
+          // approve の確認を待ってから supply を送信
+          setSigningStep(t('signingApproveConfirm'))
+          const approveReceipt = await ethProvider.waitForTransaction(approveTxHash)
+          if (approveReceipt === null || approveReceipt.status === 0) {
+            throw new Error(t('errApproveRevert'))
+          }
+
+          setSigningStep(t('signingSupplyStep'))
+          finalTxHash = await eip1193.request({
+            method: 'eth_sendTransaction',
+            params: [{
+              to: txData.supply_tx.to,
+              data: txData.supply_tx.data,
+              from: txData.supply_tx.from,
+              value: '0x0',
+            }],
+          }) as string
+
+        } else if (txData.operation === 'WITHDRAW' && txData.withdraw_tx) {
+          // WITHDRAW: withdraw を署名・送信
+          setSigningStep(t('signingWithdrawStep'))
+          finalTxHash = await eip1193.request({
+            method: 'eth_sendTransaction',
+            params: [{
+              to: txData.withdraw_tx.to,
+              data: txData.withdraw_tx.data,
+              from: txData.withdraw_tx.from,
+              value: '0x0',
+            }],
+          }) as string
+
+        } else {
+          throw new Error(t('errUnsupportedOp', { op: txData.operation }))
+        }
       }
 
       // Step 3: tx_hash をバックエンドに報告
