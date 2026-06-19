@@ -770,6 +770,7 @@
         "title": "Deposit / Withdraw",
         "tabDeposit": "Deposit",
         "tabWithdraw": "Withdraw",
+        "withdrawComingSoon": "Coming soon",
         "currentBalance": "Current balance",
         "withdrawableBalance": "Available balance",
         "balanceLoading": "Loading...",

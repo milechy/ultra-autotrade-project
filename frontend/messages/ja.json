@@ -770,6 +770,7 @@
         "title": "入金/出金",
         "tabDeposit": "入金",
         "tabWithdraw": "出金",
+        "withdrawComingSoon": "準備中",
         "currentBalance": "現在の残高",
         "withdrawableBalance": "出金可能残高",
         "balanceLoading": "取得中...",
