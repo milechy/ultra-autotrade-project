@@ -350,6 +350,13 @@ class AuthService:
         return db.query(User).filter(User.wallet_address == wallet_address.lower()).first()
 
     @classmethod
+    def get_user_by_smart_wallet(cls, db: Session, smart_wallet_address: str) -> Optional[User]:
+        """Smart Wallet (ERC-4337 SCW) アドレスでユーザーを取得する (slice4b)。"""
+        return (
+            db.query(User).filter(User.smart_wallet_address == smart_wallet_address.lower()).first()
+        )
+
+    @classmethod
     def verify_wallet_signature(cls, wallet_address: str, message: str, signature: str) -> bool:
         """
         ウォレット署名を検証する。

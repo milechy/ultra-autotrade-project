@@ -9,6 +9,7 @@ import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactNode, useState } from 'react'
 import { wagmiConfig } from './config'
+import { SmartWalletRegistrar } from './SmartWalletRegistrar'
 
 const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || ''
 
@@ -58,6 +59,8 @@ export function PrivyRootClient({ children }: { children: ReactNode }) {
           useSmartWallets() が SCW client を返し、slice4c で署名経路が UserOp 送信に使う。
           非カストディアル不変条件: SCW の owner はユーザー embedded EOA のみ (§1.5)。 */}
       <SmartWalletsProvider>
+        {/* SCW が用意でき次第 backend に自動登録する (slice4b)。描画なし。 */}
+        <SmartWalletRegistrar />
         <WagmiProvider config={wagmiConfig}>
           <QueryClientProvider client={queryClient}>
             {children}
