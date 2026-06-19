@@ -3,7 +3,7 @@
 """ユーザー設定API ルーター定義。"""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,8 +16,20 @@ from app.database import get_db
 from app.partner import allocation_service
 from app.partner.allocation_schemas import MyAllocationResponse
 
-from .models import ACCOUNT_DELETION_STATUS_PENDING, AccountDeletionRequest
-from .settings_schemas import UserSettingsResponse, UserSettingsUpdate
+from .models import (
+    ACCOUNT_DELETION_STATUS_PENDING,
+    DELEGATION_STATUS_ACTIVE,
+    DELEGATION_STATUS_REVOKED,
+    AccountDeletionRequest,
+    DelegationGrant,
+    get_active_grant,
+)
+from .settings_schemas import (
+    DelegationGrantRequest,
+    DelegationGrantResponse,
+    UserSettingsResponse,
+    UserSettingsUpdate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -259,3 +271,97 @@ def request_account_deletion(
         "requested_at": req.requested_at.isoformat(),
         "already_requested": False,
     }
+
+
+# ---------------------------------------------------------------------------
+# 委譲枠 (delegation grant) — v4 完全おまかせ自動運用 Phase 0 / スライス0-C
+# ユーザーが「この枠・このリスクで任せる」と1回 consent する事前枠承認。
+# AUTO 執行時に有効な grant が無ければ fail-closed で拒否される（PolicyEngine Rule 8）。
+# 実際の % 上限は執行直前に risk_limiter で二重クランプする。
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/delegation",
+    response_model=Optional[DelegationGrantResponse],
+    summary="現在有効な委譲枠を取得",
+)
+def get_delegation_grant(
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> Optional[DelegationGrantResponse]:
+    """現在有効な委譲枠を返す。無ければ null。"""
+    grant = get_active_grant(current_user.id, db)
+    if grant is None:
+        return None
+    return DelegationGrantResponse.model_validate(grant)
+
+
+@router.post(
+    "/delegation/grant",
+    response_model=DelegationGrantResponse,
+    summary="委譲枠を作成（consent）",
+)
+def create_delegation_grant(
+    request: DelegationGrantRequest,
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> DelegationGrantResponse:
+    """委譲枠を作成する。既存の有効枠は新規作成前に revoke する（常に1枠のみ有効）。
+
+    上限 % は schema 段階でハードキャップ（単一≤10% / 日次≤30% / HF≥1.6）を検証済み。
+    委譲対象ウォレットは smart_wallet_address を優先、無ければ wallet_address。
+    """
+    now = datetime.now(timezone.utc)
+
+    # 既存の有効枠を revoke（1ユーザー1有効枠を維持）
+    existing = get_active_grant(current_user.id, db)
+    if existing is not None:
+        existing.status = DELEGATION_STATUS_REVOKED
+        existing.revoked_at = now
+
+    wallet = current_user.smart_wallet_address or current_user.wallet_address
+    grant = DelegationGrant(
+        user_id=current_user.id,
+        wallet_address=wallet,
+        status=DELEGATION_STATUS_ACTIVE,
+        max_single_trade_pct=request.max_single_trade_pct,
+        max_daily_trade_pct=request.max_daily_trade_pct,
+        hf_floor=request.hf_floor,
+        allowed_protocols=request.allowed_protocols,
+        allowed_assets=request.allowed_assets,
+        consent_at=now,
+        expires_at=now + timedelta(days=request.expires_in_days),
+    )
+    db.add(grant)
+    db.commit()
+    db.refresh(grant)
+    logger.info(
+        "delegation grant created: user_id=%s, single=%s%%, daily=%s%%, expires_in=%dd",
+        current_user.id,
+        request.max_single_trade_pct,
+        request.max_daily_trade_pct,
+        request.expires_in_days,
+    )
+    return DelegationGrantResponse.model_validate(grant)
+
+
+@router.post(
+    "/delegation/revoke",
+    response_model=Optional[DelegationGrantResponse],
+    summary="委譲枠を取消",
+)
+def revoke_delegation_grant(
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> Optional[DelegationGrantResponse]:
+    """現在有効な委譲枠を取消する。無ければ null（冪等）。"""
+    grant = get_active_grant(current_user.id, db)
+    if grant is None:
+        return None
+    grant.status = DELEGATION_STATUS_REVOKED
+    grant.revoked_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(grant)
+    logger.info("delegation grant revoked: user_id=%s, grant_id=%s", current_user.id, grant.id)
+    return DelegationGrantResponse.model_validate(grant)
