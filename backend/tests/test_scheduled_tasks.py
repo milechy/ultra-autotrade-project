@@ -1493,6 +1493,16 @@ class TestProcessNewsLoop:
     - 例外発生時は on_error を呼び 60 秒待機すること
     """
 
+    @pytest.fixture(autouse=True)
+    def _enable_news_auto_execute(self):  # type: ignore[no-untyped-def]
+        """本クラスは POST 挙動を検証するため NEWS_AUTO_EXECUTE_ENABLED を有効化する。
+
+        process_news_loop は CEX 裏線封鎖（2026-06）で、このフラグが true でない限り
+        POST をスキップする。フラグ未設定時のスキップ挙動は専用テストで別途検証する。
+        """
+        with patch.dict("os.environ", {"NEWS_AUTO_EXECUTE_ENABLED": "true"}):
+            yield
+
     @staticmethod
     def _make_httpx_mock(status_code: int = 200) -> tuple[object, AsyncMock]:
         """httpx.AsyncClient のモック (class, client_instance) を返す。"""
@@ -1583,6 +1593,38 @@ class TestProcessNewsLoop:
         with (
             patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
             patch.dict("os.environ", {"INTERNAL_API_TOKEN": ""}),
+            patch("httpx.AsyncClient", mock_class),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await process_news_loop(interval_seconds=1)
+
+        mock_client.post.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_skips_when_news_auto_execute_disabled(self) -> None:
+        """NEWS_AUTO_EXECUTE_ENABLED が未設定/false のとき、token があっても POST しない。
+
+        CEX 裏線封鎖（2026-06）: 承認ゲートなしの自動発注経路を既定で無効化する第3層防御。
+        """
+        from app.automation.scheduled_tasks import process_news_loop
+
+        sleep_count = 0
+
+        async def mock_sleep(seconds: float) -> None:
+            nonlocal sleep_count
+            sleep_count += 1
+            if sleep_count >= 2:
+                raise asyncio.CancelledError()
+
+        mock_class, mock_client = self._make_httpx_mock()
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            # autouse fixture の true を false で上書き（token は設定済みでも POST しないこと）
+            patch.dict(
+                "os.environ",
+                {"INTERNAL_API_TOKEN": "tok", "NEWS_AUTO_EXECUTE_ENABLED": "false"},
+            ),
             patch("httpx.AsyncClient", mock_class),
         ):
             with pytest.raises(asyncio.CancelledError):

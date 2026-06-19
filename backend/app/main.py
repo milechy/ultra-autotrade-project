@@ -507,11 +507,21 @@ def create_app() -> FastAPI:
                 mmt_interval = int(os.getenv("MMT_UPDATE_INTERVAL", "1800")) // 60
                 asyncio.create_task(start_mmt_background_task(interval_minutes=mmt_interval))
                 logger.info("MMT data feed started (interval: %ds)", mmt_interval * 60)
-            from app.automation.scheduled_tasks import process_news_loop  # noqa: PLC0415
+            # CEX 自動発注ループは NEWS_AUTO_EXECUTE_ENABLED=true のとき以外は起動しない。
+            # 旧実装は承認ゲートなしで 5 分毎に exchange_service.execute_trade を呼べる
+            # 状態で生きていた（既定 sandbox で実害は止まっていたが env 次第で本番約定し得た）。
+            # 多層防御の第1層: ループ自体を既定で起動しない（2026-06 CEX 裏線封鎖）。
+            if os.getenv("NEWS_AUTO_EXECUTE_ENABLED", "false").lower() in ("true", "1", "yes"):
+                from app.automation.scheduled_tasks import process_news_loop  # noqa: PLC0415
 
-            pn_interval = int(os.getenv("PROCESS_NEWS_INTERVAL_SECONDS", "300"))
-            asyncio.create_task(process_news_loop(interval_seconds=pn_interval))
-            logger.info("process_news_loop started (interval=%ds)", pn_interval)
+                pn_interval = int(os.getenv("PROCESS_NEWS_INTERVAL_SECONDS", "300"))
+                asyncio.create_task(process_news_loop(interval_seconds=pn_interval))
+                logger.info("process_news_loop started (interval=%ds)", pn_interval)
+            else:
+                logger.info(
+                    "process_news_loop NOT started: NEWS_AUTO_EXECUTE_ENABLED is not set "
+                    "(CEX auto-execution disabled)"
+                )
         except BaseException as exc:
             logger.error("Failed to start data feed background tasks: %s", exc)
 

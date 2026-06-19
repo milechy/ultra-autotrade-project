@@ -9,6 +9,7 @@ POST /automation/process-news:
 """
 
 import logging
+import os
 from typing import Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -77,6 +78,17 @@ def process_news(
     """
     logger.info("POST /automation/process-news called")
 
+    # CEX 自動発注は NEWS_AUTO_EXECUTE_ENABLED=true のとき以外は PROPOSAL_ONLY に固定する。
+    # 旧実装は execution_policy=AUTO_EXECUTE をハードコードしており、内部トークンさえあれば
+    # 承認ゲートなしで exchange_service.execute_trade に到達できた。多層防御の第2層（最重要）:
+    # このエンドポイントが直接叩かれても既定では発注に到達させない（2026-06 CEX 裏線封鎖）。
+    news_auto_exec = os.getenv("NEWS_AUTO_EXECUTE_ENABLED", "false").lower() in ("true", "1", "yes")
+    news_execution_policy = (
+        ExecutionPolicy.AUTO_EXECUTE.value
+        if news_auto_exec
+        else ExecutionPolicy.PROPOSAL_ONLY.value
+    )
+
     try:
         run_result = process_pending_knowledge(
             db,
@@ -85,7 +97,7 @@ def process_news(
             exchange_service=get_exchange_service(),
             monitoring_service=monitoring_service,
             dry_run=dry_run,
-            execution_policy=ExecutionPolicy.AUTO_EXECUTE.value,
+            execution_policy=news_execution_policy,
         )
         monitoring_service.record_news_fetch()
     except Exception as exc:
