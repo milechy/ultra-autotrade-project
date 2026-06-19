@@ -344,6 +344,34 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
         _notify_aave_failure(proposal.id, _error_msg, _blocked_at)
         return
 
+    # HARD_STOP 安全ゲート（スライス0-E2）: 執行直前にグローバル安全条件を確認する。
+    # rule engine(HF<1.6/emergency stop/oracle/reserve) / StressController / MacroSafeMode /
+    # CompoundRiskAssessor を経路非依存に評価する（safety_gate, スライス0-E1）。
+    # 従来この execute 経路はこれらを通っておらず(gap E)、承認スキップの自動執行(Phase 2-D)でも
+    # バイパスされないよう execute 直前に配置する。HARD_STOP は transient なため dead-letter せず、
+    # proposal は 'approved' のまま据え置き(条件解消後に再執行可能)にする。
+    from app.automation.safety_gate import evaluate_hard_stop  # noqa: PLC0415
+    from app.automation.state import get_monitoring_service  # noqa: PLC0415
+
+    _hf_for_gate: Optional[Decimal] = None
+    try:
+        from app.aave.monitor import get_health_factor as _gate_get_hf  # noqa: PLC0415
+
+        _hf_for_gate = _gate_get_hf()
+    except Exception as _hf_exc:  # noqa: BLE001
+        logger.warning("proposal %d: HF fetch for safety gate failed: %s", proposal.id, _hf_exc)
+
+    _hard_stop = evaluate_hard_stop(get_monitoring_service(), _hf_for_gate)
+    if _hard_stop.blocked:
+        logger.warning(
+            "proposal %d: execution HELD by safety gate (source=%s, reason=%s) — "
+            "status remains 'approved' for retry after condition clears",
+            proposal.id,
+            _hard_stop.source,
+            _hard_stop.reason,
+        )
+        return
+
     try:
         multi_service = MultiChainAaveService()
         result = multi_service.execute_rebalance(
