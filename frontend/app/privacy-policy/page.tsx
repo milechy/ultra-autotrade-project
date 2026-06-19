@@ -79,6 +79,11 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-base font-semibold text-zinc-100 mb-2">{t('section9Title')}</h2>
             <p>{t('section9Body')}</p>
           </section>
+
+          <div className="pt-4 border-t border-zinc-800 text-xs text-zinc-500 space-y-1">
+            <p><span className="text-zinc-400 font-medium">{t('operatorLabel')}: </span>{t('operatorName')}</p>
+            <p>{t('operatorLocation')}</p>
+          </div>
         </div>
       </div>
     </div>
