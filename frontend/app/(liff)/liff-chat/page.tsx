@@ -359,7 +359,8 @@ export default function LiffChatPage() {
             >
               {t("home.aiJudgment")}
             </span>
-            {confidence > 0 && (
+            {/* BUY/SELL のみヘッダー右上に信頼度を表示（HOLD はアクション下に文章で説明） */}
+            {confidence > 0 && (isBuy || isSell) && (
               <span className="ml-auto text-[#736f7e] text-xs">{confidence}% {t("home.confidenceLabel")}</span>
             )}
           </div>
@@ -372,6 +373,13 @@ export default function LiffChatPage() {
           >
             {aiJudgment ? action : t("home.noSignal")}
           </div>
+
+          {/* HOLD 時: 弱シグナルのため様子見である旨を平易に説明（投資リテラシーの低いユーザー向け） */}
+          {aiJudgment && action === "HOLD" && confidence > 0 && (
+            <p className="mt-1 text-[#736f7e] text-xs leading-relaxed">
+              {t("home.holdWeakSignalLabel", { confidence })}
+            </p>
+          )}
 
           {/* なぜ{action}？理由トグル（aiJudgment がある場合のみ表示） */}
           {aiJudgment && (
