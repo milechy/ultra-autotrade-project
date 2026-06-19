@@ -225,25 +225,29 @@ export function DepositPanel() {
 
   return (
     <div className="pb-2">
-      {/* タブ（v3 は出金非表示。WITHDRAW_ENABLED=false の間はタブ自体を出さず入金のみ） */}
-      {WITHDRAW_ENABLED && (
-        <div className="flex border-b border-[#1c1a27]/15 mb-4">
-          {(["deposit", "withdraw"] as Tab[]).map((tabKey) => (
-            <button
-              key={tabKey}
-              onClick={() => handleTabChange(tabKey)}
-              className={[
-                "flex-1 py-2 text-sm font-medium transition-colors",
-                tab === tabKey
-                  ? "border-b-2 border-[#1D9E75] text-[#1D9E75]"
-                  : "text-[#736f7e]",
-              ].join(" ")}
-            >
-              {tabKey === "deposit" ? t("tabDeposit") : t("tabWithdraw")}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* タブ（出金は準備中表示のみ・クリック不可） */}
+      <div className="flex border-b border-[#1c1a27]/15 mb-4">
+        <button
+          onClick={() => handleTabChange("deposit")}
+          className={[
+            "flex-1 py-2 text-sm font-medium transition-colors",
+            tab === "deposit"
+              ? "border-b-2 border-[#1D9E75] text-[#1D9E75]"
+              : "text-[#736f7e]",
+          ].join(" ")}
+        >
+          {t("tabDeposit")}
+        </button>
+        <button
+          disabled
+          className="flex-1 py-2 text-sm font-medium text-[#736f7e] opacity-40 cursor-not-allowed flex items-center justify-center gap-1"
+        >
+          {t("tabWithdraw")}
+          <span className="text-[10px] bg-[#736f7e]/20 rounded px-1 py-0.5 leading-none">
+            {t("withdrawComingSoon")}
+          </span>
+        </button>
+      </div>
 
       {/* 残高カード */}
       <div className="bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] rounded-xl px-4 py-4 mb-4">
