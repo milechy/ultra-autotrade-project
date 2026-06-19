@@ -683,6 +683,7 @@
       "lastMonthComparison": "先月比",
       "aiJudgment": "AI JUDGMENT",
       "confidenceLabel": "信頼度",
+      "holdWeakSignalLabel": "売買シグナルが弱いため様子見中（確信度 {confidence}%）",
       "approve": "承認する",
       "reject": "見送る",
       "whyAction": "なぜ{action}？",
