@@ -36,9 +36,8 @@ export function PrivyRootClient({ children }: { children: ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
-        // 2026-05-26 Lane H: SNS (google/apple) を loginMethods に追加し、デモ参加者が
-        // 外部 wallet 不要で onboarding できるようにする。LINE は OAuth 設定別途必要 (別 Lane)。
-        loginMethods: ['email', 'google', 'apple', 'wallet'],
+        // v3: email のみ。google/apple は v4 で再有効化予定。
+        loginMethods: ['email'],
         appearance: {
           // Arobix ブランド統一: アプリの primary CTA（紫系グラデ）に合わせ、
           // Privy モーダルの accentColor を Arobix purple に揃える。
