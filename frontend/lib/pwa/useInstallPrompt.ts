@@ -12,8 +12,18 @@ export function useInstallPrompt() {
   const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null)
   const [isInstalled, setIsInstalled] = useState(false)
   const [isInstallable, setIsInstallable] = useState(false)
+  // iOS Safari は beforeinstallprompt 非対応のため isInstallable が立たない。
+  // 「共有 → ホーム画面に追加」を案内するため iOS 判定を別途持つ。
+  const [isIOS, setIsIOS] = useState(false)
 
   useEffect(() => {
+    // iOS 判定（iPadOS 13+ は UA が Macintosh を名乗るため touch 有無で補完）
+    const ua = window.navigator.userAgent
+    const iOSDevice =
+      /iPad|iPhone|iPod/.test(ua) ||
+      (ua.includes('Macintosh') && 'ontouchend' in document)
+    setIsIOS(iOSDevice)
+
     // Check if already installed (standalone mode)
     const mq = window.matchMedia('(display-mode: standalone)')
     setIsInstalled(mq.matches || (navigator as Navigator & { standalone?: boolean }).standalone === true)
@@ -52,5 +62,5 @@ export function useInstallPrompt() {
     return outcome
   }
 
-  return { isInstallable, isInstalled, promptInstall }
+  return { isInstallable, isInstalled, isIOS, promptInstall }
 }
