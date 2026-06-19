@@ -1120,6 +1120,12 @@ async def process_news_loop(
         try:
             await asyncio.sleep(interval_seconds)
 
+            # 多層防御の第3層: ループが何らかの経路で起動していても、フラグ未設定なら
+            # POST せずスキップ（runtime トグル・別経路起動への保険）。2026-06 CEX 裏線封鎖。
+            if os.getenv("NEWS_AUTO_EXECUTE_ENABLED", "false").lower() not in ("true", "1", "yes"):
+                logger.info("process_news_loop: NEWS_AUTO_EXECUTE_ENABLED not set, skipping POST")
+                continue
+
             token = os.getenv("INTERNAL_API_TOKEN", "")
             if not token:
                 logger.warning("process_news_loop: INTERNAL_API_TOKEN not set, skipping")

@@ -114,6 +114,18 @@
 
 ## backend/app/main.py
 
+### 変更 #15: process_news_loop 起動を NEWS_AUTO_EXECUTE_ENABLED でガード (PR #814 / 2026-06-19)
+- **コミット範囲**: `fix/cex-auto-execute-disable`
+- **変更内容**: `process_news_loop` の `asyncio.create_task` 起動を
+  `NEWS_AUTO_EXECUTE_ENABLED`（既定 false）の env フラグで条件分岐（13 行）。
+  フラグ未設定時は起動せず info ログのみ。
+- **理由**: CEX 自動発注の裏線封鎖（v4 完全おまかせ自動運用 Phase 0 / スライス0-F）。
+  承認ゲートなしで 5 分毎に `exchange_service.execute_trade` を呼べた経路を安全側に倒す。
+  多層防御の第1層（第2層=automation_router.py、第3層=scheduled_tasks.py は凍結対象外）。
+- **影響範囲**: 既定で CEX 自動発注ループが起動しなくなるのみ。news/RAG/AI Judge/
+  knowledge ・他 startup task への影響なし。
+- **承認**: fix/cex-auto-execute-disable → main (PR #814)
+
 ### 変更 #14: chat_router include_router + ChatMessage table 登録 (PR #643 / 2026-06-12)
 - **コミット範囲**: `feat/chat-history-persistence`
 - **変更内容**: `app.include_router(chat_router, prefix="/api")` を追加 (3 行) +
