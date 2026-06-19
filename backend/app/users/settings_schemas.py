@@ -9,6 +9,13 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+# 委譲枠の上限ハードキャップ（risk_limiter STRICT と一致。これを超える値は受け付けない）。
+# 実行時にも risk_limiter で二重クランプするが、入力段階でも fail-fast で弾く。
+DELEGATION_MAX_SINGLE_TRADE_PCT = Decimal("10")
+DELEGATION_MAX_DAILY_TRADE_PCT = Decimal("30")
+DELEGATION_MIN_HF_FLOOR = Decimal("1.6")
+DELEGATION_MAX_EXPIRES_DAYS = 365
+
 
 class UserSettingsResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -70,3 +77,61 @@ class UserSettingsUpdate(BaseModel):
         if not re.match(r"^[\w\s\-]+$", v):
             raise ValueError("ユーザー名には文字・数字・スペース・_・- のみ使用できます")
         return v.lower()
+
+
+class DelegationGrantRequest(BaseModel):
+    """事前枠承認（委譲枠）の作成リクエスト。
+
+    上限は % で指定。ハードキャップ（単一≤10% / 日次≤30% / HF≥1.6）を超える値は
+    入力段階で 422 にする（実行時にも risk_limiter で二重クランプ）。
+    """
+
+    max_single_trade_pct: Decimal = Field(..., gt=0)
+    max_daily_trade_pct: Decimal = Field(..., gt=0)
+    hf_floor: Decimal = Field(default=DELEGATION_MIN_HF_FLOOR)
+    allowed_protocols: list[str] = Field(..., min_length=1)
+    allowed_assets: list[str] = Field(..., min_length=1)
+    expires_in_days: int = Field(..., ge=1, le=DELEGATION_MAX_EXPIRES_DAYS)
+
+    @field_validator("max_single_trade_pct")
+    @classmethod
+    def _validate_single(cls, v: Decimal) -> Decimal:
+        if v > DELEGATION_MAX_SINGLE_TRADE_PCT:
+            raise ValueError(
+                f"max_single_trade_pct は {DELEGATION_MAX_SINGLE_TRADE_PCT}% 以下にしてください"
+            )
+        return v
+
+    @field_validator("max_daily_trade_pct")
+    @classmethod
+    def _validate_daily(cls, v: Decimal) -> Decimal:
+        if v > DELEGATION_MAX_DAILY_TRADE_PCT:
+            raise ValueError(
+                f"max_daily_trade_pct は {DELEGATION_MAX_DAILY_TRADE_PCT}% 以下にしてください"
+            )
+        return v
+
+    @field_validator("hf_floor")
+    @classmethod
+    def _validate_hf(cls, v: Decimal) -> Decimal:
+        if v < DELEGATION_MIN_HF_FLOOR:
+            raise ValueError(f"hf_floor は {DELEGATION_MIN_HF_FLOOR} 以上にしてください")
+        return v
+
+
+class DelegationGrantResponse(BaseModel):
+    """委譲枠のレスポンス。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    status: str
+    wallet_address: Optional[str]
+    max_single_trade_pct: Decimal
+    max_daily_trade_pct: Decimal
+    hf_floor: Decimal
+    allowed_protocols: list[str]
+    allowed_assets: list[str]
+    consent_at: datetime
+    expires_at: datetime
+    revoked_at: Optional[datetime]

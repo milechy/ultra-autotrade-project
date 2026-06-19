@@ -36,6 +36,9 @@ class PolicyContext:
     expected_hf_after: Optional[Decimal] = None
     # 承認時のみ設定。DB クエリで自分自身を除外するために使う。
     proposal_id: Optional[int] = None
+    # True のとき「無承認の AUTO 執行」。有効な委譲枠 (delegation grant) が無ければ拒否する。
+    # 既定 False = 手動承認経路（approve_proposal）は本ルールの影響を受けない。
+    is_auto_execution: bool = False
 
 
 @dataclass
@@ -112,6 +115,18 @@ class PolicyEngine:
             violations.append(
                 f"expected_hf_after {ctx.expected_hf_after} below floor {self._hf_floor}"
             )
+
+        # Rule 8: AUTO 執行は有効な委譲枠 (delegation grant) を必須とする（fail-closed）。
+        # 手動承認経路 (is_auto_execution=False) には影響しない。実際の % 上限クランプは
+        # 執行直前の risk_limiter で行う（本ルールは「枠の存在・有効性」のみを担保する）。
+        if ctx.is_auto_execution and db is not None:
+            from app.users.models import get_active_grant  # noqa: PLC0415
+
+            if get_active_grant(ctx.user_id, db) is None:
+                violations.append(
+                    "auto-execution requires an active delegation grant "
+                    f"(user_id={ctx.user_id}); none found"
+                )
 
         passed = not violations
         if not passed:
