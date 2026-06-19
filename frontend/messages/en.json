@@ -3388,7 +3388,11 @@
     "description": "Install as an app for quick access",
     "dismissAriaLabel": "Close",
     "installButton": "Install",
-    "laterButton": "Later"
+    "laterButton": "Later",
+    "iosTitle": "Add the app to your Home Screen",
+    "iosStep1Before": "Tap the Share",
+    "iosStep1After": "button below",
+    "iosStep2": "Choose \"Add to Home Screen\""
   },
   "PwaUpdatePrompt": {
     "title": "App update available",
