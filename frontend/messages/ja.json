@@ -3400,7 +3400,11 @@
     "description": "アプリとしてインストールするとすばやくアクセスできます",
     "dismissAriaLabel": "閉じる",
     "installButton": "インストール",
-    "laterButton": "後で"
+    "laterButton": "後で",
+    "iosTitle": "ホーム画面にアプリを追加",
+    "iosStep1Before": "下部の共有",
+    "iosStep1After": "をタップ",
+    "iosStep2": "「ホーム画面に追加」を選択"
   },
   "PwaUpdatePrompt": {
     "title": "アプリを更新できます",
