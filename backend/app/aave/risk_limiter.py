@@ -201,3 +201,50 @@ def notify_slack_if_custom(limits: EffectiveLimits) -> None:
                 logger.warning("risk_limiter: Slack notification returned status %d", resp.status)
     except Exception as exc:  # noqa: BLE001
         logger.warning("risk_limiter: Slack notification failed: %s", exc)
+
+
+def check_trade_within_limits(
+    amount_usd: Decimal,
+    total_assets_usd: Optional[Decimal],
+    daily_traded_usd: Decimal,
+    hf: Optional[Decimal],
+    limits: Optional[EffectiveLimits] = None,
+) -> Optional[str]:
+    """単一取引/日次/HF をハード上限に対して検査し、違反理由を返す（無ければ None）。
+
+    純関数。executor / 自動執行経路の執行前ゲートで再利用する（v4 Phase 2-D で配線予定）。
+    上限値は get_effective_limits() のハードクランプ済み値を使う（env が緩くても勝てない）。
+
+    Args:
+        amount_usd: 今回の取引額（USD）。
+        total_assets_usd: ユーザー総資産（USD）。% 判定の分母。None または 0 の場合は
+            % 判定を行わない（初回入金など分母が無いケース。絶対額上限は別層=PolicyEngine で担保）。
+        daily_traded_usd: 当日既執行額（USD）。日次 % 判定に加算する。
+        hf: 現在の Health Factor。None/inf は HF 判定をスキップ。
+        limits: 明示指定が無ければ get_effective_limits() を使う。
+
+    Returns:
+        違反理由文字列（最初の1件）。違反なしは None。
+    """
+    eff = limits if limits is not None else get_effective_limits()
+
+    # HF floor（inf/None はスキップ）
+    if hf is not None and hf != Decimal("inf") and hf < eff.hf_min:
+        return f"hf {hf} below floor {eff.hf_min}"
+
+    # % 判定は総資産（分母）が正のときのみ。0/None は絶対額上限(PolicyEngine)に委ねる。
+    if total_assets_usd is not None and total_assets_usd > Decimal("0"):
+        single_max_usd = total_assets_usd * eff.single_trade_pct_max / Decimal("100")
+        if amount_usd > single_max_usd:
+            return (
+                f"single trade {amount_usd} exceeds {eff.single_trade_pct_max}% of "
+                f"total assets ({single_max_usd})"
+            )
+        daily_max_usd = total_assets_usd * eff.daily_trade_pct_max / Decimal("100")
+        if daily_traded_usd + amount_usd > daily_max_usd:
+            return (
+                f"daily trade {daily_traded_usd + amount_usd} exceeds "
+                f"{eff.daily_trade_pct_max}% of total assets ({daily_max_usd})"
+            )
+
+    return None
