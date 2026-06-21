@@ -880,7 +880,11 @@
         "activeDesc": "AIが提案。自分で承認してから実行。",
         "toastSwitched": "「{mode}」に切り替えました",
         "toastAuthExpired": "認証が切れています。再ログインしてください",
-        "toastSwitchFailed": "切り替えに失敗しました"
+        "toastSwitchFailed": "切り替えに失敗しました",
+        "consentNotReady": "おまかせ運用は現在準備中です。もう少しお待ちください",
+        "consentNoWallet": "ウォレットが見つかりません。再ログインしてください",
+        "consentCancelled": "おまかせ運用の許可がキャンセルされました",
+        "consentFailed": "おまかせ運用の設定に失敗しました"
       },
       "txHistory": {
         "title": "取引履歴",
