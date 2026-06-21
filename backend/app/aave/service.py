@@ -74,6 +74,11 @@ class AaveService:
         # 直近のトレード時刻を記録する（単純なリストで十分）
         self._recent_actions: List[datetime] = []
 
+    @property
+    def client(self) -> AaveClient:
+        """配下の AaveClient（委譲(SCW)経路の build_deposit_txs 等に使う read 用アクセサ）。"""
+        return self._client
+
     # ---- 内部ヘルパー -------------------------------------------------
 
     def _now(self) -> datetime:
