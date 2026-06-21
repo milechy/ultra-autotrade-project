@@ -880,7 +880,11 @@
         "activeDesc": "AI proposes. You approve before execution.",
         "toastSwitched": "Switched to \"{mode}\"",
         "toastAuthExpired": "Session expired. Please log in again.",
-        "toastSwitchFailed": "Failed to switch mode"
+        "toastSwitchFailed": "Failed to switch mode",
+        "consentNotReady": "Auto mode is being prepared. Please try again later.",
+        "consentNoWallet": "Wallet not found. Please log in again.",
+        "consentCancelled": "Auto mode authorization was cancelled.",
+        "consentFailed": "Failed to enable auto mode."
       },
       "txHistory": {
         "title": "Transaction History",
