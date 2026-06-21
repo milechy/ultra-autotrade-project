@@ -156,3 +156,31 @@ class PrivyRestClient:
     def create_policy(self, policy: dict[str, Any]) -> dict[str, Any]:
         """POST /v1/policies（app-level / Basic auth のみ・委譲署名不要）。"""
         return self._post("/policies", policy, signed=False)
+
+    def create_key_quorum(
+        self,
+        *,
+        public_keys: list[str],
+        authorization_threshold: int = 1,
+        display_name: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """POST /v1/key_quorums（L0: サーバ authorization key を quorum 登録）。
+
+        app-level 操作で **Basic auth のみ**（委譲署名不要）。SDK の
+        `KeyQuorums.create` は `update`/`delete` と異なり authorization-signature を付けない
+        （`node_modules/@privy-io/node/resources/key-quorums.js` の create で確認）。
+
+        :param public_keys: P-256 公開鍵（SPKI DER の base64・PEM ヘッダなし）のリスト
+        :param authorization_threshold: 必要署名数（既定 1 = 単独サーバ signer）
+        :param display_name: 監査用表示名
+        :return: 作成された key quorum（``id`` が SERVER_SIGNER_ID = signerId）
+        """
+        if not public_keys:
+            raise ValueError("public_keys must not be empty")
+        body: dict[str, Any] = {
+            "public_keys": public_keys,
+            "authorization_threshold": authorization_threshold,
+        }
+        if display_name:
+            body["display_name"] = display_name
+        return self._post("/key_quorums", body, signed=False)
