@@ -3713,5 +3713,15 @@
     "adminOnly": "入金・引き出しはadminのみ実行できます",
     "amountPlaceholder": "USDC数量",
     "vaultAddressPlaceholder": "Vault アドレス"
+  },
+  "StressTestCard": {
+    "title": "清算リスク（ストレステスト）",
+    "currentHf": "現在のヘルスファクター",
+    "scenario": "価格 {drop}% 下落時",
+    "noPosition": "対象ポジションがありません",
+    "loading": "読み込み中...",
+    "fetchError": "データを取得できません",
+    "refresh": "更新",
+    "note": "担保価格が下落した場合のヘルスファクター試算です（1.0 で清算）。"
   }
 }

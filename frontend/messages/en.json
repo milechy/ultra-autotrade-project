@@ -3697,6 +3697,16 @@
     "amountPlaceholder": "USDC amount",
     "vaultAddressPlaceholder": "Vault address"
   },
+  "StressTestCard": {
+    "title": "Liquidation Risk (Stress Test)",
+    "currentHf": "Current Health Factor",
+    "scenario": "If price drops {drop}%",
+    "noPosition": "No applicable position",
+    "loading": "Loading...",
+    "fetchError": "Unable to fetch data",
+    "refresh": "Refresh",
+    "note": "Estimated health factor if collateral price drops (liquidation at 1.0)."
+  },
   "BorrowRatesPanel": {
     "title": "GHO / USDC Borrow Rate Comparison",
     "description": "Displays the optimal borrowing currency considering stkAAVE discounts in real time (auto-refreshed every 60s)",
