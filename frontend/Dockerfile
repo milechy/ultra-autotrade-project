@@ -54,6 +54,11 @@ ENV NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
 ARG NEXT_PUBLIC_APP_VERSION
 ENV NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
 
+# v4 Phase 2-D-E: 委譲おまかせ consent フローの dormant フラグ（既定 false）。
+# true のときのみ OpModePanel の managed 選択で session signer consent を走らせる。
+ARG NEXT_PUBLIC_DELEGATION_CONSENT_ENABLED
+ENV NEXT_PUBLIC_DELEGATION_CONSENT_ENABLED=${NEXT_PUBLIC_DELEGATION_CONSENT_ENABLED}
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 

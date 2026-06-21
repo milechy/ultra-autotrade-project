@@ -189,6 +189,8 @@ services:
         NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
         NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-https://us.i.posthog.com}
         NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-dev}
+        # v4 Phase 2-D-E: 委譲 consent フロー dormant フラグ（既定 false）。L0 登録後に true で有効化。
+        NEXT_PUBLIC_DELEGATION_CONSENT_ENABLED: ${NEXT_PUBLIC_DELEGATION_CONSENT_ENABLED:-false}
         # Next.js ビルド OOM 対策 (CLAUDE.md §2026-05-19 GID 1214828243363427)
         NODE_BUILD_MAX_OLD_SPACE_SIZE: ${NODE_BUILD_MAX_OLD_SPACE_SIZE:-4096}
     environment:
