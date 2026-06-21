@@ -1182,3 +1182,13 @@ deploy_staging.sh)が稼働中だった。ps の ELAPSED は MM:SS 表記、誤�
 - **i18n キー存在検査を CI に追加済み** (`.github/workflows/ci.yml` → `node scripts/check-i18n-keys.mjs`)。コードが参照する `t()` キーが `messages/ja.json`・`en.json` に存在するか baseline ratchet で検査し、新規欠落で fail する。Asana 1215691378757415。
 - i18n ファイルの**コメント内に `t("…")` リテラルを書かない** (チェッカーがコメントも走査して誤検出する。2026-06-17 PR #784 で別途学習)。
 - messages 全体上書きの wave PR は surgical merge を原則化し、レビューで他 PR のキー消失を確認する。
+
+## 2026-06-14 parse エラーは tsc / ignoreBuildErrors をすり抜ける（次の deploy 全停止）
+
+**何が起きたか**: staging deploy が `npm run build` で失敗し staging が 502 ダウン。真因は `frontend/app/layout.tsx` の**重複 import**（wave16 と wave18d #725 が同じ `NextIntlClientProvider`/`getLocale`/`getMessages` を二重追加）で、SWC が "defined multiple times" でパース失敗（PR #726 で修正）。i18n キー消失（上記 2026-06-14）と同じ wave マージ起因。
+
+**なぜ CI を素通りしたか**: これは「型エラー」ではなく**パースエラー**のため、`next.config.js` の `typescript.ignoreBuildErrors`/`eslint.ignoreDuringBuilds` では抑止されず、CI の `tsc --noEmit` ゲートだけでは**検出漏れ**する。結果 main がビルド不能になり全 deploy がブロックされる。
+
+**再発防止ルール**:
+- **CI frontend ジョブで `npm run build` を実行する**（`.github/workflows/ci.yml`・OOM 対策 `NODE_OPTIONS=--max-old-space-size=4096`）。parse エラーを確実に検出する。Asana 1215690860479307。
+- `tsc --noEmit` は型のみ・`ignoreBuildErrors` は parse を黙らせない設定。**ビルド可否は build を実走させて検証**する（型チェックで代替しない）。
