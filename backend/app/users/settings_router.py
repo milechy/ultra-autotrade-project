@@ -15,6 +15,13 @@ from app.auth.models import User, UserRole
 from app.database import get_db
 from app.partner import allocation_service
 from app.partner.allocation_schemas import MyAllocationResponse
+from app.privy.delegation_service import (
+    DelegationPolicyError,
+    DelegationPolicyNotEnabledError,
+    is_delegation_policy_enabled,
+    prepare_delegation_policy,
+    resolve_delegation_chain_name,
+)
 
 from .models import (
     ACCOUNT_DELETION_STATUS_PENDING,
@@ -27,6 +34,7 @@ from .models import (
 from .settings_schemas import (
     DelegationGrantRequest,
     DelegationGrantResponse,
+    DelegationPrepareResponse,
     UserSettingsResponse,
     UserSettingsUpdate,
 )
@@ -298,6 +306,62 @@ def get_delegation_grant(
 
 
 @router.post(
+    "/delegation/prepare",
+    response_model=DelegationPrepareResponse,
+    summary="委譲 policy を作成（L1・consent 前）",
+)
+def prepare_delegation_policy_endpoint(
+    request: DelegationGrantRequest,
+    current_user: User = Depends(require_active_user),
+) -> DelegationPrepareResponse:
+    """委譲枠から Privy policy を作成し ``policy_id`` / ``signer_id`` を返す（L1）。
+
+    frontend は返値を ``addSessionSigners`` に渡して consent を取り、その後
+    ``/delegation/grant`` に同じ識別子を返して枠を確定する。
+
+    **dormant**: ``DELEGATION_PRIVY_POLICY_ENABLED`` + ``PRIVY_SERVER_SIGNER_ID``（L0 登録）+
+    Privy creds が揃わない限り 503 を返し、Privy を一切叩かない（本番は現状 inert）。
+    """
+    # dormant: フラグ/L0 未設定なら wallet を見るまでもなく 503（Privy を叩かない）。
+    if not is_delegation_policy_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "delegation policy preparation is not enabled "
+                "(requires DELEGATION_PRIVY_POLICY_ENABLED + PRIVY_SERVER_SIGNER_ID after L0)"
+            ),
+        )
+    now = datetime.now(timezone.utc)
+    wallet = current_user.smart_wallet_address or current_user.wallet_address
+    if not wallet:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="委譲対象ウォレットが未設定です",
+        )
+    expires_at = now + timedelta(days=request.expires_in_days)
+    chain_name = resolve_delegation_chain_name()
+    try:
+        policy_id, signer_id = prepare_delegation_policy(
+            wallet_address=wallet,
+            allowed_protocols=request.allowed_protocols,
+            expires_at=expires_at,
+            chain_name=chain_name,
+        )
+    except DelegationPolicyNotEnabledError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+    except DelegationPolicyError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    return DelegationPrepareResponse(
+        privy_policy_id=policy_id,
+        privy_signer_id=signer_id,
+        chain_name=chain_name,
+        expires_at=expires_at,
+    )
+
+
+@router.post(
     "/delegation/grant",
     response_model=DelegationGrantResponse,
     summary="委譲枠を作成（consent）",
@@ -332,6 +396,9 @@ def create_delegation_grant(
         allowed_assets=request.allowed_assets,
         consent_at=now,
         expires_at=now + timedelta(days=request.expires_in_days),
+        # L3: consent(addSessionSigners) 後に frontend が渡す Privy 識別子（任意）。
+        privy_policy_id=request.privy_policy_id,
+        privy_signer_id=request.privy_signer_id,
     )
     db.add(grant)
     db.commit()

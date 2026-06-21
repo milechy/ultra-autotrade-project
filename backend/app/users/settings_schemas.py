@@ -92,6 +92,10 @@ class DelegationGrantRequest(BaseModel):
     allowed_protocols: list[str] = Field(..., min_length=1)
     allowed_assets: list[str] = Field(..., min_length=1)
     expires_in_days: int = Field(..., ge=1, le=DELEGATION_MAX_EXPIRES_DAYS)
+    # L1/L3: frontend が consent(addSessionSigners) 後に渡す Privy 識別子（任意・後方互換）。
+    # /delegation/prepare で作成した policy_id と SERVER_SIGNER_ID を grant 確定時に保存する。
+    privy_policy_id: Optional[str] = Field(default=None, max_length=255)
+    privy_signer_id: Optional[str] = Field(default=None, max_length=255)
 
     @field_validator("max_single_trade_pct")
     @classmethod
@@ -135,3 +139,19 @@ class DelegationGrantResponse(BaseModel):
     consent_at: datetime
     expires_at: datetime
     revoked_at: Optional[datetime]
+    privy_policy_id: Optional[str] = None
+    privy_signer_id: Optional[str] = None
+
+
+class DelegationPrepareResponse(BaseModel):
+    """委譲 policy 作成（L1 / prepare）のレスポンス。
+
+    frontend はこの ``privy_signer_id`` / ``privy_policy_id`` を
+    ``addSessionSigners({signers:[{signerId, policyIds:[policyId]}]})`` に渡し、consent 後に
+    ``/delegation/grant`` へ同じ値を返して枠を確定する。
+    """
+
+    privy_policy_id: str
+    privy_signer_id: str
+    chain_name: str
+    expires_at: datetime
