@@ -19,15 +19,20 @@ Pattern: python-async-patterns.md の「Pattern 2: Background Tasks」を適用�
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 from zoneinfo import ZoneInfo
 
 from app.automation.jobs import run_daily_jobs, run_weekly_jobs
 from app.database import SessionLocal
 from app.notifications.schemas import NotificationChannel
+
+if TYPE_CHECKING:
+    from app.automation.oracle_monitor import OracleFeedConfig
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +55,7 @@ REWARD_AUTO_CLAIM_UTC_HOUR = 3  # 03:00 UTC
 
 # 複合リスク監視間隔（秒）
 COMPOUND_RISK_INTERVAL_SECONDS = 600  # 10 分
+ORACLE_MONITOR_INTERVAL_SECONDS = 300  # 5 分（oracle staleness は短周期で監視）
 
 # プール赤字監視間隔（秒）
 # ENABLE_POOL_HEALTH_MONITOR=1 設定時のみ有効（main.py lifespan 配線は human 承認 PR が必要）
@@ -1416,6 +1422,101 @@ async def compound_risk_monitor_loop(
             await asyncio.sleep(600)
 
 
+def _build_oracle_feeds_from_env() -> list["OracleFeedConfig"]:
+    """``ORACLE_MONITOR_FEEDS``(JSON) から監視フィード設定を構築する。
+
+    形式: ``[{"name":"USDC","feed_address":"0x...","rpc_url":"https://..."}, ...]``。
+    未設定 / 不正 JSON / キー欠落は fail-safe で [] / 該当エントリ skip（起動を妨げない・
+    監視は単に行われない）。実 Chainlink feed アドレスは env 注入（コードに焼かない）。
+    """
+    from app.automation.oracle_monitor import OracleFeedConfig  # noqa: PLC0415
+
+    raw = os.getenv("ORACLE_MONITOR_FEEDS", "").strip()
+    if not raw:
+        return []
+    try:
+        items = json.loads(raw)
+    except (ValueError, TypeError):
+        logger.warning("ORACLE_MONITOR_FEEDS is not valid JSON — oracle monitor has no feeds")
+        return []
+    if not isinstance(items, list):
+        logger.warning("ORACLE_MONITOR_FEEDS must be a JSON array — oracle monitor has no feeds")
+        return []
+    feeds: list[OracleFeedConfig] = []
+    for it in items:
+        try:
+            feeds.append(
+                OracleFeedConfig(
+                    name=str(it["name"]),
+                    feed_address=str(it["feed_address"]),
+                    rpc_url=str(it["rpc_url"]),
+                )
+            )
+        except (KeyError, TypeError):
+            logger.warning("ORACLE_MONITOR_FEEDS entry missing name/feed_address/rpc_url — skipped")
+    return feeds
+
+
+async def oracle_monitor_loop(
+    *,
+    interval_seconds: int = ORACLE_MONITOR_INTERVAL_SECONDS,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """Chainlink oracle の staleness / 価格乖離を定期ポーリングし、異常時に
+    ``MonitoringService.activate_emergency_stop`` を発火するループ（OracleMonitor 配線）。
+
+    ``ORACLE_MONITOR_FEEDS`` 未設定（=フィードゼロ）なら起動せず即終了する（dormant）。
+    発火条件は OracleMonitor 既定（oracle 異常 AND HF<1.8、または極端異常で fail-safe）。
+    check_once() は同期（web3 RPC）なので executor で実行しイベントループを塞がない。
+    """
+    from app.automation.oracle_monitor import OracleMonitor  # noqa: PLC0415
+    from app.automation.state import get_monitoring_service  # noqa: PLC0415
+
+    feeds = _build_oracle_feeds_from_env()
+    if not feeds:
+        logger.warning(
+            "oracle_monitor_loop: no feeds configured (ORACLE_MONITOR_FEEDS) — not starting"
+        )
+        return
+
+    monitor = OracleMonitor(get_monitoring_service(), feeds)
+    logger.info(
+        "Starting oracle monitor loop (interval: %ds, feeds: %d)", interval_seconds, len(feeds)
+    )
+    loop = asyncio.get_running_loop()
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+
+            report = await loop.run_in_executor(None, monitor.check_once)
+            logger.info(
+                "oracle_monitor_loop: anomaly=%s, emergency=%s, fetch_failures=%d",
+                report.anomaly_detected,
+                report.emergency_triggered,
+                len(report.fetch_failures),
+            )
+            if report.emergency_triggered:
+                logger.warning(
+                    "oracle_monitor_loop: emergency_stop fired (reasons=%s)",
+                    "; ".join(report.reasons),
+                )
+
+        except asyncio.CancelledError:
+            logger.info("oracle_monitor_loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in oracle monitor loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            await asyncio.sleep(interval_seconds)
+
+
 async def pool_health_check_loop(
     *,
     interval_seconds: int = POOL_HEALTH_CHECK_INTERVAL_SECONDS,
@@ -1598,6 +1699,7 @@ class ScheduledTaskManager:
         self._learning_task: Optional[asyncio.Task[None]] = None
         self._outcome_labeling_task: Optional[asyncio.Task[None]] = None
         self._compound_risk_task: Optional[asyncio.Task[None]] = None
+        self._oracle_monitor_task: Optional[asyncio.Task[None]] = None
         self._monthly_fee_batch_task: Optional[asyncio.Task[None]] = None
         self._monthly_line_report_task: Optional[asyncio.Task[None]] = None
         self._expiry_reminder_task: Optional[asyncio.Task[None]] = None
@@ -1668,6 +1770,11 @@ class ScheduledTaskManager:
     def is_compound_risk_running(self) -> bool:
         """複合リスク監視タスクが動作中かどうか。"""
         return self._compound_risk_task is not None and not self._compound_risk_task.done()
+
+    @property
+    def is_oracle_monitor_running(self) -> bool:
+        """oracle 監視タスクが動作中かどうか。"""
+        return self._oracle_monitor_task is not None and not self._oracle_monitor_task.done()
 
     @property
     def is_monthly_fee_batch_running(self) -> bool:
@@ -2474,6 +2581,48 @@ class ScheduledTaskManager:
 
         self._compound_risk_task = None
         logger.info("Compound risk monitor task stopped")
+
+    async def start_oracle_monitor(
+        self,
+        *,
+        interval_seconds: int = ORACLE_MONITOR_INTERVAL_SECONDS,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """oracle 監視タスクを開始する（フィード未設定なら即終了する dormant ループ）。
+
+        Raises:
+            RuntimeError: 既に開始されている場合
+        """
+        if self.is_oracle_monitor_running:
+            raise RuntimeError("Oracle monitor already running")
+
+        logger.info("Starting oracle monitor task")
+        self._oracle_monitor_task = asyncio.create_task(
+            oracle_monitor_loop(interval_seconds=interval_seconds, on_error=on_error)
+        )
+        logger.info("Oracle monitor task started")
+
+    async def stop_oracle_monitor(self, timeout: float = 5.0) -> None:
+        """oracle 監視タスクを停止する。"""
+        if not self.is_oracle_monitor_running:
+            logger.debug("Oracle monitor not running - nothing to stop")
+            return
+
+        logger.info("Stopping oracle monitor task")
+        assert self._oracle_monitor_task is not None  # noqa: S101
+        self._oracle_monitor_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._oracle_monitor_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Oracle monitor task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning("Oracle monitor task did not stop within %.1fs timeout", timeout)
+        except Exception as exc:
+            logger.error("Error while stopping oracle monitor task: %s", exc)
+
+        self._oracle_monitor_task = None
+        logger.info("Oracle monitor task stopped")
 
     async def start_expiry_reminder(
         self,
