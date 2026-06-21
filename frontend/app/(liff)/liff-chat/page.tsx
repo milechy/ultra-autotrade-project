@@ -370,6 +370,14 @@ export default function LiffChatPage() {
             {aiJudgment ? action : t("home.noSignal")}
           </div>
 
+          {/* 確信度表示。HOLD は「シグナルが弱く様子見」と分かる文言、BUY/SELL は従来表記。 */}
+          {aiJudgment && (
+            <p className="mt-1 text-[#736f7e] text-xs" data-testid="confidence-label">
+              {action === "HOLD"
+                ? t("home.holdWeakSignalLabel", { confidence })
+                : `${confidence}% ${t("home.confidenceLabel")}`}
+            </p>
+          )}
 
           {/* なぜ{action}？理由トグル（aiJudgment がある場合のみ表示） */}
           {aiJudgment && (
