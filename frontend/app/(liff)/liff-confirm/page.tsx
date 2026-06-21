@@ -192,7 +192,7 @@ export default function LiffConfirmPage() {
               {isExpanded && (
                 <div className="px-4 pb-4">
                   {id === "terms_full" ? (
-                    <div className="max-h-52 overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-800/50 p-3 text-zinc-400 text-xs leading-relaxed whitespace-pre-line">
+                    <div className="max-h-52 overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-800 p-3 text-zinc-300 text-xs leading-relaxed whitespace-pre-line">
                       {t(`items.${id}.detail`)}
                     </div>
                   ) : (
