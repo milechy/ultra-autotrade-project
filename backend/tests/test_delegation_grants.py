@@ -257,3 +257,39 @@ class TestDelegationAPI:
         token = register_and_login(client)
         h = {"Authorization": f"Bearer {token}"}
         assert client.post("/api/user/delegation/revoke", headers=h).json() is None
+
+    def test_prepare_dormant_returns_503(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """L1 prepare はフラグ/L0 未設定（既定）で 503・Privy を叩かない。"""
+        monkeypatch.delenv("DELEGATION_PRIVY_POLICY_ENABLED", raising=False)
+        token = register_and_login(client)
+        h = {"Authorization": f"Bearer {token}"}
+        r = client.post("/api/user/delegation/prepare", json=self._VALID, headers=h)
+        assert r.status_code == 503, r.text
+
+    def test_prepare_requires_auth(self, client: TestClient) -> None:
+        assert client.post("/api/user/delegation/prepare", json=self._VALID).status_code == 401
+
+    def test_grant_persists_privy_ids(self, client: TestClient) -> None:
+        """L3: grant に privy_policy_id/privy_signer_id を渡すと保存される。"""
+        token = register_and_login(client)
+        h = {"Authorization": f"Bearer {token}"}
+        payload = dict(self._VALID)
+        payload["privy_policy_id"] = "policy_xyz"
+        payload["privy_signer_id"] = "kq_server_1"
+        r = client.post("/api/user/delegation/grant", json=payload, headers=h)
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data["privy_policy_id"] == "policy_xyz"
+        assert data["privy_signer_id"] == "kq_server_1"
+
+    def test_grant_without_privy_ids_stays_null(self, client: TestClient) -> None:
+        """後方互換: privy id を渡さない既存フローは None のまま。"""
+        token = register_and_login(client)
+        h = {"Authorization": f"Bearer {token}"}
+        r = client.post("/api/user/delegation/grant", json=self._VALID, headers=h)
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data["privy_policy_id"] is None
+        assert data["privy_signer_id"] is None
