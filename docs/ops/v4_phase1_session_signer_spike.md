@@ -79,6 +79,31 @@ Privy signer は permissionless.js(Pimlico) / ZeroDev / Safe / MetaMask Smart Ac
 
 ---
 
+## スパイク結果（2026-06-21 実機実行）: **経路A GO 確定**
+
+dev VPS 上で `@privy-io/node` v0.22.0 を用いた段階プローブ harness（`~/uata-privy-spike-harness/`、本番 merge せず）で実機検証。Privy app "UAT"（Base Sepolia only / smart_wallet_type=`coinbase_smart_wallet` v1.1 / bundler+paymaster=Pimlico）。既存ユーザーには触れず、サーバが新規に専用 wallet を生成して検証。
+
+| 検証 | 結果 | 根拠 |
+|---|---|---|
+| O1: サーバが非カストディアル wallet を委譲署名 | ✅ | `wallets().ethereum().signMessage(walletId, {authorization_context})` 成功（自前 openssl P-256 鍵を owner にした wallet を、その秘密鍵でサーバ署名） |
+| coinbase smart wallet をサーバ生成＋delegated signer | ✅ | `users().create({wallets:[{create_smart_wallet:true, additional_signers:[{signer_id}]}]})` で SCW 生成、EOA signer は `delegated:true` |
+| O2: UserOp 署名メソッド | ✅ | `signUserOperation`（署名のみ）/ 高レベルは `sendCalls`（ERC-5792） |
+| O3+S3: サーバが SCW 経由で組立→署名→broadcast | ✅（gas を除き全通） | `sendCalls(eoaWalletId, {caip2:'eip155:84532', sponsor:true/false, params:{calls:[...]}, authorization_context})` が smart wallet 経由で broadcast 到達。`sponsor:false` 時のみ「insufficient funds for gas（have 0）」= 配線は全成立、testnet gas のみ不足 |
+
+**結論:**
+- **経路A（Privy native session signers）を本実装経路に確定。経路B（ZeroDev Kernel 移行）は不要。**
+- Phase 2-D `auto_executor` は **`sendCalls` 1 呼び出し**で SCW を駆動できる（manual UserOp 組立は不要。Privy がサーバ側で組立～署名～送信を処理）。
+- authorization key は **openssl 自前生成で可**（dashboard "New key" 不要）。形式: 秘密鍵=PKCS8 DER の base64（PEM ヘッダなし）/ 公開鍵=SPKI DER の base64。owner は `owner:{public_key}` で指定。
+- 実 on-chain receipt は未取得（testnet gas 入手の物流のみ。feasibility 判定には不要なため (A) で完了）。本番 v4 の paymaster sponsor は別途インフラ（Pimlico paymaster 設定済 + クライアント経路）で確認する。
+- サーバ wallet API の `sponsor:true` は `Gas sponsorship is not enabled` を返す（クライアント smart wallet SDK が使う paymaster とは別系統）。本番では SCW を gas で賄うか、別途 gas sponsorship 設定が要る点に留意。
+
+### Phase 2-D 実装メモ（この spike からの確定事項）
+- 署名駆動 API: `privy.wallets().ethereum().sendCalls(eoaWalletId, {caip2, params:{calls:[{to,value,data}]}, authorization_context:{authorization_private_keys:[<P256 PKCS8 b64>]}})`。
+- policy（被害上限の TEE enforce）は `policies().create` + wallet/signer への attach（`policy_ids`）。S2/S4 は本実装時に併せて検証。
+- 委譲枠（`delegation_grants`）→ Privy policy 写像 + `privy_policy_id`/`privy_signer_id` 保存（0-C 既設）。
+
+---
+
 ## 必要な環境・認証情報（小林さん側で準備が必要）
 
 - staging-v4 の **Privy app** dashboard アクセス（session signers 有効化 / authorization key 登録）。
