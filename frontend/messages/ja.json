@@ -922,6 +922,12 @@
         "corpFiscalMonthUnit": "{month}月",
         "corpCsvPendingTitle": "法人向け CSV は準備中です",
         "corpCsvPendingDesc": "freee / 弥生 形式の仕訳 CSV は、税理士監修の会計マッピング適用後に提供します。決算月の設定は保存済みです。",
+        "monthLabel": "対象月",
+        "monthUnit": "{month}月",
+        "monthlyReportLabel": "月次レポート",
+        "monthlyReportDesc": "運用サマリー（PDF / CSV）",
+        "monthlyReportLoading": "レポートを生成しています...",
+        "monthlyReportError": "レポートのダウンロードに失敗しました",
         "cryptactNote": "CSV ファイルは Cryptact（暗号資産税務ソフト）で直接インポートできます。",
         "loadError": "設定の読み込みに失敗しました"
       },

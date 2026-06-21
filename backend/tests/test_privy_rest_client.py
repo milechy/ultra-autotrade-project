@@ -147,6 +147,37 @@ def test_send_calls_request_shape() -> None:
     assert "privy-authorization-signature" in captured["headers"]
 
 
+def test_create_key_quorum_basic_auth_only() -> None:
+    """key quorum 作成は Basic auth のみ・authorization-signature を付けない（L0）。"""
+    captured: dict = {}
+    c = _client()
+    with _patch_httpx(captured, _FakeResp(200, {"id": "kq_123"})):
+        out = c.create_key_quorum(public_keys=["PUBKEY_SPKI_B64"], display_name="srv")
+    assert out == {"id": "kq_123"}
+    assert captured["url"] == "https://api.privy.io/v1/key_quorums"
+    assert captured["json"]["public_keys"] == ["PUBKEY_SPKI_B64"]
+    assert captured["json"]["authorization_threshold"] == 1
+    assert captured["json"]["display_name"] == "srv"
+    assert captured["auth"] == ("app123", "secret123")
+    assert "privy-authorization-signature" not in captured["headers"]
+    assert "privy-request-expiry" not in captured["headers"]
+
+
+def test_create_key_quorum_empty_keys_raises() -> None:
+    c = _client()
+    with pytest.raises(ValueError):
+        c.create_key_quorum(public_keys=[])
+
+
+def test_create_key_quorum_omits_display_name_when_absent() -> None:
+    captured: dict = {}
+    c = _client()
+    with _patch_httpx(captured, _FakeResp(200, {"id": "kq_1"})):
+        c.create_key_quorum(public_keys=["PK"], authorization_threshold=2)
+    assert "display_name" not in captured["json"]
+    assert captured["json"]["authorization_threshold"] == 2
+
+
 def test_non_2xx_raises_privy_rest_error() -> None:
     captured: dict = {}
     c = _client()

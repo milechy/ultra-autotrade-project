@@ -153,12 +153,14 @@ def _generate_pdf(data: MonthlyReportData) -> bytes:
     story.append(Spacer(1, 12))
 
     # 概要テーブル
+    # 注: positive_results / win_rate は status=="executed" の件数・割合であり、
+    # 「利益が出た件数・勝率」ではない。誤解を避けるため「実行回数」「実行率」と表示する。
     table_data = [
         ["項目", "値"],
         ["対象期間", data.period],
         ["提案回数", f"{data.total_proposals:,} 回"],
-        ["プラス結果", f"{data.positive_results:,} 回"],
-        ["勝率", f"{data.win_rate:.1f} %"],
+        ["実行回数", f"{data.positive_results:,} 回"],
+        ["実行率", f"{data.win_rate:.1f} %"],
         ["累計損益", _fmt_yen(data.total_gain_jpy)],
         ["平均損益 / 回", _fmt_yen(data.avg_gain_per_trade_jpy)],
         ["手数料合計", _fmt_yen(data.total_fees_jpy)],
@@ -207,8 +209,9 @@ def _generate_csv(data: MonthlyReportData) -> bytes:
     writer.writerow(["項目", "値"])
     writer.writerow(["対象期間", data.period])
     writer.writerow(["提案回数", f"{data.total_proposals:,} 回"])
-    writer.writerow(["プラス結果", f"{data.positive_results:,} 回"])
-    writer.writerow(["勝率", f"{data.win_rate:.1f} %"])
+    # 実行回数 / 実行率: status=="executed" の件数・割合（利益ベースではない）
+    writer.writerow(["実行回数", f"{data.positive_results:,} 回"])
+    writer.writerow(["実行率", f"{data.win_rate:.1f} %"])
     writer.writerow(["累計損益", _fmt_yen(data.total_gain_jpy)])
     writer.writerow(["平均損益 / 回", _fmt_yen(data.avg_gain_per_trade_jpy)])
     writer.writerow(["手数料合計", _fmt_yen(data.total_fees_jpy)])
