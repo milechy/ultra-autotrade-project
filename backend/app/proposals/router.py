@@ -8,7 +8,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -25,6 +25,7 @@ from app.auth.models import User, UserRole
 from app.auth.models import User as UserModel
 from app.database import get_db
 from app.policy.engine import PolicyContext, get_policy_engine
+from app.users.models import DelegationGrant, get_active_grant
 
 from .models import Proposal
 from .schemas import (
@@ -272,6 +273,69 @@ def _daily_traded_usd_for_user(
     return Decimal(str(raw)) if raw is not None else Decimal("0")
 
 
+def _resolve_privy_wallet_id(user: Optional[UserModel]) -> str:
+    """委譲(SCW)送信に使う Privy **内部 wallet ID** を解決する（アドレスではない）。
+
+    dev/shadow フェーズは env ``PRIVY_DELEGATED_WALLET_ID`` の単一 wallet（spike の
+    ``SPIKE_SW_EOA_WALLET_ID`` を写す運用）。将来マルチユーザー本番化で per-user 列が入れば
+    そちらを優先する（現状 users に privy_wallet_id 列は無い）。
+    """
+    pid = getattr(user, "privy_wallet_id", None)
+    if pid:
+        return str(pid)
+    return os.getenv("PRIVY_DELEGATED_WALLET_ID", "")
+
+
+def _should_use_scw_route(proposal: Proposal, grant: Optional[DelegationGrant]) -> bool:
+    """委譲(SCW)経路で執行するか（dormant 既定 False）。
+
+    True 条件: delegation policy 有効（フラグ+L0 signer+creds）かつ 有効 grant に
+    privy_signer_id/privy_policy_id があり、operation が SUPPLY のとき。
+    出金(WITHDRAW)は委譲対象外＝常に custodial(本人署名)維持。
+    """
+    if proposal.operation != "SUPPLY":
+        return False
+    from app.privy.delegation_service import is_delegation_policy_enabled  # noqa: PLC0415
+
+    if not is_delegation_policy_enabled():
+        return False
+    if grant is None:
+        return False
+    return bool(grant.privy_signer_id and grant.privy_policy_id)
+
+
+def _execute_supply_via_scw(
+    proposal: Proposal, chain: str, grant: DelegationGrant, user: Optional[UserModel], db: Session
+) -> Any:
+    """委譲(SCW)経路で SUPPLY を執行し、custodial 互換の result(tx_hash/status) を返す。
+
+    HARD_STOP / risk_limiter / Rule8 は呼び出し元が執行直前に通過済み（本関数は通さない）。
+    amount は custodial 経路と同じく proposal.amount_usd を token 単位として渡す（既存挙動踏襲）。
+    """
+    from app.aave.service import MultiChainAaveService  # noqa: PLC0415
+    from app.proposals.scw_executor import (  # noqa: PLC0415
+        build_supply_calls,
+        execute_calls_via_scw,
+    )
+
+    scw_address = grant.wallet_address or (user.smart_wallet_address if user else None)
+    if not scw_address:
+        raise ValueError("SCW route requires a smart wallet address (grant/user)")
+    privy_wallet_id = _resolve_privy_wallet_id(user)
+
+    client = MultiChainAaveService().get_service(chain).client
+    deposit_txs = client.build_deposit_txs(
+        proposal.asset, Decimal(str(proposal.amount_usd)), wallet_address=scw_address
+    )
+    calls = build_supply_calls(deposit_txs)
+    return execute_calls_via_scw(
+        privy_wallet_id=privy_wallet_id,
+        chain_name=chain,
+        calls=calls,
+        idempotency_key=f"proposal-{proposal.id}",
+    )
+
+
 def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
     """
     承認された提案に対して Aave 操作を実行し、proposal を更新する。
@@ -426,15 +490,25 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
         return
 
     try:
-        multi_service = MultiChainAaveService()
-        result = multi_service.execute_rebalance(
-            chain_name=chain,
-            action=trade_action,
-            amount=Decimal(str(proposal.amount_usd)),
-            asset_symbol=proposal.asset,
-            dry_run=False,
-            wallet_address=_wallet_address,
-        )
+        # 委譲(SCW)経路（2-D-C.2・dormant）: delegation policy 有効 かつ 当該ユーザーに
+        # privy_signer_id/policy_id 付き有効 grant がある SUPPLY のみ SCW 経由で執行する。
+        # それ以外（本番現状＝フラグ未設定）は従来の custodial EOA 直署名経路で挙動不変。
+        _grant = get_active_grant(proposal.user_id, db)
+        if _grant is not None and _should_use_scw_route(proposal, _grant):
+            logger.info(
+                "proposal %d: routing via delegated SCW path (policy_id present)", proposal.id
+            )
+            result = _execute_supply_via_scw(proposal, chain, _grant, _user, db)
+        else:
+            multi_service = MultiChainAaveService()
+            result = multi_service.execute_rebalance(
+                chain_name=chain,
+                action=trade_action,
+                amount=Decimal(str(proposal.amount_usd)),
+                asset_symbol=proposal.asset,
+                dry_run=False,
+                wallet_address=_wallet_address,
+            )
 
         # 成功: attempt カウントも記録（診断用）
         proposal.execution_attempts += 1
