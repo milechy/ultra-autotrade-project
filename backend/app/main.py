@@ -635,6 +635,17 @@ def create_app() -> FastAPI:
             except BaseException as exc:
                 logger.error("Failed to start loop %s: %s", name, exc)
 
+        # --- oracle 監視 (opt-in: ENABLE_ORACLE_MONITOR=1, フィードは ORACLE_MONITOR_FEEDS) ---
+        # 異常検知時に emergency_stop を自動発火するため既定 OFF。ON かつフィード設定時のみ稼働。
+        if os.getenv("ENABLE_ORACLE_MONITOR", "false").lower() in ("1", "true", "yes"):
+            try:
+                await scheduled_manager.start_oracle_monitor(
+                    on_error=_make_scheduler_error_handler("oracle_monitor_loop"),
+                )
+                logger.info("Oracle monitor scheduled (ENABLE_ORACLE_MONITOR=on)")
+            except BaseException as exc:
+                logger.error("Failed to start oracle monitor: %s", exc)
+
         # --- 月次手数料バッチ (opt-in: ENABLE_MONTHLY_FEE_BATCH=1) ---
         if os.getenv("ENABLE_MONTHLY_FEE_BATCH", "0") == "1":
             try:

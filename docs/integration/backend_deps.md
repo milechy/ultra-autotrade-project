@@ -114,6 +114,17 @@
 
 ## backend/app/main.py
 
+### 変更 #16: OracleMonitor を scheduler に配線（flag-gated / 接続監査 #3）(PR #834 / 2026-06-22)
+- **コミット範囲**: `feat/oracle-monitor-wiring`
+- **変更内容**: `startup_scheduled_tasks` に oracle 監視の起動分岐を追加（11 行）。
+  `ENABLE_ORACLE_MONITOR`（既定 false）が有効かつ `ORACLE_MONITOR_FEEDS` 設定時のみ
+  `scheduled_manager.start_oracle_monitor(...)` を起動。未設定時は info ログのみ。
+- **理由**: 接続監査 #3 — 既存実装済みの OracleMonitor が scheduler に未配線（孤立コード）だった。
+  異常検知時に emergency_stop を自動発火するため既定 OFF の opt-in で安全側に配線する。
+- **影響範囲**: フラグ既定 OFF のため既存挙動に影響なし。ON かつフィード設定時のみ
+  oracle_monitor_loop が起動。他 startup task への影響なし。
+- **承認**: feat/oracle-monitor-wiring → main (PR #834)
+
 ### 変更 #15: process_news_loop 起動を NEWS_AUTO_EXECUTE_ENABLED でガード (PR #814 / 2026-06-19)
 - **コミット範囲**: `fix/cex-auto-execute-disable`
 - **変更内容**: `process_news_loop` の `asyncio.create_task` 起動を
