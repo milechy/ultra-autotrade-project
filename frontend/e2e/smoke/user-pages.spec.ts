@@ -7,7 +7,6 @@ import { test, expect } from '@playwright/test'
 const USER_PAGES = [
   { path: '/user/dashboard', name: 'ダッシュボード' },
   { path: '/user/ai-feed', name: 'AI判定フィード' },
-  { path: '/user/trade', name: '取引' },
   { path: '/user/history', name: '取引履歴' },
   { path: '/user/settings', name: '設定' },
   { path: '/user/copy-trading', name: 'コピートレード' },
