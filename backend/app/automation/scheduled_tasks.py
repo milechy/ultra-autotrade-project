@@ -1422,18 +1422,14 @@ async def compound_risk_monitor_loop(
             await asyncio.sleep(600)
 
 
-def _build_oracle_feeds_from_env() -> list["OracleFeedConfig"]:
-    """``ORACLE_MONITOR_FEEDS``(JSON) から監視フィード設定を構築する。
+def _parse_oracle_monitor_feeds(raw: str) -> list["OracleFeedConfig"]:
+    """``ORACLE_MONITOR_FEEDS``(JSON) を解析する。
 
     形式: ``[{"name":"USDC","feed_address":"0x...","rpc_url":"https://..."}, ...]``。
-    未設定 / 不正 JSON / キー欠落は fail-safe で [] / 該当エントリ skip（起動を妨げない・
-    監視は単に行われない）。実 Chainlink feed アドレスは env 注入（コードに焼かない）。
+    不正 JSON / 非 list / キー欠落は fail-safe（[] / 該当エントリ skip）。
     """
     from app.automation.oracle_monitor import OracleFeedConfig  # noqa: PLC0415
 
-    raw = os.getenv("ORACLE_MONITOR_FEEDS", "").strip()
-    if not raw:
-        return []
     try:
         items = json.loads(raw)
     except (ValueError, TypeError):
@@ -1455,6 +1451,59 @@ def _build_oracle_feeds_from_env() -> list["OracleFeedConfig"]:
         except (KeyError, TypeError):
             logger.warning("ORACLE_MONITOR_FEEDS entry missing name/feed_address/rpc_url — skipped")
     return feeds
+
+
+def _feeds_from_aave_oracle_assets(raw: str) -> list["OracleFeedConfig"]:
+    """既存 ``AAVE_ORACLE_ASSETS_JSON``（oracle_checker と共有の真実源）から feed を導出する。
+
+    形式: ``[{"asset":"USDC","chainlink_feed":"0x...","rpc_url":"https://...", ...}, ...]``。
+    ``chainlink_feed`` と ``rpc_url`` が揃うエントリのみ採用（無いものは monitor 対象外）。
+    監視と per-tx HARD_STOP で feed アドレスを二重管理しないための単一ソース化（drift 防止）。
+    """
+    from app.automation.oracle_monitor import OracleFeedConfig  # noqa: PLC0415
+
+    try:
+        items = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(items, list):
+        return []
+    feeds: list[OracleFeedConfig] = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        feed_addr = it.get("chainlink_feed")
+        rpc_url = it.get("rpc_url")
+        asset = it.get("asset")
+        if feed_addr and rpc_url and asset:
+            feeds.append(
+                OracleFeedConfig(name=str(asset), feed_address=str(feed_addr), rpc_url=str(rpc_url))
+            )
+    return feeds
+
+
+def _build_oracle_feeds_from_env() -> list["OracleFeedConfig"]:
+    """監視フィード設定を構築する（fail-safe で [] を返し起動を妨げない）。
+
+    解決順:
+      1. ``ORACLE_MONITOR_FEEDS``（明示指定・monitor 専用上書き）
+      2. ``AAVE_ORACLE_ASSETS_JSON``（既存 oracle_checker と共有・**単一ソース推奨**）
+
+    feed アドレスを 2 箇所で二重管理しないため、通常は既存 ``AAVE_ORACLE_ASSETS_JSON`` を
+    そのまま再利用し、ON は ``ENABLE_ORACLE_MONITOR=1`` だけで済むようにする。
+    """
+    explicit = os.getenv("ORACLE_MONITOR_FEEDS", "").strip()
+    if explicit:
+        return _parse_oracle_monitor_feeds(explicit)
+    shared = os.getenv("AAVE_ORACLE_ASSETS_JSON", "").strip()
+    if shared:
+        feeds = _feeds_from_aave_oracle_assets(shared)
+        if feeds:
+            logger.info(
+                "oracle monitor feeds derived from AAVE_ORACLE_ASSETS_JSON (%d feeds)", len(feeds)
+            )
+        return feeds
+    return []
 
 
 async def oracle_monitor_loop(

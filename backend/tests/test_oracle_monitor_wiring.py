@@ -40,6 +40,7 @@ def test_build_feeds_empty_env(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.automation.scheduled_tasks import _build_oracle_feeds_from_env
 
     monkeypatch.delenv("ORACLE_MONITOR_FEEDS", raising=False)
+    monkeypatch.delenv("AAVE_ORACLE_ASSETS_JSON", raising=False)
     assert _build_oracle_feeds_from_env() == []
 
 
@@ -71,6 +72,50 @@ def test_build_feeds_skips_missing_keys(monkeypatch: pytest.MonkeyPatch) -> None
     )
     feeds = _build_oracle_feeds_from_env()
     assert [f.name for f in feeds] == ["ok"]
+
+
+def test_build_feeds_falls_back_to_aave_oracle_assets(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ORACLE_MONITOR_FEEDS 未設定なら AAVE_ORACLE_ASSETS_JSON を再利用する（単一ソース）。"""
+    from app.automation.scheduled_tasks import _build_oracle_feeds_from_env
+
+    monkeypatch.delenv("ORACLE_MONITOR_FEEDS", raising=False)
+    monkeypatch.setenv(
+        "AAVE_ORACLE_ASSETS_JSON",
+        json.dumps(
+            [
+                {"asset": "USDC", "chainlink_feed": "0xfeed1", "rpc_url": "https://rpc"},
+                {"asset": "WETH", "chainlink_feed": "0xfeed2", "rpc_url": "https://rpc"},
+                {"asset": "NOFEED", "rpc_url": "https://rpc"},  # chainlink_feed 欠落 → 除外
+            ]
+        ),
+    )
+    feeds = _build_oracle_feeds_from_env()
+    assert [f.name for f in feeds] == ["USDC", "WETH"]
+    assert feeds[0].feed_address == "0xfeed1"
+
+
+def test_explicit_feeds_take_precedence(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ORACLE_MONITOR_FEEDS があれば AAVE_ORACLE_ASSETS_JSON より優先。"""
+    from app.automation.scheduled_tasks import _build_oracle_feeds_from_env
+
+    monkeypatch.setenv(
+        "ORACLE_MONITOR_FEEDS",
+        json.dumps([{"name": "OVERRIDE", "feed_address": "0xover", "rpc_url": "u"}]),
+    )
+    monkeypatch.setenv(
+        "AAVE_ORACLE_ASSETS_JSON",
+        json.dumps([{"asset": "USDC", "chainlink_feed": "0xfeed1", "rpc_url": "u"}]),
+    )
+    feeds = _build_oracle_feeds_from_env()
+    assert [f.name for f in feeds] == ["OVERRIDE"]
+
+
+def test_build_feeds_both_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.automation.scheduled_tasks import _build_oracle_feeds_from_env
+
+    monkeypatch.delenv("ORACLE_MONITOR_FEEDS", raising=False)
+    monkeypatch.delenv("AAVE_ORACLE_ASSETS_JSON", raising=False)
+    assert _build_oracle_feeds_from_env() == []
 
 
 # ---- oracle_monitor_loop ----
