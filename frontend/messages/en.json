@@ -922,6 +922,12 @@
         "corpFiscalMonthUnit": "Month {month}",
         "corpCsvPendingTitle": "Corporate CSV coming soon",
         "corpCsvPendingDesc": "freee / Yayoi format CSV will be available after accountant-reviewed mapping is applied. Your fiscal month is saved.",
+        "monthLabel": "Target month",
+        "monthUnit": "Month {month}",
+        "monthlyReportLabel": "Monthly report",
+        "monthlyReportDesc": "Performance summary (PDF / CSV)",
+        "monthlyReportLoading": "Generating report...",
+        "monthlyReportError": "Failed to download report",
         "cryptactNote": "CSV files can be directly imported into Cryptact tax software.",
         "loadError": "Failed to load settings"
       },
