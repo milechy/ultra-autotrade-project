@@ -251,6 +251,27 @@ def _record_failed_transaction(
     db.add(tx)
 
 
+def _daily_traded_usd_for_user(
+    user_id: int, db: Session, exclude_proposal_id: Optional[int] = None
+) -> Decimal:
+    """当日(UTC)に approved/executed になった当該ユーザーの提案額合計(USD)。
+
+    risk_limiter %クランプ / HARD_STOP の日次%判定の分母加算に使う。
+    PolicyEngine._check_velocity と同じ集計条件(approved/executed・当日・自分以外)を踏襲する。
+    """
+    now = datetime.now(timezone.utc)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    stmt = select(func.sum(Proposal.amount_usd)).where(
+        Proposal.user_id == user_id,
+        Proposal.status.in_(["approved", "executed"]),
+        Proposal.approved_at >= day_start,
+    )
+    if exclude_proposal_id is not None:
+        stmt = stmt.where(Proposal.id != exclude_proposal_id)
+    raw = db.scalar(stmt)
+    return Decimal(str(raw)) if raw is not None else Decimal("0")
+
+
 def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
     """
     承認された提案に対して Aave 操作を実行し、proposal を更新する。
@@ -361,7 +382,20 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
     except Exception as _hf_exc:  # noqa: BLE001
         logger.warning("proposal %d: HF fetch for safety gate failed: %s", proposal.id, _hf_exc)
 
-    _hard_stop = evaluate_hard_stop(get_monitoring_service(), _hf_for_gate)
+    # 日次既執行額（HARD_STOP 日次%判定 / risk_limiter %クランプの分母加算用）。
+    _daily_traded = _daily_traded_usd_for_user(
+        proposal.user_id, db, exclude_proposal_id=proposal.id
+    )
+    # per-user 総資産の取得元は未実装（Phase 2-D 後続 sub-task）。None の間は %判定をスキップし、
+    # PolicyEngine 絶対額上限 +（後続スライスの）Privy policy で担保する（fail-safe）。
+    _total_assets: Optional[Decimal] = None
+
+    _hard_stop = evaluate_hard_stop(
+        get_monitoring_service(),
+        _hf_for_gate,
+        daily_traded_usd=_daily_traded,
+        total_assets_usd=_total_assets,
+    )
     if _hard_stop.blocked:
         logger.warning(
             "proposal %d: execution HELD by safety gate (source=%s, reason=%s) — "
@@ -369,6 +403,25 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
             proposal.id,
             _hard_stop.source,
             _hard_stop.reason,
+        )
+        return
+
+    # risk_limiter %クランプ（スライス2-D-A）: 単一/日次% と HF をハード上限に対し執行直前に再検査。
+    # 違反は HARD_STOP と同様 transient 扱いで 'approved' 据え置き（条件変化後に再執行可能）。
+    from app.aave.risk_limiter import check_trade_within_limits  # noqa: PLC0415
+
+    _limit_violation = check_trade_within_limits(
+        amount_usd=Decimal(str(proposal.amount_usd)),
+        total_assets_usd=_total_assets,
+        daily_traded_usd=_daily_traded,
+        hf=_hf_for_gate,
+    )
+    if _limit_violation is not None:
+        logger.warning(
+            "proposal %d: execution HELD by risk_limiter (%s) — "
+            "status remains 'approved' for retry after condition clears",
+            proposal.id,
+            _limit_violation,
         )
         return
 
@@ -695,6 +748,9 @@ def approve_proposal(
             detail=f"Cannot approve proposal with status '{proposal.status}'",
         )
 
+    # AUTO 執行フラグは PolicyContext (Rule8: AUTO 執行は有効委譲枠必須) より前に評価する。
+    auto_execution_enabled = os.getenv("AUTO_EXECUTION_ENABLED", "false").lower() == "true"
+
     # Step 1: PolicyEngine hard rule 検算（承認前に必ず通す）
     ctx = PolicyContext(
         user_id=proposal.user_id,
@@ -705,6 +761,7 @@ def approve_proposal(
         if proposal.expected_hf_after is not None
         else None,
         proposal_id=proposal.id,
+        is_auto_execution=auto_execution_enabled,
     )
     policy_result = get_policy_engine().check(ctx, db)
     if policy_result.blocked:
@@ -725,7 +782,7 @@ def approve_proposal(
     # Step 2: Aave 自動実行 (AUTO_EXECUTION_ENABLED=true の場合のみ)
     # non-custodial 方式2 では default=false。partner 手動署名 (submit_partner_tx) のみが実 tx を立てる。
     # AAVE_WALLET_PRIVATE_KEY が署名する経路はこのフラグで完全に無効化される。
-    auto_execution_enabled = os.getenv("AUTO_EXECUTION_ENABLED", "false").lower() == "true"
+    # （auto_execution_enabled は上の PolicyContext 構築前に評価済み）
     if auto_execution_enabled:
         from .execution_route import RouteMismatchError  # noqa: PLC0415
 

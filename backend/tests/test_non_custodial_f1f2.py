@@ -90,6 +90,38 @@ def create_proposal(client: TestClient, token: str) -> int:
     return r.json()["id"]
 
 
+def _create_active_grant(engine: object, user_id: int = 1) -> None:
+    """AUTO 執行に必須の有効委譲枠を作る（PolicyEngine Rule8 / スライス2-D-A）。
+
+    AUTO_EXECUTION_ENABLED=true の承認は有効な delegation grant が無いと
+    fail-closed で 422 拒否される。
+    """
+    from datetime import datetime, timedelta, timezone  # noqa: PLC0415
+    from decimal import Decimal  # noqa: PLC0415
+
+    from sqlalchemy.orm import Session  # noqa: PLC0415
+
+    from app.users.models import DelegationGrant  # noqa: PLC0415
+
+    now = datetime.now(timezone.utc)
+    with Session(engine) as db:  # type: ignore[arg-type]
+        db.add(
+            DelegationGrant(
+                user_id=user_id,
+                wallet_address="0x" + "a" * 40,
+                status="active",
+                max_single_trade_pct=Decimal("10"),
+                max_daily_trade_pct=Decimal("30"),
+                hf_floor=Decimal("1.6"),
+                allowed_protocols=["aave"],
+                allowed_assets=["USDC"],
+                consent_at=now,
+                expires_at=now + timedelta(days=30),
+            )
+        )
+        db.commit()
+
+
 # ---------------------------------------------------------------------------
 # F1: AUTO_EXECUTION_ENABLED feature flag
 # ---------------------------------------------------------------------------
@@ -129,9 +161,13 @@ class TestF1AutoExecutionFlag:
         assert r.status_code == 200
         assert r.json()["status"] == "approved"
 
-    def test_approve_with_flag_true_attempts_aave_execution(self, client: TestClient) -> None:
+    def test_approve_with_flag_true_attempts_aave_execution(
+        self, client: TestClient, test_db
+    ) -> None:
         """AUTO_EXECUTION_ENABLED=true では Aave 実行を試みる (RPC 未設定で failed になる)。"""
+        _override, engine = test_db
         token = get_admin_token(client)
+        _create_active_grant(engine, user_id=1)  # Rule8: AUTO は有効委譲枠必須
         proposal_id = create_proposal(client, token)
 
         with patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}):
