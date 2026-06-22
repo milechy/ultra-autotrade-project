@@ -20,6 +20,7 @@ import { RewardsCard } from '@/components/dashboard/RewardsCard'
 import { IdleYieldCard } from '@/components/dashboard/IdleYieldCard'
 import { StressTestCard } from '@/components/dashboard/StressTestCard'
 import { UnifiedPortfolioCard } from '@/components/dashboard/UnifiedPortfolioCard'
+import { OptimizerCard } from '@/components/strategies/OptimizerCard'
 
 // Note: PortfolioSummary, SafetyScore, AiAccuracyCard are used by ActiveDashboard only
 
@@ -258,6 +259,11 @@ function ManagedDashboard({ isAdmin }: { isAdmin: boolean }) {
       <section>
         <StressTestCard />
       </section>
+
+      {/* AI Optimizer 戦略推奨（監査 G1） */}
+      <section>
+        <OptimizerCard />
+      </section>
     </div>
   )
 }
@@ -326,6 +332,11 @@ function ActiveDashboard({ isAdmin }: { isAdmin: boolean }) {
       {/* 清算リスク事前計算（ストレステスト） */}
       <section>
         <StressTestCard />
+      </section>
+
+      {/* AI Optimizer 戦略推奨（監査 G1） */}
+      <section>
+        <OptimizerCard />
       </section>
 
       {/* Disclaimer */}
