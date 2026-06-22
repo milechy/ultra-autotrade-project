@@ -438,3 +438,51 @@ class TestRegistrationWithInvitation:
             },
         )
         assert resp.status_code == 403
+
+
+# ────────────────────────────────────────────────────────────────
+# GET /api/invitations/{code} 事前検証エンドポイント（監査 G4）
+# ────────────────────────────────────────────────────────────────
+
+
+class TestInvitationValidateEndpoint:
+    """公開（認証不要）の招待コード事前検証 GET エンドポイント。"""
+
+    def test_valid_code_returns_valid_true(self, client: TestClient, test_db) -> None:
+        """有効コードは valid=True と付随情報を返す（認証不要）。"""
+        override_get_db, _ = test_db
+        db: Session = next(override_get_db())
+        try:
+            inv = invitation_service.create_invitation(db, partner_id=7, expires_at=_future())
+            code = inv.code
+        finally:
+            db.close()
+
+        resp = client.get(f"/api/invitations/{code}")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["valid"] is True
+        assert body["partner_id"] == 7
+        assert body["uses_remaining"] == 1
+
+    def test_unknown_code_returns_valid_false(self, client: TestClient) -> None:
+        """存在しないコードは 200 + valid=False（enumeration 対策で付随情報なし）。"""
+        resp = client.get("/api/invitations/NONEXISTENTCODE0")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["valid"] is False
+        assert body["partner_id"] is None
+
+    def test_expired_code_returns_valid_false(self, client: TestClient, test_db) -> None:
+        """期限切れコードは 200 + valid=False。"""
+        override_get_db, _ = test_db
+        db: Session = next(override_get_db())
+        try:
+            inv = invitation_service.create_invitation(db, partner_id=1, expires_at=_past())
+            code = inv.code
+        finally:
+            db.close()
+
+        resp = client.get(f"/api/invitations/{code}")
+        assert resp.status_code == 200
+        assert resp.json()["valid"] is False
