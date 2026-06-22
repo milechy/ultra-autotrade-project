@@ -42,63 +42,8 @@ interface ReportDetail {
   created_at: string;
 }
 
-// ── Mock Data ──────────────────────────────────────────────────────────────
-// (note strings resolved at render time via t() — see buildMockReports())
-
-const MOCK_REPORT_TEMPLATES = [
-  {
-    id: "rpt-001",
-    period_type: "daily" as const,
-    period_start: "2026-03-21T00:00:00+09:00",
-    period_end: "2026-03-21T23:59:59+09:00",
-    event_counts: { INFO: 42, WARNING: 3, ALERT: 1, CRITICAL: 0, EMERGENCY: 0 },
-    hf_min: 1.72,
-    hf_max: 2.15,
-    hf_last: 2.01,
-    emergency_occurred: false,
-    noteKey: "mockNote1" as const,
-    metric_aggregates: [
-      { metric_id: "health_factor", count: 288, min_value: 1.72, max_value: 2.15, avg_value: 1.94, unit: null },
-      { metric_id: "usdc_balance", count: 288, min_value: 9800.0, max_value: 10200.0, avg_value: 10020.5, unit: "USDC" },
-    ],
-    created_at: "2026-03-22T00:05:00+09:00",
-  },
-  {
-    id: "rpt-002",
-    period_type: "daily" as const,
-    period_start: "2026-03-20T00:00:00+09:00",
-    period_end: "2026-03-20T23:59:59+09:00",
-    event_counts: { INFO: 38, WARNING: 8, ALERT: 4, CRITICAL: 2, EMERGENCY: 1 },
-    hf_min: 1.48,
-    hf_max: 1.98,
-    hf_last: 1.71,
-    emergency_occurred: true,
-    noteKey: "mockNote2" as const,
-    metric_aggregates: [
-      { metric_id: "health_factor", count: 288, min_value: 1.48, max_value: 1.98, avg_value: 1.68, unit: null },
-      { metric_id: "usdc_balance", count: 288, min_value: 9200.0, max_value: 10100.0, avg_value: 9710.3, unit: "USDC" },
-      { metric_id: "aave_borrow_usd", count: 288, min_value: 4500.0, max_value: 5100.0, avg_value: 4820.0, unit: "USD" },
-    ],
-    created_at: "2026-03-21T00:05:00+09:00",
-  },
-  {
-    id: "rpt-003",
-    period_type: "weekly" as const,
-    period_start: "2026-03-14T00:00:00+09:00",
-    period_end: "2026-03-20T23:59:59+09:00",
-    event_counts: { INFO: 310, WARNING: 21, ALERT: 7, CRITICAL: 2, EMERGENCY: 1 },
-    hf_min: 1.48,
-    hf_max: 2.31,
-    hf_last: 1.71,
-    emergency_occurred: true,
-    noteKey: "mockNote3" as const,
-    metric_aggregates: [
-      { metric_id: "health_factor", count: 2016, min_value: 1.48, max_value: 2.31, avg_value: 1.92, unit: null },
-      { metric_id: "usdc_balance", count: 2016, min_value: 9200.0, max_value: 10500.0, avg_value: 10045.8, unit: "USDC" },
-    ],
-    created_at: "2026-03-21T01:00:00+09:00",
-  },
-];
+// NOTE: monitoring レポート（event/metric 集計）の backend は未実装のため、mock データの
+// フォールバック表示は撤去した（実データに見える偽装を解消・2026-06-22 監査 G2）。
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -412,11 +357,6 @@ function ReportViewerContent() {
   const [generating, setGenerating] = React.useState(false);
   const [toast, setToast] = React.useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  const mockReports: ReportDetail[] = MOCK_REPORT_TEMPLATES.map((tmpl) => ({
-    ...tmpl,
-    notes: t(tmpl.noteKey),
-  }));
-
   const loadReports = React.useCallback(async () => {
     setLoading(true);
     setFetchError(null);
@@ -425,8 +365,8 @@ function ReportViewerContent() {
       const data = await getJson<ReportDetail[]>("/api/reports", init);
       setReports(data);
     } catch {
-      // Fallback to mock data
-      setReports(mockReports);
+      // backend 未実装/取得失敗時は mock を出さず、空 + エラー通知で正直に表示する。
+      setReports([]);
       setFetchError(t("fetchError"));
     } finally {
       setLoading(false);
@@ -484,13 +424,15 @@ function ReportViewerContent() {
             {loading ? t("loadingButton") : t("refreshButton")}
           </button>
           {isAdmin && (
+            // monitoring レポート生成 backend は未実装のため disabled（押下時 404 だった偽機能を解消）。
             <button
-              onClick={() => setShowConfirm(true)}
-              disabled={loading || generating}
+              type="button"
+              disabled
+              title={t("generateUnavailable")}
               style={{
                 padding: "7px 16px", borderRadius: 8, border: "none",
-                background: "#2563eb", color: "#fff",
-                cursor: loading || generating ? "not-allowed" : "pointer",
+                background: "#9ca3af", color: "#fff",
+                cursor: "not-allowed", opacity: 0.7,
                 fontSize: 13, fontWeight: 600,
               }}
             >
