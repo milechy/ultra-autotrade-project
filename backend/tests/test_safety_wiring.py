@@ -141,6 +141,86 @@ async def test_compound_risk_monitor_loop_no_evacuate_skips_evacuator() -> None:
 
 
 # ---------------------------------------------------------------------------
+# 避難条件成立時の EMERGENCY 通知（実避難が dry_run のみのため手動対応を促す）
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_compound_risk_monitor_loop_notifies_on_evacuate() -> None:
+    """should_evacuate=True なら _notify_evacuation_required が呼ばれる（手動対応 EMERGENCY）。"""
+    from app.automation.scheduled_tasks import compound_risk_monitor_loop
+    from app.protocols.risk.schemas import EvacuationPlan, EvacuationResult, EvacuationStep
+
+    assessment = _make_assessment(should_evacuate=True, risk_level=RiskLevel.CRITICAL)
+    plan = EvacuationPlan(
+        trigger_reason="テスト",
+        steps=[
+            EvacuationStep(
+                protocol="aave",
+                action="withdraw",
+                asset="USDC",
+                amount=Decimal("1000"),
+                destination="USDC",
+                order=1,
+            )
+        ],
+        estimated_gas_cost_usd=Decimal("8"),
+        estimated_time_minutes=5,
+        priority="immediate",
+    )
+    evac_result = EvacuationResult(
+        plan=plan, executed=False, dry_run=True, steps_completed=1, steps_total=1, errors=[]
+    )
+
+    mock_assessor = MagicMock()
+    mock_assessor.assess = AsyncMock(return_value=assessment)
+    mock_evacuator = MagicMock()
+    mock_evacuator.create_evacuation_plan = AsyncMock(return_value=plan)
+    mock_evacuator.execute_evacuation = AsyncMock(return_value=evac_result)
+
+    with (
+        patch("app.protocols.risk.compound_risk.CompoundRiskAssessor", return_value=mock_assessor),
+        patch("app.protocols.risk.auto_evacuate.AutoEvacuator", return_value=mock_evacuator),
+        patch("app.automation.scheduled_tasks._notify_evacuation_required") as mock_notify,
+        patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+    ):
+        mock_sleep.side_effect = [None, asyncio.CancelledError()]
+        with pytest.raises(asyncio.CancelledError):
+            await compound_risk_monitor_loop(interval_seconds=1)
+
+    mock_notify.assert_called_once()
+    _, kwargs = mock_notify.call_args
+    assert kwargs["reason"] == "テスト理由"
+
+
+def test_notify_evacuation_required_sends_emergency() -> None:
+    """_notify_evacuation_required が EMERGENCY 重大度で通知サービスに send する。"""
+    from app.automation.scheduled_tasks import _notify_evacuation_required
+    from app.notifications.schemas import NotificationSeverity
+
+    mock_svc = MagicMock()
+    with patch("app.notifications.factory.get_notification_service", return_value=mock_svc):
+        _notify_evacuation_required(reason="HF危機", priority="immediate", steps_total=2)
+
+    mock_svc.send.assert_called_once()
+    sent = mock_svc.send.call_args.args[0]
+    assert sent.severity == NotificationSeverity.EMERGENCY
+    assert "HF危機" in sent.body
+
+
+def test_notify_evacuation_required_fail_open() -> None:
+    """通知サービスが例外を投げても _notify_evacuation_required は伝播させない（fail-open）。"""
+    from app.automation.scheduled_tasks import _notify_evacuation_required
+
+    with patch(
+        "app.notifications.factory.get_notification_service",
+        side_effect=RuntimeError("boom"),
+    ):
+        # 例外が外に漏れない（監視ループを止めない）
+        _notify_evacuation_required(reason="x", priority="n/a", steps_total=0)
+
+
+# ---------------------------------------------------------------------------
 # ScheduledTaskManager の compound_risk 配線テスト
 # ---------------------------------------------------------------------------
 

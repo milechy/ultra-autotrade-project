@@ -1363,6 +1363,34 @@
     "pendle": {
       "subtitle": "イールドトレーディング",
       "description": "Pendleプロトコルでトークン化された利回りを売買します。元本トークン（PT）と利回りトークン（YT）を活用した高度なイールド最適化戦略です。"
+    },
+    "optimizer": {
+      "title": "最適配分を試算",
+      "subtitle": "投資額・リスク・保有日数から最適な運用配分を推奨します",
+      "investmentLabel": "投資額（USD）",
+      "holdingDaysLabel": "保有予定日数",
+      "riskModeLabel": "リスクモード",
+      "riskMode": {
+        "conservative": "保守的",
+        "balanced": "バランス",
+        "aggressive": "積極的"
+      },
+      "submit": "推奨を取得",
+      "calculating": "計算中...",
+      "error": "推奨の取得に失敗しました",
+      "recommendedLabel": "推奨戦略",
+      "allocationLabel": "推奨配分",
+      "totalApyLabel": "想定合計APY",
+      "riskScoreLabel": "リスクスコア",
+      "disclaimer": "本試算は参考値です。実際の運用成果を保証するものではありません。",
+      "protocol": {
+        "aave": "Aave レンディング",
+        "lido": "Lido stETH",
+        "lido_aave": "Lido + Aave 複合",
+        "pendle_pt": "Pendle PT",
+        "pendle_yt": "Pendle YT",
+        "idle": "未投資（現金）"
+      }
     }
   },
   "WalletOnboarding": {
@@ -2484,7 +2512,9 @@
       "settings": "設定",
       "gridBot": "Grid Bot",
       "copyTrading": "Copy Trading",
-      "wallet": "ウォレット"
+      "wallet": "ウォレット",
+      "performance": "成績レポート",
+      "simulation": "シミュレーション"
     },
     "partnerNav": {
       "dashboard": "ダッシュボード",
@@ -2497,7 +2527,9 @@
     "viewerNav": {
       "dashboard": "ダッシュボード",
       "aiFeed": "AI判定",
-      "history": "取引履歴"
+      "history": "取引履歴",
+      "performance": "成績レポート",
+      "simulation": "シミュレーション"
     },
     "logout": "ログアウト",
     "helpAriaLabel": "ヘルプ",
