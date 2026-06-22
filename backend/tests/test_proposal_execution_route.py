@@ -297,3 +297,64 @@ def test_onchain_partners_not_mixed(db_session: Session) -> None:
     assert p2.tx_hash == "0x" + "22" * 32
     assert p1.user_id != p2.user_id
     assert p1.tx_hash != p2.tx_hash
+
+
+# ---------------------------------------------------------------------------
+# 執行後 (post-execution) の経路↔証跡整合チェック wiring
+# detect_route_mismatch が _execute_aave_for_proposal に結線されていることを担保する。
+# ---------------------------------------------------------------------------
+
+
+def test_onchain_execution_clean_evidence_no_mismatch_alert(db_session: Session) -> None:
+    """正常系: on-chain 経路 (tx あり / CEX order なし) では誤執行アラートを出さない。"""
+    from app.proposals.router import _execute_aave_for_proposal
+
+    _make_user_with_wallet(db_session, user_id=1, wallet_address="0x" + "ab" * 20)
+    p = _make_proposal(db_session, execution_route=ExecutionRoute.ONCHAIN_AAVE.value)
+    fake_result = MagicMock()
+    fake_result.tx_hash = "0x" + "cd" * 32
+    fake_result.status = "success"
+
+    with patch("app.proposals.execution_route.notify_route_mismatch") as mock_notify:
+        with patch.dict(os.environ, {"AAVE_ACTIVE_CHAINS": "base"}):
+            with patch("app.aave.service.MultiChainAaveService") as mock_svc:
+                mock_svc.return_value.execute_rebalance.return_value = fake_result
+                _execute_aave_for_proposal(p, db_session)
+
+    db_session.commit()
+    db_session.refresh(p)
+    assert p.status == "executed"
+    # 正常系では post-execution mismatch 通知は発火しない
+    mock_notify.assert_not_called()
+
+
+def test_onchain_execution_corrupted_cex_evidence_alerts(db_session: Session) -> None:
+    """証跡破損: on-chain proposal に CEX order が混入したら執行後に EMERGENCY 通知。
+
+    tx は確定済みのため status は executed のまま (手動介入を促す通知のみ)。
+    """
+    from app.proposals.router import _execute_aave_for_proposal
+
+    _make_user_with_wallet(db_session, user_id=1, wallet_address="0x" + "ab" * 20)
+    p = _make_proposal(db_session, execution_route=ExecutionRoute.ONCHAIN_AAVE.value)
+    # 誤執行の疑い: on-chain 経路なのに CEX order_id が付いている (証跡破損)
+    p.cex_order_id = "cex-order-should-not-exist"
+    db_session.commit()
+    fake_result = MagicMock()
+    fake_result.tx_hash = "0x" + "ef" * 32
+    fake_result.status = "success"
+
+    with patch("app.proposals.execution_route.notify_route_mismatch") as mock_notify:
+        with patch.dict(os.environ, {"AAVE_ACTIVE_CHAINS": "base"}):
+            with patch("app.aave.service.MultiChainAaveService") as mock_svc:
+                mock_svc.return_value.execute_rebalance.return_value = fake_result
+                _execute_aave_for_proposal(p, db_session)
+
+    db_session.commit()
+    db_session.refresh(p)
+    # tx は確定済み → status は executed のまま (誤執行は通知で人手介入を促す)
+    assert p.status == "executed"
+    assert p.tx_hash == "0x" + "ef" * 32
+    mock_notify.assert_called_once()
+    # 通知引数に当該 proposal_id が含まれる
+    assert mock_notify.call_args.args[0] == p.id
