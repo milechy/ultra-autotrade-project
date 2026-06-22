@@ -517,9 +517,11 @@ tmux attach -t phase-<X>
 |------|-----|---------|-----|---------------|
 | **production** | app/api.ultra-auto-trade.com | `docker-compose.production.yml` | `.env.production` | `scripts/deploy_production.sh` |
 | **staging** | staging/api-staging.ultra-auto-trade.com（Phase 4設定予定）| `docker-compose.staging.yml` | `.env.staging` | `scripts/deploy_staging.sh` |
+| **staging-v4** | https://staging-v4.ultra-auto-trade.com | `docker-compose.staging-v4.yml` | `.env.staging-v4` | — |
 
 - **コンテナ名**: production は `*-production` suffix（2026-04-24 container_name 衝突インシデント後にリネーム済み）
 - **staging**: Shadow Mode専用（`AI_SHADOW_MODE=true` / `REBALANCE_SHADOW_MODE=true`）、Base Sepolia、port 3001/8082(nginx経由)/5433（注: 旧8001は廃止。`curl http://127.0.0.1:8082/health` で確認）。`docker-compose.staging.yml` は `profiles:` 指定なし = `up -d` 既定で **7 サービス**（postgres / backend-blue / backend-green / nginx / frontend / loki / promtail）が全起動。nginx upstream は `docker/nginx/upstream.staging.conf` で `backend-blue:8000` に固定。旧記述「5コンテナ / green のみ」は B案リネーム期の名残であり現 compose と矛盾（2026-05-22 訂正）。
+- **staging-v4** (2026-06-17 新設): v4 開発用 staging、v3 staging-new とは独立。frontend=3002 / backend=8030 / nginx=8083 / postgres=5434 (DB=ultra_autotrade_staging_v4) / `COMPOSE_PROJECT_NAME=ultra-autotrade-staging-v4`
 - **production**: 実資金・実トレード、Base Mainnet、port 3000/8000(nginx host port)/8080(nginx container)/5432（8010=backend-blue直ポート、8011=backend-green直ポート、nginx経由=8000→8080→active backend）
 
 ---
@@ -537,6 +539,7 @@ tmux attach -t phase-<X>
 |----|--------|----|---------|------------------|------|
 | **dev** | `uata-dev-01`（開発専用 VPS、新規） | `77.42.79.75` | `uata` | `/opt/ultra-autotrade/main`（main worktree）+ `/opt/ultra-autotrade-worktrees/<branch>` | Claude Code CLI による実装・並列レーン開発。実資金・実トレードなし |
 | **staging** | 本番 Hetzner VPS | `77.42.46.155` | `ultra` | `/opt/ultra-autotrade`（staging compose stack） | Shadow Mode 専用（Base Sepolia）、port 3001/8082(nginx)/5433（旧8001廃止） |
+| **staging-v4** | 本番 Hetzner VPS | `77.42.46.155` | `ultra` | `/opt/ultra-autotrade`（staging-v4 compose stack） | v4 開発用 staging（Base Sepolia）、port 3002/8083(nginx)/8030(backend)/5434。v3 staging-new と独立 |
 | **production** | 本番 Hetzner VPS | `77.42.46.155` | `ultra` | `/opt/ultra-autotrade`（production compose stack） | 実資金・実トレード（Base Mainnet）、port 3000/8000/5432 |
 
 > **[CRITICAL] パス構造差 — 推測禁止**
