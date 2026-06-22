@@ -19,6 +19,7 @@ import { useAuthFetch } from '@/hooks/useAuthFetch'
 import { RewardsCard } from '@/components/dashboard/RewardsCard'
 import { IdleYieldCard } from '@/components/dashboard/IdleYieldCard'
 import { StressTestCard } from '@/components/dashboard/StressTestCard'
+import { UnifiedPortfolioCard } from '@/components/dashboard/UnifiedPortfolioCard'
 
 // Note: PortfolioSummary, SafetyScore, AiAccuracyCard are used by ActiveDashboard only
 
@@ -223,6 +224,11 @@ function ManagedDashboard({ isAdmin }: { isAdmin: boolean }) {
   const t = useTranslations('Dashboard')
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
+      {/* 統合ポートフォリオ（自分の Aave 純資産 + Privy Wallet 残高） */}
+      <section>
+        <UnifiedPortfolioCard />
+      </section>
+
       {/* 資金割り振り — メインコンテンツ */}
       <section>
         <AllocationCard />
@@ -266,6 +272,11 @@ function ActiveDashboard({ isAdmin }: { isAdmin: boolean }) {
       <div className="flex items-center gap-2">
         <RiskModeBadge />
       </div>
+
+      {/* 統合ポートフォリオ（自分の Aave 純資産 + Privy Wallet 残高） */}
+      <section>
+        <UnifiedPortfolioCard />
+      </section>
 
       <section>
         <PortfolioSummary />
