@@ -2467,7 +2467,9 @@
       "settings": "Settings",
       "gridBot": "Grid Bot",
       "copyTrading": "Copy Trading",
-      "wallet": "Wallet"
+      "wallet": "Wallet",
+      "performance": "Performance",
+      "simulation": "Simulation"
     },
     "partnerNav": {
       "dashboard": "Dashboard",
@@ -2480,7 +2482,9 @@
     "viewerNav": {
       "dashboard": "Dashboard",
       "aiFeed": "AI",
-      "history": "History"
+      "history": "History",
+      "performance": "Performance",
+      "simulation": "Simulation"
     },
     "logout": "Logout",
     "helpAriaLabel": "Help",

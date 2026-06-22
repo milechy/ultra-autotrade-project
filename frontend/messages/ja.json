@@ -2484,7 +2484,9 @@
       "settings": "設定",
       "gridBot": "Grid Bot",
       "copyTrading": "Copy Trading",
-      "wallet": "ウォレット"
+      "wallet": "ウォレット",
+      "performance": "成績レポート",
+      "simulation": "シミュレーション"
     },
     "partnerNav": {
       "dashboard": "ダッシュボード",
@@ -2497,7 +2499,9 @@
     "viewerNav": {
       "dashboard": "ダッシュボード",
       "aiFeed": "AI判定",
-      "history": "取引履歴"
+      "history": "取引履歴",
+      "performance": "成績レポート",
+      "simulation": "シミュレーション"
     },
     "logout": "ログアウト",
     "helpAriaLabel": "ヘルプ",
