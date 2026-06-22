@@ -1348,6 +1348,36 @@ async def outcome_labeling_loop(
             await asyncio.sleep(600)
 
 
+def _notify_evacuation_required(*, reason: str, priority: str, steps_total: int) -> None:
+    """避難条件成立を管理者へ EMERGENCY 通知する（fail-open: 通知失敗でループを止めない）。
+
+    現状 AutoEvacuator の実避難（on-chain tx）は未実装で dry_run シミュレーションのみ。
+    避難条件成立時も資金は自動退避されないため、手動対応が必須であることを明示する。
+    """
+    try:
+        from app.notifications.factory import get_notification_service  # noqa: PLC0415
+        from app.notifications.schemas import (  # noqa: PLC0415
+            NotificationMessage,
+            NotificationSeverity,
+        )
+
+        message = NotificationMessage(
+            channel=NotificationChannel.SLACK,
+            severity=NotificationSeverity.EMERGENCY,
+            title="🚨 複合リスク避難条件 成立（手動対応必須）",
+            body=(
+                f"reason: {reason}\n"
+                f"priority: {priority} / steps: {steps_total}\n"
+                "状態: 自動避難は dry_run シミュレーションのみ実装済み。"
+                "実資金の退避 tx は未実装のため自動では移動されません。"
+                "至急 手動でデレバレッジ/退避を実施してください。"
+            ),
+        )
+        get_notification_service().send(message)
+    except Exception:  # noqa: BLE001 — 通知失敗で監視ループを止めない
+        logger.exception("compound_risk_monitor_loop: 避難 EMERGENCY 通知の送信に失敗")
+
+
 async def compound_risk_monitor_loop(
     *,
     interval_seconds: int = COMPOUND_RISK_INTERVAL_SECONDS,
@@ -1366,6 +1396,9 @@ async def compound_risk_monitor_loop(
         - このコルーチンは無限ループで動作する
         - 停止は asyncio.CancelledError で行う
         - エラー発生時もループは継続（fail-open）
+        - [重要] 現状 AutoEvacuator の実避難（on-chain tx）は未実装で dry_run のみ。
+          避難条件成立時は資金が自動退避されないため、EMERGENCY 通知で手動対応を促す。
+          実避難の実装は別タスク（Tier S / HUMAN-REVIEW / Asana 1215899099898891）。
     """
     from app.protocols.risk.auto_evacuate import AutoEvacuator  # noqa: PLC0415
     from app.protocols.risk.compound_risk import CompoundRiskAssessor  # noqa: PLC0415
@@ -1397,8 +1430,12 @@ async def compound_risk_monitor_loop(
                     assessment.evacuation_reason,
                 )
                 plan = await evacuator.create_evacuation_plan(assessment)
+                _priority = "n/a"
+                _steps_total = 0
                 if plan is not None:
                     result = await evacuator.execute_evacuation(plan, dry_run=True)
+                    _priority = str(plan.priority)
+                    _steps_total = result.steps_total
                     logger.warning(
                         "compound_risk_monitor_loop: 避難計画 dry_run 完了 "
                         "(steps=%d/%d, priority=%s)",
@@ -1406,6 +1443,13 @@ async def compound_risk_monitor_loop(
                         result.steps_total,
                         plan.priority,
                     )
+                # 実避難（on-chain tx）は未実装で dry_run のみ。資金は自動退避されないため
+                # EMERGENCY 通知で運用者に手動対応を促す（fail-open）。
+                _notify_evacuation_required(
+                    reason=assessment.evacuation_reason or "(reason 不明)",
+                    priority=_priority,
+                    steps_total=_steps_total,
+                )
 
         except asyncio.CancelledError:
             logger.info("compound_risk_monitor_loop cancelled - shutting down")
