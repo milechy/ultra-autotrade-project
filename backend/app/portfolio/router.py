@@ -2,6 +2,7 @@
 # backend/app/portfolio/router.py
 """ポートフォリオ履歴API ルーター定義。"""
 
+import logging
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -16,6 +17,8 @@ from app.auth.dependencies import require_admin, require_viewer
 from app.auth.models import User
 from app.database import get_db
 
+from .aggregation import aggregate_portfolio
+from .aggregation_schemas import SourceBalance, UnifiedPortfolioInput, UnifiedPortfolioView
 from .models import PortfolioSnapshot
 from .schemas import (
     PortfolioCurrentResponse,
@@ -24,6 +27,8 @@ from .schemas import (
     PortfolioSnapshotCreate,
     PortfolioSnapshotResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 # 30秒インメモリキャッシュ: {cache_key: (timestamp, data)}
 _live_cache: dict[str, tuple[float, PortfolioLiveResponse]] = {}
@@ -76,6 +81,66 @@ def get_live_portfolio(
 
     _live_cache[cache_key] = (now_ts, response)
     return response
+
+
+def _build_aave_source(wallet_address: str) -> Optional[SourceBalance]:
+    """ユーザー wallet の Aave 純資産を SourceBalance にする（fail-open: 失敗時 None）。"""
+    try:
+        from app.aave.client import get_default_aave_client  # noqa: PLC0415
+
+        data = get_default_aave_client().get_account_data(wallet_address)
+        net = data.total_collateral_usd - data.total_debt_usd
+        return SourceBalance(
+            source="aave",
+            total_usd=net,
+            available=True,
+            supply_usd=data.total_collateral_usd,
+            borrow_usd=data.total_debt_usd,
+            health_factor=data.health_factor,
+        )
+    except Exception:  # noqa: BLE001 — fail-open: 集約は欠落ソースを除外して継続
+        logger.warning("unified portfolio: aave source fetch failed", exc_info=True)
+        return None
+
+
+async def _build_wallet_source(wallet_address: str) -> Optional[SourceBalance]:
+    """ユーザー Privy wallet（Base ETH+USDC）残高を SourceBalance にする（fail-open）。"""
+    try:
+        from app.partner.wallet_balance_service import (
+            fetch as fetch_wallet_balance,  # noqa: PLC0415
+        )
+
+        resp = await fetch_wallet_balance(wallet_address)
+        # RPC フォールバック（balance=0）は available=False として grand_total から除外。
+        return SourceBalance(
+            source="wallet",
+            total_usd=resp.total_usd,
+            available=not resp.fallback_used,
+        )
+    except Exception:  # noqa: BLE001 — fail-open
+        logger.warning("unified portfolio: wallet source fetch failed", exc_info=True)
+        return None
+
+
+@router.get(
+    "/unified",
+    response_model=UnifiedPortfolioView,
+    summary="統合ポートフォリオ（消費者個人: Aave 純資産 + Privy Wallet 残高）",
+)
+async def get_unified_portfolio(
+    current_user: User = Depends(require_viewer),
+) -> UnifiedPortfolioView:
+    """ログインユーザー個人の統合ポートフォリオを返す。
+
+    対象は **自分の** Aave 純資産（自 wallet の getUserAccountData）と **自分の** Privy wallet
+    残高（Base ETH+USDC）の 2 ソース。CEX(Bybit) は運用オペレータ口座のため対象外（cex=None）。
+    各ソースは fail-open（取得失敗は None で除外し degraded=True で他ソースの表示を継続）。
+    wallet 未設定ユーザーは全ソース欠落＝degraded な空ビュー（grand_total=0）。
+    """
+    wallet = current_user.smart_wallet_address or current_user.wallet_address or ""
+    aave_src = _build_aave_source(wallet) if wallet else None
+    wallet_src = await _build_wallet_source(wallet) if wallet else None
+    return aggregate_portfolio(UnifiedPortfolioInput(aave=aave_src, wallet=wallet_src, cex=None))
 
 
 def _get_since(period: str) -> Optional[datetime]:
