@@ -31,6 +31,8 @@ export function UserHeader() {
     { href: '/user/ai-feed', label: t('adminNav.aiFeed') },
     { href: '/user/approve', label: t('adminNav.approve') },
     { href: '/user/history', label: t('adminNav.history') },
+    { href: '/user/performance', label: t('adminNav.performance') },
+    { href: '/user/simulation', label: t('adminNav.simulation') },
     { href: '/user/deposit', label: t('adminNav.deposit') },
     { href: '/user/settings', label: t('adminNav.settings') },
     { href: '/user/grid', label: t('adminNav.gridBot') },
@@ -53,6 +55,8 @@ export function UserHeader() {
     { href: '/user/dashboard', label: t('viewerNav.dashboard') },
     { href: '/user/ai-feed', label: t('viewerNav.aiFeed') },
     { href: '/user/history', label: t('viewerNav.history') },
+    { href: '/user/performance', label: t('viewerNav.performance') },
+    { href: '/user/simulation', label: t('viewerNav.simulation') },
   ]
 
   const handleLogout = async () => {
