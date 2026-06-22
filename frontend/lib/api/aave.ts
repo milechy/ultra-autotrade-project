@@ -3,13 +3,14 @@
 // frontend/lib/api/aave.ts
 /**
  * Aave 関連 API クライアント
- * - getStressTest(): GET /api/aave/stress-test
  * - getPoolHealth(): GET /api/aave/pool-health
- * - getRewards(): GET /api/aave/rewards
  * - claimRewards(): POST /api/aave/rewards/claim
  * - getBorrowRates(): GET /api/aave/borrow-rates
  * - getEMode(): GET /api/aave/emode
  * - setEMode(): POST /api/aave/emode
+ *
+ * NOTE: getStressTest()/getRewards() は呼出元ゼロのため削除（2026-06-22 監査 fe-10）。
+ * 各 read は画面側 useAuthFetch がインラインで担当。型は保持。
  */
 
 import { getJson, postJson } from "./http";
@@ -32,10 +33,6 @@ export interface StressTestResult {
   liquidation_threshold: string | null; // Decimal 文字列 (例: "0.80")
   scenarios: StressTestScenario[];
   error: string | null;
-}
-
-export async function getStressTest(): Promise<StressTestResult> {
-  return getJson<StressTestResult>("/api/aave/stress-test");
 }
 
 // ---------------------------------------------------------------------------
@@ -86,13 +83,6 @@ export interface ClaimRewardsResponse {
   skip_reason: string | null;
   error: string | null;
   claimed_at: string | null;
-}
-
-/**
- * GET /aave/rewards — 未請求リワードを取得する（viewer 以上）
- */
-export async function getRewards(): Promise<RewardsResponse> {
-  return getJson<RewardsResponse>("/api/aave/rewards");
 }
 
 /**
