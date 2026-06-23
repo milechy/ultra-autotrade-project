@@ -85,10 +85,10 @@ def test_prepare_success_returns_ids(enabled_env: None) -> None:
         )
     assert policy_id == "policy_abc"
     assert signer_id == "kq_server_1"
-    # create_policy に渡る body が Privy policy schema
+    # create_policy に渡る body が Privy policy schema（default_action は未サポート）
     sent = fake.create_policy.call_args.args[0]
     assert sent["version"] == "1.0"
-    assert sent["default_action"] == "DENY"
+    assert "default_action" not in sent
 
 
 def test_prepare_mapping_error_wrapped(enabled_env: None) -> None:
