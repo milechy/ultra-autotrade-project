@@ -92,7 +92,6 @@ def prepare_delegation_policy(
         policy = build_delegation_policy(
             wallet_address=wallet_address,
             allowed_protocols=allowed_protocols,
-            expires_at=expires_at,
             chain_name=chain,
         )
     except PolicyMappingError as exc:
