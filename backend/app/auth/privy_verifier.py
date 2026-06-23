@@ -245,6 +245,15 @@ def get_privy_verifier() -> Optional[PrivyVerifier]:
         if not app_id:
             return None
         verification_key = os.getenv("PRIVY_VERIFICATION_KEY") or None
+        if verification_key:
+            # .env では PEM を 1 行で持つため改行を "\n" リテラルでエスケープしている
+            # (例: "-----BEGIN PUBLIC KEY-----\nMFkw...\n-----END PUBLIC KEY-----")。
+            # pyjwt/cryptography の PEM パーサは実改行を要求し、リテラル "\n" のままだと
+            # `ValueError: Unable to load PEM file` を raise する。これは verify_id_token の
+            # except 節 (InvalidTokenError 系) で捕捉されず HTTP 500 になり、かつ
+            # verification_key が真値のため JWKS フォールバックにも入らない。
+            # ここで実改行へ正規化する (実改行で渡された値には影響しない)。
+            verification_key = verification_key.replace("\\n", "\n")
         jwks_url = os.getenv("PRIVY_JWKS_URL") or None
         _default_verifier = PrivyVerifier(
             app_id=app_id,
