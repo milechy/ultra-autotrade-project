@@ -790,3 +790,49 @@ class TestErrorHandlingFixes:
                 AuthService.create_wallet_user(s2, wallet2, privy_did=did)
             assert exc_info.value.status_code == 409
             assert "did" in str(exc_info.value.detail).lower()
+
+
+class TestPrivyVerificationKeyNewlineNormalization:
+    """PRIVY_VERIFICATION_KEY に "\\n" リテラルが含まれる場合の正規化テスト。
+
+    .env では PEM を 1 行で持つため改行を "\\n" エスケープで格納する。
+    正規化漏れがあると pyjwt が `ValueError: Unable to load PEM file` を
+    raise し、verify_id_token の except 節で捕捉されず HTTP 500 になる
+    (かつ verification_key が真値のため JWKS フォールバックにも入らない)。
+    """
+
+    def test_literal_backslash_n_key_is_normalized_and_verifies(
+        self, privy_keypair: Tuple[bytes, bytes]
+    ) -> None:
+        from app.auth.privy_verifier import get_privy_verifier
+
+        private_pem, public_pem = privy_keypair
+        # 実改行 PEM を 1 行 "\\n" エスケープ形式へ（.env.production と同じ表現）
+        escaped = public_pem.decode("ascii").replace("\n", "\\n")
+        assert "\\n" in escaped and "\n" not in escaped  # リテラルであることを保証
+
+        prev_app_id = os.environ.get("PRIVY_APP_ID")
+        prev_key = os.environ.get("PRIVY_VERIFICATION_KEY")
+        os.environ["PRIVY_APP_ID"] = PRIVY_TEST_APP_ID
+        os.environ["PRIVY_VERIFICATION_KEY"] = escaped
+        reset_privy_verifier()
+        try:
+            verifier = get_privy_verifier()
+            assert verifier is not None
+            # 正規化されて実改行になっていること
+            assert "\n" in verifier.verification_key
+            assert "\\n" not in verifier.verification_key
+
+            token = _make_id_token(private_pem, sub="did:privy:newline-test")
+            # 500 ではなく正常に sub を返せること（PEM パース成功）
+            assert verifier.verify_id_token(token) == "did:privy:newline-test"
+        finally:
+            if prev_app_id is None:
+                os.environ.pop("PRIVY_APP_ID", None)
+            else:
+                os.environ["PRIVY_APP_ID"] = prev_app_id
+            if prev_key is None:
+                os.environ.pop("PRIVY_VERIFICATION_KEY", None)
+            else:
+                os.environ["PRIVY_VERIFICATION_KEY"] = prev_key
+            reset_privy_verifier()
