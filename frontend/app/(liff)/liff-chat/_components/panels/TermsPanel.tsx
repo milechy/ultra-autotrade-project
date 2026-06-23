@@ -3,31 +3,37 @@
 
 import { ExternalLink, FileText, Shield } from "lucide-react"
 import { useTranslations } from "next-intl"
+import { useRouter } from "next/navigation"
 
-// 利用規約/プライバシーポリシーは外部ブラウザ (新コンテキスト) で開く。
-// LIFF webview 内で SPA を置換すると liff-chat の履歴が汚れ「戻る」で
-// /liff-approve (パートナートップ) に戻ってしまうため、target=_blank の
-// 素の <a> ではなく liff.openWindow({external:true}) を優先して使用する。
-// liff が無い (通常ブラウザ等) 場合は window.open へフォールバック。
+// 法的文書ページから liff-chat に戻すための return パラメータ。
+// 各文書ページの useSmartBack がこれを最優先で読み「戻る」で /liff-chat へ戻す。
+const RETURN_TO = "/liff-chat"
+
+// 利用規約/プライバシーポリシーへの遷移。
+// - LINE (LIFF webview): 外部ブラウザで開く。LIFF webview 内で SPA を置換すると
+//   liff-chat の履歴が汚れ「戻る」で /liff-approve に飛ぶため liff.openWindow({external:true})。
+// - PWA / 通常ブラウザ: 同一タブで router.push する。新規タブ (window.open) は
+//   認証セッション・履歴を引き継げず「戻る」が fallback `/` → 未認証で /connect に
+//   飛ぶ不具合があったため、同一タブ遷移に変更し ?return=/liff-chat で戻り先を明示する。
 //
-// path は同一オリジン相対 ("/terms" 等) で保持し、openExternal で
-// window.location.origin を前置して絶対 URL 化する。prod ドメインを
-// ハードコードすると staging で開いても本番 (app.ultra-auto-trade.com) に
-// 飛んでしまうため (環境跨ぎバグ)、必ず現在のオリジン基準で解決する。
-function openExternal(path: string) {
-  const url = typeof window !== "undefined" ? `${window.location.origin}${path}` : path
-  if (
-    typeof window !== "undefined" &&
-    (window as Window & { liff?: { openWindow: (opts: { url: string; external: boolean }) => void } }).liff
-  ) {
-    (window as Window & { liff?: { openWindow: (opts: { url: string; external: boolean }) => void } }).liff?.openWindow({ url, external: true })
+// path は同一オリジン相対 ("/terms" 等) で保持。LINE 経路のみ window.location.origin を
+// 前置して絶対 URL 化する (prod ドメインのハードコードは環境跨ぎバグの元なので避ける)。
+function openDoc(router: ReturnType<typeof useRouter>, path: string) {
+  const href = `${path}?return=${encodeURIComponent(RETURN_TO)}`
+  const liff =
+    typeof window !== "undefined"
+      ? (window as Window & { liff?: { openWindow: (opts: { url: string; external: boolean }) => void } }).liff
+      : undefined
+  if (liff) {
+    liff.openWindow({ url: `${window.location.origin}${href}`, external: true })
   } else {
-    window.open(url, "_blank", "noopener,noreferrer")
+    router.push(href)
   }
 }
 
 export function TermsPanel() {
   const t = useTranslations("Liff.panels.terms")
+  const router = useRouter()
 
   const links = [
     {
@@ -51,7 +57,7 @@ export function TermsPanel() {
         <button
           key={href}
           type="button"
-          onClick={() => openExternal(href)}
+          onClick={() => openDoc(router, href)}
           className="flex items-center gap-3 w-full ax-card-warm hover:bg-black/5 px-4 py-4 rounded-xl transition-colors text-left"
         >
           <Icon className="w-5 h-5 text-[#1D9E75] flex-shrink-0" />
