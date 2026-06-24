@@ -15,6 +15,11 @@ import { Badge } from '@/components/ui/badge'
 import { postJson } from '@/lib/api/http'
 import { useAutomationStatus } from '@/components/user/UserProviders'
 
+// 出金導線の env gate（money を動かす経路のため default-off）。
+// (user)/withdraw ページ・(liff) DepositPanel と同じ env 名で統一。
+// false のときは nav に出金リンクを出さない。★ 有効化は #391 money gate 人間承認後。
+const WITHDRAW_ENABLED: boolean = process.env.NEXT_PUBLIC_WITHDRAW_ENABLED === 'true'
+
 export function UserHeader() {
   const pathname = usePathname()
   const router = useRouter()
@@ -34,6 +39,11 @@ export function UserHeader() {
     { href: '/user/performance', label: t('adminNav.performance') },
     { href: '/user/simulation', label: t('adminNav.simulation') },
     { href: '/user/deposit', label: t('adminNav.deposit') },
+    // 出金は (user)/withdraw（URL: /withdraw, route group prefix なし）。
+    // env off のときは出さない。
+    ...(WITHDRAW_ENABLED
+      ? [{ href: '/withdraw', label: t('adminNav.withdraw') }]
+      : []),
     { href: '/user/settings', label: t('adminNav.settings') },
     { href: '/user/grid', label: t('adminNav.gridBot') },
     { href: '/user/copy-trading', label: t('adminNav.copyTrading') },

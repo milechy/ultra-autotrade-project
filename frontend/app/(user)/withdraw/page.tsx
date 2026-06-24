@@ -39,6 +39,11 @@ const BASE_RPC_URL = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.ba
 // ETH price (USD) fallback; gas 表示の概算用。実値は estimateContractGas の結果に乗じる。
 const ETH_USD_FALLBACK = parseFloat(process.env.NEXT_PUBLIC_ETH_USD_FALLBACK || '3500')
 
+// 出金機能の env gate（money を動かす経路のため default-off）。
+// false のときは WithdrawPanel 本体を出さず「準備中」フォールバックを表示する。
+// (liff) DepositPanel と同じ env 名で統一。★ 有効化は #391 money gate 人間承認後。
+const WITHDRAW_ENABLED: boolean = process.env.NEXT_PUBLIC_WITHDRAW_ENABLED === 'true'
+
 // transfer(address,uint256) + balanceOf(address) ABI (minimal)
 const USDC_ABI = [
   {
@@ -744,7 +749,37 @@ function WithdrawPageInner() {
   )
 }
 
+function WithdrawComingSoon() {
+  const t = useTranslations('Withdraw')
+  return (
+    <div className="mx-auto max-w-md px-4 py-10">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">{t('comingSoonTitle')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="text-sm leading-relaxed">
+              {t('comingSoonBody')}
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export default function WithdrawPage() {
+  // env off（既定）では本体を出さず準備中表示にする。money gate (#391) 承認前に
+  // 実 UI を露出させないための物理ガード。
+  if (!WITHDRAW_ENABLED) {
+    return (
+      <AuthGuard>
+        <WithdrawComingSoon />
+      </AuthGuard>
+    )
+  }
   return (
     <AuthGuard>
       <WithdrawPageInner />

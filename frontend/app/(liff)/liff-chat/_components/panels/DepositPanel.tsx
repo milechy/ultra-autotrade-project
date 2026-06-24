@@ -202,29 +202,13 @@ export function DepositPanel() {
     { label: t("confirmSheetDest"), value: walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : t("withdrawDestDefault") },
   ]
 
+  // 出金は (user)/withdraw（Privy 本人署名 + 記録専用 /api/users/withdrawals）を正とする。
+  // 以前ここから呼んでいた POST /api/transactions/withdraw は backend に存在せず本番で 404 に
+  // なるため除去した。出金タブは disabled（準備中）で到達不能だが、誤 endpoint 呼び出しの
+  // 配線を物理的に断つため no-op 化する。出金 UI 有効化は (user)/withdraw 側 + #391 money gate。
   const handleWithdrawConfirm = useCallback(async () => {
-    setConfirmBusy(true)
-    setConfirmError(null)
-    try {
-      const res = await liffFetch("/api/transactions/withdraw", {
-        method: "POST",
-        body: JSON.stringify({ amount_usdc: withdrawNum }),
-      })
-      if (!res.ok) {
-        const detail = (await res.json().catch(() => null)) as { detail?: string } | null
-        throw new Error(detail?.detail ?? t("withdrawFailed"))
-      }
-      setConfirmOpen(false)
-      track(EV.WITHDRAW_SUBMIT)
-      setSuccessMsg(t("successMsg"))
-      setWithdrawAmount("")
-      refetchBalance()
-    } catch (e) {
-      setConfirmError(e instanceof Error ? e.message : t("withdrawFailed"))
-    } finally {
-      setConfirmBusy(false)
-    }
-  }, [withdrawNum, refetchBalance])
+    setConfirmError(t("withdrawComingSoon"))
+  }, [t])
 
   // ---- 残高ラベル（タブ依存） -----------------------------------------------
 
