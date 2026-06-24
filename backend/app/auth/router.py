@@ -15,7 +15,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.referral import service as referral_service
+from app.users.registration_webhook import send_registration_webhook
 
 from .dependencies import require_active_user, require_admin
 from .models import (
@@ -80,6 +81,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 )
 def register(
     request: RegisterRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> RegisterResponse:
     """
@@ -110,6 +112,13 @@ def register(
             "User registered via invitation: %s (partner_id=%d)", user.email, invitation.partner_id
         )
         token, expires_in = AuthService.create_access_token(user.id, user.email, user.role)
+        background_tasks.add_task(
+            send_registration_webhook,
+            user.email,
+            user.id,
+            None,
+            user.created_at.isoformat(),
+        )
         return RegisterResponse(
             **UserResponse.model_validate(user).model_dump(),
             access_token=token,
@@ -143,6 +152,13 @@ def register(
         )
         logger.info("Initial admin registered: %s", user.email)
         token, expires_in = AuthService.create_access_token(user.id, user.email, user.role)
+        background_tasks.add_task(
+            send_registration_webhook,
+            user.email,
+            user.id,
+            None,
+            user.created_at.isoformat(),
+        )
         return RegisterResponse(
             **UserResponse.model_validate(user).model_dump(),
             access_token=token,
@@ -165,6 +181,7 @@ def register(
 def register_with_referral(
     request: Request,
     body: RegisterWithReferralRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> RegisterResponse:
     """
@@ -223,6 +240,13 @@ def register_with_referral(
 
     # Step 7: JWT
     token, expires_in = AuthService.create_access_token(user.id, user.email, user.role)
+    background_tasks.add_task(
+        send_registration_webhook,
+        user.email,
+        user.id,
+        body.referral_code,
+        user.created_at.isoformat(),
+    )
     return RegisterResponse(
         **UserResponse.model_validate(user).model_dump(),
         access_token=token,
@@ -240,6 +264,7 @@ def register_with_referral(
 def register_open(
     request: Request,
     body: OpenRegisterRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> RegisterResponse:
     """
@@ -303,6 +328,13 @@ def register_open(
 
     logger.info("User registered via open registration: %s", user.email)
     token, expires_in = AuthService.create_access_token(user.id, user.email, user.role)
+    background_tasks.add_task(
+        send_registration_webhook,
+        user.email,
+        user.id,
+        None,
+        user.created_at.isoformat(),
+    )
     return RegisterResponse(
         **UserResponse.model_validate(user).model_dump(),
         access_token=token,
