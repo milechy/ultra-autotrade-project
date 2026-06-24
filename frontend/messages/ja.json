@@ -647,7 +647,11 @@
   },
   "Liff": {
     "kpi": {
-      "walletBalance": "ウォレット残高"
+      "walletBalance": "ウォレット残高",
+      "totalValue": "運用残高",
+      "avgApy": "平均 APY",
+      "monthlyDividend": "月次手取り（配当）",
+      "noDataYet": "運用開始後に表示されます"
     },
     "exec": {
       "operation": "操作",

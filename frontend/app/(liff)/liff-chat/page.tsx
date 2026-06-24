@@ -24,6 +24,7 @@ import { TermsPanel } from "./_components/panels/TermsPanel"
 import { ChatPanel } from "./_components/ChatPanel"
 import { ProposalActionCard } from "./_components/ProposalActionCard"
 import { ProposalSignSheet, type ChatProposal } from "./_components/ProposalSignSheet"
+import { DividendChartWrapper } from "./_components/DividendChartWrapper"
 
 // recharts は SSR クラッシュ防止のため dynamic import
 const AssetChart = dynamic(() => import("./_components/AssetChart"), {
@@ -69,6 +70,8 @@ interface PortfolioPositionRaw {
 interface PortfolioCurrentResponse {
   positions_json?: PortfolioPositionRaw[] | null
   has_data?: boolean
+  total_value_usd?: string
+  weighted_avg_apy?: string
 }
 
 // positions_json (非構造) を CoinHolding[] に正規化する。
@@ -125,6 +128,10 @@ export default function LiffChatPage() {
   const [unreadCount] = useState(0)
   const [reasonOpen, setReasonOpen] = useState(false)
 
+  // ── KPI 表示 state（KPI-C: 運用残高 + 加重平均APY / KPI-D: 月次手取りグラフ）
+  const [portfolio, setPortfolio] = useState<PortfolioCurrentResponse | null>(null)
+  const [dividends, setDividends] = useState<{ month: string; value_jpy: number }[]>([])
+
   // ── 緊急停止 state
   const [paused, setPaused] = useState(false)
   const [stopConfirmOpen, setStopConfirmOpen] = useState(false)
@@ -174,6 +181,49 @@ export default function LiffChatPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { items?: ChatProposal[] } | null) => {
         if (d?.items?.[0]) setPendingProposal(d.items[0])
+      })
+      .catch(() => {})
+  }, [])
+
+  // ── KPI-C: 運用残高 + 加重平均APY を 30秒ポーリングで取得
+  useEffect(() => {
+    const token =
+      typeof window !== "undefined" ? (localStorage.getItem("auth_token") ?? "") : ""
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
+    if (!token) return
+    const headers = { Authorization: `Bearer ${token}` }
+    const fetchPortfolio = () => {
+      fetch(`${API_BASE}/api/portfolio/current`, { headers })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: PortfolioCurrentResponse | null) => {
+          if (d) setPortfolio(d)
+        })
+        .catch(() => {})
+    }
+    fetchPortfolio()
+    const id = setInterval(fetchPortfolio, 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  // ── KPI-D: 月次手取り（配当）を取得（月次データのため初回のみ）
+  useEffect(() => {
+    const token =
+      typeof window !== "undefined" ? (localStorage.getItem("auth_token") ?? "") : ""
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
+    if (!token) return
+    const headers = { Authorization: `Bearer ${token}` }
+    fetch(`${API_BASE}/api/user/dividends`, { headers })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { dividends?: { month: string; user_takehome_jpy: string }[] } | null) => {
+        if (!d?.dividends) return
+        setDividends(
+          d.dividends
+            .map((item) => ({
+              month: item.month.slice(0, 7),
+              value_jpy: Number(item.user_takehome_jpy),
+            }))
+            .reverse(),
+        )
       })
       .catch(() => {})
   }, [])
@@ -330,6 +380,32 @@ export default function LiffChatPage() {
               : "—"}
           </div>
         </button>
+
+        {/* KPI-C: 運用残高 + 加重平均APY */}
+        <div className="grid grid-cols-2 gap-3 mx-4 mt-3">
+          <div className="ax-card-warm rounded-2xl p-3">
+            <div className="text-xs text-[#736f7e]">{t("kpi.totalValue")}</div>
+            <div className="text-lg font-bold text-[#1c1a27]">
+              {portfolio
+                ? `$${Number(portfolio.total_value_usd).toLocaleString("en-US", { maximumFractionDigits: 2 })}`
+                : "—"}
+            </div>
+          </div>
+          <div className="ax-card-warm rounded-2xl p-3">
+            <div className="text-xs text-[#736f7e]">{t("kpi.avgApy")}</div>
+            <div className="text-lg font-bold text-[#1D9E75]">
+              {portfolio && Number(portfolio.weighted_avg_apy) > 0
+                ? `${Number(portfolio.weighted_avg_apy).toFixed(2)}%`
+                : "—"}
+            </div>
+          </div>
+        </div>
+
+        {/* KPI-D: 月次手取り（配当）グラフ */}
+        <div className="mx-4 mt-3 ax-card-warm rounded-2xl p-4">
+          <div className="text-xs text-[#736f7e] mb-2">{t("kpi.monthlyDividend")}</div>
+          <DividendChartWrapper data={dividends} />
+        </div>
 
         {/* AI 判定カード */}
         <div

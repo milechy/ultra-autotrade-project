@@ -409,6 +409,63 @@ def _is_user_due_for_judgment(user: User, now: datetime) -> bool:
     return now >= last + timedelta(hours=interval)
 
 
+def _multiprotocol_routing_enabled() -> bool:
+    """AI Optimizer 経由のマルチプロトコル提案ルーティングが有効か。
+
+    デフォルト無効 (既存 Aave 既定挙動を完全維持)。env で明示的に opt-in する。
+    """
+    import os  # noqa: PLC0415
+
+    return os.getenv("AI_OPTIMIZER_MULTIPROTOCOL_ENABLED", "false").lower() == "true"
+
+
+def _resolve_protocol_routing(
+    result: CrossValidationResult,
+    risk_mode: str | None,
+    investment_usd: Decimal,
+) -> tuple[str, str, str]:
+    """Proposal の (operation, asset, protocol) を決める (Phase-B)。
+
+    既定 (フラグ無効 / SELL / optimizer 失敗 / aave 推奨) は Aave 既定経路
+    ``(SUPPLY|WITHDRAW, "USDC", "aave")``。フラグ有効かつ BUY かつ AI Optimizer が
+    lido/pendle を推奨した場合のみ該当プロトコルへルーティングする:
+      - Lido → ``("STAKE_ETH", "ETH", "lido")``
+      - Pendle → ``("BUY_PT", "PT-stETH", "pendle")``
+
+    いずれの場合も on-chain 実行は行わず、Proposal を DB に作成するのみ
+    (実際の ETH staking / Pendle swap の broadcast は Phase-D / 人間承認後)。
+    Health Factor チェック・緊急停止フラグには一切触れない。
+    """
+    aave_operation = "SUPPLY" if result.final_action == TradeAction.BUY else "WITHDRAW"
+    aave_default = (aave_operation, _PROPOSAL_ASSET, "aave")
+
+    # マルチプロトコルは BUY (新規投資) のみ対象。SELL/WITHDRAW は Aave 既定経路を維持
+    # (lido unstake / pendle PT 売却は Phase-D 範囲のため、ここでは生成しない)。
+    if not _multiprotocol_routing_enabled() or result.final_action != TradeAction.BUY:
+        return aave_default
+
+    try:
+        from app.ai.optimizer.comparator import StrategyComparator  # noqa: PLC0415
+        from app.ai.optimizer.schemas import Protocol  # noqa: PLC0415
+
+        comparison = StrategyComparator().compare(
+            investment_usd=investment_usd,
+            risk_mode=risk_mode or "balanced",
+        )
+        recommended = comparison.recommended.protocol
+    except Exception as exc:  # noqa: BLE001
+        # optimizer 失敗時は安全側で Aave 既定にフォールバック (提案生成は継続)
+        logger.warning("AI Optimizer 比較に失敗、Aave 既定にフォールバック: %s", exc)
+        return aave_default
+
+    if recommended in (Protocol.LIDO, Protocol.LIDO_AAVE):
+        return ("STAKE_ETH", "ETH", "lido")
+    if recommended in (Protocol.PENDLE_PT, Protocol.PENDLE_YT):
+        return ("BUY_PT", "PT-stETH", "pendle")
+    # AAVE / IDLE / その他 → Aave 既定経路
+    return aave_default
+
+
 def _create_proposals_for_users(
     db: Session,
     decision: AIDecision,
@@ -424,7 +481,8 @@ def _create_proposals_for_users(
     Returns:
         作成した Proposal の件数。
     """
-    operation = "SUPPLY" if result.final_action == TradeAction.BUY else "WITHDRAW"
+    # operation/asset/protocol は per-user の risk_mode に依存するため、ループ内で
+    # _resolve_protocol_routing により決定する (Phase-B)。
     expires_at = datetime.now(timezone.utc) + timedelta(hours=_PROPOSAL_EXPIRES_HOURS)
     reason = result.final_reason or "AI判定による提案"
     now = datetime.now(timezone.utc)
@@ -520,12 +578,18 @@ def _create_proposals_for_users(
                     )
                     continue
 
+                # Phase-B: AI Optimizer 経由で (operation, asset, protocol) を決定。
+                # フラグ無効時は従来どおり (SUPPLY|WITHDRAW, USDC, aave)。
+                operation, asset, protocol = _resolve_protocol_routing(
+                    result, user.risk_mode, proposal_amount_usd
+                )
                 estimated_gas_usd = estimate_static_gas_cost_usd(operation)
                 proposal = Proposal(
                     user_id=user.id,
                     ai_decision_id=decision.id,
                     operation=operation,
-                    asset=_PROPOSAL_ASSET,
+                    asset=asset,
+                    protocol=protocol,
                     amount=proposal_amount_usd,
                     amount_usd=proposal_amount_usd,
                     reason=reason,
@@ -547,7 +611,7 @@ def _create_proposals_for_users(
 
                     _payload = ai_proposal_notification(
                         operation=operation,
-                        asset=_PROPOSAL_ASSET,
+                        asset=asset,
                         amount=proposal_amount_usd,
                         confidence=result.final_confidence,
                     )

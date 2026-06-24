@@ -647,7 +647,11 @@
   },
   "Liff": {
     "kpi": {
-      "walletBalance": "Wallet Balance"
+      "walletBalance": "Wallet Balance",
+      "totalValue": "Total Value",
+      "avgApy": "Avg APY",
+      "monthlyDividend": "Monthly Dividend",
+      "noDataYet": "Available after your first month"
     },
     "exec": {
       "operation": "Operation",
