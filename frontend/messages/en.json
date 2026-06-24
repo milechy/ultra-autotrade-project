@@ -677,7 +677,12 @@
       "rejecting": "Dismissing...",
       "rejected": "Proposal dismissed",
       "rejectFailed": "Failed to dismiss. Please try again later.",
-      "executeSuccess": "Proposal executed"
+      "executeSuccess": "Proposal executed",
+      "stakeEth": "Stake ETH",
+      "unstakeEth": "Unstake ETH",
+      "buyPt": "Buy PT Token",
+      "sellPt": "Sell PT Token",
+      "lidoStakeNote": "* ETH staking will be executed after approval"
     },
     "header": {
       "menuAriaLabel": "Open menu",

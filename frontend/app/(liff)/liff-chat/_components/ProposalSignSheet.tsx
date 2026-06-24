@@ -28,11 +28,12 @@ function toCall(tx: UnsignedTx): { to: `0x${string}`; data: `0x${string}`; value
 // confidence は ai_decision 由来で ProposalResponse には含まれないため optional。
 export interface ChatProposal {
   id: number
-  operation: "SUPPLY" | "WITHDRAW"
+  operation: "SUPPLY" | "WITHDRAW" | "STAKE_ETH" | "UNSTAKE_ETH" | "BUY_PT" | "SELL_PT"
   asset: string
   amount: string
   amount_usd: string
   reason: string
+  protocol?: string // "aave" | "lido" | "pendle"
   expected_hf_after: string | null
   estimated_gas_usd: string | null
   confidence?: number
@@ -186,6 +187,19 @@ export function ProposalSignSheet({
   const isBusy = signingStatus === "signing" || signingStatus === "confirming"
   const isSupply = proposal.operation === "SUPPLY"
 
+  // operation 種別ごとの表示ラベル（マルチプロトコル対応 / Phase-C3）。
+  const operationLabel: Record<string, string> = {
+    SUPPLY: t("supply"),
+    WITHDRAW: t("withdraw"),
+    STAKE_ETH: t("stakeEth"),
+    UNSTAKE_ETH: t("unstakeEth"),
+    BUY_PT: t("buyPt"),
+    SELL_PT: t("sellPt"),
+  }
+  const operationDisplayLabel = operationLabel[proposal.operation] ?? proposal.operation
+  // 入金系（資金投入）= 緑 / 出金系（引き出し）= 赤
+  const isInflowOperation = ["SUPPLY", "STAKE_ETH", "BUY_PT"].includes(proposal.operation)
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       <div
@@ -201,8 +215,14 @@ export function ProposalSignSheet({
         {/* detail rows */}
         <div className="space-y-3 mb-4">
           <DetailRow label={t("operation")}>
-            <span className={isSupply ? "text-[#1D9E75] font-semibold" : "text-red-600 font-semibold"}>
-              {isSupply ? t("supply") : t("withdraw")}
+            <span
+              className={
+                isInflowOperation
+                  ? "text-[#1D9E75] font-semibold"
+                  : "text-red-600 font-semibold"
+              }
+            >
+              {operationDisplayLabel}
             </span>
           </DetailRow>
           <DetailRow label={t("amount")}>
@@ -222,6 +242,11 @@ export function ProposalSignSheet({
             </DetailRow>
           )}
         </div>
+
+        {/* protocol 別の注意書き（Phase-C3） */}
+        {proposal.protocol === "lido" && (
+          <p className="text-xs text-[#736f7e] mt-2">{t("lidoStakeNote")}</p>
+        )}
 
         {/* signing status */}
         {(signingStatus === "signing" || signingStatus === "confirming") && (

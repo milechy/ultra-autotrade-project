@@ -677,7 +677,12 @@
       "rejecting": "見送り中...",
       "rejected": "提案を見送りました",
       "rejectFailed": "見送りに失敗しました。時間をおいて再度お試しください",
-      "executeSuccess": "提案を実行しました"
+      "executeSuccess": "提案を実行しました",
+      "stakeEth": "ETH ステーキング",
+      "unstakeEth": "ETH 引き出し",
+      "buyPt": "PT トークン購入",
+      "sellPt": "PT トークン売却",
+      "lidoStakeNote": "※ ETH ステーキングは承認後に実行されます"
     },
     "header": {
       "menuAriaLabel": "メニューを開く",
