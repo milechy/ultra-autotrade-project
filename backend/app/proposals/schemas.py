@@ -35,6 +35,10 @@ class ProposalResponse(BaseModel):
     ai_decision_id: Optional[int]
     operation: str
     asset: str
+    # 提案元プロトコル ("aave" / "lido" / "pendle")。model/DB には存在するが
+    # 従来 response schema 未露出のため、フロントの protocol バッジ・lido 注記・
+    # operation 別表示が機能しなかった (NULL=従来 Aave 既定フロー)。
+    protocol: Optional[str] = None
     amount: Decimal
     amount_usd: Decimal
     reason: str
