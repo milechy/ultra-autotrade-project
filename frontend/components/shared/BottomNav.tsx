@@ -4,10 +4,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, CheckCircle, Brain, Settings, HelpCircle, Users, ClipboardList, Gift } from 'lucide-react'
+import { Home, CheckCircle, Brain, Settings, HelpCircle, Users, ClipboardList, Gift, ArrowUpFromLine } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
+
+// 出金導線の env gate（money を動かす経路のため default-off）。
+// (user)/withdraw ページ・UserHeader・(liff) DepositPanel と同じ env 名で統一。
+// ★ 有効化は #391 money gate 人間承認後。
+const WITHDRAW_ENABLED: boolean = process.env.NEXT_PUBLIC_WITHDRAW_ENABLED === 'true'
 
 export function BottomNav() {
   const pathname = usePathname()
@@ -18,6 +23,10 @@ export function BottomNav() {
     { href: '/user/dashboard', label: t('adminNav.home'), icon: Home },
     { href: '/user/approve', label: t('adminNav.approve'), icon: CheckCircle },
     { href: '/user/ai-feed', label: t('adminNav.aiDecisions'), icon: Brain },
+    // 出金は (user)/withdraw（URL: /withdraw, route group prefix なし）。env off のときは出さない。
+    ...(WITHDRAW_ENABLED
+      ? [{ href: '/withdraw', label: t('adminNav.withdraw'), icon: ArrowUpFromLine }]
+      : []),
     { href: '/user/settings', label: t('adminNav.settings'), icon: Settings },
   ]
 

@@ -1291,6 +1291,8 @@
   "Withdraw": {
     "pageTitle": "USDC Withdraw",
     "pageDesc": "Transfer USDC on Base network to a specified address.",
+    "comingSoonTitle": "Withdrawals coming soon",
+    "comingSoonBody": "USDC withdrawal is being prepared. Please check back once it becomes available.",
     "loading": "Loading...",
     "notConnected": "Wallet not connected",
     "notConnectedDesc": "Wallet is not connected. Please connect your wallet first.",
@@ -2505,6 +2507,7 @@
       "approve": "Approvals",
       "history": "History",
       "deposit": "Deposit",
+      "withdraw": "Withdraw",
       "settings": "Settings",
       "gridBot": "Grid Bot",
       "copyTrading": "Copy Trading",
@@ -2544,6 +2547,7 @@
       "home": "Home",
       "approve": "Approve",
       "aiDecisions": "AI",
+      "withdraw": "Withdraw",
       "settings": "Settings"
     },
     "partnerNav": {

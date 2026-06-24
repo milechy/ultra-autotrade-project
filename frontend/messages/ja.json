@@ -1291,6 +1291,8 @@
   "Withdraw": {
     "pageTitle": "USDC 出金",
     "pageDesc": "Base ネットワーク上の USDC を指定アドレスへ送金します。",
+    "comingSoonTitle": "出金は準備中です",
+    "comingSoonBody": "USDC 出金機能は現在準備中です。提供開始までしばらくお待ちください。",
     "loading": "読み込み中...",
     "notConnected": "ウォレット未接続",
     "notConnectedDesc": "ウォレット未接続です。先にウォレットを接続してください。",
@@ -2522,6 +2524,7 @@
       "approve": "取引承認",
       "history": "取引履歴",
       "deposit": "入金",
+      "withdraw": "出金",
       "settings": "設定",
       "gridBot": "Grid Bot",
       "copyTrading": "Copy Trading",
@@ -2561,6 +2564,7 @@
       "home": "ホーム",
       "approve": "承認",
       "aiDecisions": "AI判定",
+      "withdraw": "出金",
       "settings": "設定"
     },
     "partnerNav": {
