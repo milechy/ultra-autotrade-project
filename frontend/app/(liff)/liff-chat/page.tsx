@@ -95,6 +95,30 @@ function mapPositionsToHoldings(
     .filter((c) => c.asset !== "" && Number.isFinite(c.amount_usd))
 }
 
+// fetch 失敗 (非2xx レスポンス / 例外) を観測可能化する。
+// 従来は `.catch(() => {})` と `r.ok ? json : null` で 500 等が無言で握りつぶされ、
+// 提案カードや AI 判定が「出ない」障害が長期間表面化しなかった
+// (例: /api/proposals/pending の 500 = protocol カラム欠落)。
+// 消費者 UX は変えず (データ無し表示は従来通り)、console.warn + PostHog で早期検知する。
+function reportFetchError(endpoint: string, detail: unknown): null {
+  console.warn(`[liff-chat] ${endpoint} の取得に失敗`, detail)
+  try {
+    track(EV.DATA_FETCH_ERROR, {
+      endpoint,
+      detail: detail instanceof Error ? detail.message : String(detail),
+    })
+  } catch {
+    // posthog 未初期化でも握りつぶさない (console.warn は出ている)
+  }
+  return null
+}
+
+// レスポンスを JSON 化する。非2xx は reportFetchError で記録して null を返す。
+async function jsonOrReport(endpoint: string, r: Response): Promise<unknown> {
+  if (!r.ok) return reportFetchError(endpoint, `HTTP ${r.status}`)
+  return r.json()
+}
+
 // ────────────────────────────────────────────
 // ページ本体
 // ────────────────────────────────────────────
@@ -152,37 +176,40 @@ export default function LiffChatPage() {
     // 運用停止状態（is_active=false）を読んで緊急停止バーの初期状態に反映する。
     // 現在資産はオンチェーン残高（useUsdcBalance）で取得するため、ここでは balance を読まない。
     fetch(`${API_BASE}/api/user/settings`, { headers })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { is_active?: boolean } | null) => {
-        if (d?.is_active === false) setPaused(true)
+      .then((r) => jsonOrReport("user/settings", r))
+      .then((d) => {
+        const s = d as { is_active?: boolean } | null
+        if (s?.is_active === false) setPaused(true)
       })
-      .catch(() => {})
+      .catch((e) => reportFetchError("user/settings", e))
 
     // AI 判定（最新 1 件）
     fetch(`${API_BASE}/api/ai/decisions?limit=1`, { headers })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { items?: AiJudgment[] } | null) => {
-        if (d?.items?.[0]) setAiJudgment(d.items[0])
+      .then((r) => jsonOrReport("ai/decisions", r))
+      .then((d) => {
+        const j = d as { items?: AiJudgment[] } | null
+        if (j?.items?.[0]) setAiJudgment(j.items[0])
       })
-      .catch(() => {})
+      .catch((e) => reportFetchError("ai/decisions", e))
 
     // 運用中コイン: 最新ポートフォリオ snapshot の positions_json を表示する。
     // /api/user/holdings は不在のため /api/portfolio/current を使う (Asana 1215723024139228)。
     // v3 (shadow mode) は positions_json が空 → 「運用中のコインがありません」が正。
     fetch(`${API_BASE}/api/portfolio/current`, { headers })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: PortfolioCurrentResponse | null) => {
-        setCoins(mapPositionsToHoldings(d?.positions_json))
+      .then((r) => jsonOrReport("portfolio/current", r))
+      .then((d) => {
+        setCoins(mapPositionsToHoldings((d as PortfolioCurrentResponse | null)?.positions_json))
       })
-      .catch(() => {})
+      .catch((e) => reportFetchError("portfolio/current", e))
 
     // 保留中の提案（最新 1 件）。あれば承認/見送りの実行導線を表示する。
     fetch(`${API_BASE}/api/proposals/pending`, { headers })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { items?: ChatProposal[] } | null) => {
-        if (d?.items?.[0]) setPendingProposal(d.items[0])
+      .then((r) => jsonOrReport("proposals/pending", r))
+      .then((d) => {
+        const p = d as { items?: ChatProposal[] } | null
+        if (p?.items?.[0]) setPendingProposal(p.items[0])
       })
-      .catch(() => {})
+      .catch((e) => reportFetchError("proposals/pending", e))
   }, [])
 
   // ── KPI-C: 運用残高 + 加重平均APY を 30秒ポーリングで取得
@@ -194,11 +221,11 @@ export default function LiffChatPage() {
     const headers = { Authorization: `Bearer ${token}` }
     const fetchPortfolio = () => {
       fetch(`${API_BASE}/api/portfolio/current`, { headers })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d: PortfolioCurrentResponse | null) => {
-          if (d) setPortfolio(d)
+        .then((r) => jsonOrReport("portfolio/current", r))
+        .then((d) => {
+          if (d) setPortfolio(d as PortfolioCurrentResponse)
         })
-        .catch(() => {})
+        .catch((e) => reportFetchError("portfolio/current", e))
     }
     fetchPortfolio()
     const id = setInterval(fetchPortfolio, 30_000)
@@ -213,8 +240,9 @@ export default function LiffChatPage() {
     if (!token) return
     const headers = { Authorization: `Bearer ${token}` }
     fetch(`${API_BASE}/api/user/dividends`, { headers })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { dividends?: { month: string; user_takehome_jpy: string }[] } | null) => {
+      .then((r) => jsonOrReport("user/dividends", r))
+      .then((raw) => {
+        const d = raw as { dividends?: { month: string; user_takehome_jpy: string }[] } | null
         if (!d?.dividends) return
         setDividends(
           d.dividends
@@ -225,7 +253,7 @@ export default function LiffChatPage() {
             .reverse(),
         )
       })
-      .catch(() => {})
+      .catch((e) => reportFetchError("user/dividends", e))
   }, [])
 
   // ── WebSocket: AI 判定リアルタイム受信
@@ -249,7 +277,10 @@ export default function LiffChatPage() {
         // parse 失敗は無視
       }
     }
-    ws.onerror = () => ws.close()
+    ws.onerror = (ev) => {
+      reportFetchError("ai/ws/decisions", ev)
+      ws.close()
+    }
     return () => ws.close()
   }, [])
 

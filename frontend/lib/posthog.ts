@@ -38,6 +38,9 @@ export const EV = {
   OPMODE_CHANGE:       "liff_opmode_change",
   DEPOSIT_FUND:        "liff_deposit_fund",
   WITHDRAW_SUBMIT:     "liff_withdraw_submit",
+  // データ取得失敗 (非2xx / 例外)。silent な握りつぶしを観測可能化し、
+  // 提案・AI判定・残高などが「出ない」障害を早期検知する。
+  DATA_FETCH_ERROR:    "liff_data_fetch_error",
 } as const
 
 export type EventName = typeof EV[keyof typeof EV]
