@@ -114,6 +114,17 @@
 
 ## backend/app/main.py
 
+### 変更 #17: v4 market_router / dividends_router 配線（MARKET-A / KPI-A）(PR #866 / 2026-06-24)
+- **コミット範囲**: `feat/v4-round1-backend`
+- **変更内容**: 新規 router 2 本を import + `include_router` で配線（計 4 行）。
+  - `from app.market.router import router as market_router` → `app.include_router(market_router)`（`GET /api/market/prices`、MARKET-A）
+  - `from app.fees.dividends_router import router as dividends_router` → `app.include_router(dividends_router)`（`GET /api/user/dividends`、KPI-A）
+- **理由**: v4 Round 1 の新規エンドポイント（市場価格 ETH/USD・USD/JPY / ユーザー月次手取り）を
+  公開するため。CLAUDE.md §並列ルール「main.py への include_router 追加はメインセッションが直接行う」に従い配線。
+- **影響範囲**: 既存 router・startup task への影響なし（追加のみ）。両 EP とも `require_active_user` 認証必須。
+  market は fail-open（外部 API 失敗時も 200）。新規 startup task の追加はなし。
+- **承認**: feat/v4-round1-backend → main (PR #866)
+
 ### 変更 #16: OracleMonitor を scheduler に配線（flag-gated / 接続監査 #3）(PR #834 / 2026-06-22)
 - **コミット範囲**: `feat/oracle-monitor-wiring`
 - **変更内容**: `startup_scheduled_tasks` に oracle 監視の起動分岐を追加（11 行）。

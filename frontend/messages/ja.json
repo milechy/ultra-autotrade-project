@@ -647,7 +647,11 @@
   },
   "Liff": {
     "kpi": {
-      "walletBalance": "ウォレット残高"
+      "walletBalance": "ウォレット残高",
+      "totalValue": "運用残高",
+      "avgApy": "平均 APY",
+      "monthlyDividend": "月次手取り（配当）",
+      "noDataYet": "運用開始後に表示されます"
     },
     "exec": {
       "operation": "操作",
@@ -673,7 +677,12 @@
       "rejecting": "見送り中...",
       "rejected": "提案を見送りました",
       "rejectFailed": "見送りに失敗しました。時間をおいて再度お試しください",
-      "executeSuccess": "提案を実行しました"
+      "executeSuccess": "提案を実行しました",
+      "stakeEth": "ETH ステーキング",
+      "unstakeEth": "ETH 引き出し",
+      "buyPt": "PT トークン購入",
+      "sellPt": "PT トークン売却",
+      "lidoStakeNote": "※ ETH ステーキングは承認後に実行されます"
     },
     "header": {
       "menuAriaLabel": "メニューを開く",

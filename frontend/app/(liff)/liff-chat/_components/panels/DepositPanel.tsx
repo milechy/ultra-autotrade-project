@@ -1,7 +1,7 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { AlertTriangle, Loader2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useLanguage } from "@/lib/useLanguage"
@@ -16,8 +16,9 @@ import { track, EV } from "@/lib/posthog"
 
 type Tab = "deposit" | "withdraw"
 
-// 入金目安表示用 JPY → USDC 変換レート（固定近似値）
-const JPY_PER_USDC = 155
+// 入金目安表示用 JPY → USDC 変換レートのフォールバック値（API 失敗時に使用）。
+// 実値は GET /api/market/prices の usd_jpy を MARKET-C で動的取得する。
+const JPY_PER_USDC_FALLBACK = 155
 
 // 出金ネットワーク手数料概算 (USDC)
 const WITHDRAW_FEE = 0.08
@@ -95,6 +96,18 @@ export function DepositPanel() {
   const { language } = useLanguage()
   const [tab, setTab] = useState<Tab>("deposit")
 
+  // JPY→USDC 換算レート（MARKET-C: /api/market/prices の usd_jpy をリアルタイム取得）。
+  // 取得失敗時はフォールバック値 155 のまま（入金画面は崩壊しない）。
+  const [jpyPerUsdc, setJpyPerUsdc] = useState<number>(JPY_PER_USDC_FALLBACK)
+  useEffect(() => {
+    liffFetch("/api/market/prices")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && d.usd_jpy) setJpyPerUsdc(Number(d.usd_jpy))
+      })
+      .catch(() => {})
+  }, [])
+
   // Privy ウォレット情報（useFundWallet 用）
   const { address, chainId } = useWallet()
 
@@ -138,7 +151,7 @@ export function DepositPanel() {
       // Privy fundWallet の amount は USDC 建てのため、ここで USDC へ正規化する
       // （旧実装は ¥ 値をそのまま USDC として渡していた不具合を修正）。
       const num = parseFloat(depositAmount) || 0
-      const usdc = language === "en" ? num : num / JPY_PER_USDC
+      const usdc = language === "en" ? num : num / jpyPerUsdc
       await fundWallet({
         address,
         options: {
@@ -156,7 +169,7 @@ export function DepositPanel() {
       setIsFunding(false)
       refetchBalance()
     }
-  }, [address, chainId, depositAmount, language, refetchBalance, fundWallet])
+  }, [address, chainId, depositAmount, language, jpyPerUsdc, refetchBalance, fundWallet])
 
   // ---- 出金可能額上限（全額ボタン用） ----------------------------------------
 
@@ -169,7 +182,7 @@ export function DepositPanel() {
   const depositNum = parseFloat(depositAmount) || 0
   // 入力単位: 英語=USD（≈USDC 1:1）/ 日本語=¥（÷155 で USDC 換算）
   const isEn = language === "en"
-  const depositUsdc = isEn ? depositNum : depositNum / JPY_PER_USDC
+  const depositUsdc = isEn ? depositNum : depositNum / jpyPerUsdc
 
   // ---- タブ切替 ------------------------------------------------------------
 
