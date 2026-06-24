@@ -12,7 +12,8 @@ const TOKEN_EXPIRES_KEY = 'ultra_auth_expires'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
-test.describe('ITP session guard — itp-guard.ts pure logic', () => {
+// NOTE: ロジックは page.evaluate でインライン再現（実装は lib/auth/session-monitor が担当）。
+test.describe('ITP session guard — セッション有効期限検知ロジック', () => {
   test('updateLastSeen が現在時刻を localStorage に書き込む', async ({ page }) => {
     await page.goto('/')
 

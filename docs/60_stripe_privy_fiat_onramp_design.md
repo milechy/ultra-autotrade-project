@@ -299,10 +299,18 @@ Ultra AutoTrade Backend 側での KYC 実装は不要（Stripe への委任）�
 
 ### Phase B: Stripe SDK + webhook signature 検証 + 着金処理（HUMAN-REVIEW-REQUIRED）
 
-**スコープ:**
-- `backend/requirements.txt` への `stripe` 追加
-- `backend/app/fees/onramp/stripe_provider.py`（Stripe Crypto Onramp API クライアント）
-- `backend/app/fees/onramp/webhook_handler.py`（Stripe-Signature HMAC 検証 + 状態遷移処理）
+**Phase B-1（実装済み・2026-06-22）:**
+- ✅ `backend/app/fees/onramp/webhook_signature.py` — Stripe-Signature HMAC-SHA256 検証
+  （§6 準拠の純実装・stdlib のみ・Stripe SDK 非依存・dormant=router 未配線）。
+  `verify_stripe_signature()` は raw body + Stripe-Signature ヘッダー + secret + 現在時刻を
+  受け取り、署名一致 + replay 窓（既定 300s）を検証する純関数。secret は env のみ（引数渡し）。
+  Stripe の payload 構造・event 名・通貨/暗号リスト（Q1〜Q5/Q8/Q9/Q11）には非依存なため
+  外部確認なしで faithful 実装可能だった（署名仕様 Q6 は公開・安定仕様）。
+
+**Phase B-2 以降（残・HUMAN-REVIEW + Stripe 確認 Q1〜Q11 が前提）:**
+- `backend/requirements.txt` への `stripe` 追加（または httpx 直叩き継続）
+- `backend/app/fees/onramp/stripe_provider.py`（Stripe Crypto Onramp API クライアント・Q1〜Q4/Q8/Q9）
+- `backend/app/fees/onramp/webhook_handler.py`（B-1 の署名検証を使い、event payload → 状態遷移・Q5/Q11）
 - DB スキーマ（`onramp_sessions` テーブル）
 - Alembic マイグレーション
 

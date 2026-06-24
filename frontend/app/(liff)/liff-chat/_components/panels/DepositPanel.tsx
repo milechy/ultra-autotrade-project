@@ -23,12 +23,8 @@ const JPY_PER_USDC_FALLBACK = 155
 // 出金ネットワーク手数料概算 (USDC)
 const WITHDRAW_FEE = 0.08
 
-// v3: 出金 UI は非表示。資金はユーザー自身の非カストディアルウォレットにあるが、
-// embedded wallet(EOA) の USDC 送金にはガス用 ETH が必要で、現状ガススポンサー(paymaster)が
-// 本番未配線のため ETH 未保有の一般ユーザーは出金 tx が失敗する。v4 で paymaster
-// (feat/erc20-paymaster-with-approval-ui の sendUserOpWithPaymaster) と共に有効化する
-// （true に切り替えるだけで出金タブが復活する）。
-const WITHDRAW_ENABLED: boolean = false
+// v3: 出金 UI は非表示（paymaster 未配線）。v4 以降は NEXT_PUBLIC_WITHDRAW_ENABLED=true で有効化。
+const WITHDRAW_ENABLED: boolean = process.env.NEXT_PUBLIC_WITHDRAW_ENABLED === "true"
 
 // ---- 確認シート（出金専用） -------------------------------------------------
 

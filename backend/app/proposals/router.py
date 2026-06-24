@@ -357,7 +357,14 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
     from app.ai.schemas import TradeAction  # noqa: PLC0415
     from app.transactions.models import Transaction  # noqa: PLC0415
 
-    from .execution_route import ExecutionRoute, RouteMismatchError, assert_route
+    from .execution_route import (
+        DEFAULT_EXECUTION_ROUTE,
+        ExecutionRoute,
+        RouteMismatchError,
+        assert_route,
+        detect_route_mismatch,
+        notify_route_mismatch,
+    )
 
     # P0-2 誤執行ガード: Aave 自動実行は on-chain 経路専用。
     # CEX 選択 proposal がこの経路に入った場合は即時 EMERGENCY アラート + 例外で停止する
@@ -515,6 +522,26 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
         proposal.tx_hash = result.tx_hash
         proposal.status = "executed"
         proposal.executed_at = datetime.now(timezone.utc)
+
+        # 執行後の経路↔証跡整合チェック (§14a defense-in-depth)。
+        # assert_route は「執行前」ガードなのに対し、ここは「執行後」に
+        # 経路 (execution_route) と実際の証跡 (on-chain tx_hash / CEX order) の
+        # 食い違いを検出する。on-chain 経路の正常系 (tx あり / CEX order なし) では
+        # None を返し no-op。CEX order が誤って付くなど証跡破損 (誤執行の疑い) 時のみ
+        # EMERGENCY 通知を出して手動介入を促す (tx は確定済みのため status は変えない)。
+        _route = proposal.execution_route or DEFAULT_EXECUTION_ROUTE
+        _evidence_mismatch = detect_route_mismatch(
+            _route,
+            has_onchain_tx=bool(proposal.tx_hash),
+            has_cex_order=bool(proposal.cex_order_id),
+        )
+        if _evidence_mismatch:
+            notify_route_mismatch(proposal.id, _route, _evidence_mismatch)
+            logger.error(
+                "proposal %d: post-execution route mismatch — %s",
+                proposal.id,
+                _evidence_mismatch,
+            )
 
         # 取引履歴に記録
         tx_status = "completed" if result.tx_hash else "pending"
