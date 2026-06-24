@@ -6,7 +6,7 @@ import os
 import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -78,6 +78,27 @@ def get_live_portfolio(
     return response
 
 
+def _calc_weighted_avg_apy(positions: Optional[list[Any]]) -> Decimal:
+    """positions_json の apy_pct を value_usd で加重平均した APY (%) を返す。
+
+    value_usd の合計が 0 (= ポジション無し) のときは "0.00"。
+    金額計算は Decimal 型のみ (float 禁止)。
+    """
+    if not positions:
+        return Decimal("0.00")
+    total_value = sum((Decimal(str(p.get("value_usd", 0))) for p in positions), Decimal("0"))
+    if total_value == Decimal("0"):
+        return Decimal("0.00")
+    weighted = sum(
+        (
+            Decimal(str(p.get("apy_pct", 0))) * Decimal(str(p.get("value_usd", 0)))
+            for p in positions
+        ),
+        Decimal("0"),
+    )
+    return (weighted / total_value).quantize(Decimal("0.01"))
+
+
 def _get_since(period: str) -> Optional[datetime]:
     """期間文字列から開始datetimeを返す。"""
     now = datetime.now(timezone.utc)
@@ -104,7 +125,11 @@ def get_current_portfolio(
     )
     snapshot = db.scalars(stmt).first()
     if snapshot is None:
-        return PortfolioCurrentResponse(user_id=current_user.id, has_data=False)
+        return PortfolioCurrentResponse(
+            user_id=current_user.id,
+            has_data=False,
+            weighted_avg_apy=_calc_weighted_avg_apy([]),
+        )
 
     return PortfolioCurrentResponse(
         id=snapshot.id,
@@ -116,6 +141,7 @@ def get_current_portfolio(
         positions_json=snapshot.positions_json,
         recorded_at=snapshot.recorded_at,
         has_data=True,
+        weighted_avg_apy=_calc_weighted_avg_apy(snapshot.positions_json),
     )
 
 

@@ -44,6 +44,11 @@ class Proposal(Base):
     ai_decision_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     operation: Mapped[str] = mapped_column(String(20), nullable=False)
     asset: Mapped[str] = mapped_column(String(20), nullable=False)
+    # protocol: 提案元プロトコル ("aave" / "lido" / "pendle")。
+    # v4 マルチプロトコル対応 (Phase-A)。後方互換のため nullable=True (既存提案は NULL)。
+    # alembic: pp20260624_add_protocol_to_proposals.py
+    # ALTER TABLE proposals ADD COLUMN IF NOT EXISTS protocol VARCHAR(50);
+    protocol: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(precision=36, scale=18), nullable=False)
     amount_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=2), nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)

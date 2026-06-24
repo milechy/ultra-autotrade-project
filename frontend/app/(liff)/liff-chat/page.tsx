@@ -392,12 +392,23 @@ export default function LiffChatPage() {
 
         {/* 保留中の提案（承認→自己署名→実行 / 見送り） */}
         {pendingProposal && (
-          <ProposalActionCard
-            proposal={pendingProposal}
-            rejecting={rejecting}
-            onApprove={() => setSignSheetOpen(true)}
-            onReject={handleRejectProposal}
-          />
+          <>
+            {/* 提案カード上部のウォレット残高表示（KPI-E） */}
+            <div className="mx-4 mt-4 px-4 py-2.5 rounded-xl ax-card-warm flex items-center justify-between">
+              <span className="text-xs text-[#736f7e]">{t("kpi.walletBalance")}</span>
+              <span className="text-sm font-semibold text-[#1c1a27]">
+                {balanceUsd != null
+                  ? `$${balanceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : "—"}
+              </span>
+            </div>
+            <ProposalActionCard
+              proposal={pendingProposal}
+              rejecting={rejecting}
+              onApprove={() => setSignSheetOpen(true)}
+              onReject={handleRejectProposal}
+            />
+          </>
         )}
 
         {/* 運用中コイン一覧 */}

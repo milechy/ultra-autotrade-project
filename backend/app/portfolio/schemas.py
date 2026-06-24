@@ -66,6 +66,9 @@ class PortfolioCurrentResponse(BaseModel):
     positions_json: Optional[List[Any]] = None
     recorded_at: Optional[datetime] = None
     has_data: bool = False
+    # positions_json の apy_pct を value_usd で加重平均した APY (%)。
+    # ポジション無し / value 合計 0 のときは "0.00"。財務値は Decimal 型。
+    weighted_avg_apy: Decimal = Decimal("0")
 
     @field_validator("health_factor", mode="before")
     @classmethod

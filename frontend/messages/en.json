@@ -646,6 +646,9 @@
     "closeDetail": "Close"
   },
   "Liff": {
+    "kpi": {
+      "walletBalance": "Wallet Balance"
+    },
     "exec": {
       "operation": "Operation",
       "supply": "Supply",
