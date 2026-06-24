@@ -25,6 +25,7 @@ from decimal import Decimal
 from typing import Any, Optional, Protocol, cast
 
 from .config import AaveSettings, get_aave_settings
+from .credit_delegation import DelegationAssessment
 from .gas_estimator import (
     DEFAULT_FALLBACK_GAS_APPROVE,
     DEFAULT_FALLBACK_GAS_SUPPLY,
@@ -152,6 +153,40 @@ _ERC20_ABI_MINIMAL = [
         "name": "approve",
         "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
         "stateMutability": "nonpayable",
+        "type": "function",
+    },
+    {
+        "inputs": [],
+        "name": "decimals",
+        "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+        "stateMutability": "view",
+        "type": "function",
+    },
+]
+
+# Aave V3 variable debt token ABI（Credit Delegation — 最小限）
+# approveDelegation: delegator が delegatee に borrow allowance を委譲する write 操作。
+# borrowAllowance: 現在の委譲枠を読む view（テスト・監査用、本スライスでは未署名 tx のみ）。
+# decimals: amount→wei 変換用（underlying と同 decimals。USDC=6）。
+_DEBT_TOKEN_ABI_MINIMAL = [
+    {
+        "inputs": [
+            {"internalType": "address", "name": "delegatee", "type": "address"},
+            {"internalType": "uint256", "name": "amount", "type": "uint256"},
+        ],
+        "name": "approveDelegation",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+    {
+        "inputs": [
+            {"internalType": "address", "name": "fromUser", "type": "address"},
+            {"internalType": "address", "name": "toUser", "type": "address"},
+        ],
+        "name": "borrowAllowance",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
         "type": "function",
     },
     {
@@ -1548,6 +1583,119 @@ class Web3AaveClient(AaveClientBase):
             "set_emode_tx": {
                 "to": str(self._pool.address),
                 "data": set_emode_data,
+                "from": checksum_wallet,
+                "chainId": chain_id,
+                "value": "0x0",
+            }
+        }
+
+    def build_approve_delegation_tx(
+        self,
+        *,
+        asset_symbol: str,
+        delegatee: str,
+        delegation_assessment: DelegationAssessment,
+        wallet_address: str,
+        dry_run: bool = False,
+    ) -> "dict[str, Any]":
+        """variableDebtToken.approveDelegation(delegatee, amount) の未署名 tx を構築する。
+
+        HUMAN-REVIEW-REQUIRED: on-chain broadcast は本スライス対象外（未署名 tx を返すのみ）。
+        署名・送信 (send_raw_transaction) は第3スライス（HUMAN-REVIEW）に隔離する。本メソッドは
+        Aave V3 Credit Delegation の approveDelegation calldata を組み立てるだけで、秘密鍵経路・
+        broadcast には一切触れない。
+
+        委譲額の上限は第1スライス（credit_delegation.assess_delegated_borrow）が算出した
+        ``delegation_assessment.approved_usd``（HF floor 1.6 と絶対委譲上限で二重クランプ済み）。
+        本メソッドは HF floor を読み取るだけで変更しない。
+
+        Args:
+            asset_symbol: 委譲対象資産シンボル（例: "USDC"）。variable debt token を解決する。
+            delegatee: borrow allowance を委譲する先（UATa 運用アドレス等）。
+            delegation_assessment: 第1スライスの安全枠評価。approved_usd を委譲額として使う。
+            wallet_address: 委譲元（delegator）ウォレットアドレス = tx の from。
+            dry_run: True なら calldata・tx を構築せず試算結果のみ返す。
+
+        Returns:
+            dry_run=True:  {"asset_symbol", "delegatee", "approved_usd", "dry_run": True}
+            dry_run=False: {"approve_delegation_tx": {to, data, from, chainId, value}}
+
+        Raises:
+            AaveClientError: web3 未導入 / アドレス未指定 / approved_usd<=0（安全枠超）/ 資産未解決時
+        """
+        if Web3 is None:
+            raise AaveClientError("web3 package is required")
+
+        if not wallet_address:
+            raise AaveClientError("wallet_address は必須です (approveDelegation)")
+        if not delegatee:
+            raise AaveClientError("delegatee は必須です (approveDelegation)")
+
+        approved_usd = delegation_assessment.approved_usd
+        if approved_usd <= 0:
+            # 安全枠（HF floor 1.6）超過 / headroom ゼロ → 委譲枠を作らせない
+            raise AaveClientError(
+                "approved_usd must be positive to approve delegation "
+                f"(assessment: {delegation_assessment.reason})"
+            )
+
+        checksum_wallet = Web3.to_checksum_address(wallet_address)
+        checksum_delegatee = Web3.to_checksum_address(delegatee)
+
+        logger.info(
+            "build_approve_delegation_tx: wallet=%s...%s, delegatee=%s...%s, "
+            "asset=%s, approved_usd=%s, dry_run=%s",
+            wallet_address[:6] if wallet_address else "N/A",
+            wallet_address[-4:] if wallet_address else "N/A",
+            delegatee[:6] if delegatee else "N/A",
+            delegatee[-4:] if delegatee else "N/A",
+            asset_symbol,
+            str(approved_usd),
+            dry_run,
+        )
+
+        if dry_run:
+            return {
+                "asset_symbol": asset_symbol,
+                "delegatee": checksum_delegatee,
+                "approved_usd": str(approved_usd),
+                "dry_run": True,
+            }
+
+        # asset_symbol → underlying address 解決
+        if not hasattr(self, "token_addresses"):
+            raise AaveClientError(f"Unknown asset: {asset_symbol}")
+        asset_address = self.token_addresses.get(asset_symbol)
+        if not asset_address:
+            raise AaveClientError(f"Unknown asset: {asset_symbol}")
+
+        # Pool.getReserveData(asset)[10] = variableDebtTokenAddress
+        reserve_data = self._pool.functions.getReserveData(
+            Web3.to_checksum_address(asset_address)
+        ).call()
+        vdebt_addr: str = reserve_data[10]
+        if not vdebt_addr or int(vdebt_addr, 16) == 0:
+            raise AaveClientError(f"variable debt token not found for asset: {asset_symbol}")
+
+        debt_token_contract = self._w3.eth.contract(
+            address=Web3.to_checksum_address(vdebt_addr),
+            abi=_DEBT_TOKEN_ABI_MINIMAL,
+        )
+        # decimals は underlying/debt token 共通（USDC=6）。Decimal のまま wei 化（float 化禁止）。
+        decimals = debt_token_contract.functions.decimals().call()
+        amount_wei = self._to_wei(approved_usd, decimals)
+        chain_id = self._w3.eth.chain_id
+
+        # web3.py v7: encode_abi（fn_name= → 位置引数）。send_raw_transaction は呼ばない。
+        approve_delegation_data = debt_token_contract.encode_abi(
+            "approveDelegation",
+            args=[checksum_delegatee, amount_wei],
+        )
+
+        return {
+            "approve_delegation_tx": {
+                "to": Web3.to_checksum_address(vdebt_addr),
+                "data": approve_delegation_data,
                 "from": checksum_wallet,
                 "chainId": chain_id,
                 "value": "0x0",
