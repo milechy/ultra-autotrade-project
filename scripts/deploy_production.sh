@@ -481,8 +481,17 @@ log "git pull origin main"
 git pull origin main
 
 log ".env.production を読み込み（ビルド ARG 用）"
-# shellcheck disable=SC2046
-export $(grep -v '^#' "${ENV_FILE}" | grep '=' | xargs)
+# 値にスペース/特殊文字を含む行（例: PRIVY_VERIFICATION_KEY の PEM 公開鍵
+# "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"）でも壊れないよう、
+# 1 行ずつ KEY=VALUE 全体を単一引数として export する。
+# 旧実装 `export $(grep ... | xargs)` は xargs の空白分割で
+# "BEGIN PUBLIC KEY" が複数トークンに割れ "not a valid identifier" で失敗していた。
+while IFS= read -r _envline || [[ -n "${_envline}" ]]; do
+  [[ -z "${_envline}" || "${_envline}" == \#* ]] && continue
+  [[ "${_envline}" != *=* ]] && continue
+  export "${_envline%%=*}=${_envline#*=}"
+done < "${ENV_FILE}"
+unset _envline
 
 # デプロイ版識別子: PostHog の app_version（全イベント super property）に git short SHA を埋め込む。
 # バージョンアップ前後の行動比較を可能にする。git 失敗時は dev フォールバック。

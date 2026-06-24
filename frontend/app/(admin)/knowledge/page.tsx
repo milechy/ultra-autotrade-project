@@ -14,6 +14,7 @@ import {
   type KnowledgeItemStatus,
   type KnowledgeItemType,
 } from "@/lib/api/knowledge";
+import { getJson, postJson } from "@/lib/api/http";
 
 // ─── RAG search types ────────────────────────────────────────────────────────
 
@@ -160,15 +161,12 @@ export default function KnowledgeIndexPage() {
         query: ragQuery.trim(),
         top_k: ragTopK,
       });
-      const headers: Record<string, string> = token
-        ? { Authorization: `Bearer ${token}` }
-        : {};
-      const res = await fetch(`/api/knowledge/search/test?${params}`, { headers });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as { detail?: string }).detail ?? `HTTP ${res.status}`);
-      }
-      const data: SearchTestResponse = await res.json();
+      // backend prefix は /knowledge（/api なし）。getJson が base URL を解決するため
+      // /api を付けた raw fetch（必ず 404）ではなくラッパ経由で叩く。
+      const data = await getJson<SearchTestResponse>(
+        `/knowledge/search/test?${params}`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      );
       setRagResult(data);
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message ?? String(e);
@@ -186,15 +184,12 @@ export default function KnowledgeIndexPage() {
     setWorkflowResult(null);
     setWorkflowIsError(false);
     try {
-      const res = await fetch("/api/knowledge/workflow/trigger", {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as { detail?: string }).detail ?? `HTTP ${res.status}`);
-      }
-      const data: WorkflowResult = await res.json();
+      // backend prefix は /knowledge（/api なし）。postJson が base URL を解決する。
+      const data = await postJson<WorkflowResult>(
+        "/knowledge/workflow/trigger",
+        {},
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      );
       setWorkflowResult(data);
       setWorkflowIsError(false);
       loadItems();

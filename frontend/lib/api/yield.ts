@@ -6,7 +6,7 @@
  * Privy Earn / Morpho Vaults アイドル資本自動運用エンドポイント。
  */
 
-import { getJson, postJson } from "./http";
+import { postJson } from "./http";
 
 // ---- Types ----
 
@@ -74,27 +74,8 @@ export interface WithdrawRequest {
 }
 
 // ---- API 関数 ----
-
-/**
- * GET /api/yield-optimizer/vaults — Vault 一覧取得 (viewer 以上)
- */
-export async function getVaults(): Promise<VaultListResponse> {
-  return getJson<VaultListResponse>("/api/yield-optimizer/vaults");
-}
-
-/**
- * GET /api/yield-optimizer/positions — ポジション一覧取得 (viewer 以上)
- */
-export async function getPositions(): Promise<PositionListResponse> {
-  return getJson<PositionListResponse>("/api/yield-optimizer/positions");
-}
-
-/**
- * GET /api/yield-optimizer/idle-report — アイドル資本レポート (viewer 以上)
- */
-export async function getIdleReport(): Promise<IdleCapitalReport> {
-  return getJson<IdleCapitalReport>("/api/yield-optimizer/idle-report");
-}
+// NOTE: getVaults/getPositions/getIdleReport は呼出元ゼロのため削除（2026-06-22 監査 fe-09）。
+// 各 read は画面側 useAuthFetch がインラインで担当。型は将来の UI 配線用に保持。
 
 /**
  * POST /api/yield-optimizer/deposit — Morpho Vault 入金 (admin 専用)

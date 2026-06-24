@@ -8,7 +8,7 @@
  *   TC2: /partner/proposals に JP pageTitle "AI提案管理" が存在する
  *        認証ゲートで到達できない場合は gracefully skip
  *   TC3: /partner/proposals に EN pageTitle "AI Proposal Management" が存在する
- *        （accept-language: en ヘッダー付きリクエスト / 認証ゲートで到達不能なら skip）
+ *        （NEXT_LOCALE=en cookie 設定 / 認証ゲートで到達不能なら skip）
  *   TC4: NextIntlClientProvider が runtime エラーを起こさず DOM が構築される
  *        （runtime error overlay または uncaught IntlError が存在しないことを確認）
  *
@@ -46,14 +46,17 @@ test.describe('[partner-proposals-i18n] /partner/proposals i18n smoke', () => {
     await expect(jpTitle).toBeVisible()
   })
 
-  test('TC3: EN Accept-Language - "AI Proposal Management" が DOM に存在する', async ({
+  test('TC3: NEXT_LOCALE=en cookie - "AI Proposal Management" が DOM に存在する', async ({
     browser,
   }) => {
-    // EN ロケールを accept-language で指定して新しいコンテキストを作成
-    const context = await browser.newContext({
-      locale: 'en-US',
-      extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
-    })
+    // middleware は NEXT_LOCALE cookie のみで locale を決定する（Accept-Language は不使用）。
+    // liff.openWindow({external:true}) で開いた外部ブラウザが LINE WebView の cookie を
+    // 引き継がず、Accept-Language 依存で日本語ユーザーに英語が表示されるバグの修正に伴い変更。
+    const COOKIE_DOMAIN = new URL(process.env.STAGING_URL || 'https://app.ultra-auto-trade.com').hostname
+    const context = await browser.newContext()
+    await context.addCookies([
+      { name: 'NEXT_LOCALE', value: 'en', domain: COOKIE_DOMAIN, path: '/' },
+    ])
     const page = await context.newPage()
 
     const res = await page.goto(PROPOSALS_URL, { waitUntil: 'domcontentloaded' })

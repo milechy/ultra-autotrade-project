@@ -34,6 +34,9 @@ jobs:
             exit 1
           fi
           echo "✅ docker-compose に .env.staging 参照なし"
+      - name: Check no real .env files committed
+        # 旧 env ファイル含む実 .env が tracked に混入していないか検証 (Asana 1214696986457078)。
+        run: bash scripts/check_no_committed_env_files.sh
       - name: Shellcheck
         uses: ludeeus/action-shellcheck@master
         with:
