@@ -1105,6 +1105,109 @@ def test_resolve_proposal_amount_multiple_allocations_summed(db_session):
     assert result == Decimal("500.00")
 
 
+# ---------------------------------------------------------------------------
+# _resolve_proposal_amount: wallet 残高 fallback (案C / docs/61)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_amount_wallet_fallback_uses_balance(db_session, monkeypatch):
+    """allocation 不在 + wallet 設定済 → wallet USDC 残高 × 10% を使う。
+
+    $1,000 残高 × 10% = $100。
+    """
+    import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
+
+    user = _add_active_user(db_session, "wallet_consumer@example.com")
+    user.smart_wallet_address = "0x" + "a" * 40
+    db_session.commit()
+
+    monkeypatch.setattr(sched, "_read_wallet_usdc_balance", lambda _addr: Decimal("1000"))
+    result = sched._resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("100.00")
+
+
+def test_resolve_amount_wallet_below_min_is_skipped(db_session, monkeypatch):
+    """wallet 残高 × 10% が min ($50) 未満 → $0 で skip (切り上げない / 安全側)。
+
+    $400 残高 × 10% = $40 < $50 → $0。
+    """
+    import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
+
+    user = _add_active_user(db_session, "wallet_small@example.com")
+    user.wallet_address = "0x" + "b" * 40
+    db_session.commit()
+
+    monkeypatch.setattr(sched, "_read_wallet_usdc_balance", lambda _addr: Decimal("400"))
+    result = sched._resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("0")
+
+
+def test_resolve_amount_wallet_clamps_to_max(db_session, monkeypatch):
+    """wallet 残高 × 10% が max ($2,000) 超 → $2,000 にクランプ。
+
+    $30,000 残高 × 10% = $3,000 → $2,000。
+    """
+    import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
+
+    user = _add_active_user(db_session, "wallet_big@example.com")
+    user.smart_wallet_address = "0x" + "c" * 40
+    db_session.commit()
+
+    monkeypatch.setattr(sched, "_read_wallet_usdc_balance", lambda _addr: Decimal("30000"))
+    result = sched._resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("2000.00")
+
+
+def test_resolve_amount_wallet_balance_unavailable_is_skipped(db_session, monkeypatch):
+    """残高取得失敗 (None) / 残高0 → $0 で skip (誤った金額を捏造しない)。"""
+    import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
+
+    user = _add_active_user(db_session, "wallet_rpcfail@example.com")
+    user.smart_wallet_address = "0x" + "d" * 40
+    db_session.commit()
+
+    monkeypatch.setattr(sched, "_read_wallet_usdc_balance", lambda _addr: None)
+    assert sched._resolve_proposal_amount(db_session, user.id) == Decimal("0")
+
+    monkeypatch.setattr(sched, "_read_wallet_usdc_balance", lambda _addr: Decimal("0"))
+    assert sched._resolve_proposal_amount(db_session, user.id) == Decimal("0")
+
+
+def test_resolve_amount_allocation_takes_priority_over_wallet(db_session, monkeypatch):
+    """allocation と wallet 双方ある場合は allocation を優先 (既存パートナー互換)。
+
+    allocation $10,000 → $1,000。wallet 残高は参照されない。
+    """
+    import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
+
+    user = _add_active_user(db_session, "both@example.com")
+    user.smart_wallet_address = "0x" + "e" * 40
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("10000"))
+    db_session.commit()
+
+    def _should_not_be_called(_addr):
+        raise AssertionError("wallet balance must not be read when allocation exists")
+
+    monkeypatch.setattr(sched, "_read_wallet_usdc_balance", _should_not_be_called)
+    assert sched._resolve_proposal_amount(db_session, user.id) == Decimal("1000.00")
+
+
+def test_resolve_amount_no_allocation_no_wallet_notifies_and_zero(db_session, monkeypatch):
+    """allocation も wallet も無い → $0 + Slack 通知 (テスター登録漏れ検知を維持)。"""
+    import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
+
+    user = _add_active_user(db_session, "nowallet@example.com")
+    db_session.commit()
+
+    called: dict[str, int] = {}
+    monkeypatch.setattr(
+        sched, "_notify_missing_allocation", lambda uid: called.__setitem__("uid", uid)
+    )
+    result = sched._resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("0")
+    assert called.get("uid") == user.id
+
+
 def test_create_proposals_db_error_one_user_does_not_stop_others(db_session):
     """_resolve_proposal_amount が DB 例外を投げたとき、他ユーザーの処理が継続すること。
 
