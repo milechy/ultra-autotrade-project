@@ -24,7 +24,7 @@ import type {
 
 type OperationMode = 'NORMAL' | 'SAFE_MODE' | 'HARD_STOP'
 
-const MOCK_SETTINGS = {
+const DEFAULT_SETTINGS = {
   mode: 'NORMAL' as OperationMode,
   ai: { frequency: '4h', confidenceThreshold: 70, crossVerification: true } satisfies AISettings,
   risk: {
@@ -35,14 +35,11 @@ const MOCK_SETTINGS = {
     cooldownSeconds: 600,
   } satisfies RiskSettings,
   notifications: {
-    slackWebhookUrl: 'https://hooks.slack.com/services/T000/B000/xxxxxxxxxxxx',
-    lineToken: 'Bearer xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    slackWebhookUrl: '',
+    lineToken: '',
     notificationLevel: 'WARNING',
   } satisfies NotificationSettings,
-  apiKeys: [
-    { name: 'Production Key', createdAt: '2026-03-01', maskedKey: 'sk-...a1b2', status: 'active' },
-    { name: 'Staging Key', createdAt: '2026-03-15', maskedKey: 'sk-...c3d4', status: 'active' },
-  ] satisfies APIKey[],
+  apiKeys: [] satisfies APIKey[],
 }
 
 export default function SettingsPage() {
@@ -55,13 +52,13 @@ export default function SettingsPage() {
 
 function SettingsContent() {
   const t = useTranslations('AdminSettingsConfig')
-  const [mode, setMode] = useState<OperationMode>(MOCK_SETTINGS.mode)
-  const [aiSettings, setAiSettings] = useState<AISettings>(MOCK_SETTINGS.ai)
-  const [riskSettings, setRiskSettings] = useState<RiskSettings>(MOCK_SETTINGS.risk)
+  const [mode, setMode] = useState<OperationMode>(DEFAULT_SETTINGS.mode)
+  const [aiSettings, setAiSettings] = useState<AISettings>(DEFAULT_SETTINGS.ai)
+  const [riskSettings, setRiskSettings] = useState<RiskSettings>(DEFAULT_SETTINGS.risk)
   const [notifSettings, setNotifSettings] = useState<NotificationSettings>(
-    MOCK_SETTINGS.notifications,
+    DEFAULT_SETTINGS.notifications,
   )
-  const [apiKeys, setApiKeys] = useState<APIKey[]>(MOCK_SETTINGS.apiKeys)
+  const [apiKeys, setApiKeys] = useState<APIKey[]>(DEFAULT_SETTINGS.apiKeys)
 
   const handleRotate = (keyName: string) => {
     // Phase 1: mock rotation (no-op — key list unchanged)
