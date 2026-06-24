@@ -646,6 +646,9 @@
     "closeDetail": "閉じる"
   },
   "Liff": {
+    "kpi": {
+      "walletBalance": "ウォレット残高"
+    },
     "exec": {
       "operation": "操作",
       "supply": "入金 (Supply)",

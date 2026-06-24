@@ -161,3 +161,33 @@ class TestPortfolioAPI:
         assert r.status_code == 200
         data = r.json()
         assert data["period"] == "7d"
+
+    def test_weighted_avg_apy_no_data_is_zero(self, client: TestClient) -> None:
+        """データ無しのとき weighted_avg_apy = '0.00' (KPI-B)。"""
+        token = get_admin_token(client)
+        r = client.get("/api/portfolio/current", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["has_data"] is False
+        assert data["weighted_avg_apy"] == "0.00"
+
+    def test_weighted_avg_apy_computed(self, client: TestClient) -> None:
+        """positions_json の apy_pct を value_usd で加重平均する (KPI-B)。"""
+        token = get_admin_token(client)
+        snapshot = {
+            **SAMPLE_SNAPSHOT,
+            "positions_json": [
+                {"asset": "USDC", "value_usd": "3000", "apy_pct": "5.0"},
+                {"asset": "ETH", "value_usd": "1000", "apy_pct": "9.0"},
+            ],
+        }
+        client.post(
+            "/api/portfolio/snapshot",
+            json=snapshot,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r = client.get("/api/portfolio/current", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        data = r.json()
+        # (5*3000 + 9*1000) / 4000 = 24000/4000 = 6.00
+        assert data["weighted_avg_apy"] == "6.00"

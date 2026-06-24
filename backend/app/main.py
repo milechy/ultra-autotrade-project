@@ -61,10 +61,12 @@ from app.database import init_db
 from app.dca.router import router as dca_router
 from app.error_handlers import register_error_handlers
 from app.exchange.router import router as exchange_router
+from app.fees.dividends_router import router as dividends_router
 from app.health.detail_router import router as health_detail_router
 from app.hooks.router import router as hooks_router
 from app.invitations.router import router as invitations_router
 from app.knowledge.router import router as knowledge_router
+from app.market.router import router as market_router
 from app.notifications.models import (
     NotificationLog,  # noqa: F401 — ensure table registered with Base.metadata
 )
@@ -273,6 +275,7 @@ def create_app() -> FastAPI:
     app.include_router(reports_router, prefix="/api/reports")  # Monthly reports
     app.include_router(fees_v10_router, prefix="/api/v1")  # Fee Model v10 API (/api/v1/fees/*)
     app.include_router(fee_transfer_router, prefix="/api/v1")  # Fee Transfer & Allowance (Lane R)
+    app.include_router(dividends_router)  # User dividends / monthly takehome (v4 KPI-A)
     app.include_router(ai_decisions_router)  # AI Decisions API
     app.include_router(ai_decisions_ws_router)  # AI Decisions WebSocket
     app.include_router(ai_feedback_router)  # AI Feedback API (Layer 4)
@@ -282,6 +285,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_users_router)  # Admin Users API
     app.include_router(proposals_router)  # Proposals API
     app.include_router(portfolio_router)  # Portfolio History API
+    app.include_router(market_router)  # Market prices (v4 MARKET-A: ETH/USD + USD/JPY)
     app.include_router(
         yield_optimizer_router
     )  # Yield Optimizer (Privy Earn / Morpho) — #750 配線漏れ修正
