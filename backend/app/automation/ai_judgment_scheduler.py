@@ -69,23 +69,84 @@ _PROPOSAL_ASSET = "USDC"
 _PROPOSAL_EXPIRES_HOURS = 72
 
 # 提案金額: fund_allocations.allocated_amount_usd × _PROPOSAL_RATIO で動的計算。
-# fund_allocations が未設定のユーザーへの提案は Decimal("0") → skip (安全側)。
+# fund_allocation 不在の非カストディアル消費者は本人 wallet の USDC 残高 × ratio に
+# fallback する (案C / docs/61)。いずれも sizing 不能なら Decimal("0") → skip (安全側)。
 # 環境変数で上書き可能。
 _PROPOSAL_RATIO = Decimal(os.getenv("PROPOSAL_AMOUNT_RATIO", "0.10"))  # 10%
 _PROPOSAL_AMOUNT_MIN_USD = Decimal(os.getenv("PROPOSAL_AMOUNT_MIN_USD", "50"))
 _PROPOSAL_AMOUNT_MAX_USD = Decimal(os.getenv("PROPOSAL_AMOUNT_MAX_USD", "2000"))
 
+# USDC は 6 decimals。ERC20 balanceOf の最小 ABI。
+_USDC_DECIMALS = 6
+_ERC20_BALANCE_OF_ABI: list[dict[str, Any]] = [
+    {
+        "constant": True,
+        "inputs": [{"name": "account", "type": "address"}],
+        "name": "balanceOf",
+        "outputs": [{"name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function",
+    }
+]
+
+
+def _read_wallet_usdc_balance(wallet_address: str) -> Optional[Decimal]:
+    """active chain 上の wallet USDC 残高 (USDC 単位) を返す。
+
+    AAVE_ACTIVE_CHAINS の先頭チェーン (production=base / staging=base_sepolia) の USDC
+    コントラクトに対し web3 で balanceOf する (web3.py の .call() は同期)。
+    web3 未導入 / RPC URL 未設定 / 不正アドレス / RPC 失敗時は **None** を返し、
+    呼び出し側で skip させる (安全側: 残高不明のまま提案金額を捏造しない)。
+
+    NOTE: チェーン別 USDC アドレス・RPC は app.aave.chains に集約済 (mainnet 直書きしない)。
+    """
+    try:
+        from web3 import Web3  # noqa: PLC0415
+
+        from app.aave.chains import (  # noqa: PLC0415
+            get_active_chains,
+            get_rpc_url_for_chain,
+        )
+
+        chain = get_active_chains()[0]
+        usdc_addr = chain.tokens.get("USDC")
+        if not usdc_addr:
+            logger.warning("[proposal_amount] USDC address missing for %s", chain.chain_name)
+            return None
+        rpc_url = get_rpc_url_for_chain(chain)
+        w3 = Web3(Web3.HTTPProvider(rpc_url))
+        contract = w3.eth.contract(
+            address=w3.to_checksum_address(usdc_addr),
+            abi=_ERC20_BALANCE_OF_ABI,
+        )
+        raw_balance = contract.functions.balanceOf(w3.to_checksum_address(wallet_address)).call()
+        return Decimal(raw_balance) / Decimal(10**_USDC_DECIMALS)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "[proposal_amount] wallet USDC balance read failed for %s: %s",
+            wallet_address,
+            exc,
+        )
+        return None
+
 
 def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
-    """ユーザーの fund_allocations 合計 × _PROPOSAL_RATIO を提案金額として返す。
+    """提案金額を解決する (案C: fund_allocation 優先 + wallet 残高 fallback / docs/61)。
 
-    active な fund_allocations が存在しない場合は Decimal("0") を返し、
-    Slack 通知 (best-effort) を送る。$0 は下流の explicit check でスキップされる。
+    1. active fund_allocations 合計 × ratio (custodial パートナー/テスター枠)。
+       min/max にクランプ。**既存挙動を完全維持**。
+    2. allocation 不在 & wallet 設定済の非カストディアル消費者: 本人 wallet の
+       on-chain USDC 残高 × ratio。残高0 / 取得失敗 / min 未満は Decimal("0") で skip
+       (安全側: wallet 額を超える/極小の提案を作らない)。
+    3. allocation も wallet も無い: sizing 不能 → Slack 通知 + Decimal("0")
+       (パートナー/テスター登録漏れの検知を維持)。
 
-    新テスター追加後に fund_allocations INSERT を忘れると Slack 警告が飛ぶ設計。
+    $0 は呼び出し側 (_create_proposals_for_users) の explicit check でスキップされる。
+    金融計算は Decimal のみ (CLAUDE.md)。
     """
     from app.partner.allocation_models import FundAllocation  # noqa: PLC0415
 
+    # ── 1. fund_allocation 優先 (custodial 枠) ──
     raw = (
         db.query(func.sum(FundAllocation.allocated_amount_usd))
         .filter(
@@ -95,17 +156,44 @@ def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
         .scalar()
     )
     allocated = Decimal(str(raw)) if raw else Decimal("0")
-    if allocated <= Decimal("0"):
-        logger.warning(
-            "fund_allocations empty for user_id=%d — proposal skipped. "
-            "ACTION REQUIRED: INSERT INTO fund_allocations (tester_user_id=%d, status='active').",
-            user_id,
-            user_id,
-        )
-        _notify_missing_allocation(user_id)
-        return Decimal("0")
-    amount = (allocated * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
-    return max(_PROPOSAL_AMOUNT_MIN_USD, min(amount, _PROPOSAL_AMOUNT_MAX_USD))
+    if allocated > Decimal("0"):
+        amount = (allocated * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
+        return max(_PROPOSAL_AMOUNT_MIN_USD, min(amount, _PROPOSAL_AMOUNT_MAX_USD))
+
+    # ── 2. fallback: 非カストディアル消費者の wallet USDC 残高 ──
+    user = db.get(User, user_id)
+    wallet = (user.smart_wallet_address or user.wallet_address) if user else None
+    if wallet:
+        balance = _read_wallet_usdc_balance(wallet)
+        if balance is None or balance <= Decimal("0"):
+            # 残高0 / RPC 取得失敗 → skip (安全側)
+            logger.debug(
+                "[proposal_amount] wallet USDC 0/unavailable for user_id=%d — skipped",
+                user_id,
+            )
+            return Decimal("0")
+        amount = (balance * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
+        if amount < _PROPOSAL_AMOUNT_MIN_USD:
+            # 10% が gas viable な最小額未満 → skip。
+            # allocation 経路は min へ切り上げるが、消費者 wallet 経路では残高に対し
+            # 過大な supply を避けるため切り上げず skip する (意図的な非対称 / docs/61)。
+            logger.debug(
+                "[proposal_amount] wallet-based amount %s < min $%s for user_id=%d — skipped",
+                amount,
+                _PROPOSAL_AMOUNT_MIN_USD,
+                user_id,
+            )
+            return Decimal("0")
+        return min(amount, _PROPOSAL_AMOUNT_MAX_USD)
+
+    # ── 3. allocation も wallet も無い → sizing 不能 ──
+    logger.warning(
+        "no active fund_allocation and no wallet for user_id=%d — proposal skipped. "
+        "ACTION: register fund_allocations (tester) or ensure wallet is set (consumer).",
+        user_id,
+    )
+    _notify_missing_allocation(user_id)
+    return Decimal("0")
 
 
 def _notify_missing_allocation(user_id: int) -> None:
