@@ -70,8 +70,12 @@ function UserGuardInner({ children }: { children: React.ReactNode }) {
 }
 
 function UserGuard({ children }: { children: React.ReactNode }) {
+  // 完全な messages を渡す。部分指定 ({ ProvidersUser, SharedSessionExpiry } のみ) だと
+  // この provider が子孫 (UserHeader / BottomNav / EmergencyStopFloat 等) の i18n context を
+  // 覆い隠し、UserHeader 等の namespace が解決できず MISSING_MESSAGE → 生キー表示になる。
+  // next-intl のネスト provider は messages をマージせず置換するため、ここは全量必須。
   return (
-    <NextIntlClientProvider locale="ja" messages={{ ProvidersUser: jaMessages.ProvidersUser, SharedSessionExpiry: jaMessages.SharedSessionExpiry }}>
+    <NextIntlClientProvider locale="ja" messages={jaMessages}>
       <UserGuardInner>{children}</UserGuardInner>
     </NextIntlClientProvider>
   )

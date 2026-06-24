@@ -37,8 +37,11 @@ function AdminGuardInner({ children }: { children: React.ReactNode }) {
 }
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
+  // 完全な messages を渡す。部分指定だとこの provider が子孫 (AppShell / TermsModal 等) の
+  // i18n context を覆い隠し、MISSING_MESSAGE → 生キー表示になる。
+  // next-intl のネスト provider は messages をマージせず置換するため全量必須。
   return (
-    <NextIntlClientProvider locale="ja" messages={{ ProvidersAdmin: jaMessages.ProvidersAdmin }}>
+    <NextIntlClientProvider locale="ja" messages={jaMessages}>
       <AdminGuardInner>{children}</AdminGuardInner>
     </NextIntlClientProvider>
   )
