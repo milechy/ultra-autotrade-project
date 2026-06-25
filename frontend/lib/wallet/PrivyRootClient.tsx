@@ -43,6 +43,14 @@ export function PrivyRootClient({ children }: { children: ReactNode }) {
           // Privy モーダルの accentColor を Arobix purple に揃える。
           theme: 'dark',
           accentColor: '#6e56cf',
+          // ロゴは現在のオリジンの同一ドメイン資産を指す (public/icons/ に存在)。
+          // Privy ダッシュボード設定だと prod ドメイン (app.ultra-auto-trade.com) の URL が
+          // 入り、staging-v4 等では CSP img-src ('self' のみ) でブロックされ画像切れになる。
+          // window.location.origin を使い env を問わず同一オリジン = CSP 'self' で常に表示。
+          logo:
+            typeof window !== 'undefined'
+              ? `${window.location.origin}/icons/privy-logo-banner.png`
+              : '/icons/privy-logo-banner.png',
         },
         supportedChains: [base, baseSepolia],
         defaultChain,
