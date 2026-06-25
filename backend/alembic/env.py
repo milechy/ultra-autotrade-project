@@ -13,10 +13,18 @@ from alembic import context
 # Add backend directory to sys.path so app modules can be imported
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Import all models so Alembic autogenerate can detect them
+# Import all models so Alembic autogenerate can detect them.
+# 【重要】__tablename__ を持つ全モデルモジュールをここで import すること。
+# import 漏れがあると Base.metadata がそのテーブルを認識せず、autogenerate が
+# 実在テーブルを「removed」と誤検出して DROP TABLE を生成する(本番スキーマ破壊リスク)。
+# 1 モジュールから 1 クラス import すれば、そのモジュール内の全テーブルが登録される。
+# 確認: grep -rl "__tablename__" app/ の全モジュールが下に揃っているか。
+from app.ai.feedback_models import AIFeedback  # noqa: F401, E402
 from app.ai.models import AIDecision  # noqa: F401, E402
 from app.auth.models import User  # noqa: F401, E402
+from app.chat.models import ChatMessage  # noqa: F401, E402
 from app.database import Base, get_database_url  # noqa: E402
+from app.fees.allowance_models import FeeAllowance  # noqa: F401, E402
 from app.fees.models import (  # noqa: F401, E402
     FeeConfigV10,
     FeeTransaction,
@@ -29,6 +37,8 @@ from app.knowledge.models import (  # noqa: F401, E402
     KnowledgeDocument,
     KnowledgeSource,
 )
+from app.notifications.models import NotificationLog  # noqa: F401, E402
+from app.partner.allocation_models import FundAllocation  # noqa: F401, E402
 from app.portfolio.models import PortfolioHistory, PortfolioSnapshot  # noqa: F401, E402
 from app.proposals.models import Proposal  # noqa: F401, E402
 from app.tos.models import ToSConsent, ToSUserAction  # noqa: F401, E402
