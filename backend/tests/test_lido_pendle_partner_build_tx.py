@@ -49,6 +49,18 @@ def test_dummy_lido_build_stake_tx_shape() -> None:
     assert set(tx.keys()) == {"to", "data", "from", "chainId", "value"}
 
 
+def test_lido_resolve_chain_id_fail_closed_on_unknown() -> None:
+    """未知 chain 名は mainnet へ fallback せず fail-closed (誤ネットワーク署名防止)。"""
+    from app.protocols.lido.client import _resolve_chain_id  # noqa: PLC0415
+
+    assert _resolve_chain_id("holesky") == 17000
+    assert _resolve_chain_id("mainnet") == 1
+    with pytest.raises(ValueError):
+        _resolve_chain_id("base-sepolia")  # マップ外 → 1 に黙って落とさない
+    with pytest.raises(ValueError):
+        _resolve_chain_id("")
+
+
 def test_dummy_lido_build_stake_tx_rejects_bad_args() -> None:
     """from 未指定 / 非正数 amount は ValueError。"""
     client = DummyLidoClient(LidoConfig())

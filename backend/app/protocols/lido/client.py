@@ -155,8 +155,19 @@ _CHAIN_ID_MAP: dict[str, int] = {
 
 
 def _resolve_chain_id(chain: str) -> int:
-    """config の chain 名から chain_id を解決する（未知は mainnet=1）。"""
-    return _CHAIN_ID_MAP.get(chain.lower(), 1)
+    """config の chain 名から chain_id を解決する。
+
+    未署名 tx に焼き込む chainId を mainnet(1) へサイレント fallback すると、testnet/L2 上の
+    partner に誤って mainnet ETH stake を署名させる事故になる。未知 chain 名は fail-closed で
+    ValueError を送出し、誤ネットワークの tx を組ませない（呼び出し側で 500 に変換される）。
+    """
+    chain_id = _CHAIN_ID_MAP.get(chain.lower())
+    if chain_id is None:
+        raise ValueError(
+            f"未知の LIDO_CHAIN '{chain}' です。chainId を解決できません "
+            f"(対応: {sorted(_CHAIN_ID_MAP)})。誤ネットワーク署名を防ぐため fail-closed。"
+        )
+    return chain_id
 
 
 class AbstractLidoClient(BaseProtocolClient):

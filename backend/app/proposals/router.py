@@ -1015,9 +1015,6 @@ def reject_proposal(
     return ProposalResponse.model_validate(proposal)
 
 
-_WEI_PER_ETH = Decimal("1000000000000000000")
-
-
 def _resolve_onchain_token_amount(proposal: Proposal) -> Decimal:
     """proposal から **トークン建て** の on-chain 数量 (ETH / 入力トークン) を解決する。
 
@@ -1064,7 +1061,7 @@ def _build_lido_partner_tx(proposal: Proposal, wallet_address: str) -> PartnerUn
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Lido は STAKE_ETH のみ partner 署名に対応します (指定: {proposal.operation})",
         )
-    from app.protocols.lido.client import get_lido_client  # noqa: PLC0415
+    from app.protocols.lido.client import _WEI_PER_ETH, get_lido_client  # noqa: PLC0415
     from app.protocols.lido.config import get_lido_config  # noqa: PLC0415
 
     amount_eth = _resolve_onchain_token_amount(proposal)  # token(ETH) 建て / 未配線時は 501
