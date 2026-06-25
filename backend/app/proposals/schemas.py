@@ -108,11 +108,15 @@ class PartnerUnsignedTxs(BaseModel):
     """build-tx エンドポイントのレスポンス。"""
 
     proposal_id: int
-    operation: str  # "SUPPLY" or "WITHDRAW"
+    operation: str  # "SUPPLY" / "WITHDRAW" / "STAKE_ETH" / "BUY_PT"
     wallet_address: str
     approve_tx: Optional[UnsignedTx] = None  # SUPPLY のみ
     supply_tx: Optional[UnsignedTx] = None  # SUPPLY のみ
     withdraw_tx: Optional[UnsignedTx] = None  # WITHDRAW のみ
+    # 非カストディアル化 (Lido/Pendle)。サーバー鍵で署名・broadcast せず、
+    # partner が Privy 本人署名する未署名 tx を返す。
+    stake_tx: Optional[UnsignedTx] = None  # STAKE_ETH (Lido) のみ
+    buy_pt_tx: Optional[UnsignedTx] = None  # BUY_PT (Pendle) のみ
 
 
 class SubmitTxRequest(BaseModel):

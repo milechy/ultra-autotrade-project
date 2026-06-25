@@ -124,6 +124,9 @@ export interface PartnerUnsignedTxs {
   approve_tx?: UnsignedTx;
   supply_tx?: UnsignedTx;
   withdraw_tx?: UnsignedTx;
+  // 非カストディアル化 (Lido/Pendle)。partner が Privy 本人署名する未署名 tx。
+  stake_tx?: UnsignedTx; // STAKE_ETH (Lido) のみ
+  buy_pt_tx?: UnsignedTx; // BUY_PT (Pendle) のみ
 }
 
 /** 未署名 tx データをバックエンドから取得する (サーバー鍵で署名しない)。 */

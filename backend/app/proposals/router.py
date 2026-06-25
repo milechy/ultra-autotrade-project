@@ -2,6 +2,7 @@
 # backend/app/proposals/router.py
 """提案API ルーター定義。"""
 
+import asyncio
 import csv
 import io
 import logging
@@ -1014,6 +1015,108 @@ def reject_proposal(
     return ProposalResponse.model_validate(proposal)
 
 
+_WEI_PER_ETH = Decimal("1000000000000000000")
+
+
+def _build_lido_partner_tx(proposal: Proposal, wallet_address: str) -> PartnerUnsignedTxs:
+    """Lido STAKE_ETH の非カストディアル未署名 tx を構築する。
+
+    サーバー鍵 (``LIDO_WALLET_PRIVATE_KEY``) を一切参照せず、``LidoClient.build_stake_tx``
+    で未署名 submit tx を組み立てて返す。partner が Privy で本人署名・送信する。
+
+    注意 (HUMAN-REVIEW): ``proposal.amount_usd`` を ETH 建て数量として wei に換算する
+    （asset="ETH"）。Aave が amount_usd をトークン数量として扱うのと同じ簡略化。USD→ETH の
+    厳密換算は price oracle を要するフォローアップで、staging 実 tx 検証 (basescan) で本番前に
+    数量を確認する。
+    """
+    if proposal.operation != "STAKE_ETH":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Lido は STAKE_ETH のみ partner 署名に対応します (指定: {proposal.operation})",
+        )
+    from app.protocols.lido.client import get_lido_client  # noqa: PLC0415
+    from app.protocols.lido.config import get_lido_config  # noqa: PLC0415
+
+    amount_wei = int(Decimal(str(proposal.amount_usd)) * _WEI_PER_ETH)
+    if amount_wei <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="STAKE_ETH の数量が 0 以下です",
+        )
+    try:
+        client = get_lido_client(get_lido_config())
+        stake_tx = client.build_stake_tx(amount_wei=amount_wei, from_address=wallet_address)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lido stake tx 構築失敗: {exc}",
+        ) from exc
+    return PartnerUnsignedTxs(
+        proposal_id=proposal.id,
+        operation=proposal.operation,
+        wallet_address=wallet_address,
+        stake_tx=UnsignedTx.model_validate(stake_tx),
+    )
+
+
+def _build_pendle_partner_tx(proposal: Proposal, wallet_address: str) -> PartnerUnsignedTxs:
+    """Pendle BUY_PT の非カストディアル未署名 tx を構築する。
+
+    サーバー鍵 (``PENDLE_WALLET_PRIVATE_KEY``) を参照せず、Hosted SDK が生成した
+    swapExactTokenForPt calldata を未署名 tx として返す。receiver/from は partner 本人に固定し、
+    SDK calldata の宛先が Router であることを照合する (``build_buy_pt_tx`` 内 fail-closed)。
+
+    注意 (HUMAN-REVIEW): market は ``PENDLE_MARKET_ADDRESS``、入力トークンは
+    ``PENDLE_UNDERLYING_TOKEN_ADDRESS``、数量は ``proposal.amount_usd`` をトークン建てとして
+    扱う簡略化。厳密な USD→token 換算・market/token 解決は staging 実 tx 検証で本番前に確認する。
+    """
+    if proposal.operation != "BUY_PT":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Pendle は BUY_PT のみ partner 署名に対応します (指定: {proposal.operation})",
+        )
+    from app.protocols.pendle.client import (  # noqa: PLC0415
+        PendleBuildTxError,
+        get_pendle_router_v4_client,
+    )
+    from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
+
+    amount_in = Decimal(str(proposal.amount_usd))
+    if amount_in <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="BUY_PT の数量が 0 以下です",
+        )
+    config = get_pendle_config()
+    try:
+        client = get_pendle_router_v4_client(config)
+        buy_pt_tx = asyncio.run(
+            client.build_buy_pt_tx(
+                market_address=config.market_address,
+                token_in=config.underlying_token_address,
+                amount_in=amount_in,
+                from_address=wallet_address,
+            )
+        )
+    except PendleBuildTxError as exc:
+        # calldata 取得失敗 / Router 不一致は fail-closed。未署名 tx を返さない。
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Pendle BUY_PT tx 構築失敗: {exc}",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Pendle BUY_PT tx 構築失敗: {exc}",
+        ) from exc
+    return PartnerUnsignedTxs(
+        proposal_id=proposal.id,
+        operation=proposal.operation,
+        wallet_address=wallet_address,
+        buy_pt_tx=UnsignedTx.model_validate(buy_pt_tx),
+    )
+
+
 @router.get(
     "/{proposal_id}/build-tx",
     response_model=PartnerUnsignedTxs,
@@ -1062,6 +1165,15 @@ def build_partner_tx(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="wallet_address / smart_wallet_address が未設定です。Privy で wallet を作成してください。",
         )
+
+    # protocol で非カストディアル経路を振り分ける。Lido (STAKE_ETH) / Pendle (BUY_PT) は
+    # サーバー鍵 broadcast せず、未署名 tx を返して partner が Privy 本人署名する。
+    # protocol 無指定 / "aave" は従来どおり Aave SUPPLY/WITHDRAW。
+    protocol = (proposal.protocol or "aave").lower()
+    if protocol == "lido":
+        return _build_lido_partner_tx(proposal, wallet_address)
+    if protocol == "pendle":
+        return _build_pendle_partner_tx(proposal, wallet_address)
 
     op_map: dict[str, str] = {"SUPPLY": "DEPOSIT", "WITHDRAW": "WITHDRAW"}
     if proposal.operation not in op_map:

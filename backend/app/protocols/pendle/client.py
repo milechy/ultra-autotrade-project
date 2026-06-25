@@ -33,6 +33,14 @@ from .schemas import (
 logger = logging.getLogger(__name__)
 
 
+class PendleBuildTxError(Exception):
+    """パートナー署名用の未署名 tx 構築に失敗したことを表す。
+
+    Router 照合不一致 / calldata 欠損 / SDK HTTP 失敗など、未署名 tx を安全に組めない
+    状況で送出する（fail-closed: 不確実なら未署名 tx を返さない）。
+    """
+
+
 class AbstractPendleClient(BaseProtocolClient):
     """Pendle クライアントの抽象基底クラス。"""
 
@@ -909,6 +917,71 @@ class PendleRouterV4Client:
                 exc,
             )
             return RouterV4SwapResult(success=False, error=str(exc))
+
+    async def build_buy_pt_tx(
+        self,
+        market_address: str,
+        token_in: str,
+        amount_in: Decimal,
+        from_address: str,
+        slippage: Decimal | None = None,
+        token_in_decimals: int | None = None,
+    ) -> dict[str, Any]:
+        """パートナー本人署名用: PT 購入 (swapExactTokenForPt) の未署名 tx を構築して返す。
+
+        サーバー鍵で署名・broadcast しない非カストディアル経路。Hosted SDK が生成した
+        calldata を未署名 tx dict にして返す。``receiver`` / ``from`` は partner 本人に固定し
+        （PT は本人 wallet に着金）、SDK calldata の ``tx.to`` / approvals.spender が Router
+        であることを ``_execute_swap`` 内で照合する。
+
+        ``enable_onchain_write`` ガード（``buy_pt`` 経由の ``_check_guards``）は **サーバー
+        broadcast** を二段ガードするためのもの。本メソッドはサーバー broadcast を行わず
+        partner が Privy で送信するため、当該ガードは適用しない（Router 照合・calldata
+        欠損チェックは維持する fail-closed）。
+
+        Args:
+            market_address: 対象 Pendle マーケットアドレス。
+            token_in: 支払いに使う入力トークンアドレス（partner が保有・approve 済み前提）。
+            amount_in: 入力量（Decimal）。
+            from_address: 署名者（partner 本人）= PT 受取アドレス。
+            slippage: スリッページ（デフォルト 0.5% = 0.005）。
+            token_in_decimals: 入力トークンの decimals（USDC=6 等の桁ズレ防止）。
+
+        Returns:
+            {"to", "data", "from", "chainId", "value"} 形式の未署名 tx dict（value="0x0"）。
+
+        Raises:
+            PendleBuildTxError: calldata 取得失敗 / Router 不一致 / 引数不正。
+        """
+        if not from_address:
+            raise PendleBuildTxError("from_address は必須です (partner 署名)")
+        if amount_in <= 0:
+            raise PendleBuildTxError("amount_in は正の値である必要があります")
+
+        effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
+        in_decimals = self._resolve_decimals(token_in, token_in_decimals)
+        req = RouterV4SwapRequest(
+            market_address=market_address,
+            token_in=token_in,
+            token_out="PT",  # noqa: S106 — トークン種別リテラル (パスワードではない)
+            amount_in=amount_in,
+            slippage=effective_slippage,
+            receiver=from_address,  # 非カストディアル: PT は partner 本人へ着金
+        )
+        # PT は 18 桁。入力トークンのみ decimals を解決する。enable_onchain_write ガードは
+        # 通さず（partner broadcast のため）、SDK 呼び出し + Router 照合のみ行う。
+        result = await self._execute_swap(
+            req, "swapExactTokenForPt", amount_in_decimals=in_decimals, amount_out_decimals=18
+        )
+        if not result.success or not result.calldata or not result.to:
+            raise PendleBuildTxError(result.error or "未署名 tx の calldata 取得に失敗しました")
+        return {
+            "to": result.to,
+            "data": result.calldata,
+            "from": from_address,
+            "chainId": self._chain_id,
+            "value": "0x0",  # ERC20 入力のため native value なし
+        }
 
     async def add_liquidity(
         self,
