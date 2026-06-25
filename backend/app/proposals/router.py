@@ -1018,16 +1018,46 @@ def reject_proposal(
 _WEI_PER_ETH = Decimal("1000000000000000000")
 
 
+def _resolve_onchain_token_amount(proposal: Proposal) -> Decimal:
+    """proposal から **トークン建て** の on-chain 数量 (ETH / 入力トークン) を解決する。
+
+    [安全ブロック / fail-closed] ``proposal.amount`` / ``proposal.amount_usd`` は提案生成時
+    (ai_judgment_scheduler ``_resolve_proposal_amount``) で **両方とも USD 建て** に設定される
+    (``amount = amount_usd = proposal_amount_usd``)。Aave は asset=USDC (1 USDC≒1 USD) のため
+    amount_usd をそのままトークン数量として扱えるが、Lido(ETH) / Pendle(stETH 等) では
+    1 token ≫ 1 USD のため、USD 値を token 数量として on-chain tx に載せると ETH 価格倍
+    (~数千倍) 過大ステークになる。
+
+    現状システムには USD→token のスポット価格換算が無い (price oracle 未配線)。誤った数量の
+    未署名 tx を partner に署名させるのは「誰の資産が動くか」観点で危険なため、ここで明示的に
+    501 を返して **未署名 tx を一切組み立てない**。
+
+    フォローアップ (いずれか):
+      1. 提案生成時に ``proposal.amount`` を token 建てで保存する (本命の修正)、または
+      2. 本関数で ETH/USD 等のスポット価格 (app.partner.wallet_balance_service._fetch_eth_usd_price
+         / app.market) を用いて USD→token 換算する。
+
+    実装後は本関数が token 建て Decimal を返し、下流の build_stake_tx / build_buy_pt_tx 配線が
+    そのまま有効化される。
+    """
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail=(
+            "Lido/Pendle の非カストディアル未署名 tx 構築には token 建て数量が必要ですが、"
+            "現状 proposal.amount は USD 建てで保存されており USD→token 価格換算が未配線です。"
+            "誤った数量での署名を防ぐため fail-closed (HUMAN-REVIEW: 価格換算 or token 建て amount 保存を実装)。"
+        ),
+    )
+
+
 def _build_lido_partner_tx(proposal: Proposal, wallet_address: str) -> PartnerUnsignedTxs:
     """Lido STAKE_ETH の非カストディアル未署名 tx を構築する。
 
     サーバー鍵 (``LIDO_WALLET_PRIVATE_KEY``) を一切参照せず、``LidoClient.build_stake_tx``
-    で未署名 submit tx を組み立てて返す。partner が Privy で本人署名・送信する。
+    で未署名 submit tx を組み立てて返す (submit は msg.sender=partner に stETH を mint するため
+    着金先も partner 本人)。partner が Privy で本人署名・送信する。
 
-    注意 (HUMAN-REVIEW): ``proposal.amount_usd`` を ETH 建て数量として wei に換算する
-    （asset="ETH"）。Aave が amount_usd をトークン数量として扱うのと同じ簡略化。USD→ETH の
-    厳密換算は price oracle を要するフォローアップで、staging 実 tx 検証 (basescan) で本番前に
-    数量を確認する。
+    数量は ``_resolve_onchain_token_amount`` で ETH 建てに解決する (現状 fail-closed 501)。
     """
     if proposal.operation != "STAKE_ETH":
         raise HTTPException(
@@ -1037,7 +1067,8 @@ def _build_lido_partner_tx(proposal: Proposal, wallet_address: str) -> PartnerUn
     from app.protocols.lido.client import get_lido_client  # noqa: PLC0415
     from app.protocols.lido.config import get_lido_config  # noqa: PLC0415
 
-    amount_wei = int(Decimal(str(proposal.amount_usd)) * _WEI_PER_ETH)
+    amount_eth = _resolve_onchain_token_amount(proposal)  # token(ETH) 建て / 未配線時は 501
+    amount_wei = int(amount_eth * _WEI_PER_ETH)
     if amount_wei <= 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -1063,12 +1094,12 @@ def _build_pendle_partner_tx(proposal: Proposal, wallet_address: str) -> Partner
     """Pendle BUY_PT の非カストディアル未署名 tx を構築する。
 
     サーバー鍵 (``PENDLE_WALLET_PRIVATE_KEY``) を参照せず、Hosted SDK が生成した
-    swapExactTokenForPt calldata を未署名 tx として返す。receiver/from は partner 本人に固定し、
-    SDK calldata の宛先が Router であることを照合する (``build_buy_pt_tx`` 内 fail-closed)。
+    swapExactTokenForPt calldata を未署名 tx として返す。receiver/from は partner 本人に固定し
+    (PT が本人着金)、SDK calldata の宛先が Router であることを照合する (``build_buy_pt_tx`` 内
+    fail-closed)。
 
-    注意 (HUMAN-REVIEW): market は ``PENDLE_MARKET_ADDRESS``、入力トークンは
-    ``PENDLE_UNDERLYING_TOKEN_ADDRESS``、数量は ``proposal.amount_usd`` をトークン建てとして
-    扱う簡略化。厳密な USD→token 換算・market/token 解決は staging 実 tx 検証で本番前に確認する。
+    market は ``PENDLE_MARKET_ADDRESS``、入力トークンは ``PENDLE_UNDERLYING_TOKEN_ADDRESS``。
+    数量は ``_resolve_onchain_token_amount`` で入力トークン建てに解決する (現状 fail-closed 501)。
     """
     if proposal.operation != "BUY_PT":
         raise HTTPException(
@@ -1081,7 +1112,7 @@ def _build_pendle_partner_tx(proposal: Proposal, wallet_address: str) -> Partner
     )
     from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
 
-    amount_in = Decimal(str(proposal.amount_usd))
+    amount_in = _resolve_onchain_token_amount(proposal)  # 入力トークン建て / 未配線時は 501
     if amount_in <= 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

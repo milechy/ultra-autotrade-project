@@ -16,6 +16,7 @@ Privy 本人署名する。本テストは以下を保証する:
 
 from __future__ import annotations
 
+import os
 from decimal import Decimal
 from typing import Any
 
@@ -170,3 +171,56 @@ def test_partner_unsigned_txs_has_stake_and_buy_pt_fields() -> None:
     assert "approve_tx" in fields
     assert "supply_tx" in fields
     assert "withdraw_tx" in fields
+
+
+# ---------------------------------------------------------------------------
+# endpoint helper: USD→token 換算未配線につき fail-closed (501)
+# ---------------------------------------------------------------------------
+def _mk_proposal(operation: str, amount_usd: str = "100") -> Any:
+    from unittest.mock import MagicMock  # noqa: PLC0415
+
+    p = MagicMock()
+    p.id = 1
+    p.operation = operation
+    p.amount = Decimal(amount_usd)
+    p.amount_usd = Decimal(amount_usd)
+    return p
+
+
+def test_lido_build_partner_tx_fail_closed_501() -> None:
+    """Lido build-tx は USD→ETH 換算未配線のため 501 で fail-closed (誤数量を組まない)。"""
+    os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-build-tx")
+    os.environ.setdefault("INITIAL_ADMIN_EMAIL", "admin@example.com")
+    from fastapi import HTTPException  # noqa: PLC0415
+
+    from app.proposals.router import _build_lido_partner_tx  # noqa: PLC0415
+
+    with pytest.raises(HTTPException) as exc_info:
+        _build_lido_partner_tx(_mk_proposal("STAKE_ETH"), "0x" + "ab" * 20)
+    assert exc_info.value.status_code == 501
+
+
+def test_pendle_build_partner_tx_fail_closed_501() -> None:
+    """Pendle build-tx は USD→token 換算未配線のため 501 で fail-closed。"""
+    os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-build-tx")
+    os.environ.setdefault("INITIAL_ADMIN_EMAIL", "admin@example.com")
+    from fastapi import HTTPException  # noqa: PLC0415
+
+    from app.proposals.router import _build_pendle_partner_tx  # noqa: PLC0415
+
+    with pytest.raises(HTTPException) as exc_info:
+        _build_pendle_partner_tx(_mk_proposal("BUY_PT"), "0x" + "ab" * 20)
+    assert exc_info.value.status_code == 501
+
+
+def test_build_partner_tx_wrong_operation_422() -> None:
+    """protocol と operation の不一致は 422 (501 ガードより先に弾く)。"""
+    os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-build-tx")
+    os.environ.setdefault("INITIAL_ADMIN_EMAIL", "admin@example.com")
+    from fastapi import HTTPException  # noqa: PLC0415
+
+    from app.proposals.router import _build_lido_partner_tx  # noqa: PLC0415
+
+    with pytest.raises(HTTPException) as exc_info:
+        _build_lido_partner_tx(_mk_proposal("SUPPLY"), "0x" + "ab" * 20)
+    assert exc_info.value.status_code == 422
