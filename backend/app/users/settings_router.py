@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.auth.constants import ExecutionPolicy
-from app.auth.dependencies import require_active_user
+from app.auth.dependencies import get_current_user, require_active_user
 from app.auth.models import User, UserRole
 from app.database import get_db
 from app.partner import allocation_service
@@ -229,7 +229,11 @@ def pause_user(
 
 @router.post("/resume", summary="運用再開")
 def resume_user(
-    current_user: User = Depends(require_active_user),
+    # NOTE: require_active_user は使えない。pause で is_active=False にした後に resume を
+    # 呼ぶため、require_active_user だと 403 "User is inactive" で永久に再開不能になる
+    # (catch-22)。resume は「非アクティブな本人」が自分を再アクティブ化する操作なので
+    # 認証のみ (get_current_user) を要求する。
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """運用を再開する（is_active=True）。"""
