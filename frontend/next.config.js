@@ -5,11 +5,20 @@
 // (scripts/cf-pages-prebuild.js) which runs before next build.
 const isCFPages = process.env.CF_PAGES === '1';
 const backendUrl = process.env.NEXT_PUBLIC_API_URL || '';
+// AI 判定のリアルタイム配信は wss://<api-host>/api/ai/ws/decisions に接続する
+// (liff-chat/page.tsx の WebSocket)。connect-src に wss 版が無いと CSP がブロックし、
+// AI判定カードがリアルタイム更新されない (初期 fetch にフォールバックするため一見動くが
+// realtime push が静かに死ぬ)。https の API ホストと同一オリジンの wss を明示的に許可する。
+// NOTE: connect-src の "https:" ワイルドカードは wss スキームを許可しない。
+const wssBackendUrl = backendUrl ? backendUrl.replace(/^https?:\/\//, 'wss://') : '';
 const cspConnectSrc = [
   "'self'",
   backendUrl,
+  wssBackendUrl,
   "https://api.ultra-auto-trade.com",
+  "wss://api.ultra-auto-trade.com",
   "https://api-staging.ultra-auto-trade.com",
+  "wss://api-staging.ultra-auto-trade.com",
   "https://*.infura.io",
   "https://*.alchemy.com",
   "wss://*.walletconnect.org",
