@@ -599,6 +599,68 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
         _notify_aave_failure(proposal.id, error_message, failed_at)
 
 
+class ProtocolExecutionNotWiredError(Exception):
+    """custodial 自動執行がまだ配線されていない protocol を指す。
+
+    Lido/Pendle の on-chain 実行 (real ETH stake / PT swap の broadcast) は
+    HUMAN-REVIEW-REQUIRED かつ Opus による安全レビュー対象 (CLAUDE.md v4 鉄則10)。
+    本スライスでは dispatch 構造とテストのみ整備し、実 broadcast は意図的に未配線。
+    """
+
+
+def _execute_lido_for_proposal(proposal: Proposal, db: Session) -> None:
+    """[Phase D / HUMAN-REVIEW 未配線] Lido STAKE_ETH の custodial 実行。
+
+    実装方針 (HUMAN-REVIEW + Opus で配線すること):
+      1. LidoClient.stake_eth(amount_wei) で stETH をステーク (real ETH 送金 = 要レビュー)
+      2. receipt 確認 → proposal.status='executed' / tx_hash 保存
+      3. 失敗時は _execute_aave_for_proposal と同様に status='failed' + 通知
+
+    現状は実 broadcast を含まないため未配線として明示的に raise する。これにより
+    auto_execution_enabled=true でも Lido 提案が誤って Aave 経路で実行されることを防ぐ。
+    """
+    raise ProtocolExecutionNotWiredError(
+        f"Lido (proposal={proposal.id}, op={proposal.operation}) の custodial 自動執行は "
+        "未配線です (HUMAN-REVIEW-REQUIRED)。"
+    )
+
+
+def _execute_pendle_for_proposal(proposal: Proposal, db: Session) -> None:
+    """[Phase D / HUMAN-REVIEW 未配線] Pendle BUY_PT/SELL_PT の custodial 実行。
+
+    実装方針 (HUMAN-REVIEW + Opus で配線すること):
+      1. PendleService/RouterV4 で swap calldata 取得 (dry_run=True は安全・本番前確認用)
+      2. PENDLE_ENABLE_ONCHAIN_WRITE=true かつ dry_run=False で broadcast (要レビュー)
+      3. receipt 確認 → proposal.status='executed' / tx_hash 保存
+
+    現状は実 broadcast を含まないため未配線として明示的に raise する。
+    """
+    raise ProtocolExecutionNotWiredError(
+        f"Pendle (proposal={proposal.id}, op={proposal.operation}) の custodial 自動執行は "
+        "未配線です (HUMAN-REVIEW-REQUIRED)。"
+    )
+
+
+def _dispatch_custodial_execution(proposal: Proposal, db: Session) -> None:
+    """proposal.protocol で custodial 自動執行ハンドラを振り分ける。
+
+    protocol 無指定 / "aave" は従来どおり Aave 経路。"lido"/"pendle" は専用ハンドラ
+    (現状 HUMAN-REVIEW 未配線で raise)。protocol を見ずに常に Aave 実行していた
+    潜在的な誤執行 (Lido/Pendle 提案を Aave operation として実行) を防ぐ。
+    """
+    protocol = (proposal.protocol or "aave").lower()
+    if protocol in ("", "aave"):
+        _execute_aave_for_proposal(proposal, db)
+    elif protocol == "lido":
+        _execute_lido_for_proposal(proposal, db)
+    elif protocol == "pendle":
+        _execute_pendle_for_proposal(proposal, db)
+    else:
+        raise ProtocolExecutionNotWiredError(
+            f"未知の protocol '{protocol}' (proposal={proposal.id}) は自動執行非対応です。"
+        )
+
+
 @router.get(
     "/admin/all", response_model=AdminProposalListResponse, summary="全ユーザー提案一覧（管理者）"
 )
@@ -888,12 +950,23 @@ def approve_proposal(
         from .execution_route import RouteMismatchError  # noqa: PLC0415
 
         try:
-            _execute_aave_for_proposal(proposal, db)
+            # protocol (aave/lido/pendle) で執行ハンドラを振り分ける。
+            # Lido/Pendle は HUMAN-REVIEW 未配線のため ProtocolExecutionNotWiredError。
+            _dispatch_custodial_execution(proposal, db)
         except RouteMismatchError as exc:
             db.commit()  # status='failed' / error_message を永続化
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"誤執行検出: {exc} (手動介入必須)",
+            ) from exc
+        except ProtocolExecutionNotWiredError as exc:
+            # Lido/Pendle の custodial 自動執行は未配線 (HUMAN-REVIEW)。
+            # approved のまま据置き、501 で明示する (Aave として誤実行しない)。
+            logger.warning("proposal %d: custodial execution 未配線: %s", proposal.id, exc)
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail=str(exc),
             ) from exc
         db.commit()
         db.refresh(proposal)
