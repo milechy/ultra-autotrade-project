@@ -185,6 +185,22 @@ class TestUserSettingsAPI:
         assert r.status_code == 200
         assert r.json()["is_active"] is True
 
+    def test_pause_then_resume_recovers(self, client: TestClient) -> None:
+        """pause で is_active=False にした後でも resume で再開できること (catch-22 回帰)。
+
+        resume が require_active_user 依存だと、pause 後 is_active=False のため 403
+        "User is inactive" で永久に再開不能になる。get_current_user に修正済。
+        """
+        headers = {"Authorization": f"Bearer {register_and_login(client)}"}
+        # pause → is_active=False
+        rp = client.post("/api/user/pause", headers=headers)
+        assert rp.status_code == 200
+        assert rp.json()["is_active"] is False
+        # 非アクティブ状態から resume → 再開できる (403 にならない)
+        rr = client.post("/api/user/resume", headers=headers)
+        assert rr.status_code == 200, f"resume が非アクティブ状態で失敗: {rr.status_code} {rr.text}"
+        assert rr.json()["is_active"] is True
+
     def test_automation_pause(self, client: TestClient) -> None:
         token = register_and_login(client)
         r = client.post("/api/automation/pause", headers={"Authorization": f"Bearer {token}"})
