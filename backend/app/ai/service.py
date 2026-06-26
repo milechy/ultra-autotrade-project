@@ -13,10 +13,11 @@ Responsibilities:
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Callable, Iterable, List, Optional
 
-from app.ai.agents import MultiAgentContext, run_all_agents
+from app.ai.agents import Bias, MultiAgentContext, run_all_agents
 from app.ai.judgment_log import CognitiveState
 from app.data_feeds.context import MarketContext
 from app.notion.schemas import NotionNewsItem
@@ -33,6 +34,26 @@ from .schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Indicator-only confidence threshold for the staging demo relax (= directional
+# threshold used by the multi-agent AND-condition guard).
+_DEMO_DIRECTIONAL_THRESHOLD = 70
+
+
+def _staging_demo_force_directional_enabled() -> bool:
+    """staging 限定デモ用ゲート緩和の有効判定 (本番では絶対に無効)。
+
+    用途: 実 macro が directional でない (hawkish/neutral) ときでも、Indicator 単独
+    BULLISH>=70% で HOLD→BUY に格上げして提案生成パイプラインを実機検証するための
+    デモ専用フラグ。**二重ガード**で本番混入を防ぐ:
+      1. APP_ENV=production なら常に False (フラグ値に関わらず無効)
+      2. それ以外で AI_STAGING_RELAX_MACRO_GATE=true のときのみ True (既定 false)
+    HARD STOP / COMPOUND RISK は本メソッドより上流で return 済みなので、本緩和が
+    安全停止を上書きすることはない。
+    """
+    if os.getenv("APP_ENV", "").strip().lower() == "production":
+        return False
+    return os.getenv("AI_STAGING_RELAX_MACRO_GATE", "false").strip().lower() == "true"
 
 
 # LLM client type (expects a callable: NotionNewsItem -> AIAnalysisResult)
@@ -228,10 +249,13 @@ class AIService:
         version = ai_settings.prompt_version
         # AND-condition flag: set True if agents disagree and v4/v5 guard applies
         _and_condition_failed = False
+        # Rule-engine result kept for the staging demo relax (None if no market_context).
+        _rule_ctx: Optional[MultiAgentContext] = None
 
         # Rule engine: pre-LLM checks (deterministic, cannot be overridden by LLM)
         if market_context is not None:
             agent_ctx_check = run_all_agents(market_context)
+            _rule_ctx = agent_ctx_check
             # Guard 1: COMPOUND RISK → force HOLD
             if agent_ctx_check.has_compound_risk():
                 logger.warning("COMPOUND RISK detected by Risk Agent. Forcing HOLD.")
@@ -306,6 +330,45 @@ class AIService:
                 final_action=TradeAction.HOLD,
                 final_confidence=_clamped.confidence,
                 final_reason=_clamp_reason,
+                prompt_version=version,
+            )
+
+        # Staging-only demo relax (NEVER production / double-gated env flag):
+        # 実 macro が directional でない (hawkish/neutral) ときでも、Indicator 単独
+        # BULLISH>=70% で HOLD→BUY に格上げして提案生成パイプラインを実機検証する。
+        # COMPOUND RISK / HARD STOP は上流で return 済みなので安全停止は上書きしない。
+        if (
+            _staging_demo_force_directional_enabled()
+            and result.final_action == TradeAction.HOLD
+            and _rule_ctx is not None
+            and _rule_ctx.indicator_signal is not None
+            and _rule_ctx.indicator_signal.bias == Bias.BULLISH
+            and _rule_ctx.indicator_signal.confidence >= _DEMO_DIRECTIONAL_THRESHOLD
+        ):
+            logger.warning(
+                "STAGING DEMO RELAX: HOLD→BUY (Indicator-only BULLISH %s%%). "
+                "本番では無効 (AI_STAGING_RELAX_MACRO_GATE + non-production gate).",
+                _rule_ctx.indicator_signal.confidence,
+            )
+            _demo_reason = (
+                "STAGING DEMO RELAX: Indicator-only BULLISH>=70% でゲート緩和 "
+                "(macro 軸ドロップ・staging 限定)。"
+                f"Original: {result.final_reason}"
+            )
+            _demo_decision = LLMDecision(
+                provider=LLMProvider.RULE_BASED,
+                action=TradeAction.BUY,
+                confidence=_rule_ctx.indicator_signal.confidence,
+                reason=_demo_reason,
+                prompt_version=version,
+            )
+            result = CrossValidationResult(
+                primary=_demo_decision,
+                secondary=result.secondary,
+                agreed=result.agreed,
+                final_action=TradeAction.BUY,
+                final_confidence=_rule_ctx.indicator_signal.confidence,
+                final_reason=_demo_reason,
                 prompt_version=version,
             )
 
