@@ -34,8 +34,13 @@ _VALID_STABLECOIN_RISKS = ("low", "medium", "high")
 
 # 2026-05-28: staging soak で sonar-pro が 200/400 交互。
 # 1) 非2xx 時に response body をログ (DoD: 真因特定)。
-# 2) 4xx/5xx/timeout を一過性とみなし最大 1 回 retry (DoD: 200 安定化)。
-_PERPLEXITY_MAX_ATTEMPTS = 2
+# 2) 4xx/5xx/timeout を一過性とみなし retry (DoD: 200 安定化)。
+# 2026-06-26: クォータ復旧後の実機検証で、起動時 fetch が一過性 400 に当たると
+# 次の 60min tick まで macro が fed=unknown のまま空になり、AI 判定が常時 HOLD に
+# 張り付くことを確認 (手動 curl では同 payload が 200 を返すため真に一過性)。
+# attempts を 2→4 に増やし、空振り (fed=unknown フォールバック) の頻度を下げる。
+# 背景タスク (60min 間隔) なので最悪 +6s 程度の追加レイテンシは許容範囲。
+_PERPLEXITY_MAX_ATTEMPTS = 4
 _PERPLEXITY_RETRY_BACKOFF_SECONDS = 2.0
 # auth 系は retry 不要 (key が違うだけ無駄打ち) なので除外。
 _PERPLEXITY_NON_RETRIABLE_STATUSES = frozenset({401, 403})
