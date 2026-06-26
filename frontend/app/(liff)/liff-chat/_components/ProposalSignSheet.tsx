@@ -14,12 +14,12 @@ import { Loader2, Lock, CheckCircle2 } from "lucide-react"
 import { buildPartnerTx, submitPartnerTx, type UnsignedTx } from "@/lib/api/admin-proposals"
 
 // build-tx の UnsignedTx を Smart Wallet UserOp の call 形式 (to/data/value) に変換する。
-// approve/supply/withdraw はいずれも 0 ETH value。
+// approve/supply/withdraw/buy_pt は 0 ETH value。STAKE_ETH (Lido submit) のみ value=添付 ETH。
 function toCall(tx: UnsignedTx): { to: `0x${string}`; data: `0x${string}`; value: bigint } {
   return {
     to: tx.to as `0x${string}`,
     data: tx.data as `0x${string}`,
-    value: 0n,
+    value: BigInt(tx.value ?? "0x0"),
   }
 }
 
@@ -101,6 +101,12 @@ export function ProposalSignSheet({
           calls = [toCall(txData.approve_tx), toCall(txData.supply_tx)]
         } else if (txData.operation === "WITHDRAW" && txData.withdraw_tx) {
           calls = [toCall(txData.withdraw_tx)]
+        } else if (txData.operation === "STAKE_ETH" && txData.stake_tx) {
+          // Lido 非カストディアル: submit に value=添付 ETH。toCall が value を引き継ぐ。
+          calls = [toCall(txData.stake_tx)]
+        } else if (txData.operation === "BUY_PT" && txData.buy_pt_tx) {
+          // Pendle 非カストディアル: swapExactTokenForPt の calldata (value=0)。
+          calls = [toCall(txData.buy_pt_tx)]
         } else {
           throw new Error(t("unsupportedOperation", { operation: txData.operation }))
         }
@@ -158,6 +164,32 @@ export function ProposalSignSheet({
                 to: txData.withdraw_tx.to,
                 data: txData.withdraw_tx.data,
                 from: txData.withdraw_tx.from,
+                value: "0x0",
+              },
+            ],
+          })) as string
+        } else if (txData.operation === "STAKE_ETH" && txData.stake_tx) {
+          // Lido 非カストディアル: submit は payable。value=添付 ETH をそのまま送る。
+          finalHash = (await eip1193.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                to: txData.stake_tx.to,
+                data: txData.stake_tx.data,
+                from: txData.stake_tx.from,
+                value: txData.stake_tx.value,
+              },
+            ],
+          })) as string
+        } else if (txData.operation === "BUY_PT" && txData.buy_pt_tx) {
+          // Pendle 非カストディアル: ERC20 入力のため value=0。
+          finalHash = (await eip1193.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                to: txData.buy_pt_tx.to,
+                data: txData.buy_pt_tx.data,
+                from: txData.buy_pt_tx.from,
                 value: "0x0",
               },
             ],

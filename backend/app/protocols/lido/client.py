@@ -143,6 +143,32 @@ _WITHDRAWAL_QUEUE_ABI: list[dict[str, Any]] = [
 
 _WEI_PER_ETH = Decimal("1000000000000000000")
 
+# chain 名 → EVM chain_id。未署名 tx 構築時に RPC を叩かず chain_id を解決するためのマップ
+# （tx builder で RPC ラウンドトリップ・ネットワーク失敗を避ける）。未知 chain は mainnet(1)。
+_CHAIN_ID_MAP: dict[str, int] = {
+    "mainnet": 1,
+    "ethereum": 1,
+    "holesky": 17000,
+    "hoodi": 560048,
+    "sepolia": 11155111,
+}
+
+
+def _resolve_chain_id(chain: str) -> int:
+    """config の chain 名から chain_id を解決する。
+
+    未署名 tx に焼き込む chainId を mainnet(1) へサイレント fallback すると、testnet/L2 上の
+    partner に誤って mainnet ETH stake を署名させる事故になる。未知 chain 名は fail-closed で
+    ValueError を送出し、誤ネットワークの tx を組ませない（呼び出し側で 500 に変換される）。
+    """
+    chain_id = _CHAIN_ID_MAP.get(chain.lower())
+    if chain_id is None:
+        raise ValueError(
+            f"未知の LIDO_CHAIN '{chain}' です。chainId を解決できません "
+            f"(対応: {sorted(_CHAIN_ID_MAP)})。誤ネットワーク署名を防ぐため fail-closed。"
+        )
+    return chain_id
+
 
 class AbstractLidoClient(BaseProtocolClient):
     """Lido クライアントの抽象基底クラス。"""
@@ -257,6 +283,24 @@ class AbstractLidoClient(BaseProtocolClient):
     @abstractmethod
     async def stake_eth(self, amount_wei: int) -> TxResult:
         """ETH → stETH ステーキング。"""
+        ...
+
+    @abstractmethod
+    def build_stake_tx(self, amount_wei: int, from_address: str) -> dict[str, Any]:
+        """パートナー本人署名用: 未署名の stake (submit) トランザクションを構築して返す。
+
+        サーバー鍵では署名・broadcast しない。フロントエンドが Privy sendTransaction()
+        で本人署名・送信する非カストディアル経路。``stake_eth`` と異なり
+        ``wallet_private_key`` を一切参照しない。
+
+        Args:
+            amount_wei: ステークする ETH 量（Wei 単位）。submit に ``value`` として添付する。
+            from_address: 署名者（partner 本人）のウォレットアドレス。
+
+        Returns:
+            {"to", "data", "from", "chainId", "value"} 形式の未署名 tx dict。
+            ``value`` は添付 ETH（amount_wei）を 16 進文字列で格納する。
+        """
         ...
 
     @abstractmethod
@@ -391,6 +435,38 @@ class LidoClient(AbstractLidoClient):
         except Exception as exc:
             logger.exception("stake_eth 失敗: amount_wei=%d", amount_wei)
             return TxResult(success=False, error=str(exc))
+
+    def build_stake_tx(self, amount_wei: int, from_address: str) -> dict[str, Any]:
+        """パートナー本人署名用の未署名 stake (submit) tx を構築して返す。
+
+        ``stake_eth`` から ``sign_transaction`` / ``send_raw_transaction`` を取り除いた
+        非カストディアル版。submit(referral=0) の calldata を encode し、添付 ETH は
+        ``value`` に格納する。サーバー秘密鍵を一切参照しない。
+        """
+        self._ensure_initialized()
+        from web3 import Web3  # noqa: PLC0415
+
+        if not from_address:
+            raise ValueError("from_address は必須です (partner 署名)")
+        if amount_wei <= 0:
+            raise ValueError("amount_wei は正の整数である必要があります")
+
+        checksum_from = Web3.to_checksum_address(from_address)
+        # chain_id は config の chain 名から解決する（RPC を叩かない）。
+        chain_id = _resolve_chain_id(self._config.chain)
+        # submit(_referral=0x0) の calldata を生成（web3.py v7: encode_abi）。
+        submit_data = self._contract.encode_abi(
+            "submit",
+            args=[Web3.to_checksum_address("0x0000000000000000000000000000000000000000")],
+        )
+        return {
+            "to": Web3.to_checksum_address(self._config.steth_contract_address),
+            "data": submit_data,
+            "from": checksum_from,
+            "chainId": chain_id,
+            # submit は payable。ステークする ETH を value として添付する。
+            "value": hex(amount_wei),
+        }
 
     async def request_withdrawals(self, amounts_wei: list[int]) -> WithdrawalRequestResult:
         """stETH 引き出しリクエストを WithdrawalQueue に送信する。
@@ -688,6 +764,25 @@ class DummyLidoClient(AbstractLidoClient):
             success=True,
             received_steth_wei=amount_wei,  # 1:1 ratio
         )
+
+    def build_stake_tx(self, amount_wei: int, from_address: str) -> dict[str, Any]:
+        """未署名 stake tx 構築のスタブ（web3 不要・秘密鍵不参照）。"""
+        if not from_address:
+            raise ValueError("from_address は必須です (partner 署名)")
+        if amount_wei <= 0:
+            raise ValueError("amount_wei は正の整数である必要があります")
+        logger.info(
+            "DummyLidoClient.build_stake_tx: amount_wei=%d, from=%s（シミュレーション）",
+            amount_wei,
+            from_address[:10],
+        )
+        return {
+            "to": self._config.steth_contract_address,
+            "data": "0x",
+            "from": from_address,
+            "chainId": _resolve_chain_id(self._config.chain),
+            "value": hex(amount_wei),
+        }
 
     async def get_steth_balance(self, address: str) -> Decimal:
         """常に 1.0 stETH を返すスタブ。"""

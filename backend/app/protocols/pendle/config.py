@@ -36,6 +36,14 @@ class PendleConfig:
             "0x0000000000000000000000000000000000000002",  # dummy address
         )
     )
+    # BUY_PT で支払う入力トークン（underlying）アドレス。非カストディアル build-tx で
+    # swapExactTokenForPt の tokenIn として使用する（partner が保有・approve 済み前提）。
+    underlying_token_address: str = field(
+        default_factory=lambda: os.getenv(
+            "PENDLE_UNDERLYING_TOKEN_ADDRESS",
+            "0x0000000000000000000000000000000000000003",  # dummy address
+        )
+    )
     # RPC エンドポイント（Arbitrum Sepolia）
     rpc_url: str = field(
         default_factory=lambda: os.getenv(
