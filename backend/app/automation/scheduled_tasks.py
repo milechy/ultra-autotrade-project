@@ -838,6 +838,124 @@ async def proposal_timeout_loop(
             await asyncio.sleep(600)
 
 
+def run_funding_detection_once() -> int:
+    """awaiting_funds proposal を1回スキャンし、状態遷移した件数を返す (S2・同期)。
+
+    funding_detection_loop が asyncio.to_thread 経由で呼ぶ本体。テスト容易化のため
+    モジュールレベルに分離。残高 >= amount_usd → approved+通知 / expires_at<now → expired。
+    残高取得失敗(None)は skip(次サイクル再試行・安全側)。
+    """
+    from datetime import datetime, timezone  # noqa: PLC0415
+    from decimal import Decimal  # noqa: PLC0415
+
+    from app.aave.balance import read_wallet_usdc_balance  # noqa: PLC0415
+    from app.database import SessionLocal  # noqa: PLC0415
+
+    db = SessionLocal()
+    try:
+        from app.auth.models import User  # noqa: PLC0415
+        from app.proposals.models import Proposal  # noqa: PLC0415
+
+        now = datetime.now(timezone.utc)
+        waiting = db.query(Proposal).filter(Proposal.status == "awaiting_funds").all()
+        changed = 0
+        for proposal in waiting:
+            try:
+                # funding window 切れ → expired
+                if proposal.expires_at is not None and proposal.expires_at < now:
+                    proposal.status = "expired"
+                    db.flush()
+                    changed += 1
+                    logger.info("awaiting_funds proposal %d expired (funding window)", proposal.id)
+                    continue
+                user = db.get(User, proposal.user_id)
+                wallet = (user.smart_wallet_address or user.wallet_address) if user else None
+                if not wallet:
+                    continue
+                balance = read_wallet_usdc_balance(wallet)
+                if balance is None:
+                    continue  # RPC 失敗は次サイクル再試行 (安全側)
+                if balance >= Decimal(str(proposal.amount_usd)):
+                    proposal.status = "approved"
+                    proposal.approved_at = now
+                    db.flush()
+                    changed += 1
+                    logger.info(
+                        "Funding detected for proposal %d (balance=%s >= %s)",
+                        proposal.id,
+                        balance,
+                        proposal.amount_usd,
+                    )
+                    try:
+                        from app.notifications.factory import (  # noqa: PLC0415
+                            get_notification_service,
+                        )
+                        from app.notifications.templates import (  # noqa: PLC0415
+                            funding_detected_notification,
+                        )
+
+                        payload = funding_detected_notification(
+                            operation=proposal.operation,
+                            asset=proposal.asset,
+                            required_usd=proposal.amount_usd,
+                        )
+                        m = payload.notification_message.model_copy(
+                            update={"user_id": proposal.user_id}
+                        )
+                        get_notification_service().send(m)
+                    except Exception as _n_exc:
+                        logger.debug("funding_detected notify failed: %s", _n_exc)
+            except Exception as _item_exc:
+                logger.warning("Funding check failed for proposal %d: %s", proposal.id, _item_exc)
+        if changed:
+            db.commit()
+        return changed
+    except Exception as _db_exc:
+        db.rollback()
+        logger.warning("Funding detection DB error: %s", _db_exc)
+        return 0
+    finally:
+        db.close()
+
+
+async def funding_detection_loop(
+    *,
+    interval_seconds: int = 60,
+    on_error: Optional[Callable[[Exception], None]] = None,
+) -> None:
+    """awaiting_funds(入金待ち) proposal の着金を検知して approved 化する定期ループ (S2)。
+
+    interval ごとに status=awaiting_funds を検索し、本人 wallet の USDC 残高 >= amount_usd
+    なら approved に遷移して「署名できます」通知を送る。funding window(expires_at)を過ぎたら
+    expired に倒す(docs/62 §11.2 案A)。非カストディアル: 残高検知のみで秘密鍵に触れない。
+    残高取得失敗(None)は次サイクルで再試行(安全側)。
+
+    Args:
+        interval_seconds: チェック間隔（秒）。デフォルト 60 秒。
+        on_error: エラー発生時のコールバック。
+    """
+    logger.info("Starting funding detection loop (interval: %ds)", interval_seconds)
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+            await asyncio.to_thread(run_funding_detection_once)
+
+        except asyncio.CancelledError:
+            logger.info("Funding detection loop cancelled - shutting down")
+            raise
+
+        except Exception as exc:
+            logger.error("Error in funding detection loop: %s", exc)
+            if on_error:
+                try:
+                    on_error(exc)
+                except Exception as callback_exc:
+                    logger.error("Error in on_error callback: %s", callback_exc)
+
+            await asyncio.sleep(600)
+
+
 async def proposal_expiry_reminder_loop(
     *,
     interval_seconds: int = 300,
@@ -1789,6 +1907,7 @@ class ScheduledTaskManager:
         self._health_check_task: Optional[asyncio.Task[None]] = None
         self._latency_monitor_task: Optional[asyncio.Task[None]] = None
         self._proposal_timeout_task: Optional[asyncio.Task[None]] = None
+        self._funding_detection_task: Optional[asyncio.Task[None]] = None
         self._learning_task: Optional[asyncio.Task[None]] = None
         self._outcome_labeling_task: Optional[asyncio.Task[None]] = None
         self._compound_risk_task: Optional[asyncio.Task[None]] = None
@@ -1848,6 +1967,11 @@ class ScheduledTaskManager:
     def is_proposal_timeout_running(self) -> bool:
         """期限切れProposalチェックタスクが動作中かどうか。"""
         return self._proposal_timeout_task is not None and not self._proposal_timeout_task.done()
+
+    @property
+    def is_funding_detection_running(self) -> bool:
+        """着金検知タスク (S2) が動作中かどうか。"""
+        return self._funding_detection_task is not None and not self._funding_detection_task.done()
 
     @property
     def is_learning_running(self) -> bool:
@@ -2394,6 +2518,48 @@ class ScheduledTaskManager:
 
         self._proposal_timeout_task = None
         logger.info("Proposal timeout task stopped")
+
+    async def start_funding_detection(
+        self,
+        *,
+        interval_seconds: int = 60,
+        on_error: Optional[Callable[[Exception], None]] = None,
+    ) -> None:
+        """着金検知タスク (S2) を開始する。
+
+        Raises:
+            RuntimeError: 既に開始されている場合
+        """
+        if self.is_funding_detection_running:
+            raise RuntimeError("Funding detection already running")
+
+        logger.info("Starting funding detection task")
+        self._funding_detection_task = asyncio.create_task(
+            funding_detection_loop(interval_seconds=interval_seconds, on_error=on_error)
+        )
+        logger.info("Funding detection task started")
+
+    async def stop_funding_detection(self, timeout: float = 5.0) -> None:
+        """着金検知タスク (S2) を停止する。"""
+        if not self.is_funding_detection_running:
+            logger.debug("Funding detection not running - nothing to stop")
+            return
+
+        logger.info("Stopping funding detection task")
+        assert self._funding_detection_task is not None  # noqa: S101
+        self._funding_detection_task.cancel()
+
+        try:
+            await asyncio.wait_for(self._funding_detection_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("Funding detection task cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning("Funding detection task did not stop within %.1fs timeout", timeout)
+        except Exception as exc:
+            logger.error("Error while stopping funding detection task: %s", exc)
+
+        self._funding_detection_task = None
+        logger.info("Funding detection task stopped")
 
     async def start_latency_monitor(
         self,

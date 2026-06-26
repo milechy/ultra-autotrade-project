@@ -50,6 +50,10 @@ router = APIRouter(prefix="/api/proposals", tags=["proposals"])
 # 恒久エラー (ValueError/KeyError 等の設定起因) は 1回目で即 failed。
 MAX_EXECUTION_ATTEMPTS = 3
 
+# S2: awaiting_funds(入金待ち)の funding window(日)。承認=投資意図キャプチャ時に
+# expires_at を now+この日数に書き換え、市場期限(72h)と分離する(docs/62 §11.2 案A)。
+_FUNDING_WINDOW_DAYS = int(os.getenv("FUNDING_WINDOW_DAYS", "7"))
+
 # 恒久エラー (RPC 設定未完成 / チェーン未設定 等): 再試行しても無意味なので即 failed。
 _PERMANENT_EXCEPTION_TYPES = (ValueError, KeyError)
 
@@ -873,13 +877,18 @@ def list_pending_proposals(
     current_user: User = Depends(require_viewer),
     db: Session = Depends(get_db),
 ) -> ProposalListResponse:
-    """自分の保留中（pending）提案リストを返す。"""
+    """自分の保留中（pending）+ 入金待ち（awaiting_funds）提案リストを返す。
+
+    S2: awaiting_funds も含めることで、フロントが入金待ちカードを表示し残高ポーリングで
+    着金検知できる。`_expire_old_proposals` は pending のみ対象なので awaiting_funds の
+    期限切れには影響しない（funding window の expire は funding_detection_loop が担当）。
+    """
     _expire_old_proposals(db, current_user.id)
     stmt = (
         select(Proposal)
         .where(
             Proposal.user_id == current_user.id,
-            Proposal.status == "pending",
+            Proposal.status.in_(["pending", "awaiting_funds"]),
         )
         .order_by(Proposal.created_at.desc())
     )
@@ -1040,6 +1049,65 @@ def reject_proposal(
     db.commit()
     db.refresh(proposal)
     return ProposalResponse.model_validate(proposal)
+
+
+@router.post(
+    "/{proposal_id}/await-funds",
+    response_model=ProposalResponse,
+    summary="入金待ち化（残高不足時の投資意図キャプチャ）",
+)
+def await_funds_proposal(
+    proposal_id: int,
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> ProposalResponse:
+    """残高不足の SUPPLY 提案を `awaiting_funds`(入金待ち)に遷移させる (S2 / docs/62)。
+
+    「承認＝投資意図のキャプチャ」。署名はまだ行わず、入金期限(funding window)内に
+    着金すれば funding_detection_loop が approved 化して署名可能になる。
+    市場期限(72h)とは分離するため expires_at を now+_FUNDING_WINDOW_DAYS に書き換える(案A)。
+    VIEWER は自分の提案のみ。admin/partner は代行可。reject と同じ認可・遷移パターン。
+    """
+    stmt = select(Proposal).where(Proposal.id == proposal_id)
+    proposal = db.scalars(stmt).first()
+    if proposal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    _is_privileged = current_user.role in (UserRole.ADMIN.value, UserRole.PARTNER.value)
+    if not _is_privileged and proposal.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this proposal",
+        )
+    if proposal.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot await-funds proposal with status '{proposal.status}'",
+        )
+    now = datetime.now(timezone.utc)
+    proposal.status = "awaiting_funds"
+    # funding window: 市場期限と分離。入金待ち中は expires_at をこちらで上書き。
+    proposal.expires_at = now + timedelta(days=_FUNDING_WINDOW_DAYS)
+    db.commit()
+    db.refresh(proposal)
+    _notify_funding_requested(proposal)
+    return ProposalResponse.model_validate(proposal)
+
+
+def _notify_funding_requested(proposal: Proposal) -> None:
+    """入金待ち化を「あと $X 入金してください」とユーザー通知する (best-effort)。"""
+    try:
+        from app.notifications.factory import get_notification_service  # noqa: PLC0415
+        from app.notifications.templates import funding_requested_notification  # noqa: PLC0415
+
+        payload = funding_requested_notification(
+            operation=proposal.operation,
+            asset=proposal.asset,
+            required_usd=proposal.amount_usd,
+        )
+        msg = payload.notification_message.model_copy(update={"user_id": proposal.user_id})
+        get_notification_service().send(msg)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("_notify_funding_requested failed for proposal %d: %s", proposal.id, exc)
 
 
 def _resolve_onchain_token_amount(proposal: Proposal) -> Decimal:

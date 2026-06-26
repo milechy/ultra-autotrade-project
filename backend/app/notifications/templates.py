@@ -152,6 +152,33 @@ def trade_executed_notification(
     return _build_payload(title, body, "info")
 
 
+def funding_requested_notification(
+    operation: str,
+    asset: str,
+    required_usd: Decimal,
+) -> NotificationPayload:
+    """入金待ち化通知 (S2): 残高不足で承認したので「あと $X 入金してください」。"""
+    op_label = _ACTION_LABEL_JA.get(operation, operation)
+    title = "💰 入金待ち"
+    body = (
+        f"{op_label}（{asset}）の提案を入金待ちにしました。"
+        f"必要額 ${required_usd} 分の USDC を Base ウォレットに入金すると署名できます。"
+    )
+    return _build_payload(title, body, "info")
+
+
+def funding_detected_notification(
+    operation: str,
+    asset: str,
+    required_usd: Decimal,
+) -> NotificationPayload:
+    """着金検知通知 (S2): 残高が必要額に到達したので署名可能になった。"""
+    op_label = _ACTION_LABEL_JA.get(operation, operation)
+    title = "✅ 入金を確認しました"
+    body = f"{op_label}（{asset}・${required_usd}）の入金を確認しました。署名して実行できます。"
+    return _build_payload(title, body, "info")
+
+
 def trade_failed_notification(
     operation: str,
     asset: str,

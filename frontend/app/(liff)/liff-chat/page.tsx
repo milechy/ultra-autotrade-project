@@ -23,7 +23,9 @@ import { AccountPanel } from "./_components/panels/AccountPanel"
 import { TermsPanel } from "./_components/panels/TermsPanel"
 import { ChatPanel } from "./_components/ChatPanel"
 import { ProposalActionCard } from "./_components/ProposalActionCard"
+import { AwaitingFundsCard } from "./_components/AwaitingFundsCard"
 import { ProposalSignSheet, type ChatProposal } from "./_components/ProposalSignSheet"
+import { awaitFundsProposal } from "@/lib/api/admin-proposals"
 import { DividendChartWrapper } from "./_components/DividendChartWrapper"
 
 // recharts は SSR クラッシュ防止のため dynamic import
@@ -128,7 +130,8 @@ export default function LiffChatPage() {
   const { language, setLanguage } = useLanguage()
 
   // 現在資産 = ユーザー自身のウォレットの USDC オンチェーン残高（非カストディアル）。
-  const { balanceUsd } = useUsdcBalance()
+  // refetch は S2 の着金検知ポーリングで使う。
+  const { balanceUsd, refetch: refetchBalance } = useUsdcBalance()
 
   // ── 既存 state（ハンバーガー）
   const [menuOpen, setMenuOpen] = useState(false)
@@ -232,6 +235,32 @@ export default function LiffChatPage() {
     return () => clearInterval(id)
   }, [])
 
+  // ── S2: awaiting_funds(入金待ち)の間だけ残高+提案状態を 30秒ポーリングして着金検知。
+  // 残高 ≥ 必要額になると backend(funding_detection_loop)が approved 化 → ここで検知して
+  // setPendingProposal で署名フロー(ProposalActionCard/ProposalSignSheet)へ自動遷移する。
+  useEffect(() => {
+    const p = pendingProposal
+    if (p?.status !== "awaiting_funds") return
+    const token =
+      typeof window !== "undefined" ? (localStorage.getItem("auth_token") ?? "") : ""
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
+    if (!token) return
+    const headers = { Authorization: `Bearer ${token}` }
+    const poll = () => {
+      refetchBalance()
+      fetch(`${API_BASE}/api/proposals/pending`, { headers })
+        .then((r) => jsonOrReport("proposals/pending", r))
+        .then((d) => {
+          const items = (d as { items?: ChatProposal[] } | null)?.items
+          const same = items?.find((it) => it.id === p.id)
+          if (same && same.status !== p.status) setPendingProposal(same)
+        })
+        .catch((e) => reportFetchError("proposals/pending", e))
+    }
+    const id = setInterval(poll, 30_000)
+    return () => clearInterval(id)
+  }, [pendingProposal, refetchBalance])
+
   // ── KPI-D: 月次手取り（配当）を取得（月次データのため初回のみ）
   useEffect(() => {
     const token =
@@ -332,6 +361,23 @@ export default function LiffChatPage() {
       setRejecting(false)
       setTimeout(() => setToast(null), 2800)
     }
+  }
+
+  // ── 提案 承認: 残高十分なら署名シート、残高不足なら入金待ち(awaiting_funds)化(S2)。
+  // 「承認＝投資意図のキャプチャ」。await-funds で保持し、着金検知で署名可能になる。
+  async function handleApproveProposal() {
+    if (!pendingProposal || !authToken) return
+    if (insufficientBalance) {
+      try {
+        await awaitFundsProposal(pendingProposal.id, authToken)
+        setPendingProposal({ ...pendingProposal, status: "awaiting_funds" })
+      } catch {
+        setToast(t("exec.signFailed"))
+        setTimeout(() => setToast(null), 2800)
+      }
+      return
+    }
+    setSignSheetOpen(true)
   }
 
   // ── 提案 実行完了（署名シートからの成功コールバック）
@@ -524,13 +570,23 @@ export default function LiffChatPage() {
                   : "—"}
               </span>
             </div>
-            <ProposalActionCard
-              proposal={pendingProposal}
-              rejecting={rejecting}
-              onApprove={() => setSignSheetOpen(true)}
-              onReject={handleRejectProposal}
-              insufficientBalance={insufficientBalance}
-            />
+            {pendingProposal.status === "awaiting_funds" ? (
+              <AwaitingFundsCard
+                proposal={pendingProposal}
+                balanceUsd={balanceUsd}
+                rejecting={rejecting}
+                onDeposit={() => setActivePanel("deposit")}
+                onReject={handleRejectProposal}
+              />
+            ) : (
+              <ProposalActionCard
+                proposal={pendingProposal}
+                rejecting={rejecting}
+                onApprove={handleApproveProposal}
+                onReject={handleRejectProposal}
+                insufficientBalance={insufficientBalance}
+              />
+            )}
           </>
         )}
 
