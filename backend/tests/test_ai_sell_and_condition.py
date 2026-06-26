@@ -14,6 +14,7 @@ Guard 2) and documented in the v4/v5 prompts.
 These tests are deterministic — no LLM calls are made.
 """
 
+import os
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -776,3 +777,110 @@ class TestPromptRegistry:
 
         versions = list_versions()
         assert "v5" in versions
+
+
+# ---------------------------------------------------------------------------
+# Tests: staging-only demo macro-gate relax (HOLD→BUY on Indicator-only BULLISH)
+# ---------------------------------------------------------------------------
+
+
+class TestStagingDemoMacroRelax:
+    """`AI_STAGING_RELAX_MACRO_GATE` のデモ用ゲート緩和。
+
+    実 macro が directional でない (hawkish/neutral) → LLM は HOLD を返すが、
+    フラグ有効 (かつ非 production) のときだけ Indicator 単独 BULLISH>=70% で
+    HOLD→BUY に格上げする。**本番では絶対に発火しない**ことを保証する。
+    """
+
+    def _make_service(self) -> AIService:
+        return AIService()
+
+    def _make_settings(self, version: str = "v5") -> MagicMock:
+        settings = MagicMock()
+        settings.prompt_version = version
+        settings.anthropic_api_key = "fake-key"
+        settings.openai_api_key = None
+        settings.cross_validation_enabled = False
+        settings.shadow_mode = False
+        settings.claude_model = "claude-opus-4-5"
+        return settings
+
+    def _indicator_bullish_hawkish_ctx(self):
+        """Indicator BULLISH (高HF/低util/高APY) だが macro は hawkish=非directional。
+
+        通常は LLM が HOLD → 緩和フラグ無しなら HOLD のまま。
+        """
+        fin = FinanceFeedResult(fed_stance="hawkish", stablecoin_risk="medium")
+        news = NewsFeedResult(sentiment="positive", summary="AAVE rallies")
+        return build_market_context(
+            health_factor=Decimal("2.8"),
+            aave_utilization_rate=Decimal("30"),
+            aave_supply_apy=Decimal("7.0"),
+            finance=fin,
+            news=news,
+        )
+
+    def _judge_hold(self, svc: AIService, settings: MagicMock):
+        with patch.object(
+            svc, "_call_claude", return_value=_make_cross_result(TradeAction.HOLD, 51).primary
+        ):
+            return svc.judge_with_rag(
+                query="market update",
+                rag_context=_make_rag_context(),
+                market_context=self._indicator_bullish_hawkish_ctx(),
+                settings=settings,
+            )
+
+    def test_flag_off_keeps_hold(self) -> None:
+        """既定 (フラグ未設定) では HOLD のまま (緩和は発火しない)。"""
+        svc = self._make_service()
+        settings = self._make_settings()
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AI_STAGING_RELAX_MACRO_GATE", None)
+            result = self._judge_hold(svc, settings)
+        assert result.final_action == TradeAction.HOLD
+
+    def test_flag_on_non_production_upgrades_to_buy(self) -> None:
+        """フラグ有効 + 非 production + Indicator BULLISH>=70 → HOLD→BUY。"""
+        svc = self._make_service()
+        settings = self._make_settings()
+        with patch.dict(
+            os.environ,
+            {"AI_STAGING_RELAX_MACRO_GATE": "true", "APP_ENV": "staging"},
+        ):
+            result = self._judge_hold(svc, settings)
+        assert result.final_action == TradeAction.BUY
+
+    def test_flag_on_production_is_ignored(self) -> None:
+        """**本番安全**: APP_ENV=production ならフラグ有効でも HOLD のまま。"""
+        svc = self._make_service()
+        settings = self._make_settings()
+        with patch.dict(
+            os.environ,
+            {"AI_STAGING_RELAX_MACRO_GATE": "true", "APP_ENV": "production"},
+        ):
+            result = self._judge_hold(svc, settings)
+        assert result.final_action == TradeAction.HOLD
+
+    def test_flag_on_but_indicator_not_bullish_keeps_hold(self) -> None:
+        """Indicator が BULLISH>=70 でなければ緩和有効でも昇格しない。"""
+        svc = self._make_service()
+        settings = self._make_settings()
+        # 低HF → Indicator は BULLISH にならない
+        fin = FinanceFeedResult(fed_stance="hawkish")
+        news = NewsFeedResult(sentiment="negative", summary="risk-off")
+        ctx = build_market_context(health_factor=Decimal("1.45"), finance=fin, news=news)
+        with patch.dict(
+            os.environ,
+            {"AI_STAGING_RELAX_MACRO_GATE": "true", "APP_ENV": "staging"},
+        ):
+            with patch.object(
+                svc, "_call_claude", return_value=_make_cross_result(TradeAction.HOLD, 51).primary
+            ):
+                result = svc.judge_with_rag(
+                    query="market update",
+                    rag_context=_make_rag_context(),
+                    market_context=ctx,
+                    settings=settings,
+                )
+        assert result.final_action == TradeAction.HOLD
