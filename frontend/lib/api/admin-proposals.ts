@@ -107,6 +107,18 @@ export async function rejectProposal(
   );
 }
 
+// S2: 残高不足の SUPPLY 提案を awaiting_funds(入金待ち)に遷移させる(投資意図キャプチャ)。
+export async function awaitFundsProposal(
+  id: number,
+  token: string
+): Promise<AdminProposal> {
+  return await postJson<AdminProposal>(
+    `/api/proposals/${id}/await-funds`,
+    {},
+    { headers: authHeaders(token) }
+  );
+}
+
 // --- 方式2: パートナー本人署名 (Privy) ---
 
 export interface UnsignedTx {

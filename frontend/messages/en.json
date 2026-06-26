@@ -693,6 +693,16 @@
       "accountAriaLabel": "Account",
       "langToggleAriaLabel": "Switch language"
     },
+    "awaitingFunds": {
+      "title": "Awaiting deposit",
+      "detecting": "Checking for your deposit…",
+      "requiredAmount": "Required",
+      "currentBalance": "Current balance",
+      "shortfall": "Shortfall",
+      "guide": "Deposit USDC on the Base network to your wallet. Domestic exchanges (e.g. SBI VC Trade) withdraw USDC on Ethereum, so bridge it to Base via Circle CCTP before sending (this can take tens of minutes). Once your deposit is confirmed, you'll be able to sign automatically.",
+      "depositCta": "Deposit",
+      "reject": "Dismiss"
+    },
     "home": {
       "currentAsset": "CURRENT ASSET",
       "lastMonthComparison": "vs last month",

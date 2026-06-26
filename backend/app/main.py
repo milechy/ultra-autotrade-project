@@ -686,6 +686,19 @@ def create_app() -> FastAPI:
             except BaseException as exc:
                 logger.error("Failed to start expiry reminder: %s", exc)
 
+        # --- 着金検知 (S2 / opt-in: ENABLE_FUNDING_DETECTION=1) ---
+        # awaiting_funds 提案の残高を監視し、着金したら approved 化して署名可能にする。
+        # 既定 off → 本番/staging で明示有効化するまで無影響。
+        if os.getenv("ENABLE_FUNDING_DETECTION", "0") == "1":
+            try:
+                await scheduled_manager.start_funding_detection(
+                    interval_seconds=int(os.getenv("FUNDING_DETECTION_INTERVAL_SECONDS", "60")),
+                    on_error=_make_scheduler_error_handler("funding_detection_loop"),
+                )
+                logger.info("Funding detection scheduled (S2)")
+            except BaseException as exc:
+                logger.error("Failed to start funding detection: %s", exc)
+
     @app.on_event("startup")
     async def startup_health_probes() -> None:
         """Start background probes for /health/detail (OpenAI / Perplexity / Aave safety)."""

@@ -693,6 +693,16 @@
       "accountAriaLabel": "アカウント",
       "langToggleAriaLabel": "言語切替"
     },
+    "awaitingFunds": {
+      "title": "入金待ち",
+      "detecting": "着金を確認中…",
+      "requiredAmount": "必要額",
+      "currentBalance": "現在残高",
+      "shortfall": "不足額",
+      "guide": "Base ネットワークの USDC をウォレットに入金してください。国内取引所(SBI VCトレード等)は USDC を Ethereum で出庫するため、Circle CCTP で Base へブリッジしてから送金します（数十分かかる場合があります）。入金を確認すると自動で署名できるようになります。",
+      "depositCta": "入金する",
+      "reject": "見送る"
+    },
     "home": {
       "currentAsset": "CURRENT ASSET",
       "lastMonthComparison": "先月比",

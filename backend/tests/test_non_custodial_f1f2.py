@@ -591,3 +591,43 @@ class TestBuildTxBalanceGuard:
 
         # None は skip。残高不足 422 にはしない (build 自体は env 依存で別結果になりうる)。
         assert "残高不足" not in r.text
+
+
+class TestAwaitFunds:
+    """S2: POST /{id}/await-funds (pending→awaiting_funds + funding window 書換)。"""
+
+    def test_await_funds_transitions_pending_to_awaiting(self, client: TestClient) -> None:
+        token = get_admin_token(client)
+        proposal_id = create_proposal(client, token)  # SUPPLY pending
+        r = client.post(
+            f"/api/proposals/{proposal_id}/await-funds",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["status"] == "awaiting_funds"
+
+    def test_await_funds_appears_in_pending(self, client: TestClient) -> None:
+        """awaiting_funds 提案は /pending に含まれる (フロント入金待ちカード用)。"""
+        token = get_admin_token(client)
+        proposal_id = create_proposal(client, token)
+        client.post(
+            f"/api/proposals/{proposal_id}/await-funds",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r = client.get("/api/proposals/pending", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        statuses = {it["status"] for it in r.json()["items"]}
+        assert "awaiting_funds" in statuses
+
+    def test_await_funds_non_pending_returns_400(self, client: TestClient) -> None:
+        token = get_admin_token(client)
+        proposal_id = create_proposal(client, token)
+        client.post(
+            f"/api/proposals/{proposal_id}/reject",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r = client.post(
+            f"/api/proposals/{proposal_id}/await-funds",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 400

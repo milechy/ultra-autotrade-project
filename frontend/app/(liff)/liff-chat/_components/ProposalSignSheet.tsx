@@ -40,6 +40,8 @@ export interface ChatProposal {
   confidence?: number
   status: string
   created_at: string
+  // S2: awaiting_funds の funding window 期限 (案A で expires_at を funding deadline に流用)。
+  expires_at?: string
 }
 
 type SigningStatus = "idle" | "signing" | "confirming" | "success" | "error"
