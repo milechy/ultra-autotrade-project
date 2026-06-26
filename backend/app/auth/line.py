@@ -38,10 +38,17 @@ async def verify_line_id_token(id_token: str) -> dict[str, Any]:
     if not liff_id:
         raise LineAuthError("LIFF_ID環境変数が設定されていません")
 
+    # LINE /oauth2/v2.1/verify の client_id は「チャネルID」を要求する。
+    # idToken の aud はチャネルID（数字）であり、LIFF ID 全体ではない。
+    # LIFF ID 形式 "1234567890-AbcdEfgh" はプレフィックスがチャネルIDなので、
+    # LIFF ID 全体を渡すと aud と不一致になり検証が 400/401 で失敗する。
+    # LINE_LOGIN_CHANNEL_ID が明示設定されていればそれを優先、なければ LIFF ID から導出する。
+    channel_id = os.getenv("LINE_LOGIN_CHANNEL_ID") or liff_id.split("-", 1)[0]
+
     async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.post(
             LINE_TOKEN_VERIFY_URL,
-            data={"id_token": id_token, "client_id": liff_id},
+            data={"id_token": id_token, "client_id": channel_id},
         )
 
     if response.status_code != 200:

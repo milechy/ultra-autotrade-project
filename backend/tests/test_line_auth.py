@@ -234,3 +234,91 @@ class TestLineAuth:
 
         assert response.status_code == 401
         assert "LIFF_ID" in response.json()["detail"]
+
+
+class TestVerifyLineIdTokenClientId:
+    """verify_line_id_token が LINE verify API に渡す client_id の検証。
+
+    LINE の /oauth2/v2.1/verify は client_id に「チャネルID」を要求する。
+    LIFF ID 全体（"<channelId>-<suffix>"）を渡すと idToken の aud（チャネルID）と
+    不一致になり 400/401 で失敗する（審査用 LIFF でログイン不能になる回帰）。
+    これらのテストは verify_line_id_token を丸ごとモックせず、実関数が
+    httpx に渡す data を捕捉して client_id を直接アサートする。
+    """
+
+    @staticmethod
+    def _capture_client_id(monkeypatch) -> dict:
+        """httpx.AsyncClient.post をモックし、渡された data を捕捉する。"""
+        import app.auth.line as line_module
+
+        captured: dict = {}
+
+        class _MockResponse:
+            status_code = 200
+
+            def json(self) -> dict:
+                return {"sub": "Uabcdef", "name": "Test"}
+
+        class _MockAsyncClient:
+            def __init__(self, *args, **kwargs) -> None:
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args) -> bool:
+                return False
+
+            async def post(self, url, data=None):
+                captured["url"] = url
+                captured["data"] = data
+                return _MockResponse()
+
+        monkeypatch.setattr(line_module.httpx, "AsyncClient", _MockAsyncClient)
+        return captured
+
+    def test_client_id_uses_channel_id_not_full_liff_id(self, monkeypatch):
+        """LIFF ID のプレフィックス（チャネルID）が client_id に渡ること。"""
+        import asyncio
+
+        import app.auth.line as line_module
+
+        monkeypatch.setenv("NEXT_PUBLIC_LIFF_ID", "2010494865-pto3eNh7")
+        monkeypatch.delenv("LINE_LOGIN_CHANNEL_ID", raising=False)
+        captured = self._capture_client_id(monkeypatch)
+
+        result = asyncio.run(line_module.verify_line_id_token("dummy-id-token"))
+
+        assert result["sub"] == "Uabcdef"
+        # 回帰防止: フルの LIFF ID ではなく数字のチャネルIDであること
+        assert captured["data"]["client_id"] == "2010494865"
+        assert captured["data"]["client_id"] != "2010494865-pto3eNh7"
+
+    def test_explicit_channel_id_env_takes_precedence(self, monkeypatch):
+        """LINE_LOGIN_CHANNEL_ID が設定されていればそれを優先すること。"""
+        import asyncio
+
+        import app.auth.line as line_module
+
+        monkeypatch.setenv("NEXT_PUBLIC_LIFF_ID", "2010494865-pto3eNh7")
+        monkeypatch.setenv("LINE_LOGIN_CHANNEL_ID", "9999999999")
+        captured = self._capture_client_id(monkeypatch)
+
+        asyncio.run(line_module.verify_line_id_token("dummy-id-token"))
+
+        assert captured["data"]["client_id"] == "9999999999"
+
+    def test_channel_id_when_liff_id_has_no_suffix(self, monkeypatch):
+        """LIFF_ID がサフィックスなし（チャネルIDのみ）でも壊れないこと。"""
+        import asyncio
+
+        import app.auth.line as line_module
+
+        monkeypatch.delenv("NEXT_PUBLIC_LIFF_ID", raising=False)
+        monkeypatch.setenv("LIFF_ID", "2010494865")
+        monkeypatch.delenv("LINE_LOGIN_CHANNEL_ID", raising=False)
+        captured = self._capture_client_id(monkeypatch)
+
+        asyncio.run(line_module.verify_line_id_token("dummy-id-token"))
+
+        assert captured["data"]["client_id"] == "2010494865"
