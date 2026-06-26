@@ -37,6 +37,15 @@ class UserOpVerificationError(ValueError):
     """
 
 
+class UserOpRevertedError(UserOpVerificationError):
+    """UserOp が on-chain で revert (success=false) した恒久失敗。
+
+    pending / sender 不一致 / RPC error と区別し、submit-tx 側で **revert のみ**
+    proposal を failed に遷移させる (B6) ために使う。UserOpVerificationError を継承する
+    ので既存の except 経路とも後方互換。
+    """
+
+
 def _default_rpc_call(bundler_url: str) -> Callable[[str, list[Any]], dict[str, Any]]:
     """web3.py HTTPProvider 経由で bundler の JSON-RPC を叩く呼び出し器を返す。
 
@@ -109,7 +118,7 @@ def verify_userop_receipt(
         )
 
     if result.get("success") is not True:
-        raise UserOpVerificationError(
+        raise UserOpRevertedError(
             f"userOp {user_op_hash[:12]}... は失敗 (success={result.get('success')!r}) です。"
         )
 

@@ -256,8 +256,14 @@ class TestF2SubmitTxReceiptVerification:
         assert data["expected_from"] == PARTNER_WALLET
         assert data["expected_to"] == POOL_ADDRESS
 
-    def test_reverted_tx_returns_400_and_stays_pending(self, client: TestClient) -> None:
-        """status=0 (reverted) の receipt → 400 / proposal が pending のまま。"""
+    def test_reverted_tx_returns_400_and_marks_failed(self, client: TestClient) -> None:
+        """status=0 (reverted) → 400 / proposal が failed に遷移 + 失敗記録/通知 (B6)。
+
+        revert はオンチェーン確定の恒久失敗。従来は pending のまま残る無言失敗だったが、
+        B6 で failed 遷移 + _record_failed_transaction + _notify_aave_failure を配線。
+        """
+        from app.proposals.router import TxRevertedError
+
         token = get_admin_token(client)
         proposal_id = create_proposal(client, token)
 
@@ -265,8 +271,10 @@ class TestF2SubmitTxReceiptVerification:
             patch.dict(os.environ, {"AAVE_RPC_URL_BASE": "http://localhost:8545"}),
             patch(
                 "app.proposals.router._verify_on_chain_receipt",
-                side_effect=ValueError("tx 0xaaaa... は reverted (status=0) です。"),
+                side_effect=TxRevertedError("tx 0xaaaa... は reverted (status=0) です。"),
             ),
+            patch("app.proposals.router._record_failed_transaction") as mock_record,
+            patch("app.proposals.router._notify_aave_failure") as mock_notify,
         ):
             r = client.post(
                 f"/api/proposals/{proposal_id}/submit-tx",
@@ -275,13 +283,15 @@ class TestF2SubmitTxReceiptVerification:
             )
 
         assert r.status_code == 400
-        assert "reverted" in r.json()["detail"]
+        assert "revert" in r.json()["detail"]
+        mock_record.assert_called_once()
+        mock_notify.assert_called_once()
 
         get_r = client.get(
             f"/api/proposals/{proposal_id}",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert get_r.json()["status"] == "pending"
+        assert get_r.json()["status"] == "failed"
 
     def test_from_address_mismatch_returns_400(self, client: TestClient) -> None:
         """from アドレス不一致 → 400 を返す。"""
@@ -305,6 +315,14 @@ class TestF2SubmitTxReceiptVerification:
 
         assert r.status_code == 400
         assert "from" in r.json()["detail"]
+
+        # revert 限定 failed の裏取り: from/to 不一致は別 tx で再 submit 可能なので
+        # 従来どおり pending を維持する (failed にしない)。
+        get_r = client.get(
+            f"/api/proposals/{proposal_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert get_r.json()["status"] == "pending"
 
     def test_pending_receipt_returns_400(self, client: TestClient) -> None:
         """receipt が pending (None) → 400 を返す。"""
@@ -516,3 +534,60 @@ class TestVerifyOnChainReceipt:
                 expected_to=POOL_ADDRESS,
                 rpc_url="http://localhost:8545",
             )
+
+
+def _set_user_wallet(engine: object, user_id: int, wallet: str) -> None:
+    """build-tx 検証用に対象ユーザーの wallet_address を設定する。"""
+    from sqlalchemy.orm import Session  # noqa: PLC0415
+
+    from app.auth.models import User  # noqa: PLC0415
+
+    with Session(engine) as db:  # type: ignore[arg-type]
+        u = db.get(User, user_id)
+        if u is not None:
+            u.wallet_address = wallet
+            db.commit()
+
+
+class TestBuildTxBalanceGuard:
+    """B1: build-tx 前の USDC 残高ガード (SUPPLY 限定)。"""
+
+    def test_supply_insufficient_balance_returns_422(self, client: TestClient, test_db) -> None:
+        """残高 < 提案額 → build-tx が 422 で署名前にブロック (無駄ガス防止)。"""
+        from decimal import Decimal  # noqa: PLC0415
+
+        _override, engine = test_db
+        token = get_admin_token(client)  # user_id=1 を登録
+        _set_user_wallet(engine, 1, PARTNER_WALLET)
+        proposal_id = create_proposal(client, token)  # SUPPLY $500
+
+        with patch(
+            "app.proposals.router.read_wallet_usdc_balance",
+            return_value=Decimal("100"),  # 100 < 500
+        ):
+            r = client.get(
+                f"/api/proposals/{proposal_id}/build-tx",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert r.status_code == 422
+        assert "残高不足" in r.json()["detail"]
+
+    def test_supply_balance_none_is_fail_open(self, client: TestClient, test_db) -> None:
+        """残高取得失敗 (None) は fail-open: 残高ガードでは弾かない。"""
+        _override, engine = test_db
+        token = get_admin_token(client)
+        _set_user_wallet(engine, 1, PARTNER_WALLET)
+        proposal_id = create_proposal(client, token)
+
+        with patch(
+            "app.proposals.router.read_wallet_usdc_balance",
+            return_value=None,
+        ):
+            r = client.get(
+                f"/api/proposals/{proposal_id}/build-tx",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        # None は skip。残高不足 422 にはしない (build 自体は env 依存で別結果になりうる)。
+        assert "残高不足" not in r.text

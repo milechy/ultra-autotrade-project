@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.aave.balance import read_wallet_usdc_balance
 from app.auth.dependencies import (
     require_active_user,
     require_admin,
@@ -251,6 +252,32 @@ def _record_failed_transaction(
         error_message=error_message,
     )
     db.add(tx)
+
+
+class TxRevertedError(ValueError):
+    """on-chain tx が revert (receipt status=0) したことを表す。
+
+    submit-tx の検証で revert を他の検証失敗 (from/to 不一致・pending タイムアウト) と
+    区別し、**revert のみ** proposal を failed に遷移させるために使う (同じ tx を再 submit
+    しても revert する恒久失敗)。ValueError を継承するので既存 `except ValueError` 経路とも
+    後方互換 (revert 用 except を先に置く)。
+    """
+
+
+def _fail_proposal(proposal: Proposal, chain: str, error_message: str, db: Session) -> None:
+    """proposal を failed に遷移させ、失敗 transaction 記録 + Slack 通知を行う共通処理。
+
+    非カストディアル submit-tx の revert (B6) で使う。commit は呼び出し側。
+    custodial 経路 (_execute_aave_for_proposal) は独自の dead-letter ロジックを持つため
+    そちらは別管理 (将来寄せる余地あり)。
+    """
+    failed_at = datetime.now(timezone.utc)
+    proposal.status = "failed"
+    proposal.error_message = error_message
+    proposal.executed_at = failed_at
+    proposal.execution_attempts += 1
+    _record_failed_transaction(proposal, chain, error_message, db)
+    _notify_aave_failure(proposal.id, error_message, failed_at)
 
 
 def _daily_traded_usd_for_user(
@@ -1210,6 +1237,21 @@ def build_partner_tx(
             detail=f"Operation {proposal.operation} は partner 署名に非対応です",
         )
 
+    # B1: SUPPLY は USDC 残高不足を build-tx 前に検出し、無駄ガス・on-chain revert を防ぐ。
+    # 残高取得失敗 (None) は fail-open（ガード skip）— submit-tx の revert→failed が安全網。
+    # WITHDRAW は aToken 引出なので USDC 残高ガード対象外。
+    if proposal.operation == "SUPPLY":
+        _balance = read_wallet_usdc_balance(wallet_address)
+        _need = Decimal(str(proposal.amount_usd))
+        if _balance is not None and _balance < _need:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"USDC 残高不足: 必要 {_need} USDC に対しウォレット残高 {_balance} USDC。"
+                    "入金してから再度お試しください。"
+                ),
+            )
+
     chain = _get_primary_chain()
     try:
         multi_service = MultiChainAaveService()
@@ -1323,7 +1365,9 @@ def _verify_on_chain_receipt(
         )
 
     if receipt["status"] != 1:
-        raise ValueError(f"tx {tx_hash[:12]}... は reverted (status={receipt['status']}) です。")
+        raise TxRevertedError(
+            f"tx {tx_hash[:12]}... は reverted (status={receipt['status']}) です。"
+        )
 
     actual_from = receipt.get("from", "")
     if actual_from.lower() != expected_from.lower():
@@ -1434,6 +1478,7 @@ def submit_partner_tx(
                 detail="BUNDLER_RPC_URL が未設定です (Smart Wallet 実行の検証不可)。",
             )
         from .userop_verify import (  # noqa: PLC0415
+            UserOpRevertedError,
             UserOpVerificationError,
             verify_userop_receipt,
         )
@@ -1442,6 +1487,15 @@ def submit_partner_tx(
             verify_userop_receipt(
                 body.tx_hash, expected_sender=scw_address, bundler_url=bundler_url
             )
+        except UserOpRevertedError as exc:
+            # B6: SCW(UserOp) revert も恒久失敗 → failed 遷移＋記録＋通知。
+            # pending / sender 不一致は下の except で従来どおり pending 維持 (再 submit 可)。
+            _fail_proposal(proposal, chain_name, f"UserOp revert: {exc}", db)
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"UserOp receipt 検証失敗 (revert): {exc}",
+            ) from exc
         except UserOpVerificationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -1469,6 +1523,15 @@ def submit_partner_tx(
                 chain_name,
                 body.tx_hash[:12],
             )
+        except TxRevertedError as exc:
+            # B6: revert は恒久失敗。proposal を failed に遷移＋記録＋通知 (無言失敗の解消)。
+            # from/to 不一致・pending は別 tx で再 submit 可能なので下の except で pending 維持。
+            _fail_proposal(proposal, chain_name, f"on-chain revert: {exc}", db)
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"on-chain receipt 検証失敗 (revert): {exc}",
+            ) from exc
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
