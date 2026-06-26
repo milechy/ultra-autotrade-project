@@ -5,6 +5,23 @@
 
 ---
 
+## PR #891 (S2 入金待ち): funding_detection loop の opt-in 起動配線 (2026-06-26)
+
+### 変更: startup_scheduled_tasks に funding detection の opt-in 起動を追加
+- **対象凍結ファイル**: `backend/app/main.py`
+- **変更内容**:
+  - `startup_scheduled_tasks` 内、期限切れリマインダー(`ENABLE_EXPIRY_REMINDER`)の直後に
+    `if os.getenv("ENABLE_FUNDING_DETECTION","0")=="1":` ブロックを追加し
+    `scheduled_manager.start_funding_detection(interval_seconds=..., on_error=...)` を呼ぶ。
+- **理由**: S2(docs/62) の awaiting_funds 着金検知 loop を起動するため。残高が必要額に
+  到達したら proposal を approved 化して署名可能にする。
+- **影響範囲**: **既定 off**（`ENABLE_FUNDING_DETECTION` 未設定で起動しない）。既存の起動
+  シーケンス・他 loop・エンドポイントへの影響なし。明示有効化した環境でのみ 60秒間隔で
+  awaiting_funds 提案の残高を read-only に監視する（秘密鍵に触れない非カストディアル）。
+- **承認**: feat/s2-awaiting-funds → main の通常フロー経由（PR #891）
+
+---
+
 ## PR #775 (AI判定 WebSocket): ai_decisions_ws_router 配線 (2026-06-17)
 
 ### 変更: ai_decisions_ws_router を main.py に include_router
