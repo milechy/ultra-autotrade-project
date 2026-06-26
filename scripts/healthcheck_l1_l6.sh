@@ -73,6 +73,15 @@ FAIL_COUNT_FILE="${TMPDIR:-/tmp}/.healthcheck_fail_count"
 TWILIO_LAST_CALL_FILE="${TMPDIR:-/tmp}/.healthcheck_twilio_last_call"
 PASS_COOLDOWN_SEC=3600  # 1時間
 
+# FAIL 通知の dedup/throttle (アラート疲労対策 / 2026-06-26)
+# 背景: FAIL 側は従来 throttle 無しで 5分毎に無条件送信していた。本番 P0(blue/green
+# color drift で AI判定停止)では L3=FAIL が 22日間・6099回連続で Slack に送られ続け、
+# 同一メッセージの洪水で #ultra-auto-project に埋没し人間が気づけなかった (検知も送信も
+# 正常だったが「鳴りすぎて無視された」)。対策: 同一 failed_layers が継続する間は
+# FAIL_RESEND_COOLDOWN_SEC に1回だけ再送し、状態変化(新規/解消/レイヤー変化)時は即送信。
+FAIL_SIG_FILE="${TMPDIR:-/tmp}/.healthcheck_fail_sig"
+FAIL_RESEND_COOLDOWN_SEC="${FAIL_RESEND_COOLDOWN_SEC:-3600}"  # 同一FAIL継続中の再送間隔 (既定1h)
+
 # ログ
 LOG_DIR="${LOG_DIR:-/var/log/ultra-autotrade}"
 mkdir -p "${LOG_DIR}" 2>/dev/null || true
@@ -445,6 +454,33 @@ should_send_pass_notification() {
 record_pass_time() {
   date +%s > "${LAST_PASS_FILE}" 2>/dev/null || true
   echo "0" > "${FAIL_COUNT_FILE}" 2>/dev/null || true
+  # 復旧したら FAIL シグネチャをクリアし、次の FAIL を「状態変化=即送信」扱いにする
+  rm -f "${FAIL_SIG_FILE}" 2>/dev/null || true
+}
+
+# FAIL 通知を送るべきか判定 (dedup/throttle)。
+# 引数: $1 = 現在の failed_layers シグネチャ (例 "L3 ")
+# 送信する条件: (a) 前回と異なるシグネチャ=状態変化/新規 (b) 前回送信から
+#   FAIL_RESEND_COOLDOWN_SEC 以上経過。いずれも該当しなければ抑止 (return 1)。
+# 送信決定時は新しいシグネチャ+時刻を記録する。
+should_send_fail_notification() {
+  local sig="$1"
+  local now prev_sig prev_ts elapsed
+  now=$(date +%s)
+  prev_sig=""
+  prev_ts=0
+  if [[ -f "${FAIL_SIG_FILE}" ]]; then
+    prev_sig=$(sed -n '1p' "${FAIL_SIG_FILE}" 2>/dev/null || echo "")
+    prev_ts=$(sed -n '2p' "${FAIL_SIG_FILE}" 2>/dev/null || echo "0")
+  fi
+  [[ "${prev_ts}" =~ ^[0-9]+$ ]] || prev_ts=0
+  elapsed=$(( now - prev_ts ))
+
+  if [[ "${sig}" != "${prev_sig}" ]] || (( elapsed >= FAIL_RESEND_COOLDOWN_SEC )); then
+    printf '%s\n%s\n' "${sig}" "${now}" > "${FAIL_SIG_FILE}" 2>/dev/null || true
+    return 0
+  fi
+  return 1
 }
 
 increment_fail_count() {
@@ -646,25 +682,34 @@ print(json.dumps(payload))
       log "PASS 通知スキップ (冷却期間中)"
     fi
   else
-    # FAIL: 即送信
+    # FAIL: dedup/throttle 付き送信 (アラート疲労対策)
     local fail_count
     fail_count=$(increment_fail_count)
-    log "FAIL 通知送信 (連続 ${fail_count} 回目)"
-    send_slack "${slack_json}"
 
-    # 5連続FAIL → Twilio 電話エスカレーション
+    # failed_layers シグネチャを先に算出 (throttle 判定と Twilio 双方で使う)
+    local failed_layers=""
+    [[ "${l1_status}" == "FAIL" ]] && failed_layers="${failed_layers}L1 "
+    [[ "${l2_status}" == "FAIL" ]] && failed_layers="${failed_layers}L2 "
+    [[ "${l3_status}" == "FAIL" ]] && failed_layers="${failed_layers}L3 "
+    [[ "${l4_status}" == "FAIL" ]] && failed_layers="${failed_layers}L4 "
+    [[ "${l5_status}" == "FAIL" ]] && failed_layers="${failed_layers}L5 "
+    [[ "${l7_status}" == "CRITICAL" ]] && failed_layers="${failed_layers}L7(disk) "
+    [[ "${l8_status}" == "FAIL" ]] && failed_layers="${failed_layers}L8(loki) "
+    [[ "${l9_status}" == "FAIL" ]] && failed_layers="${failed_layers}L9(proposal_rate) "
+    failed_layers="${failed_layers:-L1-L5}"
+
+    # 状態変化時は即送信 / 同一FAIL継続中は FAIL_RESEND_COOLDOWN_SEC に1回だけ再送
+    if should_send_fail_notification "${failed_layers}"; then
+      log "FAIL 通知送信 (連続 ${fail_count} 回目, layers=${failed_layers})"
+      send_slack "${slack_json}"
+    else
+      log "FAIL 通知抑止 (同一FAIL継続: ${failed_layers}, 連続 ${fail_count} 回目, 再送間隔 ${FAIL_RESEND_COOLDOWN_SEC}s 未満)"
+    fi
+
+    # 5連続FAIL → Twilio 電話エスカレーション (throttle とは独立に評価。
+    # 第2の砦なので埋没対策の対象外=連続FAILが続く限りレート制限内で発火させる)
     # L6 単独 FAIL は対象外 (overall_status が FAIL になるのは L1-L5 の FAIL のみ)
     if [[ "${fail_count}" -ge "${TWILIO_CONSECUTIVE_FAIL_THRESHOLD}" ]]; then
-      local failed_layers=""
-      [[ "${l1_status}" == "FAIL" ]] && failed_layers="${failed_layers}L1 "
-      [[ "${l2_status}" == "FAIL" ]] && failed_layers="${failed_layers}L2 "
-      [[ "${l3_status}" == "FAIL" ]] && failed_layers="${failed_layers}L3 "
-      [[ "${l4_status}" == "FAIL" ]] && failed_layers="${failed_layers}L4 "
-      [[ "${l5_status}" == "FAIL" ]] && failed_layers="${failed_layers}L5 "
-      [[ "${l7_status}" == "CRITICAL" ]] && failed_layers="${failed_layers}L7(disk) "
-      [[ "${l8_status}" == "FAIL" ]] && failed_layers="${failed_layers}L8(loki) "
-      [[ "${l9_status}" == "FAIL" ]] && failed_layers="${failed_layers}L9(proposal_rate) "
-      failed_layers="${failed_layers:-L1-L5}"
       log "5連続FAIL到達 (${fail_count}回) — Twilio 電話エスカレーション発動: ${failed_layers}"
       call_twilio_phone "${fail_count}" "${failed_layers}"
     fi

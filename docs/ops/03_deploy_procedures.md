@@ -420,3 +420,45 @@ docker inspect ultra-autotrade-postgres-production \
 3. `curl http://127.0.0.1:3000` でホスト→フロントエンドの疎通確認
 4. `docker logs ultra-autotrade-cloudflared-production` で `connection refused` 確認
 5. 多くは起動中の一時的状態（30秒待機で自然解消）
+
+### AI判定スケジューラが inactive color skip し続ける（2026-06-26 インシデント）
+
+**症状**: コンテナは healthy・nginx も疎通200・feeds も毎時更新されているのに、
+`ai_decisions` テーブルに新規行が増えず、AI由来 proposal が生成されない（実ユーザーに提案ゼロ）。
+
+**真因**: nginx upstream の実 active（`docker/nginx/upstream.production.conf` の `set $backend backend-XXX`）と
+`.env.production` の `ACTIVE_BACKEND_COLOR` が **drift**。`backend/app/main.py` の
+`_is_inactive_color_skip()`（BACKEND_COLOR ≠ ACTIVE_BACKEND_COLOR かつ両方set→True）により、
+実トラフィックを受けている唯一の生存コンテナが「自分は非アクティブ」と誤判定し、
+AI判定スケジューラを丸ごと skip する。feeds/HOWL は color ガード無しなので動き続けるため
+気づきにくい。2026-06-26 に本番で 22 日間（6/04〜）この状態が継続していた。
+
+**診断（read-only）**:
+```bash
+# 起動ログに skip が出ているか
+docker logs <active-backend> 2>&1 | grep -E "AI judgment scheduler started|inactive color: scheduler skip"
+# nginx 実 active と env の一致確認
+grep -E 'set \$backend' docker/nginx/upstream.production.conf      # 例: backend-blue
+docker exec <active-backend> printenv | grep -E "BACKEND_COLOR|ACTIVE_BACKEND_COLOR"
+# 死活: ai_decisions が最近書かれているか
+docker exec <postgres> psql -U ultra -d ultra_autotrade -c "SELECT MAX(created_at) FROM ai_decisions;"
+```
+
+**復旧**: `.env.production` の `ACTIVE_BACKEND_COLOR` を nginx 実 active（通常 blue）に揃え、
+当該 backend を **force-recreate**（env はコンテナ作成時固定のため `restart` では反映されない）。
+```bash
+ENV_FILE=.env.production
+TMP=$(mktemp "${ENV_FILE}.XXXXXX")
+awk '{if($0 ~ /^ACTIVE_BACKEND_COLOR=/){print "ACTIVE_BACKEND_COLOR=blue"}else{print}}' "$ENV_FILE" > "$TMP"
+cat "$TMP" > "$ENV_FILE" && rm -f "$TMP"        # inode 保持・sed -i 禁止
+docker compose -f docker-compose.production.yml --env-file .env.production \
+  up -d --no-deps --force-recreate backend-blue
+# 検証: 起動ログに "AI judgment scheduler started" が出ること
+```
+
+**再発防止**: deploy 後に nginx 実 active と `.env.production` の `ACTIVE_BACKEND_COLOR` の
+整合を `deploy_production.sh` がチェックする（drift で WARN）。また healthcheck L3
+（`ai_decisions_24h < 3 → FAIL`）はこの障害を検知できるが、**検知できていても気づけるとは限らない**
+（本件は L3 FAIL が 6099 回 Slack 送信されたが連発で埋没した＝アラート疲労）。
+FAIL 通知は dedup/throttle 済み（同一FAILは1h毎に再送・状態変化時のみ即送信、
+`scripts/healthcheck_l1_l6.sh`）。Twilio 電話エスカレーション（5連続FAIL）の credentials 設定も推奨。
