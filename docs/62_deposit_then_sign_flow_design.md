@@ -1,6 +1,6 @@
 # 設計ドキュメント: 承認 → 入金 → 署名フロー（残高不足を投資ファネルに変える）
 
-> Status: Draft v0.1 / 2026-06-26 / 起案: 残高不足時の UX 改善
+> Status: Draft v0.2 / 2026-06-26 / 起案: 残高不足時の UX 改善（v0.2: SBI→Base 入金経路 web 調査を §11.5 に反映・(a)ガイド方針確定）
 > 関連: `docs/61_*`(消費者提案額・案C) / 残高不足フロー調査 (本ドキュメント §1)
 > 実装は本ドキュメントのレビュー後に別途（Plan モード → スライス実装）。
 
@@ -45,8 +45,8 @@ AI 提案（SUPPLY）に対しユーザーの USDC 残高が不足している�
 
 ## 3. 制約（設計前提）
 
-1. **入金は非同期**: 取引所→Base USDC 着金は数分〜1時間。「購入してすぐ署名」は秒で完結しない → 「入金待ち」を挟む設計が必須。
-2. **Base Mainnet 限定 / ブリッジ未実装**: SBI VCトレード等が Base USDC 出金に非対応なら、ユーザーは「Base 対応取引所で USDC 購入 → 出金」or 手動ブリッジが要る。導線ガイドはこの現実経路を案内する（誤った「自動変換」案内は禁止・PR #788 教訓）。
+1. **入金は非同期**: 取引所→Base USDC 着金は数分〜1時間（SBI 経由はブリッジ込みでさらに長い・§11.5）。「購入してすぐ署名」は秒で完結しない → 「入金待ち」を挟む設計が必須。
+2. **Base Mainnet 限定 / ブリッジ前提【2026-06-26 調査確定・詳細は §11.5】**: **SBI VCトレードの USDC は Ethereum チェーンのみ対応（Base 未対応・「今後拡充予定」）**。国内に Base USDC を直接出金できる取引所は現状見当たらない。SBI 経由の現実経路は **SBI で USDC 購入 → Ethereum で出金 → Circle CCTP で Base へブリッジ → アプリ署名**＝**ブリッジ（要 Ethereum ガス・標準 ~15分）が前提**。導線ガイドはこの現実経路を正確に案内する（誤った「自動変換」案内は禁止・PR #788 教訓）。**今回は (a) ガイド案内を軸とし、CCTP のアプリ内蔵は将来 (b) として段階化**。
 3. **非カストディアル維持**: 入金は本人操作。バックエンドは **残高検知のみ**（秘密鍵に触れない）。
 4. **提案の鮮度**: APY/HF/gas/推奨額は時間で変わる。着金時点で再見積もりが要る。
 5. **既存状態機械**: `proposals.status` は `String(20)` で **CHECK 制約なし**（`models.py:67`）→ 新状態追加は **migration 不要**（低コスト）。現状値: `pending / approved / executed / rejected / failed / expired / canceled`。
@@ -173,11 +173,34 @@ awaiting_funds / approved ──見送る/取消──► rejected/canceled
 ---
 
 ## 11. リスク・未解決論点
-1. **SBI→Base の実経路**: SBI VCトレードが Base USDC 出金に対応しているか要確認。非対応なら「対応取引所で購入→Base出金」or ブリッジ手順を案内（誤誘導は PR #788 教訓で厳禁）。所要時間が UX を大きく左右。
-2. **有効期限 vs 着金ラグ**: 72h（`_PROPOSAL_EXPIRES_HOURS`）で足りるか。入金待ち中は期限延長 or 再生成のポリシーが要る。
-3. **ガス代**: SUPPLY は approve+supply の2tx。残高チェックは USDC だけでなく **ガス用 ETH(Base)** も要確認（sponsor paymaster 有無で変わる・memory: paymaster スライス）。
+1. **SBI→Base の実経路【2026-06-26 調査確定 → §11.5】**: 解決。SBI は USDC=Ethereum 限定 → CCTP ブリッジ前提。今回は **(a) ガイド案内**を軸に据える。
+2. **有効期限 vs 着金ラグ**: 72h（`_PROPOSAL_EXPIRES_HOURS`）で足りるか。**SBI 経由はブリッジ込みで 30分〜数時間**になりうるため、入金待ち中は期限延長 or 再生成のポリシーが要る（要決定）。
+3. **ガス代**: SUPPLY は approve+supply の2tx。残高チェックは USDC だけでなく **ガス用 ETH(Base)** も要確認（sponsor paymaster 有無で変わる・memory: paymaster スライス）。**加えて CCTP ブリッジには Ethereum 側ガス（ETH）が要る**＝ユーザーは Ethereum に少額 ETH も必要。
 4. **二重入金/競合**: ポーリングと手動 push の競合、同一提案の多重署名防止（既存 submit-tx ガード活用）。
 5. **金額基準（§8 案a/b）** の決定。
+
+### 11.5 入金経路（2026-06-26 web 調査・確定事項）
+
+| 事項 | 結論 | 出典 |
+|---|---|---|
+| SBI VCトレードの USDC 対応チェーン | **Ethereum のみ**（入庫・出庫とも）。Base 未対応・「今後順次拡充予定」。SBI は国内唯一の USDC 提供事業者 | sbivc.co.jp/usdc, /guide/3-8 |
+| 国内取引所の Base USDC 直接出金 | **現状見当たらない**（Coincheck は Circle 提携で 2026 中 USDC 上場見込みだが Base 出金は未確認） | coinpost 2026 版 |
+| Ethereum→Base ブリッジ | **Circle CCTP**（native burn&mint・ラップ無し・Circle 手数料なし）。CCTP V2 Fast ~8–20秒 / 標準 ~15分。**Ethereum に触れる側は Ethereum mainnet ガスを払う** | circle.com/cross-chain-transfer-protocol, developers.circle.com/cctp |
+
+**確定した SBI 経由の現実経路**:
+```
+SBI: JPY → USDC 購入
+  → SBI: USDC を Ethereum で出金（Base 出金は不可）
+    → Circle CCTP (cctp.io 等) で Ethereum USDC → Base USDC へブリッジ（要 ETH ガス・標準 ~15分）
+      → アプリ(Base) のウォレットに Base USDC 着金
+        → 提案を署名・実行
+```
+所要: 取引所出金 + ブリッジで **概ね 30分〜数時間**。`awaiting_funds`（入金待ち）非同期設計の妥当性を補強。
+
+**方針（今回スコープ）**: **(a) ガイドで上記経路を正確に案内**（誤った「自動変換/即時」案内は厳禁・PR #788 教訓）。所要時間・Ethereum ガス必要・ブリッジ手順を明示。
+**将来 (b)**: アプリ内 CCTP ブリッジ補助（非カストディアル）で SBI→Ethereum 出金後のブリッジを肩代わり → 摩擦最小化（S3+ 磨きとして段階化）。
+
+> 出典リンク: [SBI USDC](https://www.sbivc.co.jp/usdc) / [SBI ご利用ガイド](https://www.sbivc.co.jp/guide/3-8) / [Circle CCTP](https://www.circle.com/cross-chain-transfer-protocol) / [CCTP Docs](https://developers.circle.com/cctp)
 
 ---
 
