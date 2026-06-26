@@ -14,6 +14,9 @@ interface ProposalActionCardProps {
   rejecting: boolean
   onApprove: () => void
   onReject: () => void
+  // F4: wallet 残高 < 提案額のとき true。承認は有効のまま (押すと署名シートで入金導線を出す)
+  // が、カードにヒントを表示して事前に気づけるようにする。
+  insufficientBalance?: boolean
 }
 
 export function ProposalActionCard({
@@ -21,6 +24,7 @@ export function ProposalActionCard({
   rejecting,
   onApprove,
   onReject,
+  insufficientBalance = false,
 }: ProposalActionCardProps) {
   const t = useTranslations("Liff")
   const [expanded, setExpanded] = useState(false)
@@ -110,6 +114,11 @@ export function ProposalActionCard({
             </button>
           )}
         </p>
+      )}
+
+      {/* F4: 残高不足ヒント (承認は有効・押すと署名シートで入金導線) */}
+      {insufficientBalance && (
+        <p className="text-amber-700 text-xs mb-2">{t("exec.insufficientBalance")}</p>
       )}
 
       {/* actions */}

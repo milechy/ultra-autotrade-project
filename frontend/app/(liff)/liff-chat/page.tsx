@@ -361,6 +361,13 @@ export default function LiffChatPage() {
     terms:        t("panels.terms.title"),
   }
 
+  // F4: SUPPLY (USDC 入金) で wallet 残高 < 提案額なら署名前にブロック + 入金導線を出す。
+  // backend B1 の build-tx 残高ガード (SUPPLY/USDC 限定) とフロント表示を一致させる。
+  const insufficientBalance =
+    pendingProposal?.operation === "SUPPLY" &&
+    balanceUsd != null &&
+    Number(pendingProposal.amount_usd) > balanceUsd
+
   return (
     <div className="w-[375px] mx-auto h-dvh ax-bg-app text-[#1c1a27] flex flex-col overflow-hidden relative">
 
@@ -522,6 +529,7 @@ export default function LiffChatPage() {
               rejecting={rejecting}
               onApprove={() => setSignSheetOpen(true)}
               onReject={handleRejectProposal}
+              insufficientBalance={insufficientBalance}
             />
           </>
         )}
@@ -682,6 +690,8 @@ export default function LiffChatPage() {
           open={signSheetOpen}
           onClose={() => setSignSheetOpen(false)}
           onExecuted={handleProposalExecuted}
+          insufficientBalance={insufficientBalance}
+          onDeposit={() => { setSignSheetOpen(false); setActivePanel("deposit") }}
         />
       )}
 

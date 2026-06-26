@@ -12,6 +12,7 @@ import { useTranslations } from "next-intl"
 import { ethers } from "ethers"
 import { Loader2, Lock, CheckCircle2 } from "lucide-react"
 import { buildPartnerTx, submitPartnerTx, type UnsignedTx } from "@/lib/api/admin-proposals"
+import { classifyTxError } from "@/lib/web3/classify-tx-error"
 
 // build-tx の UnsignedTx を Smart Wallet UserOp の call 形式 (to/data/value) に変換する。
 // approve/supply/withdraw/buy_pt は 0 ETH value。STAKE_ETH (Lido submit) のみ value=添付 ETH。
@@ -49,6 +50,10 @@ interface ProposalSignSheetProps {
   open: boolean
   onClose: () => void
   onExecuted: (txHash: string) => void
+  // F4: 入金系で wallet 残高 < 提案額のとき true。署名前ブロック + 入金導線に使う。
+  insufficientBalance?: boolean
+  // F5: 残高不足時に入金パネルへ誘導するコールバック (page.tsx の setActivePanel("deposit"))。
+  onDeposit?: () => void
 }
 
 export function ProposalSignSheet({
@@ -57,6 +62,8 @@ export function ProposalSignSheet({
   open,
   onClose,
   onExecuted,
+  insufficientBalance = false,
+  onDeposit,
 }: ProposalSignSheetProps) {
   const { login } = usePrivy()
   const { wallets } = useWallets()
@@ -65,6 +72,8 @@ export function ProposalSignSheet({
   const t = useTranslations("Liff.exec")
   const [signingStatus, setSigningStatus] = useState<SigningStatus>("idle")
   const [error, setError] = useState<string | null>(null)
+  // 署名時に残高不足を検知したら入金導線を出す (build-tx 422 / on-chain insufficient)。
+  const [showDepositCta, setShowDepositCta] = useState(false)
 
   const amountUsd = Number(proposal.amount_usd).toLocaleString("ja-JP", {
     style: "currency",
@@ -83,6 +92,7 @@ export function ProposalSignSheet({
 
   const handleSignAndExecute = useCallback(async () => {
     setError(null)
+    setShowDepositCta(false)
     setSigningStatus("signing")
 
     try {
@@ -209,8 +219,20 @@ export function ProposalSignSheet({
       onExecuted(finalHash)
     } catch (err) {
       setSigningStatus("error")
-      const msg = err instanceof Error ? err.message : t("signFailed")
-      setError(msg.includes("rejected") ? t("signCanceled") : msg)
+      // F5: HttpError(build/submit-tx の 402/422) は instanceof Error が false なので
+      // 従来 catch は汎用 signFailed に倒れ、残高不足 detail が出ていなかった (実バグ)。
+      // classifyTxError で 残高不足 / 拒否 / revert を出し分け、残高不足は入金導線を出す。
+      const kind = classifyTxError(err)
+      if (kind === "insufficient") {
+        setError(t("errInsufficientFunds"))
+        setShowDepositCta(true)
+      } else if (kind === "rejected") {
+        setError(t("signCanceled"))
+      } else if (kind === "revert") {
+        setError(t("revertError"))
+      } else {
+        setError(err instanceof Error ? err.message : t("signFailed"))
+      }
     }
   }, [scwClient, wallets, login, proposal.id, token, onExecuted, t])
 
@@ -295,10 +317,27 @@ export function ProposalSignSheet({
         )}
         {error && <p className="text-red-600 text-xs mb-3">{error}</p>}
 
+        {/* F4/F5: 残高不足 — 署名前ブロック (insufficientBalance) または署名時検知 (showDepositCta)。
+            残高不足の案内 + 入金導線を出す。on-chain revert / 無駄ガスを未然に防ぐ。 */}
+        {(insufficientBalance || showDepositCta) && (
+          <div className="mb-3 rounded-xl bg-amber-50 border border-amber-200 p-3">
+            <p className="text-amber-800 text-xs mb-2">{t("insufficientBalance")}</p>
+            {onDeposit && (
+              <button
+                onClick={onDeposit}
+                className="w-full py-2 rounded-lg bg-[#1D9E75] active:bg-[#178a64] text-white
+                           text-sm font-bold transition-colors"
+              >
+                {t("depositCta")}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* sign button */}
         <button
           onClick={handleSignAndExecute}
-          disabled={isBusy || signingStatus === "success"}
+          disabled={isBusy || signingStatus === "success" || insufficientBalance}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#1D9E75]
                      active:bg-[#178a64] text-white font-bold disabled:opacity-50 transition-colors"
         >
