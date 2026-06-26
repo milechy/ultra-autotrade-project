@@ -886,6 +886,40 @@ check_nginx_upstream() {
   fi
 }
 
+# 検証 7: active color 整合 (nginx 実 active と .env.production ACTIVE_BACKEND_COLOR)
+# 背景: 2026-06-26 本番 P0。nginx=blue だが .env.production ACTIVE_BACKEND_COLOR=green の
+# drift により、生存 backend が _is_inactive_color_skip() で「自分は非アクティブ」と誤判定し
+# AI判定スケジューラを22日間 skip。env はコンテナ作成時固定なので deploy/switch 後に乖離すると
+# 静かに AI 判定が死ぬ。この乖離を deploy 後に自動検出して Slack 発報する。
+check_active_color_consistency() {
+  log "=== active color 整合チェック (nginx vs .env ACTIVE_BACKEND_COLOR) ==="
+  local nginx_slot env_color
+  nginx_slot=$(read_active_slot)
+  if [ "${nginx_slot}" = "unknown" ]; then
+    log "⚠️  WARNING: upstream.conf から active slot を判定できません（整合チェックskip）"
+    return
+  fi
+  if [ ! -f "${ENV_FILE}" ]; then
+    log "⚠️  WARNING: ${ENV_FILE} が見つかりません（整合チェックskip）"
+    return
+  fi
+  env_color=$(grep '^ACTIVE_BACKEND_COLOR=' "${ENV_FILE}" | head -1 | cut -d= -f2- | tr -d '"[:space:]')
+  log "  nginx active slot: ${nginx_slot} / .env ACTIVE_BACKEND_COLOR: ${env_color:-（未設定）}"
+  if [ -z "${env_color}" ]; then
+    # 未設定なら _is_inactive_color_skip は後方互換で有効化される（skip しない）ため致命ではない
+    log "ℹ️  ACTIVE_BACKEND_COLOR 未設定（color ガードは後方互換で有効）"
+    return
+  fi
+  if [ "${env_color}" != "${nginx_slot}" ]; then
+    log "🚨 CRITICAL: active color drift 検出 — nginx=${nginx_slot} だが .env=${env_color}"
+    log "   → 生存 backend が inactive 判定で AI判定スケジューラを skip する恐れ（2026-06-26 P0 と同型）"
+    log "   → 修正: .env.production の ACTIVE_BACKEND_COLOR を ${nginx_slot} に揃え backend-${nginx_slot} を force-recreate"
+    slack_notify "🚨 [deploy_production.sh] active color drift 検出\nnginx active=${nginx_slot} / .env ACTIVE_BACKEND_COLOR=${env_color}\n生存 backend が AI判定スケジューラを skip する恐れ（2026-06-26 P0 と同型）。ACTIVE_BACKEND_COLOR を ${nginx_slot} に揃えて recreate してください。"
+  else
+    log "✅ active color 整合 OK (nginx=${nginx_slot} = .env=${env_color})"
+  fi
+}
+
 # 全追加検証を実行（各ステップは独立して動作）
 run_post_deploy_checks() {
   log "=== デプロイ後追加検証 開始 ==="
@@ -895,6 +929,7 @@ run_post_deploy_checks() {
   check_auth_errors     || true
   check_cors            || true
   check_nginx_upstream  || true
+  check_active_color_consistency || true
   log "=== デプロイ後追加検証 完了 ==="
 }
 
