@@ -226,6 +226,14 @@ export default function LiffConfirmPage() {
           >
             {t("privacyLink")} <ExternalLink className="w-3 h-3" />
           </a>
+          <a
+            href="/tokushoho"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 hover:text-zinc-300"
+          >
+            {t("tokushohoLink")} <ExternalLink className="w-3 h-3" />
+          </a>
         </div>
         {error && (
           <p role="alert" className="text-red-400 text-sm text-center">
