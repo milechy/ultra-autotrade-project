@@ -24,7 +24,9 @@ export default function TermsPage() {
           {t('back')}
         </Button>
 
-        <h1 className="text-2xl font-bold mb-2">{t('title')}</h1>
+        {/* arobix テーマ下では h1 が -webkit-text-fill-color を currentColor(薄色)で
+            継承し見出しがほぼ不可視になるため、暗色を明示する（--text-primary 相当）。 */}
+        <h1 className="text-2xl font-bold mb-2" style={{ color: '#1c1a27', WebkitTextFillColor: '#1c1a27' }}>{t('title')}</h1>
         <p className="text-sm text-zinc-500 mb-8">{t('lastUpdated')}</p>
 
         <div className="space-y-8 text-sm text-zinc-300 leading-relaxed">
