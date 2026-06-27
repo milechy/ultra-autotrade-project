@@ -52,7 +52,15 @@ async def verify_line_id_token(id_token: str) -> dict[str, Any]:
         )
 
     if response.status_code != 200:
-        logger.warning("LINE token verify failed: status=%d", response.status_code)
+        # LINE の検証失敗は client_id(チャネルID)不一致 / idToken 期限切れ / scope 不足 等、
+        # 原因が status だけでは切り分けられない。LINE が返す error_description を
+        # ログに残して原因を特定できるようにする（本文は LINE のエラー説明で idToken は含まれない）。
+        logger.warning(
+            "LINE token verify failed: status=%d client_id=%s body=%s",
+            response.status_code,
+            channel_id,
+            response.text[:300],
+        )
         raise LineAuthError("LINE idTokenの検証に失敗しました")
 
     payload = response.json()
