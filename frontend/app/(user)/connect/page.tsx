@@ -13,9 +13,13 @@ import { useMinimumBalance } from '@/hooks/useMinimumBalance'
 import { apiPut } from '@/lib/api/client'
 import { acceptTerms } from '@/lib/api/auth'
 import { getAuthToken } from '@/lib/auth/token-key'
+import { isAutoModeEnabled } from '@/lib/flags'
 import { OperationModeSelector } from '@/components/OperationModeSelector'
 
 type UserMode = 'managed' | 'active' | 'pro'
+
+// おまかせ（managed）非表示時の既定モード。managed = 一任運用のため active を既定にする。
+const DEFAULT_USER_MODE: UserMode = isAutoModeEnabled() ? 'managed' : 'active'
 
 const USER_MODE_STORAGE_KEY = 'ultra_user_mode'
 
@@ -101,13 +105,18 @@ export default function ConnectPage() {
   const [riskAccepted, setRiskAccepted] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
-  const [userMode, setUserMode] = useState<UserMode>('managed')
+  const [userMode, setUserMode] = useState<UserMode>(DEFAULT_USER_MODE)
 
   // Load saved mode from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem(USER_MODE_STORAGE_KEY)
     if (saved === 'managed' || saved === 'active' || saved === 'pro') {
-      setUserMode(saved)
+      // おまかせ非表示時は保存済み managed を active に矯正する（一任運用を既定にしない）。
+      if (saved === 'managed' && !isAutoModeEnabled()) {
+        setUserMode('active')
+      } else {
+        setUserMode(saved)
+      }
     }
   }, [])
 

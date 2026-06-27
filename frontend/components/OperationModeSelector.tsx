@@ -3,6 +3,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
+import { isAutoModeEnabled } from '@/lib/flags'
 
 type UserMode = 'managed' | 'active' | 'pro'
 
@@ -43,9 +44,14 @@ export function OperationModeSelector({
 }: OperationModeSelectorProps) {
   const t = useTranslations('OperationMode')
 
+  // managed（おまかせ）= 一任運用。投資運用業の登録/法務クリアまで非表示。
+  const visibleOptions = MODE_OPTIONS.filter(
+    (option) => isAutoModeEnabled() || option.value !== 'managed',
+  )
+
   return (
     <div className="space-y-2" data-testid="mode-selector">
-      {MODE_OPTIONS.map((option) => (
+      {visibleOptions.map((option) => (
         <button
           key={option.value}
           type="button"

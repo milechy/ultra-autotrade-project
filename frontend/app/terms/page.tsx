@@ -48,10 +48,6 @@ export default function TermsPage() {
             <p>{t('section4Intro')}</p>
             <ul className="mt-2 space-y-2 list-disc list-inside">
               <li>
-                <span className="font-medium text-zinc-200">{t('section4Mode1Label')}</span>
-                {t('section4Mode1Body')}
-              </li>
-              <li>
                 <span className="font-medium text-zinc-200">{t('section4Mode2Label')}</span>
                 {t('section4Mode2Body')}
               </li>

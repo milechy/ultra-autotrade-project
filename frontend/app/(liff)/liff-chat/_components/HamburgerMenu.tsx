@@ -14,6 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { useTranslations } from "next-intl"
+import { isAutoModeEnabled } from "@/lib/flags"
 
 interface HamburgerMenuProps {
   open: boolean
@@ -28,7 +29,11 @@ export function HamburgerMenu({ open, onClose, onPanelOpen }: HamburgerMenuProps
     { id: "myWallet",     label: t("myWalletLabel"),     sub: t("myWalletSub"),     icon: Wallet },
     { id: "deposit",      label: t("depositLabel"),      sub: t("depositSub"),      icon: ArrowDownUp },
     { id: "referral",     label: t("referralLabel"),     sub: t("referralSub"),     icon: Users },
-    { id: "opMode",       label: t("opModeLabel"),       sub: t("opModeSub"),       icon: Settings2 },
+    // 運用モード切替（おまかせ/アクティブ）は、おまかせ非表示時はモードが
+    // アクティブのみとなり切替が無意味なため、メニュー項目ごと隠す。
+    ...(isAutoModeEnabled()
+      ? [{ id: "opMode", label: t("opModeLabel"), sub: t("opModeSub"), icon: Settings2 }]
+      : []),
     { id: "txHistory",    label: t("txHistoryLabel"),    sub: t("txHistorySub"),    icon: Clock },
     { id: "tax",          label: t("taxLabel"),          sub: t("taxSub"),          icon: FileText },
     { id: "notification", label: t("notificationLabel"), sub: t("notificationSub"), icon: Bell },
