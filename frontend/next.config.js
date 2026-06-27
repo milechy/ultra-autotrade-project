@@ -119,10 +119,14 @@ const nextConfig = {
               key: 'Content-Security-Policy',
               value: [
                 "default-src 'self'",
-                "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://static.cloudflareinsights.com https://auth.privy.io",
+                // LINE LIFF SDK は static.line-scdn.net から client features 拡張
+                // (non-ios-extensions 等) を読む。許可しないと liff.init() が
+                // 「Unable to load client features」で失敗する（LINE アプリ内 WebView も CSP 準拠）。
+                "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://static.cloudflareinsights.com https://auth.privy.io https://static.line-scdn.net",
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://auth.privy.io",
                 "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://auth.privy.io",
-                "img-src 'self' data: blob: https://auth.privy.io https://*.privy.io https://imagedelivery.net",
+                // LIFF プロフィール画像は *.line-scdn.net 配信。
+                "img-src 'self' data: blob: https://auth.privy.io https://*.privy.io https://imagedelivery.net https://*.line-scdn.net",
                 "font-src 'self' https://fonts.gstatic.com",
                 `connect-src ${cspConnectSrc}`,
                 "frame-src 'self' https://auth.privy.io https://verify.walletconnect.com https://verify.walletconnect.org",
