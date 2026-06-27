@@ -6,6 +6,7 @@ import { Bot, MousePointer2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useSigners, useWallets } from "@privy-io/react-auth"
 import { getAuthToken } from "@/lib/auth/token-key"
+import { isAutoModeEnabled } from "@/lib/flags"
 import { liffFetch } from "@/lib/liff/liff-fetch"
 import { track, EV } from "@/lib/posthog"
 import {
@@ -112,6 +113,8 @@ export function OpModePanel() {
   }
 
   const MODES = [
+    // おまかせ（managed）= 一任運用。投資運用業の登録/法務クリアまでフラグで非表示。
+    // 詳細は isAutoModeEnabled の JSDoc 参照。
     {
       id: "managed" as UserMode,
       label: t("managedLabel"),
@@ -130,7 +133,7 @@ export function OpModePanel() {
       bg: "bg-blue-500/10",
       border: "border-blue-500",
     },
-  ]
+  ].filter((m) => isAutoModeEnabled() || m.id !== "managed")
 
   const MODE_LABEL: Record<UserMode, string> = {
     managed: t("managedLabel"),

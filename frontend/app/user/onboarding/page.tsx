@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl'
 import { Sparkles, Brain, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { apiPut } from '@/lib/api/client'
 import { useAuth } from '@/lib/auth'
+import { isAutoModeEnabled } from '@/lib/flags'
 
 type UserMode = 'managed' | 'active'
 
@@ -130,17 +131,20 @@ export default function OnboardingPage() {
 
         {/* Mode cards */}
         <div className="space-y-4">
-          <ModeCard
-            mode="managed"
-            icon={<Sparkles className="h-6 w-6" />}
-            title={t('managed.title')}
-            badge={t('managed.badge')}
-            bullets={managedBullets}
-            isLoading={loadingMode === 'managed'}
-            onSelect={handleSelect}
-            startLabel={t('startBtn')}
-            savingLabel={t('saving')}
-          />
+          {/* おまかせ（managed）= 一任運用。投資運用業の登録/法務クリアまで非表示。 */}
+          {isAutoModeEnabled() && (
+            <ModeCard
+              mode="managed"
+              icon={<Sparkles className="h-6 w-6" />}
+              title={t('managed.title')}
+              badge={t('managed.badge')}
+              bullets={managedBullets}
+              isLoading={loadingMode === 'managed'}
+              onSelect={handleSelect}
+              startLabel={t('startBtn')}
+              savingLabel={t('saving')}
+            />
+          )}
 
           <ModeCard
             mode="active"
