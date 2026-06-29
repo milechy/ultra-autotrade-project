@@ -17,8 +17,8 @@ export function useMinimumBalance() {
       currentValueUSD,
       minimumUSD: MINIMUM_USD_BALANCE,
       message: isBelowMinimum
-        ? `最低運用額 $${MINIMUM_USD_BALANCE.toLocaleString()} USD を下回っています（現在: $${currentValueUSD.toFixed(2)}）`
-        : `残高 $${currentValueUSD.toFixed(2)} USD は最低運用額を満たしています`,
+        ? `推奨運用額 $${MINIMUM_USD_BALANCE.toLocaleString()} USD を下回っています（現在: $${currentValueUSD.toFixed(2)}）`
+        : `残高 $${currentValueUSD.toFixed(2)} USD は推奨運用額を満たしています`,
     }
   }, [])
 

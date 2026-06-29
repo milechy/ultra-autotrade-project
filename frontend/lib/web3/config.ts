@@ -101,6 +101,15 @@ export type SupportedToken = keyof typeof TOKEN_ADDRESSES.arbitrum
 export const DEFAULT_CHAIN: SupportedChainKey =
   (process.env.NEXT_PUBLIC_DEFAULT_CHAIN as SupportedChainKey) || 'base'
 
+// 運用開始の最低入金額（USD）— 入金ゲートの単一の真実源（single source of truth）。
+// バックエンドの正本は backend/app/users/deposit_policy.py の MIN_DEPOSIT_USD（両者は一致させる）。
+// 入金/運用開始のハードブロックに使うのはこの定数。env で上書きしたい場合は
+// NEXT_PUBLIC_DEPOSIT_GATE_USD を参照する（build-time 埋め込み）。
+export const DEPOSIT_GATE_USD = Number(process.env.NEXT_PUBLIC_DEPOSIT_GATE_USD ?? 200)
+
+// [混同注意] DEPOSIT_GATE_USD（$200, 上）とは別概念。
+// MINIMUM_USD_BALANCE は「推奨運用額」の参考表示用しきい値であり、入金ゲートではない。
+// 現状ブロックには使われていない（connect/page.tsx で informational only）。
 export const MINIMUM_USD_BALANCE = 3000
 
 // Supported chain IDs — env-driven (default: Base Mainnet 8453)

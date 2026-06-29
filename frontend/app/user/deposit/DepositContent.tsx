@@ -9,7 +9,7 @@ import { base, baseSepolia } from 'wagmi/chains'
 import { formatUnits } from 'viem'
 import { useTranslations } from 'next-intl'
 import { useWallet } from '@/hooks/useWallet'
-import { getChainDisplayName } from '@/lib/web3/config'
+import { getChainDisplayName, DEPOSIT_GATE_USD } from '@/lib/web3/config'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -30,8 +30,8 @@ const USDC_BY_CHAIN: Record<number, `0x${string}`> = {
 }
 
 const USDC_DECIMALS = 6
-const DEPOSIT_GATE_USD = 200
-const DEFAULT_ONRAMP_AMOUNT = '200'
+// 入金ゲートは lib/web3/config.ts の DEPOSIT_GATE_USD を単一の真実源として参照する。
+const DEFAULT_ONRAMP_AMOUNT = String(DEPOSIT_GATE_USD)
 
 function getChainForPrivy(chainId: number | undefined) {
   return chainId === 84532 ? baseSepolia : base
