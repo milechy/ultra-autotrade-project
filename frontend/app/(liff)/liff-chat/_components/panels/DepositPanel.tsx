@@ -12,7 +12,7 @@ import { useWallet } from "@/hooks/useWallet"
 import { useUsdcBalance } from "@/hooks/useUsdcBalance"
 import { useEffectiveWalletAddress } from "@/hooks/useEffectiveWalletAddress"
 import { track, EV } from "@/lib/posthog"
-import { SUPPORTED_CHAIN_IDS, getChainDisplayName } from "@/lib/web3/config"
+import { SUPPORTED_CHAIN_IDS, getChainDisplayName, DEPOSIT_GATE_USD } from "@/lib/web3/config"
 
 // ---- 型定義 ---------------------------------------------------------------
 
@@ -266,6 +266,22 @@ export function DepositPanel() {
           USDC · {getChainDisplayName(SUPPORTED_CHAIN_IDS[0])}
         </p>
       </div>
+
+      {/* $200 入金ゲート状態（入金自体は許可。自動運用の開始可否を明示） */}
+      {!balanceLoading && balance != null && (
+        balance >= DEPOSIT_GATE_USD ? (
+          <div className="ax-card-warm border border-[#1D9E75] rounded-xl px-4 py-2.5 mb-4 text-xs text-[#1D9E75]">
+            {t("gateMet", { gate: String(DEPOSIT_GATE_USD) })}
+          </div>
+        ) : (
+          <div className="ax-card-warm border border-[#E5484D] rounded-xl px-4 py-2.5 mb-4 text-xs text-[#E5484D]">
+            {t("gateShortfall", {
+              gate: String(DEPOSIT_GATE_USD),
+              remaining: (DEPOSIT_GATE_USD - balance).toFixed(2),
+            })}
+          </div>
+        )
+      )}
 
       {/* 成功メッセージ */}
       {successMsg && (
