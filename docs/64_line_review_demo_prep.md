@@ -20,9 +20,12 @@
 cd /opt/ultra-autotrade
 # .env.staging-v4 に追記（printf で改行保証 / sed -i 禁止）
 printf '\nSTAGING_REVIEW_DEMO_SEED=true\n' >> .env.staging-v4
-docker compose -p ultra-autotrade-staging-v4 -f docker-compose.staging-v4.yml \
-  up -d --no-deps --force-recreate backend
+# 【重要】--env-file 必須。これを抜くと ${POSTGRES_PASSWORD} 等が空展開され
+# backend が DB接続不能(fe_sendauth: no password supplied)になり全API 500 になる。
+docker compose --env-file .env.staging-v4 -p ultra-autotrade-staging-v4 \
+  -f docker-compose.staging-v4.yml up -d --no-deps --force-recreate backend
 # 検証: 新規LINEログイン → ホームに AI判定 + 保留中提案が出ること
+#       + docker logs ... | grep -i "no password" が空であること
 ```
 ※ 二重ガードで `APP_ENV=production` では仮に設定されても no-op。本番は無設定でよい。
 ※ 実行(on-chain tx)はサンプルのため発生しない。CURRENT ASSET(オンチェーン残高)は$0のまま
