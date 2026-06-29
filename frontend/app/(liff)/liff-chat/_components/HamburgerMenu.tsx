@@ -14,7 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { useTranslations } from "next-intl"
-import { isAutoModeEnabled } from "@/lib/flags"
+import { isAutoModeEnabled, isReferralEnabled } from "@/lib/flags"
 
 interface HamburgerMenuProps {
   open: boolean
@@ -28,7 +28,10 @@ export function HamburgerMenu({ open, onClose, onPanelOpen }: HamburgerMenuProps
   const MENU_ITEMS = [
     { id: "myWallet",     label: t("myWalletLabel"),     sub: t("myWalletSub"),     icon: Wallet },
     { id: "deposit",      label: t("depositLabel"),      sub: t("depositSub"),      icon: ArrowDownUp },
-    { id: "referral",     label: t("referralLabel"),     sub: t("referralSub"),     icon: Users },
+    // 友達紹介（利益連動リワード）は LINE 審査リスクのため審査期間中はフラグで非表示。
+    ...(isReferralEnabled()
+      ? [{ id: "referral", label: t("referralLabel"), sub: t("referralSub"), icon: Users }]
+      : []),
     // 運用モード切替（おまかせ/アクティブ）は、おまかせ非表示時はモードが
     // アクティブのみとなり切替が無意味なため、メニュー項目ごと隠す。
     ...(isAutoModeEnabled()
