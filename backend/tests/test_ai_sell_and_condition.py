@@ -511,7 +511,7 @@ class TestJudgeWithRagAndConditionGuard:
         assert result.final_action == TradeAction.HOLD, (
             "SELL must be blocked when only Macro is BEARISH (AND-condition not met)"
         )
-        assert "AND-condition" in result.final_reason
+        assert "テクニカル指標とマクロ環境" in result.final_reason
 
     def test_sell_allowed_when_both_indicator_and_macro_bearish(self) -> None:
         """
