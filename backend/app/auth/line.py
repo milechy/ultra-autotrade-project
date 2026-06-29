@@ -96,4 +96,10 @@ def get_or_create_line_user(db: Session, line_user_id: str, display_name: str) -
     db.commit()
     db.refresh(user)
     logger.info("Created new LINE user: user_id=%d", user.id)
+
+    # staging / 審査用デモシード（本番では no-op の二重ガード）。新規ユーザーのみ。
+    # 審査担当者が初回ログイン直後にホームで AI 提案を確認できるようにする。
+    from app.staging_demo import maybe_seed_review_demo  # noqa: PLC0415
+
+    maybe_seed_review_demo(db, user)
     return user
