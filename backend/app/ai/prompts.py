@@ -104,7 +104,7 @@ Respond in JSON format ONLY:
 {{
     "action": "BUY" | "SELL" | "HOLD",
     "confidence": 0-100,
-    "reason": "Brief explanation referencing agent signals"
+    "reason": "判断根拠を必ず日本語で簡潔に記述する（どのエージェントのシグナルに基づくか言及。write the reason field in Japanese）"
 }}"""
 
 _V3_USER_TEMPLATE = """## Specialist Agent Reports:
@@ -150,7 +150,7 @@ Respond in JSON format ONLY:
 {{
     "action": "BUY" | "SELL" | "HOLD",
     "confidence": 0-100,
-    "reason": "Brief explanation referencing agent signals"
+    "reason": "判断根拠を必ず日本語で簡潔に記述する（どのエージェントのシグナルに基づくか言及。write the reason field in Japanese）"
 }}"""
 
 _V4_USER_TEMPLATE = """## Specialist Agent Reports:
@@ -201,7 +201,7 @@ Respond in JSON format ONLY:
 {{
     "action": "BUY" | "SELL" | "HOLD",
     "confidence": 0-100,
-    "reason": "Brief explanation referencing which agents agreed and their confidence"
+    "reason": "判断根拠を必ず日本語で簡潔に記述する（どのエージェントが一致したか・確信度に言及。write the reason field in Japanese）"
 }}"""
 
 _V5_USER_TEMPLATE = """## Specialist Agent Reports:
@@ -266,7 +266,7 @@ Respond in JSON format ONLY:
 {{
     "action": "BUY" | "SELL" | "HOLD",
     "confidence": 0-100,
-    "reason": "Brief explanation referencing the weighted score and which agents agreed"
+    "reason": "判断根拠を必ず日本語で簡潔に記述する（加重スコアとどのエージェントが一致したかに言及。write the reason field in Japanese）"
 }}"""
 
 _V6_USER_TEMPLATE = """## Specialist Agent Reports:
