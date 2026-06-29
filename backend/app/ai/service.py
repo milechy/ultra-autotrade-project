@@ -263,7 +263,7 @@ class AIService:
                     provider=LLMProvider.RULE_BASED,
                     action=TradeAction.HOLD,
                     confidence=95,
-                    reason="COMPOUND RISK: Low HF + elevated geo risk. Forced HOLD by rule engine.",
+                    reason="複合リスク検知（Health Factor 低下＋地政学リスク上昇）のため、安全を優先して様子見（HOLD）としました。",
                     prompt_version=version,
                 )
                 return CrossValidationResult(
@@ -272,7 +272,7 @@ class AIService:
                     agreed=True,
                     final_action=TradeAction.HOLD,
                     final_confidence=95,
-                    final_reason="COMPOUND RISK detected. Rule engine forced HOLD before LLM call.",
+                    final_reason="複合リスクを検知したため、安全を優先して様子見（HOLD）としました。",
                 )
             # Guard 2: AND-condition for v4/v5 — SELL/BUY needs both Indicator AND Macro >=70%
             if version in ("v4", "v5") and not (
@@ -312,9 +312,8 @@ class AIService:
                 result.final_confidence,
             )
             _clamp_reason = (
-                f"AND-condition not met: LLM proposed {result.final_action.value} but "
-                "Indicator and Macro agents did not both agree >=70%. "
-                f"Original: {result.final_reason}"
+                "テクニカル指標とマクロ環境の両方が同方向（信頼度70%以上）で"
+                "揃わなかったため、安全を優先して様子見（HOLD）としました。"
             )
             _clamped = LLMDecision(
                 provider=LLMProvider.RULE_BASED,
@@ -351,9 +350,9 @@ class AIService:
                 _rule_ctx.indicator_signal.confidence,
             )
             _demo_reason = (
-                "STAGING DEMO RELAX: Indicator-only BULLISH>=70% でゲート緩和 "
-                "(macro 軸ドロップ・staging 限定)。"
-                f"Original: {result.final_reason}"
+                "テクニカル指標が強気シグナル"
+                f"（信頼度{_rule_ctx.indicator_signal.confidence}%）を示しているため、"
+                "買い（BUY）と判断しました。"
             )
             _demo_decision = LLMDecision(
                 provider=LLMProvider.RULE_BASED,
@@ -466,7 +465,7 @@ class AIService:
                 provider=LLMProvider.CLAUDE,
                 action=TradeAction.HOLD,
                 confidence=0,
-                reason="API key not configured",
+                reason="AI APIキーが未設定のため、安全を優先して様子見（HOLD）としました。",
                 prompt_version=version,
             )
 
@@ -538,7 +537,10 @@ class AIService:
                 provider=LLMProvider.CLAUDE_FALLBACK,
                 action=TradeAction.HOLD,
                 confidence=0,
-                reason=f"Opus error: {last_exc}; Fallback error: {exc}",
+                reason=(
+                    "AI判定に失敗したため、安全を優先して様子見（HOLD）としました。"
+                    f"（エラー: {last_exc} / フォールバックエラー: {exc}）"
+                ),
                 prompt_version=version,
             )
 
@@ -556,7 +558,7 @@ class AIService:
                 provider=LLMProvider.OPENAI,
                 action=TradeAction.HOLD,
                 confidence=0,
-                reason="API key not configured",
+                reason="AI APIキーが未設定のため、安全を優先して様子見（HOLD）としました。",
                 prompt_version=version,
             )
         try:
@@ -581,7 +583,7 @@ class AIService:
                 provider=LLMProvider.OPENAI,
                 action=TradeAction.HOLD,
                 confidence=0,
-                reason=f"API error: {exc}",
+                reason=f"AI判定でエラーが発生したため、安全を優先して様子見（HOLD）としました。（エラー: {exc}）",
                 prompt_version=version,
             )
 
@@ -615,7 +617,7 @@ class AIService:
                 provider=provider,
                 action=TradeAction.HOLD,
                 confidence=0,
-                reason=f"Parse error: {exc}",
+                reason=f"AI応答の解析に失敗したため、安全を優先して様子見（HOLD）としました。（エラー: {exc}）",
                 raw_response=raw,
             )
 
@@ -648,7 +650,7 @@ class AIService:
                 agreed=True,
                 final_action=primary.action,
                 final_confidence=avg_confidence,
-                final_reason=f"Both LLMs agree: {primary.reason}",
+                final_reason=f"2つのAIモデルの判定が一致しました。{primary.reason}",
                 prompt_version=primary.prompt_version,
             )
         else:
@@ -660,8 +662,8 @@ class AIService:
                 final_action=TradeAction.HOLD,
                 final_confidence=min(min_confidence, 30),
                 final_reason=(
-                    f"LLMs disagree ({primary.action.value} vs {secondary.action.value});"
-                    " defaulting to HOLD"
+                    f"2つのAIモデルの判定が分かれた（{primary.action.value} と "
+                    f"{secondary.action.value}）ため、安全を優先して様子見（HOLD）としました。"
                 ),
                 prompt_version=primary.prompt_version,
             )

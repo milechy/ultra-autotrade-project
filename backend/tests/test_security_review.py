@@ -525,7 +525,7 @@ class TestLlmFailClosed:
 
         assert decision.action == TradeAction.HOLD
         assert decision.confidence == 0
-        assert "Parse error" in (decision.reason or "")
+        assert "解析に失敗" in (decision.reason or "")
 
     def test_parse_empty_string_returns_hold(self) -> None:
         """_parse_llm_response with empty string must return HOLD."""
