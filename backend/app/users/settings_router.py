@@ -123,6 +123,27 @@ def update_user_settings(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="user_mode must be one of: managed, active, pro",
             )
+        # A-2 入金ゲート: 完全おまかせ (managed = AUTO 執行) への切替は最低入金額を要求する。
+        # active/pro は per-trade 承認が挟まり approve 側ゲートで担保されるため対象外。
+        # 判定不能 (None) は fail-open（インフラ起因で正規の切替を止めない）、確定不足のみブロック。
+        if request.user_mode == "managed":
+            from app.users.deposit_policy import MIN_DEPOSIT_USD  # noqa: PLC0415
+            from app.users.deposit_resolver import resolve_user_deposit_usd  # noqa: PLC0415
+
+            _deposit_usd = resolve_user_deposit_usd(db, current_user.id)
+            if _deposit_usd is not None and _deposit_usd < MIN_DEPOSIT_USD:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "code": "DEPOSIT_BELOW_MINIMUM",
+                        "message": (
+                            f"完全おまかせ運用の開始には最低 ${MIN_DEPOSIT_USD} の入金が必要です"
+                            f"（現在: ${_deposit_usd}）。"
+                        ),
+                        "min_deposit_usd": str(MIN_DEPOSIT_USD),
+                        "current_deposit_usd": str(_deposit_usd),
+                    },
+                )
         current_user.user_mode = request.user_mode
         current_user.execution_policy = _USER_MODE_TO_POLICY[request.user_mode]
     # execution_policy の直接指定は admin/partner のみ（低レベル操作のため温存）。
