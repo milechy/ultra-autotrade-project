@@ -272,7 +272,7 @@ export default function ConnectPage() {
             <Card className="border-zinc-800 bg-zinc-900/60">
               <CardContent className="pt-4 pb-4">
                 <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
-                  最低残高確認
+                  推奨残高の確認
                 </p>
                 {balanceCheck.isBelowMinimum ? (
                   <div className="flex items-start gap-2">
@@ -280,7 +280,7 @@ export default function ConnectPage() {
                     <div>
                       <p className="text-sm text-yellow-300">{balanceCheck.message}</p>
                       <p className="text-xs text-zinc-500 mt-1">
-                        最低運用額: ${minimumUSD.toLocaleString()} USD
+                        推奨運用額: ${minimumUSD.toLocaleString()} USD
                       </p>
                     </div>
                   </div>
