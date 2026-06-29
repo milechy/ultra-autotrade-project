@@ -35,3 +35,15 @@ export function isPublicRegistrationEnabled(): boolean {
 export function isAutoModeEnabled(): boolean {
   return process.env.NEXT_PUBLIC_AUTO_MODE_ENABLED === 'true'
 }
+
+/**
+ * 友達紹介プログラムを UI に表示するか。
+ *
+ * 既定 false（非表示）。「紹介した友達の実利益の N% を継続的に支払う」という
+ * 利益連動の金銭リワードは、LINE ミニアプリ審査でマルチ商法的訴求と見なされる
+ * リスクがあるため、審査期間中はフラグで非表示にする。審査通過後に文言を
+ * 利益非連動の設計へ整備したうえで true にして再ビルドする（code-ready-behind-flag）。
+ */
+export function isReferralEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_REFERRAL_ENABLED === 'true'
+}

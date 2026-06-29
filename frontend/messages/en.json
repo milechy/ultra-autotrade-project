@@ -718,15 +718,15 @@
       "openChatAriaLabel": "Open chat",
       "assetChartLoading": "Loading chart...",
       "emergencyStop": "Emergency Stop",
-      "emergencyStopAriaLabel": "Emergency stop autonomous trading",
+      "emergencyStopAriaLabel": "Emergency stop AI analysis and proposals",
       "noSignal": "No signal",
-      "stoppedStatus": "Autonomous trading is stopped",
-      "stopConfirmTitle": "Stop autonomous trading?",
-      "stopConfirmDesc": "Stopping halts the AI's automatic decisions and execution. To resume, please contact support.",
+      "stoppedStatus": "AI analysis and proposals are stopped",
+      "stopConfirmTitle": "Stop AI analysis and proposals?",
+      "stopConfirmDesc": "Stopping halts the AI's market analysis and proposals. To resume, please contact support.",
       "stopCancel": "Cancel",
       "stopConfirm": "Stop",
       "stopping": "Stopping...",
-      "stopSuccess": "Autonomous trading stopped",
+      "stopSuccess": "AI analysis and proposals stopped",
       "stopFailed": "Failed to stop. Please try again later."
     },
     "panels": {
@@ -991,7 +991,7 @@
         "termsDesc": "Service terms and disclaimers",
         "privacyLabel": "Privacy Policy",
         "privacyDesc": "Personal data handling",
-        "footer": "UAT App v1.0 | © 2026 UAT Co., Ltd."
+        "footer": "UAT App v1.0 | Operated by ASSISTONE Sdn. Bhd. (Malaysia) / Japan contact: YMO Yield Media Online"
       }
     },
     "menu": {
@@ -1015,7 +1015,7 @@
       "accountSub": "Profile & log out",
       "termsLabel": "Terms",
       "termsSub": "Terms of service & privacy policy",
-      "footer": "UAT App v1.0 | © 2026 UAT Co., Ltd."
+      "footer": "UAT App v1.0 | Operated by ASSISTONE Sdn. Bhd. (Malaysia) / Japan contact: YMO Yield Media Online"
     },
     "confirm": {
       "title": "Important Disclosures",
