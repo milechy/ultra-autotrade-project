@@ -10,6 +10,7 @@ import { useFundWallet } from "@privy-io/react-auth"
 import { base, baseSepolia } from "wagmi/chains"
 import { useWallet } from "@/hooks/useWallet"
 import { useUsdcBalance } from "@/hooks/useUsdcBalance"
+import { DEPOSIT_GATE_USD } from "@/lib/web3/config"
 import { track, EV } from "@/lib/posthog"
 
 // ---- 型定義 ---------------------------------------------------------------
@@ -258,6 +259,22 @@ export function DepositPanel() {
         )}
         <p className="text-xs text-[#736f7e] mt-1">{t("network")}</p>
       </div>
+
+      {/* $200 入金ゲート状態（入金自体は許可。自動運用の開始可否を明示） */}
+      {!balanceLoading && balance != null && (
+        balance >= DEPOSIT_GATE_USD ? (
+          <div className="ax-card-warm border border-[#1D9E75] rounded-xl px-4 py-2.5 mb-4 text-xs text-[#1D9E75]">
+            {t("gateMet", { gate: String(DEPOSIT_GATE_USD) })}
+          </div>
+        ) : (
+          <div className="ax-card-warm border border-[#E5484D] rounded-xl px-4 py-2.5 mb-4 text-xs text-[#E5484D]">
+            {t("gateShortfall", {
+              gate: String(DEPOSIT_GATE_USD),
+              remaining: (DEPOSIT_GATE_USD - balance).toFixed(2),
+            })}
+          </div>
+        )
+      )}
 
       {/* 成功メッセージ */}
       {successMsg && (

@@ -948,6 +948,27 @@ def approve_proposal(
             detail=f"Cannot approve proposal with status '{proposal.status}'",
         )
 
+    # A-2 入金ゲート: 残高が運用開始の最低入金額 (MIN_DEPOSIT_USD) 未満なら承認・執行を拒否。
+    # 判定不能 (None) は fail-open（RPC 失敗等インフラ起因で正規の承認を止めない）、
+    # 確定した不足のみブロックする。提案生成側でも同ゲートを通すため、ここは防御的二重化。
+    from app.users.deposit_policy import MIN_DEPOSIT_USD  # noqa: PLC0415
+    from app.users.deposit_resolver import resolve_user_deposit_usd  # noqa: PLC0415
+
+    _deposit_usd = resolve_user_deposit_usd(db, proposal.user_id)
+    if _deposit_usd is not None and _deposit_usd < MIN_DEPOSIT_USD:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "DEPOSIT_BELOW_MINIMUM",
+                "message": (
+                    f"運用開始には最低 ${MIN_DEPOSIT_USD} の入金が必要です"
+                    f"（現在: ${_deposit_usd}）。"
+                ),
+                "min_deposit_usd": str(MIN_DEPOSIT_USD),
+                "current_deposit_usd": str(_deposit_usd),
+            },
+        )
+
     # AUTO 執行フラグは PolicyContext (Rule8: AUTO 執行は有効委譲枠必須) より前に評価する。
     auto_execution_enabled = os.getenv("AUTO_EXECUTION_ENABLED", "false").lower() == "true"
 
