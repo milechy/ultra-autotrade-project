@@ -1011,7 +1011,7 @@
       "taxLabel": "TAX & REPORTS",
       "taxSub": "税務レポート・CSV出力",
       "notificationLabel": "通知設定",
-      "notificationSub": "LINE・プッシュ通知の設定",
+      "notificationSub": "通知の設定",
       "accountLabel": "アカウント",
       "accountSub": "プロフィール・ログアウト",
       "termsLabel": "利用規約",
@@ -1170,7 +1170,7 @@
       "badge": "おすすめ",
       "bullet1": "入金したらAIが全自動で運用します",
       "bullet2": "危険時は自動で資産を守ります",
-      "bullet3": "結果はLINEでお知らせ"
+      "bullet3": "結果は通知でお知らせ"
     },
     "active": {
       "title": "アクティブモード",
@@ -1647,7 +1647,7 @@
     "cancelLabel": "返品・キャンセル・解約",
     "cancelValue": "デジタルサービスの性質上、提供開始後の返金は原則として承っておりません。利用者は、アプリ内「アカウント > アカウント削除」より、いつでも退会（利用停止）できます（利用規約 第10条）。",
     "envLabel": "動作環境",
-    "envValue": "LINEミニアプリ、または最新のモダンブラウザ。"
+    "envValue": "最新のモダンブラウザ、またはLINEミニアプリ。"
   },
   "PartnerDashboard": {
     "title": "パートナーダッシュボード",

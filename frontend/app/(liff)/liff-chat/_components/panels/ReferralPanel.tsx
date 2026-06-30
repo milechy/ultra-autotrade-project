@@ -8,6 +8,7 @@ import { getReferralInfo, createReferralCode, type ReferralInfo } from "@/lib/ap
 
 type TFn = ReturnType<typeof useTranslations>
 import { getAuthToken } from "@/lib/auth/token-key"
+import { isLiffConfigured } from "@/lib/liff/init"
 
 // SIGNUP URL: 専用の env/定数が無いため、sibling パネル (TermsPanel 等) と同じ
 // app.ultra-auto-trade.com 系ドメインへハードコードでフォールバックする。
@@ -109,7 +110,7 @@ export function ReferralPanel() {
     if (!code) return
     const shareText = buildShareText(code, t("shareTextBody"))
     try {
-      const { getLiff, isLiffConfigured } = await import("@/lib/liff/init")
+      const { getLiff } = await import("@/lib/liff/init")
       // ブラウザ PWA モード（LIFF 未設定）は SDK を触らずクリップボードへ degrade。
       const liff = isLiffConfigured() ? await getLiff() : null
       if (liff && liff.isApiAvailable("shareTargetPicker")) {
@@ -130,7 +131,7 @@ export function ReferralPanel() {
     const body = encodeURIComponent(buildShareText(code, t("shareTextBody")))
     const mailtoUrl = `mailto:?subject=${subject}&body=${body}`
     try {
-      const { getLiff, isLiffConfigured } = await import("@/lib/liff/init")
+      const { getLiff } = await import("@/lib/liff/init")
       const liff = isLiffConfigured() ? await getLiff() : null
       if (liff) {
         // LIFF webview では openWindow(external=true) でOS のメールアプリを起動する。
@@ -251,16 +252,21 @@ export function ReferralPanel() {
         <div className="space-y-2">
           <p className="text-[#736f7e] text-xs font-medium px-1">{t("shareSectionLabel")}</p>
           <div className="space-y-2">
-            <button
-              onClick={handleLineShare}
-              className="w-full flex items-center gap-3 bg-[#06C755] hover:bg-[#05a848]
-                         text-white font-semibold py-3 px-4 rounded-xl
-                         transition-colors"
-            >
-              <Share2 className="w-5 h-5" />
-              <span className="flex-1 text-left">{t("lineShareBtn")}</span>
-              <ChevronRight className="w-4 h-4 opacity-60" />
-            </button>
+            {/* LINE 共有は LIFF モード（LINE 連携）でのみ表示。PWA 本番形態では
+                LINE shareTargetPicker が使えずクリップボードへ degrade するだけで
+                「LINEで送る」表記が実態と食い違うため、メール共有＋リンクコピーに委ねる。 */}
+            {isLiffConfigured() && (
+              <button
+                onClick={handleLineShare}
+                className="w-full flex items-center gap-3 bg-[#06C755] hover:bg-[#05a848]
+                           text-white font-semibold py-3 px-4 rounded-xl
+                           transition-colors"
+              >
+                <Share2 className="w-5 h-5" />
+                <span className="flex-1 text-left">{t("lineShareBtn")}</span>
+                <ChevronRight className="w-4 h-4 opacity-60" />
+              </button>
+            )}
 
             <button
               onClick={handleMailShare}
