@@ -54,12 +54,42 @@ function safeRemove(key: string): void {
 }
 
 /**
+ * JWT の exp(秒) を見て期限切れかを判定する。
+ * decode 不能 / exp 不在時は false を返す (fail-open: 解釈できないトークンは壊さない)。
+ * 最終的な失効判定は backend (401) が真実源で、本判定はクライアント側の早期検知用。
+ */
+function isJwtExpired(token: string): boolean {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return false;
+    // base64url → base64
+    const base64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(base64)) as { exp?: number };
+    if (typeof payload.exp !== "number") return false;
+    return payload.exp * 1000 <= Date.now();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 保存済み auth token を取得する。
  * 正準キー (AUTH_TOKEN_KEY) を優先し、無ければ旧キー (LEGACY_AUTH_TOKEN_KEY) を
  * フォールバックで読む移行シム。SSR / localStorage アクセス不可時は null。
+ *
+ * 期限切れ JWT は localStorage に残っていても無効として扱い、消して null を返す。
+ * 残置すると /liff-login が「ログイン済み」と誤認して /liff-chat へ押し戻し、
+ * terms gate が 401 → /liff-confirm → /liff-login の無限ループ (再ログイン不能の
+ * ソフトロック) を起こすため (調査: 期限切れ token で smart-link/terms-agree が 401)。
  */
 export function getAuthToken(): string | null {
-  return safeGet(AUTH_TOKEN_KEY) ?? safeGet(LEGACY_AUTH_TOKEN_KEY);
+  const token = safeGet(AUTH_TOKEN_KEY) ?? safeGet(LEGACY_AUTH_TOKEN_KEY);
+  if (token === null) return null;
+  if (isJwtExpired(token)) {
+    clearAuthToken();
+    return null;
+  }
+  return token;
 }
 
 /**
