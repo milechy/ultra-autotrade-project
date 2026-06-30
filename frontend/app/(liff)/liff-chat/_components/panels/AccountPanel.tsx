@@ -20,6 +20,7 @@ import { useLanguage } from "@/lib/useLanguage"
 import { getAuthToken, clearAuthToken } from "@/lib/auth/token-key"
 import { useWallet } from "@/hooks/useWallet"
 import { liffFetch } from "@/lib/liff/liff-fetch"
+import { isLiffConfigured } from "@/lib/liff/init"
 import { isAutoModeEnabled } from "@/lib/flags"
 
 interface UserData {
@@ -53,6 +54,9 @@ export function AccountPanel() {
   const { language } = useLanguage()
   const router = useRouter()
   const { logout: privyLogout, authenticated } = usePrivy()
+  // ログイン経路の判定。LINE 未設定（PWA 本番形態）では Privy passwordless（メール）
+  // ログインとなるため、LINE 前提の表示・遷移を出し分ける。
+  const liffMode = isLiffConfigured()
   // ウォレット表示の単一情報源化: backend の wallet_address が未記録でも、
   // Privy embedded（または injected）ウォレットのアドレスを useWallet から拾って
   // 「未連携」誤表示を防ぐ（Asana 1215576087505209）。
@@ -366,8 +370,7 @@ export function AccountPanel() {
 
   // ログアウト
   const handleLogout = async () => {
-    const { getLiff, isLiffConfigured } = await import("@/lib/liff/init")
-    const liffMode = isLiffConfigured()
+    const { getLiff } = await import("@/lib/liff/init")
 
     // 1. Privy ログアウト
     try {
@@ -389,8 +392,10 @@ export function AccountPanel() {
     // 3. トークンクリア（正準キー + 旧キーの両方を消す）
     clearAuthToken()
 
-    // 4. リダイレクト（LIFF モードは /liff-login、ブラウザは /login）
-    router.replace(liffMode ? "/liff-login" : "/login")
+    // 4. リダイレクト。LIFF / PWA いずれも消費者は /liff-login へ送る
+    //    （PWA モードでは /liff-login が BrowserLoginPrompt=Privy を表示する）。
+    //    旧実装は PWA 時に /login（スタッフ用メール+パスワード画面）へ送っていた。
+    router.replace("/liff-login")
   }
 
   // アカウント削除申請
@@ -522,10 +527,11 @@ export function AccountPanel() {
                 {t("resetIcon")}
               </button>
             )}
-            {/* ログイン方法バッジ（LIFF = LINE ログイン） */}
+            {/* ログイン方法バッジ。LIFF モード=LINE ログイン / PWA モード=Privy
+                passwordless（メール）ログインのため出し分ける。 */}
             <div className="flex flex-wrap gap-1 mt-1">
               <span className="ax-card-warm text-[#1c1a27] text-xs px-2 py-0.5 rounded-full">
-                {t("lineLoginBadge")}
+                {liffMode ? t("lineLoginBadge") : t("browserLoginBadge")}
               </span>
             </div>
           </div>

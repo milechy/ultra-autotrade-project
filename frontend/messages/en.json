@@ -748,6 +748,7 @@
         "avatarAlt": "Avatar",
         "defaultUser": "User",
         "lineLoginBadge": "LINE",
+        "browserLoginBadge": "Email",
         "startedAt": "Started",
         "opMode": "Mode",
         "wallet": "Wallet",
