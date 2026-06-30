@@ -20,6 +20,7 @@ import { useLanguage } from "@/lib/useLanguage"
 import { getAuthToken, clearAuthToken } from "@/lib/auth/token-key"
 import { useWallet } from "@/hooks/useWallet"
 import { liffFetch } from "@/lib/liff/liff-fetch"
+import { isAutoModeEnabled } from "@/lib/flags"
 
 interface UserData {
   id?: number
@@ -539,11 +540,16 @@ export function AccountPanel() {
           <span className="text-[#1c1a27] text-sm">{getStartedAt()}</span>
         </div>
 
-        {/* 運用モード */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#1c1a27]/15">
-          <span className="text-[#736f7e] text-sm">{t("opMode")}</span>
-          <span className="text-[#1c1a27] text-sm">{getModeLabel()}</span>
-        </div>
+        {/* 運用モード（おまかせ/アクティブ）。
+            おまかせ(Auto)モード無効時はモードがアクティブ実態のみとなり、
+            「おまかせ」表記が実挙動(AI提案→都度承認のセミオート)と乖離するため、
+            ハンバーガーメニューの運用モード項目と同様にフラグで行ごと隠す。 */}
+        {isAutoModeEnabled() && (
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[#1c1a27]/15">
+            <span className="text-[#736f7e] text-sm">{t("opMode")}</span>
+            <span className="text-[#1c1a27] text-sm">{getModeLabel()}</span>
+          </div>
+        )}
 
         {/* ウォレットアドレス */}
         <div className="flex items-center justify-between px-4 py-3">
