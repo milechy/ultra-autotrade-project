@@ -1036,7 +1036,7 @@
         },
         "self_custody": {
           "title": "You Are Responsible for Managing Your Assets",
-          "detail": "This Service adopts a Non-Custodial model. Your digital assets remain under your own control through your personal wallet, and the Company does not hold or custody your assets. You are responsible for the management and security of your wallet and your LINE account used for login."
+          "detail": "This Service adopts a Non-Custodial model. Your digital assets remain under your own control through your personal wallet, and the Company does not hold or custody your assets. You are responsible for the management and security of your wallet and the account you use to log in (e.g., your email address or LINE account)."
         },
         "defi_risk": {
           "title": "AI-Assisted Strategy Execution Involves Risks",
@@ -1048,7 +1048,7 @@
         },
         "user_responsibility": {
           "title": "Account Management Is Your Responsibility",
-          "detail": "Users are responsible for managing their login accounts, including their LINE accounts, and for taking appropriate measures against unauthorized access. The Company shall not be responsible for losses or damages resulting from insufficient account management or unauthorized use by third parties."
+          "detail": "Users are responsible for managing the account they use to log in (e.g., email address or LINE account) and for taking appropriate measures against unauthorized access. The Company shall not be responsible for losses or damages resulting from insufficient account management or unauthorized use by third parties."
         },
         "age_confirm": {
           "title": "Eligibility Requirements",
