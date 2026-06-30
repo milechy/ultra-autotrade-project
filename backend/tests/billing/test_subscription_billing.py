@@ -83,9 +83,16 @@ def _add_user(
     user_id: int = 1,
     risk_mode: str = "balanced",
     tier: str = "LOWER",
-    created_days_ago: int = 60,
+    created_days_before_month: int = 60,
 ) -> User:
-    """テスト用アクティブユーザーを作成して返す。"""
+    """テスト用アクティブユーザーを作成して返す。
+
+    created_at は「計算対象月 (_MONTH) の N 日前」に固定する。
+    実時刻 (now) 基準にすると、now が _MONTH の created_days 日後に達した時点で
+    created_at が _MONTH 内に入り is_first_month=True に化け、初月サブスク=0 で
+    テストが日付依存に落ちる (2026-06-30 に created_days_ago=60 で発火した時限バグ)。
+    _MONTH 基準の固定にして「計算月より前に作成済み = 初月でない」を常に保証する。
+    """
     u = User(
         id=user_id,
         email=f"user{user_id}@test.com",
@@ -94,7 +101,8 @@ def _add_user(
         is_active=True,
         risk_mode=risk_mode,
         tier=tier,
-        created_at=datetime.now(timezone.utc) - timedelta(days=created_days_ago),
+        created_at=datetime(_MONTH.year, _MONTH.month, 1, tzinfo=timezone.utc)
+        - timedelta(days=created_days_before_month),
     )
     db.add(u)
     db.flush()
