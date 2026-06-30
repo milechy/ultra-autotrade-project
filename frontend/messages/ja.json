@@ -748,6 +748,7 @@
         "avatarAlt": "アバター",
         "defaultUser": "ユーザー",
         "lineLoginBadge": "LINE",
+        "browserLoginBadge": "メール",
         "startedAt": "運用開始日",
         "opMode": "運用モード",
         "wallet": "ウォレット",

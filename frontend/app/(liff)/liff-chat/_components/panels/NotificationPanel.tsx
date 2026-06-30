@@ -6,6 +6,7 @@ import { MessageCircle, Bell, AlertTriangle, ShieldAlert, FileText, Info } from 
 import { useTranslations } from "next-intl"
 import { getAuthToken } from "@/lib/auth/token-key"
 import { liffFetch } from "@/lib/liff/liff-fetch"
+import { isLiffConfigured } from "@/lib/liff/init"
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -245,20 +246,24 @@ export function NotificationPanel() {
       {/* 通知チャネル */}
       <SectionHeader label={t("channelSection")} />
 
-      {/* LINE 通知 */}
-      <div className="flex items-center justify-between ax-card-warm rounded-xl px-4 py-3 mb-2">
-        <div className="flex items-center gap-3">
-          <MessageCircle className="w-5 h-5 text-[#1D9E75]" />
-          <div>
-            <div className="text-[#1c1a27] text-sm">{t("lineNotification")}</div>
-            <div className="text-[#1D9E75] text-xs">{t("lineConnected")}</div>
+      {/* LINE 通知。LIFF モード（LINE 連携）でのみ表示する。PWA 本番形態
+          （NEXT_PUBLIC_LIFF_ID 未設定）では LINE 未接続のため「接続済み」の
+          誤表示を避けて行ごと非表示にする。 */}
+      {isLiffConfigured() && (
+        <div className="flex items-center justify-between ax-card-warm rounded-xl px-4 py-3 mb-2">
+          <div className="flex items-center gap-3">
+            <MessageCircle className="w-5 h-5 text-[#1D9E75]" />
+            <div>
+              <div className="text-[#1c1a27] text-sm">{t("lineNotification")}</div>
+              <div className="text-[#1D9E75] text-xs">{t("lineConnected")}</div>
+            </div>
           </div>
+          <Toggle
+            checked={settings.line_enabled}
+            onChange={(v) => updateChannel("line_enabled", v)}
+          />
         </div>
-        <Toggle
-          checked={settings.line_enabled}
-          onChange={(v) => updateChannel("line_enabled", v)}
-        />
-      </div>
+      )}
 
       {/* PWA プッシュ通知 */}
       <div className="flex items-center justify-between ax-card-warm rounded-xl px-4 py-3 mb-2">
