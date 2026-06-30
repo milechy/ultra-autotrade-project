@@ -7,7 +7,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { CheckCircle, ChevronDown, ExternalLink } from "lucide-react"
-import { getAuthToken } from "@/lib/auth/token-key"
+import { getAuthToken, clearAuthToken } from "@/lib/auth/token-key"
 import { TERMS_JUST_ACCEPTED_KEY } from "@/hooks/useLiffTermsGate"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
@@ -84,7 +84,9 @@ export default function LiffConfirmPage() {
         sessionStorage.setItem(TERMS_JUST_ACCEPTED_KEY, "liff-v3")
         router.replace("/liff-chat")
       } else if (res.status === 401) {
-        // セッション切れ — 再ログインへ誘導
+        // セッション切れ — 失効トークンを消してから再ログインへ誘導。
+        // 消さないと /liff-login が残存トークンで /liff-chat へ押し戻すループになる。
+        clearAuthToken()
         router.replace("/liff-login")
       } else {
         // それ以外の失敗は黙らせず明示（沈黙の失敗を防ぐ）
