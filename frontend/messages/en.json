@@ -1010,7 +1010,7 @@
       "taxLabel": "TAX & REPORTS",
       "taxSub": "Tax reports & CSV export",
       "notificationLabel": "Notifications",
-      "notificationSub": "LINE & push notification settings",
+      "notificationSub": "Notification settings",
       "accountLabel": "Account",
       "accountSub": "Profile & log out",
       "termsLabel": "Terms",
@@ -1169,7 +1169,7 @@
       "badge": "Recommended",
       "bullet1": "AI manages your assets fully automatically after deposit",
       "bullet2": "Assets are protected automatically in case of risk",
-      "bullet3": "Results are notified via LINE"
+      "bullet3": "Results delivered via notifications"
     },
     "active": {
       "title": "Active Mode",
@@ -1646,7 +1646,7 @@
     "cancelLabel": "Returns, Cancellation and Termination",
     "cancelValue": "Due to the nature of digital services, refunds after the service has begun are generally not accepted. Users may delete their account (stop using the service) at any time from \"Account > Delete Account\" within the app (Terms of Service Article 10).",
     "envLabel": "System Requirements",
-    "envValue": "LINE Mini App, or the latest modern browser."
+    "envValue": "The latest modern browser, or the LINE Mini App."
   },
   "PartnerDashboard": {
     "title": "Partner Dashboard",
