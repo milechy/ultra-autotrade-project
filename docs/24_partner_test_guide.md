@@ -30,7 +30,7 @@ Ultra AutoTrade は、ニュース情報を AI が解析し BUY/SELL/HOLD を判
 | バックエンド API | `https://api.ultra-auto-trade.com` |
 | API ドキュメント（Swagger UI） | 本番では無効化済み（APP_ENV=production） |
 
-> **注意:** 77.42.46.155 への直接アクセスは127.0.0.1バインドにより接続拒否されます（正常動作）。
+> **注意:** 188.34.167.142 への直接アクセスは127.0.0.1バインドにより接続拒否されます（正常動作）。
 > 全てのアクセスはCloudflare Named Tunnel経由の上記URLを使用してください。
 
 > **ログイン情報:** 別途 PM より共有します。

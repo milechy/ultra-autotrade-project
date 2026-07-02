@@ -2,7 +2,7 @@
 
 > 作成: 2026-05-20 / 更新: 2026-05-21
 > 参照: CLAUDE.md「docker 操作前 (落とし穴 7 項目)」テーブル、`docs/35_docker_maintenance_runbook.md`
-> 対象: dev VPS (`uata-dev-01`) / 本番 VPS (`77.42.46.155`) の全 docker 操作
+> 対象: dev VPS (`95.216.167.198`、2026-07-02時点未構築) / staging VPS (`188.34.167.142`) / production VPS (`5.223.88.14`) の全 docker 操作
 
 ---
 
@@ -134,24 +134,26 @@ docker exec ultra-autotrade-nginx-production \
 ### 落とし穴 7: dev VPS と本番 VPS のパス構造差 (`/main/` の有無)
 
 ```bash
-# ❌ 本番 VPS で dev VPS のパスを使うと "No such file or directory"
-cd /opt/ultra-autotrade/main/         # dev VPS: ✅ / 本番 VPS: ❌
+# ❌ production/staging VPS で dev VPS のパスを使うと "No such file or directory"
+cd /opt/ultra-autotrade/main/         # dev VPS: ✅（構築後） / production・staging VPS: ❌
 
-# ✅ 本番 VPS の正しいパス
-cd /opt/ultra-autotrade/              # 本番 VPS (77.42.46.155) の repo root
+# ✅ production VPS の正しいパス
+cd /opt/ultra-autotrade/              # production VPS (5.223.88.14) の repo root
 
 # ✅ SSH 後は必ず pwd && ls で確認してから操作
-ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155
+# production は alias無し・3段階プロトコル経由のみ
+ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14
 pwd && ls
 # → /opt/ultra-autotrade  (main/ サブディレクトリはない)
 ```
 
 | VPS | git repo root | backend/ の絶対パス |
 |---|---|---|
-| **dev VPS** (`uata-dev-01`, `77.42.79.75`) | `/opt/ultra-autotrade/main/` | `/opt/ultra-autotrade/main/backend/` |
-| **本番 VPS** (`77.42.46.155`) | `/opt/ultra-autotrade/` | `/opt/ultra-autotrade/backend/` |
+| **dev VPS** (`95.216.167.198`、2026-07-02時点未構築) | `/opt/ultra-autotrade/main/`（構築後） | `/opt/ultra-autotrade/main/backend/` |
+| **staging VPS** (`188.34.167.142`) | `/opt/ultra-autotrade/` | `/opt/ultra-autotrade/backend/` |
+| **production VPS** (`5.223.88.14`) | `/opt/ultra-autotrade/` | `/opt/ultra-autotrade/backend/` |
 
-**背景:** dev VPS は git worktree 構造で `main/` サブディレクトリが存在する。本番 VPS には `main/` サブディレクトリは**存在しない**。
+**背景:** dev VPS は git worktree 構造で `main/` サブディレクトリが存在する（構築後）。staging/production VPS には `main/` サブディレクトリは**存在しない**。
 
 ---
 

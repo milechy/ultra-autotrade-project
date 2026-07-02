@@ -1,15 +1,15 @@
 # Ultra AutoTrade — 本番運用操作チェックリスト
 
 > 最終更新: 2026-06-05
-> 対象: production VPS (77.42.46.155) での運用操作全般
+> 対象: production VPS (5.223.88.14) での運用操作全般
 > 朝プロトコル §9 Step 0 で `cat /mnt/project/production_operation_checklist.md` として参照される正本
 
 ---
 
 ## ゲート 0: 環境混同防止 (必須・最初に確認)
 
-- [ ] `hostname && pwd` で dev VPS (uata-dev-01 / 77.42.79.75) 上にいることを確認
-- [ ] production VPS (77.42.46.155) 上で git commit / git merge / ファイル直接編集をしていないこと
+- [ ] `hostname && pwd` で dev VPS (95.216.167.198、2026-07-02時点で未構築のため実際には production/staging VPS 上で直接この確認を行う) 上にいることを確認
+- [ ] production VPS (5.223.88.14) 上で git commit / git merge / ファイル直接編集をしていないこと
 - [ ] 対象コンテナ名: `docker ps | grep ultra-autotrade` で実際の名前を取得すること (推測禁止)
 - [ ] .env ファイル編集: `sed -i` 禁止。`awk '{...}' file > /tmp/f && mv /tmp/f file` を使うこと
 - [ ] production DB 変更 (INSERT/UPDATE/DELETE): 3段プロンプト確認必須 (CLAUDE.md §2026-05-02追加 参照)

@@ -99,7 +99,7 @@ AND 閾値が厳しすぎる可能性が高い。以下の対応を行う:
 
 ```bash
 # 本番 VPS: /opt/ultra-autotrade/ が repo root (main/ サブディレクトリなし)
-ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155
+ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14
 
 # .env.production のバックアップ作成
 cp /opt/ultra-autotrade/.env.production /opt/ultra-autotrade/.env.production.bak.$(date +%Y%m%d-%H%M%S)

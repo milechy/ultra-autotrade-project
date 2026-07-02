@@ -44,7 +44,7 @@ INFO  AI judgment scheduler started (interval=4h)
 ### 管理者トークン取得
 
 ```bash
-TOKEN=$(curl -s -X POST http://77.42.46.155:8000/auth/login \
+TOKEN=$(curl -s -X POST http://188.34.167.142:8000/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@ultra-auto-trade.com","password":"YOUR_PASSWORD"}' \
   | jq -r '.access_token')
@@ -53,7 +53,7 @@ TOKEN=$(curl -s -X POST http://77.42.46.155:8000/auth/login \
 ### 手動トリガー実行
 
 ```bash
-curl -s -X POST http://77.42.46.155:8000/api/ai/trigger \
+curl -s -X POST http://188.34.167.142:8000/api/ai/trigger \
   -H "Authorization: Bearer $TOKEN" \
   | jq .
 ```
@@ -81,17 +81,17 @@ BUY または SELL の場合:
 ### AI判定履歴確認
 
 ```bash
-curl -s http://77.42.46.155:8000/api/ai/decisions/latest \
+curl -s http://188.34.167.142:8000/api/ai/decisions/latest \
   -H "Authorization: Bearer $TOKEN" | jq .
 
-curl -s "http://77.42.46.155:8000/api/ai/decisions?limit=20" \
+curl -s "http://188.34.167.142:8000/api/ai/decisions?limit=20" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ### 承認待ちProposal確認
 
 ```bash
-curl -s http://77.42.46.155:8000/api/proposals/pending \
+curl -s http://188.34.167.142:8000/api/proposals/pending \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 

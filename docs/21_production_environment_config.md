@@ -6,24 +6,26 @@ Ultra AutoTrade – Production 環境設定ガイド（2026-04-17 B案リネー�
 
 ---
 
-## 0. 開発VPSとの区別 (2026-05-18追加)
+## 0. 開発VPS/staging VPSとの区別 (2026-07-02改訂、ASSIST ONE 3VPS分離)
 
-2026-05-18 に開発専用 VPS を追加（3 層運用）。**本番 VPS と開発 VPS は物理的に別ホスト**。
-本ドキュメントが対象とするのは **本番 VPS（`77.42.46.155`）のみ**。IP / ホストの混同を防ぐ:
+2026-07-02 のHetzner別アカウント(ASSIST ONE)移行により、dev / staging(+staging-v4) / production は
+**3台の物理的に別ホスト**に完全分離（旧構成ではstagingがproductionと同居していた）。
+本ドキュメントが対象とするのは **production VPS（`5.223.88.14`）のみ**。IP / ホストの混同を防ぐ:
 
-| 項目 | 開発 VPS | 本番 / staging VPS（本ドキュメント対象） |
-|------|----------|------------------------------------------|
-| IP | `77.42.79.75` | `77.42.46.155` |
-| ホスト名 | `uata-dev-01` | Hetzner 本番 VPS |
-| OS user | `uata` | `ultra` |
-| ssh | `ssh uata@77.42.79.75` | `ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155` |
-| 資金 | なし（実トレードなし） | **実資金・実トレード（誤操作 = 資金リスク）** |
-| `.env` | （開発用、本番キー禁止） | `.env.production` / `.env.staging`（物理的に別キー） |
-| 用途 | Claude Code CLI 実装・並列レーン | production（実トレード）+ staging（Shadow Mode） |
+| 項目 | 開発 VPS | staging VPS | production VPS（本ドキュメント対象） |
+|------|----------|-------------|----------------------------------------|
+| IP | `95.216.167.198` | `188.34.167.142` | `5.223.88.14` |
+| ホスト名 | ASSIST ONE dev VPS（2026-07-02時点未構築） | ASSIST ONE staging VPS | ASSIST ONE production VPS（専用 Hetzner Project） |
+| OS user | `root` | `root` | `root` |
+| ssh | `ssh uata-assistone-dev` | `ssh uata-assistone-staging` | alias無し（3段階プロトコル経由のみ、CLAUDE.md ABSOLUTE） |
+| 資金 | なし（実トレードなし） | なし（Shadow Mode） | **実資金・実トレード（誤操作 = 資金リスク）** |
+| `.env` | （開発用、本番キー禁止） | `.env.staging` / `.env.staging-v4`（物理的に別キー） | `.env.production`（物理的に別キー） |
+| 用途 | Claude Code CLI 実装・並列レーン | staging（Shadow Mode）+ staging-v4 | production（実トレード） |
 
-> ⚠️ `77.42.79.75`（開発）と `77.42.46.155`（本番）を取り違えると、開発操作を本番に
-> 適用する重大インシデントになる。curl / ssh / deploy を打つ前に必ず IP を目視確認すること。
-> 開発 VPS のセットアップは `docs/20_development_vps_setup.md` を参照。
+> ⚠️ dev(`95.216.167.198`) / staging(`188.34.167.142`) / production(`5.223.88.14`) を取り違えると、
+> 開発操作を本番に適用する重大インシデントになる。curl / ssh / deploy を打つ前に必ず IP を目視確認すること。
+> 旧VPS(`77.42.46.155`、旧production+staging同居)は保険期間(3〜7日)経過後に解約予定。
+> 旧dev VPS(`uata-dev-01` / `77.42.79.75`)は廃止対象。開発 VPS のセットアップは `docs/20_development_vps_setup.md` を参照。
 
 ---
 

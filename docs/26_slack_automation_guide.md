@@ -80,7 +80,7 @@ Add New Webhook to Workspace
 **Interactivity & Shortcuts** ページ:
 ```
 Interactivity: ON
-Request URL: https://77.42.46.155:5000/slack/interactions
+Request URL: https://188.34.167.142:5000/slack/interactions
   ↑ Slack Handler（Flask API）のURL
 ```
 
@@ -102,7 +102,7 @@ GITHUB_TOKEN=ghp_...  # Personal Access Token（repo権限）
 #### 3.1 サーバー準備
 
 ```bash
-ssh root@77.42.46.155
+ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142
 cd /opt/ultra-autotrade
 
 # Flask 用ディレクトリ作成

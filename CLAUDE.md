@@ -131,7 +131,7 @@ Docker ビルド・CI が失敗する。`npm install` は `package.json` ベー�
 - package.json変更時は `npm install --legacy-peer-deps` → package-lock.json も一緒にコミット
 - rechartsは必ず `dynamic(() => import('./XxxRecharts'), { ssr: false })` で読み込む（SSRクラッシュ防止）
 - `grep -E "ignoreBuildErrors|ignoreDuringBuilds" frontend/next.config.js` でOOMワークアラウンド確認
-- Playwright E2E: デフォルトは本番URL直打ち。ローカルテスト時は `STAGING_URL=http://localhost:3000` + `npm run dev` 必須。77.42.46.155直IPは127.0.0.1バインドにより接続拒否される（正常）
+- Playwright E2E: デフォルトは本番URL直打ち。ローカルテスト時は `STAGING_URL=http://localhost:3000` + `npm run dev` 必須。production VPS(5.223.88.14)直IPは127.0.0.1バインドにより接続拒否される（正常）
 
 ### Next.js App Router route group と URL の対応 (E2E spec 必須確認)
 
@@ -526,62 +526,61 @@ tmux attach -t phase-<X>
 
 ---
 
-## 開発環境 v3 (2026-05-18〜)
+## 開発環境 v4 (2026-07-02〜、ASSIST ONE 3VPS分離)
 
-> 2026-05-18 に **開発専用 VPS** を追加し、3 層運用（dev / staging / production）へ移行。
-> dev は本番 Hetzner VPS とは**物理的に別ホスト**。staging と production は本番 Hetzner VPS
-> (77.42.46.155) 上に compose stack を分離して同居する（従来通り）。
-> 詳細手順は `docs/20_development_vps_setup.md` を参照。
+> 2026-07-02 に本番 Hetzner アカウントを別アカウント(ASSIST ONE)へ移行し、
+> production / staging(+staging-v4) / dev を**3台の物理的に別VPS**に完全分離。
+> 旧構成(開発環境v3、2026-05-18〜)は staging が production と同居していたが、
+> 移行後は同居していない。旧VPS(77.42.46.155)は保険期間(3〜7日)保持後に解約予定。
+> 詳細手順は `docs/ops/host_migration_runbook.md` を参照。
 
 ### 3 層運用 — ホスト / 作業ディレクトリ
 
 | 層 | ホスト | IP | OS user | 作業ディレクトリ | 用途 |
 |----|--------|----|---------|------------------|------|
-| **dev** | `uata-dev-01`（開発専用 VPS、新規） | `77.42.79.75` | `uata` | `/opt/ultra-autotrade/main`（main worktree）+ `/opt/ultra-autotrade-worktrees/<branch>` | Claude Code CLI による実装・並列レーン開発。実資金・実トレードなし |
-| **staging** | 本番 Hetzner VPS | `77.42.46.155` | `ultra` | `/opt/ultra-autotrade`（staging compose stack） | Shadow Mode 専用（Base Sepolia）、port 3001/8082(nginx)/5433（旧8001廃止） |
-| **staging-v4** | 本番 Hetzner VPS | `77.42.46.155` | `ultra` | `/opt/ultra-autotrade`（staging-v4 compose stack） | v4 開発用 staging（Base Sepolia）、port 3002/8083(nginx)/8030(backend)/5434。v3 staging-new と独立 |
-| **production** | 本番 Hetzner VPS | `77.42.46.155` | `ultra` | `/opt/ultra-autotrade`（production compose stack） | 実資金・実トレード（Base Mainnet）、port 3000/8000/5432 |
+| **dev** | ASSIST ONE dev VPS（Helsinki） | `95.216.167.198` | `root` | `/opt/ultra-autotrade/main`（main worktree、予定）+ `/opt/ultra-autotrade-worktrees/<branch>` | Claude Code CLI による実装・並列レーン開発。実資金・実トレードなし。**2026-07-02時点でVPS provisioningのみ完了、repo clone等のアプリ環境構築は未実施**（`/opt/ultra-autotrade` 自体が未作成） |
+| **staging** | ASSIST ONE staging VPS（Falkenstein） | `188.34.167.142` | `root` | `/opt/ultra-autotrade`（staging compose stack） | Shadow Mode 専用（Base Sepolia）、port 3001/8082(nginx)/5433（旧8001廃止） |
+| **staging-v4** | ASSIST ONE staging VPS（Falkenstein、staging と同居） | `188.34.167.142` | `root` | `/opt/ultra-autotrade`（staging-v4 compose stack） | v4 開発用 staging（Base Sepolia）、port 3002/8083(nginx)/8030(backend)/5434。v3 staging-new と独立 |
+| **production** | ASSIST ONE production VPS（Singapore、専用 Hetzner Project で分離） | `5.223.88.14` | `root` | `/opt/ultra-autotrade`（production compose stack） | 実資金・実トレード（Base Mainnet）、port 3000/8000/5432 |
 
 > **[CRITICAL] パス構造差 — 推測禁止**
 >
 > | VPS | git repo root | `backend/` の絶対パス |
 > |---|---|---|
-> | **dev VPS** (`uata-dev-01`) | `/opt/ultra-autotrade/main/` | `/opt/ultra-autotrade/main/backend/` |
-> | **本番 VPS** (`77.42.46.155`) | `/opt/ultra-autotrade/` | `/opt/ultra-autotrade/backend/` |
+> | **dev VPS**（構築後） | `/opt/ultra-autotrade/main/` | `/opt/ultra-autotrade/main/backend/` |
+> | **staging VPS** (`188.34.167.142`) | `/opt/ultra-autotrade/` | `/opt/ultra-autotrade/backend/` |
+> | **production VPS** (`5.223.88.14`) | `/opt/ultra-autotrade/` | `/opt/ultra-autotrade/backend/` |
 >
-> dev VPS の `/main/` サブディレクトリは git worktree 構造に由来する。本番 VPS には `main/` サブディレクトリは**存在しない**。
-> 手順書・Lane プロンプト・curl パスに `/opt/ultra-autotrade/main/` を書いた場合、本番 VPS で `No such file or directory` になる。
+> dev VPS の `/main/` サブディレクトリは git worktree 構造に由来する（構築後の想定。2026-07-02時点で未構築）。staging/production 両VPSには `main/` サブディレクトリは**存在しない**。
+> 手順書・Lane プロンプト・curl パスに `/opt/ultra-autotrade/main/` を書いた場合、staging/production VPS で `No such file or directory` になる。
 > SSH ログイン直後に必ず `pwd && ls` で確認してから操作を開始すること。
 
-- dev VPS への接続: ローカル Mac から `ssh uata-dev`（Mac `~/.ssh/config` に alias 定義済 →
-  `uata@77.42.79.75` / 鍵 `~/.ssh/hetzner_uata_dev`）。**dev VPS 側の `~/.ssh/config` には
-  VPS 向け alias は未定義**（`github-uata` のみ）。dev VPS 上では推測の別名を使わない。
-- 本番 VPS への接続: `ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155`（staging / production 共通ホスト）
+- dev VPS への接続: ローカル Mac から `ssh uata-assistone-dev`（Mac `~/.ssh/config` に alias 定義済 →
+  `root@95.216.167.198` / 鍵 `~/.ssh/hetzner_assistone_stagingdev`）。
+- staging VPS への接続: ローカル Mac から `ssh uata-assistone-staging`（→ `root@188.34.167.142` / 鍵 `~/.ssh/hetzner_assistone_stagingdev`、dev と鍵共用）。
+- **production VPS への接続: 意図的に `~/.ssh/config` に alias を作らない**。3段階プロトコル
+  （phase1-investigator / phase2-implementer / phase3-deployer）経由のみで操作すること（CLAUDE.md ABSOLUTE）。
+  やむを得ず直接 ssh する場合も `root@5.223.88.14` / 鍵 `~/.ssh/hetzner_assistone_production`。
 
 ### 役割分担（開発体制 v2 を 3 層に展開）
 
 | 主体 | 稼働場所 | 責務 |
 |------|----------|------|
 | **claude.ai** | ブラウザ | PM / アーキテクト / Asana 管理 / Phase 計画 / 4 軸確認（コード実装はしない） |
-| **Claude Code CLI** | dev VPS (`uata@77.42.79.75`) | 実装・テスト・並列レーン（worktree 分離）・PR 作成 |
-| **Mac（ローカル）** | 開発者端末 | GitHub への push 起点 / ローカル merge / レビュー。本番 VPS は **pull only**（CLAUDE.md ABSOLUTE） |
+| **Claude Code CLI** | dev VPS (`root@95.216.167.198`、構築後) | 実装・テスト・並列レーン（worktree 分離）・PR 作成 |
+| **Mac（ローカル）** | 開発者端末 | GitHub への push 起点 / ローカル merge / レビュー。production VPS は **pull only**（CLAUDE.md ABSOLUTE） |
 
-- 正規フロー: dev VPS で実装 → PR → ローカル Mac で merge → GitHub push → 本番 Hetzner で `git pull origin main` → `deploy_production.sh`
-- 本番 Hetzner 上で直接 `git merge` / `git commit` / エディタ編集をしない（「本番デプロイフロー」セクション準拠）
+- 正規フロー: dev VPS で実装 → PR → ローカル Mac で merge → GitHub push → production VPS で `git pull origin main` → `deploy_production.sh`
+- production VPS 上で直接 `git merge` / `git commit` / エディタ編集をしない（「本番デプロイフロー」セクション準拠）
 
-### Phase 6 環境構築コンポーネント（dev VPS / 2026-05-18 時点）
+### dev VPS 構築状況（2026-07-02時点）
 
-> **状態は構築中。** 別 Claude Code セッションが `/opt/ultra-autotrade/main` で Phase 6
-> 環境構築（swap / venv / npm install）を並行実行中。本ドキュメント監査時点（2026-05-18）の
-> 観測値は以下（仮説ではなく `free -h` / ディレクトリ実在確認による実測）:
-
-| コンポーネント | 監査時点の状態 | 確認方法 |
-|----------------|----------------|----------|
-| Python venv (`backend/.venv`) | ✅ 構築済み | `ls -d /opt/ultra-autotrade/main/backend/.venv` |
-| Frontend `node_modules` | ✅ 構築済み | `ls /opt/ultra-autotrade/main/frontend/node_modules` |
-| swap | ⏳ **未反映（`free -h` で Swap 0B）** | `swapon --show` / `free -h` |
-
-- swap は別セッション完了後に有効化される見込み。完了確認まで「Phase 6 完了」と断定しない。
+> **未構築。** ASSIST ONE 上に dev VPS（95.216.167.198）は provisioning 済みだが、
+> `/opt/ultra-autotrade` 自体が存在せず、repo clone / venv / node_modules いずれも未実施
+> （2026-07-02 read-only 確認: `ls /opt/ultra-autotrade/` → No such file or directory）。
+> 旧 `uata-dev-01`（77.42.79.75）は廃止対象。dev VPS 実装環境の構築は
+> `docs/ops/host_migration_runbook.md`「Dev VPS 構築」セクション参照、
+> production/staging のデータ移行フェーズとは独立して別途実施が必要。
 
 ---
 

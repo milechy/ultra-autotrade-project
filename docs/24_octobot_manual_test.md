@@ -1,7 +1,7 @@
 # OctoBot Manual Test Report
 
 ## Test Environment
-- **Server:** 77.42.46.155 (Hetzner staging)
+- **Server:** 188.34.167.142 (Hetzner staging)
 - **Date:** 2026-02-02
 - **Backend:** Docker container `ultra-autotrade-backend-staging`
 - **OctoBot Settings:**

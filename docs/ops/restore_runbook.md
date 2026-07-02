@@ -400,7 +400,7 @@ docker compose -f docker-compose.production.yml start backend-blue backend-green
 
 memory 参照:
 - `no-prod-vps-commands-from-dev` — dev からは本番 VPS 向けコマンドを提案しない
-- `staging-lives-on-prod-vps` — staging も本番 Hetzner VPS (77.42.46.155) 上に同居
+- `staging-lives-on-prod-vps` — **2026-07-02移行後は陳腐化**: staging (188.34.167.142) は production (5.223.88.14) と別VPS
 - `prod-steps-not-done-until-verified` — 実機出力で裏取りするまで「完了」と書かない
 
 ---

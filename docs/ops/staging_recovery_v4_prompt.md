@@ -26,7 +26,7 @@ Phase B で問題 → env を v3 に戻して backend recreate（5分復旧）
 ```bash
 # Mac のターミナルから
 ssh hetzner
-# → VPS: 77.42.46.155
+# → VPS: 188.34.167.142
 ```
 
 ---

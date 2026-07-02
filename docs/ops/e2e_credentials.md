@@ -35,7 +35,7 @@ Playwright `frontend/e2e/yamamoto-partner-flow.spec.ts` (TC1-TC7) を staging �
 
 ## 3. `/opt/ultra-autotrade/.env.e2e` への配置手順 (staging VPS)
 
-staging は本番 Hetzner VPS (77.42.46.155) 上に同居 ([[staging-lives-on-prod-vps]])。
+2026-07-02移行後、staging VPS (188.34.167.142) は production VPS (5.223.88.14) と別ホスト。
 dev VPS 上には .env.e2e は無い。dev からは触らない ([[no-prod-vps-commands-from-dev]])。
 
 ```bash

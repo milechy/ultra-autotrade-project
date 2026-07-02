@@ -1,8 +1,16 @@
 # 20_development_vps_setup.md
 # 開発VPS構築ガイド (2026-05-18 初版)
 
+> **⚠️ 2026-07-02 陳腐化注記**: 本ドキュメントが記述する `uata-dev-01`（`77.42.79.75`）は
+> Hetzner別アカウント(ASSIST ONE)移行に伴い**廃止対象**。新dev VPSは `95.216.167.198`（Helsinki、
+> 同スペックCPX32で再構築予定）だが、**2026-07-02時点でVPS provisioningのみ完了、
+> repo clone / venv / node_modules 等のアプリ環境構築は未実施**（`/opt/ultra-autotrade` 自体が
+> 未作成）。下記の仕様・手順は新dev VPS構築時の参考手順として有効だが、§5「Phase 6構築済み
+> コンポーネント」の完了実績は旧VPSのものであり、新VPSには適用されない。構築手順は
+> `docs/ops/host_migration_runbook.md`「Dev VPS 構築」セクション参照。
+>
 > 2026-05-18 に **開発専用 VPS** を追加し、dev / staging / production の 3 層運用へ移行した。
-> 本ドキュメントは開発 VPS（`uata-dev-01` / `77.42.79.75`）の仕様・認証・運用ポリシーを
+> 本ドキュメントは開発 VPS（`uata-dev-01` / `77.42.79.75`、**廃止対象**）の仕様・認証・運用ポリシーを
 > 司令塔(claude.ai) userMemories #5/#28/#29/#30 と整合する形でまとめる。
 > 本番 / staging 環境設定は `docs/21_production_environment_config.md` /
 > `docs/17_staging_environment_config.md`、混同防止は `docs/21` §0 を参照。
