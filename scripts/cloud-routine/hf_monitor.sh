@@ -31,7 +31,7 @@
 #     bash scripts/cloud-routine/hf_monitor.sh >> /var/log/ultra/hf_monitor.log 2>&1
 #
 # Mac から cron でリモート実行する場合 (launchd 例は README.md 参照):
-#   */15 * * * * ssh -i ~/.ssh/hetzner_id_ed25519 user@77.42.46.155 \
+#   */15 * * * * ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14 \
 #     'cd /opt/ultra-autotrade && env $(grep -v "^#" .env.production | xargs) \
 #     bash scripts/cloud-routine/hf_monitor.sh'
 

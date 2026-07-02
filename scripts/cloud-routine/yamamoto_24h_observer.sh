@@ -6,9 +6,9 @@
 #
 # 環境変数:
 #   OBSERVATION_START_UTC  観察開始 UTC (デフォルト: 2026-05-01 02:50:00+00)
-#   HETZNER_HOST           Hetzner ホスト (デフォルト: 77.42.46.155)
-#   HETZNER_USER           SSH ユーザー   (デフォルト: ultra)
-#   HETZNER_SSH_KEY        SSH 鍵パス    (デフォルト: ~/.ssh/hetzner_staging)
+#   HETZNER_HOST           Hetzner ホスト (デフォルト: 5.223.88.14, ASSIST ONE production)
+#   HETZNER_USER           SSH ユーザー   (デフォルト: root)
+#   HETZNER_SSH_KEY        SSH 鍵パス    (デフォルト: ~/.ssh/hetzner_assistone_production)
 #   SLACK_WEBHOOK_URL      Slack Webhook URL (未設定時は通知スキップ)
 #
 # 実行頻度想定: 4 時間間隔
@@ -23,9 +23,9 @@ set -uo pipefail
 # 設定
 # -----------------------------------------------------------------------
 OBS_START="${OBSERVATION_START_UTC:-2026-05-01 02:50:00+00}"
-HETZNER_HOST="${HETZNER_HOST:-77.42.46.155}"
-HETZNER_USER="${HETZNER_USER:-ultra}"
-SSH_KEY="${HETZNER_SSH_KEY:-$HOME/.ssh/hetzner_staging}"
+HETZNER_HOST="${HETZNER_HOST:-5.223.88.14}"
+HETZNER_USER="${HETZNER_USER:-root}"
+SSH_KEY="${HETZNER_SSH_KEY:-$HOME/.ssh/hetzner_assistone_production}"
 POSTGRES_CTR="ultra-autotrade-postgres-production"
 BACKEND_CTR="ultra-autotrade-backend-blue-production"
 POSTGRES_USER="ultra"

@@ -17,7 +17,7 @@
 # WEBHOOK 取得経路 (上から順に検索):
 #   1. 環境変数 SLACK_WEBHOOK_URL
 #   2. ローカル <git root>/.env.production の SLACK_WEBHOOK_URL=
-#   3. SSH ultra@77.42.46.155 で Hetzner 上の .env.production
+#   3. SSH root@5.223.88.14 で Hetzner (ASSIST ONE) 上の .env.production
 #
 # 終了コード: 200 OK → 0, それ以外 → 1
 
@@ -62,8 +62,8 @@ elif [[ -f "${HOME}/.claude-uata/secrets/slack.env" ]]; then
   WEBHOOK=$(grep "^SLACK_WEBHOOK_URL=" "${HOME}/.claude-uata/secrets/slack.env" | head -1 | cut -d= -f2-)
 elif GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) && [[ -f "${GIT_ROOT}/.env.production" ]]; then
   WEBHOOK=$(grep "^SLACK_WEBHOOK_URL=" "${GIT_ROOT}/.env.production" | head -1 | cut -d= -f2-)
-elif [[ -f "${HOME}/.ssh/hetzner_staging" ]]; then
-  WEBHOOK=$(ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155 \
+elif [[ -f "${HOME}/.ssh/hetzner_assistone_production" ]]; then
+  WEBHOOK=$(ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14 \
     'grep SLACK_WEBHOOK_URL /opt/ultra-autotrade/.env.production | head -1 | cut -d= -f2-' 2>/dev/null || true)
 fi
 

@@ -35,9 +35,14 @@ BASE_URL="${LAUNCH_GATE_BASE_URL:-${DEFAULT_BASE}}"
 # dev VPS では prod / staging に届かないため skip-with-instructions
 # ---------------------------------------------------------------------------
 if is_dev_vps; then
+  case "${ENV_TARGET}" in
+    production) TARGET_VPS_DESC="production VPS (ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14)" ;;
+    staging)    TARGET_VPS_DESC="staging VPS (ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142)" ;;
+    *)          TARGET_VPS_DESC="対象 VPS" ;;
+  esac
   cat <<EOF
-[INFO] L4 kill switch: dev VPS のため prod VPS 同居の ${ENV_TARGET} に到達できません。
-       prod VPS (77.42.46.155) で以下を実行し、結果を貼り付けてください:
+[INFO] L4 kill switch: dev VPS のため ${ENV_TARGET} に到達できません。
+       ${TARGET_VPS_DESC} で以下を実行し、結果を貼り付けてください:
 
          BASE=${BASE_URL}
          # 1) 緊急停止

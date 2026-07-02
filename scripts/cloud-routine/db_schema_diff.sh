@@ -18,7 +18,7 @@
 #   STAGING_DB_CONTAINER    staging postgres コンテナ名 (未指定時はスキップ)
 #   STAGING_DB_USER         staging postgres ユーザー名
 #   STAGING_DB_NAME         staging postgres DB 名
-#   HETZNER_SSH_HOST        SSH 経由で実行する場合のホスト (例: 77.42.46.155)
+#   HETZNER_SSH_HOST        SSH 経由で実行する場合のホスト (例: 5.223.88.14, ASSIST ONE production)
 #   HETZNER_SSH_USER        SSH ユーザー名 (default: root)
 #   HETZNER_SSH_KEY         SSH 鍵パス (default: ~/.ssh/id_ed25519)
 #   REPO_PATH               リポジトリパス (default: /opt/ultra-autotrade)
@@ -31,7 +31,7 @@
 #   SLACK_WEBHOOK_URL=https://... bash db_schema_diff.sh
 #
 # 実行例 (ローカル Mac から SSH 経由):
-#   HETZNER_SSH_HOST=77.42.46.155 HETZNER_SSH_USER=root \
+#   HETZNER_SSH_HOST=5.223.88.14 HETZNER_SSH_USER=root \
 #   SLACK_WEBHOOK_URL=... bash db_schema_diff.sh
 #
 # cron 設定例 (毎日 9:00 JST = 00:00 UTC、Hetzner cron):

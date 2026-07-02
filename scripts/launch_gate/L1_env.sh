@@ -44,17 +44,21 @@ missing=()
 if [[ "${#missing[@]}" -gt 0 ]]; then
   cat <<EOF
 [INFO] L1 env: ${missing[*]} がこの worktree に存在しません。
-       prod VPS (77.42.46.155) 上で以下を実行し、結果を貼り付けてください:
+       2026-07-02移行後、staging と production は別 VPS です。それぞれ以下を実行し、結果を貼り付けてください:
 
-         bash ${SEP_SCRIPT}
-         grep -E '^(APP_ENV|AAVE_NETWORK|BYBIT_SANDBOX)=' ${PROD_ENV}
-         grep -E '^(APP_ENV|AAVE_NETWORK|BYBIT_SANDBOX)=' ${STAGING_ENV}
+         # production (5.223.88.14):
+         ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14 \\
+           "cd /opt/ultra-autotrade && bash ${SEP_SCRIPT}; grep -E '^(APP_ENV|AAVE_NETWORK|BYBIT_SANDBOX)=' ${PROD_ENV}"
+
+         # staging (188.34.167.142):
+         ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142 \\
+           "cd /opt/ultra-autotrade && grep -E '^(APP_ENV|AAVE_NETWORK|BYBIT_SANDBOX)=' ${STAGING_ENV}"
 
        期待値:
          .env.production: APP_ENV=production / AAVE_NETWORK=base / BYBIT_SANDBOX=false
          .env.staging:    APP_ENV=staging    / AAVE_NETWORK=base_sepolia / BYBIT_SANDBOX=true
 EOF
-  gate_record SKIP "${LABEL}" "${missing[*]} がこの host に無し (prod VPS で要手動確認)"
+  gate_record SKIP "${LABEL}" "${missing[*]} がこの host に無し (production=5.223.88.14 / staging=188.34.167.142 で要手動確認)"
   exit 0
 fi
 

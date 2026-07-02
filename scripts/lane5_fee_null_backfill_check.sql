@@ -1,5 +1,5 @@
 -- Lane 5: proposals.fee_rate / fee_amount NULL バックフィル判定用 診断 SQL
--- 実行: 本番 VPS (Hetzner 77.42.46.155) で hkobayashi が psql から実行する。
+-- 実行: 本番 VPS (Hetzner 5.223.88.14, ASSIST ONE) で hkobayashi が psql から実行する。
 --        dev VPS からは本番 DB へ到達不可のため、ここでは SQL のみ用意 (実行しない)。
 -- 目的: 2026-06-04 本番 proposal id=16 以外に fee_rate / fee_amount NULL の行が
 --        残っているかを把握し、バックフィルの要否・対象件数を判断する。
