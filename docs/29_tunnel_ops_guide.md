@@ -68,7 +68,7 @@ docker compose -f docker-compose.staging.yml up -d cloudflared
 | バックエンド | https://api.ultra-auto-trade.com |
 | PC 直接アクセス | 廃止（127.0.0.1バインド） |
 
-> **注意:** 全てのアクセスはNamed Tunnel経由の上記URLを使用すること。77.42.46.155への直接アクセスは127.0.0.1バインドにより接続拒否される（正常動作）。
+> **注意:** 全てのアクセスはNamed Tunnel経由の上記URLを使用すること。production VPS(5.223.88.14)への直接アクセスは127.0.0.1バインドにより接続拒否される（正常動作）。2026-07-02移行後はstaging VPS(188.34.167.142)も別途同様。
 
 ---
 

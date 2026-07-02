@@ -88,7 +88,7 @@ deploy を始める前に**必ず**以下 4 点を確認する。1 点でも漏�
 ### 2.1 docker compose ls + ネットワーク確認
 
 ```bash
-ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155
+ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14
 cd /opt/ultra-autotrade
 
 # 起動中の compose project 一覧
@@ -159,7 +159,7 @@ docker compose -p ultra-autotrade-project -f docker-compose.production.yml up -d
 ### 3.1 通常 deploy (Blue/Green active 切替なし)
 
 ```bash
-ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155
+ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14
 cd /opt/ultra-autotrade
 
 # (1) git pull (ローカル push 禁止、Hetzner pull only — CLAUDE.md ABSOLUTE)
@@ -620,7 +620,7 @@ docker logs ${ACTIVE_BACKEND} 2>&1 | grep -E "(web3|nonce|revert)"
 **実行コマンド**:
 ```bash
 # Hetzner 内部から実行 (staging URL は Cloudflare Access ブロック中 → §5.2 参照)
-ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155
+ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14
 
 # nginx 経由 (active slot 自動追跡、IPv4 強制)
 docker run --rm --network host \
@@ -650,11 +650,11 @@ docker run --rm --network host \
 
 | 手段 | 用途 | コマンド |
 |------|------|---------|
-| Hetzner 内部から ssh | 推奨 | `ssh ultra@77.42.46.155` → 上記 docker run |
+| Hetzner 内部から ssh | 推奨 | `ssh root@5.223.88.14` → 上記 docker run |
 | production URL 直打ち | 本番のみ | `STAGING_URL=https://app.ultra-auto-trade.com BACKEND_URL=https://api.ultra-auto-trade.com` |
 | ローカル `npm run dev` | フロント単体 | `STAGING_URL=http://localhost:3000` + `cd frontend && npm run dev` |
 
-**禁止**: 直 IP `77.42.46.155` 接続 (127.0.0.1 バインドにより接続拒否される、これは正常動作)
+**禁止**: 直 IP `5.223.88.14` 接続 (127.0.0.1 バインドにより接続拒否される、これは正常動作)
 
 ---
 
@@ -666,7 +666,7 @@ docker run --rm --network host \
 
 **手順**:
 ```bash
-ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155
+ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14
 cd /opt/ultra-autotrade
 
 # 1. 現在 active な slot を確認

@@ -118,8 +118,10 @@ project root/
 
 ## 開発VPS構成 (2026-05-18追加)
 
-2026-05-18 に開発専用 VPS（`uata-dev-01` / `77.42.79.75` / OS user `uata`）を追加。
-リポジトリは git worktree で複数ブランチを物理分離して並列開発する。
+2026-05-18 に開発専用 VPS（`uata-dev-01` / `77.42.79.75` / OS user `uata`、**2026-07-02移行後は廃止対象**）を追加。
+2026-07-02 Hetzner別アカウント(ASSIST ONE)移行後の新dev VPSは `95.216.167.198`（OS user `root`）だが、
+本ドキュメント時点でVPS provisioningのみ完了・repo clone等のアプリ環境構築は未実施。
+リポジトリは git worktree で複数ブランチを物理分離して並列開発する（構築後の想定）。
 
 ```
 /opt/
@@ -139,6 +141,6 @@ project root/
 
 - `git worktree list` で全 worktree とブランチ・SHA を確認できる
 - 並列レーンは各 worktree で完結させ、他 worktree のファイルは編集しない（コンフリクト回避）
-- 本番 / staging は別ホスト（Hetzner VPS `77.42.46.155`）。混同防止は
+- production（`5.223.88.14`）と staging（`188.34.167.142`）は 2026-07-02移行後、別ホスト・別Hetzner Projectに完全分離。混同防止は
   `docs/21_production_environment_config.md` §0 を参照
 - セットアップ手順の詳細は `docs/20_development_vps_setup.md` を参照

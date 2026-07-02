@@ -44,7 +44,7 @@
 
 ## S. Staging dry-run 手順 (本番 F-16 前の事前確認)
 
-> **実行場所**: 本番 VPS (77.42.46.155) — dev VPS から SSH 不可。人間が実行してください。
+> **実行場所**: 本番 VPS (5.223.88.14) — dev VPS から SSH 不可。人間が実行してください。
 > **コンテナ名**: `ultra-autotrade-backend-blue-staging-new` / `ultra-autotrade-postgres-staging-new`
 > **目的**: seed 値の整合を人間の目で確認してから本番投入の go/no-go を判断する。
 

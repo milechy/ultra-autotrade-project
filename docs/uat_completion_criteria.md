@@ -89,7 +89,7 @@ COUNT(tx_hash IS NOT NULL) WHERE status='executed' = 条件1のCOUNT
 以下を本番サーバーで実行して PASS/FAIL を確認する:
 
 ```bash
-ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 <<'ENDSSH'
+ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14 <<'ENDSSH'
 docker exec ultra-autotrade-postgres-production \
   psql -U ultra -d ultra_autotrade -c "
 WITH
@@ -157,7 +157,7 @@ ENDSSH
 ### partner 別内訳 SQL（補助 / 偏り検知用）
 
 ```bash
-ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 <<'ENDSSH'
+ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14 <<'ENDSSH'
 docker exec ultra-autotrade-postgres-production \
   psql -U ultra -d ultra_autotrade -c "
 SELECT
@@ -218,7 +218,7 @@ partner 別の executed 件数・合計 USD・中央値を見て、どちらか�
 `executed` 提案が出たら以下で tx_hash を取得して確認する:
 
 ```bash
-ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 <<'ENDSSH'
+ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14 <<'ENDSSH'
 docker exec ultra-autotrade-postgres-production \
   psql -U ultra -d ultra_autotrade -c "
 SELECT p.id, p.user_id, u.email, p.tx_hash, p.executed_at, p.amount_usd

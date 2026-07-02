@@ -361,7 +361,7 @@ PR マージ前に、既存機能が壊れていないことを担保する。
    >   ```
    >   CF Accessトークンの発行: Cloudflare Dashboard > Access > Service Auth > Service Tokens
    >   バックエンドもCF Access配下の場合は `NEXT_PUBLIC_BACKEND_BASE_URL=https://api-staging.ultra-auto-trade.com` も指定
-   > - 77.42.46.155 直IPはproduction.ymlで127.0.0.1バインド済みのため接続拒否される（正常動作）
+   > - production VPS(5.223.88.14) 直IPはproduction.ymlで127.0.0.1バインド済みのため接続拒否される（正常動作）
 
 5. **孤立コード検出（手動トリガー）** — PR作成前。安全装置・リスク管理の配線漏れ検出。大量タスク一括完了後は必須
 6. **Codex Review（手動トリガー）** — PR作成前に `/codex:review --base main --background`。Aave/セキュリティ変更時は adversarial review

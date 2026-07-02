@@ -206,7 +206,7 @@ git checkout main && git pull origin main
 git push origin main  # GitHub に push
 
 # 2. Hetzner でコードを pull（Hetzner は pull only — 直接コミット禁止）
-ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155
+ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14
 cd /opt/ultra-autotrade
 git pull origin main  # ← pull のみ。git commit / merge / nano 編集は禁止
 

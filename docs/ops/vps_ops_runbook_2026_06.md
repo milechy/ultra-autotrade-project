@@ -1,6 +1,6 @@
 # VPS 運用セットアップ runbook（2026-06）
 
-本番 VPS（Hetzner `77.42.46.155` / user `ultra`）で実施する運用ジョブ登録の手順書。
+本番 VPS（Hetzner `5.223.88.14` / user `ultra`）で実施する運用ジョブ登録の手順書。
 リポジトリ側のスクリプト・CI は実装済み。本書の作業は **VPS 実行（3段プロトコル）** が前提。
 
 > **[CRITICAL] パス**: 本番 VPS の repo root は `/opt/ultra-autotrade/`（`main/` サブディレクトリなし）。

@@ -97,7 +97,7 @@
 
 ```bash
 # 1. 現在のキー一覧 (.env.staging 側) — マスク後 echo
-ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155
+ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142
 cd /opt/ultra-autotrade
 grep -E "^(PERPLEXITY_API_KEY|ALCHEMY_RPC_URL_|AAVE_RPC_URL|NEXT_PUBLIC_.*_RPC|WEB3_RPC_URL)" .env.staging \
   | sed -E 's/(=.{6}).*$/\1********/'   # 最初の6文字 + マスク
@@ -123,7 +123,7 @@ curl -s http://127.0.0.1:8082/api/data-feeds/news    | jq '.updated_at'
 ### Step 1 — 新キーを `.env.staging` に投入 (sed -i 禁止)
 
 ```bash
-# ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 で staging 用 VPS へ
+# ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142 で staging 用 VPS へ
 cd /opt/ultra-autotrade
 
 # バックアップ

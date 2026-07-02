@@ -18,7 +18,7 @@ git log origin/dev -3 --oneline   # デプロイしたいコミットを確認
 ## 1. SSH 接続
 
 ```bash
-ssh root@77.42.46.155
+ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142
 # または ~/.ssh/config にエイリアスを設定している場合
 ssh hetzner-staging
 ```

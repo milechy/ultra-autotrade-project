@@ -53,7 +53,7 @@ Phase7 時点では **staging 環境** を対象とし、
    - `"status": "degraded"` の場合はスケジューラーが停止している。Slack にも通知が来るはず。
    - 対応: backend コンテナを再起動し、再度 `/health` で `"scheduler": true` を確認する。
      ```bash
-     ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155 \
+     ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142 \
        'cd /opt/ultra-autotrade && docker compose -f docker-compose.staging.yml restart backend'
      ```
 

@@ -12,16 +12,18 @@ CLI を起動したら必ず以下を実行して、どの環境で作業して�
 hostname && pwd && echo "branch: $(git branch --show-current 2>/dev/null || echo 'not-git')"
 ```
 
-### ホスト判定
+### ホスト判定 (2026-07-02 ASSIST ONE 3VPS分離後)
 
 | hostname / IP | 環境 | git repo root | 許可 | 禁止 |
 |---|---|---|---|---|
-| `uata-dev-01` / `77.42.79.75` | **dev VPS** | `/opt/ultra-autotrade/main/` | git commit / push / merge / Claude Code 実行 | 本番 DB 直接操作 |
-| `77.42.46.155` | **production VPS** | `/opt/ultra-autotrade/` ※`main/`なし | git pull / docker compose up / deploy_production.sh | git commit / git merge / nano 直接編集 |
-| Mac (`hostname` = 個人 Mac) | **ローカル** | — | 全開発作業 / Agent View 起動 | 本番 VPS 直接接続（3段プロトコル経由のみ） |
+| `95.216.167.198` | **dev VPS**（ASSIST ONE、2026-07-02時点未構築） | `/opt/ultra-autotrade/main/`（構築後） | git commit / push / merge / Claude Code 実行 | production DB 直接操作 |
+| `188.34.167.142` | **staging VPS**（ASSIST ONE、staging+staging-v4同居） | `/opt/ultra-autotrade/` ※`main/`なし | git pull / docker compose up / deploy_staging.sh | git commit / git merge / nano 直接編集 |
+| `5.223.88.14` | **production VPS**（ASSIST ONE、専用Project分離） | `/opt/ultra-autotrade/` ※`main/`なし | git pull / docker compose up / deploy_production.sh | git commit / git merge / nano 直接編集 |
+| `77.42.46.155` | **旧production/staging VPS**（保険期間中、解約予定） | `/opt/ultra-autotrade/` | 参照のみ（automation停止済み） | 新規操作全般（Phase 10保険期間終了後解約） |
+| Mac (`hostname` = 個人 Mac) | **ローカル** | — | 全開発作業 / Agent View 起動 | production VPS 直接接続（3段プロトコル経由のみ、alias自体を作らない） |
 
-> **パス構造差**: dev VPS は worktree 構造で `main/` サブディレクトリが存在する。本番 VPS は repo root が直接 `/opt/ultra-autotrade/`。
-> SSH 後は必ず `pwd && ls` で確認してから操作すること。`/opt/ultra-autotrade/main/` を本番 VPS で使うと `No such file or directory`。
+> **パス構造差**: dev VPS は worktree 構造で `main/` サブディレクトリが存在する（構築後）。staging/production VPS は repo root が直接 `/opt/ultra-autotrade/`。
+> SSH 後は必ず `pwd && ls` で確認してから操作すること。`/opt/ultra-autotrade/main/` を staging/production VPS で使うと `No such file or directory`。
 
 ### production VPS での禁止操作 (ABSOLUTE)
 

@@ -89,7 +89,7 @@ git revert <target-commit-sha> --no-edit
 git push origin main
 
 # === Hetzner で実施 ===
-ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155
+ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14
 
 cd /opt/ultra-autotrade
 git pull origin main
@@ -174,7 +174,7 @@ PR マージ時に以下が自動実行される:
 F-17a は `.env.production` の env var のみで制御。DB に変更なし。
 
 ```bash
-ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155
+ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14
 
 cd /opt/ultra-autotrade
 

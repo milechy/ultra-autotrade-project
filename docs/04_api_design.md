@@ -16,7 +16,7 @@
 | 環境 | URL |
 |------|-----|
 | ローカル開発 | `http://localhost:8000` |
-| Staging | `http://77.42.46.155:8000` |
+| Staging | `http://188.34.167.142:8000` |
 | 本番 | Cloudflare Tunnel 経由（別途設定） |
 
 ### 認証

@@ -17,7 +17,7 @@
 | morning-report 実行 | `scripts/uata-morning-report.sh` |
 | asana-poll 実行 | `scripts/uata-asana-poll.sh` |
 | ローカル git 操作 | merge / push / PR 作成 |
-| dev VPS 接続 | `ssh uata-dev`（下記参照）|
+| dev VPS 接続 | `ssh uata-assistone-dev`（下記参照、2026-07-02時点で未構築） |
 
 ---
 
@@ -25,25 +25,32 @@
 
 | 禁止 | 理由 |
 |------|------|
-| 本番 VPS (`77.42.46.155`) への直接 ssh | 3段プロトコル経由のみ（CLAUDE.md ABSOLUTE） |
-| dev VPS への直接 IP 接続 | 必ず `ssh uata-dev` alias を使う |
+| production VPS (`5.223.88.14`) への直接 ssh | 3段プロトコル経由のみ（CLAUDE.md ABSOLUTE、alias自体を作らない） |
+| dev VPS への直接 IP 接続 | 必ず `ssh uata-assistone-dev` alias を使う |
 | `.env.production` の直接編集 | guard-env-files.sh フック対象 |
-| `deploy_production.sh` の手動実行 | Hetzner 本番 VPS で実行すること |
+| `deploy_production.sh` の手動実行 | production VPS 上で実行すること |
 | 山本さん DM | 本人が送信すること |
 | secrets / API キーの commit | .env ファイルは絶対コミットしない |
 
 ---
 
-## dev VPS 接続方法
+## dev / staging VPS 接続方法（2026-07-02 ASSIST ONE移行後）
 
 ```bash
-# dev VPS (uata-dev-01 / 77.42.79.75)
-ssh uata-dev
-# → Mac ~/.ssh/config で alias 定義済（uata@77.42.79.75 / ~/.ssh/hetzner_uata_dev）
+# dev VPS (95.216.167.198、2026-07-02時点 provisioning のみ・アプリ環境未構築)
+ssh uata-assistone-dev
+# → Mac ~/.ssh/config で alias 定義済（root@95.216.167.198 / ~/.ssh/hetzner_assistone_stagingdev）
 
-# 本番 VPS (Hetzner / 77.42.46.155) — 3段プロトコル経由のみ
+# staging VPS (188.34.167.142、staging+staging-v4 同居)
+ssh uata-assistone-staging
+# → Mac ~/.ssh/config で alias 定義済（root@188.34.167.142 / ~/.ssh/hetzner_assistone_stagingdev、dev と鍵共用）
+
+# production VPS (5.223.88.14) — 3段プロトコル経由のみ、alias自体を作らない
 # @phase1-investigator / @phase3-deployer を使うこと
 ```
+
+旧VPS(77.42.46.155、旧dev VPS uata-dev-01=77.42.79.75)は移行に伴い廃止対象
+（旧production/stagingは保険期間3〜7日経過後に解約予定）。
 
 ---
 

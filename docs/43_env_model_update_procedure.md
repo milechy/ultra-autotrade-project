@@ -12,7 +12,7 @@ Hetzner VPS 上の実ファイルへ反映する手順。
 
 ## 前提
 
-- Hetzner SSH: `ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155`
+- Hetzner SSH: `ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142`
 - 作業ディレクトリ: `/opt/ultra-autotrade`
 - 許可モデルリスト: `backend/app/ai/config.py` の `VALID_CLAUDE_MODELS`
 - CI スクリプト: `scripts/validate_anthropic_model.py` (root `.env.*.example` を検証)
@@ -31,7 +31,7 @@ Hetzner VPS 上の実ファイルへ反映する手順。
 
 ```bash
 # Hetzner SSH
-ssh -i ~/.ssh/hetzner_staging ultra@77.42.46.155
+ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142
 cd /opt/ultra-autotrade
 
 # 現在の稼働モデル確認（staging）
