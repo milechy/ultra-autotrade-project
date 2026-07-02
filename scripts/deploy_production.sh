@@ -237,6 +237,13 @@ deploy_backend_zero_downtime() {
   rm -f "${_env_tmp}"
   log "ACTIVE_BACKEND_COLOR=${inactive_slot} → ${ENV_FILE} に書き込み完了"
 
+  # 2026-07-02: docker-compose.production.yml の environment: ACTIVE_BACKEND_COLOR は
+  # シェルにエクスポート済みの値を --env-file より優先して補間する(Compose の変数解決順序)。
+  # このシェルに古い ACTIVE_BACKEND_COLOR が残っていると、直前の書き込みが無視され
+  # 新コンテナが古い色で起動し scheduler color ガードが誤判定する(2026-07-02 移行時に発覚)。
+  # ここで明示的に再エクスポートし、常に書き込み直後の値と一致させる。
+  export ACTIVE_BACKEND_COLOR="${inactive_slot}"
+
   # 2. 新コンテナを起動 (--no-deps で他サービスに影響を与えない)
   log "backend-${inactive_slot} を起動..."
   ${DC} -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d --no-deps "backend-${inactive_slot}"
@@ -638,6 +645,28 @@ else
   log "upstream.conf を blue に初期化..."
   write_upstream_conf "blue"
 
+  # 2026-07-02: .env.production に他環境由来の古い ACTIVE_BACKEND_COLOR が残っている場合
+  # (例: 別ホストからの .env 移行時)、フルデプロイで新規作成される backend-blue が
+  # 自身と異なる色を読み込み scheduler color ガードが誤判定する。フルデプロイは常に
+  # active=blue で始まるため、ここで blue に強制的に揃えてから export する。
+  log "ACTIVE_BACKEND_COLOR を blue に初期化 (${ENV_FILE})..."
+  _env_tmp_init=$(mktemp "${ENV_FILE}.XXXXXX")
+  if grep -q '^ACTIVE_BACKEND_COLOR=' "${ENV_FILE}"; then
+    awk '{
+      if ($0 ~ /^ACTIVE_BACKEND_COLOR=/) {
+        print "ACTIVE_BACKEND_COLOR=blue"
+      } else {
+        print
+      }
+    }' "${ENV_FILE}" > "${_env_tmp_init}"
+  else
+    awk '{print}' "${ENV_FILE}" > "${_env_tmp_init}"
+    printf '\nACTIVE_BACKEND_COLOR=blue\n' >> "${_env_tmp_init}"
+  fi
+  cat "${_env_tmp_init}" > "${ENV_FILE}"
+  rm -f "${_env_tmp_init}"
+  export ACTIVE_BACKEND_COLOR="blue"
+
   # ── 新イメージを down 前にビルド ──
   # 下記「down 前 migration」を新 migration 入りの使い捨てコンテナで先行実行するため、
   # 新イメージは down より前に確定している必要がある (旧コンテナは稼働継続のまま)。
@@ -915,8 +944,24 @@ check_active_color_consistency() {
     log "   → 生存 backend が inactive 判定で AI判定スケジューラを skip する恐れ（2026-06-26 P0 と同型）"
     log "   → 修正: .env.production の ACTIVE_BACKEND_COLOR を ${nginx_slot} に揃え backend-${nginx_slot} を force-recreate"
     slack_notify "🚨 [deploy_production.sh] active color drift 検出\nnginx active=${nginx_slot} / .env ACTIVE_BACKEND_COLOR=${env_color}\n生存 backend が AI判定スケジューラを skip する恐れ（2026-06-26 P0 と同型）。ACTIVE_BACKEND_COLOR を ${nginx_slot} に揃えて recreate してください。"
+    return
+  fi
+  log "✅ active color 整合 OK (nginx=${nginx_slot} = .env=${env_color})"
+
+  # 2026-07-02: 上記チェックは .env ファイルの値しか見ておらず、compose の
+  # environment: ACTIVE_BACKEND_COLOR: ${ACTIVE_BACKEND_COLOR:-} がシェルの古い
+  # エクスポート値で env_file を上書きするケース（ファイルは正しいがコンテナ内は古い値）
+  # を検出できない盲点があった（2026-07-02 移行時に発覚）。実コンテナの env も直接確認する。
+  local active_container container_color
+  active_container="ultra-autotrade-backend-${nginx_slot}-production"
+  container_color=$(docker exec "${active_container}" printenv ACTIVE_BACKEND_COLOR 2>/dev/null || echo "")
+  if [ "${container_color}" != "${nginx_slot}" ]; then
+    log "🚨 CRITICAL: コンテナ内 ACTIVE_BACKEND_COLOR drift 検出 — active=${nginx_slot} だがコンテナ内は「${container_color:-（未設定）}」"
+    log "   → .env ファイルは正しいが、compose の environment: 補間がシェルの古い値で上書きした疑い"
+    log "   → 修正: ACTIVE_BACKEND_COLOR=${nginx_slot} ${DC} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} up -d --no-deps backend-${nginx_slot} で ${active_container} を再作成"
+    slack_notify "🚨 [deploy_production.sh] コンテナ内 ACTIVE_BACKEND_COLOR drift 検出\n.envファイルは${nginx_slot}で正しいが、稼働中コンテナ${active_container}の実環境変数は「${container_color:-未設定}」\nAI判定スケジューラがskipされている可能性大。手動で該当backendをACTIVE_BACKEND_COLOR明示指定して再作成してください。"
   else
-    log "✅ active color 整合 OK (nginx=${nginx_slot} = .env=${env_color})"
+    log "✅ コンテナ内 ACTIVE_BACKEND_COLOR 整合 OK (${active_container}: ${container_color})"
   fi
 }
 
