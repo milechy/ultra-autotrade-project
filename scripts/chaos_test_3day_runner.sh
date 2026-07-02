@@ -27,8 +27,8 @@
 #   STAGING_DB        staging DB 名 (default: ultra_autotrade_staging)
 #   STAGING_DB_USER   staging DB user (default: ultra)
 #
-# 実行場所: 本番 Hetzner VPS (77.42.46.155) — staging compose が同居している
-#   ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 \
+# 実行場所: staging VPS (188.34.167.142, ASSIST ONE) — 2026-07-02移行後、staging専用VPS
+#   ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142 \
 #     "bash /opt/ultra-autotrade/scripts/chaos_test_3day_runner.sh"
 #
 # 注意: production コンテナには絶対に触らない。chaos_test_staging.sh 側の

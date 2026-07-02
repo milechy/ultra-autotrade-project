@@ -30,9 +30,9 @@
 #     その他 4xx (404 / 400 / 503 等以外)    -> FAIL (endpoint 消失 / 経路破損)
 #
 # 注意:
-#   staging は本番 Hetzner VPS (77.42.46.155) に同居しており dev VPS から
-#   到達不可。memory [[staging-lives-on-prod-vps]] / [[no-prod-vps-commands-from-dev]]
-#   に従い、dev VPS では skip-with-instructions モードに倒す。
+#   2026-07-02移行後、staging(188.34.167.142)は production(5.223.88.14)と
+#   別 VPS。いずれも dev VPS からは到達不可のため、dev VPS では
+#   skip-with-instructions モードに倒す。
 #
 # Usage:
 #   ENV_TARGET=staging    bash scripts/launch_gate/L2_smoke.sh
@@ -76,9 +76,14 @@ BASE_URL="${LAUNCH_GATE_BASE_URL:-${DEFAULT_BASE}}"
 # dev VPS では prod / staging に届かないため skip-with-instructions
 # ---------------------------------------------------------------------------
 if is_dev_vps; then
+  case "${ENV_TARGET}" in
+    production) TARGET_VPS_DESC="production VPS (ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14)" ;;
+    staging)    TARGET_VPS_DESC="staging VPS (ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142)" ;;
+    *)          TARGET_VPS_DESC="対象 VPS" ;;
+  esac
   cat <<EOF
-[INFO] L2 smoke: dev VPS のため prod VPS 同居の ${ENV_TARGET} に直接到達できません。
-       prod VPS (77.42.46.155) で以下のコマンドを実行し、結果を貼り付けてください:
+[INFO] L2 smoke: dev VPS のため ${ENV_TARGET} に直接到達できません。
+       ${TARGET_VPS_DESC} で以下のコマンドを実行し、結果を貼り付けてください:
 
          BASE=${BASE_URL}
          # /health は 2xx 必須

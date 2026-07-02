@@ -43,14 +43,18 @@ fi
 # dev VPS からは prod DB に届かないので skip-with-instructions
 if is_dev_vps; then
   echo "[INFO] L0 schema: dev VPS のため DB に直接アクセスできません。"
-  echo "       prod VPS (77.42.46.155) で以下を実行し、exit 0 を確認してください:"
+  echo "       2026-07-02移行後、staging と production は別 VPS です。以下を実行し、exit 0 を確認してください:"
   echo ""
   for env in "${run_envs[@]}"; do
-    echo "         bash ${GAP_SCRIPT} --env=${env}"
+    case "${env}" in
+      production) echo "         ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14 'cd /opt/ultra-autotrade && bash ${GAP_SCRIPT} --env=${env}'" ;;
+      staging)    echo "         ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142 'cd /opt/ultra-autotrade && bash ${GAP_SCRIPT} --env=${env}'" ;;
+      *)          echo "         bash ${GAP_SCRIPT} --env=${env}" ;;
+    esac
   done
   echo ""
   echo "       0 でない場合は alembic head に gap あり → launch 不可。"
-  gate_record SKIP "${LABEL}" "dev VPS のため手動実行 (prod VPS で check_db_migration_gap.sh --env={${run_envs[*]}})"
+  gate_record SKIP "${LABEL}" "dev VPS のため手動実行 (production=5.223.88.14 / staging=188.34.167.142 で check_db_migration_gap.sh --env={${run_envs[*]}})"
   exit 0
 fi
 

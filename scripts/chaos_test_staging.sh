@@ -8,7 +8,7 @@
 #   2026-06-11 実機確認)。root か sudo で実行すること (host PID への kill -9 が必要)。
 #
 # 対象: staging 環境のみ（production は絶対に触らない）
-# 実行場所: 本番 Hetzner VPS (77.42.46.155) または dev VPS
+# 実行場所: staging VPS (188.34.167.142, ASSIST ONE) 上で実行
 #
 # 使い方:
 #   bash scripts/chaos_test_staging.sh          # staging で全コンテナ検証
@@ -90,8 +90,8 @@ _safety_check() {
   local staging_count
   staging_count=$(docker ps --filter "name=staging" --format "{{.Names}}" | wc -l)
   if [[ "$staging_count" -eq 0 ]]; then
-    log_warn "staging コンテナが見つかりません。本番 VPS で実行してください。"
-    log_warn "または: ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155 'bash /opt/ultra-autotrade/scripts/chaos_test_staging.sh'"
+    log_warn "staging コンテナが見つかりません。staging VPS で実行してください。"
+    log_warn "または: ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142 'bash /opt/ultra-autotrade/scripts/chaos_test_staging.sh'"
     exit 1
   fi
 

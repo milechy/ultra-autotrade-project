@@ -13,10 +13,10 @@
 # TC-4: HF < 1.6 閾値 → trading_paused=true + LINE 通知 (ロジック+状態検証)
 # TC-5: resume / 復元 総合確認
 #
-# 実行先: 本番 Hetzner VPS (77.42.46.155) 上 staging stack に対して実行。
-#         dev VPS からは構造上実行不可 (staging は本番 VPS に同居)。
+# 実行先: staging VPS (188.34.167.142, ASSIST ONE) 上の staging stack に対して実行。
+#         2026-07-02 移行後は staging は production と別 VPS に分離済み。
 #
-# SSH: ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155
+# SSH: ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142
 #
 # 必須 env:
 #   ADMIN_EMAIL       staging admin ユーザーメール
@@ -173,11 +173,11 @@ _safety_check() {
     cat <<EOF
 
 [INFO] dev VPS (${hn}) では実行不可。
-       本スクリプトは本番 VPS (77.42.46.155) 上で staging stack に対して実行する設計です。
+       本スクリプトは staging VPS (188.34.167.142, ASSIST ONE) 上で staging stack に対して実行する設計です。
        実行手順:
          1) iMac で:
-              ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155
-         2) 本番 VPS で:
+              ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142
+         2) staging VPS で:
               export ADMIN_EMAIL='<staging admin email>'
               export ADMIN_PASSWORD='<staging admin password>'
               cd /opt/ultra-autotrade

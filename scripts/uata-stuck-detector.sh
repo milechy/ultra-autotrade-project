@@ -50,12 +50,12 @@ get_webhook() {
     grep "^SLACK_WEBHOOK_URL=" "${GIT_ROOT}/.env.production" | head -1 | cut -d= -f2-
     return
   fi
-  # 4. SSH fallback (Hetzner本番VPS — dev VPS からは接続不可の場合あり)
-  local ssh_key="${HOME}/.ssh/hetzner_direct"
+  # 4. SSH fallback (Hetzner本番VPS ASSIST ONE — dev VPS からは接続不可の場合あり)
+  local ssh_key="${HOME}/.ssh/hetzner_assistone_production"
   if [[ -f "$ssh_key" ]]; then
     ssh -i "$ssh_key" \
       -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o BatchMode=yes \
-      ultra@77.42.46.155 \
+      root@5.223.88.14 \
       'grep SLACK_WEBHOOK_URL /opt/ultra-autotrade/.env.production | head -1 | cut -d= -f2-' \
       2>/dev/null || echo ""
   else

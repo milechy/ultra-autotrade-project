@@ -72,10 +72,10 @@ FAILED_COUNT=$( [ -n "$FAILED" ] && printf '%s\n' "$FAILED" | grep -c '^' || ech
 # ─── 5. L1-L6 状態 ───
 # 本番ログ出力先: /opt/ultra-autotrade/logs/healthcheck_l1_l6.log (id=30 で修正)
 # fallback: SSH 取得失敗時は curl /health HTTP ステータスで代替 (PR #246 維持)
-SSH_OPTS=(-F /dev/null -i ~/.ssh/hetzner_staging -o IdentitiesOnly=yes
+SSH_OPTS=(-F /dev/null -i ~/.ssh/hetzner_assistone_production -o IdentitiesOnly=yes
           -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10)
 
-HEALTH_RAW=$(ssh "${SSH_OPTS[@]}" ultra@77.42.46.155 \
+HEALTH_RAW=$(ssh "${SSH_OPTS[@]}" root@5.223.88.14 \
     'tail -1 /opt/ultra-autotrade/logs/healthcheck_l1_l6.log 2>/dev/null' 2>/dev/null)
 if [ -n "$HEALTH_RAW" ]; then
     HEALTH="$HEALTH_RAW"
@@ -88,7 +88,7 @@ fi
 
 # ─── 6. 山本さん UAT 状況 (R3: 正ロール=ultra。heredoc で $$ 安全化) ───
 
-YAMAMOTO_STATUS=$(ssh "${SSH_OPTS[@]}" ultra@77.42.46.155 bash -s <<'ENDSSH' 2>/dev/null
+YAMAMOTO_STATUS=$(ssh "${SSH_OPTS[@]}" root@5.223.88.14 bash -s <<'ENDSSH' 2>/dev/null
 PG_CONTAINER=$(docker ps --filter 'name=postgres-production' --filter 'status=running' --format '{{.Names}}' | head -1)
 if [ -z "$PG_CONTAINER" ]; then
   echo "(postgres-production コンテナが見つかりません)"

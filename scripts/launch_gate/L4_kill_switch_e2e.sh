@@ -14,8 +14,8 @@
 #   5) 発動・解除ログが Slack #ultra-auto-project に出る (backend ログから
 #      Slack post 試行を確認 / 直近 webhook 送信ログ 2 件以上)
 #
-# 実行先: iMac から `ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155` 後、
-#         本番 VPS 上で staging stack に対して実行する。
+# 実行先: iMac から `ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142` 後、
+#         staging VPS (ASSIST ONE) 上で staging stack に対して実行する。
 #         本番 stack には絶対に触らない (staging endpoint / staging DB / staging
 #         backend container のみ操作)。
 #
@@ -72,16 +72,16 @@ trap 'rm -rf "${TMP_DIR}"' EXIT
 if is_dev_vps; then
   cat <<'EOF'
 [INFO] L4 kill switch e2e: dev VPS では実行不可。
-       本 script は本番 VPS (77.42.46.155) 上で staging stack に対して実行する設計です。
+       本 script は staging VPS (188.34.167.142, ASSIST ONE) 上で staging stack に対して実行する設計です。
        実行手順:
-         1) ローカル Mac で: ssh -i ~/.ssh/hetzner_direct ultra@77.42.46.155
-         2) 本番 VPS で:
+         1) ローカル Mac で: ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142
+         2) staging VPS で:
               export ADMIN_EMAIL=...
               export ADMIN_PASSWORD=...
               cd /opt/ultra-autotrade
               bash scripts/launch_gate/L4_kill_switch_e2e.sh
 EOF
-  gate_record SKIP "L4-killswitch-e2e" "dev VPS のため SKIP (本番 VPS で実行する)"
+  gate_record SKIP "L4-killswitch-e2e" "dev VPS のため SKIP (staging VPS で実行する)"
   gate_summary
   exit 0
 fi
