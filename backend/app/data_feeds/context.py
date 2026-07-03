@@ -56,6 +56,14 @@ class MarketContext(BaseModel):
     # AI cognitive state (recent judgment history for pattern detection)
     cognitive_state: Optional[CognitiveState] = None
 
+    # GHO/USDC 借入通貨最適化ヒント（Phase 1: 観測のみ）。
+    # "recommend_gho" | "recommend_usdc" | None（未取得/失敗時、fail-open）。
+    # 利回り最適化の参考情報であり BUY/SELL/HOLD の方向性には一切関与しない
+    # （borrow_currency_signal() は Aave/borrow_optimizer.py 参照）。
+    # Phase 1 では to_prompt_context() に注入しない（raw_features 記録のみ）。
+    # プロンプト注入は Phase 2（別PR、本番soak確認後）で追加する。
+    gho_borrow_signal: Optional[str] = None
+
     # Metadata
     collected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
