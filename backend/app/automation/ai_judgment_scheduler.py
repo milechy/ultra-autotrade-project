@@ -273,6 +273,8 @@ def _build_raw_features_json(
         raw["news_sentiment"] = market_ctx.news.sentiment
         raw["fed_stance"] = market_ctx.finance.fed_stance
         raw["stablecoin_risk"] = market_ctx.finance.stablecoin_risk
+        # Phase 1 観測のみ（プロンプト非注入・BUY/SELL/HOLD 判定への影響なし）。
+        raw["gho_borrow_signal"] = market_ctx.gho_borrow_signal
     return raw
 
 
@@ -727,6 +729,28 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
             "borrow_apy": None,
             "health_factor": None,
         }
+        # GHO/USDC 借入通貨最適化シグナル（Phase 1: raw_features 観測のみ）。
+        # 独立した try/except に隔離し、失敗しても下記の market_ctx 構築・
+        # context_degraded 判定には一切影響させない（fail-open を二重に効かせる。
+        # borrow_optimizer.compare_borrow_rates 自体も内部で fail-open 実装済み）。
+        gho_signal: Optional[str] = None
+        try:
+            from app.aave.borrow_optimizer import (  # noqa: PLC0415
+                borrow_currency_signal,
+                make_borrow_optimizer_from_env,
+            )
+
+            optimizer = make_borrow_optimizer_from_env()
+            if optimizer is not None:
+                cmp_result = optimizer.compare_borrow_rates()
+                if cmp_result.error is None:
+                    gho_signal = borrow_currency_signal(
+                        cmp_result.usdc_apr, cmp_result.gho_effective_apr
+                    )
+        except Exception as exc:
+            logger.warning("GHO borrow signal fetch failed (fail-open, ignored): %s", exc)
+            gho_signal = None
+
         try:
             aave_data = fetch_aave_market_data_safe()
             cognitive_state = get_judgment_logger().get_cognitive_state()
@@ -736,6 +760,7 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
                 aave_borrow_apy=aave_data["borrow_apy"],
                 health_factor=aave_data["health_factor"],
                 cognitive_state=cognitive_state,
+                gho_borrow_signal=gho_signal,
             )
         except Exception as exc:
             context_degraded = True

@@ -6,7 +6,7 @@ import asyncio
 import os
 import tempfile
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -967,6 +967,160 @@ def test_run_ai_judgment_job_aave_failure_falls_back_to_none(db_session):
     assert call_kwargs["aave_supply_apy"] is None
     assert call_kwargs["aave_borrow_apy"] is None
     assert call_kwargs["health_factor"] is None
+
+
+# ---------------------------------------------------------------------------
+# GHO 借入シグナル Phase 1（観測のみ・fail-open）(2026-07-03)
+# ---------------------------------------------------------------------------
+
+
+def _base_aave_kwargs():
+    return {
+        "utilization_rate": Decimal("0.5"),
+        "supply_apy": Decimal("3.0"),
+        "borrow_apy": Decimal("5.0"),
+        "health_factor": Decimal("2.0"),
+    }
+
+
+def test_gho_signal_passed_to_build_market_context_when_optimizer_recommends_gho(db_session):
+    """optimizer が正常応答なら gho_borrow_signal が build_market_context に渡ること。"""
+    from app.aave.schemas import BorrowRateComparison  # noqa: PLC0415
+
+    mock_result = _make_cross_validation_result(TradeAction.HOLD)
+    fake_cmp = BorrowRateComparison(
+        usdc_apr=Decimal("0.05"),
+        gho_variable_apr=Decimal("0.03"),
+        gho_effective_apr=Decimal("0.03"),
+        recommendation="GHO",
+        annual_savings_usd=Decimal("100"),
+        error=None,
+    )
+    mock_optimizer = MagicMock()
+    mock_optimizer.compare_borrow_rates.return_value = fake_cmp
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+        patch(
+            "app.automation.ai_judgment_scheduler.fetch_aave_market_data_safe",
+            return_value=_base_aave_kwargs(),
+        ),
+        patch("app.automation.ai_judgment_scheduler.build_market_context") as mock_build,
+        patch(
+            "app.aave.borrow_optimizer.make_borrow_optimizer_from_env",
+            return_value=mock_optimizer,
+        ),
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        run_ai_judgment_job(db=db_session)
+
+    call_kwargs = mock_build.call_args.kwargs
+    assert call_kwargs["gho_borrow_signal"] == "recommend_gho"
+
+
+def test_gho_signal_none_when_optimizer_not_configured(db_session):
+    """make_borrow_optimizer_from_env が None（env未設定）→ gho_borrow_signal=None、job は継続。"""
+    mock_result = _make_cross_validation_result(TradeAction.HOLD)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+        patch(
+            "app.automation.ai_judgment_scheduler.fetch_aave_market_data_safe",
+            return_value=_base_aave_kwargs(),
+        ),
+        patch("app.automation.ai_judgment_scheduler.build_market_context") as mock_build,
+        patch(
+            "app.aave.borrow_optimizer.make_borrow_optimizer_from_env",
+            return_value=None,
+        ),
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        result = run_ai_judgment_job(db=db_session)
+
+    assert result["action"] == "HOLD"
+    call_kwargs = mock_build.call_args.kwargs
+    assert call_kwargs["gho_borrow_signal"] is None
+
+
+def test_gho_signal_none_when_compare_borrow_rates_raises(db_session):
+    """optimizer.compare_borrow_rates が例外送出 → fail-open で None、
+    かつ context_degraded を誤発火させず job が継続すること
+    （GHO シグナル取得は独立 try/except で隔離されている）。"""
+    mock_result = _make_cross_validation_result(TradeAction.HOLD)
+    mock_optimizer = MagicMock()
+    mock_optimizer.compare_borrow_rates.side_effect = RuntimeError("RPC down")
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+        patch(
+            "app.automation.ai_judgment_scheduler.fetch_aave_market_data_safe",
+            return_value=_base_aave_kwargs(),
+        ),
+        patch("app.automation.ai_judgment_scheduler.build_market_context") as mock_build,
+        patch(
+            "app.aave.borrow_optimizer.make_borrow_optimizer_from_env",
+            return_value=mock_optimizer,
+        ),
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        result = run_ai_judgment_job(db=db_session)
+
+    # GHO シグナル取得失敗が context_degraded を誤発火させていないこと
+    # （通常通り BUY/SELL/HOLD 判定が完走している）。
+    assert result["action"] == "HOLD"
+    assert result["decision_id"] is not None
+    call_kwargs = mock_build.call_args.kwargs
+    assert call_kwargs["gho_borrow_signal"] is None
+    # 他の Aave フィールドは通常通り渡っている（GHO 失敗が波及していない）
+    assert call_kwargs["health_factor"] == Decimal("2.0")
+
+
+def test_gho_signal_none_when_comparison_has_error(db_session):
+    """BorrowRateComparison.error が設定されている（optimizer内部fail-open）
+    → borrow_currency_signal を呼ばず None のまま渡ること。"""
+    from app.aave.schemas import BorrowRateComparison  # noqa: PLC0415
+
+    mock_result = _make_cross_validation_result(TradeAction.HOLD)
+    fake_cmp = BorrowRateComparison(
+        usdc_apr=Decimal("0"),
+        gho_variable_apr=Decimal("0"),
+        gho_effective_apr=Decimal("0"),
+        recommendation="USDC",
+        annual_savings_usd=Decimal("0"),
+        error="AAVE_DATA_PROVIDER_ADDRESS 等の環境変数が未設定です。",
+    )
+    mock_optimizer = MagicMock()
+    mock_optimizer.compare_borrow_rates.return_value = fake_cmp
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+        patch(
+            "app.automation.ai_judgment_scheduler.fetch_aave_market_data_safe",
+            return_value=_base_aave_kwargs(),
+        ),
+        patch("app.automation.ai_judgment_scheduler.build_market_context") as mock_build,
+        patch(
+            "app.aave.borrow_optimizer.make_borrow_optimizer_from_env",
+            return_value=mock_optimizer,
+        ),
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        run_ai_judgment_job(db=db_session)
+
+    call_kwargs = mock_build.call_args.kwargs
+    assert call_kwargs["gho_borrow_signal"] is None
 
 
 def test_run_ai_judgment_job_passes_cognitive_state(db_session):
