@@ -161,8 +161,8 @@ export interface EModeTxData {
 
 export interface EModeSetResponse {
   category_id: number;
-  tx_hash: string | null;
-  set_emode_tx: EModeTxData | null; // C-1 修正: 未署名 tx データ (dry_run=False 時に設定)
+  tx_hash: string | null; // dry_run=False 時、サーバー側署名・送信完了後の実 tx hash
+  set_emode_tx: EModeTxData | null; // 後方互換のため残すフィールド。現在は常に null
   dry_run: boolean;
   message: string;
 }

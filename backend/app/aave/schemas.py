@@ -366,19 +366,18 @@ class EModeSetRequest(BaseModel):
 class EModeSetResponse(BaseModel):
     """POST /aave/emode のレスポンス。
 
-    dry_run=False かつ build-tx モードの場合、set_emode_tx に未署名 tx データが入る。
-    フロントエンドはこの tx をウォレットで署名・送信することで eMode を切り替える。
-    HUMAN-REVIEW-REQUIRED: setUserEMode は Aave V3 の write 操作。
+    2026-07-03: dry_run=False の場合、admin 限定のプラットフォーム運用ウォレット操作として
+    サーバー側で署名・送信まで完結し、実際の tx_hash を返す（AaveClient.deposit/withdraw と
+    同型の署名パターン）。set_emode_tx フィールドは後方互換のため残すが常に None
+    （旧: 未署名 tx を返しフロントエンドの署名待ちだったが、実際には送信されない
+    ギャップがあった。2026-07-03 棚卸しで検出し解消）。
     """
 
     category_id: int = Field(description="設定した eMode カテゴリ ID")
     tx_hash: Optional[str] = Field(None, description="tx ハッシュ (dry_run=True の場合は None)")
     set_emode_tx: Optional[dict[str, object]] = Field(
         None,
-        description=(
-            "未署名の setUserEMode tx データ (dry_run=False 時に返る)。"
-            "フロントエンドがウォレットで署名・送信する。"
-        ),
+        description="後方互換のため残すフィールド。現在は常に None（サーバー側で送信完結）。",
     )
     dry_run: bool = Field(description="ドライランかどうか")
     message: str = Field(description="結果メッセージ")
