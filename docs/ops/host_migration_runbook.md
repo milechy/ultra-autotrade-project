@@ -452,11 +452,14 @@ cd ../frontend && npm install --legacy-peer-deps
 sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
 ```
 
-- [ ] repo clone（worktree構造 `/opt/ultra-autotrade/main/`）
-- [ ] backend venv 構築・依存インストール
-- [ ] frontend node_modules 構築
-- [ ] VSCode Remote SSH で接続確認（`~/.ssh/config` の dev alias 経由）
-- [ ] CLAUDE.md / .claude/CLAUDE.md のホスト判定表を新IPに合わせて更新（別PR）
+- [x] repo clone（worktree構造 `/opt/ultra-autotrade/main/`）— 2026-07-03完了、HEAD = origin/main 追従
+- [x] backend venv 構築・依存インストール — 2026-07-03完了
+- [x] frontend node_modules 構築 — 2026-07-03完了
+- [x] Docker / Docker Compose 導入（`docker.io` + `docker-compose-v2`、Ubuntu 26.04標準リポジトリ）— 2026-07-03完了（本チェックリストになかったが並列レーン運用に必要なため追加実施）
+- [x] `/opt/ultra-autotrade-worktrees/` 作成（並列レーン用）— 2026-07-03完了
+- [ ] VSCode Remote SSH で接続確認（`~/.ssh/config` の dev alias 経由）— 小林さん側手動確認待ち
+- [x] CLAUDE.md / .claude/CLAUDE.md のホスト判定表を新IPに合わせて更新（本PR）
+- [ ] `.env.*` 実ファイルの配置（現状 `.example` のみ。secrets配布は別途判断）
 
 ---
 

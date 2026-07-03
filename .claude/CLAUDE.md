@@ -16,13 +16,13 @@ hostname && pwd && echo "branch: $(git branch --show-current 2>/dev/null || echo
 
 | hostname / IP | 環境 | git repo root | 許可 | 禁止 |
 |---|---|---|---|---|
-| `95.216.167.198` | **dev VPS**（ASSIST ONE、2026-07-02時点未構築） | `/opt/ultra-autotrade/main/`（構築後） | git commit / push / merge / Claude Code 実行 | production DB 直接操作 |
+| `95.216.167.198` | **dev VPS**（ASSIST ONE、2026-07-03構築完了） | `/opt/ultra-autotrade/main/` | git commit / push / merge / Claude Code 実行 | production DB 直接操作 |
 | `188.34.167.142` | **staging VPS**（ASSIST ONE、staging+staging-v4同居） | `/opt/ultra-autotrade/` ※`main/`なし | git pull / docker compose up / deploy_staging.sh | git commit / git merge / nano 直接編集 |
 | `5.223.88.14` | **production VPS**（ASSIST ONE、専用Project分離） | `/opt/ultra-autotrade/` ※`main/`なし | git pull / docker compose up / deploy_production.sh | git commit / git merge / nano 直接編集 |
 | `77.42.46.155` | **旧production/staging VPS**（保険期間中、解約予定） | `/opt/ultra-autotrade/` | 参照のみ（automation停止済み） | 新規操作全般（Phase 10保険期間終了後解約） |
 | Mac (`hostname` = 個人 Mac) | **ローカル** | — | 全開発作業 / Agent View 起動 | production VPS 直接接続（3段プロトコル経由のみ、alias自体を作らない） |
 
-> **パス構造差**: dev VPS は worktree 構造で `main/` サブディレクトリが存在する（構築後）。staging/production VPS は repo root が直接 `/opt/ultra-autotrade/`。
+> **パス構造差**: dev VPS は worktree 構造で `main/` サブディレクトリが存在する。staging/production VPS は repo root が直接 `/opt/ultra-autotrade/`。
 > SSH 後は必ず `pwd && ls` で確認してから操作すること。`/opt/ultra-autotrade/main/` を staging/production VPS で使うと `No such file or directory`。
 
 ### production VPS での禁止操作 (ABSOLUTE)
