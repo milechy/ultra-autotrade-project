@@ -21,16 +21,17 @@ export function isPublicRegistrationEnabled(): boolean {
 /**
  * 「おまかせ（Auto / managed）」運用モードを UI に表示するか。
  *
- * 既定 false（非表示）。おまかせは AI が事前条件の範囲内で売買を自動執行する
- * 一任運用に該当し、日本では投資運用業（金商法）の登録なしに提供できない
- * （森先生 法務判断 2026-06-26）。
+ * 背景: おまかせは AI が事前条件の範囲内で売買を自動執行する一任運用に該当し、
+ * 日本では投資運用業（金商法）の登録なしに提供すると無登録営業（刑事罰対象）
+ * になり得る（森先生 法務判断 2026-06-26）。登録取得・設計変更による法務クリア
+ * のいずれも満たさないまま有効化することは非推奨。
  *
- * このフラグを true にしてよいのは「時間が経過したから」ではなく、次のいずれかが
- * 満たされたときのみ:
- *   1. 投資運用業の登録を取得した、または
- *   2. 一任に当たらない設計へ作り変え、法務（森先生）が明示的にクリアした。
- * 上記なしに true にすると無登録投資運用業（刑事罰対象）になるため、安易に
- * フラグを反転しないこと。backend の user_mode 自体は実装済（code-ready-behind-flag）。
+ * 2026-07-03: hkobayashi が上記リスクを認識した上で「Auto モードも含め全ユーザーに
+ * 今すぐ全機能を開放する」と明示決定（法務再クリアを待たない事業判断）。
+ * このフラグの既定値をリポジトリ側で true に変更することはしない
+ * （production への反映は .env.production 側で NEXT_PUBLIC_AUTO_MODE_ENABLED=true
+ * を設定 + frontend 再ビルドで行う。3段プロトコル / 本番デプロイ手順に従うこと）。
+ * 詳細: memory `project_jp_auto_mode_open_decision_2026_07_03`。
  */
 export function isAutoModeEnabled(): boolean {
   return process.env.NEXT_PUBLIC_AUTO_MODE_ENABLED === 'true'
