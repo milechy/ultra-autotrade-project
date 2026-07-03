@@ -13,6 +13,13 @@
  * 揃ってからフラグを true にして再ビルドする（code-ready-behind-flag）。
  * backend POST /auth/register-open 自体は常時実装済だが、フロント側の到達経路を
  * このフラグで gate する。
+ *
+ * 2026-07-03: hkobayashi が法務(non-custodial S-5)・KYC ベンダー判断は既に揃って
+ * いると確認し、PWA 配布（LINE 審査を経由しない経路）側では true にすることを決定。
+ * LINE 審査を経由する配布（staging-v4 / LINE production 版）は審査通過まで false を
+ * 維持する（審査中に見せる内容を審査終了前に変えるとレビュー撹乱になるため）。
+ * env var は PWA 系(.env.staging-new / PWA 用 .env.production)にのみ設定し、
+ * LINE 系(.env.staging-v4)には設定しないこと。
  */
 export function isPublicRegistrationEnabled(): boolean {
   return process.env.NEXT_PUBLIC_PUBLIC_REGISTRATION_ENABLED === 'true'
@@ -44,6 +51,12 @@ export function isAutoModeEnabled(): boolean {
  * 利益連動の金銭リワードは、LINE ミニアプリ審査でマルチ商法的訴求と見なされる
  * リスクがあるため、審査期間中はフラグで非表示にする。審査通過後に文言を
  * 利益非連動の設計へ整備したうえで true にして再ビルドする（code-ready-behind-flag）。
+ *
+ * 2026-07-03: この理由は LINE 審査リスクのみ（法務ブロッカーとは無関係）と確認済み。
+ * hkobayashi の決定により、PWA 配布（LINE 審査を経由しない経路）側では true にする。
+ * LINE 審査を経由する配布（staging-v4 / LINE production 版）は審査通過まで false を
+ * 維持する。env var は PWA 系(.env.staging-new / PWA 用 .env.production)にのみ設定し、
+ * LINE 系(.env.staging-v4)には設定しないこと。
  */
 export function isReferralEnabled(): boolean {
   return process.env.NEXT_PUBLIC_REFERRAL_ENABLED === 'true'
