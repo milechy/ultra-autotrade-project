@@ -94,12 +94,16 @@ check_cmd() {
   fi
 
   # R5: production への直接書込(production_operation_checklist.md 違反)
+  # 対象ホスト: 旧 production 77.42.46.155 + 新 production(ASSIST ONE) 5.223.88.14
+  #   (2026-07-02 移行後、新ホストは root@5.223.88.14。旧ルールは ultra@77.42.46.155 の
+  #    ハードコードで新ホストの .env.production 書込を素通ししていた = 本ゲートの取り残し。
+  #    IP で照合し user を問わない形に一般化して両ホストを covered にする)
   # 誤発火対策 (2026-05-19 GID 1214761976014146):
   #   `2>&1 ./build.sh --env-file .env.production` のような ">" + 任意文字 + .env.production を
   #   誤検知しないよう、各パターンを厳密化。
   #   - redirect: `>[[:space:]]*\.env\.production` (> の直後が .env.production のみ BLOCK)
   #   - tee: tee の直後引数が .env.production の場合のみ BLOCK
-  if [[ "$cmd" =~ ssh.*ultra@77\.42\.46\.155 ]] \
+  if [[ "$cmd" =~ ssh.*(77\.42\.46\.155|5\.223\.88\.14) ]] \
      && [[ "$cmd" =~ \.env\.production ]] \
      && { [[ "$cmd" =~ sed[[:space:]]+-i ]] \
           || [[ "$cmd" =~ tee[[:space:]]+\.env\.production ]] \
@@ -109,7 +113,7 @@ check_cmd() {
       log_block "R5" \
         "ssh production への .env.production 直接書込 (production_operation_checklist.md ゲート 3 違反)" \
         "$cmd" \
-        "ローカルで編集 → scp → 必ずバックアップ + Phase 3 承認後"
+        "3段プロトコル(phase3-deployer)の承認済み手順で・必ずバックアップ後。意図的実行は UATA_HOOK_BYPASS_R5=1"
       return 2
     fi
   fi
@@ -136,6 +140,13 @@ self_test() {
     'PASS||ssh ultra@77.42.46.155 "bash deploy.sh 2>&1 --env-file .env.production"'
     'PASS||ssh ultra@77.42.46.155 "docker compose --env-file .env.production build 2>&1 | tee /tmp/build.log"'
     'PASS||ssh ultra@77.42.46.155 "cat .env.production"'
+    'BLOCK|R5|ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14 "printf FOO=bar >> /opt/ultra-autotrade/.env.production"'
+    'BLOCK|R5|ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14 "sed -i s/old/new/ /opt/ultra-autotrade/.env.production"'
+    'BLOCK|R5|ssh root@5.223.88.14 "tee .env.production"'
+    'BLOCK|R5|ssh root@5.223.88.14 "cp /tmp/new.env .env.production"'
+    'PASS||ssh -i ~/.ssh/hetzner_assistone_production root@5.223.88.14 "cat /opt/ultra-autotrade/.env.production | grep API_KEY"'
+    'PASS||ssh root@5.223.88.14 "grep NEXT_PUBLIC_AUTO_MODE_ENABLED /opt/ultra-autotrade/.env.production"'
+    'BYPASS_R5|PASS|ssh root@5.223.88.14 "printf FOO=bar >> /opt/ultra-autotrade/.env.production"'
     "PASS||ls -la /opt/ultra-autotrade/"
     "BYPASS_R1|PASS|cat /opt/ultra-autotrade/.env.staging"
   )
@@ -145,8 +156,14 @@ self_test() {
     IFS='|' read -r expected rule_id cmd <<< "$t"
     local actual_exit=0
 
-    if [[ "$expected" == "BYPASS_R1" ]]; then
-      UATA_HOOK_BYPASS_R1=1 check_cmd "$cmd" >/dev/null 2>&1 || actual_exit=$?
+    if [[ "$expected" =~ ^BYPASS_(R[0-9]+)$ ]]; then
+      # BYPASS_R<N>: 該当ルールを個別 bypass した上で PASS(exit 0) を期待。
+      # bash の動的スコープで、ここで local 宣言した変数は check_cmd→is_bypassed の
+      # `${!var:-0}` 間接展開から参照できる。
+      local bypass_var="UATA_HOOK_BYPASS_${BASH_REMATCH[1]}"
+      local "$bypass_var=1"
+      check_cmd "$cmd" >/dev/null 2>&1 || actual_exit=$?
+      unset "$bypass_var"
       expected="PASS"
     else
       check_cmd "$cmd" >/dev/null 2>&1 || actual_exit=$?
