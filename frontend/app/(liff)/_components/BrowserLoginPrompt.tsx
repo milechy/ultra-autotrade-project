@@ -8,6 +8,7 @@
 import { Loader2, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useLiffBrowserAuth } from "@/hooks/useLiffBrowserAuth";
+import { isLiffConfigured } from "@/lib/liff/init";
 
 interface BrowserLoginPromptProps {
   /** ログイン成功後の処理。未指定ならページをリロードして token を読み直す。 */
@@ -56,9 +57,11 @@ export function BrowserLoginPrompt({ onSuccess }: BrowserLoginPromptProps) {
 
       {error && <p className="text-red-600 text-xs mt-3 max-w-xs">{error}</p>}
 
-      <p className="ax-text-secondary opacity-70 text-xs mt-6 leading-relaxed">
-        {t("lineAppHint")}
-      </p>
+      {isLiffConfigured() && (
+        <p className="ax-text-secondary opacity-70 text-xs mt-6 leading-relaxed">
+          {t("lineAppHint")}
+        </p>
+      )}
     </div>
   );
 }
