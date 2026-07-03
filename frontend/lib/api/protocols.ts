@@ -1,6 +1,15 @@
 // Copyright (c) Ultra AutoTrade. All rights reserved.
 // Unauthorized copying or distribution is strictly prohibited.
+import { getAuthToken } from "../auth/token-key";
 import { getJson } from "./http";
+
+// 2026-07-03 修正: fetchOracleStatus は require_viewer 保護下だが Authorization
+// ヘッダーが付与されておらず、production を含む全環境で 401 になっていた
+// （ブラウザ実機確認で検出。lib/api/aave.ts と同種のバグ）。
+function authHeaders(): HeadersInit {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 
@@ -50,7 +59,7 @@ export async function fetchProtocolsHealth(): Promise<ProtocolHealth[]> {
 }
 
 export async function fetchOracleStatus(): Promise<OracleStatusResponse> {
-  return getJson<OracleStatusResponse>("/api/aave/oracle-status");
+  return getJson<OracleStatusResponse>("/api/aave/oracle-status", { headers: authHeaders() });
 }
 
 export async function fetchPendleMarkets(): Promise<PendleMarketInfo[]> {
