@@ -389,6 +389,23 @@ class AaveClientBase(ABC):
         """
         return None
 
+    def execute_set_emode(
+        self,
+        category_id: int,
+        wallet_address: str,
+        private_key: str = "",
+    ) -> "dict[str, Any]":
+        """setUserEMode を実際に署名・送信する。
+
+        非 abstractmethod: AaveV4ClientBase 等の他サブクラスに実装を強制しないため
+        （get_pool_utilization と同型のオプトイン方式）。未対応クライアントは呼ばれたら
+        NotImplementedError で明示的に失敗する。
+
+        Returns:
+            {"tx_hash": str, "category_id": int}
+        """
+        raise NotImplementedError(f"{type(self).__name__} は execute_set_emode 未対応です")
+
 
 class AaveClientError(Exception):
     """Aave クライアントの基底例外。"""
@@ -458,6 +475,11 @@ class AaveClient(Protocol):
         self, category_id: int, wallet_address: str, dry_run: bool = False
     ) -> "dict[str, Any]":
         """eMode 切替用の未署名 tx を返す（build-tx パターン）。"""
+
+    def execute_set_emode(
+        self, category_id: int, wallet_address: str, private_key: str = ""
+    ) -> "dict[str, Any]":
+        """setUserEMode を実際に署名・送信する（管理者操作、プラットフォーム運用ウォレット）。"""
 
 
 class DummyAaveClient(AaveClientBase):
@@ -595,6 +617,16 @@ class DummyAaveClient(AaveClientBase):
                 "value": "0x0",
             }
         }
+
+    def execute_set_emode(
+        self,
+        category_id: int,
+        wallet_address: str,
+        private_key: str = "",
+    ) -> "dict[str, Any]":
+        """ダミークライアント: execute_set_emode のスタブ（tx 送信なし）。"""
+        logger.info("DummyAaveClient.execute_set_emode called (no tx sent)")
+        return {"tx_hash": "0xdummy_set_emode_hash", "category_id": category_id}
 
 
 class Web3AaveClient(AaveClientBase):
@@ -1588,6 +1620,103 @@ class Web3AaveClient(AaveClientBase):
                 "value": "0x0",
             }
         }
+
+    def execute_set_emode(
+        self,
+        category_id: int,
+        wallet_address: str,
+        private_key: str = "",
+    ) -> "dict[str, Any]":
+        """
+        Pool.setUserEMode(categoryId) を実際に署名・送信する。
+
+        2026-07-03: eMode 切替は admin 限定のプラットフォーム運用ウォレット操作
+        （require_admin エンドポイントからのみ呼ばれ、ユーザー個別資金は動かさない）。
+        withdraw() と同じ署名・送信パターン（nonce tracker・gas estimator・
+        sign_transaction・send_raw_transaction・receipt 待機）を用いる。
+        HF < 1.6 の事前チェックは呼び出し元 (router.set_emode) が行う（既存の安全設計を維持、
+        本メソッドでは重複させない）。
+
+        Args:
+            category_id: 設定する eMode カテゴリ ID (0-255)
+            wallet_address: 送信元ウォレットアドレス
+            private_key: 署名鍵。未指定なら self.account (AAVE_WALLET_PRIVATE_KEY) を使う
+
+        Returns:
+            {"tx_hash": str, "category_id": int}
+
+        Raises:
+            AaveClientError: web3 未導入 / signer 未設定 / ガス上限超過など
+            ValueError: category_id が範囲外
+        """
+        if Web3 is None:
+            raise AaveClientError("web3 package is required")
+        if not wallet_address:
+            raise AaveClientError("wallet_address は必須です (setUserEMode)")
+        if not (0 <= category_id <= 255):
+            raise ValueError(f"category_id は 0-255 の範囲で指定してください: {category_id}")
+
+        if not getattr(self, "account", None) and not private_key:
+            raise AaveClientError(
+                "AAVE_WALLET_PRIVATE_KEY (or private_key arg) is required "
+                "for signed setUserEMode tx"
+            )
+
+        logger.info(
+            "execute_set_emode: wallet=%s...%s, category_id=%d",
+            wallet_address[:6],
+            wallet_address[-4:],
+            category_id,
+        )
+
+        try:
+            if hasattr(self, "account"):
+                account = self.account
+            else:
+                from eth_account import Account
+
+                account = Account.from_key(private_key)
+
+            checksum_wallet = Web3.to_checksum_address(wallet_address)
+            nonce_tracker = _NonceTracker(self._w3, checksum_wallet)
+
+            # setUserEMode は withdraw より軽量だが、専用の gas fallback 定数が
+            # 無いため DEFAULT_FALLBACK_GAS_WITHDRAW を安全側の上限として流用する
+            # (estimate_gas_with_buffer は実 estimateGas を優先し、失敗時のみ fallback)。
+            gas_estimator = GasEstimator(self._w3)
+            set_emode_params_for_estimate = {
+                "from": checksum_wallet,
+                "nonce": nonce_tracker.peek(),
+                "gasPrice": self._w3.eth.gas_price,
+            }
+            set_emode_gas = gas_estimator.estimate_gas_with_buffer(
+                set_emode_params_for_estimate, DEFAULT_FALLBACK_GAS_WITHDRAW
+            )
+            if not gas_estimator.is_gas_cost_acceptable(set_emode_gas):
+                raise AaveClientError(f"setUserEMode ガスコストが上限を超過: {set_emode_gas} units")
+
+            set_emode_tx = self._pool.functions.setUserEMode(category_id).build_transaction(
+                {
+                    "from": checksum_wallet,
+                    "nonce": nonce_tracker.peek(),
+                    "gas": set_emode_gas,
+                    "gasPrice": self._w3.eth.gas_price,
+                }
+            )
+            signed_tx = self._w3.eth.account.sign_transaction(set_emode_tx, private_key=account.key)
+            tx_hash = self._w3_tx.eth.send_raw_transaction(signed_tx.raw_transaction)
+            nonce_tracker.advance()
+            receipt = self._w3.eth.wait_for_transaction_receipt(tx_hash)
+
+            tx_hash_hex = receipt["transactionHash"].hex()
+            logger.info("execute_set_emode 完了: tx=%s, category_id=%d", tx_hash_hex, category_id)
+
+            return {"tx_hash": tx_hash_hex, "category_id": category_id}
+
+        except (AaveClientError, ValueError):
+            raise
+        except Exception as exc:
+            raise AaveClientError(f"setUserEMode 失敗: {exc}") from exc
 
     def build_approve_delegation_tx(
         self,

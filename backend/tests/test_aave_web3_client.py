@@ -613,7 +613,7 @@ def _make_mocked_web3_client(mock_web3, mock_rpc_provider_cls, mock_settings):
         int(2e18),
     )
 
-    # approve / supply / withdraw の build_transaction
+    # approve / supply / withdraw / setUserEMode の build_transaction
     mock_pool.functions.approve.return_value.build_transaction.return_value = {
         "from": "",
         "nonce": 0,
@@ -623,6 +623,10 @@ def _make_mocked_web3_client(mock_web3, mock_rpc_provider_cls, mock_settings):
         "nonce": 0,
     }
     mock_pool.functions.withdraw.return_value.build_transaction.return_value = {
+        "from": "",
+        "nonce": 0,
+    }
+    mock_pool.functions.setUserEMode.return_value.build_transaction.return_value = {
         "from": "",
         "nonce": 0,
     }
@@ -978,3 +982,67 @@ def test_build_withdraw_tx_uses_encode_abi_v7_api(mock_web3, mock_rpc_provider_c
 
     assert mock_pool.encode_abi.called
     assert not mock_pool.encodeABI.called
+
+
+# ==============================================================================
+# execute_set_emode: 2026-07-03 追加
+#
+# 背景: build_set_emode_tx は未署名 tx を返すだけで実際の署名・送信を行わず、
+# フロントエンドの EModePanel は「切替完了」のようなメッセージを表示しながら
+# 実際にはオンチェーンで何も起きていなかった (棚卸しで検出)。
+# admin 限定・プラットフォーム運用ウォレット操作のため、deposit/withdraw と
+# 同型のサーバー側署名・送信で完結させる。
+# ==============================================================================
+
+
+@patch("app.aave.rpc_provider.RPCProvider")
+@patch("app.aave.client.Web3")
+def test_execute_set_emode_signs_and_sends_returns_tx_hash(
+    mock_web3, mock_rpc_provider_cls, mock_settings
+):
+    """execute_set_emode が署名・送信まで完結し tx_hash を返すこと。"""
+    client, mock_pool, _server = _make_mocked_web3_client(
+        mock_web3, mock_rpc_provider_cls, mock_settings
+    )
+
+    result = client.execute_set_emode(category_id=1, wallet_address="0x" + "2" * 40)
+
+    assert result["category_id"] == 1
+    assert result["tx_hash"] == "ab" * 32  # bytes.hex() は "0x" プレフィックス無し
+    mock_pool.functions.setUserEMode.assert_called_once_with(1)
+    assert client._w3.eth.account.sign_transaction.called
+    assert client._w3_tx.eth.send_raw_transaction.called
+
+
+@patch("app.aave.rpc_provider.RPCProvider")
+@patch("app.aave.client.Web3")
+def test_execute_set_emode_rejects_invalid_category_id(
+    mock_web3, mock_rpc_provider_cls, mock_settings
+):
+    """category_id が 0-255 の範囲外なら ValueError。"""
+    client, _mock_pool, _server = _make_mocked_web3_client(
+        mock_web3, mock_rpc_provider_cls, mock_settings
+    )
+
+    with pytest.raises(ValueError, match="0-255"):
+        client.execute_set_emode(category_id=256, wallet_address="0x" + "2" * 40)
+
+
+@patch("app.aave.rpc_provider.RPCProvider")
+@patch("app.aave.client.Web3")
+def test_execute_set_emode_requires_wallet_address(mock_web3, mock_rpc_provider_cls, mock_settings):
+    """wallet_address 未指定は AaveClientError。"""
+    client, _mock_pool, _server = _make_mocked_web3_client(
+        mock_web3, mock_rpc_provider_cls, mock_settings
+    )
+
+    with pytest.raises(AaveClientError, match="wallet_address"):
+        client.execute_set_emode(category_id=1, wallet_address="")
+
+
+def test_dummy_client_execute_set_emode_returns_stub_tx_hash():
+    """DummyAaveClient.execute_set_emode は tx 送信せずスタブ tx_hash を返す。"""
+    client = DummyAaveClient()
+    result = client.execute_set_emode(category_id=2, wallet_address="0x" + "3" * 40)
+    assert result["category_id"] == 2
+    assert result["tx_hash"] == "0xdummy_set_emode_hash"

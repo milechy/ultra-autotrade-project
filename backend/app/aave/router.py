@@ -560,8 +560,9 @@ def set_emode(
     """
     Pool.setUserEMode(categoryId) を呼び出して eMode を切り替える。
 
-    HUMAN-REVIEW-REQUIRED: setUserEMode は Aave V3 の write 操作であり、
-    LTV / 清算閾値を変更するため、本番での実行は人間承認後に行うこと。
+    admin 限定・プラットフォーム運用ウォレット（AAVE_WALLET_ADDRESS）操作。
+    ユーザー個別資金は動かさない。dry_run=False の場合、AaveClient.deposit/withdraw と
+    同型のサーバー側署名・送信（execute_set_emode）で実際にオンチェーン反映まで完結する。
 
     dry_run=True の場合はオンチェーン tx を送信せず効果試算のみ返す。
     """
@@ -596,13 +597,13 @@ def set_emode(
         except Exception as hf_exc:  # noqa: BLE001
             logger.warning("HF チェック失敗 (継続): %s", hf_exc)
 
-        result = client.build_set_emode_tx(
-            category_id=body.category_id,
-            wallet_address=wallet_address,
-            dry_run=body.dry_run,
-        )
-
         if body.dry_run:
+            result = client.build_set_emode_tx(
+                category_id=body.category_id,
+                wallet_address=wallet_address,
+                dry_run=True,
+            )
+            _ = result
             return EModeSetResponse(
                 category_id=body.category_id,
                 tx_hash=None,
@@ -611,25 +612,29 @@ def set_emode(
                 message=f"dry_run: eMode cat{body.category_id} への切替 tx を試算しました（送信なし）",
             )
 
-        # build-tx モード: 未署名 tx をレスポンスに含めてフロントエンドへ返す。
-        # フロントエンドはこの tx をウォレットで署名・送信することで eMode を切り替える。
-        # HUMAN-REVIEW-REQUIRED: setUserEMode は Aave V3 の write 操作。
-        set_emode_tx: dict[str, object] | None = result.get("set_emode_tx")
+        # 2026-07-03: admin 限定のプラットフォーム運用ウォレット操作（ユーザー個別資金は
+        # 動かさない）のため、AaveClient.deposit/withdraw と同じサーバー側署名・送信で
+        # 完結させる。以前は未署名 tx を返すのみで「HUMAN-REVIEW-REQUIRED: フロントエンドで
+        # 署名・送信してください」という誤解を招くメッセージを表示しながら実際には何も
+        # 実行されていなかった（2026-07-03 棚卸しで検出）。
+        exec_result = client.execute_set_emode(
+            category_id=body.category_id,
+            wallet_address=wallet_address,
+        )
+        tx_hash = exec_result.get("tx_hash")
         logger.info(
-            "set_emode build_tx: wallet=%s...%s, category_id=%d",
+            "set_emode executed: wallet=%s...%s, category_id=%d, tx=%s",
             wallet_address[:6],
             wallet_address[-4:],
             body.category_id,
+            tx_hash,
         )
         return EModeSetResponse(
             category_id=body.category_id,
-            tx_hash=None,
-            set_emode_tx=set_emode_tx,
+            tx_hash=str(tx_hash) if tx_hash is not None else None,
+            set_emode_tx=None,
             dry_run=False,
-            message=(
-                f"eMode cat{body.category_id} への切替 tx を構築しました。"
-                " HUMAN-REVIEW-REQUIRED: フロントエンドで署名・送信してください。"
-            ),
+            message=f"eMode cat{body.category_id} への切替を実行しました。tx={tx_hash}",
         )
 
     except HTTPException:

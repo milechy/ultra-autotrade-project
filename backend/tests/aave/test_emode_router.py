@@ -87,6 +87,14 @@ class _StubAaveClient(AaveClientBase):
             }
         }
 
+    def execute_set_emode(
+        self,
+        category_id: int,
+        wallet_address: str,
+        private_key: str = "",
+    ) -> "dict[str, Any]":
+        return {"tx_hash": "0xstub_set_emode_hash", "category_id": category_id}
+
 
 # ── 認証ユーザースタブ ──────────────────────────────────────────────────────
 
@@ -255,10 +263,17 @@ class TestSetEmode:
         assert data["set_emode_tx"] is None
         assert data["category_id"] == 1
 
-    def test_post_emode_build_tx_returns_tx_data(
+    def test_post_emode_execute_returns_tx_hash(
         self, admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """dry_run=False 時は set_emode_tx が返る (C-1 修正確認)。"""
+        """dry_run=False 時はサーバー側で署名・送信まで完結し tx_hash が返る。
+
+        2026-07-03 修正: 以前は set_emode_tx（未署名 tx）を返すだけで、
+        「フロントエンドで署名・送信してください」という誤解を招く message を
+        表示しながら実際には何も実行されない gap があった（棚卸しで検出）。
+        admin 限定のプラットフォーム運用ウォレット操作であり、ユーザー個別資金は
+        動かさないため、deposit/withdraw と同型のサーバー側署名で完結させる。
+        """
         monkeypatch.setenv("AAVE_WALLET_ADDRESS", "0xWALLET")
         stub = _StubAaveClient(hf=Decimal("2.5"), emode_id=0)
         with patch("app.aave.router.get_default_aave_client", return_value=stub):
@@ -269,9 +284,10 @@ class TestSetEmode:
         assert resp.status_code == 200
         data = resp.json()
         assert data["dry_run"] is False
-        assert data["set_emode_tx"] is not None
-        assert data["set_emode_tx"]["to"] == "0xPOOL"
-        assert "data" in data["set_emode_tx"]
+        assert data["tx_hash"] == "0xstub_set_emode_hash"
+        assert data["category_id"] == 1
+        # 後方互換フィールドは常に None（サーバー側で送信完結するため未署名 tx は返さない）
+        assert data["set_emode_tx"] is None
 
     def test_post_emode_hf_below_threshold_409(
         self, admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
