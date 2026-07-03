@@ -1305,6 +1305,34 @@ def build_partner_tx(
             detail=f"Operation {proposal.operation} は partner 署名に非対応です",
         )
 
+    # PolicyEngine hard rule 検算（approve_proposal と同型）。Aave SUPPLY/WITHDRAW 限定
+    # （Lido/Pendle は STAKE_ETH/BUY_PT 等 PolicyEngine 既定 whitelist 対象外のため対象外。
+    # 本エンドポイントは approve_proposal を経由しない非カストディアル主経路のため、
+    # ここで通さないと HF floor / 単一取引上限 / velocity cap / cooldown / whitelist が
+    # 一切評価されないまま未署名 tx が発行されてしまう（2026-07-03 棚卸しで検出）。
+    # 本経路はパートナー本人が Privy で署名する手動フローであり AUTO 執行ではないため
+    # is_auto_execution=False 固定（Rule8 の delegation grant 要件は対象外）。
+    policy_ctx = PolicyContext(
+        user_id=proposal.user_id,
+        asset=proposal.asset,
+        operation=proposal.operation,
+        amount_usd=Decimal(str(proposal.amount_usd)),
+        expected_hf_after=Decimal(str(proposal.expected_hf_after))
+        if proposal.expected_hf_after is not None
+        else None,
+        proposal_id=proposal.id,
+        is_auto_execution=False,
+    )
+    policy_result = get_policy_engine().check(policy_ctx, db)
+    if policy_result.blocked:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "POLICY_VIOLATION",
+                "violations": policy_result.violations,
+            },
+        )
+
     # B1: SUPPLY は USDC 残高不足を build-tx 前に検出し、無駄ガス・on-chain revert を防ぐ。
     # 残高取得失敗 (None) は fail-open（ガード skip）— submit-tx の revert→failed が安全網。
     # WITHDRAW は aToken 引出なので USDC 残高ガード対象外。
