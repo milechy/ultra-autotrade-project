@@ -30,15 +30,18 @@ export function MyWalletPanel() {
   const t = useTranslations("Liff.panels.myWallet")
   const { ready: privyReady, login } = usePrivy()
 
-  // live wallet（injected / Privy embedded）は useWallet に集約済み。
+  // live wallet（injected / Privy embedded、EOA）は useWallet に集約済み。
   // settings 画面など他の消費者と同一の単一情報源を共有する。
   const { address: liveAddress } = useWallet()
 
-  // live wallet が取れないときだけ、バックエンド記録アドレスをフォールバック取得。
-  // （別デバイスで連携済み等。表示専用で署名はできない。）
-  const linked = useLinkedWalletAddress(privyReady && !liveAddress)
+  // smart_wallet_address 判定のため liveAddress の有無に関わらず常時取得する
+  // （live wallet が取れないときのフォールバック表示も兼ねる）。
+  const linked = useLinkedWalletAddress(privyReady)
 
-  const address = liveAddress ?? linked.address
+  // 表示・コピー・QRコード先は実効アドレス（smart_wallet_address 優先、無ければ EOA）。
+  // Aave 実行の実体（backend submit_partner_tx の UserOp sender 検証）と一致させるため
+  // EOA 固定にしない（2026-07-04 資金迷子バグ修正）。
+  const address = linked.smartWalletAddress ?? liveAddress ?? linked.address
 
   // 表示状態を派生。Privy 初期化前は loading を維持（永久固まり回避）。
   const fetchState: FetchState = !privyReady

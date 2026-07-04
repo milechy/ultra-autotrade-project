@@ -10,6 +10,7 @@ import { useFundWallet } from "@privy-io/react-auth"
 import { base, baseSepolia } from "wagmi/chains"
 import { useWallet } from "@/hooks/useWallet"
 import { useUsdcBalance } from "@/hooks/useUsdcBalance"
+import { useEffectiveWalletAddress } from "@/hooks/useEffectiveWalletAddress"
 import { track, EV } from "@/lib/posthog"
 import { SUPPORTED_CHAIN_IDS, getChainDisplayName } from "@/lib/web3/config"
 
@@ -109,12 +110,16 @@ export function DepositPanel() {
       .catch(() => {})
   }, [])
 
-  // Privy ウォレット情報（useFundWallet 用）
-  const { address, chainId } = useWallet()
+  // Privy ウォレット情報（chainId は署名/ネットワーク判定用。EOA。）
+  const { chainId } = useWallet()
 
-  // 残高 = ユーザー自身のウォレットの USDC オンチェーン残高（非カストディアル）。
-  // 出金先/入金先アドレスも settings 依存をやめ useWallet の address を正とする。
-  const { balanceUsd, loading: balanceLoading, refetch: refetchBalance } = useUsdcBalance()
+  // 入金先/出金先/残高チェック対象アドレスは実効アドレス（smart_wallet_address 優先、
+  // 未設定なら EOA）。Aave 実行の実体（backend submit_partner_tx の UserOp sender 検証）
+  // と一致させるため、EOA 固定にしない（2026-07-04 資金迷子バグ修正）。
+  const { address } = useEffectiveWalletAddress()
+
+  // 残高 = 実効アドレスの USDC オンチェーン残高（非カストディアル）。
+  const { balanceUsd, loading: balanceLoading, refetch: refetchBalance } = useUsdcBalance(address)
   const balance = balanceUsd
   const walletAddress = address
 

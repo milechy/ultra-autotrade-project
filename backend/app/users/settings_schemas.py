@@ -39,6 +39,11 @@ class UserSettingsResponse(BaseModel):
     corporate_fiscal_month: Optional[int] = None
     # ユーザーロール（admin / viewer / partner）。フロントエンドの権限分岐に使用する。
     role: str = "viewer"
+    # EOA ウォレットアドレス（Privy embedded wallet 等）。未設定なら None。
+    wallet_address: Optional[str] = None
+    # Smart Wallet (ERC-4337) アドレス。設定済みなら Aave 実行の実体はこちら
+    # (backend/app/proposals/router.py の smart_wallet_address 優先ロジックと対応)。
+    smart_wallet_address: Optional[str] = None
 
 
 class UserSettingsUpdate(BaseModel):

@@ -16,6 +16,8 @@ export type LinkedAddressState = 'idle' | 'loading' | 'ready' | 'empty' | 'error
 
 export interface LinkedWalletAddress {
   address: string | null
+  /** Smart Wallet (ERC-4337) アドレス。未設定 (EOA ユーザー) なら null。 */
+  smartWalletAddress: string | null
   state: LinkedAddressState
   refetch: () => void
 }
@@ -38,6 +40,7 @@ export interface LinkedWalletAddress {
  */
 export function useLinkedWalletAddress(enabled = true): LinkedWalletAddress {
   const [address, setAddress] = useState<string | null>(null)
+  const [smartWalletAddress, setSmartWalletAddress] = useState<string | null>(null)
   const [state, setState] = useState<LinkedAddressState>('idle')
 
   const fetchAddress = useCallback(async () => {
@@ -50,6 +53,7 @@ export function useLinkedWalletAddress(enabled = true): LinkedWalletAddress {
     if (!token) {
       // 認証トークンが無い = 記録も引けない（空状態）
       setAddress(null)
+      setSmartWalletAddress(null)
       setState('empty')
       return
     }
@@ -64,13 +68,17 @@ export function useLinkedWalletAddress(enabled = true): LinkedWalletAddress {
         setState('error')
         return
       }
-      const data = (await res.json()) as { wallet_address?: string | null } | null
+      const data = (await res.json()) as {
+        wallet_address?: string | null
+        smart_wallet_address?: string | null
+      } | null
+      setSmartWalletAddress(data?.smart_wallet_address ?? null)
       if (data?.wallet_address) {
         setAddress(data.wallet_address)
         setState('ready')
       } else {
         setAddress(null)
-        setState('empty')
+        setState(data?.smart_wallet_address ? 'ready' : 'empty')
       }
     } catch {
       // ネットワーク失敗等は fail-visible（refetch 可能）
@@ -82,5 +90,5 @@ export function useLinkedWalletAddress(enabled = true): LinkedWalletAddress {
     void fetchAddress()
   }, [fetchAddress])
 
-  return { address, state, refetch: fetchAddress }
+  return { address, smartWalletAddress, state, refetch: fetchAddress }
 }

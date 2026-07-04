@@ -30,6 +30,7 @@ interface UserData {
   user_mode?: "managed" | "active" | "pro"
   created_at?: string
   wallet_address?: string
+  smart_wallet_address?: string
   avatar_url?: string
   // 法人決算月 (1-12)。backend /api/user/settings で永続化される。
   corporate_fiscal_month?: number | null
@@ -120,6 +121,7 @@ export function AccountPanel() {
             email?: string
             created_at?: string
             wallet_address?: string
+            smart_wallet_address?: string
           } | null,
         ) => {
           if (data) {
@@ -128,6 +130,9 @@ export function AccountPanel() {
               ...(data.email && { email: data.email }),
               ...(data.created_at && { created_at: data.created_at }),
               ...(data.wallet_address && { wallet_address: data.wallet_address }),
+              ...(data.smart_wallet_address && {
+                smart_wallet_address: data.smart_wallet_address,
+              }),
             }))
           }
         },
@@ -172,10 +177,12 @@ export function AccountPanel() {
     return t("defaultUser")
   }
 
-  // ウォレットアドレス短縮表示。backend の wallet_address を優先し、
-  // 未記録時は Privy/injected の実ウォレット（liveWalletAddress）にフォールバック。
+  // ウォレットアドレス短縮表示。実効アドレス（smart_wallet_address 優先、無ければ
+  // backend の wallet_address、未記録時は Privy/injected の実ウォレット）。
+  // Aave 実行の実体（backend submit_partner_tx の UserOp sender 検証）と一致させる
+  // ため EOA 固定にしない（2026-07-04 資金迷子バグ修正）。
   const getShortAddress = () => {
-    const addr = userData?.wallet_address ?? liveWalletAddress
+    const addr = userData?.smart_wallet_address ?? userData?.wallet_address ?? liveWalletAddress
     if (!addr) return null
     return `${addr.slice(0, 6)}…${addr.slice(-4)}`
   }
@@ -200,7 +207,7 @@ export function AccountPanel() {
 
   // ウォレットアドレスコピー（表示と同じ単一情報源を使う）
   const handleCopyWallet = async () => {
-    const addr = userData?.wallet_address ?? liveWalletAddress
+    const addr = userData?.smart_wallet_address ?? userData?.wallet_address ?? liveWalletAddress
     if (!addr) return
     try {
       await navigator.clipboard.writeText(addr)
