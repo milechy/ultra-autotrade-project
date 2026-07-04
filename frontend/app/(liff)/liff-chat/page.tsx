@@ -9,6 +9,7 @@ import { Menu, User } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useLanguage } from "@/lib/useLanguage"
 import { useUsdcBalance } from "@/hooks/useUsdcBalance"
+import { useEffectiveWalletAddress } from "@/hooks/useEffectiveWalletAddress"
 import { track, EV } from "@/lib/posthog"
 import { HamburgerMenu } from "./_components/HamburgerMenu"
 import { SlideUpPanel } from "./_components/SlideUpPanel"
@@ -129,9 +130,12 @@ export default function LiffChatPage() {
   const t = useTranslations("Liff")
   const { language, setLanguage } = useLanguage()
 
-  // 現在資産 = ユーザー自身のウォレットの USDC オンチェーン残高（非カストディアル）。
-  // refetch は S2 の着金検知ポーリングで使う。
-  const { balanceUsd, refetch: refetchBalance } = useUsdcBalance()
+  // 現在資産 = 実効アドレス（smart_wallet_address 優先、無ければ EOA）の USDC
+  // オンチェーン残高（非カストディアル）。backend B1 の build-tx 残高ガード
+  // （smart_wallet_address 優先）とフロント表示を一致させる
+  // （2026-07-04 資金迷子バグ修正）。refetch は S2 の着金検知ポーリングで使う。
+  const { address: effectiveWalletAddress } = useEffectiveWalletAddress()
+  const { balanceUsd, refetch: refetchBalance } = useUsdcBalance(effectiveWalletAddress)
 
   // ── 既存 state（ハンバーガー）
   const [menuOpen, setMenuOpen] = useState(false)

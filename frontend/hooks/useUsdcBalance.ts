@@ -27,9 +27,15 @@ const CHAINS = SUPPORTED_CHAINS as Record<string, { rpc?: string } | undefined>
  * 旧実装は /api/user/settings の `balance` を読んでいたが、当該フィールドはバックエンドに
  * 存在せず常に null（= 残高 $0 表示）だった。read-only provider 経由の balanceOf に置換する。
  * balanceOf は署名不要のため signer は使わない。
+ *
+ * @param addressOverride 残高を読む対象アドレス。省略時は useWallet().address（EOA）を使う
+ *   後方互換動作（v3 レガシーダッシュボード向け）。Smart Wallet ユーザーの実際の資金は
+ *   smart_wallet_address 側にあるため、liff-chat 等の呼び出し元は実効アドレス
+ *   （smart_wallet_address 優先）を明示的に渡すこと。
  */
-export function useUsdcBalance(): UsdcBalanceState {
-  const { address, chainId } = useWallet()
+export function useUsdcBalance(addressOverride?: string | null): UsdcBalanceState {
+  const { address: eoaAddress, chainId } = useWallet()
+  const address = addressOverride !== undefined ? addressOverride : eoaAddress
   const [balanceUsd, setBalanceUsd] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)

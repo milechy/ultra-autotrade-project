@@ -125,6 +125,8 @@ class UserResponse(BaseModel):
     invited_by: Optional[int] = None
     tier: InvestmentTier = InvestmentTier.LOWER
     execution_policy: str = "require_approval"
+    wallet_address: Optional[str] = None
+    smart_wallet_address: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

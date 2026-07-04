@@ -78,6 +78,25 @@ class TestUserSettingsAPI:
         data = r.json()
         assert data["notification_frequency"] == "important"
         assert data["notification_email"] is None
+        assert data["wallet_address"] is None
+        assert data["smart_wallet_address"] is None
+
+    def test_get_settings_includes_smart_wallet_address_when_linked(
+        self, client: TestClient
+    ) -> None:
+        token = register_and_login(client)
+        headers = {"Authorization": f"Bearer {token}"}
+        addr = "0xb332b5fccf25c09cf5098f6363a18b1173158ce3"
+        link_res = client.post(
+            "/auth/wallet/smart-link",
+            json={"smart_wallet_address": addr},
+            headers=headers,
+        )
+        assert link_res.status_code == 200
+
+        r = client.get("/api/user/settings", headers=headers)
+        assert r.status_code == 200
+        assert r.json()["smart_wallet_address"] == addr.lower()
 
     def test_update_notification_email(self, client: TestClient) -> None:
         token = register_and_login(client)

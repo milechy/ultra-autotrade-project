@@ -67,6 +67,8 @@ def _build_settings_response(user: User) -> UserSettingsResponse:
         terms_version=user.terms_version,
         corporate_fiscal_month=user.corporate_fiscal_month,
         role=user.role,
+        wallet_address=user.wallet_address,
+        smart_wallet_address=user.smart_wallet_address,
     )
 
 
