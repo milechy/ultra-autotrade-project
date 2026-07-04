@@ -318,7 +318,9 @@ export function DepositPanel() {
               {t("depositMethodDesc")}
             </p>
             <ul className="text-xs text-[#736f7e] leading-relaxed space-y-0.5 list-disc list-inside">
-              <li>{t("depositMethodNote1")}</li>
+              <li>
+                {t("depositMethodNote1", { chain: getChainDisplayName(SUPPORTED_CHAIN_IDS[0]) ?? "" })}
+              </li>
               <li>{t("depositMethodNote2")}</li>
               <li>{t("depositMethodNote3")}</li>
             </ul>

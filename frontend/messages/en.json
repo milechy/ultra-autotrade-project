@@ -805,7 +805,7 @@
         "depositAmountPlaceholder": "Enter amount",
         "depositMethodTitle": "How to deposit",
         "depositMethodDesc": "Tap \"Deposit\" to reveal your deposit address. Send USDC from your exchange (e.g. SBI VC Trade) or wallet.",
-        "depositMethodNote1": "Important: Always send USDC on the Base (Base Mainnet) network. Funds sent on other networks (e.g. Ethereum) will NOT arrive",
+        "depositMethodNote1": "Important: Always send USDC on the {chain} network. Funds sent on other networks (e.g. Ethereum) will NOT arrive",
         "depositMethodNote2": "Very small amounts may not transfer (recommended minimum: ~$30)",
         "depositMethodNote3": "The amount entered is an estimate; set the actual transfer amount in your wallet",
         "depositAddressLabel": "Deposit address (Base Mainnet)",

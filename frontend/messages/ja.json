@@ -805,7 +805,7 @@
         "depositAmountPlaceholder": "金額を入力",
         "depositMethodTitle": "入金方法",
         "depositMethodDesc": "「入金する」を押すと入金用アドレスが表示されます。取引所（例: SBI VCトレード）やお持ちのウォレットから USDC を送金してください。",
-        "depositMethodNote1": "【重要】必ず Base（Base Mainnet）ネットワークで USDC を送金してください。Ethereum など他のネットワークで送ると着金しません",
+        "depositMethodNote1": "【重要】必ず {chain} ネットワークで USDC を送金してください。Ethereum など他のネットワークで送ると着金しません",
         "depositMethodNote2": "少額すぎると送金できない場合があります（目安: 数十ドル以上）",
         "depositMethodNote3": "入力した金額は送金額の目安です（実際の送金額はご自身で指定します）",
         "depositAddressLabel": "入金用アドレス（Base Mainnet）",
