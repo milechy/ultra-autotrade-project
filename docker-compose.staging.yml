@@ -302,6 +302,13 @@ services:
         NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
         NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-https://us.i.posthog.com}
         NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-dev}
+        # v4 Phase 2-D-E: 委譲おまかせ consent フロー（ビルド時埋め込み・既定 false=dormant）。
+        NEXT_PUBLIC_DELEGATION_CONSENT_ENABLED: ${NEXT_PUBLIC_DELEGATION_CONSENT_ENABLED:-false}
+        # PWA 配布向けフィーチャーフラグ（lib/flags.ts・build-time 埋め込み）。
+        # 本番 PR #917 と同型配線。.env.staging-new で true 設定 + frontend 再ビルドで有効化。
+        NEXT_PUBLIC_AUTO_MODE_ENABLED: ${NEXT_PUBLIC_AUTO_MODE_ENABLED:-false}
+        NEXT_PUBLIC_PUBLIC_REGISTRATION_ENABLED: ${NEXT_PUBLIC_PUBLIC_REGISTRATION_ENABLED:-false}
+        NEXT_PUBLIC_REFERRAL_ENABLED: ${NEXT_PUBLIC_REFERRAL_ENABLED:-false}
         # Next.js ビルド OOM 対策 (CLAUDE.md §2026-05-19 GID 1214828243363427)
         # staging-new は 7.6GB RAM / swap なし → 4096MB が安全下限。
         # 実ビルドログでピーク確認後に値を調整すること。
