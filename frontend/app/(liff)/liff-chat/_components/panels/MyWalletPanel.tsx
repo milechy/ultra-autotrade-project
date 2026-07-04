@@ -17,6 +17,7 @@ import { useTranslations } from "next-intl"
 import { usePrivy } from "@privy-io/react-auth"
 import { useWallet } from "@/hooks/useWallet"
 import { useLinkedWalletAddress } from "@/hooks/useLinkedWalletAddress"
+import { SUPPORTED_CHAIN_IDS, getChainDisplayName } from "@/lib/web3/config"
 
 // アドレス解決の状態。
 //  - loading : Privy 初期化中 / API 取得中
@@ -111,7 +112,9 @@ export function MyWalletPanel() {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#1D9E75] inline-block" />
-            <span className="text-[#736f7e] text-xs">{t("baseMainnet")}</span>
+            <span className="text-[#736f7e] text-xs">
+              {getChainDisplayName(SUPPORTED_CHAIN_IDS[0])}
+            </span>
           </div>
         </div>
 
