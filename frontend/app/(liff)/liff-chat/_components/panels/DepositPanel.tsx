@@ -11,6 +11,7 @@ import { base, baseSepolia } from "wagmi/chains"
 import { useWallet } from "@/hooks/useWallet"
 import { useUsdcBalance } from "@/hooks/useUsdcBalance"
 import { track, EV } from "@/lib/posthog"
+import { SUPPORTED_CHAIN_IDS, getChainDisplayName } from "@/lib/web3/config"
 
 // ---- 型定義 ---------------------------------------------------------------
 
@@ -256,7 +257,9 @@ export function DepositPanel() {
             <span className="text-sm font-normal text-[#736f7e] ml-2">USDC</span>
           </p>
         )}
-        <p className="text-xs text-[#736f7e] mt-1">{t("network")}</p>
+        <p className="text-xs text-[#736f7e] mt-1">
+          USDC · {getChainDisplayName(SUPPORTED_CHAIN_IDS[0])}
+        </p>
       </div>
 
       {/* 成功メッセージ */}
