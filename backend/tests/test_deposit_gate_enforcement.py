@@ -68,19 +68,27 @@ def client(test_db) -> TestClient:  # type: ignore[no-untyped-def]
     return TestClient(app)
 
 
-# 登録は INITIAL_ADMIN_EMAIL に一致する email のみ許可される (initial admin, first user)。
-# conftest が先に setdefault するため、実際に有効な値を runtime で読む。
-_ADMIN_EMAIL = os.environ.get("INITIAL_ADMIN_EMAIL", "gate_admin@example.com")
 _ADMIN_PASSWORD = "GateTestPass123!"
+
+
+def _admin_email() -> str:
+    """登録は「initial admin (first user) かつ email == 現在の INITIAL_ADMIN_EMAIL」のみ許可。
+
+    他テスト (例: test_api_v1_fees) が INITIAL_ADMIN_EMAIL を os.environ に上書きするため、
+    module import 時にキャプチャすると実行順序で register 403→login 401 になる。
+    必ず呼び出し時 (runtime) に現在値を読むこと。
+    """
+    return os.environ.get("INITIAL_ADMIN_EMAIL", "gate_admin@example.com")
 
 
 def _login(client: TestClient) -> str:
     """INITIAL_ADMIN_EMAIL ユーザー（admin ロール）を登録してトークン取得。"""
+    email = _admin_email()
     client.post(
         "/auth/register",
-        json={"email": _ADMIN_EMAIL, "username": "gate_admin", "password": _ADMIN_PASSWORD},
+        json={"email": email, "username": "gate_admin", "password": _ADMIN_PASSWORD},
     )
-    r = client.post("/auth/login", json={"email": _ADMIN_EMAIL, "password": _ADMIN_PASSWORD})
+    r = client.post("/auth/login", json={"email": email, "password": _ADMIN_PASSWORD})
     assert r.status_code == 200, f"login failed: {r.status_code} {r.text}"
     return str(r.json()["access_token"])
 
@@ -179,7 +187,7 @@ class TestApprovalDepositGate:
         """残高 $150 (<$200) で承認は 422 DEPOSIT_BELOW_MINIMUM（執行前に遮断）。"""
         _, engine = test_db
         token = _login(client)
-        uid = _user_id(engine, _ADMIN_EMAIL)
+        uid = _user_id(engine, _admin_email())
         pid = _create_pending_proposal(client, token, uid)
         with patch(_RESOLVER, return_value=Decimal("150")):
             r = client.post(f"/api/proposals/{pid}/approve", headers=_auth(token))
@@ -190,7 +198,7 @@ class TestApprovalDepositGate:
         """境界: $199.99 は承認 block。"""
         _, engine = test_db
         token = _login(client)
-        uid = _user_id(engine, _ADMIN_EMAIL)
+        uid = _user_id(engine, _admin_email())
         pid = _create_pending_proposal(client, token, uid)
         with patch(_RESOLVER, return_value=Decimal("199.99")):
             r = client.post(f"/api/proposals/{pid}/approve", headers=_auth(token))

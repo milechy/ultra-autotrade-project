@@ -69,7 +69,7 @@ const LiffInitError = withLiffLayoutIntl(LiffLayoutInitError)
 // - liff-sign-poc: 署名診断ページ (ログイン状態を意図的に表示する)
 const AUTH_GUARD_EXEMPT = ['/liff-login', '/liff-sign-poc']
 
-// 重要事項同意 (terms_version="liff-v3") を入口非依存で強制する BtoC 消費者ページ。
+// 重要事項同意 (terms_version="liff-v4") を入口非依存で強制する BtoC 消費者ページ。
 // リッチメニュー / ブックマーク等で直接アクセスされても、未同意なら /liff-confirm へ
 // 誘導する (法的同意の 1 経路依存を解消; Asana 1215360586206558)。
 // パートナー承認系 (liff-approve / liff-fee-approve 等) は別系統のため対象外。
@@ -85,7 +85,7 @@ export default function LiffLayout({ children }: { children: React.ReactNode }) 
   const reauth = useLiffAutoReAuth()
 
   // ── 重要事項同意ガード (入口非依存) ──
-  // token を持つ消費者が TERMS_GATE_PATHS に直接来た場合に、liff-v3 未同意なら
+  // token を持つ消費者が TERMS_GATE_PATHS に直接来た場合に、liff-v4 未同意なら
   // /liff-confirm へ送る。token が無い場合は下の auth guard 側に委ねる。
   const token = getAuthToken()
   const needsTermsGate =

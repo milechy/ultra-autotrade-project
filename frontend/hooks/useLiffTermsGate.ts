@@ -2,7 +2,7 @@
 // Unauthorized copying or distribution is strictly prohibited.
 // frontend/hooks/useLiffTermsGate.ts
 //
-// LIFF (BtoC 消費者) の重要事項同意 (terms_version="liff-v3") を入口非依存で
+// LIFF (BtoC 消費者) の重要事項同意 (terms_version="liff-v4") を入口非依存で
 // 強制するためのゲート判定フック。
 //
 // 背景 (Asana 1215360586206558):
@@ -47,8 +47,8 @@ export type LiffTermsGateState = "loading" | "accepted" | "not-accepted"
  * @param enabled          false の間はゲートを無効化し常に "accepted" を返す
  *                         (除外ページ / 未認証時に呼び出し側が無効化する)。
  * @param acceptedVersions 「同意済み」とみなすバージョン一覧。
- *                         デフォルト ['liff-v3'] — 既存 LIFF 呼び出しは引数省略で後方互換。
- *                         ブラウザ経路では ['liff-v3', '2.0'] を渡す。
+ *                         デフォルト ['liff-v4'] — 既存 LIFF 呼び出しは引数省略で後方互換。
+ *                         ブラウザ経路では ['liff-v3', 'liff-v4', '2.0'] を渡す。
  */
 export function useLiffTermsGate(
   enabled: boolean,
