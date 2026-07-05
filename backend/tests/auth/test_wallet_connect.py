@@ -205,6 +205,45 @@ class TestWalletConnect:
         assert data["token_type"] == "bearer"
         assert data["is_new_user"] is True
 
+    def test_wallet_connect_stores_privy_wallet_id(self, client: TestClient, test_db) -> None:  # type: ignore[no-untyped-def]
+        """privy_wallet_id を送ると user に保存される (委譲 SCW 執行用)。"""
+        from sqlalchemy import select as _select
+
+        from app.auth.models import User as _User
+
+        _, engine = test_db
+        payload = self._make_valid_request()
+        payload["privy_wallet_id"] = "abc123privywalletid"
+        resp = client.post("/auth/wallet/connect", json=payload)
+        assert resp.status_code == 200, resp.text
+
+        with sessionmaker(bind=engine)() as s:
+            user = s.scalar(_select(_User).where(_User.privy_wallet_id == "abc123privywalletid"))
+        assert user is not None
+        assert user.privy_wallet_id == "abc123privywalletid"
+
+    def test_wallet_connect_backfills_privy_wallet_id_on_reconnect(
+        self, client: TestClient, test_db
+    ) -> None:  # type: ignore[no-untyped-def]
+        """既存ユーザーが後から privy_wallet_id 付きで再接続すると backfill される。"""
+        from sqlalchemy import select as _select
+
+        from app.auth.models import User as _User
+
+        _, engine = test_db
+        # 1回目: privy_wallet_id なし
+        client.post("/auth/wallet/connect", json=self._make_valid_request())
+        # 2回目: privy_wallet_id あり
+        payload = self._make_valid_request()
+        payload["privy_wallet_id"] = "wallet-id-backfilled"
+        resp = client.post("/auth/wallet/connect", json=payload)
+        assert resp.status_code == 200, resp.text
+
+        with sessionmaker(bind=engine)() as s:
+            user = s.scalar(_select(_User).where(_User.privy_wallet_id == "wallet-id-backfilled"))
+        assert user is not None
+        assert user.privy_wallet_id == "wallet-id-backfilled"
+
     def test_wallet_connect_new_user_needs_terms(self, client: TestClient):
         """新規ユーザーは needs_terms_acceptance = True になること。"""
         payload = self._make_valid_request()
