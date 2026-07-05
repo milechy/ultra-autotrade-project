@@ -22,8 +22,9 @@ import { useEffect, useState } from "react"
 
 import { getAuthToken } from "@/lib/auth/token-key"
 
-/** liff-confirm / settings_router (LIFF_TERMS_VERSION) と一致させること。 */
-const LIFF_TERMS_VERSION = "liff-v3"
+/** liff-confirm / settings_router (LIFF_TERMS_VERSION) と一致させること。
+ *  liff-v4: 月額利用料・成功報酬の同意 (monthly_fee) を追加。liff-v3 同意者は再同意が必要。 */
+const LIFF_TERMS_VERSION = "liff-v4"
 
 /**
  * terms-agree POST 直後に sessionStorage へ書き込むキー。

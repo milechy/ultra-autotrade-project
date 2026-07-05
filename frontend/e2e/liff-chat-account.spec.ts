@@ -48,12 +48,12 @@ async function openAccountPanel(page: Page): Promise<boolean> {
 
 // /api/user/settings と /auth/me を 200 で固定する。これにより
 //   - liffFetch の 401→/liff-login リダイレクトを抑止
-//   - 重要事項同意ゲート（terms_version="liff-v3" 一致で accepted）の /liff-confirm リダイレクト抑止
+//   - 重要事項同意ゲート（terms_version="liff-v4" 一致で accepted）の /liff-confirm リダイレクト抑止
 // が成立し、認証あり/なしのどちらでも AccountPanel を決定的に開ける。
 async function mockUserApis(page: Page): Promise<void> {
   const settingsBody = JSON.stringify({
     user_mode: 'managed',
-    terms_version: 'liff-v3',
+    terms_version: 'liff-v4',
     corporate_fiscal_month: null,
     created_at: '2026-01-01T00:00:00Z',
     email: 'e2e@example.com',

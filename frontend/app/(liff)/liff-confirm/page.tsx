@@ -12,8 +12,9 @@ import { TERMS_JUST_ACCEPTED_KEY } from "@/hooks/useLiffTermsGate"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
-// 規約 ver04 — id は messages キーとして使用
-const ITEM_IDS = ["terms_full", "self_custody", "defi_risk", "usage_conditions", "user_responsibility", "age_confirm"] as const
+// 規約 ver05 (月額利用料・成功報酬の同意 monthly_fee を追加) — id は messages キーとして使用。
+// terms_version は "liff-v4" に更新（liff-v3 同意者は本項目を含む再同意が必要）。
+const ITEM_IDS = ["terms_full", "self_custody", "defi_risk", "usage_conditions", "monthly_fee", "user_responsibility", "age_confirm"] as const
 
 export default function LiffConfirmPage() {
   const router = useRouter()
@@ -47,8 +48,8 @@ export default function LiffConfirmPage() {
     })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { terms_agreed_at?: string | null; terms_version?: string | null } | null) => {
-        // liff-v3 で同意済みの場合のみスキップ (旧バージョン同意者は再同意を求める)
-        if (data?.terms_agreed_at && data?.terms_version === "liff-v3") {
+        // liff-v4 で同意済みの場合のみスキップ (旧バージョン同意者は再同意を求める)
+        if (data?.terms_agreed_at && data?.terms_version === "liff-v4") {
           router.replace("/liff-chat")
         } else {
           setLoading(false)
@@ -81,7 +82,7 @@ export default function LiffConfirmPage() {
       if (res.ok) {
         // terms gate の sessionStorage 高速パス: Cloudflare キャッシュやネットワーク
         // 失敗によるループを防ぐ（useLiffTermsGate.ts と対になる）。
-        sessionStorage.setItem(TERMS_JUST_ACCEPTED_KEY, "liff-v3")
+        sessionStorage.setItem(TERMS_JUST_ACCEPTED_KEY, "liff-v4")
         router.replace("/liff-chat")
       } else if (res.status === 401) {
         // セッション切れ — 失効トークンを消してから再ログインへ誘導。

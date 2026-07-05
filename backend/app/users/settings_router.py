@@ -41,7 +41,7 @@ from .settings_schemas import (
 
 logger = logging.getLogger(__name__)
 
-LIFF_TERMS_VERSION = "liff-v3"
+LIFF_TERMS_VERSION = "liff-v4"
 
 router = APIRouter(prefix="/api/user", tags=["user-settings"])
 
@@ -195,10 +195,10 @@ def agree_to_terms(
     """重要事項への同意を記録する（LIFF オンボーディング用）。
 
     既に同意済みの場合はそのまま返す（冪等）。
-    terms_accepted_at カラムに現在時刻を書き込み、terms_version="liff-v3" を設定する。
+    terms_accepted_at カラムに現在時刻を書き込み、terms_version=LIFF_TERMS_VERSION (liff-v4) を設定する。
     """
-    # terms_version が liff-v3 の場合のみ同意済みとして扱う
-    # — 旧バージョン (liff-v1, 2.0 等) で同意済みのユーザーは再同意を求める
+    # terms_version が現行 LIFF_TERMS_VERSION (liff-v4) の場合のみ同意済みとして扱う
+    # — 旧バージョン (liff-v1/v3, 2.0 等) で同意済みのユーザーは再同意を求める
     if (
         current_user.terms_accepted_at is not None
         and current_user.terms_version == LIFF_TERMS_VERSION

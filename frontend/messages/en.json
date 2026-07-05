@@ -1049,6 +1049,10 @@
           "title": "Usage Conditions (Connected Asset Range and Monthly Usage Limits)",
           "detail": "This Service applies monthly usage limits based on the range of digital assets connected by each user. Please refer to the Service interface, Terms of Service, and related documents for the applicable conditions and limitations."
         },
+        "monthly_fee": {
+          "title": "I agree to the monthly fee and performance fee",
+          "detail": "The Service fees consist of a monthly fee (per month on your deposited amount: 0% Conservative / 0.3% Balanced / 1% Aggressive; the first month is free) and a performance fee (20%-30% of profit, only when the operation is profitable, based on your deposit size). Current rates are always shown on the \"Pricing\" screen within the Service. Before charging begins, we will notify you in advance and apply fees only with your consent (Terms of Service Article 7). Blockchain network fees (gas) are borne separately by the user."
+        },
         "user_responsibility": {
           "title": "Account Management Is Your Responsibility",
           "detail": "Users are responsible for managing the account they use to log in (e.g., email address or LINE account) and for taking appropriate measures against unauthorized access. The Company shall not be responsible for losses or damages resulting from insufficient account management or unauthorized use by third parties."
@@ -1640,11 +1644,11 @@
     "emailLabel": "Email",
     "emailValue": "info@yieldmediaonline.com",
     "priceLabel": "Fees",
-    "priceValue": "The Service is currently free of charge. If fees are introduced in the future, they will be displayed within the service in advance and applied only with the user's consent. Monthly usage limits may apply according to the range of connected digital assets (Terms of Service Articles 5 and 7).",
+    "priceValue": "Monthly fee: depending on the operation mode, 0% (Conservative) / 0.3% (Balanced) / 1% (Aggressive) per month on the deposited amount (first month free). Performance fee: only when the operation is profitable, 20%-30% of such profit depending on the deposit size. Current rates are shown on the \"Pricing\" screen within the Service. Before charging begins, users will be notified in advance and fees applied only with their consent (Terms of Service Article 7).",
     "extraCostLabel": "Costs Other Than Fees",
     "extraCostValue": "Network fees (gas) for on-chain transactions, third-party service fees, and other costs are borne by the user.",
     "paymentMethodLabel": "Payment Method",
-    "paymentMethodValue": "As specified within the service.",
+    "paymentMethodValue": "Deducted after each month-end finalization from the digital wallet connected by the user, by the method specified within the service (the start date of charging will be notified in advance).",
     "deliveryLabel": "Timing of Service Provision",
     "deliveryValue": "Available immediately after account creation and acceptance of the Terms of Service.",
     "cancelLabel": "Returns, Cancellation and Termination",
@@ -2202,7 +2206,7 @@
     "section6Title": "Article 6 (Risk Management and Service Restrictions)",
     "section6Body": "The Company may suspend or restrict AI-based strategy execution when deemed necessary based on market conditions, liquidity, price volatility, or other risk factors.",
     "section7Title": "Article 7 (Service Fees and Network Costs)",
-    "section7Body": "The Service is currently free of charge. If service fees are introduced in the future, they will be specified within the Service in advance and applied only with the user's consent. Users are responsible for blockchain network fees (gas fees), external service fees, and other costs associated with transactions.",
+    "section7Body": "The Service fees are as follows. (1) Monthly fee: depending on the operation mode, calculated at month-end on the deposited amount at 0% (Conservative), 0.3% (Balanced), or 1% (Aggressive) per month (the first month is free). (2) Performance fee: only when the operation is profitable, 20%-30% of such profit depending on the deposit size. The current rates are always displayed on the \"Pricing\" screen within the Service. Before we begin charging, we will notify users in advance and apply fees only with their consent. Users are responsible for blockchain network fees (gas fees), external service fees, and other costs associated with transactions.",
     "section8Title": "Article 8 (Disclaimer)",
     "section8Body": "The Company does not guarantee any profits, returns, or increases in asset value resulting from the use of the Service. The Company shall not be liable, to the extent permitted by applicable laws, for damages arising from market fluctuations, blockchain network failures, failures of external services, smart contract vulnerabilities, unauthorized access by third parties, or other circumstances beyond the Company's reasonable control.",
     "section9Title": "Article 9 (Prohibited Activities)",
