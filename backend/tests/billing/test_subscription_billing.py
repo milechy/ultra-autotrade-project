@@ -16,6 +16,7 @@ DB は SQLite テスト DB (in-memory)。
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from collections.abc import Generator
@@ -475,3 +476,58 @@ class TestSubscriptionProtectionBoundary:
         )
         assert result2.yield_excess_to_uata_jpy == Decimal("17000")  # 35,000 - 18,000
         assert result2.user_takehome_jpy == Decimal("18000")
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: finalize_month_core on-chain transfer fail-fast guard
+# ---------------------------------------------------------------------------
+
+
+class TestFinalizeMonthTransferGuard:
+    """FEE_TRANSFER_ENABLED=true だが operator wallet 未設定時の fail-fast guard 検証。
+
+    設計A (fee_transfer_service) の on-chain transfer phase は、operator address/key が
+    未設定のまま loop に入ると全 fee_tx が transfer_status="failed" で汚染される。
+    guard により phase 全体をスキップし 1 本の ERROR ログに集約する (2026-07-05, 設計B削除と同PR)。
+    """
+
+    def _import_core(self):  # type: ignore[no-untyped-def]
+        from app.api.v1.fees import finalize_month_core  # noqa: PLC0415
+
+        return finalize_month_core
+
+    def test_operator_unset_skips_transfer_phase(
+        self,
+        db: Session,
+        active_config: FeeConfigV10,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        monkeypatch.setenv("FEE_TRANSFER_ENABLED", "true")
+        monkeypatch.delenv("OPERATOR_FEE_WALLET_ADDRESS", raising=False)
+        monkeypatch.delenv("OPERATOR_FEE_WALLET_KEY", raising=False)
+
+        # conservative + 利益ありで seed (sub=0 → 保護発動せず fee_tx が確実に生成される)。
+        _add_user(db, user_id=1, risk_mode="conservative", tier="LOWER")
+        _add_snapshots(db, 1, start_usd=Decimal("1000"), end_usd=Decimal("1050"))
+        db.commit()
+
+        finalize_month_core = self._import_core()
+        with caplog.at_level(logging.ERROR, logger="app.api.v1.fees"):
+            resp = finalize_month_core(db, active_config, _MONTH, Decimal("150"))
+
+        # phase 全体スキップ: 送金統計はすべて 0 (per-user failed 汚染なし)。
+        assert resp.fee_transfer_enabled is True
+        assert resp.transfer_sent == 0
+        assert resp.transfer_skipped == 0
+        assert resp.transfer_failed == 0
+
+        # fee_tx は生成されるが transfer_status は None のまま。
+        fee_tx = db.scalar(select(FeeTransaction).where(FeeTransaction.user_id == 1))
+        assert fee_tx is not None
+        assert fee_tx.transfer_status is None
+
+        # 1 本の明示 ERROR ログに集約されている。
+        assert any("fee_transfer phase skipped" in rec.getMessage() for rec in caplog.records), (
+            f"guard ERROR ログが見つからない: {[r.getMessage() for r in caplog.records]}"
+        )

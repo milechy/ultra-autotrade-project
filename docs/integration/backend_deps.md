@@ -5,6 +5,24 @@
 
 ---
 
+## PR #928 (収益受取 設計A統一): fee_transfer_router 配線削除 (2026-07-05)
+
+### 変更: 設計B の fee_transfer_router を main.py から削除
+- **対象凍結ファイル**: `backend/app/main.py`
+- **変更内容**:
+  - `from app.api.v1.fee_transfer import router as fee_transfer_router` の import 削除
+  - `app.include_router(fee_transfer_router, prefix="/api/v1")  # ... (Lane R)` の登録削除
+- **理由**: 手数料徴収に2つの並行設計（設計A=`OPERATOR_FEE_WALLET_ADDRESS`/`_KEY` 専用ウォレット・
+  月次バッチ配線済み / 設計B=`FEE_RECIPIENT_ADDRESS`+`AAVE_WALLET_PRIVATE_KEY` 流用=鉄則7違反・
+  未配線・フロント未使用・`FeeTransferService` クラス名衝突）が混在し事故リスクだった。設計Aに統一し
+  設計B（`fee_transfer.py` router / `transfer_service.py` / `allowance_service.py`）を削除。
+- **影響範囲**: 設計B は元々どこからも実行されておらず（フロント未登録・main.py 以外参照ゼロ）、
+  **挙動変化ゼロ**（`FEE_TRANSFER_ENABLED=false` のまま）。設計A の `fees_v10_router`（`/api/v1/fees/*`、
+  `/allowance-info` 含む）は残置。`import app.main` clean / 4616 test collect / 538 fee系 pass で確認。
+- **承認**: refactor/fee-transfer-unify-design-a → main の通常フロー経由（PR #928）
+
+---
+
 ## PR #891 (S2 入金待ち): funding_detection loop の opt-in 起動配線 (2026-06-26)
 
 ### 変更: startup_scheduled_tasks に funding detection の opt-in 起動を追加
