@@ -4,6 +4,8 @@
 
 from decimal import Decimal
 
+import pytest
+
 from app.ai.agents import (
     AgentSignal,
     Bias,
@@ -18,7 +20,16 @@ from app.ai.judgment_log import CognitiveState
 from app.data_feeds.context import build_market_context
 from app.data_feeds.finance_feed import FinanceFeedResult
 from app.data_feeds.geopolitical import GeoRiskResult
+from app.data_feeds.mmt_feed import MMTCandle, MMTData
 from app.data_feeds.news_feed import NewsFeedResult
+
+
+def _candles(symbol: str, oldest_close: Decimal, latest_close: Decimal) -> list[MMTCandle]:
+    """2本のcandleでmomentum計算に必要な最小データを組み立てるテストヘルパー。"""
+    return [
+        MMTCandle(symbol=symbol, exchange="binancef", close=oldest_close, timestamp=1000),
+        MMTCandle(symbol=symbol, exchange="binancef", close=latest_close, timestamp=4600),
+    ]
 
 
 class TestIndicatorAgent:
@@ -171,6 +182,85 @@ class TestIndicatorAgent:
         assert sig_inf.bias == Bias.BULLISH, (
             f"inf シナリオは BULLISH になるべき (got {sig_inf.bias})"
         )
+
+    # ------------------------------------------------------------------
+    # Price momentum signal (2026-07-06 — HOLD脱却プロジェクト A)
+    # kill switch AI_INDICATOR_MOMENTUM_ENABLED は既定OFF。
+    # ------------------------------------------------------------------
+
+    def test_momentum_disabled_by_default_is_a_noop(self) -> None:
+        """flag未設定(既定false)なら candles があってもスコアは不変であること。"""
+        mmt_data = MMTData(candles={"btc/usd": _candles("btc/usd", Decimal(100), Decimal(105))})
+        ctx_with_momentum = build_market_context(
+            health_factor=Decimal("2.6"),
+            aave_utilization_rate=Decimal("75"),
+            mmt_data=mmt_data,
+        )
+        ctx_without_momentum = build_market_context(
+            health_factor=Decimal("2.6"),
+            aave_utilization_rate=Decimal("75"),
+        )
+        sig_with = indicator_agent(ctx_with_momentum)
+        sig_without = indicator_agent(ctx_without_momentum)
+        assert sig_with.confidence == sig_without.confidence
+        assert sig_with.bias == sig_without.bias
+        assert "price_momentum_24h_pct" not in sig_with.key_data
+
+    def test_momentum_disabled_when_mmt_data_absent(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """flag ONでも mmt_data=None(フィード未取得)なら fail-open で不変であること。"""
+        monkeypatch.setenv("AI_INDICATOR_MOMENTUM_ENABLED", "true")
+        ctx = build_market_context(
+            health_factor=Decimal("2.6"), aave_utilization_rate=Decimal("75")
+        )
+        signal = indicator_agent(ctx)
+        assert "price_momentum_24h_pct" not in signal.key_data
+
+    def test_bullish_momentum_pushes_stuck_confidence_over_70(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """本番実測(HF=2.6/util=75→score68/conf66%)が+5%モメンタムで70超えを確認。
+
+        docs記載の「あと2ptでHOLD固着」ケースを再現し、momentum追加で
+        v4/v5 AND-conditionの閾値(confidence>=70)を実際に越えられることを検証する。
+        """
+        monkeypatch.setenv("AI_INDICATOR_MOMENTUM_ENABLED", "true")
+        mmt_data = MMTData(candles={"btc/usd": _candles("btc/usd", Decimal(100), Decimal(105))})
+        base_ctx = build_market_context(
+            health_factor=Decimal("2.6"), aave_utilization_rate=Decimal("75")
+        )
+        boosted_ctx = build_market_context(
+            health_factor=Decimal("2.6"),
+            aave_utilization_rate=Decimal("75"),
+            mmt_data=mmt_data,
+        )
+        base_signal = indicator_agent(base_ctx)
+        boosted_signal = indicator_agent(boosted_ctx)
+        assert base_signal.confidence < 70, (
+            f"前提が崩れている(momentum無しで既に70超え): {base_signal.confidence}"
+        )
+        assert boosted_signal.bias == Bias.BULLISH
+        assert boosted_signal.confidence >= 70
+        assert Decimal(boosted_signal.key_data["price_momentum_24h_pct"]) == Decimal("5")
+
+    def test_bearish_momentum_flips_neutral_to_bearish(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """NEUTRAL(score40)が-5%モメンタムでBEARISH/confidence>=70に転じることを確認。"""
+        monkeypatch.setenv("AI_INDICATOR_MOMENTUM_ENABLED", "true")
+        mmt_data = MMTData(candles={"eth/usd": _candles("eth/usd", Decimal(100), Decimal(95))})
+        base_ctx = build_market_context(
+            health_factor=Decimal("1.85"), aave_utilization_rate=Decimal("75")
+        )
+        boosted_ctx = build_market_context(
+            health_factor=Decimal("1.85"),
+            aave_utilization_rate=Decimal("75"),
+            mmt_data=mmt_data,
+        )
+        base_signal = indicator_agent(base_ctx)
+        boosted_signal = indicator_agent(boosted_ctx)
+        assert base_signal.bias == Bias.NEUTRAL
+        assert boosted_signal.bias == Bias.BEARISH
+        assert boosted_signal.confidence >= 70
 
 
 class TestPatternAgent:
