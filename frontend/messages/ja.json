@@ -2595,6 +2595,30 @@
     "resumeWarning": "注意: Health Factor など自動条件が未改善の場合、再開後に再停止される可能性があります。",
     "resumeButton": "再開する"
   },
+  "FeePricing": {
+    "title": "料金プラン",
+    "subtitle": "運用にかかる費用の内訳です。",
+    "subscriptionTitle": "月額利用料（運用モード別）",
+    "subscriptionNote": "毎月末に、預け入れ額に対して上記の料率で計算されます。初月は無料です。",
+    "perMonthOfDeposit": "預け入れ額 / 月",
+    "risk": {
+      "conservative": "保守的",
+      "balanced": "バランス",
+      "aggressive": "積極的"
+    },
+    "performanceTitle": "成功報酬（運用益に対して）",
+    "performanceNote": "運用益（利益）が出た場合のみ、預け入れ規模に応じた料率がかかります。",
+    "tier": {
+      "lower": "スタンダード",
+      "middle": "プレミアム",
+      "upper": "アルティメット"
+    },
+    "depositUpTo": "預け入れ {amount} まで",
+    "depositRange": "預け入れ {from} 〜 {to}",
+    "depositFrom": "預け入れ {amount} 以上",
+    "billingNote": "課金は毎月末の確定後に行われます。",
+    "notActiveNote": "現在、月額利用料の徴収は行っておりません（無料）。開始時は事前に通知し、同意をいただいたうえで適用します。"
+  },
   "SharedBottomNav": {
     "adminNav": {
       "home": "ホーム",
@@ -2614,6 +2638,7 @@
     "viewerNav": {
       "home": "ホーム",
       "aiDecisions": "AI判定",
+      "fees": "料金",
       "help": "ヘルプ"
     }
   },

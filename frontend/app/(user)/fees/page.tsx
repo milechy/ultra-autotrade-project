@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { apiFetch } from '@/lib/api/client'
 import { useAuth } from '@/lib/auth'
 import AuthGuard from '@/components/AuthGuard'
+import FeePlanSection from '@/components/user/FeePlanSection'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -184,6 +185,9 @@ function FeesContent() {
       </div>
 
       <div className="space-y-4 px-4 py-4 pb-24 max-w-4xl mx-auto">
+        {/* B-1: 料金プラン / Tier別月額の事前提示（config は独自に取得・独立描画） */}
+        <FeePlanSection />
+
         {loading && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -2578,6 +2578,30 @@
     "resumeWarning": "Note: If automated conditions (e.g., Health Factor) are not resolved, trading may stop again after resuming.",
     "resumeButton": "Resume"
   },
+  "FeePricing": {
+    "title": "Pricing",
+    "subtitle": "Breakdown of fees for managed operation.",
+    "subscriptionTitle": "Monthly fee (by operation mode)",
+    "subscriptionNote": "Calculated at month-end on your deposited amount at the rates above. The first month is free.",
+    "perMonthOfDeposit": "of deposit / month",
+    "risk": {
+      "conservative": "Conservative",
+      "balanced": "Balanced",
+      "aggressive": "Aggressive"
+    },
+    "performanceTitle": "Performance fee (on profit)",
+    "performanceNote": "Charged only when your operation is profitable, at a rate based on your deposit size.",
+    "tier": {
+      "lower": "Standard",
+      "middle": "Premium",
+      "upper": "Ultimate"
+    },
+    "depositUpTo": "Deposit up to {amount}",
+    "depositRange": "Deposit {from} – {to}",
+    "depositFrom": "Deposit {amount}+",
+    "billingNote": "Charged after month-end finalization.",
+    "notActiveNote": "Monthly fees are not currently charged (free). Before we begin, we will notify you and apply them only with your consent."
+  },
   "SharedBottomNav": {
     "adminNav": {
       "home": "Home",
@@ -2597,6 +2621,7 @@
     "viewerNav": {
       "home": "Home",
       "aiDecisions": "AI",
+      "fees": "Pricing",
       "help": "Help"
     }
   },

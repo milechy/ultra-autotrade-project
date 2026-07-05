@@ -4,7 +4,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, CheckCircle, Brain, Settings, HelpCircle, Users, ClipboardList, Gift, ArrowUpFromLine } from 'lucide-react'
+import { Home, CheckCircle, Brain, Settings, HelpCircle, Users, ClipboardList, Gift, ArrowUpFromLine, Receipt } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
@@ -44,6 +44,8 @@ export function BottomNav() {
   const viewerNavItems = [
     { href: '/user/dashboard', label: t('viewerNav.home'), icon: Home },
     { href: '/user/ai-feed', label: t('viewerNav.aiDecisions'), icon: Brain },
+    // B-1: 料金プラン / Tier別月額の事前提示ページ（URL: /fees, route group prefix なし）。
+    { href: '/fees', label: t('viewerNav.fees'), icon: Receipt },
     { href: '/user/help', label: t('viewerNav.help'), icon: HelpCircle },
   ]
 
