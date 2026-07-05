@@ -1049,6 +1049,10 @@
           "title": "Usage Conditions (Connected Asset Range and Monthly Usage Limits)",
           "detail": "This Service applies monthly usage limits based on the range of digital assets connected by each user. Please refer to the Service interface, Terms of Service, and related documents for the applicable conditions and limitations."
         },
+        "monthly_fee": {
+          "title": "I agree to the monthly fee and performance fee",
+          "detail": "The Service fees consist of a monthly fee (per month on your deposited amount: 0% Conservative / 0.3% Balanced / 1% Aggressive; the first month is free) and a performance fee (20%-30% of profit, only when the operation is profitable, based on your deposit size). Current rates are always shown on the \"Pricing\" screen within the Service. Before charging begins, we will notify you in advance and apply fees only with your consent (Terms of Service Article 7). Blockchain network fees (gas) are borne separately by the user."
+        },
         "user_responsibility": {
           "title": "Account Management Is Your Responsibility",
           "detail": "Users are responsible for managing the account they use to log in (e.g., email address or LINE account) and for taking appropriate measures against unauthorized access. The Company shall not be responsible for losses or damages resulting from insufficient account management or unauthorized use by third parties."

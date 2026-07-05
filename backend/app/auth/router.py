@@ -64,9 +64,15 @@ limiter = Limiter(key_func=get_remote_address)
 LOGIN_RATE_LIMIT = os.getenv("LOGIN_RATE_LIMIT", "5/minute")
 
 CURRENT_TERMS_VERSION = "2.0"
-# LIFF 固有の同意バージョン（liff-confirm 経由での同意）も accepted として扱う
-_LIFF_TERMS_VERSION = "liff-v3"
-_ACCEPTED_TERMS_VERSIONS = frozenset([CURRENT_TERMS_VERSION, _LIFF_TERMS_VERSION])
+# LIFF 固有の同意バージョン（liff-confirm 経由での同意）。
+# liff-v4: 月額利用料・成功報酬の同意 (monthly_fee) を追加。新規同意は liff-v4 で記録する。
+_LIFF_TERMS_VERSION = "liff-v4"
+# 旧 liff-v3 は backend では引き続き accepted 扱い（grandfather / needs_terms を過剰にトリガーしない）。
+# LIFF サーフェスでの再同意強制は frontend の terms gate（liff-v4 要求）が担う。
+_PREV_LIFF_TERMS_VERSION = "liff-v3"
+_ACCEPTED_TERMS_VERSIONS = frozenset(
+    [CURRENT_TERMS_VERSION, _LIFF_TERMS_VERSION, _PREV_LIFF_TERMS_VERSION]
+)
 
 logger = logging.getLogger(__name__)
 

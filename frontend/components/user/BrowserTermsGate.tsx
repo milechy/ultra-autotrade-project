@@ -27,8 +27,9 @@ import { getAuthToken } from "@/lib/auth/token-key"
 /** ゲートを適用しないパス。terms-accept 自身は除外（無限ループ防止）。 */
 const GATE_EXEMPT_PATHS = ["/user/terms-accept"]
 
-/** ブラウザ経路で「同意済み」とみなすバージョン一覧。 */
-const BROWSER_ACCEPTED_VERSIONS: readonly string[] = ["liff-v3", "2.0"]
+/** ブラウザ経路で「同意済み」とみなすバージョン一覧。
+ *  liff-v4 (月額同意を含む LIFF 最新) も accepted。liff-v3 はブラウザ経路では grandfather。 */
+const BROWSER_ACCEPTED_VERSIONS: readonly string[] = ["liff-v3", "liff-v4", "2.0"]
 
 export function BrowserTermsGate({ children }: { children: React.ReactNode }) {
   const t = useTranslations("UserBrowserTermsGate")

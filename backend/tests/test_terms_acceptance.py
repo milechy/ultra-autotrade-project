@@ -128,3 +128,41 @@ class TestTermsAcceptance:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 422
+
+
+class TestLiffV4MonthlyFeeConsent:
+    """liff-v4 (月額利用料・成功報酬の同意 monthly_fee 追加) の受理と旧版 grandfather を検証。"""
+
+    def test_liff_v4_accepted(self, client: TestClient):
+        """liff-v4 は accepted 扱い（needs_acceptance=False）。"""
+        token = _get_token(client)
+        h = {"Authorization": f"Bearer {token}"}
+        r = client.post("/auth/terms/accept", json={"version": "liff-v4"}, headers=h)
+        assert r.status_code == 200
+        assert r.json()["accepted"] is True
+        assert r.json()["needs_acceptance"] is False
+
+    def test_liff_v3_grandfathered_on_backend(self, client: TestClient):
+        """旧 liff-v3 は backend では引き続き accepted（needs_terms を過剰トリガーしない）。
+
+        LIFF サーフェスでの再同意強制は frontend の terms gate（liff-v4 要求）が担うため、
+        backend は grandfather する。
+        """
+        token = _get_token(client)
+        h = {"Authorization": f"Bearer {token}"}
+        client.post("/auth/terms/accept", json={"version": "liff-v3"}, headers=h)
+        r = client.get("/auth/terms/status", headers=h)
+        assert r.status_code == 200
+        assert r.json()["needs_acceptance"] is False
+
+    def test_user_terms_agree_writes_liff_v4(self, client: TestClient):
+        """POST /api/user/terms-agree は最新の liff-v4 を書き込む。"""
+        token = _get_token(client)
+        h = {"Authorization": f"Bearer {token}"}
+        # まず旧版に落としてから terms-agree で最新へ更新されることを確認。
+        client.post("/auth/terms/accept", json={"version": "liff-v3"}, headers=h)
+        r = client.post("/api/user/terms-agree", headers=h)
+        assert r.status_code == 200
+        settings = client.get("/api/user/settings", headers=h)
+        assert settings.status_code == 200
+        assert settings.json()["terms_version"] == "liff-v4"
