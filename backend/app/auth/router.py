@@ -730,6 +730,21 @@ def wallet_connect(
                     detail="DID backfill failed",
                 ) from exc
 
+    # Privy 内部 wallet ID を保存 (委譲 SCW 執行用)。frontend の Privy SDK から受領。
+    # 執行にのみ使う識別子で login の必須要件ではないため、失敗しても login は止めない (best-effort)。
+    if request.privy_wallet_id and user.privy_wallet_id != request.privy_wallet_id:
+        try:
+            user.privy_wallet_id = request.privy_wallet_id
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        except Exception:  # noqa: BLE001
+            db.rollback()
+            logger.warning(
+                "privy_wallet_id store failed (non-fatal): wallet=%s...",
+                request.wallet_address[:10],
+            )
+
     token, expires_in = AuthService.create_access_token(
         user_id=user.id,
         email=user.email,

@@ -296,6 +296,11 @@ class WalletConnectRequest(BaseModel):
         max_length=4096,
         description="Privy ID token (JWT). 提供時はサーバーで検証し sub == privy_did を確認する。",
     )
+    # Privy 内部 wallet ID (アドレスではない)。委譲(SCW)執行の wallet_sendCalls が要求する識別子。
+    # frontend の Privy SDK が保持する値を送る。非機密 (識別子のみ)。
+    privy_wallet_id: Optional[str] = Field(
+        None, max_length=64, description="Privy internal wallet ID (for delegated SCW execution)"
+    )
 
 
 class WalletConnectResponse(BaseModel):
