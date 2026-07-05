@@ -2604,7 +2604,8 @@
     "depositRange": "Deposit {from} – {to}",
     "depositFrom": "Deposit {amount}+",
     "billingNote": "Charged after month-end finalization.",
-    "notActiveNote": "Monthly fees are not currently charged (free). Before we begin, we will notify you and apply them only with your consent."
+    "notActiveNote": "Monthly fees are not currently charged (free). Before we begin, we will notify you and apply them only with your consent.",
+    "setupPaymentLink": "Set up payment method (auto-debit)"
   },
   "SharedBottomNav": {
     "adminNav": {

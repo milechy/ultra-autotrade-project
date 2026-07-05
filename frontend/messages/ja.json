@@ -2621,7 +2621,8 @@
     "depositRange": "預け入れ {from} 〜 {to}",
     "depositFrom": "預け入れ {amount} 以上",
     "billingNote": "課金は毎月末の確定後に行われます。",
-    "notActiveNote": "現在、月額利用料の徴収は行っておりません（無料）。開始時は事前に通知し、同意をいただいたうえで適用します。"
+    "notActiveNote": "現在、月額利用料の徴収は行っておりません（無料）。開始時は事前に通知し、同意をいただいたうえで適用します。",
+    "setupPaymentLink": "お支払い方法（自動引き落とし）を設定する"
   },
   "SharedBottomNav": {
     "adminNav": {

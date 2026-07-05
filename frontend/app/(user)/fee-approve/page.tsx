@@ -7,6 +7,7 @@
 // aToken allowance 承認ページ (PWA / デスクトップ)
 
 import dynamic from 'next/dynamic'
+import FeePlanSection from '@/components/user/FeePlanSection'
 
 const FeeApproveCard = dynamic(
   () => import('@/components/user/FeeApproveCard').then((m) => ({ default: m.FeeApproveCard })),
@@ -22,6 +23,8 @@ export default function FeeApprovePage() {
           月次手数料の自動徴収を有効にするための承認を行います
         </p>
       </div>
+      {/* B-3: 承認前に料率・課金日・「現在は徴収なし」を提示（孤立していた本ページに文脈を付与） */}
+      <FeePlanSection />
       <FeeApproveCard />
     </main>
   )

@@ -9,6 +9,7 @@
 import { useTranslations } from 'next-intl'
 import { useLiff } from '@/hooks/useLiff'
 import { FeeApproveCard } from '@/components/user/FeeApproveCard'
+import FeePlanSection from '@/components/user/FeePlanSection'
 import { BrowserLoginPrompt } from '../_components/BrowserLoginPrompt'
 
 export default function LiffFeeApprovePage() {
@@ -61,6 +62,10 @@ export default function LiffFeeApprovePage() {
         <p className="text-sm text-zinc-400 mt-1">
           {t('description')}
         </p>
+      </div>
+      {/* B-3: 承認前に料率・課金日・「現在は徴収なし」を提示 */}
+      <div className="mb-4">
+        <FeePlanSection />
       </div>
       <FeeApproveCard />
     </div>

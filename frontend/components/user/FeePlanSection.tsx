@@ -10,6 +10,7 @@
 // 「現在は無料」である旨を notActiveNote で明示する（規約第7条と整合）。
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { apiFetch } from '@/lib/api/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,7 +37,7 @@ function jpy(v: number): string {
   return `¥${Math.round(v).toLocaleString()}`
 }
 
-export default function FeePlanSection() {
+export default function FeePlanSection({ showPaymentLink = false }: { showPaymentLink?: boolean }) {
   const t = useTranslations('FeePricing')
   const [config, setConfig] = useState<FeeConfig | null>(null)
   const [loading, setLoading] = useState(true)
@@ -139,6 +140,16 @@ export default function FeePlanSection() {
           <p className="text-xs text-zinc-400">{t('billingNote')}</p>
           <p className="text-xs text-amber-400/90">{t('notActiveNote')}</p>
         </div>
+
+        {/* 決済手段（自動引き落とし = operator allowance 承認）への導線。/fees からのみ表示。 */}
+        {showPaymentLink && (
+          <Link
+            href="/fee-approve"
+            className="block w-full text-center rounded-lg border border-zinc-700 bg-zinc-800/60 px-3 py-2.5 text-sm text-zinc-200 hover:bg-zinc-800 transition-colors"
+          >
+            {t('setupPaymentLink')}
+          </Link>
+        )}
       </CardContent>
     </Card>
   )
