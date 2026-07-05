@@ -19,15 +19,16 @@ from __future__ import annotations
 import os
 import tempfile
 from collections.abc import Generator
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-tier-fee-integration")
 
+from app.api.v1.fees import finalize_month_core  # noqa: E402
 from app.auth.models import (  # noqa: E402
     TIER_BOUNDARY_LOWER_JPY,
     TIER_BOUNDARY_UPPER_JPY,
@@ -35,7 +36,8 @@ from app.auth.models import (  # noqa: E402
     User,
 )
 from app.database import Base  # noqa: E402
-from app.fees.models import FeeConfigV10  # noqa: E402
+from app.fees.models import FeeConfigV10, FeeTransaction  # noqa: E402
+from app.portfolio.models import PortfolioSnapshot  # noqa: E402
 from app.proposals.router import _lookup_fee_rate_for_user  # noqa: E402
 from app.users.tier_service import determine_tier_jpy  # noqa: E402
 
@@ -194,3 +196,132 @@ class TestTierFeeIntegration:
         assert actual_fee_rate == Decimal("0"), (
             f"is_active=False の config のみの場合は Decimal('0') を期待したが got {actual_fee_rate}"
         )
+
+
+# 月次バッチ (finalize_month_core) 内で tier を deposit_jpy から都度判定・書き戻す配線の検証。
+_MONTH_START = date(2026, 5, 1)
+
+
+def _insert_snapshot(
+    db: Session,
+    user_id: int,
+    total_supply_usd: Decimal,
+    recorded_at: datetime,
+) -> PortfolioSnapshot:
+    snap = PortfolioSnapshot(
+        user_id=user_id,
+        total_value_usd=total_supply_usd,
+        total_supply_usd=total_supply_usd,
+        total_borrow_usd=Decimal("0"),
+        recorded_at=recorded_at,
+    )
+    db.add(snap)
+    db.flush()
+    return snap
+
+
+class TestFinalizeMonthTierWiring:
+    """月次バッチが DB の stale な user.tier を読まず、deposit_jpy から都度判定することを検証する。
+
+    usd_jpy_rate=1 で seed するため total_supply_usd がそのまま deposit_jpy になる。
+    全ユーザーは DB デフォルト相当の tier="LOWER" で seed し、finalize 後に
+    deposit_jpy に応じた tier へ書き戻されること・FeeTransaction に正しい tier /
+    fee_rate_applied が記録されることを assert する。
+    """
+
+    @pytest.mark.parametrize(
+        "deposit_jpy,expected_tier,expected_fee_rate",
+        [
+            # 境界: <= 1,000,000 は LOWER
+            (Decimal("1000000"), "LOWER", Decimal("0.30")),
+            # 1,000,001 は MIDDLE
+            (Decimal("1000001"), "MIDDLE", Decimal("0.25")),
+            # 10,000,001 は UPPER
+            (Decimal("10000001"), "UPPER", Decimal("0.20")),
+        ],
+    )
+    def test_tier_determined_from_deposit_and_written_back(
+        self,
+        deposit_jpy: Decimal,
+        expected_tier: str,
+        expected_fee_rate: Decimal,
+        db_session: Session,
+    ) -> None:
+        """deposit_jpy から tier を判定し、FeeTransaction と user.tier の両方へ反映する。"""
+        # 全ユーザーを stale な tier="LOWER" で seed する (DB デフォルト相当)。
+        user = _insert_user(db_session, user_id=1, tier="LOWER")
+        # 月初・月末スナップショット。deposit_jpy は月末 (last_snap) の supply で決まる。
+        # 月初は profit を出すため deposit_jpy より低くする (conservative なので sub=0)。
+        _insert_snapshot(
+            db_session,
+            user_id=1,
+            total_supply_usd=deposit_jpy - Decimal("100000"),
+            recorded_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        )
+        _insert_snapshot(
+            db_session,
+            user_id=1,
+            total_supply_usd=deposit_jpy,
+            recorded_at=datetime(2026, 5, 28, tzinfo=timezone.utc),
+        )
+        config = _insert_fee_config(db_session)
+        db_session.commit()
+
+        finalize_month_core(
+            db_session,
+            config,
+            _MONTH_START,
+            usd_jpy_rate=Decimal("1"),
+            dry_run=False,
+        )
+
+        # user.tier が deposit_jpy 由来の tier へ書き戻されている。
+        db_session.refresh(user)
+        assert user.tier == expected_tier, (
+            f"deposit_jpy={deposit_jpy}: user.tier expected {expected_tier}, got {user.tier}"
+        )
+
+        # FeeTransaction に正しい tier / fee_rate_applied が記録されている。
+        fee_tx = db_session.scalar(
+            select(FeeTransaction).where(
+                FeeTransaction.user_id == 1,
+                FeeTransaction.calculation_month == _MONTH_START,
+            )
+        )
+        assert fee_tx is not None, "FeeTransaction が生成されていない"
+        assert fee_tx.tier == expected_tier
+        assert fee_tx.fee_rate_applied == expected_fee_rate, (
+            f"fee_rate_applied expected {expected_fee_rate}, got {fee_tx.fee_rate_applied}"
+        )
+
+    def test_dry_run_does_not_write_back_tier(self, db_session: Session) -> None:
+        """dry_run=True では user.tier を書き換えず FeeTransaction も生成しない。"""
+        # deposit_jpy=5,000,000 → MIDDLE 相当だが tier="LOWER" のまま seed。
+        user = _insert_user(db_session, user_id=1, tier="LOWER")
+        _insert_snapshot(
+            db_session,
+            user_id=1,
+            total_supply_usd=Decimal("4900000"),
+            recorded_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        )
+        _insert_snapshot(
+            db_session,
+            user_id=1,
+            total_supply_usd=Decimal("5000000"),
+            recorded_at=datetime(2026, 5, 28, tzinfo=timezone.utc),
+        )
+        config = _insert_fee_config(db_session)
+        db_session.commit()
+
+        finalize_month_core(
+            db_session,
+            config,
+            _MONTH_START,
+            usd_jpy_rate=Decimal("1"),
+            dry_run=True,
+        )
+
+        db_session.refresh(user)
+        assert user.tier == "LOWER", f"dry_run=True では user.tier 不変を期待したが got {user.tier}"
+        fee_tx = db_session.scalar(select(FeeTransaction).where(FeeTransaction.user_id == 1))
+        assert fee_tx is None, "dry_run=True では FeeTransaction を生成してはならない"
