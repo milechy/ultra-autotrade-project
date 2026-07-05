@@ -770,6 +770,23 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
             logger.warning("GHO borrow signal fetch failed (fail-open, ignored): %s", exc)
             gho_signal = None
 
+        # 価格テクニカルシグナル（RSI+MAクロス、Indicator Agent の momentum kill switch
+        # 有効時のみスコアに反映）。独立した try/except に隔離し、失敗しても他の
+        # market_ctx 構築には一切影響させない（fail-open。run_prefilter 自体も
+        # 内部でOHLCV取得失敗をINSUFFICIENT_DATAとしてfail-open実装済み）。
+        technical_signal: Optional[str] = None
+        try:
+            from app.ai.prefilter import run_prefilter  # noqa: PLC0415
+            from app.exchange.client import BybitSandboxClient  # noqa: PLC0415
+
+            prefilter_result = run_prefilter(BybitSandboxClient(), symbol="BTC/USDT")
+            technical_signal = prefilter_result.signal
+        except Exception as exc:
+            logger.warning(
+                "Technical signal (prefilter) fetch failed (fail-open, ignored): %s", exc
+            )
+            technical_signal = None
+
         try:
             aave_data = fetch_aave_market_data_safe()
             cognitive_state = get_judgment_logger().get_cognitive_state()
@@ -780,6 +797,7 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
                 health_factor=aave_data["health_factor"],
                 cognitive_state=cognitive_state,
                 gho_borrow_signal=gho_signal,
+                technical_signal=technical_signal,
             )
         except Exception as exc:
             context_degraded = True

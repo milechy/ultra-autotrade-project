@@ -29,7 +29,6 @@ from pydantic import BaseModel, Field
 from app.ai.judgment_log import CognitiveState
 from app.ai.schemas import AgentContribution, DeterministicVerdict, TradeAction
 from app.data_feeds.context import MarketContext
-from app.data_feeds.mmt_feed import MMTCandle
 
 logger = logging.getLogger(__name__)
 
@@ -446,35 +445,13 @@ def resolve_llm_and_deterministic(
 # Specialist Agents (pure functions — no side effects)
 # ============================================================
 def _indicator_momentum_enabled() -> bool:
-    """価格モメンタムシグナルのkill switch(既定OFF)。
+    """価格テクニカルシグナルのkill switch(既定OFF)。
 
     AI判定コアの新規シグナルのため、staging soak確認後に人間が明示的に
     AI_INDICATOR_MOMENTUM_ENABLED=true を設定するまでは無効(既存動作と不変)。
     異常発生時は env を戻すだけで即無効化できる(再デプロイ不要)。
     """
     return os.getenv("AI_INDICATOR_MOMENTUM_ENABLED", "false").strip().lower() == "true"
-
-
-def _compute_price_momentum(candles: dict[str, list[MMTCandle]]) -> Optional[Decimal]:
-    """MMT candles(1h足、直近24h)からシンボル横断の平均価格モメンタム(%)を計算する。
-
-    各シンボルごとに (最新close - 最古close) / 最古close * 100 を計算し、
-    有効なシンボルの単純平均を返す。close欠損・データ不足のシンボルはスキップし、
-    有効なシンボルが1つもなければ None を返す(呼び出し側で今までと同じ挙動=fail-open)。
-    """
-    symbol_momenta: list[Decimal] = []
-    for symbol_candles in candles.values():
-        if len(symbol_candles) < 2:
-            continue
-        oldest_close = symbol_candles[0].close
-        latest_close = symbol_candles[-1].close
-        if oldest_close is None or latest_close is None or oldest_close == 0:
-            continue
-        symbol_momenta.append((latest_close - oldest_close) / oldest_close * Decimal(100))
-
-    if not symbol_momenta:
-        return None
-    return sum(symbol_momenta) / Decimal(len(symbol_momenta))
 
 
 def indicator_agent(ctx: MarketContext) -> AgentSignal:
@@ -556,22 +533,14 @@ def indicator_agent(ctx: MarketContext) -> AgentSignal:
             score -= 6
             reasons.append(f"Supply APY at {supply_apy}% — yield compressed, weak demand")
 
-    if _indicator_momentum_enabled() and ctx.mmt_data is not None and ctx.mmt_data.candles:
-        momentum_pct = _compute_price_momentum(ctx.mmt_data.candles)
-        if momentum_pct is not None:
-            key_data["price_momentum_24h_pct"] = str(momentum_pct)
-            if momentum_pct >= 5:
-                score += 15
-                reasons.append(f"24h price momentum +{momentum_pct:.1f}% — strong upward move")
-            elif momentum_pct >= 2:
-                score += 8
-                reasons.append(f"24h price momentum +{momentum_pct:.1f}% — mild upward move")
-            elif momentum_pct <= -5:
-                score -= 15
-                reasons.append(f"24h price momentum {momentum_pct:.1f}% — strong downward move")
-            elif momentum_pct <= -2:
-                score -= 8
-                reasons.append(f"24h price momentum {momentum_pct:.1f}% — mild downward move")
+    if _indicator_momentum_enabled() and ctx.technical_signal is not None:
+        key_data["technical_signal"] = ctx.technical_signal
+        if ctx.technical_signal == "BUY_LEAN":
+            score += 15
+            reasons.append("Technical signal (RSI+MA cross): BUY_LEAN — momentum favors upside")
+        elif ctx.technical_signal == "SELL_LEAN":
+            score -= 15
+            reasons.append("Technical signal (RSI+MA cross): SELL_LEAN — momentum favors downside")
 
     if score >= 65:
         bias = Bias.BULLISH
