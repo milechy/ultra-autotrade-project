@@ -54,6 +54,7 @@ from app.fees.fee_transfer_service import (
 from app.fees.models import FeeConfigV10, FeeTransaction, ReferralCampaign, UatWalletLedger
 from app.portfolio.models import PortfolioSnapshot
 from app.transactions.models import Transaction
+from app.users.tier_service import determine_tier_jpy
 
 logger = logging.getLogger(__name__)
 
@@ -349,7 +350,10 @@ def finalize_month_core(
             (last_snap.total_supply_usd - first_snap.total_supply_usd) * usd_jpy_rate
         ).quantize(Decimal("1"))
 
-        user_tier = InvestmentTier(user.tier) if user.tier else InvestmentTier.LOWER
+        # v10 tier は入金額 (deposit_jpy) から都度判定する (F-2)。
+        # DB の user.tier (デフォルト LOWER 固定) を読むと入金しても最高手数料率のままになるため、
+        # ここで算出済みの deposit_jpy から determine_tier_jpy() で判定し、下で書き戻す。
+        user_tier = determine_tier_jpy(deposit_jpy)
         user_risk_mode = RiskMode(user.risk_mode) if user.risk_mode else RiskMode.CONSERVATIVE
 
         user_created_date = user.created_at.date() if user.created_at else None
@@ -389,6 +393,10 @@ def finalize_month_core(
         result = calculator.calculate_monthly(payload)
 
         if not dry_run:
+            # tier 書き戻し: 全ユーザー統一 (partner 含む)。既存の db.commit() (下部) で
+            # FeeTransaction の add/update と同一トランザクションでアトミック永続化される。
+            if user.tier != user_tier.value:
+                user.tier = user_tier.value
             if existing is None:
                 db.add(
                     FeeTransaction(
