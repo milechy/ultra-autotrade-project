@@ -179,6 +179,8 @@ class FeeTransaction(Base):
         server_default=text("NOW()"),
     )
     finalized_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # DEPRECATED (Lane R / 設計B, 2026-07-05): 設計A の transfer_tx_hash (下記 F-S6) に統一済み。
+    # 破壊的 migration 回避のため列自体は保持。新規コードから書き込まない。
     on_chain_tx_hash: Mapped[Optional[str]] = mapped_column(String(66), nullable=True)
 
     # F-S6: on-chain fee transfer 追跡 (j0k1l2m3n4o5 migration)

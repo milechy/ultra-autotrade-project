@@ -5,6 +5,12 @@
 
 fee_allowances テーブル: user→operator aToken EIP-2612 permit 追跡。
 DDL: backend/alembic/sql/050_fee_allowances.sql
+
+DEPRECATED (Lane R / 設計B, 2026-07-05): 収益受取は設計A (OPERATOR_FEE_WALLET_ADDRESS
++ fee_transfer_service, EIP-2612 permit ではなく事前 allowance 承認方式) に統一済み。
+本モデルを read/write するサービス層 (allowance_service.py / fee_transfer.py router) は
+削除済み。破壊的 migration 回避 + alembic env 完全性のためテーブル定義自体は保持するが、
+新規コードから参照しないこと。
 """
 
 from __future__ import annotations

@@ -581,60 +581,71 @@ def finalize_month_core(
 
     if not dry_run and fee_transfer_enabled:
         transfer_cfg = FeeTransferConfig.from_env()
-        transfer_svc = FeeTransferService(transfer_cfg)
-
-        fee_txs_to_transfer = (
-            db.execute(
-                select(FeeTransaction).where(
-                    FeeTransaction.calculation_month == month_start,
-                    FeeTransaction.finalized_at.is_(None),
-                    FeeTransaction.transfer_status.is_(None),
-                )
+        if not transfer_cfg.operator_wallet_address or not transfer_cfg.operator_wallet_key:
+            # fail-fast: FEE_TRANSFER_ENABLED=true だが operator wallet 未設定。
+            # このまま loop に入ると全 fee_tx が transfer_status="failed" で汚染される
+            # (fee_transfer_service.transfer_fee が per-user で "failed" を返すため)。
+            # phase 全体をスキップし、per-user の失敗 N 行を 1 本の明示 ERROR に集約する。
+            logger.error(
+                "fee_transfer phase skipped: FEE_TRANSFER_ENABLED=true だが "
+                "OPERATOR_FEE_WALLET_ADDRESS / OPERATOR_FEE_WALLET_KEY が未設定 (month=%s)",
+                month_start,
             )
-            .scalars()
-            .all()
-        )
+        else:
+            transfer_svc = FeeTransferService(transfer_cfg)
 
-        for fee_tx in fee_txs_to_transfer:
-            fee_user = db.get(User, fee_tx.user_id)
-            user_wallet = fee_user.wallet_address if fee_user else None
-            t_result = transfer_svc.transfer_fee(
-                user_id=fee_tx.user_id,
-                user_wallet=user_wallet or "",
-                fee_amount_jpy=fee_tx.fee_amount_jpy or Decimal("0"),
-                subscription_amount_jpy=fee_tx.subscription_amount_jpy or Decimal("0"),
-                yield_excess_jpy=fee_tx.yield_excess_to_uata_jpy or Decimal("0"),
-                usd_jpy_rate=usd_jpy_rate,
+            fee_txs_to_transfer = (
+                db.execute(
+                    select(FeeTransaction).where(
+                        FeeTransaction.calculation_month == month_start,
+                        FeeTransaction.finalized_at.is_(None),
+                        FeeTransaction.transfer_status.is_(None),
+                    )
+                )
+                .scalars()
+                .all()
             )
-            fee_tx.transfer_status = t_result.status
-            fee_tx.transfer_tx_hash = t_result.tx_hash
-            if t_result.status == "sent":
-                fee_tx.finalized_at = datetime.now(timezone.utc)
-                transfer_sent += 1
-                logger.info(
-                    "fee_transfer sent: user_id=%d tx=%s fee_usd=%s",
-                    fee_tx.user_id,
-                    t_result.tx_hash,
-                    t_result.fee_usd,
-                )
-            elif t_result.status in ("skipped", "low_fee"):
-                transfer_skipped += 1
-            else:
-                transfer_failed += 1
-                logger.warning(
-                    "fee_transfer %s: user_id=%d error=%s",
-                    t_result.status,
-                    fee_tx.user_id,
-                    t_result.error,
-                )
 
-        db.commit()
-        logger.info(
-            "fee_transfer phase done: sent=%d skipped=%d failed=%d",
-            transfer_sent,
-            transfer_skipped,
-            transfer_failed,
-        )
+            for fee_tx in fee_txs_to_transfer:
+                fee_user = db.get(User, fee_tx.user_id)
+                user_wallet = fee_user.wallet_address if fee_user else None
+                t_result = transfer_svc.transfer_fee(
+                    user_id=fee_tx.user_id,
+                    user_wallet=user_wallet or "",
+                    fee_amount_jpy=fee_tx.fee_amount_jpy or Decimal("0"),
+                    subscription_amount_jpy=fee_tx.subscription_amount_jpy or Decimal("0"),
+                    yield_excess_jpy=fee_tx.yield_excess_to_uata_jpy or Decimal("0"),
+                    usd_jpy_rate=usd_jpy_rate,
+                )
+                fee_tx.transfer_status = t_result.status
+                fee_tx.transfer_tx_hash = t_result.tx_hash
+                if t_result.status == "sent":
+                    fee_tx.finalized_at = datetime.now(timezone.utc)
+                    transfer_sent += 1
+                    logger.info(
+                        "fee_transfer sent: user_id=%d tx=%s fee_usd=%s",
+                        fee_tx.user_id,
+                        t_result.tx_hash,
+                        t_result.fee_usd,
+                    )
+                elif t_result.status in ("skipped", "low_fee"):
+                    transfer_skipped += 1
+                else:
+                    transfer_failed += 1
+                    logger.warning(
+                        "fee_transfer %s: user_id=%d error=%s",
+                        t_result.status,
+                        fee_tx.user_id,
+                        t_result.error,
+                    )
+
+            db.commit()
+            logger.info(
+                "fee_transfer phase done: sent=%d skipped=%d failed=%d",
+                transfer_sent,
+                transfer_skipped,
+                transfer_failed,
+            )
 
     return FinalizeMonthResponse(
         calculation_month=month_start,

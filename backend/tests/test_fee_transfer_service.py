@@ -1,12 +1,14 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_fee_transfer_service.py
-"""FeeTransferService / AllowanceService ユニットテスト。
+"""FeeTransferService ユニットテスト (F-S6: 設計A / fee_transfer_service)。
 
-F-S6: fee_transfer_service (FeeTransferConfig ベース) と
-Lane R: transfer_service / allowance_service (EIP-2612 対応新インタフェース) の両方をカバー。
+FeeTransferConfig (OPERATOR_FEE_WALLET_ADDRESS/_KEY) ベースの operator wallet 送金経路。
 on-chain 呼び出しはすべて mock。実際の RPC は使わない。
 staging 実 tx は scripts/test_fee_transfer_staging.py で別途実施。
+
+注: 設計B (transfer_service / allowance_service, FEE_RECIPIENT_ADDRESS + AAVE_WALLET_PRIVATE_KEY
+流用) は 2026-07-05 に削除済み。設計Aに統一。
 """
 
 from __future__ import annotations
@@ -23,10 +25,8 @@ from app.fees.fee_transfer_service import (
     is_fee_transfer_enabled,
 )
 
-# Lane R: transfer_service / allowance_service 用の env 初期化
+# app import 用の最小 env 初期化
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-fee-transfer")
-os.environ.setdefault("AAVE_WALLET_PRIVATE_KEY", "0x" + "a" * 64)
-os.environ.setdefault("FEE_RECIPIENT_ADDRESS", "0x" + "b" * 40)
 os.environ.setdefault("ALCHEMY_RPC_URL_BASE_SEPOLIA", "https://fake-rpc.example.com")
 os.environ.setdefault("AAVE_NETWORK", "base_sepolia")
 
@@ -372,195 +372,3 @@ def test_fee_usd_calculation(fee_jpy, sub_jpy, excess_jpy, rate, expected_usd):
     else:
         assert result.status == "sent"
         assert result.fee_usd == expected_usd
-
-
-# ===========================================================================
-# Lane R: transfer_service / AllowanceService (EIP-2612 新インタフェース)
-# ===========================================================================
-
-from app.fees.transfer_service import FeeTransferResult  # noqa: E402
-from app.fees.transfer_service import FeeTransferService as NewFeeTransferService  # noqa: E402
-
-
-class TestFeeTransferServiceDisabled:
-    """FEE_TRANSFER_ENABLED=false (default) のとき no-op を返すことを確認。"""
-
-    def test_transfer_returns_no_op_when_disabled(self) -> None:
-        with patch.dict(os.environ, {"FEE_TRANSFER_ENABLED": "false"}):
-            svc = NewFeeTransferService()
-            result = svc.transfer_fee(
-                user_address="0x" + "c" * 40,
-                fee_amount_usdc=Decimal("10.5"),
-                fee_tx_db_id=1,
-            )
-        assert isinstance(result, FeeTransferResult)
-        assert result.tx_hash is None
-        assert result.enabled is False
-        assert result.amount_usdc == Decimal("10.5")
-
-    def test_transfer_no_op_with_dry_run_disabled(self) -> None:
-        with patch.dict(os.environ, {"FEE_TRANSFER_ENABLED": "false"}):
-            svc = NewFeeTransferService()
-            result = svc.transfer_fee(
-                user_address="0x" + "c" * 40,
-                fee_amount_usdc=Decimal("5.0"),
-                fee_tx_db_id=2,
-                dry_run=True,
-            )
-        assert result.enabled is False
-        assert result.tx_hash is None
-
-
-class TestFeeTransferServiceEnabled:
-    """FEE_TRANSFER_ENABLED=true のとき web3 経由で transferFrom を呼ぶことを確認。"""
-
-    def _mock_w3(self, allowance_raw: int = 10_000_000, status: int = 1) -> MagicMock:
-        mock_w3 = MagicMock()
-        mock_contract = MagicMock()
-        mock_w3.eth.contract.return_value = mock_contract
-        mock_contract.functions.decimals.return_value.call.return_value = 6
-        mock_contract.functions.allowance.return_value.call.return_value = allowance_raw
-        mock_w3.eth.chain_id = 84532
-        mock_w3.eth.gas_price = 1000000000
-        mock_w3.eth.get_transaction_count.return_value = 0
-        mock_tx = {"chainId": 84532, "nonce": 0, "gas": 150000}
-        mock_contract.functions.transferFrom.return_value.build_transaction.return_value = mock_tx
-        mock_signed = MagicMock()
-        mock_signed.raw_transaction = b"\x00" * 32
-        mock_w3.eth.account.from_key.return_value.sign_transaction.return_value = mock_signed
-        mock_w3.eth.account.from_key.return_value.address = "0x" + "b" * 40
-        fake_hash = b"\xab" * 32
-        mock_w3.eth.send_raw_transaction.return_value = fake_hash
-        receipt = {"status": status}
-        mock_w3.eth.wait_for_transaction_receipt.return_value = receipt
-        return mock_w3
-
-    def test_transfer_enabled_calls_transferfrom(self) -> None:
-        mock_w3 = self._mock_w3(allowance_raw=20_000_000)
-        with (
-            patch.dict(os.environ, {"FEE_TRANSFER_ENABLED": "true"}),
-            patch("app.fees.transfer_service.Web3", return_value=mock_w3),
-        ):
-            svc = NewFeeTransferService()
-            result = svc.transfer_fee(
-                user_address="0x" + "c" * 40,
-                fee_amount_usdc=Decimal("10.0"),
-                fee_tx_db_id=3,
-            )
-        assert result.enabled is True
-        assert result.tx_hash == ("ab" * 32)
-        assert result.dry_run is False
-
-    def test_transfer_enabled_dry_run_no_send(self) -> None:
-        mock_w3 = self._mock_w3(allowance_raw=20_000_000)
-        with (
-            patch.dict(os.environ, {"FEE_TRANSFER_ENABLED": "true"}),
-            patch("app.fees.transfer_service.Web3", return_value=mock_w3),
-        ):
-            svc = NewFeeTransferService()
-            result = svc.transfer_fee(
-                user_address="0x" + "c" * 40,
-                fee_amount_usdc=Decimal("5.0"),
-                fee_tx_db_id=4,
-                dry_run=True,
-            )
-        assert result.dry_run is True
-        assert result.tx_hash is None
-        mock_w3.eth.send_raw_transaction.assert_not_called()
-
-    def test_transfer_raises_on_insufficient_allowance(self) -> None:
-        # 要求 10 USDC (10_000_000 raw), allowance 5_000_000
-        mock_w3 = self._mock_w3(allowance_raw=5_000_000)
-        with (
-            patch.dict(os.environ, {"FEE_TRANSFER_ENABLED": "true"}),
-            patch("app.fees.transfer_service.Web3", return_value=mock_w3),
-        ):
-            svc = NewFeeTransferService()
-            with pytest.raises(ValueError, match="allowance 不足"):
-                svc.transfer_fee(
-                    user_address="0x" + "c" * 40,
-                    fee_amount_usdc=Decimal("10.0"),
-                    fee_tx_db_id=5,
-                )
-
-    def test_transfer_raises_on_revert(self) -> None:
-        mock_w3 = self._mock_w3(allowance_raw=20_000_000, status=0)
-        with (
-            patch.dict(os.environ, {"FEE_TRANSFER_ENABLED": "true"}),
-            patch("app.fees.transfer_service.Web3", return_value=mock_w3),
-        ):
-            svc = NewFeeTransferService()
-            with pytest.raises(RuntimeError, match="fee transfer revert"):
-                svc.transfer_fee(
-                    user_address="0x" + "c" * 40,
-                    fee_amount_usdc=Decimal("10.0"),
-                    fee_tx_db_id=6,
-                )
-
-
-class TestAllowanceService:
-    """AllowanceService のユニットテスト。"""
-
-    def _mock_w3_for_permit(self) -> MagicMock:
-        mock_w3 = MagicMock()
-        mock_contract = MagicMock()
-        mock_w3.eth.contract.return_value = mock_contract
-        mock_contract.functions.decimals.return_value.call.return_value = 6
-        mock_contract.functions.nonces.return_value.call.return_value = 0
-        mock_contract.functions.name.return_value.call.return_value = "Aave Base USDC"
-        mock_w3.eth.chain_id = 84532
-        mock_w3.eth.account.from_key.return_value.address = "0x" + "b" * 40
-        return mock_w3
-
-    def test_build_permit_typed_data_structure(self) -> None:
-        from app.fees.allowance_service import AllowanceService
-
-        mock_w3 = self._mock_w3_for_permit()
-        with patch("app.fees.allowance_service.Web3", return_value=mock_w3):
-            svc = AllowanceService()
-            data = svc.build_permit_typed_data(
-                user_address="0x" + "c" * 40,
-                allowance_limit_usdc=Decimal("1000"),
-                deadline_ts=9999999999,
-            )
-
-        assert data.primary_type == "Permit"
-        assert "Permit" in data.types
-        assert data.message["value"] == 1000 * 10**6
-        assert data.message["deadline"] == 9999999999
-        assert data.message["nonce"] == 0
-        assert data.chain_id == 84532
-
-    def test_submit_permit_calls_permit_function(self) -> None:
-        from app.fees.allowance_service import AllowanceService
-
-        mock_w3 = self._mock_w3_for_permit()
-        # setup permit call
-        mock_contract = mock_w3.eth.contract.return_value
-        mock_contract.functions.permit.return_value.build_transaction.return_value = {
-            "chainId": 84532,
-            "nonce": 0,
-            "gas": 100_000,
-        }
-        mock_signed = MagicMock()
-        mock_signed.raw_transaction = b"\x00" * 32
-        mock_w3.eth.account.from_key.return_value.sign_transaction.return_value = mock_signed
-        fake_hash = b"\xcd" * 32
-        mock_w3.eth.send_raw_transaction.return_value = fake_hash
-        mock_w3.eth.wait_for_transaction_receipt.return_value = {"status": 1}
-        mock_w3.eth.get_transaction_count.return_value = 0
-        mock_w3.eth.gas_price = 1000000000
-
-        with patch("app.fees.allowance_service.Web3", return_value=mock_w3):
-            svc = AllowanceService()
-            result = svc.submit_permit(
-                user_address="0x" + "c" * 40,
-                allowance_limit_usdc=Decimal("1000"),
-                deadline_ts=9999999999,
-                v=27,
-                r="0x" + "aa" * 32,
-                s="0x" + "bb" * 32,
-            )
-
-        assert result.tx_hash == "cd" * 32
-        assert result.allowance_limit_usdc == Decimal("1000")
