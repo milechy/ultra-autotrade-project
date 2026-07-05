@@ -186,7 +186,8 @@ function FeesContent() {
 
       <div className="space-y-4 px-4 py-4 pb-24 max-w-4xl mx-auto">
         {/* B-1: 料金プラン / Tier別月額の事前提示（config は独自に取得・独立描画） */}
-        <FeePlanSection />
+        {/* B-3: 決済手段（自動引き落とし）設定への導線もここから提示 */}
+        <FeePlanSection showPaymentLink />
 
         {loading && (
           <div className="space-y-3">
