@@ -774,12 +774,20 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
         # 有効時のみスコアに反映）。独立した try/except に隔離し、失敗しても他の
         # market_ctx 構築には一切影響させない（fail-open。run_prefilter 自体も
         # 内部でOHLCV取得失敗をINSUFFICIENT_DATAとしてfail-open実装済み）。
+        #
+        # 取引用の BybitSandboxClient（testnet固定 + 取引APIキー要求）は使わない。
+        # OHLCVは公開市場データで認証不要のため、無認証の素の ccxt.bybit() で
+        # mainnetの実データを取得する（2026-07-06 staging-v4実機検証で判明:
+        # BybitSandboxClientはsandbox_mode(True)によりtestnetへ強制され、
+        # 本番用APIキーがtestnetでは無効なため fetch_ohlcv が全て失敗していた）。
         technical_signal: Optional[str] = None
         try:
-            from app.ai.prefilter import run_prefilter  # noqa: PLC0415
-            from app.exchange.client import BybitSandboxClient  # noqa: PLC0415
+            import ccxt  # noqa: PLC0415
 
-            prefilter_result = run_prefilter(BybitSandboxClient(), symbol="BTC/USDT")
+            from app.ai.prefilter import run_prefilter  # noqa: PLC0415
+
+            public_client = ccxt.bybit({"enableRateLimit": True})
+            prefilter_result = run_prefilter(public_client, symbol="BTC/USDT")
             technical_signal = prefilter_result.signal
         except Exception as exc:
             logger.warning(
