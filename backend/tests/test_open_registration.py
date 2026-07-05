@@ -143,6 +143,29 @@ class TestOpenRegistrationAPI:
         assert data["role"] == "viewer"
         assert "access_token" in data
 
+    def test_register_open_records_general_terms_not_liff(self, client: TestClient) -> None:
+        """register-open は一般規約版 (CURRENT_TERMS_VERSION=2.0) を記録し LIFF 版を付与しない。
+
+        liff-v4 を付与すると、LIFF 導線に入ったユーザーが /liff-confirm の月額利用料
+        (monthly_fee) 項目別同意を一度も見ないまま「liff-v4 同意済み」と記録されてしまう
+        （同意整合性の欠落）。一般規約版なら LIFF terms gate が /liff-confirm へ誘導する。
+        """
+        resp = client.post(
+            "/auth/register-open",
+            json={
+                "email": "generalterms@example.com",
+                "username": "genterms",
+                "password": "Password123",
+                "terms_consent": True,
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        token = resp.json()["access_token"]
+        settings = client.get("/api/user/settings", headers={"Authorization": f"Bearer {token}"})
+        assert settings.status_code == 200
+        assert settings.json()["terms_version"] == "2.0"
+        assert settings.json()["terms_version"] != "liff-v4"
+
     def test_register_open_creates_audit_invitation(self, client: TestClient, test_db) -> None:
         """open 登録後に type='open' の監査レコードが invitations テーブルに作られる。"""
         _, engine = test_db

@@ -318,7 +318,12 @@ def register_open(
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
 
-    user.terms_version = _LIFF_TERMS_VERSION
+    # 一般登録の terms_consent は「一般利用規約 (CURRENT_TERMS_VERSION=2.0)」への同意。
+    # LIFF 固有の同意 (_LIFF_TERMS_VERSION=liff-v4, 月額利用料 monthly_fee 項目を含む) を
+    # ここでセットすると、LIFF 導線に入ったユーザーが /liff-confirm の項目別同意を一度も
+    # 見ないまま「liff-v4 同意済み」と記録されてしまう (同意整合性の欠落)。
+    # 一般規約版を記録し、LIFF 利用時は frontend terms gate (liff-v4 要求) が /liff-confirm へ誘導する。
+    user.terms_version = CURRENT_TERMS_VERSION
     user.terms_accepted_at = datetime.now(timezone.utc)
     db.add(user)
     db.commit()
