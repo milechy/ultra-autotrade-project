@@ -33,6 +33,7 @@ from app.database import SessionLocal
 from app.knowledge.schemas import KnowledgeSearchRequest
 from app.knowledge.service import KnowledgeService
 from app.proposals.models import Proposal
+from app.users.deposit_policy import MIN_DEPOSIT_USD
 
 # ティア別デフォルト判定間隔（時間）
 _DEFAULT_INTERVAL_UPPER = 4
@@ -115,6 +116,15 @@ def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
     )
     allocated = Decimal(str(raw)) if raw else Decimal("0")
     if allocated > Decimal("0"):
+        # A-2 入金ゲート: 運用開始の最低入金額 (MIN_DEPOSIT_USD) 未満は提案を生成しない。
+        if allocated < MIN_DEPOSIT_USD:
+            logger.info(
+                "[deposit_gate] custodial deposit $%s < min $%s for user_id=%d — proposal skipped",
+                allocated,
+                MIN_DEPOSIT_USD,
+                user_id,
+            )
+            return Decimal("0")
         amount = (allocated * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
         return max(_PROPOSAL_AMOUNT_MIN_USD, min(amount, _PROPOSAL_AMOUNT_MAX_USD))
 
@@ -127,6 +137,15 @@ def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
             # 残高0 / RPC 取得失敗 → skip (安全側)
             logger.debug(
                 "[proposal_amount] wallet USDC 0/unavailable for user_id=%d — skipped",
+                user_id,
+            )
+            return Decimal("0")
+        # A-2 入金ゲート: wallet 残高が運用開始の最低入金額未満なら提案を生成しない。
+        if balance < MIN_DEPOSIT_USD:
+            logger.info(
+                "[deposit_gate] consumer wallet deposit $%s < min $%s for user_id=%d — proposal skipped",
+                balance,
+                MIN_DEPOSIT_USD,
                 user_id,
             )
             return Decimal("0")
