@@ -19,6 +19,7 @@ No side effects, no state, easily testable.
 """
 
 import logging
+import os
 from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
 from typing import ClassVar, Optional
@@ -443,6 +444,16 @@ def resolve_llm_and_deterministic(
 # ============================================================
 # Specialist Agents (pure functions — no side effects)
 # ============================================================
+def _indicator_momentum_enabled() -> bool:
+    """価格テクニカルシグナルのkill switch(既定OFF)。
+
+    AI判定コアの新規シグナルのため、staging soak確認後に人間が明示的に
+    AI_INDICATOR_MOMENTUM_ENABLED=true を設定するまでは無効(既存動作と不変)。
+    異常発生時は env を戻すだけで即無効化できる(再デプロイ不要)。
+    """
+    return os.getenv("AI_INDICATOR_MOMENTUM_ENABLED", "false").strip().lower() == "true"
+
+
 def indicator_agent(ctx: MarketContext) -> AgentSignal:
     """Analyze Aave on-chain indicators (utilization, APY, HF).
 
@@ -521,6 +532,15 @@ def indicator_agent(ctx: MarketContext) -> AgentSignal:
         elif apy_float < 1:
             score -= 6
             reasons.append(f"Supply APY at {supply_apy}% — yield compressed, weak demand")
+
+    if _indicator_momentum_enabled() and ctx.technical_signal is not None:
+        key_data["technical_signal"] = ctx.technical_signal
+        if ctx.technical_signal == "BUY_LEAN":
+            score += 15
+            reasons.append("Technical signal (RSI+MA cross): BUY_LEAN — momentum favors upside")
+        elif ctx.technical_signal == "SELL_LEAN":
+            score -= 15
+            reasons.append("Technical signal (RSI+MA cross): SELL_LEAN — momentum favors downside")
 
     if score >= 65:
         bias = Bias.BULLISH

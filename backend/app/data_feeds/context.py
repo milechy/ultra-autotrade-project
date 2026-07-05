@@ -64,6 +64,12 @@ class MarketContext(BaseModel):
     # プロンプト注入は Phase 2（別PR、本番soak確認後）で追加する。
     gho_borrow_signal: Optional[str] = None
 
+    # 価格テクニカルシグナル（RSI+MAクロス、app.ai.prefilter.run_prefilter 由来）。
+    # "BUY_LEAN" | "SELL_LEAN" | "NEUTRAL" | "INSUFFICIENT_DATA" | None（未取得時、fail-open）。
+    # Indicator Agent の kill switch(AI_INDICATOR_MOMENTUM_ENABLED)が有効な場合のみ
+    # スコアに反映される（agents.py 参照）。
+    technical_signal: Optional[str] = None
+
     # Metadata
     collected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -107,6 +113,9 @@ class MarketContext(BaseModel):
             mmt_section = self.mmt_data.to_prompt_section()
             if mmt_section:
                 parts.append(mmt_section)
+
+        if self.technical_signal is not None and self.technical_signal != "INSUFFICIENT_DATA":
+            parts.append(f"[Technical Signal] {self.technical_signal}")
 
         return "\n".join(parts)
 
