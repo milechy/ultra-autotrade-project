@@ -278,9 +278,7 @@ class User(Base):
     # POST /v1/wallets/{id}/rpc で要求する識別子。wallet-connect 時に frontend の Privy SDK から
     # 受領して保存する。NULL = 未取得 (旧ユーザー / 非 Privy 経路)。
     # 参照: app/proposals/router.py _resolve_privy_wallet_id / app/proposals/scw_executor.py
-    privy_wallet_id: Mapped[Optional[str]] = mapped_column(
-        String(64), nullable=True, default=None
-    )
+    privy_wallet_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, default=None)
     invited_by: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True, default=None
     )
