@@ -209,7 +209,7 @@
     "filterAll": "すべて",
     "dateFrom": "開始日",
     "dateTo": "終了日",
-    "aaveTab": "Aave操作履歴",
+    "aaveTab": "UAT操作履歴",
     "exchangeTab": "取引所履歴（準備中）",
     "loadMore": "もっと見る",
     "totalCount": "全 {total} 件",
@@ -242,9 +242,9 @@
     "loadingText": "読み込み中...",
     "totalCountExchange": "全 {total} 件",
     "pageCount": "ページ {page} / {totalPages}",
-    "headerDesc": "Aave操作の全履歴を確認できます",
+    "headerDesc": "UAT操作の全履歴を確認できます",
     "csvTitle": "税務CSV (Cryptact形式)",
-    "csvDesc": "実行済みAave操作をCryptact無料版フォーマットでエクスポートします",
+    "csvDesc": "実行済みUAT操作をCryptact無料版フォーマットでエクスポートします",
     "csvYearUnit": "{year}年",
     "csvDownloading": "ダウンロード中...",
     "csvDownload": "CSVダウンロード",
@@ -388,7 +388,7 @@
     "featureAIDesc": "Claude Sonnet 4.6 + GPT-4o のクロス検証",
     "featureSafe": "安全設計",
     "featureSafeDesc": "ヘルスファクター監視 + 緊急停止",
-    "featureAave": "Aave V3",
+    "featureAave": "UAT",
     "featureAaveDesc": "Base で自動運用"
   },
   "Connect": {
@@ -815,7 +815,7 @@
         "depositAddressLabel": "入金用アドレス（Base Mainnet）",
         "depositAddressCopyBtn": "アドレスをコピー",
         "depositAddressCopied": "コピーしました",
-        "depositAddressNote": "このアドレスに USDC を送金してください。着金後、自動で Aave 運用に反映されます。",
+        "depositAddressNote": "このアドレスに USDC を送金してください。着金後、自動で UAT 運用に反映されます。",
         "depositNoWallet": "ウォレットアドレスが登録されていません",
         "depositBtn": "入金する",
         "moonpayTitle": "クレジットカードで購入",
@@ -831,7 +831,7 @@
         "withdrawGuideNote1": "【重要】必ず {chain} ネットワークのアドレスを指定してください。異なるネットワーク宛に送ると資金が失われる可能性があります",
         "networkFeeLabel": "ネットワーク手数料",
         "receiveAmountLabel": "受取予定額",
-        "withdrawWarning": "出金後の資産はAave運用から外れます。再入金まで利回りは発生しません。",
+        "withdrawWarning": "出金後の資産はUAT運用から外れます。再入金まで利回りは発生しません。",
         "withdrawBtn": "出金する",
         "confirmSheetTitle": "出金内容の確認",
         "confirmSheetWithdrawAmount": "出金額",
@@ -1198,15 +1198,15 @@
     "pageSubtitle": "Ultra AutoTradeの利用に関するFAQです",
     "faqs": {
       "item1Question": "Health Factor（HF）とは何ですか？",
-      "item1Answer": "Aaveにおける担保の安全度指標です。1.0を下回ると清算リスクが発生します。当システムでは1.6以上を維持するよう自動管理しています。",
+      "item1Answer": "UATにおける担保の安全度指標です。1.0を下回ると清算リスクが発生します。当システムでは1.6以上を維持するよう自動管理しています。",
       "item2Question": "HFが1.6を下回るとどうなりますか？",
       "item2Answer": "SAFE_MODEに移行し、新規供給を停止します。必要に応じて自動でポジション縮小を行います。HF < 1.3の場合はHARD_STOP（全引き出し）が発動します。",
       "item3Question": "緊急停止が発動したらどうすればいいですか？",
-      "item3Answer": "すべての自動取引が停止します。資金はAave上に安全に保管されたままです。管理者が状況を確認後、手動で再開します。特にユーザー側の操作は不要です。",
+      "item3Answer": "すべての自動取引が停止します。資金はUAT上に安全に保管されたままです。管理者が状況を確認後、手動で再開します。特にユーザー側の操作は不要です。",
       "item4Question": "利回りが下がったのはなぜですか？",
-      "item4Answer": "AaveのUSDC供給利率は市場の需給で変動します。借入需要が減ると利率が低下します。AIが市場状況を判断し、最適なタイミングでの運用を目指しています。",
+      "item4Answer": "UATのUSDC供給利率は市場の需給で変動します。借入需要が減ると利率が低下します。AIが市場状況を判断し、最適なタイミングでの運用を目指しています。",
       "item5Question": "運用をやめたい場合はどうすればいいですか？",
-      "item5Answer": "管理者にご連絡ください。Aaveからの引き出し手続きを行います。資金はお使いのウォレットに返却されます。",
+      "item5Answer": "管理者にご連絡ください。UATからの引き出し手続きを行います。資金はお使いのウォレットに返却されます。",
       "item6Question": "AIの判定はどのくらいの頻度で行われますか？",
       "item6Answer": "4時間ごとに自動で市場分析と判定を実施します。判定結果はダッシュボードで確認できます。",
       "item7Question": "取引の承認期限はありますか？",
@@ -1388,7 +1388,7 @@
     "abnormal": "異常",
     "active": "稼働中",
     "phase2Note": "Phase 2 予定:",
-    "phase2NoteText": "Lido stETH・Pendle PT/YT戦略は現在開発中です。正式リリース後に選択可能になります。",
+    "phase2NoteText": "ステーキング型・イールド最適化型戦略は現在開発中です。正式リリース後に選択可能になります。",
     "risk_low": "低",
     "risk_medium": "中",
     "risk_high": "高",
@@ -1396,16 +1396,16 @@
     "risk_medium_high": "中〜高",
     "aave": {
       "subtitle": "レンディング戦略",
-      "description": "USDCをAave V3プロトコルに供給し、安定した貸出利息を獲得します。ヘルスファクター監視と自動リバランスで安全に運用します。",
+      "description": "USDCを安定型プランに供給し、安定した貸出利息を獲得します。ヘルスファクター監視と自動リバランスで安全に運用します。",
       "apyRange": "3〜5%"
     },
     "lido": {
       "subtitle": "リキッドステーキング",
-      "description": "ETHをLidoプロトコルでリキッドステーキングし、stETHとして保有します。バリデーター報酬を受け取りながら流動性を維持できます。"
+      "description": "ETHをステーキング型プランでリキッドステーキングし、流動性のある保有トークンとして保有します。バリデーター報酬を受け取りながら流動性を維持できます。"
     },
     "pendle": {
       "subtitle": "イールドトレーディング",
-      "description": "Pendleプロトコルでトークン化された利回りを売買します。元本トークン（PT）と利回りトークン（YT）を活用した高度なイールド最適化戦略です。"
+      "description": "イールド最適化型プランでトークン化された利回りを売買します。元本部分（PT）と利回り部分（YT）を活用した高度なイールド最適化戦略です。"
     },
     "optimizer": {
       "title": "最適配分を試算",
@@ -1427,11 +1427,11 @@
       "riskScoreLabel": "リスクスコア",
       "disclaimer": "本試算は参考値です。実際の運用成果を保証するものではありません。",
       "protocol": {
-        "aave": "Aave レンディング",
-        "lido": "Lido stETH",
-        "lido_aave": "Lido + Aave 複合",
-        "pendle_pt": "Pendle PT",
-        "pendle_yt": "Pendle YT",
+        "aave": "安定型レンディング",
+        "lido": "ステーキング型",
+        "lido_aave": "ステーキング型 + 安定型 複合",
+        "pendle_pt": "イールド最適化型（元本）",
+        "pendle_yt": "イールド最適化型（利回り）",
         "idle": "未投資（現金）"
       }
     }
@@ -1516,7 +1516,7 @@
       },
       "howToStop": {
         "q": "やめたいときはどうすればいいですか？",
-        "a": "いつでも資産をAaveから引き出せます。Ultra AutoTradeを解除した後も、資産はあなたのウォレットに残ります。引き出しに必要なのはガス代のみです。"
+        "a": "いつでも資産をUATから引き出せます。Ultra AutoTradeを解除した後も、資産はあなたのウォレットに残ります。引き出しに必要なのはガス代のみです。"
       }
     },
     "ctaBtn": "ウォレットを接続して始める →"
@@ -3619,7 +3619,7 @@
   "ProposalsAllocationCards": {
     "conservativeName": "Conservative（保守）",
     "conservativeSubtitle": "安定供給戦略",
-    "conservativeDescription": "USDC を Base V3（Aave）に供給し、安定した貸出利息を獲得します。価格変動リスクを取らず、ヘルスファクター監視のもとで運用します。",
+    "conservativeDescription": "USDC を UAT に供給し、安定した貸出利息を獲得します。価格変動リスクを取らず、ヘルスファクター監視のもとで運用します。",
     "conservativeVenue": "Base V3 USDC supply",
     "standardName": "Standard（標準）",
     "aggressiveName": "Aggressive（積極）",
@@ -3798,7 +3798,7 @@
     "redirecting": "リダイレクト中..."
   },
   "RewardsCard": {
-    "title": "Aaveリワード",
+    "title": "UATリワード",
     "unclaimedTotal": "未請求合計",
     "lastClaimedAt": "最終Claim日時",
     "noData": "リワードデータがありません",
@@ -3849,7 +3849,7 @@
   "UnifiedPortfolioCard": {
     "title": "統合ポートフォリオ",
     "grandTotal": "合計資産",
-    "sourceAave": "Aave 純資産",
+    "sourceAave": "UAT 純資産",
     "sourceWallet": "ウォレット残高",
     "sourceCex": "取引所",
     "healthFactor": "ヘルスファクター",
