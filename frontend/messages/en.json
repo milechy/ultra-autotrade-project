@@ -673,6 +673,7 @@
       "signFailed": "Signing failed",
       "signCanceled": "Signature canceled",
       "insufficientBalance": "Your wallet USDC balance is below the proposed amount. Please deposit before signing.",
+      "confidenceNote": "latest AI judgment",
       "errInsufficientFunds": "Insufficient balance or gas. Please check your USDC balance and ETH (for gas).",
       "depositCta": "Deposit",
       "collapse": "Collapse",

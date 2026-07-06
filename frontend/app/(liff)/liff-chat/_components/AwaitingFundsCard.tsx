@@ -8,21 +8,22 @@
 import { useTranslations } from "next-intl"
 import { Loader2, Wallet } from "lucide-react"
 import type { ChatProposal } from "./ProposalSignSheet"
+import { DepositGuideInline } from "./DepositGuideInline"
 
 interface AwaitingFundsCardProps {
   proposal: ChatProposal
   balanceUsd: number | null
-  onDeposit: () => void
   onReject: () => void
   rejecting?: boolean
+  onDepositSettled?: () => void
 }
 
 export function AwaitingFundsCard({
   proposal,
   balanceUsd,
-  onDeposit,
   onReject,
   rejecting = false,
+  onDepositSettled,
 }: AwaitingFundsCardProps) {
   const t = useTranslations("Liff.awaitingFunds")
 
@@ -54,26 +55,18 @@ export function AwaitingFundsCard({
         <Row label={t("shortfall")} value={fmt(shortfall)} amber />
       </div>
 
-      <p className="text-[#736f7e] text-xs leading-relaxed mb-3">{t("guide")}</p>
-
       {/* actions */}
-      <div className="flex gap-3 mt-3">
-        <button
-          onClick={onReject}
-          disabled={rejecting}
-          className="flex-1 py-2.5 rounded-xl border border-[#1c1a27]/20 text-[#1c1a27]
-                     font-semibold disabled:opacity-40 transition-colors"
-        >
-          {t("reject")}
-        </button>
-        <button
-          onClick={onDeposit}
-          className="flex-1 py-2.5 rounded-xl bg-[#1D9E75] active:bg-[#178a64] text-white
-                     font-bold transition-colors"
-        >
-          {t("depositCta")}
-        </button>
-      </div>
+      <button
+        onClick={onReject}
+        disabled={rejecting}
+        className="w-full py-2.5 rounded-xl border border-[#1c1a27]/20 text-[#1c1a27]
+                   font-semibold disabled:opacity-40 transition-colors"
+      >
+        {t("reject")}
+      </button>
+
+      {/* 入金導線: 別パネルへ遷移せずボックス内で Privy fundWallet を直接起動する */}
+      <DepositGuideInline shortfallUsd={shortfall} onSettled={onDepositSettled} />
     </div>
   )
 }

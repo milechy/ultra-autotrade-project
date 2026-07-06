@@ -6,12 +6,9 @@ import { AlertTriangle, Loader2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useLanguage } from "@/lib/useLanguage"
 import { liffFetch } from "@/lib/liff/liff-fetch"
-import { useFundWallet } from "@privy-io/react-auth"
-import { base, baseSepolia } from "wagmi/chains"
-import { useWallet } from "@/hooks/useWallet"
 import { useUsdcBalance } from "@/hooks/useUsdcBalance"
 import { useEffectiveWalletAddress } from "@/hooks/useEffectiveWalletAddress"
-import { track, EV } from "@/lib/posthog"
+import { useDepositFundWallet } from "@/hooks/useDepositFundWallet"
 import { SUPPORTED_CHAIN_IDS, getChainDisplayName, DEPOSIT_GATE_USD } from "@/lib/web3/config"
 
 // ---- 型定義 ---------------------------------------------------------------
@@ -110,9 +107,6 @@ export function DepositPanel() {
       .catch(() => {})
   }, [])
 
-  // Privy ウォレット情報（chainId は署名/ネットワーク判定用。EOA。）
-  const { chainId } = useWallet()
-
   // 入金先/出金先/残高チェック対象アドレスは実効アドレス（smart_wallet_address 優先、
   // 未設定なら EOA）。Aave 実行の実体（backend submit_partner_tx の UserOp sender 検証）
   // と一致させるため、EOA 固定にしない（2026-07-04 資金迷子バグ修正）。
@@ -125,8 +119,6 @@ export function DepositPanel() {
 
   // 入金フォーム（金額は送金目安の表示用）
   const [depositAmount, setDepositAmount] = useState("")
-  // Privy fundWallet 処理中フラグ
-  const [isFunding, setIsFunding] = useState(false)
 
   // 出金フォーム
   const [withdrawAmount, setWithdrawAmount] = useState("")
@@ -139,43 +131,21 @@ export function DepositPanel() {
 
   // 残高はオンチェーン取得（useUsdcBalance が自動取得）。入金/出金後は refetchBalance() で更新する。
 
-  // ---- Privy fundWallet --------------------------------------------------
+  // ---- Privy fundWallet（共通hook。ProposalActionCard/AwaitingFundsCard/
+  // ProposalSignSheet のインライン入金導線と同じ実装を使う） -----------------------
 
-  const { fundWallet } = useFundWallet({
-    onUserExited: () => {
-      setIsFunding(false)
-      refetchBalance()
-    },
+  const { trigger: triggerFundWallet, isFunding } = useDepositFundWallet({
+    onSettled: refetchBalance,
   })
 
   const handleFundWallet = useCallback(async () => {
-    if (!address) return
-    track(EV.DEPOSIT_FUND)
-    setIsFunding(true)
-    try {
-      // 入力単位は言語で異なる: 英語=USD（USDC と 1:1）/ 日本語=¥（÷155 で USDC 換算）。
-      // Privy fundWallet の amount は USDC 建てのため、ここで USDC へ正規化する
-      // （旧実装は ¥ 値をそのまま USDC として渡していた不具合を修正）。
-      const num = parseFloat(depositAmount) || 0
-      const usdc = language === "en" ? num : num / jpyPerUsdc
-      await fundWallet({
-        address,
-        options: {
-          chain: chainId === 84532 ? baseSepolia : base,
-          amount: usdc > 0 ? usdc.toFixed(2) : "200",
-          asset: "USDC",
-        },
-      })
-    } catch (e) {
-      if (e instanceof Error && !e.message.toLowerCase().includes("exit")) {
-        // ユーザーキャンセル以外のエラーはコンソールに記録（UI は onUserExited で復旧）
-        console.error("[DepositPanel] fundWallet error:", e.message)
-      }
-    } finally {
-      setIsFunding(false)
-      refetchBalance()
-    }
-  }, [address, chainId, depositAmount, language, jpyPerUsdc, refetchBalance, fundWallet])
+    // 入力単位は言語で異なる: 英語=USD（USDC と 1:1）/ 日本語=¥（÷155 で USDC 換算）。
+    // Privy fundWallet の amount は USDC 建てのため、ここで USDC へ正規化する
+    // （旧実装は ¥ 値をそのまま USDC として渡していた不具合を修正）。
+    const num = parseFloat(depositAmount) || 0
+    const usdc = language === "en" ? num : num / jpyPerUsdc
+    await triggerFundWallet(usdc)
+  }, [depositAmount, language, jpyPerUsdc, triggerFundWallet])
 
   // ---- 出金可能額上限（全額ボタン用） ----------------------------------------
 

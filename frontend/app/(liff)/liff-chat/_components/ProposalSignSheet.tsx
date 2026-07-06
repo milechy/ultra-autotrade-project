@@ -13,6 +13,7 @@ import { ethers } from "ethers"
 import { Loader2, Lock, CheckCircle2 } from "lucide-react"
 import { buildPartnerTx, submitPartnerTx, type UnsignedTx } from "@/lib/api/admin-proposals"
 import { classifyTxError } from "@/lib/web3/classify-tx-error"
+import { DepositGuideInline } from "./DepositGuideInline"
 
 // build-tx の UnsignedTx を Smart Wallet UserOp の call 形式 (to/data/value) に変換する。
 // approve/supply/withdraw/buy_pt は 0 ETH value。STAKE_ETH (Lido submit) のみ value=添付 ETH。
@@ -54,8 +55,9 @@ interface ProposalSignSheetProps {
   onExecuted: (txHash: string) => void
   // F4: 入金系で wallet 残高 < 提案額のとき true。署名前ブロック + 入金導線に使う。
   insufficientBalance?: boolean
-  // F5: 残高不足時に入金パネルへ誘導するコールバック (page.tsx の setActivePanel("deposit"))。
-  onDeposit?: () => void
+  // 不足額計算・入金後の残高再取得用（DepositGuideInline に渡す）。
+  balanceUsd?: number | null
+  onDepositSettled?: () => void
 }
 
 export function ProposalSignSheet({
@@ -65,7 +67,8 @@ export function ProposalSignSheet({
   onClose,
   onExecuted,
   insufficientBalance = false,
-  onDeposit,
+  balanceUsd,
+  onDepositSettled,
 }: ProposalSignSheetProps) {
   const { login } = usePrivy()
   const { wallets } = useWallets()
@@ -320,19 +323,17 @@ export function ProposalSignSheet({
         {error && <p className="text-red-600 text-xs mb-3">{error}</p>}
 
         {/* F4/F5: 残高不足 — 署名前ブロック (insufficientBalance) または署名時検知 (showDepositCta)。
-            残高不足の案内 + 入金導線を出す。on-chain revert / 無駄ガスを未然に防ぐ。 */}
+            残高不足の案内 + 入金導線を出す。on-chain revert / 無駄ガスを未然に防ぐ。
+            別パネルへ遷移せず DepositGuideInline がボックス内で Privy fundWallet を直接起動する。 */}
         {(insufficientBalance || showDepositCta) && (
-          <div className="mb-3 rounded-xl bg-amber-50 border border-amber-200 p-3">
+          <div className="mb-3">
             <p className="text-amber-800 text-xs mb-2">{t("insufficientBalance")}</p>
-            {onDeposit && (
-              <button
-                onClick={onDeposit}
-                className="w-full py-2 rounded-lg bg-[#1D9E75] active:bg-[#178a64] text-white
-                           text-sm font-bold transition-colors"
-              >
-                {t("depositCta")}
-              </button>
-            )}
+            <DepositGuideInline
+              shortfallUsd={
+                balanceUsd != null ? Number(proposal.amount_usd) - balanceUsd : undefined
+              }
+              onSettled={onDepositSettled}
+            />
           </div>
         )}
 
