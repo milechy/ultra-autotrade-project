@@ -708,7 +708,7 @@
     "home": {
       "currentAsset": "現在の資産",
       "lastMonthComparison": "先月比",
-      "aiJudgment": "AI JUDGMENT",
+      "aiJudgment": "AI判定",
       "confidenceLabel": "信頼度",
       "holdWeakSignalLabel": "売買シグナルが弱いため様子見中（確信度 {confidence}%）",
       "approve": "承認する",
