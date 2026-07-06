@@ -48,8 +48,9 @@ export function ProposalActionCard({
     WITHDRAW: { label: t("exec.withdraw"), color: "text-red-600", icon: ArrowDown },
     STAKE_ETH: { label: t("exec.stakeEth"), color: "text-[#1D9E75]", icon: ArrowUp },
     UNSTAKE_ETH: { label: t("exec.unstakeEth"), color: "text-red-600", icon: ArrowDown },
-    BUY_PT: { label: t("exec.buyPt"), color: "text-[#1D9E75]", icon: ArrowUp },
-    SELL_PT: { label: t("exec.sellPt"), color: "text-red-600", icon: ArrowDown },
+    // BUY_PT/SELL_PT は下の大表示 BUY/SELL が方向を示すため、ラベルは銘柄種別のみに短縮する。
+    BUY_PT: { label: t("exec.ptTokenLabel"), color: "text-[#1D9E75]", icon: ArrowUp },
+    SELL_PT: { label: t("exec.ptTokenLabel"), color: "text-red-600", icon: ArrowDown },
   }
   const config = operationConfig[proposal.operation] ?? operationConfig["SUPPLY"]
   const OperationIcon = config.icon
@@ -60,6 +61,10 @@ export function ProposalActionCard({
   // 判定する(マルチプロトコルで判定と提案がズレるリスクを避けるため確信度と同じ理由)。
   const isInflowOperation = ["SUPPLY", "STAKE_ETH", "BUY_PT"].includes(proposal.operation)
   const bigActionLabel = isInflowOperation ? "BUY" : "SELL"
+
+  // 残高不足の視覚的注意喚起（SUPPLY 限定の insufficientBalance/入金導線とは独立。
+  // Pendle/Lido 等でも残高が足りていなければ一目でわかるようにする）。
+  const isBalanceLow = balanceUsd != null && balanceUsd < Number(proposal.amount_usd)
 
   // MARKET-B: lido/pendle 提案のときのみ ETH/USD を取得してバッジ表示する。
   const isEthProposal = proposal.protocol === "lido" || proposal.protocol === "pendle"
@@ -85,8 +90,12 @@ export function ProposalActionCard({
   const isLong = reason.length > 120
   const displayReason = !isLong || expanded ? reason : reason.slice(0, 120) + "…"
 
+  const borderColor = isInflowOperation ? "border-[#1D9E75]/50" : "border-red-500/50"
+
   return (
-    <div className="ax-card-warm rounded-2xl mx-4 mt-4 p-4 border-2 border-[#1D9E75]/40">
+    <div
+      className={`ax-card-warm ax-shine-border rounded-2xl mx-4 mt-4 p-4 border-2 ${borderColor}`}
+    >
       {/* header */}
       <div className="flex items-center gap-2 mb-2">
         <span className={`flex items-center gap-1 text-sm font-bold ${config.color}`}>
@@ -110,8 +119,13 @@ export function ProposalActionCard({
         </div>
       </div>
 
-      {/* BUY/SELL 大表示（旧 AI 判定ボックスの action 表示を踏襲。一番目立たせる） */}
-      <div className={`font-bold text-2xl mb-1 ${config.color}`}>{bigActionLabel}</div>
+      {/* BUY/SELL 大表示（旧 AI 判定ボックスの action 表示を踏襲し、さらに強調。
+          白フチ(-webkit-text-stroke)で色覚・背景に依存せず視認性を確保する） */}
+      <div
+        className={`font-extrabold text-6xl text-center mb-1 tracking-wide leading-none ${config.color} [-webkit-text-stroke:2px_white] [paint-order:stroke_fill]`}
+      >
+        {bigActionLabel}
+      </div>
 
       {/* amount */}
       <div className="mb-2">
@@ -129,10 +143,23 @@ export function ProposalActionCard({
         </p>
       )}
 
-      {/* ウォレット残高（統合ボックス化: page.tsx の KPI-E 行をここに集約） */}
-      <div className="flex items-center justify-between px-3 py-2 mb-3 rounded-lg bg-[#1c1a27]/5">
-        <span className="text-xs text-[#736f7e]">{t("kpi.walletBalance")}</span>
-        <span className="text-sm font-semibold text-[#1c1a27]">
+      {/* ウォレット残高（統合ボックス化: page.tsx の KPI-E 行をここに集約）。
+          残高が提案額に満たない場合は operation 種別を問わず赤背景で警告する
+          （insufficientBalance の入金導線自体は SUPPLY 限定のままだが、視覚的な
+          注意喚起はどの operation でも出す）。 */}
+      <div
+        className={`flex items-center justify-between px-3 py-2 mb-3 rounded-lg ${
+          isBalanceLow
+            ? "bg-red-50 border border-red-300"
+            : "bg-[#1c1a27]/5"
+        }`}
+      >
+        <span className={`text-xs ${isBalanceLow ? "text-red-700" : "text-[#736f7e]"}`}>
+          {t("kpi.walletBalance")}
+        </span>
+        <span
+          className={`text-sm font-semibold ${isBalanceLow ? "text-red-700" : "text-[#1c1a27]"}`}
+        >
           {balanceUsd != null
             ? `$${balanceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             : "—"}
