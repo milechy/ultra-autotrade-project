@@ -208,8 +208,10 @@ export function ProposalActionCard({
         <button
           onClick={onApprove}
           disabled={rejecting}
-          className="flex-1 py-2.5 rounded-xl bg-[#1D9E75] active:bg-[#178a64] text-white
-                     font-bold disabled:opacity-50 transition-colors"
+          className={`flex-1 py-2.5 rounded-xl bg-[#1D9E75] active:bg-[#178a64] text-white
+                     font-bold disabled:opacity-50 transition-colors ${
+                       rejecting ? "" : "ax-approve-pulse"
+                     }`}
         >
           {t("home.approve")}
         </button>

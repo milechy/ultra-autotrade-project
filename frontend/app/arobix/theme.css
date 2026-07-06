@@ -236,3 +236,14 @@
 @keyframes ax-shine-rotate {
   to { --ax-shine-angle: 360deg; }
 }
+
+/* ================================================================
+ * 「承認する」ボタン: ゆっくり点滅（3秒間隔）で行動を促す。
+ * ================================================================ */
+.ax-approve-pulse {
+  animation: ax-approve-pulse 3s ease-in-out infinite;
+}
+@keyframes ax-approve-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
