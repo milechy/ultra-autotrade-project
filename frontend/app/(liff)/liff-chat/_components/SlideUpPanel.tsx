@@ -16,7 +16,7 @@ export function SlideUpPanel({
   onClose,
   title,
   children,
-  maxHeight = "90vh",
+  maxHeight = "90dvh",
 }: SlideUpPanelProps) {
   if (!open) return null
   return (
