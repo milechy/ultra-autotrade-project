@@ -649,7 +649,7 @@
     "kpi": {
       "walletBalance": "ウォレット残高",
       "totalValue": "運用残高",
-      "avgApy": "平均 APY",
+      "avgApy": "平均利回り",
       "monthlyDividend": "月次手取り（配当）",
       "noDataYet": "運用開始後に表示されます"
     },
@@ -706,9 +706,9 @@
       "reject": "見送る"
     },
     "home": {
-      "currentAsset": "CURRENT ASSET",
+      "currentAsset": "現在の資産",
       "lastMonthComparison": "先月比",
-      "aiJudgment": "AI JUDGMENT",
+      "aiJudgment": "AI判定",
       "confidenceLabel": "信頼度",
       "holdWeakSignalLabel": "売買シグナルが弱いため様子見中（確信度 {confidence}%）",
       "approve": "承認する",
