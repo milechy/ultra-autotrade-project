@@ -194,7 +194,9 @@ export function DepositPanel() {
 
   return (
     <div className="pb-2">
-      {/* タブ（出金は準備中表示のみ・クリック不可） */}
+      {/* タブ（WITHDRAW_ENABLED=false の間は出金＝準備中表示のみ・クリック不可。
+          2026-07-07 修正: このタブボタン自体がフラグを見ずハードコードで disabled に
+          なっており、NEXT_PUBLIC_WITHDRAW_ENABLED=true にしても出金タブが開けなかった。 */}
       <div className="flex border-b border-[#1c1a27]/15 mb-4">
         <button
           onClick={() => handleTabChange("deposit")}
@@ -208,13 +210,23 @@ export function DepositPanel() {
           {t("tabDeposit")}
         </button>
         <button
-          disabled
-          className="flex-1 py-2 text-sm font-medium text-[#736f7e] opacity-40 cursor-not-allowed flex items-center justify-center gap-1"
+          onClick={WITHDRAW_ENABLED ? () => handleTabChange("withdraw") : undefined}
+          disabled={!WITHDRAW_ENABLED}
+          className={[
+            "flex-1 py-2 text-sm font-medium flex items-center justify-center gap-1 transition-colors",
+            !WITHDRAW_ENABLED
+              ? "text-[#736f7e] opacity-40 cursor-not-allowed"
+              : tab === "withdraw"
+                ? "border-b-2 border-[#1D9E75] text-[#1D9E75]"
+                : "text-[#736f7e]",
+          ].join(" ")}
         >
           {t("tabWithdraw")}
-          <span className="text-[10px] bg-[#736f7e]/20 rounded px-1 py-0.5 leading-none">
-            {t("withdrawComingSoon")}
-          </span>
+          {!WITHDRAW_ENABLED && (
+            <span className="text-[10px] bg-[#736f7e]/20 rounded px-1 py-0.5 leading-none">
+              {t("withdrawComingSoon")}
+            </span>
+          )}
         </button>
       </div>
 
