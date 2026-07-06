@@ -209,14 +209,6 @@ export default function LiffChatPage() {
       })
       .catch((e) => reportFetchError("portfolio/current", e))
 
-    // 保留中の提案（最新 1 件）。あれば承認/見送りの実行導線を表示する。
-    fetch(`${API_BASE}/api/proposals/pending`, { headers })
-      .then((r) => jsonOrReport("proposals/pending", r))
-      .then((d) => {
-        const p = d as { items?: ChatProposal[] } | null
-        if (p?.items?.[0]) setPendingProposal(p.items[0])
-      })
-      .catch((e) => reportFetchError("proposals/pending", e))
   }, [])
 
   // ── KPI-C: 運用残高 + 加重平均APY を 30秒ポーリングで取得
@@ -239,31 +231,31 @@ export default function LiffChatPage() {
     return () => clearInterval(id)
   }, [])
 
-  // ── S2: awaiting_funds(入金待ち)の間だけ残高+提案状態を 30秒ポーリングして着金検知。
-  // 残高 ≥ 必要額になると backend(funding_detection_loop)が approved 化 → ここで検知して
-  // setPendingProposal で署名フロー(ProposalActionCard/ProposalSignSheet)へ自動遷移する。
+  // ── 保留中の提案を30秒ごとに再取得する。期限切れ・承認/見送り後の消化・
+  // 入金待ち(awaiting_funds)→承認済みへの遷移など、バックエンド側の状態変化を
+  // ポーリングで検知して画面に反映する(以前は初回1回のみの取得だったため、
+  // 期限切れ後もBOXがリロードまで残り続ける不具合があった)。
+  // awaiting_funds 中は着金検知のため残高も合わせて再取得する。
   useEffect(() => {
-    const p = pendingProposal
-    if (p?.status !== "awaiting_funds") return
     const token =
       typeof window !== "undefined" ? (localStorage.getItem("auth_token") ?? "") : ""
     const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
     if (!token) return
     const headers = { Authorization: `Bearer ${token}` }
     const poll = () => {
-      refetchBalance()
+      if (pendingProposal?.status === "awaiting_funds") refetchBalance()
       fetch(`${API_BASE}/api/proposals/pending`, { headers })
         .then((r) => jsonOrReport("proposals/pending", r))
         .then((d) => {
           const items = (d as { items?: ChatProposal[] } | null)?.items
-          const same = items?.find((it) => it.id === p.id)
-          if (same && same.status !== p.status) setPendingProposal(same)
+          setPendingProposal(items?.[0] ?? null)
         })
         .catch((e) => reportFetchError("proposals/pending", e))
     }
+    poll()
     const id = setInterval(poll, 30_000)
     return () => clearInterval(id)
-  }, [pendingProposal, refetchBalance])
+  }, [pendingProposal?.status, refetchBalance])
 
   // ── KPI-D: 月次手取り（配当）を取得（月次データのため初回のみ）
   useEffect(() => {
@@ -614,9 +606,9 @@ export default function LiffChatPage() {
           <h3 className="text-[#736f7e] text-xs font-semibold mb-3">{t("home.operatingCoins")}</h3>
           <div className="space-y-2">
             {coins.map((coin) => (
-              <button
+              <div
                 key={coin.asset}
-                className="flex items-center w-full ax-card-warm rounded-xl px-4 py-3 active:brightness-95 transition-all"
+                className="flex items-center w-full ax-card-warm rounded-xl px-4 py-3"
               >
                 {/* コインアバター */}
                 <div
@@ -639,7 +631,7 @@ export default function LiffChatPage() {
                     {coin.apy_pct}% APY
                   </div>
                 </div>
-              </button>
+              </div>
             ))}
             {coins.length === 0 && (
               <div className="text-center py-6 text-[#736f7e] text-sm">
