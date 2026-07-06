@@ -706,7 +706,7 @@
       "reject": "見送る"
     },
     "home": {
-      "currentAsset": "CURRENT ASSET",
+      "currentAsset": "現在の資産",
       "lastMonthComparison": "先月比",
       "aiJudgment": "AI JUDGMENT",
       "confidenceLabel": "信頼度",
