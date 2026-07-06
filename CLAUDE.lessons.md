@@ -1182,3 +1182,19 @@ deploy_staging.sh)が稼働中だった。ps の ELAPSED は MM:SS 表記、誤�
 - **i18n キー存在検査を CI に追加済み** (`.github/workflows/ci.yml` → `node scripts/check-i18n-keys.mjs`)。コードが参照する `t()` キーが `messages/ja.json`・`en.json` に存在するか baseline ratchet で検査し、新規欠落で fail する。Asana 1215691378757415。
 - i18n ファイルの**コメント内に `t("…")` リテラルを書かない** (チェッカーがコメントも走査して誤検出する。2026-06-17 PR #784 で別途学習)。
 - messages 全体上書きの wave PR は surgical merge を原則化し、レビューで他 PR のキー消失を確認する。
+
+## 2026-07-06 `--frontend-only` デプロイ後に生じる「working tree進行 / backendコンテナ据え置き」の二重状態
+
+**何が起きたか**: production VPS (5.223.88.14) へ liff-chat UI 改善 9件 (PR #939〜#947、frontend のみ) を反映するため `./scripts/deploy_production.sh --frontend-only` を実行 (Phase 2 承認済み案B)。実行前の production HEAD は `cf8583e4` (#917)、origin/main は `ff366a43` (#947) まで backend 側だけで 14 コミット分先行していた (fee model / PolicyEngine / eMode / GHO シグナル / `privy_wallet_id` + 新規 alembic migration 等)。
+
+**確認した挙動**: `--frontend-only` は git working tree を origin/main 最新まで進める (`git pull` 相当) が、`backend-green` コンテナは **rebuild/recreate されず旧イメージのまま据え置かれる**。デプロイ前後で `docker inspect --format='{{.Image}}' ultra-autotrade-backend-green-production` の Image ID (`sha256:74605864...`) が完全一致することで確認済み。つまり production は「git HEAD は最新 backend コミットを含む」が「実行中の backend プロセスは古いコード」という二重状態になる。
+
+**Guard スキップの設計確認**: `--frontend-only` は Guard 2 (環境分離チェック) / Guard 4 (DB schema gap チェック) を完全にスキップする設計 (backend を触らないため再検証不要という判断)。デプロイ後の追加検証ログでも alembic check は WARNING のまま (`現 DB revision: pp20260624`、未適用 migration あり) で、これは想定通り (backend 未反映のため)。
+
+**副次的に確認した既存事象 (今回のデプロイとは無関係)**: デプロイ後ログに `401 Unauthorized` が19件/直近100行で検出されたが、`GET /api/automation/status` への1分間隔の定期呼び出しがデプロイ前後 (09:18/09:19/09:20) を通じて継続的に401を返しており、backend イメージ自体は無変更のため今回のデプロイに起因するものではないと切り分け済み (INTERNAL_API_TOKEN 関連の既存事象、別途調査要)。
+
+**再発防止ルール**:
+- `--frontend-only` 実行前後で必ず `docker inspect --format='{{.Image}}' <backend-green container>` の Image ID を記録・比較し、backend が意図せず recreate されていないことを物理確認する。
+- backend 側に積み上がった差分は `git log <前回反映HEAD>..origin/main -- backend/` で都度可視化し、`docs/ops/03_deploy_procedures.md` の該当セクションに申し送りとして記録する (次回 backend/full デプロイ時、Tier S 1日1PR原則に照らした分割/一括判断の材料にする)。
+- デプロイ後 WARNING (alembic drift / 401連発等) は「今回のデプロイで新規発生したか」「デプロイ前から継続していたか」を時系列ログで切り分けてから対応要否を判断する (無条件に blocker 扱いしない、無条件に無視もしない)。
+- 詳細手順は `docs/ops/03_deploy_procedures.md`「`--frontend-only` デプロイ時の backend drift 注意」セクション参照 (PR #948)。

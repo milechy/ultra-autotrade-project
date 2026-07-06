@@ -338,6 +338,73 @@ curl -s -I \
 
 ---
 
+## `--frontend-only` デプロイ時の backend drift 注意（2026-07-06 追記）
+
+`--frontend-only` は以下の Guard を **完全にスキップする設計**である:
+
+- **Guard 2**（環境分離チェック: `DATABASE_URL` / `AAVE_NETWORK` 等の staging↔production 混入検知）
+- **Guard 4**（DB schema gap チェック: models.py と実 DB スキーマの alembic drift 検知）
+
+これは frontend-only 実行時に backend コンテナを一切 recreate しないため、backend 側の
+安全性を再検証する必要がない、という設計判断による（意図的な skip であり不具合ではない）。
+
+### 「working tree は進むが backend コンテナは据え置かれる」二重状態
+
+`--frontend-only` 実行後、production の **git working tree（`git rev-parse HEAD`）は
+origin/main の最新コミットまで進む**が、`ultra-autotrade-backend-green-production`
+コンテナは **デプロイ前の古いイメージのまま起動し続ける**。
+
+つまり以下の二重状態が生じる:
+
+| 対象 | 状態 |
+|---|---|
+| production working tree (`git rev-parse HEAD`) | origin/main 最新（backend の未反映コミットも含む） |
+| backend-green コンテナの Image ID | デプロイ前と同一（`docker inspect --format='{{.Image}}'` で確認可） |
+
+この状態で `git log <前回反映HEAD>..origin/main -- backend/` を実行すると、
+**working tree には取り込まれているが実行中コンテナには反映されていない** backend
+コミット一覧が得られる。次回 backend/full デプロイまでの申し送り事項として、
+この一覧を都度記録しておくこと。
+
+**実例（2026-07-06、PR #939〜#947 frontend-only デプロイ時点）**:
+production は cf8583e4 (#917) → ff366a43 (#947) まで origin/main 追従したが、
+backend-green は cf8583e4 時点のイメージ（`sha256:74605864...`）のまま据え置き。
+以下 14 コミット分の backend 変更（fee model / PolicyEngine / eMode / GHO シグナル /
+`privy_wallet_id` + 新規 alembic migration `pw20260705_add_privy_wallet_id.py` 等）が
+working tree には存在するが未デプロイのまま積み上がっている:
+
+```
+623ef5ea feat(staging): 新規テスターに自動でデモ資金を割当(Lido/Pendle提案の体験拡張) (#938)
+5c1a1845 fix(ai): 価格テクニカルシグナル取得を無認証の公開ccxt.bybit()に変更 (#937)
+d6144e52 feat(ai): Indicator Agentに価格モメンタムシグナルを追加(HOLD脱却A) (#936)
+1d680dad feat(privy): per-user privy_wallet_id 取得（非カストディアル SCW 執行の前提配線） (#935)
+8437ca0d fix(audit): デプロイ前監査で検出した2件の修正 + コメント整合 (#934)
+e3090412 feat(legal): 月額料金の実額開示 + 同意ゲート（弁護士レビュー用・徴収はOFF継続） (#932)
+86ce0bc6 test(deposit-gate): A-4 実行時ゲート enforcement 統合テスト（承認/モード切替） (#930)
+eb7bda2e fix(deposit-gate): A-2/A-3 実行時ゲートを main へ再ランド（孤立PR #899 復旧） (#929)
+dd443e14 refactor(fees): 収益受取を設計Aに統一・設計B(Lane R)を解消 (PR-2) (#928)
+5e0043d1 feat(fees): 月次バッチのtier判定をdeposit_jpyから都度算出・書き戻し配線 (#927)
+95a772af fix(liff-chat): EOA/SmartWallet不一致による資金迷子バグを修正 (#925)
+93c6a4b2 feat(ai): GHO借入シグナルをMarketContextへ追加（Phase 1: 観測のみ） (#921)
+1ad0aa90 fix(aave): eMode切替をサーバー側で実送信完結させる (#920)
+b4d88ca1 fix(policy): build-tx（非カストディアル主経路）にPolicyEngine検査を配線 (#919)
+```
+
+### 次回 backend/full デプロイ時の申し送り
+
+上記のように backend 差分が積み上がっている状態で次回 `--backend-only` または
+フル `./scripts/deploy_production.sh` を実行する際は、CLAUDE.md の
+「Tier S ファイルは 1 日 1 PR まで」原則に照らし、以下を事前に判断すること:
+
+- 新規 alembic migration（`pw20260705_add_privy_wallet_id.py` 等）が含まれる場合、
+  デプロイ前に `docs/ops/02_db_tables.md` の CHECK 制約 enum 突き合わせルールに従い
+  models.py との整合を確認する
+- 積み上がった backend コミット群を 1 回で一括反映するか、機能単位で分割反映するかを
+  Phase 2 相当の承認プロセスで判断する（Tier S ファイル `backend/app/main.py` /
+  `backend/migrations/versions/*.py` 等が含まれる場合は 1 日 1 PR 原則の対象）
+
+---
+
 ## ロールバック手順
 
 ```bash
