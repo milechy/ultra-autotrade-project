@@ -54,6 +54,13 @@ export function ProposalActionCard({
   const config = operationConfig[proposal.operation] ?? operationConfig["SUPPLY"]
   const OperationIcon = config.icon
 
+  // 統合ボックス化で汎用 AI 判定ボックス(BUY/SELLを text-2xl で大きく表示)が非表示に
+  // なったため、代わりにこのカード自身で BUY/SELL を一番目立つ位置に大きく出す。
+  // aiJudgment.action(直近の別ティック判定)ではなく、この提案自身の operation から
+  // 判定する(マルチプロトコルで判定と提案がズレるリスクを避けるため確信度と同じ理由)。
+  const isInflowOperation = ["SUPPLY", "STAKE_ETH", "BUY_PT"].includes(proposal.operation)
+  const bigActionLabel = isInflowOperation ? "BUY" : "SELL"
+
   // MARKET-B: lido/pendle 提案のときのみ ETH/USD を取得してバッジ表示する。
   const isEthProposal = proposal.protocol === "lido" || proposal.protocol === "pendle"
   const [ethUsd, setEthUsd] = useState<string | null>(null)
@@ -102,6 +109,9 @@ export function ProposalActionCard({
           )}
         </div>
       </div>
+
+      {/* BUY/SELL 大表示（旧 AI 判定ボックスの action 表示を踏襲。一番目立たせる） */}
+      <div className={`font-bold text-2xl mb-1 ${config.color}`}>{bigActionLabel}</div>
 
       {/* amount */}
       <div className="mb-2">
