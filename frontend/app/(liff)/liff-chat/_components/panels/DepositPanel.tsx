@@ -2,6 +2,7 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
+import { isAddress } from "viem"
 import { AlertTriangle, Loader2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useLanguage } from "@/lib/useLanguage"
@@ -115,13 +116,15 @@ export function DepositPanel() {
   // 残高 = 実効アドレスの USDC オンチェーン残高（非カストディアル）。
   const { balanceUsd, loading: balanceLoading, refetch: refetchBalance } = useUsdcBalance(address)
   const balance = balanceUsd
-  const walletAddress = address
 
   // 入金フォーム（金額は送金目安の表示用）
   const [depositAmount, setDepositAmount] = useState("")
 
   // 出金フォーム
   const [withdrawAmount, setWithdrawAmount] = useState("")
+  // 出金先アドレス(取引所直送UX対応・2026-07-07)。未入力/不正時は送金不可。
+  const [withdrawDestAddress, setWithdrawDestAddress] = useState("")
+  const withdrawDestValid = withdrawDestAddress !== "" && isAddress(withdrawDestAddress)
 
   // 確認シート（出金専用）
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -175,15 +178,15 @@ export function DepositPanel() {
     { label: t("confirmSheetWithdrawAmount"), value: `$${withdrawNum.toFixed(2)} USDC` },
     { label: t("confirmSheetNetworkFee"), value: `≈ $${WITHDRAW_FEE.toFixed(2)}` },
     { label: t("confirmSheetReceiveAmount"), value: `$${receiveAmount.toFixed(2)} USDC` },
-    { label: t("confirmSheetDest"), value: walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : t("withdrawDestDefault") },
+    { label: t("confirmSheetDest"), value: withdrawDestValid ? `${withdrawDestAddress.slice(0, 6)}...${withdrawDestAddress.slice(-4)}` : t("withdrawDestDefault") },
   ]
 
-  // 出金は (user)/withdraw（Privy 本人署名 + 記録専用 /api/users/withdrawals）を正とする。
-  // 以前ここから呼んでいた POST /api/transactions/withdraw は backend に存在せず本番で 404 に
-  // なるため除去した。出金タブは disabled（準備中）で到達不能だが、誤 endpoint 呼び出しの
-  // 配線を物理的に断つため no-op 化する。出金 UI 有効化は (user)/withdraw 側 + #391 money gate。
+  // 実送金の実行はスコープ外(2026-07-07)。liff-chat の SCW ユーザー向けに任意アドレスへの
+  // 送金を安全に実行する汎用フローが未整備のため(既存の build-tx/submit-tx は Aave/Pendle
+  // 等の事前定義オペレーション専用で任意送金には未対応)。入力・検証・確認画面までを実装し、
+  // 実行ボタンは意図的に no-op のまま。「準備中」ではなく、何が保存され何が未実装かを正直に示す。
   const handleWithdrawConfirm = useCallback(async () => {
-    setConfirmError(t("withdrawComingSoon"))
+    setConfirmError(t("withdrawExecutionPending"))
   }, [t])
 
   // ---- 残高ラベル（タブ依存） -----------------------------------------------
@@ -389,17 +392,32 @@ export function DepositPanel() {
             </button>
           </div>
 
-          {/* 出金先（変更不可） */}
+          {/* 出金先（自由入力・取引所直送UX対応） */}
           <div>
             <label className="block text-xs text-[#736f7e] mb-1">{t("withdrawDestLabel")}</label>
-            <div className="ax-card-warm border border-[#1c1a27]/15 rounded-xl px-4 py-3">
-              <p className="text-sm text-[#1c1a27] font-mono">
-                {walletAddress
-                  ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
-                  : t("withdrawDestDefault")}
-              </p>
-              <p className="text-xs text-[#736f7e] mt-0.5">{t("withdrawDestImmutable")}</p>
-            </div>
+            <input
+              type="text"
+              placeholder={t("withdrawDestPlaceholder")}
+              value={withdrawDestAddress}
+              onChange={(e) => setWithdrawDestAddress(e.target.value.trim())}
+              className="w-full ax-card-warm text-[#1c1a27] text-sm font-mono px-4 py-3 rounded-xl
+                         border border-[#1c1a27]/15 focus:border-[#1D9E75] focus:outline-none
+                         placeholder-[#736f7e]"
+            />
+            {withdrawDestAddress !== "" && !withdrawDestValid && (
+              <p className="mt-1 text-xs text-red-600">{t("withdrawDestInvalid")}</p>
+            )}
+          </div>
+
+          {/* 出金方法の案内（入金方法ガイドと同スタイル） */}
+          <div className="ax-card-warm border border-[#1c1a27]/15 rounded-xl px-4 py-3 space-y-2">
+            <p className="text-xs font-medium text-[#1c1a27]">{t("withdrawGuideTitle")}</p>
+            <p className="text-xs text-[#736f7e] leading-relaxed">{t("withdrawGuideDesc")}</p>
+            <ul className="text-xs text-[#736f7e] leading-relaxed space-y-0.5 list-disc list-inside">
+              <li>
+                {t("withdrawGuideNote1", { chain: getChainDisplayName(SUPPORTED_CHAIN_IDS[0]) ?? "" })}
+              </li>
+            </ul>
           </div>
 
           {/* 手数料・受取予定額 */}
@@ -426,7 +444,7 @@ export function DepositPanel() {
 
           {/* 出金ボタン */}
           <button
-            disabled={!withdrawAmount || withdrawNum <= 0}
+            disabled={!withdrawAmount || withdrawNum <= 0 || !withdrawDestValid}
             onClick={() => {
               setConfirmError(null)
               setSuccessMsg(null)
