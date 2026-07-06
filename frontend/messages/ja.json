@@ -673,6 +673,7 @@
       "signFailed": "署名処理に失敗しました",
       "signCanceled": "署名がキャンセルされました",
       "insufficientBalance": "ウォレットの USDC 残高が提案額に足りません。入金してから署名してください。",
+      "confidenceNote": "直近のAI判定",
       "errInsufficientFunds": "残高またはガス代が不足しています。USDC 残高と ETH（ガス代）を確認してください。",
       "depositCta": "入金する",
       "collapse": "閉じる",

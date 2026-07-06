@@ -495,103 +495,99 @@ export default function LiffChatPage() {
           <DividendChartWrapper data={dividends} />
         </div>
 
-        {/* AI 判定カード */}
-        <div
-          className={`rounded-2xl mx-4 mt-4 p-4 transition-all
-            ${isBuy
-              ? "ax-card-warm border-2 border-[#1D9E75] [animation:pulse_0.8s_ease-in-out_2]"
-              : isSell
-              ? "ax-card-warm border-2 border-red-500 [animation:pulse_0.8s_ease-in-out_2]"
-              : "ax-card-warm"
-            }`}
-        >
-          {/* ヘッダー行 */}
-          <div className="flex items-center gap-2 mb-2">
-            <div
-              className={`w-2 h-2 rounded-full ${
-                isBuy
-                  ? "bg-[#1D9E75] [animation:ping_0.5s_ease-in-out_4]"
-                  : isSell
-                  ? "bg-red-500"
-                  : "bg-[#736f7e]"
-              }`}
-            />
-            <span
-              className={`text-xs font-medium ${
-                isBuy ? "text-[#1D9E75]" : isSell ? "text-red-600" : "text-[#736f7e]"
-              }`}
-            >
-              {t("home.aiJudgment")}
-            </span>
-          </div>
-
-          {/* アクション表示 */}
+        {/* AI 判定カード（統合ボックス化: 保留中の提案がある間は下の統合カードに一本化し、
+            銘柄・金額のない汎用カードは表示しない） */}
+        {!pendingProposal && (
           <div
-            className={`font-bold text-2xl ${
-              isBuy ? "text-[#1D9E75]" : isSell ? "text-red-600" : "text-[#1c1a27]"
-            }`}
+            className={`rounded-2xl mx-4 mt-4 p-4 transition-all
+              ${isBuy
+                ? "ax-card-warm border-2 border-[#1D9E75] [animation:pulse_0.8s_ease-in-out_2]"
+                : isSell
+                ? "ax-card-warm border-2 border-red-500 [animation:pulse_0.8s_ease-in-out_2]"
+                : "ax-card-warm"
+              }`}
           >
-            {aiJudgment ? action : t("home.noSignal")}
-          </div>
-
-          {/* 確信度表示。HOLD は「シグナルが弱く様子見」と分かる文言、BUY/SELL は従来表記。 */}
-          {aiJudgment && (
-            <p className="mt-1 text-[#736f7e] text-xs" data-testid="confidence-label">
-              {action === "HOLD"
-                ? t("home.holdWeakSignalLabel", { confidence })
-                : `${confidence}% ${t("home.confidenceLabel")}`}
-            </p>
-          )}
-
-          {/* なぜ{action}？理由トグル（aiJudgment がある場合のみ表示） */}
-          {aiJudgment && (
-            <>
-              <button
-                onClick={() => { const next = !reasonOpen; setReasonOpen(next); track(EV.REASON_TOGGLE, { action, open: next }) }}
-                className="mt-2 text-[#736f7e] text-xs underline"
-                aria-expanded={reasonOpen}
+            {/* ヘッダー行 */}
+            <div className="flex items-center gap-2 mb-2">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  isBuy
+                    ? "bg-[#1D9E75] [animation:ping_0.5s_ease-in-out_4]"
+                    : isSell
+                    ? "bg-red-500"
+                    : "bg-[#736f7e]"
+                }`}
+              />
+              <span
+                className={`text-xs font-medium ${
+                  isBuy ? "text-[#1D9E75]" : isSell ? "text-red-600" : "text-[#736f7e]"
+                }`}
               >
-                {t("home.whyAction", { action })}
-              </button>
-              {reasonOpen && (
-                <p className="mt-2 text-[#736f7e] text-xs leading-relaxed whitespace-pre-wrap">
-                  {aiJudgment.reason ?? t("home.noReason")}
-                </p>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* 保留中の提案（承認→自己署名→実行 / 見送り） */}
-        {pendingProposal && (
-          <>
-            {/* 提案カード上部のウォレット残高表示（KPI-E） */}
-            <div className="mx-4 mt-4 px-4 py-2.5 rounded-xl ax-card-warm flex items-center justify-between">
-              <span className="text-xs text-[#736f7e]">{t("kpi.walletBalance")}</span>
-              <span className="text-sm font-semibold text-[#1c1a27]">
-                {balanceUsd != null
-                  ? `$${balanceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                  : "—"}
+                {t("home.aiJudgment")}
               </span>
             </div>
-            {pendingProposal.status === "awaiting_funds" ? (
-              <AwaitingFundsCard
-                proposal={pendingProposal}
-                balanceUsd={balanceUsd}
-                rejecting={rejecting}
-                onDeposit={() => setActivePanel("deposit")}
-                onReject={handleRejectProposal}
-              />
-            ) : (
-              <ProposalActionCard
-                proposal={pendingProposal}
-                rejecting={rejecting}
-                onApprove={handleApproveProposal}
-                onReject={handleRejectProposal}
-                insufficientBalance={insufficientBalance}
-              />
+
+            {/* アクション表示 */}
+            <div
+              className={`font-bold text-2xl ${
+                isBuy ? "text-[#1D9E75]" : isSell ? "text-red-600" : "text-[#1c1a27]"
+              }`}
+            >
+              {aiJudgment ? action : t("home.noSignal")}
+            </div>
+
+            {/* 確信度表示。HOLD は「シグナルが弱く様子見」と分かる文言、BUY/SELL は従来表記。 */}
+            {aiJudgment && (
+              <p className="mt-1 text-[#736f7e] text-xs" data-testid="confidence-label">
+                {action === "HOLD"
+                  ? t("home.holdWeakSignalLabel", { confidence })
+                  : `${confidence}% ${t("home.confidenceLabel")}`}
+              </p>
             )}
-          </>
+
+            {/* なぜ{action}？理由トグル（aiJudgment がある場合のみ表示） */}
+            {aiJudgment && (
+              <>
+                <button
+                  onClick={() => { const next = !reasonOpen; setReasonOpen(next); track(EV.REASON_TOGGLE, { action, open: next }) }}
+                  className="mt-2 text-[#736f7e] text-xs underline"
+                  aria-expanded={reasonOpen}
+                >
+                  {t("home.whyAction", { action })}
+                </button>
+                {reasonOpen && (
+                  <p className="mt-2 text-[#736f7e] text-xs leading-relaxed whitespace-pre-wrap">
+                    {aiJudgment.reason ?? t("home.noReason")}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* 保留中の提案（承認→自己署名→実行 / 見送り）。統合ボックス化により銘柄・金額・
+            確信度・ウォレット残高をカード内に集約する（KPI-E の別行表示は廃止）。 */}
+        {pendingProposal && (
+          pendingProposal.status === "awaiting_funds" ? (
+            <AwaitingFundsCard
+              proposal={pendingProposal}
+              balanceUsd={balanceUsd}
+              rejecting={rejecting}
+              onReject={handleRejectProposal}
+              onDepositSettled={refetchBalance}
+            />
+          ) : (
+            <ProposalActionCard
+              proposal={pendingProposal}
+              rejecting={rejecting}
+              onApprove={handleApproveProposal}
+              onReject={handleRejectProposal}
+              insufficientBalance={insufficientBalance}
+              confidence={aiJudgment?.confidence}
+              balanceUsd={balanceUsd}
+              onDepositSettled={refetchBalance}
+            />
+          )
         )}
 
         {/* 運用中コイン一覧 */}
@@ -751,7 +747,8 @@ export default function LiffChatPage() {
           onClose={() => setSignSheetOpen(false)}
           onExecuted={handleProposalExecuted}
           insufficientBalance={insufficientBalance}
-          onDeposit={() => { setSignSheetOpen(false); setActivePanel("deposit") }}
+          balanceUsd={balanceUsd}
+          onDepositSettled={refetchBalance}
         />
       )}
 

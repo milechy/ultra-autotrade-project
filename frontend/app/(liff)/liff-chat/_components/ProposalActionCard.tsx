@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl"
 import { ArrowUp, ArrowDown } from "lucide-react"
 import { liffFetch } from "@/lib/liff/liff-fetch"
 import type { ChatProposal } from "./ProposalSignSheet"
+import { DepositGuideInline } from "./DepositGuideInline"
 
 interface ProposalActionCardProps {
   proposal: ChatProposal
@@ -17,6 +18,12 @@ interface ProposalActionCardProps {
   // F4: wallet 残高 < 提案額のとき true。承認は有効のまま (押すと署名シートで入金導線を出す)
   // が、カードにヒントを表示して事前に気づけるようにする。
   insufficientBalance?: boolean
+  // 統合ボックス化: 汎用 AI 判定ボックスの代わりにこのカードが確信度・残高を表示する。
+  // confidence は proposal 自身の値ではなく直近の aiJudgment 由来（backend が
+  // ChatProposal.confidence を送信しないため）。UI上に注記を出して誤解を防ぐ。
+  confidence?: number
+  balanceUsd: number | null
+  onDepositSettled?: () => void
 }
 
 export function ProposalActionCard({
@@ -25,6 +32,9 @@ export function ProposalActionCard({
   onApprove,
   onReject,
   insufficientBalance = false,
+  confidence,
+  balanceUsd,
+  onDepositSettled,
 }: ProposalActionCardProps) {
   const t = useTranslations("Liff")
   const [expanded, setExpanded] = useState(false)
@@ -101,6 +111,24 @@ export function ProposalActionCard({
         </span>
       </div>
 
+      {/* 確信度（統合ボックス化: 直近の aiJudgment 由来。この提案固有の値ではない旨を注記） */}
+      {confidence != null && (
+        <p className="text-[#736f7e] text-xs mb-2">
+          {confidence}% {t("home.confidenceLabel")}
+          <span className="ml-1">({t("exec.confidenceNote")})</span>
+        </p>
+      )}
+
+      {/* ウォレット残高（統合ボックス化: page.tsx の KPI-E 行をここに集約） */}
+      <div className="flex items-center justify-between px-3 py-2 mb-3 rounded-lg bg-[#1c1a27]/5">
+        <span className="text-xs text-[#736f7e]">{t("kpi.walletBalance")}</span>
+        <span className="text-sm font-semibold text-[#1c1a27]">
+          {balanceUsd != null
+            ? `$${balanceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : "—"}
+        </span>
+      </div>
+
       {/* reason */}
       {reason && (
         <p className="text-[#736f7e] text-xs leading-relaxed mb-3 whitespace-pre-wrap">
@@ -116,9 +144,18 @@ export function ProposalActionCard({
         </p>
       )}
 
-      {/* F4: 残高不足ヒント (承認は有効・押すと署名シートで入金導線) */}
+      {/* F4: 残高不足ヒント (承認は有効・押すと awaiting_funds へ)。承認前から入金導線を
+          ボックス内に表示し、別パネルへ遷移せず Privy fundWallet を直接起動できるようにする。 */}
       {insufficientBalance && (
-        <p className="text-amber-700 text-xs mb-2">{t("exec.insufficientBalance")}</p>
+        <>
+          <p className="text-amber-700 text-xs mb-2">{t("exec.insufficientBalance")}</p>
+          <DepositGuideInline
+            shortfallUsd={
+              balanceUsd != null ? Number(proposal.amount_usd) - balanceUsd : undefined
+            }
+            onSettled={onDepositSettled}
+          />
+        </>
       )}
 
       {/* actions */}
