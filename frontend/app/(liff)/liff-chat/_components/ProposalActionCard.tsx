@@ -110,12 +110,6 @@ export function ProposalActionCard({
               1 ETH ≈ ${Number(ethUsd).toLocaleString("en-US", { maximumFractionDigits: 0 })}
             </span>
           )}
-          {/* Phase-C2: protocol バッジ（aave 以外のとき表示） */}
-          {proposal.protocol && proposal.protocol !== "aave" && (
-            <span className="text-xs bg-[#1c1a27]/10 px-2 py-0.5 rounded-full text-[#736f7e]">
-              {proposal.protocol}
-            </span>
-          )}
         </div>
       </div>
 
