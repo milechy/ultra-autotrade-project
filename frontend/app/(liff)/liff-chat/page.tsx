@@ -317,6 +317,24 @@ export default function LiffChatPage() {
     return () => ws.close()
   }, [])
 
+  // ── アプリアイコンバッジ（Badging API）: 保留中の提案がある間、ホーム画面に
+  // 追加済みPWAのアイコンにネイティブアプリ同様の丸バッジを表示する。
+  // ブラウザタブ表示時や未対応環境（iOS 16.3以下等）では navigator.setAppBadge
+  // 自体が存在しないため何もしない（フォアグラウンドで開いている間のみ更新される。
+  // バックグラウンドでの自動更新には Web Push 連携が別途必要）。
+  useEffect(() => {
+    const nav = navigator as Navigator & {
+      setAppBadge?: (contents?: number) => Promise<void>
+      clearAppBadge?: () => Promise<void>
+    }
+    if (!nav.setAppBadge || !nav.clearAppBadge) return
+    if (pendingProposal) {
+      nav.setAppBadge(1).catch(() => {})
+    } else {
+      nav.clearAppBadge().catch(() => {})
+    }
+  }, [pendingProposal])
+
 
   // ── 緊急停止: POST /api/user/pause（require_active_user / consumer 可）
   // backend の OR ロジック安全装置は変更せず、ユーザーの is_active フラグを落とすだけ。
