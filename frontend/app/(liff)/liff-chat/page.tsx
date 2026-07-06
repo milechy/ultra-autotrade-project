@@ -608,7 +608,6 @@ export default function LiffChatPage() {
                 </div>
                 <div className="flex-1 text-left">
                   <div className="text-[#1c1a27] text-sm font-medium">{coin.asset}</div>
-                  <div className="text-[#736f7e] text-xs">{coin.protocol}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-[#1c1a27] text-sm">${coin.amount_usd.toLocaleString()}</div>

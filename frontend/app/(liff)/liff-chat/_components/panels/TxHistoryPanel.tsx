@@ -107,7 +107,6 @@ function TxDetailPanel({ tx, onClose }: TxDetailPanelProps) {
     { label: t("detailDate"), value: formatDate(tx.created_at) },
     { label: t("detailStatus"), value: statusLabel(tx.status) },
   ]
-  if (tx.protocol) detailRows.push({ label: t("detailProtocol"), value: tx.protocol })
   if (tx.apy) detailRows.push({ label: t("detailApy"), value: `${tx.apy}%` })
   if (tx.gas_fee_usd) detailRows.push({ label: t("detailGas"), value: `$${Number(tx.gas_fee_usd).toFixed(4)}` })
   if (tx.wallet_address) detailRows.push({ label: t("detailWallet"), value: `${tx.wallet_address.slice(0, 6)}...${tx.wallet_address.slice(-4)}` })
