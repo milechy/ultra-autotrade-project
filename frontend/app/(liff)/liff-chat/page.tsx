@@ -455,48 +455,9 @@ export default function LiffChatPage() {
       {/* ── メインコンテンツ */}
       <main className="flex-1 overflow-y-auto pb-24">
 
-        {/* CURRENT ASSET カード（タップでグラフパネル） */}
-        <button
-          onClick={() => { setGraphOpen(true); track(EV.ASSET_GRAPH_OPEN) }}
-          className="bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] rounded-2xl mx-4 mt-4 p-4 text-left w-[calc(100%-2rem)]
-                     active:brightness-95 transition-all"
-        >
-          <div className="text-[#2a2440]/70 text-xs mb-1">{t("home.currentAsset")}</div>
-          <div className="text-[#1c1a27] text-3xl font-bold">
-            {balanceUsd != null
-              ? `$${balanceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-              : "—"}
-          </div>
-        </button>
-
-        {/* KPI-C: 運用残高 + 加重平均APY */}
-        <div className="grid grid-cols-2 gap-3 mx-4 mt-3">
-          <div className="ax-card-warm rounded-2xl p-3">
-            <div className="text-xs text-[#736f7e]">{t("kpi.totalValue")}</div>
-            <div className="text-lg font-bold text-[#1c1a27]">
-              {portfolio
-                ? `$${Number(portfolio.total_value_usd).toLocaleString("en-US", { maximumFractionDigits: 2 })}`
-                : "—"}
-            </div>
-          </div>
-          <div className="ax-card-warm rounded-2xl p-3">
-            <div className="text-xs text-[#736f7e]">{t("kpi.avgApy")}</div>
-            <div className="text-lg font-bold text-[#1D9E75]">
-              {portfolio && Number(portfolio.weighted_avg_apy) > 0
-                ? `${Number(portfolio.weighted_avg_apy).toFixed(2)}%`
-                : "—"}
-            </div>
-          </div>
-        </div>
-
-        {/* KPI-D: 月次手取り（配当）グラフ */}
-        <div className="mx-4 mt-3 ax-card-warm rounded-2xl p-4">
-          <div className="text-xs text-[#736f7e] mb-2">{t("kpi.monthlyDividend")}</div>
-          <DividendChartWrapper data={dividends} />
-        </div>
-
-        {/* AI 判定カード（統合ボックス化: 保留中の提案がある間は下の統合カードに一本化し、
-            銘柄・金額のない汎用カードは表示しない） */}
+        {/* AI 判定 / 保留中の提案（ヘッダー直下=最優先表示。統合ボックス化により
+            保留中の提案がある間は下の統合カードに一本化し、銘柄・金額のない
+            汎用カードは表示しない。行動を促す情報を資産サマリーより先に出す） */}
         {!pendingProposal && (
           <div
             className={`rounded-2xl mx-4 mt-4 p-4 transition-all
@@ -589,6 +550,46 @@ export default function LiffChatPage() {
             />
           )
         )}
+
+        {/* CURRENT ASSET カード（タップでグラフパネル） */}
+        <button
+          onClick={() => { setGraphOpen(true); track(EV.ASSET_GRAPH_OPEN) }}
+          className="bg-gradient-to-br from-[#b9a4f2] via-[#ecaccd] to-[#fbd9a0] rounded-2xl mx-4 mt-4 p-4 text-left w-[calc(100%-2rem)]
+                     active:brightness-95 transition-all"
+        >
+          <div className="text-[#2a2440]/70 text-xs mb-1">{t("home.currentAsset")}</div>
+          <div className="text-[#1c1a27] text-3xl font-bold">
+            {balanceUsd != null
+              ? `$${balanceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : "—"}
+          </div>
+        </button>
+
+        {/* KPI-C: 運用残高 + 加重平均APY */}
+        <div className="grid grid-cols-2 gap-3 mx-4 mt-3">
+          <div className="ax-card-warm rounded-2xl p-3">
+            <div className="text-xs text-[#736f7e]">{t("kpi.totalValue")}</div>
+            <div className="text-lg font-bold text-[#1c1a27]">
+              {portfolio
+                ? `$${Number(portfolio.total_value_usd).toLocaleString("en-US", { maximumFractionDigits: 2 })}`
+                : "—"}
+            </div>
+          </div>
+          <div className="ax-card-warm rounded-2xl p-3">
+            <div className="text-xs text-[#736f7e]">{t("kpi.avgApy")}</div>
+            <div className="text-lg font-bold text-[#1D9E75]">
+              {portfolio && Number(portfolio.weighted_avg_apy) > 0
+                ? `${Number(portfolio.weighted_avg_apy).toFixed(2)}%`
+                : "—"}
+            </div>
+          </div>
+        </div>
+
+        {/* KPI-D: 月次手取り（配当）グラフ */}
+        <div className="mx-4 mt-3 ax-card-warm rounded-2xl p-4">
+          <div className="text-xs text-[#736f7e] mb-2">{t("kpi.monthlyDividend")}</div>
+          <DividendChartWrapper data={dividends} />
+        </div>
 
         {/* 運用中コイン一覧 */}
         <div className="mx-4 mt-4">
