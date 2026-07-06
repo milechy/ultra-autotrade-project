@@ -193,3 +193,46 @@
 .ax-safe-bottom {
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
 }
+
+/* ================================================================
+ * AI提案ボックス: 枠線を光が一周するアニメーション（liff-chat 統合ボックス）
+ * conic-gradient を回転させ、mask-composite で枠線のリングだけ残す手法。
+ * 単純な左右スイープ(旧実装)は角にしか光が見えず控えめすぎたため、
+ * 枠線を一周する chase-light 表現に変更。
+ * @property 未対応の環境(旧Safari等)ではアニメーションなしの静止グラデーションに
+ * デグレードするだけで、枠線表示自体は壊れない。
+ * ================================================================ */
+@property --ax-shine-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.ax-shine-border {
+  position: relative;
+  isolation: isolate;
+}
+.ax-shine-border::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2.5px;
+  background: conic-gradient(
+    from var(--ax-shine-angle),
+    transparent 0deg,
+    transparent 300deg,
+    rgba(255, 255, 255, 0.95) 330deg,
+    white 345deg,
+    rgba(255, 255, 255, 0.95) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ax-shine-rotate 2.4s linear infinite;
+  pointer-events: none;
+}
+@keyframes ax-shine-rotate {
+  to { --ax-shine-angle: 360deg; }
+}
