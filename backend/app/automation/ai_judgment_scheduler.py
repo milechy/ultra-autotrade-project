@@ -585,8 +585,9 @@ def _create_proposals_for_users(
                     continue
 
                 # 既存の pending 提案がある場合はスキップ (2026-05-21 P0 重複作成ガード)
-                # 承認待ち提案がすでに存在するのに新たな提案を作ると
-                # 管理者が連続 approve した際に同一ユーザーへの Aave 操作が重複する。
+                # 承認待ち提案がすでに存在するのに新たな提案を作ると、管理者が連続
+                # approve した際に同一ユーザーへの Aave/Lido/Pendle 操作が重複する。
+                # protocol/operation を問わずユーザー単位でチェックする(下記クエリ参照)。
                 try:
                     _pending_raw = db.scalar(
                         select(func.count(Proposal.id)).where(

@@ -614,9 +614,9 @@ export default function LiffChatPage() {
           <h3 className="text-[#736f7e] text-xs font-semibold mb-3">{t("home.operatingCoins")}</h3>
           <div className="space-y-2">
             {coins.map((coin) => (
-              <button
+              <div
                 key={coin.asset}
-                className="flex items-center w-full ax-card-warm rounded-xl px-4 py-3 active:brightness-95 transition-all"
+                className="flex items-center w-full ax-card-warm rounded-xl px-4 py-3"
               >
                 {/* コインアバター */}
                 <div
@@ -639,7 +639,7 @@ export default function LiffChatPage() {
                     {coin.apy_pct}% APY
                   </div>
                 </div>
-              </button>
+              </div>
             ))}
             {coins.length === 0 && (
               <div className="text-center py-6 text-[#736f7e] text-sm">
