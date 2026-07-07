@@ -244,6 +244,94 @@ curl http://localhost:3001
 
 ---
 
+## 緊急停止 e2e 検証（`scripts/e2e_emergency_stop.sh`）
+
+> 2026-07-02 更新: 3-VPS構成移行（production=5.223.88.14 / staging=188.34.167.142 に完全分離）後の
+> staging スタックに合わせて更新済み。忘れられがちだが、緊急停止まわりの全経路を通しで確認できる
+> 唯一のスクリプトのため、インシデント対応・定期ドリルの両方でここに記載しておく。
+
+### 用途
+
+- **インシデント対応時**: 緊急停止の全経路（API kill switch / スケジューラー無効化 / エラー連続検知 /
+  Health Factor 閾値 / resume 復元）が正しく機能するかを、本番障害の前後に確認する。
+- **定期ドリル**: production へ影響を与えずに、staging 上で5経路の動作を通しで検証する e2e スモーク
+  テストとして、月次などの定期実行に使う。
+
+検証する5経路（TC-1〜TC-5）:
+
+| TC | 経路 | 内容 |
+|----|------|------|
+| TC-1 | API kill switch | `POST /api/automation/emergency-stop` → `is_trading_paused=true` → `ai_decisions` delta=0 → Slack通知 → resume |
+| TC-2 | env var 停止 | `DISABLE_AI_JUDGMENT_SCHEDULER=1` でスケジューラー起動をスキップ（`DO_SCHEDULER_RESTART_TEST=true` 時のみ実際に再起動して検証） |
+| TC-3 | エラー連続検知 | emergency_stop 発動中に `/api/ai/trigger` が reject されることを確認（Claude API 連続失敗の代替検証） |
+| TC-4 | Health Factor < 1.6 | 閾値ロジックの単体検証 + `LINE_NOTIFY_TOKEN` 設定確認（staging は dummy AAVE のため実HF注入は不可） |
+| TC-5 | resume / 復元 | 全TC後の最終復元確認（`is_trading_paused=false` / `emergency_reason` クリア / scheduler 再開） |
+
+### 前提
+
+- **staging VPS (188.34.167.142) 上でのみ実行する**。production (5.223.88.14) では絶対に実行しない
+  （2026-07-02 移行後、staging は production と別 VPS に分離済み）。
+- `ADMIN_EMAIL` / `ADMIN_PASSWORD`（staging admin ユーザー）が必須。
+
+### 実行方法
+
+```bash
+# iMac から staging VPS へSSH
+ssh -i ~/.ssh/hetzner_assistone_stagingdev root@188.34.167.142
+
+# staging VPS 上で
+export ADMIN_EMAIL='<staging admin email>'
+export ADMIN_PASSWORD='<staging admin password>'
+cd /opt/ultra-autotrade
+bash scripts/e2e_emergency_stop.sh
+```
+
+初回や手順確認のみ行いたい場合は、まず `DRY_RUN=true` で実際の API 呼び出しをせず手順のみ出力させる。
+
+```bash
+DRY_RUN=true bash scripts/e2e_emergency_stop.sh
+```
+
+### 主要 env（オプション、default で概ね動作する）
+
+| env | default | 用途 |
+|-----|---------|------|
+| `STAGING_BASE_URL` | `http://127.0.0.1:8082` | staging backend への base URL |
+| `POSTGRES_CONTAINER` / `BACKEND_CONTAINER` | 自動検出（`*staging*` を含むもの） | 対象コンテナ |
+| `DB_USER` / `DB_NAME` | `ultra` / `ultra_autotrade_staging` | `ai_decisions` COUNT確認用 |
+| `AI_DELTA_WAIT_SEC` | `5` | `ai_decisions` delta 観測待ち秒数 |
+| `LOG_TAIL_LINES` | `300` | backend ログ確認の tail 行数 |
+| `DO_SCHEDULER_RESTART_TEST` | `false` | `true` で TC-2 の実再起動検証を実施（staging backend が一時再起動される） |
+| `SKIP_TCS` | (なし) | スキップする TC 番号をカンマ区切りで指定（例: `"2,4"`） |
+| `ENV_FILE` | `/opt/ultra-autotrade/.env.production` | Slack webhook URL 読込元 |
+
+### 結果の見方
+
+各 TC ごとに `[PASS]` / `[FAIL]` / `[SKIP]` が出力され、最後にサマリが表示される。
+
+```
+=== e2e Emergency Stop Summary ===
+[PASS] TC-1: API kill switch        paused=true / delta=0 / slack=1hits / resume HTTP=200 / restored
+...
+PASS=5 FAIL=0 SKIP=0
+```
+
+- `FAIL` が1件でもあれば終了コードが非0になる。緊急停止の実装または通知経路に問題がある可能性が
+  あるため、該当 TC のログを遡って原因を確認すること。
+- `SKIP` は想定内のことがある（`DISABLE_AI_JUDGMENT_SCHEDULER` 未設定 かつ
+  `DO_SCHEDULER_RESTART_TEST=false` の場合の TC-2、`SKIP_TCS` 指定時、`DRY_RUN=true` 時の全 TC）。
+
+### 安全装置（production への誤爆防止）
+
+- dev VPS（hostname が `uata-dev*`）では即 EXIT し、実行手順のみ表示する
+- `/health` の `env=staging` を確認してから実行（production への誤接続防止）
+- 検出したコンテナ名に `staging` が含まれることを確認（含まれなければ `[FATAL]` で終了）
+- DB操作は `SELECT` のみ（DB write なし）
+- emergency stop の reason に `E2E_TAG`（実行毎のユニークタグ）を含め、実運用ログと区別できるようにする
+- 全 TC 完了後、`trap` により終了時に必ず resume を試みる（途中で失敗しても staging が停止したままにならない）
+
+---
+
 ## Docker Compose 設計（2026-04-24 container_name 衝突修正後）
 
 ### production.yml の重要設計原則
