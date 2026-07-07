@@ -437,12 +437,10 @@ class FeeTransferService:
             logger.warning("fee_transfer Privy send_transaction failed: status=%s", exc.status_code)
             raise
 
-        # Privy レスポンスから tx hash を取り出す (キー名の揺れに defensive)
-        tx_hash_hex = str(
-            resp.get("transaction_hash")
-            or resp.get("hash")
-            or (resp.get("data") or {}).get("transaction_hash", "")
-        ).strip()
+        # Privy レスポンスから tx hash を取り出す。eth_sendTransaction は
+        # ``{"method": ..., "data": {"hash": "0x..."}}`` の形（staging-v4 実機検証 2026-07-07）。
+        # top-level / data / result のいずれかに hash 系キーがある想定で defensive に探す。
+        tx_hash_hex = _extract_privy_tx_hash(resp)
         if not tx_hash_hex:
             raise RuntimeError(f"Privy returned no tx hash: keys={list(resp.keys())}")
         debug.append(f"privy_tx_hash={tx_hash_hex}")
@@ -564,6 +562,22 @@ class FeeTransferService:
 # ---------------------------------------------------------------------------
 # Helpers (module-level)
 # ---------------------------------------------------------------------------
+
+
+def _extract_privy_tx_hash(resp: dict[str, Any]) -> str:
+    """Privy wallet action レスポンスから tx hash を best-effort で取り出す。
+
+    eth_sendTransaction は ``{"method": ..., "data": {"hash": "0x..."}}`` を返す
+    (staging-v4 実機検証)。top-level / data / result のネストを順に探索する。
+    """
+    _keys = ("transaction_hash", "hash", "transactionHash")
+    for container in (resp, resp.get("data"), resp.get("result")):
+        if isinstance(container, dict):
+            for k in _keys:
+                v = container.get(k)
+                if isinstance(v, str) and v:
+                    return v.strip()
+    return ""
 
 
 def is_fee_transfer_enabled() -> bool:

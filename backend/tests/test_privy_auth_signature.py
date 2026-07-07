@@ -147,6 +147,17 @@ def test_load_key_and_sign_verify_roundtrip() -> None:
     pub.verify(der_sig, payload, ec.ECDSA(hashes.SHA256()))
 
 
+def test_load_key_strips_wallet_auth_prefix() -> None:
+    """Privy dashboard 形式 ``wallet-auth:<b64>`` の prefix / 前後空白を除去してロードできる。
+
+    2026-07-07 staging-v4 実機検証で prefix 付き値が "Incorrect padding" で落ちた回帰。
+    """
+    b64, _ = _new_key_b64()
+    for variant in (f"wallet-auth:{b64}", f"  wallet-auth:{b64}  ", f"  {b64}\n"):
+        loaded = load_authorization_private_key(variant)
+        assert isinstance(loaded, ec.EllipticCurvePrivateKey)
+
+
 def test_authorization_signature_header_multi_key() -> None:
     """複数鍵はカンマ連結され、各署名が対応公開鍵で verify できる。"""
     b1, pub1 = _new_key_b64()

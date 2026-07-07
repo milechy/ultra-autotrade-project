@@ -94,8 +94,16 @@ def load_authorization_private_key(b64_pkcs8: str) -> ec.EllipticCurvePrivateKey
 
     形式は Node SDK の `authorization_private_keys` と同一
     （`openssl pkcs8 -topk8 -nocrypt -outform DER | base64`）。
+
+    Privy dashboard が発行する authorization key は ``wallet-auth:<base64>`` の
+    プレフィックス付き形式のことがある（Node SDK も内部で strip する）。前後空白と
+    ``wallet-auth:`` prefix を除去してから base64 デコードする（2026-07-07 staging-v4
+    実機検証で prefix 付き値が "Incorrect padding" で落ちた不具合を修正）。
     """
-    der = base64.b64decode(b64_pkcs8)
+    cleaned = b64_pkcs8.strip()
+    if cleaned.startswith("wallet-auth:"):
+        cleaned = cleaned[len("wallet-auth:") :]
+    der = base64.b64decode(cleaned)
     key = load_der_private_key(der, password=None)
     if not isinstance(key, ec.EllipticCurvePrivateKey):
         raise ValueError("authorization key is not an EC (P-256) private key")
