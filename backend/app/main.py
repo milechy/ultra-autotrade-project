@@ -697,6 +697,18 @@ def create_app() -> FastAPI:
             except BaseException as exc:
                 logger.error("Failed to start funding detection: %s", exc)
 
+        # --- プール赤字監視 (opt-in: ENABLE_POOL_HEALTH_MONITOR=1) ---
+        # Aave Pool の赤字が $10,000 を超えたら Slack アラートを発火する。既定 off →
+        # 本番/staging で明示有効化するまで既存動作に無影響。
+        if os.getenv("ENABLE_POOL_HEALTH_MONITOR", "0") == "1":
+            try:
+                await scheduled_manager.start_pool_health_check(
+                    on_error=_make_scheduler_error_handler("pool_health_check_loop"),
+                )
+                logger.info("Pool health check scheduled (ENABLE_POOL_HEALTH_MONITOR=on)")
+            except BaseException as exc:
+                logger.error("Failed to start pool health check: %s", exc)
+
     @app.on_event("startup")
     async def startup_health_probes() -> None:
         """Start background probes for /health/detail (OpenAI / Perplexity / Aave safety)."""
