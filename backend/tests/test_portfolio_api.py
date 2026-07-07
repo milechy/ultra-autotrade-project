@@ -16,6 +16,7 @@ os.environ.setdefault("INITIAL_ADMIN_EMAIL", "terms_admin@example.com")
 
 from app.database import Base, get_db  # noqa: E402
 from app.main import create_app  # noqa: E402
+from tests.helpers.fee_config_factory import make_v10_default_config  # noqa: E402
 
 
 @pytest.fixture()
@@ -191,3 +192,37 @@ class TestPortfolioAPI:
         data = r.json()
         # (5*3000 + 9*1000) / 4000 = 24000/4000 = 6.00
         assert data["weighted_avg_apy"] == "6.00"
+
+    def test_weighted_avg_apy_capped_by_active_fee_config(
+        self, client: TestClient, test_db
+    ) -> None:
+        """アクティブな FeeConfig があるとき、月間利用上限の年率換算値で表示APYをクランプする。
+
+        生の加重平均APYが tier (LOWER=index0) の月間上限 (1.8%) の年率換算 (21.6%) を
+        超える場合、KPIの平均利回りは21.6%を超えて表示してはならない
+        (超過分はfee計算エンジンでUATaへ回るため、生の数字をそのまま見せると
+        「運営がボロ儲け」に見える矛盾を生む)。
+        """
+        override_get_db, engine = test_db
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        with SessionLocal() as db:
+            db.add(make_v10_default_config())
+            db.commit()
+
+        token = get_admin_token(client)
+        snapshot = {
+            **SAMPLE_SNAPSHOT,
+            "positions_json": [
+                {"asset": "USDC", "value_usd": "1000", "apy_pct": "50.0"},
+            ],
+        }
+        client.post(
+            "/api/portfolio/snapshot",
+            json=snapshot,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        r = client.get("/api/portfolio/current", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        data = r.json()
+        # LOWER tier cap = 0.018 * 12 * 100 = 21.60 (raw 50.00 は超過するのでクランプされる)
+        assert data["weighted_avg_apy"] == "21.60"

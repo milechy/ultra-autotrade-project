@@ -14,8 +14,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin, require_viewer
-from app.auth.models import User
+from app.auth.models import InvestmentTier, User, normalize_tier
 from app.database import get_db
+from app.fees.models import FeeConfigV10
 
 from .aggregation import aggregate_portfolio
 from .aggregation_schemas import SourceBalance, UnifiedPortfolioInput, UnifiedPortfolioView
@@ -102,6 +103,39 @@ def _calc_weighted_avg_apy(positions: Optional[list[Any]]) -> Decimal:
         Decimal("0"),
     )
     return (weighted / total_value).quantize(Decimal("0.01"))
+
+
+#: InvestmentTier → tier_monthly_yield_caps 配列の index。
+#: app.fees.calculator._TIER_INDEX と同一セマンティクス。
+_TIER_CAP_INDEX: dict[InvestmentTier, int] = {
+    InvestmentTier.LOWER: 0,
+    InvestmentTier.MIDDLE: 1,
+    InvestmentTier.UPPER: 2,
+}
+
+
+def _cap_apy_for_display(raw_apy_pct: Decimal, user_tier: str, db: Session) -> Decimal:
+    """表示用APYを、tier別月間利用上限 (tier_monthly_yield_caps) の年率換算値でクランプする。
+
+    KPIの「平均利回り」がポジションの生APYをそのまま出すと、月次手数料バッチの
+    monthly_yield_cap (超過分はUATaへ) 適用後の実際の手取りより大きく見え、
+    ユーザーに不信感を与えうる。表示専用の安全策であり、料金計算そのものには
+    影響しない (fail-open: アクティブな FeeConfig が無ければ raw をそのまま返す)。
+    """
+    config = db.scalars(
+        select(FeeConfigV10)
+        .where(FeeConfigV10.is_active.is_(True))
+        .order_by(FeeConfigV10.effective_from.desc())
+        .limit(1)
+    ).first()
+    if config is None:
+        return raw_apy_pct
+    idx = _TIER_CAP_INDEX.get(normalize_tier(user_tier), 0)
+    caps = config.tier_monthly_yield_caps
+    if idx >= len(caps):
+        return raw_apy_pct
+    annualized_cap_pct = Decimal(str(caps[idx])) * Decimal(12) * Decimal(100)
+    return min(raw_apy_pct, annualized_cap_pct.quantize(Decimal("0.01")))
 
 
 def _build_aave_source(wallet_address: str) -> Optional[SourceBalance]:
@@ -193,7 +227,9 @@ def get_current_portfolio(
         return PortfolioCurrentResponse(
             user_id=current_user.id,
             has_data=False,
-            weighted_avg_apy=_calc_weighted_avg_apy([]),
+            weighted_avg_apy=_cap_apy_for_display(
+                _calc_weighted_avg_apy([]), current_user.tier, db
+            ),
         )
 
     return PortfolioCurrentResponse(
@@ -206,7 +242,9 @@ def get_current_portfolio(
         positions_json=snapshot.positions_json,
         recorded_at=snapshot.recorded_at,
         has_data=True,
-        weighted_avg_apy=_calc_weighted_avg_apy(snapshot.positions_json),
+        weighted_avg_apy=_cap_apy_for_display(
+            _calc_weighted_avg_apy(snapshot.positions_json), current_user.tier, db
+        ),
     )
 
 
