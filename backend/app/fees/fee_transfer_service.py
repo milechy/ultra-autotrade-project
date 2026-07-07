@@ -91,7 +91,15 @@ _DATA_PROVIDER_ABI_MINIMAL: list[dict[str, object]] = [
 
 @dataclass(frozen=True)
 class FeeTransferConfig:
-    """on-chain fee transfer の設定。環境変数から組み立て。"""
+    """on-chain fee transfer の設定。環境変数から組み立て。
+
+    signing_mode:
+      - ``"raw_key"``(既定・後方互換): operator_wallet_key(生鍵)を使い
+        `w3.eth.account.sign_transaction` で署名・送信する旧式。
+      - ``"privy"``: operator wallet を Privy Server Wallet 化し、生鍵を env に
+        置かず Privy REST(`eth_sendTransaction`, TEE 内署名)で送信する。env に残る
+        秘密は P-256 authorization 鍵のみ(= ブロックチェーン鍵ではない・policy 制約下)。
+    """
 
     enabled: bool
     operator_wallet_address: str
@@ -100,6 +108,9 @@ class FeeTransferConfig:
     data_provider_address: str
     usdc_address: str
     chain_id: int
+    signing_mode: str = "raw_key"
+    operator_privy_wallet_id: str = ""
+    chain_name: str = "base_sepolia"
 
     @classmethod
     def from_env(cls, chain_name: str = "base_sepolia") -> "FeeTransferConfig":
@@ -112,6 +123,11 @@ class FeeTransferConfig:
         enabled = os.getenv("FEE_TRANSFER_ENABLED", "false").lower() == "true"
         op_address = os.getenv("OPERATOR_FEE_WALLET_ADDRESS", "")
         op_key = os.getenv("OPERATOR_FEE_WALLET_KEY", "")
+        # 署名モード: 既定 raw_key(後方互換)。privy 指定時は Privy Server Wallet 経路。
+        signing_mode = os.getenv("FEE_SIGNING_MODE", "raw_key").strip().lower()
+        if signing_mode not in ("raw_key", "privy"):
+            signing_mode = "raw_key"
+        operator_privy_wallet_id = os.getenv("OPERATOR_FEE_PRIVY_WALLET_ID", "").strip()
         active_chain = os.getenv("AAVE_ACTIVE_CHAINS", chain_name).split(",")[0].strip()
         chain_cfg = get_chain_config(active_chain)
         rpc_url = os.getenv(chain_cfg.rpc_url_env_var, "") if chain_cfg.rpc_url_env_var else ""
@@ -123,6 +139,9 @@ class FeeTransferConfig:
             data_provider_address=chain_cfg.data_provider_address or "",
             usdc_address=chain_cfg.tokens.get("USDC", ""),
             chain_id=chain_cfg.chain_id,
+            signing_mode=signing_mode,
+            operator_privy_wallet_id=operator_privy_wallet_id,
+            chain_name=active_chain,
         )
 
 
@@ -198,9 +217,37 @@ class FeeTransferService:
                 debug_log=debug,
             )
 
-        # Gate 2: operator wallet 設定
-        if not self.config.operator_wallet_address or not self.config.operator_wallet_key:
-            msg = "OPERATOR_FEE_WALLET_ADDRESS or OPERATOR_FEE_WALLET_KEY not configured"
+        # Gate 2: operator wallet 設定 (署名モード別)
+        #   raw_key: address + key(生鍵) が必要
+        #   privy:   address(allowance 確認 + transferFrom 宛先) + Privy wallet ID が必要
+        #            (生鍵 operator_wallet_key は不要・env に置かない)
+        if not self.config.operator_wallet_address:
+            msg = "OPERATOR_FEE_WALLET_ADDRESS not configured"
+            logger.error("fee_transfer user_id=%d: %s", user_id, msg)
+            return FeeTransferResult(
+                user_id=user_id,
+                user_wallet=user_wallet,
+                fee_usd=Decimal("0"),
+                atoken_units=0,
+                status="failed",
+                error=msg,
+                debug_log=debug,
+            )
+        if self.config.signing_mode == "privy":
+            if not self.config.operator_privy_wallet_id:
+                msg = "FEE_SIGNING_MODE=privy but OPERATOR_FEE_PRIVY_WALLET_ID not configured"
+                logger.error("fee_transfer user_id=%d: %s", user_id, msg)
+                return FeeTransferResult(
+                    user_id=user_id,
+                    user_wallet=user_wallet,
+                    fee_usd=Decimal("0"),
+                    atoken_units=0,
+                    status="failed",
+                    error=msg,
+                    debug_log=debug,
+                )
+        elif not self.config.operator_wallet_key:
+            msg = "OPERATOR_FEE_WALLET_KEY not configured (raw_key mode)"
             logger.error("fee_transfer user_id=%d: %s", user_id, msg)
             return FeeTransferResult(
                 user_id=user_id,
@@ -319,6 +366,89 @@ class FeeTransferService:
             logger.error("_get_atoken_address error: %s", exc)
             return None
 
+    def _submit_transferfrom_raw_key(
+        self,
+        w3: Any,
+        atoken_contract: Any,
+        user_addr_cs: str,
+        op_addr_cs: str,
+        atoken_units: int,
+    ) -> tuple[str, int]:
+        """raw_key モード: 生鍵で transferFrom を署名・送信し (tx_hash_hex, status) を返す。
+
+        旧式(後方互換)。operator_wallet_key を使い web3 でローカル署名する。
+        """
+        account = w3.eth.account.from_key(self.config.operator_wallet_key)
+        nonce = w3.eth.get_transaction_count(account.address, "pending")
+        tx = atoken_contract.functions.transferFrom(
+            user_addr_cs,
+            op_addr_cs,
+            atoken_units,
+        ).build_transaction(
+            {
+                "from": account.address,
+                "nonce": nonce,
+                "chainId": self.config.chain_id,
+                "gas": 100000,
+                "gasPrice": w3.eth.gas_price,
+            }
+        )
+        signed = w3.eth.account.sign_transaction(tx, private_key=self.config.operator_wallet_key)
+        tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
+        return tx_hash.hex(), int(receipt.status)
+
+    def _submit_transferfrom_privy(
+        self,
+        w3: Any,
+        atoken_contract: Any,
+        atoken_addr: str,
+        user_addr_cs: str,
+        op_addr_cs: str,
+        atoken_units: int,
+        debug: list[str],
+    ) -> tuple[str, int]:
+        """privy モード: Privy Server Wallet(TEE 内署名)で transferFrom を送信する。
+
+        生鍵を env に置かず、Privy REST `eth_sendTransaction` に calldata を渡す。
+        gas/nonce は Privy 側が補完。返却 tx_hash を web3 で receipt 待ちして status を確認。
+        """
+        from app.privy.rest_client import PrivyRestClient, PrivyRestError  # noqa: PLC0415
+        from app.proposals.scw_executor import caip2_for_chain  # noqa: PLC0415
+
+        # transferFrom calldata を encode (web3.py v7: encode_abi 位置引数)
+        data = atoken_contract.encode_abi(
+            "transferFrom", args=[user_addr_cs, op_addr_cs, atoken_units]
+        )
+        caip2 = caip2_for_chain(self.config.chain_name)
+        transaction = {
+            "to": w3.to_checksum_address(atoken_addr),
+            "data": data,
+            "value": "0x0",
+        }
+        try:
+            resp = PrivyRestClient().send_transaction(
+                self.config.operator_privy_wallet_id,
+                caip2=caip2,
+                transaction=transaction,
+            )
+        except PrivyRestError as exc:
+            # 秘密鍵・署名はログに出さない (status のみ)
+            logger.warning("fee_transfer Privy send_transaction failed: status=%s", exc.status_code)
+            raise
+
+        # Privy レスポンスから tx hash を取り出す (キー名の揺れに defensive)
+        tx_hash_hex = str(
+            resp.get("transaction_hash")
+            or resp.get("hash")
+            or (resp.get("data") or {}).get("transaction_hash", "")
+        ).strip()
+        if not tx_hash_hex:
+            raise RuntimeError(f"Privy returned no tx hash: keys={list(resp.keys())}")
+        debug.append(f"privy_tx_hash={tx_hash_hex}")
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash_hex, timeout=120)
+        return tx_hash_hex, int(receipt.status)
+
     def _execute_transfer(
         self,
         user_id: int,
@@ -372,32 +502,19 @@ class FeeTransferService:
                     debug_log=debug,
                 )
 
-            # Nonce 取得
-            account = w3.eth.account.from_key(self.config.operator_wallet_key)
-            nonce = w3.eth.get_transaction_count(account.address, "pending")
+            # 署名モード別に transferFrom を送信し (tx_hash_hex, receipt_status) を得る。
+            #   raw_key: 生鍵で sign_transaction → send_raw_transaction (旧式)
+            #   privy:   Privy REST(eth_sendTransaction, TEE 内署名) で送信 (生鍵不要)
+            if self.config.signing_mode == "privy":
+                tx_hash_hex, receipt_status = self._submit_transferfrom_privy(
+                    w3, atoken_contract, atoken_addr, user_addr_cs, op_addr_cs, atoken_units, debug
+                )
+            else:
+                tx_hash_hex, receipt_status = self._submit_transferfrom_raw_key(
+                    w3, atoken_contract, user_addr_cs, op_addr_cs, atoken_units
+                )
 
-            # transferFrom tx 構築
-            tx = atoken_contract.functions.transferFrom(
-                user_addr_cs,
-                op_addr_cs,
-                atoken_units,
-            ).build_transaction(
-                {
-                    "from": account.address,
-                    "nonce": nonce,
-                    "chainId": self.config.chain_id,
-                    "gas": 100000,
-                    "gasPrice": w3.eth.gas_price,
-                }
-            )
-            signed = w3.eth.account.sign_transaction(
-                tx, private_key=self.config.operator_wallet_key
-            )
-            tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
-            receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
-
-            tx_hash_hex = tx_hash.hex()
-            if receipt.status != 1:
+            if receipt_status != 1:
                 msg = f"tx reverted: {tx_hash_hex}"
                 logger.error("fee_transfer user_id=%d: %s", user_id, msg)
                 return FeeTransferResult(

@@ -153,9 +153,52 @@ class PrivyRestClient:
         }
         return self.wallet_rpc(wallet_id, body, idempotency_key=idempotency_key)
 
+    def send_transaction(
+        self,
+        wallet_id: str,
+        *,
+        caip2: str,
+        transaction: dict[str, Any],
+        idempotency_key: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """eth_sendTransaction（EOA server wallet が自身の tx を TEE 内署名して送信）。
+
+        smart wallet の `send_calls`(ERC-5792) と異なり、operator 自身の EOA wallet が
+        単一 tx を署名・broadcast する経路。手数料徴収 (aToken.transferFrom) の
+        Privy 化に使う。生鍵 (`OPERATOR_FEE_WALLET_KEY`) 経路の置換。
+
+        :param wallet_id: operator の **Privy 内部 wallet ID**（アドレスではない）
+        :param caip2: 執行チェーン（``eip155:<chain_id>``・`scw_executor.caip2_for_chain`）
+        :param transaction: ``{to, data, value}``（nonce/gas は Privy が補完）
+        """
+        body: dict[str, Any] = {
+            "method": "eth_sendTransaction",
+            "caip2": caip2,
+            "params": {"transaction": transaction},
+        }
+        return self.wallet_rpc(wallet_id, body, idempotency_key=idempotency_key)
+
     def create_policy(self, policy: dict[str, Any]) -> dict[str, Any]:
         """POST /v1/policies（app-level / Basic auth のみ・委譲署名不要）。"""
         return self._post("/policies", policy, signed=False)
+
+    def create_wallet(self, body: dict[str, Any]) -> dict[str, Any]:
+        """POST /v1/wallets（server wallet 作成・app-level / Basic auth のみ）。
+
+        operator fee wallet を Privy Server Wallet として作成する 1 回限りセットアップ用。
+        body 例::
+
+            {
+                "chain_type": "ethereum",
+                "policy_ids": ["<operator fee policy id>"],
+                "authorization_key_ids": ["<server signer / key quorum id>"],
+            }
+
+        返り値の ``id`` が ``OPERATOR_FEE_PRIVY_WALLET_ID``、``address`` が
+        ``OPERATOR_FEE_WALLET_ADDRESS`` になる。実 body 形状は Privy API reference に従い
+        セットアップスクリプト側で組む（本メソッドは薄い POST ラッパ）。
+        """
+        return self._post("/wallets", body, signed=False)
 
     def create_key_quorum(
         self,

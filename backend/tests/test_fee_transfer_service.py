@@ -56,6 +56,20 @@ DISABLED_CFG = FeeTransferConfig(
 
 USER_WALLET = "0xUserWallet00000000000000000000000000000001"
 
+# privy 署名モード config (生鍵 operator_wallet_key は空)。
+PRIVY_CFG = FeeTransferConfig(
+    enabled=True,
+    operator_wallet_address="0xOperator000000000000000000000000000000001",
+    operator_wallet_key="",  # privy モードでは生鍵不要
+    rpc_url="https://base-sepolia.example.com",
+    data_provider_address="0xBc9f5b7E248451CdD7cA54e717a2BFe1F32b566b",
+    usdc_address="0xba50cd2a20f6da35d788639e581bca8d0b5d4d5f",
+    chain_id=84532,
+    signing_mode="privy",
+    operator_privy_wallet_id="privy-wallet-abc123",
+    chain_name="base_sepolia",
+)
+
 
 # ---------------------------------------------------------------------------
 # is_fee_transfer_enabled
@@ -233,6 +247,9 @@ def _make_w3_mock(
         "gasPrice": 1000000000,
     }
 
+    # privy モード用: encode_abi(transferFrom calldata)
+    atoken_contract.encode_abi.return_value = "0xa9059cbb" + "00" * 64
+
     return w3
 
 
@@ -314,6 +331,143 @@ def test_transfer_fee_web3_exception():
 
     assert result.status == "failed"
     assert result.tx_hash is None
+
+
+# ---------------------------------------------------------------------------
+# transfer_fee: privy 署名モード (operator wallet = Privy Server Wallet)
+# ---------------------------------------------------------------------------
+
+
+def test_transfer_fee_privy_mode_sent_success():
+    """privy モード: Privy REST send_transaction 成功 + receipt status=1 → sent。生鍵不使用。"""
+    svc = FeeTransferService(PRIVY_CFG)
+    mock_w3 = _make_w3_mock(allowance=100_000_000)
+    privy_tx = "0xprivy" + "00" * 30
+
+    privy_client = MagicMock()
+    privy_client.send_transaction.return_value = {"transaction_hash": privy_tx}
+
+    with (
+        patch.object(svc, "_get_w3", return_value=mock_w3),
+        patch("app.privy.rest_client.PrivyRestClient", return_value=privy_client),
+    ):
+        result = svc.transfer_fee(
+            user_id=30,
+            user_wallet=USER_WALLET,
+            fee_amount_jpy=Decimal("1500"),
+            subscription_amount_jpy=Decimal("0"),
+            yield_excess_jpy=Decimal("0"),
+            usd_jpy_rate=Decimal("150"),
+        )
+
+    assert result.status == "sent"
+    assert result.tx_hash == privy_tx
+    # privy モードでは生鍵署名 (from_key / sign_transaction) を呼ばない
+    mock_w3.eth.account.from_key.assert_not_called()
+    mock_w3.eth.account.sign_transaction.assert_not_called()
+    # Privy REST が呼ばれ、正しい wallet_id が渡っている
+    privy_client.send_transaction.assert_called_once()
+    assert privy_client.send_transaction.call_args.args[0] == "privy-wallet-abc123"
+
+
+def test_transfer_fee_privy_mode_no_wallet_id_returns_failed():
+    """privy モードだが OPERATOR_FEE_PRIVY_WALLET_ID 未設定 → failed。"""
+    cfg = FeeTransferConfig(
+        enabled=True,
+        operator_wallet_address="0xOperator000000000000000000000000000000001",
+        operator_wallet_key="",
+        rpc_url="https://rpc",
+        data_provider_address="0xDP",
+        usdc_address="0xUSDC",
+        chain_id=84532,
+        signing_mode="privy",
+        operator_privy_wallet_id="",  # 未設定
+        chain_name="base_sepolia",
+    )
+    svc = FeeTransferService(cfg)
+    result = svc.transfer_fee(
+        user_id=31,
+        user_wallet=USER_WALLET,
+        fee_amount_jpy=Decimal("1500"),
+        subscription_amount_jpy=Decimal("0"),
+        yield_excess_jpy=Decimal("0"),
+        usd_jpy_rate=Decimal("150"),
+    )
+    assert result.status == "failed"
+    assert "OPERATOR_FEE_PRIVY_WALLET_ID" in (result.error or "")
+
+
+def test_transfer_fee_privy_mode_rest_error_returns_failed():
+    """privy モード: Privy REST が例外 → status='failed' (外側 except が捕捉)。"""
+    from app.privy.rest_client import PrivyRestError
+
+    svc = FeeTransferService(PRIVY_CFG)
+    mock_w3 = _make_w3_mock(allowance=100_000_000)
+
+    privy_client = MagicMock()
+    privy_client.send_transaction.side_effect = PrivyRestError(500, "server error")
+
+    with (
+        patch.object(svc, "_get_w3", return_value=mock_w3),
+        patch("app.privy.rest_client.PrivyRestClient", return_value=privy_client),
+    ):
+        result = svc.transfer_fee(
+            user_id=32,
+            user_wallet=USER_WALLET,
+            fee_amount_jpy=Decimal("1500"),
+            subscription_amount_jpy=Decimal("0"),
+            yield_excess_jpy=Decimal("0"),
+            usd_jpy_rate=Decimal("150"),
+        )
+
+    assert result.status == "failed"
+
+
+def test_transfer_fee_privy_mode_no_tx_hash_returns_failed():
+    """privy モード: Privy レスポンスに tx hash が無い → status='failed'。"""
+    svc = FeeTransferService(PRIVY_CFG)
+    mock_w3 = _make_w3_mock(allowance=100_000_000)
+
+    privy_client = MagicMock()
+    privy_client.send_transaction.return_value = {"unexpected": "shape"}
+
+    with (
+        patch.object(svc, "_get_w3", return_value=mock_w3),
+        patch("app.privy.rest_client.PrivyRestClient", return_value=privy_client),
+    ):
+        result = svc.transfer_fee(
+            user_id=33,
+            user_wallet=USER_WALLET,
+            fee_amount_jpy=Decimal("1500"),
+            subscription_amount_jpy=Decimal("0"),
+            yield_excess_jpy=Decimal("0"),
+            usd_jpy_rate=Decimal("150"),
+        )
+
+    assert result.status == "failed"
+
+
+def test_transfer_fee_privy_mode_still_checks_allowance():
+    """privy モードでも allowance 不足なら送信せず no_allowance (安全ゲート共通)。"""
+    svc = FeeTransferService(PRIVY_CFG)
+    mock_w3 = _make_w3_mock(allowance=0)
+
+    privy_client = MagicMock()
+    with (
+        patch.object(svc, "_get_w3", return_value=mock_w3),
+        patch("app.privy.rest_client.PrivyRestClient", return_value=privy_client),
+    ):
+        result = svc.transfer_fee(
+            user_id=34,
+            user_wallet=USER_WALLET,
+            fee_amount_jpy=Decimal("1500"),
+            subscription_amount_jpy=Decimal("0"),
+            yield_excess_jpy=Decimal("0"),
+            usd_jpy_rate=Decimal("150"),
+        )
+
+    assert result.status == "no_allowance"
+    privy_client.send_transaction.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

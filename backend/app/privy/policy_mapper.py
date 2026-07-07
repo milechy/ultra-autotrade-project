@@ -133,3 +133,49 @@ def build_delegation_policy(
         "chain_type": _CHAIN_TYPE,
         "rules": rules,
     }
+
+
+def build_operator_fee_policy(
+    *,
+    atoken_address: str,
+    chain_name: str,
+    policy_name: str | None = None,
+) -> dict[str, Any]:
+    """operator fee wallet 用 Privy policy（手数料徴収の transferFrom を宛先で縛る）。
+
+    operator wallet を Privy Server Wallet 化する際の TEE 側ガード。手数料徴収は
+    aToken コントラクトへの `eth_sendTransaction`（`transferFrom`）のみ。宛先 allowlist を
+    aToken アドレス 1 件に限定する（委譲経路の宛先 allowlist と同型）。
+
+    **静的制約の限界**（[[policy_mapper]] docstring と同じ）: Privy policy は calldata を
+    動的参照できないため「transferFrom の第2引数=operator address」までは TEE で縛れない。
+    その enforcement は backend `_execute_transfer` の allowance チェック + transferFrom の
+    宛先固定（op_addr_cs）で担う。Privy policy は「aToken 宛の tx のみ」の構造エンベロープを
+    TEE で enforce し、両者の積集合で被害上限を縛る。
+
+    :param atoken_address: 手数料徴収対象の aToken（aUSDC）コントラクトアドレス
+    :param chain_name: 執行チェーン名（監査用の policy name に含める）
+    :param policy_name: 任意の表示名（未指定なら atoken 短縮形/chain から生成・50文字以内）
+    """
+    addr = atoken_address.strip().lower()
+    if not addr:
+        raise PolicyMappingError("atoken_address must not be empty")
+
+    conditions = [_to_condition([addr])]
+    atoken_abbrev = f"{addr[:6]}...{addr[-4:]}"
+    name = policy_name or f"uata-operator-fee-{atoken_abbrev}-{chain_name}"
+    # operator は自身の EOA から直 tx を送る（eth_sendTransaction のみ）。
+    rules = [
+        {
+            "name": "allow-fee-transferfrom-to-atoken",
+            "method": "eth_sendTransaction",
+            "conditions": conditions,
+            "action": _ACTION_ALLOW,
+        }
+    ]
+    return {
+        "version": _POLICY_VERSION,
+        "name": name,
+        "chain_type": _CHAIN_TYPE,
+        "rules": rules,
+    }
