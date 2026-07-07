@@ -26,10 +26,18 @@
   # basescan で確認:
   # https://sepolia.basescan.org/tx/0x<tx_hash>
 
+署名モード (FEE_SIGNING_MODE, 既定 raw_key):
+  - raw_key: OPERATOR_FEE_WALLET_KEY(生鍵)でローカル署名 (従来)
+  - privy:   OPERATOR_FEE_PRIVY_WALLET_ID の Privy Server Wallet が TEE 内署名。
+             生鍵不要。追加で以下を設定:
+               export FEE_SIGNING_MODE="privy"
+               export OPERATOR_FEE_PRIVY_WALLET_ID="<setup スクリプトで作成した wallet id>"
+               export PRIVY_APP_ID / PRIVY_APP_SECRET / PRIVY_AUTHORIZATION_PRIVATE_KEY
+
 Non-custodial 設計確認ポイント:
   - from: TEST_USER_WALLET (ユーザーの aToken 保有者)
   - to:   OPERATOR_FEE_WALLET_ADDRESS (operator 受け取り先)
-  - 署名: OPERATOR_FEE_WALLET_KEY (operator 自身の鍵) が transferFrom を call
+  - 署名: raw_key=OPERATOR_FEE_WALLET_KEY / privy=Privy TEE が transferFrom を call
   - ユーザーの秘密鍵は allowance 付与にのみ使用 (本番では Privy 経由で browser 署名)
 """
 
@@ -114,17 +122,20 @@ def main() -> None:
     operator_key = os.getenv("OPERATOR_FEE_WALLET_KEY", "")
     user_wallet = os.getenv("TEST_USER_WALLET", "")
     user_key = os.getenv("TEST_USER_PRIVATE_KEY", "")
+    # 署名モード: raw_key(既定・生鍵) / privy(Privy Server Wallet・TEE 署名)。
+    signing_mode = os.getenv("FEE_SIGNING_MODE", "raw_key").strip().lower()
+    operator_privy_wallet_id = os.getenv("OPERATOR_FEE_PRIVY_WALLET_ID", "").strip()
 
-    missing = [
-        k
-        for k, v in [
-            ("ALCHEMY_RPC_URL_BASE_SEPOLIA", rpc_url),
-            ("OPERATOR_FEE_WALLET_ADDRESS", operator_addr),
-            ("OPERATOR_FEE_WALLET_KEY", operator_key),
-            ("TEST_USER_WALLET", user_wallet),
-        ]
-        if not v
+    required = [
+        ("ALCHEMY_RPC_URL_BASE_SEPOLIA", rpc_url),
+        ("OPERATOR_FEE_WALLET_ADDRESS", operator_addr),
+        ("TEST_USER_WALLET", user_wallet),
     ]
+    if signing_mode == "privy":
+        required.append(("OPERATOR_FEE_PRIVY_WALLET_ID", operator_privy_wallet_id))
+    else:
+        required.append(("OPERATOR_FEE_WALLET_KEY", operator_key))
+    missing = [k for k, v in required if not v]
     if missing:
         print(f"[ERROR] 環境変数未設定: {missing}")
         print("  設定方法は本スクリプト冒頭のコメントを参照してください。")
@@ -204,6 +215,7 @@ def main() -> None:
 
     from app.fees.fee_transfer_service import FeeTransferConfig, FeeTransferService  # noqa: PLC0415
 
+    print(f"  signing_mode: {signing_mode}")
     cfg = FeeTransferConfig(
         enabled=True,
         operator_wallet_address=operator_addr,
@@ -212,6 +224,9 @@ def main() -> None:
         data_provider_address=DATA_PROVIDER_ADDRESS,
         usdc_address=USDC_ADDRESS,
         chain_id=CHAIN_ID,
+        signing_mode=signing_mode,
+        operator_privy_wallet_id=operator_privy_wallet_id,
+        chain_name="base_sepolia",
     )
     svc = FeeTransferService(cfg)
     result = svc.transfer_fee(

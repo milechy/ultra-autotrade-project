@@ -125,11 +125,13 @@ def main(argv: list[str]) -> int:
         return 1
     print(f"\n✅ policy 作成成功: policy_id={policy_id}")
 
-    # 2) server wallet 作成（policy + signer を紐付け）
+    # 2) server wallet 作成（policy + owner(key quorum) を紐付け）。
+    # Privy API: POST /v1/wallets は owner_id(=key quorum id) を取る
+    # (@privy-io/api-types WalletCreateParams: chain_type / owner_id / policy_ids)。
     wallet_body = {
         "chain_type": "ethereum",
+        "owner_id": signer_id,
         "policy_ids": [policy_id],
-        "authorization_key_ids": [signer_id],
     }
     try:
         wallet_result = client.create_wallet(wallet_body)

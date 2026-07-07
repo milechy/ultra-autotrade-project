@@ -186,12 +186,12 @@ class PrivyRestClient:
         """POST /v1/wallets（server wallet 作成・app-level / Basic auth のみ）。
 
         operator fee wallet を Privy Server Wallet として作成する 1 回限りセットアップ用。
-        body 例::
+        body 例（Privy API: POST /v1/wallets / @privy-io/api-types WalletCreateParams）::
 
             {
                 "chain_type": "ethereum",
+                "owner_id": "<server signer / key quorum id>",
                 "policy_ids": ["<operator fee policy id>"],
-                "authorization_key_ids": ["<server signer / key quorum id>"],
             }
 
         返り値の ``id`` が ``OPERATOR_FEE_PRIVY_WALLET_ID``、``address`` が
