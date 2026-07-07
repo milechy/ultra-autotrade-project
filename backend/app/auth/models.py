@@ -279,6 +279,14 @@ class User(Base):
     privy_did: Mapped[Optional[str]] = mapped_column(
         String(255), unique=True, nullable=True, index=True, default=None
     )
+    # Track 2 / 層1: Privy linked_accounts から収集したアカウント email(実 PII)。
+    # notification_email(ユーザー任意入力・通知先)とは別で、ログイン時に自動収集する
+    # 連絡先。フィールドレベル暗号化(EncryptedString)で保存。収集は PII_EMAIL_COLLECTION_ENABLED
+    # フラグ ON 時のみ(既定 false・dormant)。利用目的明示・同意は層3(森先生判断・docs/13 §12.2)。
+    # ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_email VARCHAR(512) NULL;
+    contact_email: Mapped[Optional[str]] = mapped_column(
+        EncryptedString(512), nullable=True, default=None
+    )
     # Privy 内部 wallet ID (アドレスではない)。委譲(SCW)執行の Privy wallet_sendCalls が
     # POST /v1/wallets/{id}/rpc で要求する識別子。wallet-connect 時に frontend の Privy SDK から
     # 受領して保存する。NULL = 未取得 (旧ユーザー / 非 Privy 経路)。

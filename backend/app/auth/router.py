@@ -698,6 +698,13 @@ def wallet_connect(
     # 検証せずに drop する。本番環境では PRIVY_APP_ID + 公開鍵を必ず設定すること。
     verifier = get_privy_verifier()
     privy_did_to_store: str | None = None
+    # Track 2 / 層1(dormant): PII_EMAIL_COLLECTION_ENABLED=true のときのみ Privy
+    # linked_accounts から連絡先 email を収集して暗号化保存する。既定 false=収集しない。
+    # 有効化は利用目的明示・同意(層3・森先生判断)が前提(docs/13 §12.2)。
+    collect_email_enabled = (
+        os.getenv("PII_EMAIL_COLLECTION_ENABLED", "false").strip().lower() == "true"
+    )
+    collected_email: str | None = None
     if verifier is None:
         # 後方互換モード: PRIVY_APP_ID 未設定時は Privy フィールドを silent drop して通常認証へ継続
         if request.privy_id_token or request.privy_did:
@@ -708,8 +715,14 @@ def wallet_connect(
                 "<present>" if request.privy_did else None,
             )
     elif request.privy_id_token:
-        # 検証モード (PRIVY_APP_ID 設定済み): id_token を検証して DID を取得
-        verified_did = verifier.verify_id_token(request.privy_id_token)
+        # 検証モード (PRIVY_APP_ID 設定済み): id_token を検証して DID を取得。
+        # PII 収集フラグ ON 時のみ、同じ検証済みトークンから email も抽出する(追加 API 不要)。
+        if collect_email_enabled:
+            verified_did, collected_email = verifier.verify_id_token_with_email(
+                request.privy_id_token
+            )
+        else:
+            verified_did = verifier.verify_id_token(request.privy_id_token)
         if request.privy_did and request.privy_did != verified_did:
             logger.warning(
                 "Privy DID mismatch: request.privy_did=%s..., id_token.sub=%s...",
@@ -795,6 +808,23 @@ def wallet_connect(
             db.rollback()
             logger.warning(
                 "privy_wallet_id store failed (non-fatal): wallet=%s...",
+                request.wallet_address[:10],
+            )
+
+    # Track 2 / 層1(dormant): 収集フラグ ON かつ Privy から email が取れ、未保存なら
+    # contact_email に暗号化保存(EncryptedString が透過暗号化)。best-effort(login は止めない)。
+    # email 平文はログに出さない(CLAUDE.md §Security 8)。
+    if collect_email_enabled and collected_email and not user.contact_email:
+        try:
+            user.contact_email = collected_email
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            logger.info("contact_email collected for user_id=%d (Privy)", user.id)
+        except Exception:  # noqa: BLE001
+            db.rollback()
+            logger.warning(
+                "contact_email store failed (non-fatal): wallet=%s...",
                 request.wallet_address[:10],
             )
 
