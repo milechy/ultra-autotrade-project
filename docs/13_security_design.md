@@ -412,7 +412,59 @@ Phase 2 以降: `AAVE_NETWORK=base`, `BYBIT_SANDBOX=false`, `APP_ENV=production`
 
 ---
 
-最終更新: 2026-04-19
+# 12. 顧客PIIのフィールドレベル暗号化（Track 2 / 2026-07-07）
+
+## 12.1 前提と現状
+
+- **消費者の実メールは DB に保存していない**: Privy/LINE ログインの消費者ユーザーの `email`
+  列は合成ID（`wallet_<slug>@wallet.local` / `line_<id>@line.local`）。Privy verifier は
+  ID Token の `sub`（`did:privy:xxxx`）のみ取得し、実メールは Privy 側に保管される
+  （データ最小化＝漏洩リスク低減。`app/auth/privy_verifier.py`）。
+- DB に入る実 PII は、社内アカウント（admin/partner の実メール）と、ユーザーが任意入力する
+  `notification_email` のみ。将来 UAT が顧客メールを収集（Privy `linked_accounts` 取得 or
+  フォーム入力）する場合に実 PII が増える。
+
+## 12.2 層構成（3層）
+
+顧客メール収集を「障害通知/KYC（取引付随）」「キャンペーン/解析/第三者連携（要同意）」で使う場合、
+以下 3 層が必要。**本節（層2）は法務判断と独立に安全に作れる暗号化基盤**。
+
+1. 収集層（Privy 取得 / フォーム）— 未実装（森先生の法務判断後に配線）
+2. **暗号化層（本節・実装済み）** — 保存時の AES-256-GCM 暗号化
+3. 同意・利用目的管理層 — 用途別オプトイン + プライバシーポリシー/特商法（**森先生判断必須**。
+   特定電子メール法=マーケメール事前同意、個情法=第三者提供の個別同意）
+
+## 12.3 層2 暗号化基盤（実装済み）
+
+- `app/security/field_crypto.py`:
+  - `encrypt_pii` / `decrypt_pii`: AES-256-GCM。暗号文 = `enc:v<版>:<base64(nonce||ct||tag)>`。
+  - `blind_index`: HMAC-SHA256（正規化=小文字化+trim）。等価検索・unique が要る列用（決定的）。
+  - 鍵は env KEK + 版番号でローテ対応（`PII_ENCRYPTION_KEK` / `PII_KEK_VERSION` /
+    旧版 `PII_ENCRYPTION_KEK_V<n>` / `PII_BLIND_INDEX_KEY`）。self-hosted 現実解、将来 KMS 移行余地。
+- `app/security/sqlalchemy_types.py` `EncryptedString`: ORM 列型。write で暗号化・read で復号を
+  透過処理し、各読み書き箇所を触らず暗号化漏れを防ぐ。**適用済み列**: `users.notification_email`
+  / `user_settings.notification_email`。
+- **後方互換**: `enc:` prefix 無しの既存平文はそのまま読める（段階移行）。KEK 未設定環境
+  （dev / 現状の staging・本番）は平文パススルー（挙動不変）。
+
+## 12.4 有効化手順（KEK 設定時の必須オペレーション）
+
+1. **先に列幅拡張**: 暗号文は base64 で平文より長い（255文字メール → 約 390 文字）。KEK を
+   設定する前に必ず実行:
+   ```sql
+   ALTER TABLE users         ALTER COLUMN notification_email TYPE VARCHAR(512);
+   ALTER TABLE user_settings ALTER COLUMN notification_email TYPE VARCHAR(512);
+   ```
+2. `PII_ENCRYPTION_KEK`（base64 32byte）+ `PII_KEK_VERSION=1` を env に設定 → 再デプロイ。
+   以降の write は暗号化される。既存平文行は次回 write 時に暗号化される（backfill する場合は
+   全行 read→write の冪等バッチ）。
+3. **鍵ローテ**: 新版 KEK を `PII_ENCRYPTION_KEK` に、旧版を `PII_ENCRYPTION_KEK_V<旧版>` に
+   残し `PII_KEK_VERSION` をインクリメント。旧版暗号文は旧鍵で復号可能。
+4. KEK は `.gitignore` 済 `.env.*` のみ・ログ出力禁止（§1.1）。
+
+---
+
+最終更新: 2026-07-07
 主要変更:
 - OctoBot 依存の全記述を削除（アーキテクチャは Knowledge Hub → AI → Bybit/Aave に）
 - Privy / MetaMask ウォレット方式（2.4 節）を追加
@@ -420,3 +472,5 @@ Phase 2 以降: `AAVE_NETWORK=base`, `BYBIT_SANDBOX=false`, `APP_ENV=production`
 - OR ロジック緊急停止（6.2 節）を追加（docs/33 整合）
 - Phase 1 期間中の意図的 .env 乖離（1.4 節）を追加
 - パートナー管理画面の権限分離 方式 B（11 節）を追加
+- operator fee wallet の Privy Server Wallet 化（2.5 節・2026-07-07）を追加
+- 顧客PIIのフィールドレベル暗号化（12 節・2026-07-07）を追加

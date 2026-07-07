@@ -32,6 +32,7 @@ from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, St
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.security.sqlalchemy_types import EncryptedString
 
 
 class UserSettings(Base):
@@ -66,8 +67,10 @@ class UserSettings(Base):
         unique=True,
         index=True,
     )
+    # Track 2 / 層2: 実 PII のためフィールドレベル暗号化(AES-256-GCM)。
+    # ALTER TABLE user_settings ALTER COLUMN notification_email TYPE VARCHAR(512);
     notification_email: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, default=None
+        EncryptedString(512), nullable=True, default=None
     )
     notification_frequency: Mapped[str] = mapped_column(
         String(20), nullable=False, default="important"
