@@ -429,7 +429,7 @@ Phase 2 以降: `AAVE_NETWORK=base`, `BYBIT_SANDBOX=false`, `APP_ENV=production`
 顧客メール収集を「障害通知/KYC（取引付随）」「キャンペーン/解析/第三者連携（要同意）」で使う場合、
 以下 3 層が必要。**本節（層2）は法務判断と独立に安全に作れる暗号化基盤**。
 
-1. 収集層（Privy 取得 / フォーム）— 未実装（森先生の法務判断後に配線）
+1. 収集層（Privy 取得 / フォーム）— **dormant 実装済み**（既定 OFF。§12.5 参照）
 2. **暗号化層（本節・実装済み）** — 保存時の AES-256-GCM 暗号化
 3. 同意・利用目的管理層 — 用途別オプトイン + プライバシーポリシー/特商法（**森先生判断必須**。
    特定電子メール法=マーケメール事前同意、個情法=第三者提供の個別同意）
@@ -461,6 +461,23 @@ Phase 2 以降: `AAVE_NETWORK=base`, `BYBIT_SANDBOX=false`, `APP_ENV=production`
 3. **鍵ローテ**: 新版 KEK を `PII_ENCRYPTION_KEK` に、旧版を `PII_ENCRYPTION_KEK_V<旧版>` に
    残し `PII_KEK_VERSION` をインクリメント。旧版暗号文は旧鍵で復号可能。
 4. KEK は `.gitignore` 済 `.env.*` のみ・ログ出力禁止（§1.1）。
+
+## 12.5 層1 収集（dormant 実装済み・2026-07-07）
+
+顧客の連絡先 email を Privy から収集する経路を **dormant（既定 OFF）** で実装済み。
+有効化は**利用目的の明示・同意（層3・森先生判断）が前提**。
+
+- **収集源**: Privy ID Token の `linked_accounts` claim（email ログイン時に含まれる）から
+  抽出する。**追加 API 呼び出し不要**（wallet-connect 時に検証する同じトークン内から取得）。
+  `app/auth/privy_verifier.py`: `extract_email_from_claims` / `verify_id_token_with_email`。
+- **保存先**: `users.contact_email`（`EncryptedString(512)`・§12.3 で暗号化）。ユーザーが
+  設定画面で任意入力する `notification_email` とは別（自動収集した連絡先）。
+- **フラグ**: `PII_EMAIL_COLLECTION_ENABLED`（既定 `false`）。OFF の間は `verify_id_token_with_email`
+  を呼ばず email を一切取得・保存しない（現行挙動不変）。`app/auth/router.py` wallet-connect。
+- **best-effort**: 収集・保存の失敗は login を止めない。email 平文はログに出さない（§1.1）。
+- **有効化前の必須**: ①列追加 `ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_email
+  VARCHAR(512) NULL;` ②利用目的をプライバシーポリシー/規約に明示（個情法）③マーケ利用は
+  別途オプトイン（特定電子メール法）④第三者提供は個別同意（個情法）。①以外は森先生判断。
 
 ---
 

@@ -28,11 +28,12 @@ Privy 公式仕様 (https://docs.privy.io/authentication/user-authentication/acc
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
 import time
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 import jwt as pyjwt
@@ -52,6 +53,33 @@ PRIVY_ISSUER = "privy.io"
 PRIVY_ALGORITHM = "ES256"
 DEFAULT_JWKS_URL_TEMPLATE = "https://auth.privy.io/api/v1/apps/{app_id}/keys"
 JWKS_CACHE_TTL_SECONDS = 3600  # 1 hour
+
+
+def extract_email_from_claims(payload: "dict[str, Any]") -> Optional[str]:
+    """検証済み Privy claims の ``linked_accounts`` から email を抽出する（層1 / 収集）。
+
+    Privy ID Token は email ログイン時に ``linked_accounts`` を含む（JSON 文字列 or
+    既に list）。``type == "email"`` のエントリの ``address`` を返す。無ければ None。
+    parse 失敗は None（収集は best-effort・認証は止めない）。
+
+    ⚠️ **これは実 PII の取得**。呼び出し側は PII 収集フラグ ON 時のみ保存すること
+    （利用目的の明示・同意は層3 / 森先生判断。docs/13 §12.2）。
+    """
+    raw = payload.get("linked_accounts")
+    if raw is None:
+        return None
+    try:
+        accounts = json.loads(raw) if isinstance(raw, str) else raw
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(accounts, list):
+        return None
+    for acc in accounts:
+        if isinstance(acc, dict) and acc.get("type") == "email":
+            addr = acc.get("address")
+            if isinstance(addr, str) and addr.strip():
+                return addr.strip()
+    return None
 
 
 class PrivyVerifier:
@@ -76,8 +104,8 @@ class PrivyVerifier:
         self._jwks_cache_fetched_at: float = 0.0
         self._jwks_lock = threading.Lock()
 
-    def verify_id_token(self, token: str) -> str:
-        """ID Token を検証して sub claim (Privy DID) を返す。
+    def _verify_and_decode(self, token: str) -> "dict[str, Any]":
+        """ID Token を検証して verified payload(claims dict)を返す。
 
         失敗時は HTTPException(401) を raise する。JWKS 取得失敗のような
         外部依存系エラーは 503 で返す (クライアント原因と区別するため)。
@@ -89,7 +117,7 @@ class PrivyVerifier:
             )
         public_key = self._resolve_public_key(token)
         try:
-            payload = pyjwt.decode(
+            payload: dict[str, Any] = pyjwt.decode(
                 token,
                 public_key,
                 algorithms=[PRIVY_ALGORITHM],
@@ -121,7 +149,22 @@ class PrivyVerifier:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid Privy ID token (missing sub)",
             )
-        return sub
+        return payload
+
+    def verify_id_token(self, token: str) -> str:
+        """ID Token を検証して sub claim (Privy DID) を返す。"""
+        return str(self._verify_and_decode(token)["sub"])
+
+    def verify_id_token_with_email(self, token: str) -> "tuple[str, Optional[str]]":
+        """ID Token を検証し ``(did, email)`` を返す。
+
+        email は Privy の ``linked_accounts`` claim(email ログイン時に含まれる)から
+        抽出する。追加 API 呼び出しは不要(検証済みトークン内から取得)。email が無い
+        (wallet 単独ログイン等)場合は ``None``。**PII 収集フラグが ON のときのみ
+        呼び出し側が保存する**(層1・dormant / docs/13 §12.2)。
+        """
+        payload = self._verify_and_decode(token)
+        return str(payload["sub"]), extract_email_from_claims(payload)
 
     # ── 公開鍵解決 ───────────────────────────────────────────
 
