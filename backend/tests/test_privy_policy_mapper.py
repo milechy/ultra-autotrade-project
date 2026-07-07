@@ -16,10 +16,12 @@ from app.aave.chains import get_chain_config
 from app.privy.policy_mapper import (
     PolicyMappingError,
     build_delegation_policy,
+    build_operator_fee_policy,
     resolve_protocol_contracts,
 )
 
 _WALLET = "0x1234567890123456789012345678901234567890"
+_ATOKEN = "0xABCdef0000000000000000000000000000000001"
 
 
 def test_resolve_aave_contract_base() -> None:
@@ -132,3 +134,41 @@ def test_build_policy_unsupported_protocol_raises() -> None:
             allowed_protocols=["aave", "pendle"],
             chain_name="base",
         )
+
+
+# ---------------------------------------------------------------------------
+# operator fee policy（手数料徴収 wallet の Privy 化）
+# ---------------------------------------------------------------------------
+
+
+def test_build_operator_fee_policy_structure() -> None:
+    """operator fee policy: eth_sendTransaction を aToken 宛のみ ALLOW。"""
+    policy = build_operator_fee_policy(atoken_address=_ATOKEN, chain_name="base_sepolia")
+    assert policy["version"] == "1.0"
+    assert policy["chain_type"] == "ethereum"
+    assert len(policy["rules"]) == 1
+    rule = policy["rules"][0]
+    assert rule["method"] == "eth_sendTransaction"
+    assert rule["action"] == "ALLOW"
+    cond = rule["conditions"][0]
+    assert cond["field"] == "to"
+    assert cond["operator"] == "eq"
+    # 宛先は小文字化された aToken 1 件
+    assert cond["value"] == _ATOKEN.lower()
+
+
+def test_build_operator_fee_policy_name_under_50_chars() -> None:
+    policy = build_operator_fee_policy(atoken_address=_ATOKEN, chain_name="base_sepolia")
+    assert len(policy["name"]) <= 50
+
+
+def test_build_operator_fee_policy_empty_atoken_raises() -> None:
+    with pytest.raises(PolicyMappingError):
+        build_operator_fee_policy(atoken_address="  ", chain_name="base")
+
+
+def test_build_operator_fee_policy_custom_name() -> None:
+    policy = build_operator_fee_policy(
+        atoken_address=_ATOKEN, chain_name="base", policy_name="op-fee"
+    )
+    assert policy["name"] == "op-fee"

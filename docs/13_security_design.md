@@ -115,6 +115,34 @@ UAT ユーザー向けのウォレット接続は以下の2方式を採用する
 - `backend/app/auth/service.py:verify_wallet_signature()` で実装
 - 本番 Base Mainnet 接続時は Cloudflare Tunnel 経由のみ許可
 
+## 2.5 operator fee wallet の Privy Server Wallet 化（2026-07-07）
+
+手数料徴収用 operator wallet の署名方式を、**生の秘密鍵を env に置く旧式**から
+**Privy Server Wallet（TEE 内署名）** に置換可能にした（`FEE_SIGNING_MODE` で切替）。
+
+| モード | 秘密鍵の所在 | 署名 | env に残る秘密 |
+|---|---|---|---|
+| `raw_key`（既定・後方互換） | `.env` の `OPERATOR_FEE_WALLET_KEY`（生鍵） | `w3.eth.account.sign_transaction`（ローカル） | ブロックチェーン秘密鍵そのもの |
+| `privy` | Privy TEE（2-of-2 分割・署名時のみ再構成・即破棄） | `PrivyRestClient.send_transaction`（`eth_sendTransaction`） | P-256 authorization 鍵のみ（=ブロックチェーン鍵ではない） |
+
+- **設計原則（2.1 節）との整合**: `privy` モードでは「秘密鍵をコード・env・ログに書かない」を
+  完全に満たす。env に残る P-256 authorization 鍵は「Privy に対してこの操作を承認する」鍵であり、
+  Privy policy（`build_operator_fee_policy`: aToken 宛の `eth_sendTransaction` のみ ALLOW）の
+  外は動かせない。漏洩しても生鍵のように全資産を持ち出せない。
+- **二重ガード**: Privy policy（TEE・宛先 allowlist）+ backend（`_execute_transfer` の allowance
+  チェック + transferFrom 宛先を operator address に固定）。calldata 動的参照は Privy 未サポートの
+  ため、transferFrom の引数制約は backend 側で enforce する。
+- **実装**: `backend/app/fees/fee_transfer_service.py`（`FEE_SIGNING_MODE` / `_submit_transferfrom_privy`）、
+  `backend/app/privy/rest_client.py`（`send_transaction` / `create_wallet`）、
+  `backend/app/privy/policy_mapper.py`（`build_operator_fee_policy`）。
+- **セットアップ**: `backend/scripts/setup_operator_fee_privy_wallet.py`（policy + server wallet 作成、
+  既定 dry-run）。key quorum(L0) は委譲経路と共用（`privy_register_key_quorum.py`）。
+- **移行手順**: ①L0 登録 → ②setup スクリプトで policy+wallet 作成 → ③新 operator address へ
+  ユーザー allowance 再承認 → ④`FEE_SIGNING_MODE=privy` + `OPERATOR_FEE_PRIVY_WALLET_ID` 設定 →
+  ⑤staging-v4 で小額 transferFrom 検証 → ⑥検証後に旧 `OPERATOR_FEE_WALLET_KEY`（生鍵）を env から削除。
+- **安全弁**: `FEE_TRANSFER_ENABLED=false` の間はモードに関わらず一切送金しない（DB 記録のみ）。
+  本番の有効化は別途人間判断（実資金移動）。
+
 ---
 
 # 3. 操作額制限（スマートコントラクト保護）
