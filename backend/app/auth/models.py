@@ -65,6 +65,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.auth.constants import ExecutionPolicy
 from app.database import Base
+from app.security.sqlalchemy_types import EncryptedString
 
 logger = logging.getLogger(__name__)
 
@@ -244,8 +245,12 @@ class User(Base):
     risk_mode: Mapped[Optional[str]] = mapped_column(
         String(20), nullable=True, default="conservative"
     )
+    # Track 2 / 層2: 実 PII のためフィールドレベル暗号化(AES-256-GCM)。
+    # DB には enc:v<ver>:<b64> の暗号文が入る。暗号文は base64 で平文より長いため列幅を拡張。
+    # ALTER TABLE users ALTER COLUMN notification_email TYPE VARCHAR(512);
+    # KEK 未設定環境では平文パススルー(後方互換)。既存平文は enc: prefix 無しで読める。
     notification_email: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, default=None
+        EncryptedString(512), nullable=True, default=None
     )
     notification_frequency: Mapped[str] = mapped_column(
         String(20), nullable=False, default="important"
