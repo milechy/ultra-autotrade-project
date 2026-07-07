@@ -5,6 +5,26 @@
 
 ---
 
+## PR #965 (休眠機能監査 Task2): PoolHealthMonitor の opt-in 起動配線 (2026-07-07)
+
+### 変更: startup_scheduled_tasks に pool health check の opt-in 起動を追加
+- **対象凍結ファイル**: `backend/app/main.py`
+- **変更内容**:
+  - `startup_scheduled_tasks` 内、着金検知(`ENABLE_FUNDING_DETECTION`)ブロックの直後に
+    `if os.getenv("ENABLE_POOL_HEALTH_MONITOR", "0") == "1":` ブロックを追加し
+    `scheduled_manager.start_pool_health_check(on_error=...)` を呼ぶ。
+- **理由**: `PoolHealthMonitor.check_pool_deficits()`(Aaveプール赤字 $10,000 閾値監視、Slack アラート)
+  は実装・テスト済みだったが、main.py の起動処理から一切呼ばれていなかった(意図的な先送り、
+  コード内コメントで「別PR・human承認後に配線」と明記)。休眠機能監査(Asana 1216342393825058)で
+  検出し、human-review-gate 経由で人間承認(標準案: opt-in・既定off + pytest追加)を得て配線。
+- **影響範囲**: **既定 off**(`ENABLE_POOL_HEALTH_MONITOR` 未設定で起動しない)。既存の起動シーケンス・
+  他 loop・エンドポイントへの影響なし。shutdown 側は既存の `scheduled_manager.stop_all()` が
+  既にプール監視を含めて汎用停止するため変更不要(確認済み)。明示有効化した環境でのみ
+  1時間間隔で Aave プール赤字(USDC のみ)を read-only に監視する。
+- **承認**: feat/pool-health-monitor-opt-in → main の通常フロー経由(PR #965)
+
+---
+
 ## PR #928 (収益受取 設計A統一): fee_transfer_router 配線削除 (2026-07-05)
 
 ### 変更: 設計B の fee_transfer_router を main.py から削除
