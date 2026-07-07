@@ -84,7 +84,7 @@ export function OptimizerCard() {
   }
 
   return (
-    <Card className="border-zinc-800 bg-zinc-900">
+    <Card className="border-zinc-800 bg-zinc-900" data-testid="optimizer-card">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-3">
           <div className="rounded-lg border border-zinc-700 bg-zinc-800 p-2">
@@ -137,6 +137,7 @@ export function OptimizerCard() {
               <button
                 key={mode}
                 type="button"
+                data-testid={`optimizer-risk-${mode}`}
                 onClick={() => setRiskMode(mode)}
                 className={`rounded-md border px-2 py-1.5 text-xs transition-colors ${
                   riskMode === mode
@@ -150,7 +151,12 @@ export function OptimizerCard() {
           </div>
         </div>
 
-        <Button onClick={handleSubmit} disabled={!canSubmit} className="w-full">
+        <Button
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          className="w-full"
+          data-testid="optimizer-submit"
+        >
           {loading ? t('calculating') : t('submit')}
         </Button>
 
