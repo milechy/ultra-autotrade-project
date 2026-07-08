@@ -578,66 +578,70 @@ def create_app() -> FastAPI:
                 logger.error("Failed to start report tasks: %s", exc)
 
         # --- 7 operational loops (always-on, fail-safe each) ---
+        # DISABLE_BACKGROUND_MONITORING=1 はこの 8 ループ (proposal_timeout 〜
+        # compound_risk_monitor) のみを止める。oracle_monitor / monthly_fee_batch は
+        # 各々が独立した opt-in フラグを持つため、ここで return して巻き込まないこと
+        # (2026-07-08: DISABLE_BACKGROUND_MONITORING=1 の staging-v4 で
+        # ENABLE_MONTHLY_FEE_BATCH=1 が無反応になるバグとして発見)。
         if not _is_background_monitoring_enabled():
             logger.info("Operational loops disabled (DISABLE_BACKGROUND_MONITORING=1)")
-            return
-
-        _loops: list[tuple[str, object]] = [
-            (
-                "proposal_timeout",
-                scheduled_manager.start_proposal_timeout(
-                    on_error=_make_scheduler_error_handler("proposal_timeout_loop"),
+        else:
+            _loops: list[tuple[str, object]] = [
+                (
+                    "proposal_timeout",
+                    scheduled_manager.start_proposal_timeout(
+                        on_error=_make_scheduler_error_handler("proposal_timeout_loop"),
+                    ),
                 ),
-            ),
-            (
-                "rebalance_check",
-                scheduled_manager.start_rebalance_check(
-                    on_error=_make_scheduler_error_handler("rebalance_check_loop"),
+                (
+                    "rebalance_check",
+                    scheduled_manager.start_rebalance_check(
+                        on_error=_make_scheduler_error_handler("rebalance_check_loop"),
+                    ),
                 ),
-            ),
-            (
-                "price_monitor",
-                scheduled_manager.start_price_monitor(
-                    on_error=_make_scheduler_error_handler("price_monitor_loop"),
+                (
+                    "price_monitor",
+                    scheduled_manager.start_price_monitor(
+                        on_error=_make_scheduler_error_handler("price_monitor_loop"),
+                    ),
                 ),
-            ),
-            (
-                "health_check",
-                scheduled_manager.start_health_check(
-                    on_error=_make_scheduler_error_handler("health_check_loop"),
+                (
+                    "health_check",
+                    scheduled_manager.start_health_check(
+                        on_error=_make_scheduler_error_handler("health_check_loop"),
+                    ),
                 ),
-            ),
-            (
-                "latency_monitor",
-                scheduled_manager.start_latency_monitor(
-                    on_error=_make_scheduler_error_handler("latency_monitor_loop"),
+                (
+                    "latency_monitor",
+                    scheduled_manager.start_latency_monitor(
+                        on_error=_make_scheduler_error_handler("latency_monitor_loop"),
+                    ),
                 ),
-            ),
-            (
-                "rss_fetch",
-                scheduled_manager.start_rss_fetch(
-                    on_error=_make_scheduler_error_handler("rss_fetch_loop"),
+                (
+                    "rss_fetch",
+                    scheduled_manager.start_rss_fetch(
+                        on_error=_make_scheduler_error_handler("rss_fetch_loop"),
+                    ),
                 ),
-            ),
-            (
-                "dca",
-                scheduled_manager.start_dca(
-                    on_error=_make_scheduler_error_handler("dca_loop"),
+                (
+                    "dca",
+                    scheduled_manager.start_dca(
+                        on_error=_make_scheduler_error_handler("dca_loop"),
+                    ),
                 ),
-            ),
-            (
-                "compound_risk_monitor",
-                scheduled_manager.start_compound_risk_monitor(
-                    on_error=_make_scheduler_error_handler("compound_risk_monitor_loop"),
+                (
+                    "compound_risk_monitor",
+                    scheduled_manager.start_compound_risk_monitor(
+                        on_error=_make_scheduler_error_handler("compound_risk_monitor_loop"),
+                    ),
                 ),
-            ),
-        ]
-        for name, coro in _loops:
-            try:
-                await coro  # type: ignore[misc]
-                logger.info("Operational loop started: %s", name)
-            except BaseException as exc:
-                logger.error("Failed to start loop %s: %s", name, exc)
+            ]
+            for name, coro in _loops:
+                try:
+                    await coro  # type: ignore[misc]
+                    logger.info("Operational loop started: %s", name)
+                except BaseException as exc:
+                    logger.error("Failed to start loop %s: %s", name, exc)
 
         # --- oracle 監視 (opt-in: ENABLE_ORACLE_MONITOR=1, フィードは ORACLE_MONITOR_FEEDS) ---
         # 異常検知時に emergency_stop を自動発火するため既定 OFF。ON かつフィード設定時のみ稼働。
