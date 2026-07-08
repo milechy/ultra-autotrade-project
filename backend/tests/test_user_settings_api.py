@@ -16,6 +16,7 @@ os.environ.setdefault("INITIAL_ADMIN_EMAIL", "terms_admin@example.com")
 
 from app.database import Base, get_db  # noqa: E402
 from app.main import create_app  # noqa: E402
+from app.partner.allocation_models import FundAllocation  # noqa: E402
 
 
 @pytest.fixture()
@@ -354,6 +355,38 @@ class TestUserSettingsAPI:
         ts1 = r1.json()["terms_agreed_at"][:19]  # "YYYY-MM-DDTHH:MM:SS"
         ts2 = r2.json()["terms_agreed_at"][:19]
         assert ts1 == ts2
+
+    def test_terms_agree_triggers_auto_fund_when_enabled(
+        self, client: TestClient, test_db, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """POST /api/user/terms-agree (LIFF経路) でも自動デモ資金割当が発火すること。
+
+        2026-07-08: auto_fund_tester_if_enabled が app.auth.router の /terms/accept
+        にしか配線されておらず、実際に使われる LIFF 経路 (/api/user/terms-agree) では
+        発火しない配線漏れがあった。両エンドポイントから共通実装
+        (app.partner.allocation_service) を呼ぶよう修正した回帰テスト。
+        """
+        monkeypatch.setenv("AUTO_FUND_PARTNER_ID", "9")
+        monkeypatch.setenv("AUTO_FUND_TESTER_ALLOCATION_USD", "150000")
+        monkeypatch.delenv("APP_ENV", raising=False)
+
+        token = register_and_login(client)
+        headers = {"Authorization": f"Bearer {token}"}
+
+        r = client.post("/api/user/terms-agree", headers=headers)
+        assert r.status_code == 200
+
+        _override_get_db, engine = test_db
+        session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        db = session_factory()
+        try:
+            allocations = db.query(FundAllocation).all()
+            assert len(allocations) == 1
+            assert allocations[0].partner_id == 9
+            assert allocations[0].allocated_amount_usd == 150000
+            assert allocations[0].status == "active"
+        finally:
+            db.close()
 
     def test_terms_agree_requires_auth(self, client: TestClient) -> None:
         """POST /api/user/terms-agree は認証必須であること。"""

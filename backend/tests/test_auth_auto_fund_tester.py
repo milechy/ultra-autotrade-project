@@ -1,7 +1,11 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_auth_auto_fund_tester.py
-"""staging-v4 テスター自動資金割当 (_auto_fund_tester_if_enabled) のテスト。"""
+"""staging-v4 テスター自動資金割当 (auto_fund_tester_if_enabled) のテスト。
+
+app.auth.router の /terms/accept と app.users.settings_router の /terms-agree
+両方から呼ばれる共通実装 (app.partner.allocation_service) をテストする。
+"""
 
 import os
 import tempfile
@@ -14,9 +18,9 @@ from sqlalchemy.orm import Session, sessionmaker
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-auth-tests")
 
 from app.auth.models import User, UserRole
-from app.auth.router import _auto_fund_tester_if_enabled
 from app.database import Base
 from app.partner.allocation_models import FundAllocation
+from app.partner.allocation_service import auto_fund_tester_if_enabled
 
 
 @pytest.fixture()
@@ -56,7 +60,7 @@ class TestAutoFundTesterIfEnabled:
         monkeypatch.delenv("APP_ENV", raising=False)
         user = _make_tester(db)
 
-        _auto_fund_tester_if_enabled(db, user)
+        auto_fund_tester_if_enabled(db, user)
 
         assert db.query(FundAllocation).count() == 0
 
@@ -69,7 +73,7 @@ class TestAutoFundTesterIfEnabled:
         monkeypatch.delenv("APP_ENV", raising=False)
         user = _make_tester(db)
 
-        _auto_fund_tester_if_enabled(db, user)
+        auto_fund_tester_if_enabled(db, user)
 
         allocations = db.query(FundAllocation).all()
         assert len(allocations) == 1
@@ -87,8 +91,8 @@ class TestAutoFundTesterIfEnabled:
         monkeypatch.delenv("APP_ENV", raising=False)
         user = _make_tester(db)
 
-        _auto_fund_tester_if_enabled(db, user)
-        _auto_fund_tester_if_enabled(db, user)  # terms再同意を模した2回目呼び出し
+        auto_fund_tester_if_enabled(db, user)
+        auto_fund_tester_if_enabled(db, user)  # terms再同意を模した2回目呼び出し
 
         assert db.query(FundAllocation).count() == 1
 
@@ -101,6 +105,6 @@ class TestAutoFundTesterIfEnabled:
         monkeypatch.setenv("APP_ENV", "production")
         user = _make_tester(db)
 
-        _auto_fund_tester_if_enabled(db, user)
+        auto_fund_tester_if_enabled(db, user)
 
         assert db.query(FundAllocation).count() == 0
