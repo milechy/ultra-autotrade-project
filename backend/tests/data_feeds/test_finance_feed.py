@@ -414,3 +414,125 @@ async def test_fetch_finance_data_mixed_indicator_types() -> None:
     assert result.key_indicators[0] == "CPI: 3.1%"
     assert "FED rate" in result.key_indicators[1]
     assert result.key_indicators[2] == "BTC dominance: 55%"
+
+
+# ---------------------------------------------------------------------------
+# 2026-07-08: robust JSON extraction — sonar-pro が JSON を prose/フェンスで囲む /
+# 文字列に生改行を混ぜると、旧 json.loads(content) が失敗し fed_stance が黙って
+# "unknown" に落ち、本物の hawkish が BUY ゲート緩和 (unknown=relax) を誤発火させて
+# いた。抽出を頑健化し、抽出失敗時は last-known-good を維持する。
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_finance_data_prose_wrapped_json_extracts_fed_stance() -> None:
+    """JSON が前後の prose で囲まれていても fed_stance を正しく抽出する（旧実装は失敗）。"""
+    inner = {
+        "macro_summary": "Restrictive but on-hold Fed; CPI 4.2% YoY vs 2% target.",
+        "fed_stance": "hawkish",
+        "stablecoin_risk": "low",
+        "key_indicators": ["Fed funds 3.50-3.75%", "CPI 4.2%"],
+    }
+    content = (
+        f"Here is the current analysis:\n\n{json.dumps(inner)}\n\nSources: [1] fed.gov [2] bls.gov"
+    )
+    mock_resp = _make_mock_response(content, citations=["https://fed.gov", "https://bls.gov"])
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_resp
+        async with httpx.AsyncClient() as client:
+            with patch.dict(os.environ, {"PERPLEXITY_API_KEY": "test-key"}):
+                result = await fetch_finance_data(client)
+
+    assert result.fed_stance == "hawkish", "prose 囲みでも directional ラベルを落とさない"
+    assert result.macro_summary.startswith("Restrictive but on-hold Fed")
+    assert result.key_indicators == ["Fed funds 3.50-3.75%", "CPI 4.2%"]
+    assert result.updated_at is not None
+
+
+@pytest.mark.asyncio
+async def test_fetch_finance_data_markdown_fenced_json() -> None:
+    """```json フェンス + 末尾 prose でも fed_stance を抽出する。"""
+    inner = {"macro_summary": "Fed hawkish.", "fed_stance": "hawkish", "stablecoin_risk": "medium"}
+    content = f"```json\n{json.dumps(inner)}\n```\nLet me know if you need more detail."
+    mock_resp = _make_mock_response(content)
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_resp
+        async with httpx.AsyncClient() as client:
+            with patch.dict(os.environ, {"PERPLEXITY_API_KEY": "test-key"}):
+                result = await fetch_finance_data(client)
+
+    assert result.fed_stance == "hawkish"
+    assert result.stablecoin_risk == "medium"
+    assert result.updated_at is not None
+
+
+@pytest.mark.asyncio
+async def test_fetch_finance_data_literal_newline_in_string() -> None:
+    """文字列値に生の改行が入っていても (strict=False) parse できる。"""
+    # 生改行を含む JSON 文字列（標準 json.loads は "Invalid control character" で失敗）
+    content = (
+        '{"macro_summary": "First line.\nSecond line.", '
+        '"fed_stance": "neutral", "stablecoin_risk": "low", "key_indicators": []}'
+    )
+    mock_resp = _make_mock_response(content)
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_resp
+        async with httpx.AsyncClient() as client:
+            with patch.dict(os.environ, {"PERPLEXITY_API_KEY": "test-key"}):
+                result = await fetch_finance_data(client)
+
+    assert result.fed_stance == "neutral"
+    assert result.updated_at is not None
+
+
+@pytest.mark.asyncio
+async def test_fetch_finance_data_unextractable_returns_updated_at_none() -> None:
+    """抽出不能な本文は fed_stance を "unknown" 化しない印として updated_at=None を返す。
+
+    これにより update_finance_cache が last-known-good を維持し、直近の正しい
+    fed_stance を parse 失敗で潰さない（BUY ゲート緩和の誤発火防止）。
+    """
+    mock_resp = _make_mock_response("Sorry, I cannot provide structured data right now.")
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_resp
+        async with httpx.AsyncClient() as client:
+            with patch.dict(os.environ, {"PERPLEXITY_API_KEY": "test-key"}):
+                result = await fetch_finance_data(client)
+
+    assert result.updated_at is None, "抽出失敗は last-known-good 維持のため updated_at=None"
+    assert result.fed_stance == "unknown"  # default だが cache には書かれない
+
+
+@pytest.mark.asyncio
+async def test_update_finance_cache_preserves_last_good_on_parse_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """parse 失敗 tick は直近の本物 fed_stance を上書きしない（安全逆流の再発防止）。"""
+    from datetime import datetime, timezone
+
+    import app.data_feeds.finance_feed as ff
+
+    saved_cache = ff._finance_cache
+    try:
+        # 直近の正しい hawkish 読みが cache 済み
+        ff._finance_cache = FinanceFeedResult(
+            macro_summary="Restrictive Fed.",
+            fed_stance="hawkish",
+            updated_at=datetime.now(timezone.utc),
+        )
+
+        # 次の tick は抽出失敗 (updated_at=None) を返す
+        async def _fake_fetch(_client: object) -> FinanceFeedResult:
+            return FinanceFeedResult(macro_summary="garbage, unparseable")
+
+        monkeypatch.setattr(ff, "fetch_finance_data", _fake_fetch)
+        await ff.update_finance_cache()
+
+        # cache は hawkish のまま（unknown で上書きされていない）
+        assert ff.get_cached_finance().fed_stance == "hawkish"
+    finally:
+        ff._finance_cache = saved_cache
