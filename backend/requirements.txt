@@ -46,6 +46,9 @@ lxml>=5.0.0
 # Web Push (Phase PWA)
 pywebpush>=2.0.0
 
+# Billing (Stripe subscription 課金, F-7)
+stripe>=11.0.0
+
 # Cython (AI logic protection)
 Cython>=3.0.0
 
