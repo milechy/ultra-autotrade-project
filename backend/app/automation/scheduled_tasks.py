@@ -183,7 +183,7 @@ def _monthly_fee_batch_sync(calculation_month: date, usd_jpy_rate: Decimal) -> N
     from sqlalchemy import select as _select  # noqa: PLC0415
 
     from app.api.v1.fees import finalize_month_core  # noqa: PLC0415
-    from app.fees.billing_adapter import StubBillingAdapter  # noqa: PLC0415
+    from app.fees.billing_adapter import StripeBillingAdapter, StubBillingAdapter  # noqa: PLC0415
     from app.fees.models import FeeConfigV10  # noqa: PLC0415
 
     with SessionLocal() as db:
@@ -199,7 +199,14 @@ def _monthly_fee_batch_sync(calculation_month: date, usd_jpy_rate: Decimal) -> N
                 calculation_month,
             )
             return
-        vendor = StubBillingAdapter()
+        # STRIPE_SECRET_KEY 設定時は実課金 (StripeBillingAdapter)、未設定時は
+        # 従来どおり StubBillingAdapter (ログのみ・fail-open で既存挙動を壊さない)。
+        stripe_api_key = os.getenv("STRIPE_SECRET_KEY", "").strip()
+        vendor = (
+            StripeBillingAdapter(api_key=stripe_api_key, db=db)
+            if stripe_api_key
+            else StubBillingAdapter()
+        )
         result = finalize_month_core(
             db, config, calculation_month, usd_jpy_rate, vendor_adapter=vendor
         )

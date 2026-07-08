@@ -3,6 +3,7 @@
 """ユーザー設定API ルーター定義。"""
 
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -35,6 +36,9 @@ from .settings_schemas import (
     DelegationGrantRequest,
     DelegationGrantResponse,
     DelegationPrepareResponse,
+    PaymentMethodConfirmRequest,
+    PaymentMethodResponse,
+    SetupIntentResponse,
     UserSettingsResponse,
     UserSettingsUpdate,
 )
@@ -460,3 +464,152 @@ def revoke_delegation_grant(
     db.refresh(grant)
     logger.info("delegation grant revoked: user_id=%s, grant_id=%s", current_user.id, grant.id)
     return DelegationGrantResponse.model_validate(grant)
+
+
+# ---------------------------------------------------------------------------
+# 月額サブスク課金 — Stripe カード登録 (F-7)
+# 実課金 (StripeBillingAdapter) は backend/app/fees/billing_adapter.py 参照。
+# 本セクションはユーザー本人による決済手段(カード)登録のみを扱う。
+# ---------------------------------------------------------------------------
+
+
+def _get_stripe_api_key() -> str:
+    """STRIPE_SECRET_KEY 未設定時は 503 (billing 機能自体が未提供)。"""
+    api_key = os.getenv("STRIPE_SECRET_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="billing is not configured (STRIPE_SECRET_KEY unset)",
+        )
+    return api_key
+
+
+@router.post(
+    "/billing/setup-intent",
+    response_model=SetupIntentResponse,
+    summary="カード登録用 SetupIntent 発行",
+)
+def create_billing_setup_intent(
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> SetupIntentResponse:
+    """Stripe Customer を取得/作成し、off-session 用 SetupIntent を発行する。
+
+    frontend は返却された client_secret を Stripe.js の confirmSetup() に渡してカードを登録する。
+    """
+    import stripe  # noqa: PLC0415
+
+    api_key = _get_stripe_api_key()
+
+    if not current_user.stripe_customer_id:
+        customer = stripe.Customer.create(
+            email=current_user.email,
+            metadata={"user_id": str(current_user.id)},
+            api_key=api_key,
+        )
+        current_user.stripe_customer_id = customer.id
+        db.add(current_user)
+        db.commit()
+
+    setup_intent = stripe.SetupIntent.create(
+        customer=current_user.stripe_customer_id,
+        payment_method_types=["card"],
+        usage="off_session",
+        api_key=api_key,
+    )
+    return SetupIntentResponse(client_secret=setup_intent.client_secret)
+
+
+@router.get(
+    "/billing/payment-method",
+    response_model=PaymentMethodResponse,
+    summary="登録済みカード確認",
+)
+def get_billing_payment_method(
+    current_user: User = Depends(require_active_user),
+) -> PaymentMethodResponse:
+    """登録済みカードの brand/last4 を返す（PAN 等の機微情報は含まない）。未登録なら registered=False。"""
+    if not current_user.stripe_customer_id or not current_user.stripe_default_payment_method_id:
+        return PaymentMethodResponse(registered=False)
+
+    import stripe  # noqa: PLC0415
+
+    api_key = _get_stripe_api_key()
+    try:
+        payment_method = stripe.PaymentMethod.retrieve(
+            current_user.stripe_default_payment_method_id, api_key=api_key
+        )
+    except stripe.error.StripeError:
+        # Stripe 側で削除済み等 — 未登録として扱う (fail-open)
+        return PaymentMethodResponse(registered=False)
+
+    card = payment_method.card
+    return PaymentMethodResponse(
+        registered=True,
+        brand=card.brand if card else None,
+        last4=card.last4 if card else None,
+    )
+
+
+@router.post(
+    "/billing/payment-method/confirm",
+    response_model=PaymentMethodResponse,
+    summary="カード登録を確定",
+)
+def confirm_billing_payment_method(
+    request: PaymentMethodConfirmRequest,
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> PaymentMethodResponse:
+    """frontend で confirmSetup() 完了後の setup_intent_id を検証し、
+    payment_method を既定カードとして保存する。"""
+    import stripe  # noqa: PLC0415
+
+    api_key = _get_stripe_api_key()
+    try:
+        setup_intent = stripe.SetupIntent.retrieve(request.setup_intent_id, api_key=api_key)
+    except stripe.error.StripeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"invalid setup_intent: {exc}"
+        ) from exc
+
+    if setup_intent.status != "succeeded" or not setup_intent.payment_method:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"setup intent not succeeded (status={setup_intent.status})",
+        )
+    if (
+        current_user.stripe_customer_id is None
+        or setup_intent.customer != current_user.stripe_customer_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="setup intent does not belong to this user",
+        )
+
+    payment_method_id = (
+        setup_intent.payment_method
+        if isinstance(setup_intent.payment_method, str)
+        else setup_intent.payment_method.id
+    )
+    stripe.Customer.modify(
+        current_user.stripe_customer_id,
+        invoice_settings={"default_payment_method": payment_method_id},
+        api_key=api_key,
+    )
+    current_user.stripe_default_payment_method_id = payment_method_id
+    db.add(current_user)
+    db.commit()
+    logger.info(
+        "stripe payment method registered: user_id=%s pm_id=%s",
+        current_user.id,
+        payment_method_id,
+    )
+
+    payment_method = stripe.PaymentMethod.retrieve(payment_method_id, api_key=api_key)
+    card = payment_method.card
+    return PaymentMethodResponse(
+        registered=True,
+        brand=card.brand if card else None,
+        last4=card.last4 if card else None,
+    )

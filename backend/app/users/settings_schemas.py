@@ -148,6 +148,25 @@ class DelegationGrantResponse(BaseModel):
     privy_signer_id: Optional[str] = None
 
 
+class SetupIntentResponse(BaseModel):
+    """カード登録用 SetupIntent のレスポンス。frontend は client_secret を
+    Stripe.js の confirmSetup() に渡す。"""
+
+    client_secret: str
+
+
+class PaymentMethodResponse(BaseModel):
+    """登録済みカードの表示用情報（PAN 等の機微情報は含まない）。"""
+
+    registered: bool
+    brand: Optional[str] = None
+    last4: Optional[str] = None
+
+
+class PaymentMethodConfirmRequest(BaseModel):
+    setup_intent_id: str = Field(..., min_length=1)
+
+
 class DelegationPrepareResponse(BaseModel):
     """委譲 policy 作成（L1 / prepare）のレスポンス。
 

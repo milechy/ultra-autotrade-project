@@ -19,6 +19,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS ix_users_privy_did ON users (privy_did) WHERE 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS smart_wallet_address VARCHAR(42) NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS ix_users_smart_wallet_address ON users (smart_wallet_address) WHERE smart_wallet_address IS NOT NULL;
 
+-- stripe_customer_id / stripe_default_payment_method_id: 月額サブスク課金 (F-7 Stripe 統合)。
+-- migration: x4y5z6a7b8c9_add_stripe_billing_columns。NULL=カード未登録。
+ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255) NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS ix_users_stripe_customer_id ON users (stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_default_payment_method_id VARCHAR(255) NULL;
+
 -- GID 1214176344039867 (P1): execution_policy CHECK + server_default 強化
 -- DB default は a1b2c3d4e5f6 で 'auto_execute' 設定済み。
 -- CheckConstraint と SQLAlchemy 側 server_default を Alembic migration で同期する。
@@ -278,6 +284,16 @@ class User(Base):
     )
     privy_did: Mapped[Optional[str]] = mapped_column(
         String(255), unique=True, nullable=True, index=True, default=None
+    )
+    # 月額サブスク課金 (F-7 Stripe 統合)。stripe_customer_id は Stripe Customer オブジェクトの
+    # ID、stripe_default_payment_method_id は off-session 課金に使う既定カード。
+    # NULL = カード未登録 (StripeBillingAdapter.charge_subscription は no_payment_method で
+    # 失敗を返し、次回月次バッチで vendor_reference_id IS NULL フィルタにより自動再試行される)。
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(
+        String(255), unique=True, nullable=True, index=True, default=None
+    )
+    stripe_default_payment_method_id: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True, default=None
     )
     # Track 2 / 層1: Privy linked_accounts から収集したアカウント email(実 PII)。
     # notification_email(ユーザー任意入力・通知先)とは別で、ログイン時に自動収集する

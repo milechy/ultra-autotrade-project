@@ -3441,6 +3441,21 @@
     "errorSignatureCancelled": "Signature was cancelled",
     "errorApprove": "Approval failed"
   },
+  "UserStripePaymentMethodCard": {
+    "loadingInfo": "Fetching info...",
+    "notConfigured": "Card payment feature is currently unavailable",
+    "cardTitle": "Payment Method (Credit Card)",
+    "notRegistered": "No card registered",
+    "registeredLabel": "{brand} ending in {last4} registered",
+    "registerButton": "Register a card",
+    "changeButton": "Change card",
+    "cancelButton": "Cancel",
+    "submitButton": "Register",
+    "errorBackend": "Failed to fetch info",
+    "errorSetupIntent": "Failed to start registration",
+    "errorConfirm": "Failed to confirm card registration",
+    "errorGeneric": "Failed to register card. Please try again"
+  },
   "SharedEmergencyStopFloat": {
     "stoppedBannerAdmin": "Operations are stopped",
     "stoppedBannerPartner": "Operations are stopped (admin only to resume)",
