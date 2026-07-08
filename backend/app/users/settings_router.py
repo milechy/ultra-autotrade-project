@@ -578,7 +578,10 @@ def confirm_billing_payment_method(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"setup intent not succeeded (status={setup_intent.status})",
         )
-    if setup_intent.customer != current_user.stripe_customer_id:
+    if (
+        current_user.stripe_customer_id is None
+        or setup_intent.customer != current_user.stripe_customer_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="setup intent does not belong to this user",

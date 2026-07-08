@@ -5,6 +5,31 @@
 
 ---
 
+## PR #969 (月額決済フル有効化 staging-v4): DISABLE_BACKGROUND_MONITORING 巻き添えバグ修正 + stripe SDK追加 (2026-07-08)
+
+### 変更1: startup_scheduled_tasks の早期 return を 8 ループ限定に修正
+- **対象凍結ファイル**: `backend/app/main.py`
+- **変更内容**:
+  - `DISABLE_BACKGROUND_MONITORING=1` 時の早期 `return` を、7+1 ループ
+    (proposal_timeout 〜 compound_risk_monitor) の実行ブロックのみを囲む `else` 節に変更。
+  - oracle_monitor (`ENABLE_ORACLE_MONITOR`) / monthly_fee_batch (`ENABLE_MONTHLY_FEE_BATCH`)
+    は各々独立した opt-in フラグを持つため、この return に巻き込まれないよう分離。
+- **理由**: staging-v4 で `DISABLE_BACKGROUND_MONITORING=1`（compound_risk_monitor の誤検知
+  アラート抑制のため既存設定）かつ `ENABLE_MONTHLY_FEE_BATCH=1` を設定しても月次手数料バッチが
+  一切起動しないバグとして発覚。8 ループの早期 return が無関係な opt-in 機能まで道連れにしていた。
+- **影響範囲**: 8 ループの既存挙動（DISABLE_BACKGROUND_MONITORING=1 時に停止）は変更なし。
+  oracle_monitor / monthly_fee_batch は各自のフラグが off の環境では従来どおり起動しない
+  （挙動変化なし）。両方 on の環境（staging-v4 のみ現状該当）でのみ新たに起動する。
+
+### 変更2: stripe SDK 追加
+- **対象凍結ファイル**: `backend/requirements.txt`
+- **変更内容**: `stripe>=11.0.0` を追加。
+- **理由**: F-7 月額サブスク課金の Stripe 統合（`StripeBillingAdapter`）に必要。
+
+- **承認**: feat/fee-collection-staging-v4-enable → main の通常フロー経由（PR #969）
+
+---
+
 ## PR #965 (休眠機能監査 Task2): PoolHealthMonitor の opt-in 起動配線 (2026-07-07)
 
 ### 変更: startup_scheduled_tasks に pool health check の opt-in 起動を追加
