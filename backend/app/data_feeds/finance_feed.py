@@ -79,6 +79,75 @@ _finance_cache: Optional[FinanceFeedResult] = None
 _finance_lock = asyncio.Lock()
 
 
+# ============================================================
+# JSON extraction (robust)
+# ============================================================
+def _extract_finance_json(content: str) -> Optional[dict[str, Any]]:
+    """Perplexity の応答本文から最初の JSON オブジェクトを頑健に抽出する。
+
+    2026-07-08 発見のバグ対策: sonar-pro は指示に反して JSON を prose で囲む /
+    ```json フェンスを付ける / 文字列値に生の改行や ``**bold**`` を混ぜる ことが
+    あり、素の ``json.loads(content)`` が間欠的に失敗していた。失敗すると
+    ``fetch_finance_data`` が既定 ``fed_stance="unknown"`` にフォールバックし、
+    本物の hawkish が黙って "unknown" 化 → BUY ゲート緩和 (agents.py の
+    ``_BULLISH_RELAX_FED_STANCES``) を誤って発火させる安全逆流が起きていた。
+
+    対策:
+      1. ```` ```json ```` フェンスを剥がして直接 ``json.loads`` (strict=False で
+         文字列内の制御文字/改行を許容)。
+      2. 失敗したら本文中の最初の均衡した ``{...}`` ブロックだけを取り出して再試行
+         (前後に prose が付いていても JSON 本体を拾える)。
+    どちらも dict を得られなければ ``None`` を返す (呼び出し側が last-known-good を維持)。
+    """
+    clean = content.strip()
+    if clean.startswith("```"):
+        clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
+    if clean.endswith("```"):
+        clean = clean[:-3]
+    clean = clean.strip()
+    if clean.startswith("json"):
+        clean = clean[4:].strip()
+
+    # 1) まず直接 parse (strict=False で文字列内の生改行/タブを許容)
+    try:
+        obj = json.loads(clean, strict=False)
+        if isinstance(obj, dict):
+            return obj
+    except json.JSONDecodeError:
+        pass
+
+    # 2) 本文中の最初の均衡した {...} ブロックを抽出して parse
+    start = clean.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_str = False
+    escaped = False
+    for i in range(start, len(clean)):
+        ch = clean[i]
+        if in_str:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                candidate = clean[start : i + 1]
+                try:
+                    obj = json.loads(candidate, strict=False)
+                except json.JSONDecodeError:
+                    return None
+                return obj if isinstance(obj, dict) else None
+    return None
+
+
 def get_cached_finance() -> FinanceFeedResult:
     """Get cached finance data. Returns default if no cache."""
     if _finance_cache is not None:
@@ -135,52 +204,52 @@ async def fetch_finance_data(client: httpx.AsyncClient) -> FinanceFeedResult:
         content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
         citations = data.get("citations", [])
 
-        try:
-            clean = content.strip()
-            if clean.startswith("```"):
-                clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
-            if clean.endswith("```"):
-                clean = clean[:-3]
-            clean = clean.strip()
-            if clean.startswith("json"):
-                clean = clean[4:].strip()
-
-            parsed = json.loads(clean)
-
-            fed_stance = parsed.get("fed_stance", "unknown")
-            if fed_stance not in _VALID_FED_STANCES:
-                fed_stance = "unknown"
-
-            stablecoin_risk = parsed.get("stablecoin_risk", "low")
-            if stablecoin_risk not in _VALID_STABLECOIN_RISKS:
-                stablecoin_risk = "low"
-
-            # key_indicators may be list[str] or list[dict] depending on Perplexity API version.
-            # Coerce dicts to "name: value" strings to avoid pydantic ValidationError.
-            raw_indicators: list[object] = parsed.get("key_indicators", [])[:5]
-            key_indicators: list[str] = [
-                (
-                    ": ".join(filter(None, [str(item.get("name", "")), str(item.get("value", ""))]))
-                    if isinstance(item, dict)
-                    else str(item)
-                )
-                for item in raw_indicators
-            ]
-
-            return FinanceFeedResult(
-                macro_summary=str(parsed.get("macro_summary", content[:400])),
-                fed_stance=fed_stance,
-                stablecoin_risk=stablecoin_risk,
-                key_indicators=key_indicators,
-                sources_count=len(citations),
-                updated_at=datetime.now(timezone.utc),
+        parsed = _extract_finance_json(content)
+        if parsed is None:
+            # [fail-safe] JSON 抽出に失敗したときは fed_stance を既定 "unknown" に落とさない。
+            # "unknown" は BUY ゲートの緩和トリガー (agents.py _BULLISH_RELAX_FED_STANCES) の
+            # ため、本物の directional マクロ (hawkish 等) がパース失敗で "unknown" 化すると、
+            # macro 要件が外れて hawkish 局面で誤 BUY を発火し得る (2026-07-08 発見の安全逆流)。
+            # updated_at=None で返し、update_finance_cache の last-known-good 維持ロジックに
+            # 「今回は上書きしない」と伝える (直近の正しい fed_stance を parse 失敗で潰さない)。
+            logger.warning(
+                "Perplexity Finance: JSON抽出失敗、last-known-good維持 "
+                "(fed_stanceをunknownに落とさない). content[:200]=%s",
+                content[:200],
             )
-        except (json.JSONDecodeError, KeyError):
             return FinanceFeedResult(
                 macro_summary=content[:500],
                 sources_count=len(citations),
-                updated_at=datetime.now(timezone.utc),
             )
+
+        fed_stance = parsed.get("fed_stance", "unknown")
+        if fed_stance not in _VALID_FED_STANCES:
+            fed_stance = "unknown"
+
+        stablecoin_risk = parsed.get("stablecoin_risk", "low")
+        if stablecoin_risk not in _VALID_STABLECOIN_RISKS:
+            stablecoin_risk = "low"
+
+        # key_indicators may be list[str] or list[dict] depending on Perplexity API version.
+        # Coerce dicts to "name: value" strings to avoid pydantic ValidationError.
+        raw_indicators: list[object] = parsed.get("key_indicators") or []
+        key_indicators: list[str] = [
+            (
+                ": ".join(filter(None, [str(item.get("name", "")), str(item.get("value", ""))]))
+                if isinstance(item, dict)
+                else str(item)
+            )
+            for item in raw_indicators[:5]
+        ]
+
+        return FinanceFeedResult(
+            macro_summary=str(parsed.get("macro_summary", content[:400])),
+            fed_stance=fed_stance,
+            stablecoin_risk=stablecoin_risk,
+            key_indicators=key_indicators,
+            sources_count=len(citations),
+            updated_at=datetime.now(timezone.utc),
+        )
 
     except httpx.HTTPStatusError as exc:
         body_preview = ""

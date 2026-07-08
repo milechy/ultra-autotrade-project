@@ -1213,3 +1213,18 @@ deploy_staging.sh)が稼働中だった。ps の ELAPSED は MM:SS 表記、誤�
 - 安全装置の except 節を書くときは「fail-open / fail-closed のどちらが安全か」を必ず明示的に判断する。**外部 probe の失敗は原則 fail-open (監視不能フラグで可視化)**、実データが「危険」を示したときのみ避難トリガーにする。
 - 外部例外を alerts / API レスポンスにそのまま載せない (RPC URL に API キーが埋まる = Security Rule 8)。固定文言 + サーバーログ限定。
 - 安全装置は「発火しないこと」ではなく「正しい条件でのみ発火すること」でテストする。エラー経路テストは CRITICAL 期待ではなく LOW + is_operational=False を期待値にし、compound 側で「CRITICAL だが監視不能 → 避難しない」「CRITICAL かつ稼働中 → 避難する (退行防止)」を両方カバーする。
+
+## 2026-07-08 パース失敗を「緩和トリガーになる既定値」に落とすと安全装置が逆流する (Finance feed fed_stance=unknown 誤緩和)
+
+**何が起きたか**: 「本番 AI が常時 HOLD で BUY 提案が出ない」を調査中に、逆の潜在バグを発見。本番 BUY ゲート (`ai/agents.py` の `indicator_and_macro_agree_bullish()`) は、`fed_stance ∈ {"unknown","neutral"}` のとき Macro 要件を落として Indicator 単独 BULLISH≥70% で BUY を通す設計 (`_BULLISH_RELAX_FED_STANCES`、2026-05 の「マクロ欠測で永久 HOLD を避ける」意図)。一方 `data_feeds/finance_feed.py` の JSON 抽出が脆く、Perplexity sonar-pro が JSON を prose で囲む / ```json フェンスを付ける / 文字列値に生改行を混ぜると `json.loads(content)` が間欠失敗し、except 節が **fed_stance を既定 "unknown" に落として updated_at をセットしたまま返す**。本番 live 検証で「macro_summary に生 JSON エンベロープが丸ごと入り fed_stance=unknown / key_indicators=[]」を再現 (中身は本物の hawkish、CPI 4.2%・Fed 3.50-3.75%・9 citations)。
+
+**根本原因の言語化**: **安全判断の入力データで「パース失敗」を「安全側を緩めるほうの既定値」にフォールバックさせると、外部応答が少し崩れるたびに安全装置が逆流する**。ここでは「本物の hawkish → パース失敗 → ラベルだけ unknown → BUY ゲート緩和 → hawkish 局面で誤 BUY」という、`compound_risk` の probe 失敗誤検知 (上記 2026-07-08 前段) と**同種**の fail-open/closed 誤りが、今度は「緩めすぎる方向」で起きていた。`unknown` を緩和トリガーにする設計自体は妥当だが、「genuine unknown」と「parse 失敗由来の偽 unknown」を区別せず同一視したのが穴。
+
+**修正 (PR は本コミット, `data_feeds/finance_feed.py`)**:
+- `_extract_finance_json()` を新設: フェンス除去 → `json.loads(strict=False)` (文字列内の生改行/制御文字を許容) → 失敗時は本文中の最初の均衡した `{...}` ブロックだけを抽出して再 parse。prose 囲みでも directional ラベル (hawkish 等) を落とさない。
+- 抽出不能時は **fed_stance を "unknown" に落とさず updated_at=None で返す** → `update_finance_cache` の last-known-good 維持ロジックが「直近の正しい fed_stance を parse 失敗で上書きしない」。
+
+**教訓 (再発防止)**:
+- **安全判断の入力を組み立てるとき、パース/取得失敗のフォールバック値が「ゲートを緩める側」か「締める側」かを必ず意識する**。緩める側に落ちる既定値 (ここでは relax 対象の "unknown") は、外部応答の揺らぎで安全装置を無効化する経路になる。
+- 外部 LLM の JSON 応答は「フェンス除去 + `json.loads`」だけでは不十分。prose 囲み・生改行を想定し、均衡ブレース抽出 + `strict=False` で頑健化する。失敗を silent default にせず warning + last-known-good 維持。
+- 「HOLD しか出ない」の調査でも、ゲートの**両方向**(締めすぎ/緩めすぎ) を見る。今回は「BUY が出ない」入口から入って「hawkish で誤 BUY し得る」出口のバグに到達した。本物の hawkish は正しく HOLD させるのが正解 (Fed が実際に hawkish なら BUY を強制しない)。
