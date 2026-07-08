@@ -10,12 +10,15 @@ POST /webhook/generic      - 汎用 Webhook を受信して Knowledge Hub に登
 """
 
 import logging
-from typing import Optional
+import os
+import time
+from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.fees.onramp.webhook_signature import StripeSignatureError, verify_stripe_signature
 from app.knowledge.router import get_knowledge_service
 from app.knowledge.schemas import KnowledgeCreateRequest, KnowledgeItemType
 from app.knowledge.service import KnowledgeService
@@ -139,3 +142,52 @@ def receive_generic(
             knowledge_item_id=None,
             message=f"Registration failed: {exc}",
         )
+
+
+@router.post("/stripe")
+async def receive_stripe(request: Request) -> dict[str, Any]:
+    """Stripe webhook 受信 (F-7)。
+
+    本体の月額サブスク課金は StripeBillingAdapter.charge_subscription の同期
+    PaymentIntent 確認フローが担う (finalize_month_core 内で完結)。本 endpoint は
+    非同期に発生し得る異常系 (カード失敗 / キャンセル等) を可視化するログ用途。
+    Stripe-Signature (HMAC-SHA256) は app.fees.onramp.webhook_signature の
+    純関数を流用して検証する (raw body 必須、JSON パース前のバイト列で検証)。
+    """
+    import json  # noqa: PLC0415
+
+    payload = await request.body()
+    signature_header = request.headers.get("stripe-signature", "")
+    secret = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+
+    try:
+        verify_stripe_signature(
+            payload=payload,
+            signature_header=signature_header,
+            secret=secret,
+            timestamp_now=int(time.time()),
+        )
+    except StripeSignatureError as exc:
+        logger.warning("Stripe webhook signature verification failed: %s", exc)
+        raise HTTPException(status_code=400, detail="invalid signature") from exc
+
+    try:
+        event = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="invalid payload") from exc
+
+    event_type = event.get("type", "")
+    event_id = event.get("id", "")
+    logger.info("Stripe webhook received: type=%s id=%s", event_type, event_id)
+
+    if event_type in ("payment_intent.payment_failed", "payment_intent.canceled"):
+        obj = event.get("data", {}).get("object", {})
+        logger.warning(
+            "Stripe payment failure: pi_id=%s customer=%s amount=%s metadata=%s",
+            obj.get("id"),
+            obj.get("customer"),
+            obj.get("amount"),
+            obj.get("metadata"),
+        )
+
+    return {"received": True}
