@@ -44,7 +44,7 @@ def post_chat(
     Returns:
         ChatResponse（response フィールドに AI 応答テキスト）
     """
-    return process_chat(db=db, user_id=user.id, message=body.message)
+    return process_chat(db=db, user=user, message=body.message)
 
 
 @router.get("/history", response_model=ChatHistoryResponse)
