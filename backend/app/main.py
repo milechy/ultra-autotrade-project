@@ -538,11 +538,17 @@ def create_app() -> FastAPI:
         Controlled by environment variables:
             ENABLE_DAILY_REPORTS=1: enable daily reports
             ENABLE_WEEKLY_REPORTS=1: enable weekly reports
-            DISABLE_BACKGROUND_MONITORING=1: disable all 7 operational loops
+            DISABLE_BACKGROUND_MONITORING=1: disable the side-effecting
+                operational loops (NOT proposal_timeout — see below)
 
-        7 operational loops (always-on unless DISABLE_BACKGROUND_MONITORING=1):
-            proposal_timeout / rebalance_check / price_monitor / health_check /
-            latency_monitor / rss_fetch / dca
+        proposal_timeout is always-on (pure housekeeping: expires stale pending
+        proposals). It is intentionally NOT gated by DISABLE_BACKGROUND_MONITORING
+        so that disabling monitoring in Shadow Mode never causes expired proposals
+        to permanently block new ones (2026-07-08 fix).
+
+        7 side-effecting loops (disabled by DISABLE_BACKGROUND_MONITORING=1):
+            rebalance_check / price_monitor / health_check / latency_monitor /
+            rss_fetch / dca / compound_risk_monitor
         """
         from app.automation.scheduled_tasks import get_scheduled_task_manager  # noqa: PLC0415
         from app.notifications.config import get_notification_settings  # noqa: PLC0415
@@ -577,22 +583,33 @@ def create_app() -> FastAPI:
             except BaseException as exc:
                 logger.error("Failed to start report tasks: %s", exc)
 
-        # --- 7 operational loops (always-on, fail-safe each) ---
-        # DISABLE_BACKGROUND_MONITORING=1 はこの 8 ループ (proposal_timeout 〜
-        # compound_risk_monitor) のみを止める。oracle_monitor / monthly_fee_batch は
-        # 各々が独立した opt-in フラグを持つため、ここで return して巻き込まないこと
-        # (2026-07-08: DISABLE_BACKGROUND_MONITORING=1 の staging-v4 で
-        # ENABLE_MONTHLY_FEE_BATCH=1 が無反応になるバグとして発見)。
+        # --- proposal_timeout: 常時ON (housekeeping, 2026-07-08 にフラグから分離) ---
+        # 期限切れ pending 提案を canceled 化する純粋な DB housekeeping ループ。副作用は
+        # status 遷移と LINE_NOTIFY_TOKEN 設定時のみの通知だけで、実資金・オンチェーン操作を
+        # 伴わない。以前は下の 7 副作用ループと同じ DISABLE_BACKGROUND_MONITORING に束ねられて
+        # おり、Shadow Mode で副作用ループを止める目的でフラグを立てると、無害な期限切れ処理
+        # まで一緒に止まっていた。その結果 staging-v4 (DISABLE_BACKGROUND_MONITORING=1) で
+        # 期限切れ提案が pending のまま残り、_create_proposals_for_users の重複ガードがその
+        # ユーザーへの新規提案を永久ブロックする不具合が発生していた (id 8 / user 10)。
+        # housekeeping はフラグから分離し、監視の有効/無効に関わらず常時稼働させる。
+        try:
+            await scheduled_manager.start_proposal_timeout(
+                on_error=_make_scheduler_error_handler("proposal_timeout_loop"),
+            )
+            logger.info("Operational loop started: proposal_timeout (always-on)")
+        except BaseException as exc:
+            logger.error("Failed to start loop proposal_timeout: %s", exc)
+
+        # --- 7 operational loops (副作用あり, DISABLE_BACKGROUND_MONITORING で一括停止可) ---
+        # DISABLE_BACKGROUND_MONITORING=1 はこの 7 ループ (rebalance_check 〜
+        # compound_risk_monitor) を止める。proposal_timeout は上で常時ONに分離済み。
+        # oracle_monitor / monthly_fee_batch は各々が独立した opt-in フラグを持つため、
+        # ここで return して巻き込まないこと (2026-07-08: DISABLE_BACKGROUND_MONITORING=1 の
+        # staging-v4 で ENABLE_MONTHLY_FEE_BATCH=1 が無反応になるバグとして発見)。
         if not _is_background_monitoring_enabled():
             logger.info("Operational loops disabled (DISABLE_BACKGROUND_MONITORING=1)")
         else:
             _loops: list[tuple[str, object]] = [
-                (
-                    "proposal_timeout",
-                    scheduled_manager.start_proposal_timeout(
-                        on_error=_make_scheduler_error_handler("proposal_timeout_loop"),
-                    ),
-                ),
                 (
                     "rebalance_check",
                     scheduled_manager.start_rebalance_check(
