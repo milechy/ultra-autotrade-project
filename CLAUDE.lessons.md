@@ -1198,3 +1198,18 @@ deploy_staging.sh)が稼働中だった。ps の ELAPSED は MM:SS 表記、誤�
 - backend 側に積み上がった差分は `git log <前回反映HEAD>..origin/main -- backend/` で都度可視化し、`docs/ops/03_deploy_procedures.md` の該当セクションに申し送りとして記録する (次回 backend/full デプロイ時、Tier S 1日1PR原則に照らした分割/一括判断の材料にする)。
 - デプロイ後 WARNING (alembic drift / 401連発等) は「今回のデプロイで新規発生したか」「デプロイ前から継続していたか」を時系列ログで切り分けてから対応要否を判断する (無条件に blocker 扱いしない、無条件に無視もしない)。
 - 詳細手順は `docs/ops/03_deploy_procedures.md`「`--frontend-only` デプロイ時の backend drift 注意」セクション参照 (PR #948)。
+
+## 2026-07-08 probe 失敗を fail-CLOSED (CRITICAL) にすると安全装置がオオカミ少年化する (Lido 複合リスク避難の誤検知)
+
+**何が起きたか**: 本番で「複合リスク避難 成立 lido」の緊急 Slack アラートが 48h で 286 回発火 (2026-06-28 起票 `project_lido_compound_risk_false_positive.md`)。真因は `protocol_monitor.py` の `check_aave/lido/pendle_health` が、RPC/API probe 失敗の except 節で **`risk_level=RiskLevel.CRITICAL` (fail-CLOSED)** を返していたこと。本番の実 LidoClient が Holesky RPC 403 で `get_steth_eth_ratio`/`get_staking_apr` 例外 → CRITICAL → `compound_risk.assess()` が `any(p.risk_level==CRITICAL)` で `should_evacuate=True` → 10分ごとに Slack EMERGENCY。実資金は Lido に $0 で避難は dry_run stub のため無害だが、監視信頼性を毀損。
+
+**根本原因の言語化**: **「probe 失敗 (監視できていない)」と「プロトコルが危険 (CRITICAL)」は別事象**。前者を後者にマッピングすると、外部依存が一時的に落ちるたびに安全装置が資産の有無に関係なく発火する。probe 失敗は監視不能 = `is_operational=False` で可視化するのが正しく、避難トリガー (CRITICAL) にしてはならない。本当の危険 (HF<1.6 等) は client 正常応答時の分岐で CRITICAL 判定されるパスなので、except 節を LOW にしても危険検知能力は落ちない。
+
+**修正 (PR #970, Tier S・安全装置系)**:
+- 一次防御: `protocol_monitor.py` の 3 つの except 節を `CRITICAL → LOW` + `is_operational=False` 維持。`logger.exception → logger.warning` (監視不能は想定内の degraded)。alerts は固定文言に統一 (旧 lido/pendle は `f"...: {exc}"` で例外を外部露出 = 無認証 GET /api/protocols/health 経由で Security Rule 8 違反だった)。
+- 二次防御 (二重防御): `compound_risk.py` の `assess()` 避難判定と `calculate_risk_score()` の has_critical を `CRITICAL and p.is_operational` に。万一 CRITICAL + 監視不能が来ても避難根拠から除外。
+
+**教訓 (再発防止)**:
+- 安全装置の except 節を書くときは「fail-open / fail-closed のどちらが安全か」を必ず明示的に判断する。**外部 probe の失敗は原則 fail-open (監視不能フラグで可視化)**、実データが「危険」を示したときのみ避難トリガーにする。
+- 外部例外を alerts / API レスポンスにそのまま載せない (RPC URL に API キーが埋まる = Security Rule 8)。固定文言 + サーバーログ限定。
+- 安全装置は「発火しないこと」ではなく「正しい条件でのみ発火すること」でテストする。エラー経路テストは CRITICAL 期待ではなく LOW + is_operational=False を期待値にし、compound 側で「CRITICAL だが監視不能 → 避難しない」「CRITICAL かつ稼働中 → 避難する (退行防止)」を両方カバーする。

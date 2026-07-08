@@ -20,15 +20,17 @@ from app.protocols.risk.schemas import (
 _FORBIDDEN_JARGON = ["APY", "yield", "protocol", "peg", "maturity", "TVL", "HF"]
 
 
-def _make_protocol_health(risk_level: RiskLevel) -> ProtocolHealth:
+def _make_protocol_health(
+    risk_level: RiskLevel, *, is_operational: bool = True, protocol: str = "test"
+) -> ProtocolHealth:
     from datetime import datetime, timezone
 
     return ProtocolHealth(
-        protocol="test",
+        protocol=protocol,
         risk_level=risk_level,
         tvl_usd=Decimal("1000000"),
         tvl_change_24h_pct=Decimal("0"),
-        is_operational=True,
+        is_operational=is_operational,
         last_checked=datetime.now(tz=timezone.utc),
         alerts=[],
     )
@@ -145,6 +147,76 @@ class TestAssess:
                 )
 
 
+class TestEvacuationOperationalGuard:
+    """probe 失敗 (is_operational=False) のプロトコルを避難根拠から除外する二重防御。
+
+    2026-06-28 Lido 誤検知の再発防止。protocol_monitor が probe 失敗を LOW にするのが
+    一次防御だが、万一 CRITICAL + 監視不能が来ても避難アラートを出さないことを保証する。
+    """
+
+    def _build_assessor(self, protocol_risks: list[ProtocolHealth]) -> CompoundRiskAssessor:
+        """protocol_risks を返す mock を注入した assessor を組み立てる。
+
+        peg / maturity は避難条件に触れない (LOW / 空) 状態にして、プロトコル判定のみを検証する。
+        """
+        protocol_monitor = AsyncMock()
+        protocol_monitor.check_all.return_value = protocol_risks
+        peg_monitor = AsyncMock()
+        peg_monitor.get_peg_status.return_value = _make_peg_status(RiskLevel.LOW)
+        maturity_manager = AsyncMock()
+        maturity_manager.check_maturities.return_value = []
+        return CompoundRiskAssessor(
+            protocol_monitor=protocol_monitor,
+            peg_monitor=peg_monitor,
+            maturity_manager=maturity_manager,
+        )
+
+    @pytest.mark.asyncio
+    async def test_critical_but_not_operational_does_not_evacuate(self) -> None:
+        """CRITICAL でも is_operational=False (監視不能) なら should_evacuate=False。"""
+        assessor = self._build_assessor(
+            [
+                _make_protocol_health(RiskLevel.CRITICAL, is_operational=False, protocol="lido"),
+                _make_protocol_health(RiskLevel.LOW, protocol="aave"),
+                _make_protocol_health(RiskLevel.LOW, protocol="pendle"),
+            ]
+        )
+        result = await assessor.assess()
+        assert result.should_evacuate is False
+        assert result.evacuation_reason is None
+
+    @pytest.mark.asyncio
+    async def test_critical_and_operational_still_evacuates(self) -> None:
+        """CRITICAL かつ is_operational=True なら従来通り should_evacuate=True（退行防止）。"""
+        assessor = self._build_assessor(
+            [
+                _make_protocol_health(RiskLevel.CRITICAL, is_operational=True, protocol="lido"),
+                _make_protocol_health(RiskLevel.LOW, protocol="aave"),
+                _make_protocol_health(RiskLevel.LOW, protocol="pendle"),
+            ]
+        )
+        result = await assessor.assess()
+        assert result.should_evacuate is True
+        assert result.evacuation_reason is not None
+        assert "lido" in result.evacuation_reason
+
+    @pytest.mark.asyncio
+    async def test_operational_critical_only_names_operational_protocol(self) -> None:
+        """避難理由には is_operational=True の CRITICAL プロトコルのみ列挙する。"""
+        assessor = self._build_assessor(
+            [
+                _make_protocol_health(RiskLevel.CRITICAL, is_operational=False, protocol="lido"),
+                _make_protocol_health(RiskLevel.CRITICAL, is_operational=True, protocol="aave"),
+                _make_protocol_health(RiskLevel.LOW, protocol="pendle"),
+            ]
+        )
+        result = await assessor.assess()
+        assert result.should_evacuate is True
+        assert result.evacuation_reason is not None
+        assert "aave" in result.evacuation_reason
+        assert "lido" not in result.evacuation_reason
+
+
 class TestCalculateRiskScore:
     def test_score_0_to_20_is_low(self) -> None:
         assessor = CompoundRiskAssessor.__new__(CompoundRiskAssessor)
@@ -182,6 +254,23 @@ class TestCalculateRiskScore:
         maturities: list[MaturityAlert] = []
         score = assessor.calculate_risk_score(risks, peg, maturities)
         assert score >= Decimal("80")
+
+    def test_score_non_operational_critical_does_not_clamp_to_80(self) -> None:
+        """is_operational=False の CRITICAL プロトコルは 80 クランプに算入しない。
+
+        監視不能プロトコル (probe 失敗) を危険域スコアに数えない二重防御
+        （2026-06-28 Lido 誤検知対策）。他コンポーネントが LOW なら 80 未満に留まる。
+        """
+        assessor = CompoundRiskAssessor.__new__(CompoundRiskAssessor)
+        risks = [
+            _make_protocol_health(RiskLevel.CRITICAL, is_operational=False),
+            _make_protocol_health(RiskLevel.LOW),
+            _make_protocol_health(RiskLevel.LOW),
+        ]
+        peg = _make_peg_status(RiskLevel.LOW)
+        maturities: list[MaturityAlert] = []
+        score = assessor.calculate_risk_score(risks, peg, maturities)
+        assert score < Decimal("80")
 
     def test_score_critical_peg_clamps_to_80(self) -> None:
         assessor = CompoundRiskAssessor.__new__(CompoundRiskAssessor)
