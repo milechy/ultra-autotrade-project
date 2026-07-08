@@ -589,14 +589,22 @@ def finalize_month_core(
 
     if not dry_run and fee_transfer_enabled:
         transfer_cfg = FeeTransferConfig.from_env()
-        if not transfer_cfg.operator_wallet_address or not transfer_cfg.operator_wallet_key:
-            # fail-fast: FEE_TRANSFER_ENABLED=true だが operator wallet 未設定。
+        # fail-fast: 署名モード別に必須 env を確認する。raw_key モードは operator_wallet_key
+        # (生鍵) が必須、privy モードは operator_privy_wallet_id が必須で生鍵は不要
+        # (fee_transfer_service.transfer_fee 内の Gate 2 と同じ分岐に合わせる)。
+        operator_credential_missing = (
+            not transfer_cfg.operator_wallet_key
+            if transfer_cfg.signing_mode != "privy"
+            else not transfer_cfg.operator_privy_wallet_id
+        )
+        if not transfer_cfg.operator_wallet_address or operator_credential_missing:
             # このまま loop に入ると全 fee_tx が transfer_status="failed" で汚染される
             # (fee_transfer_service.transfer_fee が per-user で "failed" を返すため)。
             # phase 全体をスキップし、per-user の失敗 N 行を 1 本の明示 ERROR に集約する。
             logger.error(
                 "fee_transfer phase skipped: FEE_TRANSFER_ENABLED=true だが "
-                "OPERATOR_FEE_WALLET_ADDRESS / OPERATOR_FEE_WALLET_KEY が未設定 (month=%s)",
+                "operator wallet 未設定 (signing_mode=%s, month=%s)",
+                transfer_cfg.signing_mode,
                 month_start,
             )
         else:
@@ -621,7 +629,10 @@ def finalize_month_core(
                     user_id=fee_tx.user_id,
                     user_wallet=user_wallet or "",
                     fee_amount_jpy=fee_tx.fee_amount_jpy or Decimal("0"),
-                    subscription_amount_jpy=fee_tx.subscription_amount_jpy or Decimal("0"),
+                    # サブスク月額分は Stripe (vendor_adapter.charge_subscription) が
+                    # 排他的に回収する。ここで subscription_amount_jpy を渡すと on-chain
+                    # 送金と Stripe 課金が両方走り二重課金になるため、常に 0 を渡す。
+                    subscription_amount_jpy=Decimal("0"),
                     yield_excess_jpy=fee_tx.yield_excess_to_uata_jpy or Decimal("0"),
                     usd_jpy_rate=usd_jpy_rate,
                 )
