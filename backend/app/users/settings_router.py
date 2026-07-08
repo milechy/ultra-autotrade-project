@@ -219,6 +219,7 @@ def agree_to_terms(
         current_user.email,
         now.isoformat(),
     )
+    allocation_service.auto_fund_tester_if_enabled(db, current_user)
     return {
         "terms_agreed_at": now.isoformat(),
         "already_agreed": False,

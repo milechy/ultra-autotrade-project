@@ -13,7 +13,6 @@ GET  /auth/me       - Retrieve current user information
 import logging
 import os
 from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
@@ -24,6 +23,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.partner.allocation_service import auto_fund_tester_if_enabled
 from app.referral import service as referral_service
 from app.users.registration_webhook import send_registration_webhook
 
@@ -468,57 +468,6 @@ def get_terms_status(
     )
 
 
-def _auto_fund_tester_if_enabled(db: Session, user: User) -> None:
-    """staging-v4限定: 新規テスターにデモ資金を自動割当する(fail-open、production無効)。
-
-    二重ガード:
-      1. APP_ENV == "production" なら常に無効
-      2. AUTO_FUND_TESTER_ALLOCATION_USD / AUTO_FUND_PARTNER_ID が未設定/不正なら無効
-    既にactiveなfund_allocationを持つユーザーには何もしない(重複割当防止、
-    terms再同意のたびに増額されるのを防ぐ)。
-    """
-    if os.getenv("APP_ENV", "").strip().lower() == "production":
-        return
-    partner_id_str = os.getenv("AUTO_FUND_PARTNER_ID", "")
-    if not partner_id_str:
-        return
-    try:
-        amount = Decimal(os.getenv("AUTO_FUND_TESTER_ALLOCATION_USD", "0"))
-        partner_id = int(partner_id_str)
-    except (InvalidOperation, ValueError):
-        return
-    if amount <= Decimal("0"):
-        return
-
-    from app.partner.allocation_models import FundAllocation  # noqa: PLC0415
-
-    existing = (
-        db.query(FundAllocation)
-        .filter(FundAllocation.tester_user_id == user.id, FundAllocation.status == "active")
-        .first()
-    )
-    if existing is not None:
-        return
-
-    try:
-        from app.partner.allocation_schemas import AllocationCreateRequest  # noqa: PLC0415
-        from app.partner.allocation_service import create_allocation  # noqa: PLC0415
-
-        create_allocation(
-            db,
-            partner_id=partner_id,
-            request=AllocationCreateRequest(
-                tester_name=f"auto-demo:{user.email or user.id}",
-                tester_user_id=user.id,
-                allocated_amount_usd=amount,
-                notes="staging-v4 自動デモ資金割当(terms accept時、AUTO_FUND_TESTER_ALLOCATION_USD)",
-            ),
-        )
-        logger.info("Auto-funded tester user_id=%d with $%s (demo)", user.id, amount)
-    except Exception as exc:
-        logger.warning("Auto-fund tester failed (fail-open, ignored): %s", exc)
-
-
 @router.post(
     "/terms/accept",
     response_model=TermsStatusResponse,
@@ -534,7 +483,7 @@ def accept_terms(
     user.terms_version = request.version
     db.commit()
     db.refresh(user)
-    _auto_fund_tester_if_enabled(db, user)
+    auto_fund_tester_if_enabled(db, user)
     logger.info("User accepted terms v%s: %s", request.version, user.email)
     return TermsStatusResponse(
         accepted=True,

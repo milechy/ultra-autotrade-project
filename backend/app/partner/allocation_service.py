@@ -11,7 +11,7 @@ CRUD 操作と Aave ポジションを使ったテスター別パフォーマン
 import logging
 import os
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from sqlalchemy import func
@@ -66,6 +66,57 @@ def create_allocation(
     db.refresh(allocation)
     refresh_partner_tier(db, partner_id)
     return AllocationResponse.model_validate(allocation)
+
+
+def auto_fund_tester_if_enabled(db: Session, user: User) -> None:
+    """staging-v4限定: 新規テスターにデモ資金を自動割当する(fail-open、production無効)。
+
+    利用規約同意エンドポイント（app.auth.router の /terms/accept、
+    app.users.settings_router の /terms-agree の両方）から呼ばれる共通実装。
+    どちらか一方にしか配線しないと、実際に使われている方の経路でテスターが
+    デモ資金を受け取れない配線漏れが起きるため、両方から必ず呼ぶこと。
+
+    二重ガード:
+      1. APP_ENV == "production" なら常に無効
+      2. AUTO_FUND_TESTER_ALLOCATION_USD / AUTO_FUND_PARTNER_ID が未設定/不正なら無効
+    既にactiveなfund_allocationを持つユーザーには何もしない(重複割当防止、
+    terms再同意のたびに増額されるのを防ぐ)。
+    """
+    if os.getenv("APP_ENV", "").strip().lower() == "production":
+        return
+    partner_id_str = os.getenv("AUTO_FUND_PARTNER_ID", "")
+    if not partner_id_str:
+        return
+    try:
+        amount = Decimal(os.getenv("AUTO_FUND_TESTER_ALLOCATION_USD", "0"))
+        partner_id = int(partner_id_str)
+    except (InvalidOperation, ValueError):
+        return
+    if amount <= Decimal("0"):
+        return
+
+    existing = (
+        db.query(FundAllocation)
+        .filter(FundAllocation.tester_user_id == user.id, FundAllocation.status == "active")
+        .first()
+    )
+    if existing is not None:
+        return
+
+    try:
+        create_allocation(
+            db,
+            partner_id=partner_id,
+            request=AllocationCreateRequest(
+                tester_name=f"auto-demo:{user.email or user.id}",
+                tester_user_id=user.id,
+                allocated_amount_usd=amount,
+                notes="staging-v4 自動デモ資金割当(terms accept時、AUTO_FUND_TESTER_ALLOCATION_USD)",
+            ),
+        )
+        logger.info("Auto-funded tester user_id=%d with $%s (demo)", user.id, amount)
+    except Exception as exc:
+        logger.warning("Auto-fund tester failed (fail-open, ignored): %s", exc)
 
 
 def get_allocations(
