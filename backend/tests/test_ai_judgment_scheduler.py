@@ -850,6 +850,107 @@ def test_buy_updates_last_judgment_at(db_session):
     assert user.last_judgment_at is not None
 
 
+def test_stale_pending_does_not_permanently_block(db_session):
+    """期限切れ(expires_at<now)なのに pending のまま残った提案が、新規提案を永久に
+    ブロックしないこと (2026-07-08 自己修復)。
+
+    proposal_timeout_loop が停止している環境 (DISABLE_BACKGROUND_MONITORING=1 の
+    staging-v4 等) では期限切れ提案が pending のまま残り、重複ガードがそのユーザーへの
+    新規提案を永久にブロックしていた (id 8 / user 10)。_create_proposals_for_users が
+    重複判定の前に期限切れ pending を能動的に expired 化することで防ぐ。
+    """
+    from datetime import datetime, timedelta, timezone  # noqa: PLC0415
+
+    user = User(
+        email="stale_pending@example.com",
+        username="stale_pending",
+        hashed_password="x",
+        is_active=True,
+        execution_policy="require_approval",
+        tier=InvestmentTier.UPPER.value,
+        last_judgment_at=None,
+    )
+    db_session.add(user)
+    db_session.flush()
+    _add_fund_allocation(db_session, user)
+
+    # 期限切れ (2 日前) なのに pending のまま残っている既存提案
+    stale = Proposal(
+        user_id=user.id,
+        operation="SUPPLY",
+        asset="USDC",
+        amount=Decimal("1000"),
+        amount_usd=Decimal("1000"),
+        reason="stale",
+        status="pending",
+        expires_at=datetime.now(timezone.utc) - timedelta(days=2),
+    )
+    db_session.add(stale)
+    db_session.commit()
+
+    mock_result = _make_cross_validation_result(TradeAction.BUY)
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+        result = run_ai_judgment_job(db=db_session)
+
+    # 期限切れ提案は expired 化され、新規提案が 1 件生成される
+    assert result["proposals_created"] == 1
+    db_session.refresh(stale)
+    assert stale.status == "expired"
+
+
+def test_fresh_pending_still_blocks_new_proposal(db_session):
+    """期限内(expires_at>now)の pending 提案は従来どおり新規提案をブロックすること。
+
+    自己修復 (期限切れ expire) が正常な重複ガードを壊していないことの退行防止。
+    """
+    from datetime import datetime, timedelta, timezone  # noqa: PLC0415
+
+    user = User(
+        email="fresh_pending@example.com",
+        username="fresh_pending",
+        hashed_password="x",
+        is_active=True,
+        execution_policy="require_approval",
+        tier=InvestmentTier.UPPER.value,
+        last_judgment_at=None,
+    )
+    db_session.add(user)
+    db_session.flush()
+    _add_fund_allocation(db_session, user)
+
+    # 期限内 (2 日後) の既存 pending 提案 → 従来どおりブロックされるべき
+    fresh = Proposal(
+        user_id=user.id,
+        operation="SUPPLY",
+        asset="USDC",
+        amount=Decimal("1000"),
+        amount_usd=Decimal("1000"),
+        reason="fresh",
+        status="pending",
+        expires_at=datetime.now(timezone.utc) + timedelta(days=2),
+    )
+    db_session.add(fresh)
+    db_session.commit()
+
+    mock_result = _make_cross_validation_result(TradeAction.BUY)
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+        result = run_ai_judgment_job(db=db_session)
+
+    assert result["proposals_created"] == 0
+    db_session.refresh(fresh)
+    assert fresh.status == "pending"
+
+
 # ---------------------------------------------------------------------------
 # F-6: tier 正規化のテスト
 # ---------------------------------------------------------------------------

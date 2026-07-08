@@ -584,6 +584,39 @@ def _create_proposals_for_users(
                     )
                     continue
 
+                # 自己修復: 重複判定の前に、このユーザーの「期限切れなのに pending の
+                # まま残っている提案」を先に expired 化する (2026-07-08)。
+                # proposal_timeout_loop が停止している環境 (DISABLE_BACKGROUND_MONITORING=1
+                # の staging-v4 等) では期限切れ提案が pending のまま残り続け、下の重複ガードが
+                # そのユーザーへの新規提案を「永久に」ブロックしてしまう不具合があった
+                # (id 8 / user 10 が 6 日間 pending のまま新規提案ゼロ)。ここで能動的に
+                # expire することで、監視ループの有無に依存せず永久ブロックを防ぐ。
+                # 例外は握りつぶし (fail-open): expire に失敗しても提案生成は継続する。
+                try:
+                    _stale = db.scalars(
+                        select(Proposal).where(
+                            Proposal.user_id == user.id,
+                            Proposal.status == "pending",
+                            Proposal.expires_at < now,
+                        )
+                    ).all()
+                    for _sp in _stale:
+                        _sp.status = "expired"
+                    if _stale:
+                        db.flush()
+                        logger.info(
+                            "Self-heal: expired %d stale pending proposal(s) for user %d "
+                            "before dedup check",
+                            len(_stale),
+                            user.id,
+                        )
+                except Exception as _stale_exc:  # noqa: BLE001
+                    logger.warning(
+                        "stale pending expire failed for user %d (fail-open): %s",
+                        user.id,
+                        _stale_exc,
+                    )
+
                 # 既存の pending 提案がある場合はスキップ (2026-05-21 P0 重複作成ガード)
                 # 承認待ち提案がすでに存在するのに新たな提案を作ると、管理者が連続
                 # approve した際に同一ユーザーへの Aave/Lido/Pendle 操作が重複する。
