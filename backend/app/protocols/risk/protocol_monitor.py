@@ -74,9 +74,12 @@ class ProtocolMonitor:
         is_operational は MonitoringService.is_trading_allowed()（緊急停止
         フラグの OR ロジック）を反映する。
 
-        fail-open: 依存サービスの例外時は raise せず CRITICAL /
-        tvl_usd=Decimal("0") / is_operational=False / 日本語アラートで返す
-        （check_lido_health のエラーハンドリングと同型）。
+        fail-open: 依存サービスの例外 (RPC 落ち等) 時は raise せず、監視不能として
+        risk_level=LOW / tvl_usd=Decimal("0") / is_operational=False / 日本語アラートで返す。
+        probe 失敗は「監視できていない」だけで「プロトコルが危険」ではないため、避難
+        トリガー (CRITICAL) にはしない (2026-06-28 Lido 誤検知インシデント対策)。本当の
+        危険 (HF<1.6) は client 正常応答時に下の分岐で CRITICAL 判定される。
+        （check_lido_health / check_pendle_health のエラーハンドリングと同型）。
         """
         logger.info("check_aave_health: Aave ヘルスチェック実行")
         alerts: list[str] = []
@@ -117,16 +120,23 @@ class ProtocolMonitor:
         except Exception:
             # 例外詳細 (AaveClientError 等) は RPC URL (APIキー埋め込み形式) を内包し得る。
             # alerts は無認証 GET /api/protocols/health で外部露出されるため (Security Rule 8)、
-            # 固定文言のみを返し、詳細はサーバーログ (logger.exception) に限定する。
-            logger.exception("Aave ヘルスチェック失敗")
+            # 固定文言のみを返し、詳細はサーバーログに限定する。
+            #
+            # [fail-open] probe 失敗は「監視不能」であって「プロトコルが危険」ではない。
+            # CRITICAL を返すと compound_risk が should_evacuate=True にし、実資金の有無に
+            # 関係なく避難アラートを乱発する (2026-06-28 Lido 誤検知)。監視不能は
+            # risk_level=LOW (避難トリガーにしない) + is_operational=False (可視化) で表す。
+            logger.warning("Aave ヘルスチェック失敗（監視不能・避難トリガーにしない）")
             return ProtocolHealth(
                 protocol="aave",
-                risk_level=RiskLevel.CRITICAL,
+                risk_level=RiskLevel.LOW,
                 tvl_usd=Decimal("0"),
                 tvl_change_24h_pct=Decimal("0"),
                 is_operational=False,
                 last_checked=datetime.now(tz=timezone.utc),
-                alerts=["Aave ヘルスチェックエラー（詳細はログ参照）"],
+                alerts=[
+                    "Aave の稼働状況を一時的に確認できませんでした（監視のみ・資産への影響なし）"
+                ],
             )
 
         return ProtocolHealth(
@@ -154,16 +164,22 @@ class ProtocolMonitor:
         try:
             apr = await self._lido_client.get_staking_apr()
             ratio = await self._lido_client.get_steth_eth_ratio()
-        except Exception as exc:
-            logger.exception("Lido クライアント呼び出し失敗")
+        except Exception:
+            # [fail-open] probe 失敗 (stETH/ETH レート・APR 取得の RPC/API エラー) は
+            # 監視不能であって危険ではない。CRITICAL を返すと should_evacuate=True で
+            # 避難アラートを乱発する (2026-06-28 誤検知)。監視不能は LOW + is_operational=False。
+            # 例外詳細は RPC URL を内包し得るため alerts に露出せず固定文言のみ (Security Rule 8)。
+            logger.warning("Lido クライアント呼び出し失敗（監視不能・避難トリガーにしない）")
             return ProtocolHealth(
                 protocol="lido",
-                risk_level=RiskLevel.CRITICAL,
+                risk_level=RiskLevel.LOW,
                 tvl_usd=Decimal("0"),
                 tvl_change_24h_pct=Decimal("0"),
                 is_operational=False,
                 last_checked=datetime.now(tz=timezone.utc),
-                alerts=[f"Lido クライアントエラー: {exc}"],
+                alerts=[
+                    "Lido の稼働状況を一時的に確認できませんでした（監視のみ・資産への影響なし）"
+                ],
             )
 
         # APR チェック
@@ -207,16 +223,22 @@ class ProtocolMonitor:
 
         try:
             market_info = await self._pendle_client.get_market_info(market_address)
-        except Exception as exc:
-            logger.exception("Pendle クライアント呼び出し失敗")
+        except Exception:
+            # [fail-open] probe 失敗 (market 情報取得の API エラー) は監視不能であって
+            # 危険ではない。CRITICAL を返すと should_evacuate=True で避難アラートを乱発する
+            # (2026-06-28 誤検知)。監視不能は LOW + is_operational=False。
+            # 例外詳細は endpoint 情報を内包し得るため alerts に露出せず固定文言のみ (Security Rule 8)。
+            logger.warning("Pendle クライアント呼び出し失敗（監視不能・避難トリガーにしない）")
             return ProtocolHealth(
                 protocol="pendle",
-                risk_level=RiskLevel.CRITICAL,
+                risk_level=RiskLevel.LOW,
                 tvl_usd=Decimal("0"),
                 tvl_change_24h_pct=Decimal("0"),
                 is_operational=False,
                 last_checked=datetime.now(tz=timezone.utc),
-                alerts=[f"Pendle クライアントエラー: {exc}"],
+                alerts=[
+                    "Pendle の稼働状況を一時的に確認できませんでした（監視のみ・資産への影響なし）"
+                ],
             )
 
         tvl = market_info.tvl_usd

@@ -199,7 +199,12 @@ class TestCheckAaveHealth:
         mock_monitoring_service: MagicMock,
         mock_aave_client: Mock,
     ) -> None:
-        """monitoring 例外時は raise せず CRITICAL / is_operational=False を返す。"""
+        """monitoring 例外時は raise せず LOW / is_operational=False を返す。
+
+        probe 失敗は「監視不能」であって「プロトコルが危険」ではないため、避難トリガー
+        (CRITICAL) にはしない (2026-06-28 Lido 誤検知対策)。監視不能は is_operational=False
+        で可視化する。
+        """
         mock_monitoring_service.get_status.side_effect = RuntimeError(
             "https://rpc.example/v2/secret-api-key"
         )
@@ -207,12 +212,14 @@ class TestCheckAaveHealth:
             mock_lido_client, mock_pendle_client, mock_monitoring_service, mock_aave_client
         )
         result = await monitor.check_aave_health()
-        assert result.risk_level == RiskLevel.CRITICAL
+        assert result.risk_level == RiskLevel.LOW
         assert result.is_operational is False
         assert result.tvl_usd == Decimal("0")
         # Security Rule 8: alerts は無認証 API で外部露出されるため固定文言のみ。
         # 例外詳細 (RPC URL / APIキー等) が漏れていないことを検証する。
-        assert result.alerts == ["Aave ヘルスチェックエラー（詳細はログ参照）"]
+        assert result.alerts == [
+            "Aave の稼働状況を一時的に確認できませんでした（監視のみ・資産への影響なし）"
+        ]
         assert "secret-api-key" not in result.alerts[0]
 
     @pytest.mark.asyncio
@@ -223,13 +230,17 @@ class TestCheckAaveHealth:
         mock_monitoring_service: MagicMock,
         mock_aave_client: Mock,
     ) -> None:
-        """Aave クライアント例外時も fail-open（raise しない）。"""
+        """Aave クライアント例外時も fail-open（raise しない）。
+
+        probe 失敗は監視不能であり危険ではないため LOW + is_operational=False を返す
+        （避難トリガーにしない / 2026-06-28 Lido 誤検知対策）。
+        """
         mock_aave_client.get_account_data.side_effect = RuntimeError("rpc down")
         monitor = _build_aave_monitor(
             mock_lido_client, mock_pendle_client, mock_monitoring_service, mock_aave_client
         )
         result = await monitor.check_aave_health()
-        assert result.risk_level == RiskLevel.CRITICAL
+        assert result.risk_level == RiskLevel.LOW
         assert result.is_operational is False
 
     @pytest.mark.asyncio
@@ -304,6 +315,40 @@ class TestCheckLidoHealth:
         result = await protocol_monitor.check_lido_health()
         assert result.is_operational is True
 
+    @pytest.mark.asyncio
+    async def test_lido_health_probe_failure_returns_low_not_critical(
+        self, mock_lido_client: AsyncMock, mock_pendle_client: AsyncMock
+    ) -> None:
+        """Lido probe (RPC/API) 失敗時は LOW + is_operational=False を返す。
+
+        probe 失敗は監視不能であって危険ではないため CRITICAL にしない
+        （2026-06-28 Lido 誤検知: Holesky RPC 403 で CRITICAL → 避難アラート乱発）。
+        例外詳細 (RPC URL 等) を alerts に露出しないことも検証 (Security Rule 8)。
+        """
+        mock_lido_client.get_staking_apr.side_effect = RuntimeError(
+            "https://holesky.rpc.example/v2/secret-api-key 403"
+        )
+        monitor = ProtocolMonitor(lido_client=mock_lido_client, pendle_client=mock_pendle_client)
+        result = await monitor.check_lido_health()
+        assert result.risk_level == RiskLevel.LOW
+        assert result.is_operational is False
+        assert result.tvl_usd == Decimal("0")
+        assert result.alerts == [
+            "Lido の稼働状況を一時的に確認できませんでした（監視のみ・資産への影響なし）"
+        ]
+        assert "secret-api-key" not in result.alerts[0]
+
+    @pytest.mark.asyncio
+    async def test_lido_health_ratio_probe_failure_returns_low(
+        self, mock_lido_client: AsyncMock, mock_pendle_client: AsyncMock
+    ) -> None:
+        """stETH/ETH レート取得の probe 失敗も LOW + is_operational=False（避難トリガーにしない）。"""
+        mock_lido_client.get_steth_eth_ratio.side_effect = RuntimeError("rpc down")
+        monitor = ProtocolMonitor(lido_client=mock_lido_client, pendle_client=mock_pendle_client)
+        result = await monitor.check_lido_health()
+        assert result.risk_level == RiskLevel.LOW
+        assert result.is_operational is False
+
 
 class TestCheckPendleHealth:
     @pytest.mark.asyncio
@@ -369,6 +414,29 @@ class TestCheckPendleHealth:
     ) -> None:
         result = await protocol_monitor.check_pendle_health()
         assert isinstance(result.last_checked, datetime)
+
+    @pytest.mark.asyncio
+    async def test_pendle_health_probe_failure_returns_low_not_critical(
+        self, mock_lido_client: AsyncMock, mock_pendle_client: AsyncMock
+    ) -> None:
+        """Pendle probe (market 情報 API) 失敗時は LOW + is_operational=False を返す。
+
+        probe 失敗は監視不能であって危険ではないため CRITICAL にしない
+        （避難トリガーにしない / 2026-06-28 Lido 誤検知対策）。
+        例外詳細 (endpoint 情報等) を alerts に露出しないことも検証 (Security Rule 8)。
+        """
+        mock_pendle_client.get_market_info.side_effect = RuntimeError(
+            "https://api.pendle.example/secret-endpoint timeout"
+        )
+        monitor = ProtocolMonitor(lido_client=mock_lido_client, pendle_client=mock_pendle_client)
+        result = await monitor.check_pendle_health()
+        assert result.risk_level == RiskLevel.LOW
+        assert result.is_operational is False
+        assert result.tvl_usd == Decimal("0")
+        assert result.alerts == [
+            "Pendle の稼働状況を一時的に確認できませんでした（監視のみ・資産への影響なし）"
+        ]
+        assert "secret-endpoint" not in result.alerts[0]
 
 
 class TestCheckAll:

@@ -95,11 +95,16 @@ class CompoundRiskAssessor:
         should_evacuate = False
         evacuation_reason: Optional[str] = None
 
-        if any(p.risk_level == RiskLevel.CRITICAL for p in protocol_risks):
+        # [二重防御] is_operational=False のプロトコル (= probe 失敗で監視不能) は避難根拠に
+        # しない。protocol_monitor 側が probe 失敗を LOW にするのが一次防御だが、万一
+        # CRITICAL + 監視不能が来ても、監視できていないだけのプロトコルで避難アラートを
+        # 出さない (2026-06-28 Lido 誤検知の再発防止)。
+        operational_critical = [
+            p for p in protocol_risks if p.risk_level == RiskLevel.CRITICAL and p.is_operational
+        ]
+        if operational_critical:
             should_evacuate = True
-            critical_protocols = [
-                p.protocol for p in protocol_risks if p.risk_level == RiskLevel.CRITICAL
-            ]
+            critical_protocols = [p.protocol for p in operational_critical]
             evacuation_reason = (
                 f"プロトコルで緊急リスクが検知されました: {', '.join(critical_protocols)}"
             )
@@ -183,9 +188,11 @@ class CompoundRiskAssessor:
 
         total = protocol_score + peg_score + maturity_score
 
-        # CRITICAL 検知時は最低 80 に切り上げ
+        # CRITICAL 検知時は最低 80 に切り上げ。
+        # プロトコル CRITICAL は is_operational=True のもののみ算入する (監視不能プロトコルを
+        # 危険域スコアに数えない。避難判定と同じ二重防御 / 2026-06-28 Lido 誤検知対策)。
         has_critical = (
-            any(p.risk_level == RiskLevel.CRITICAL for p in protocol_risks)
+            any(p.risk_level == RiskLevel.CRITICAL and p.is_operational for p in protocol_risks)
             or (peg_status is not None and peg_status.risk_level == RiskLevel.CRITICAL)
             or any(a.risk_level == RiskLevel.CRITICAL for a in maturity_alerts)
         )
