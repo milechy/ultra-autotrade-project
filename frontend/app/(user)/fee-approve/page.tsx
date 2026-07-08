@@ -14,6 +14,14 @@ const FeeApproveCard = dynamic(
   { ssr: false }
 )
 
+const StripePaymentMethodCard = dynamic(
+  () =>
+    import('@/components/user/StripePaymentMethodCard').then((m) => ({
+      default: m.StripePaymentMethodCard,
+    })),
+  { ssr: false }
+)
+
 export default function FeeApprovePage() {
   return (
     <main className="px-4 py-6 max-w-md mx-auto space-y-4">
@@ -25,6 +33,8 @@ export default function FeeApprovePage() {
       </div>
       {/* B-3: 承認前に料率・課金日・「現在は徴収なし」を提示（孤立していた本ページに文脈を付与） */}
       <FeePlanSection />
+      {/* F-7: サブスク月額分はクレカ(Stripe)で回収。成功報酬+yield超過分はon-chainで回収(下記)。 */}
+      <StripePaymentMethodCard />
       <FeeApproveCard />
     </main>
   )

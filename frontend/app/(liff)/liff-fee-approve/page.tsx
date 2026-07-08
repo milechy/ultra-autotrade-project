@@ -9,6 +9,7 @@
 import { useTranslations } from 'next-intl'
 import { useLiff } from '@/hooks/useLiff'
 import { FeeApproveCard } from '@/components/user/FeeApproveCard'
+import { StripePaymentMethodCard } from '@/components/user/StripePaymentMethodCard'
 import FeePlanSection from '@/components/user/FeePlanSection'
 import { BrowserLoginPrompt } from '../_components/BrowserLoginPrompt'
 
@@ -66,6 +67,10 @@ export default function LiffFeeApprovePage() {
       {/* B-3: 承認前に料率・課金日・「現在は徴収なし」を提示 */}
       <div className="mb-4">
         <FeePlanSection />
+      </div>
+      {/* F-7: サブスク月額分はクレカ(Stripe)で回収。成功報酬+yield超過分はon-chainで回収(下記)。 */}
+      <div className="mb-4">
+        <StripePaymentMethodCard />
       </div>
       <FeeApproveCard />
     </div>

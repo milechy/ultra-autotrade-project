@@ -3458,6 +3458,21 @@
     "errorSignatureCancelled": "署名がキャンセルされました",
     "errorApprove": "承認に失敗しました"
   },
+  "UserStripePaymentMethodCard": {
+    "loadingInfo": "情報を取得中...",
+    "notConfigured": "カード決済機能は現在準備中です",
+    "cardTitle": "お支払い方法（クレジットカード）",
+    "notRegistered": "カードが登録されていません",
+    "registeredLabel": "{brand} 下4桁 {last4} を登録済み",
+    "registerButton": "カードを登録する",
+    "changeButton": "カードを変更する",
+    "cancelButton": "キャンセル",
+    "submitButton": "登録する",
+    "errorBackend": "情報の取得に失敗しました",
+    "errorSetupIntent": "登録処理の開始に失敗しました",
+    "errorConfirm": "カード登録の確定に失敗しました",
+    "errorGeneric": "カード登録に失敗しました。もう一度お試しください"
+  },
   "SharedEmergencyStopFloat": {
     "stoppedBannerAdmin": "運用を停止中です",
     "stoppedBannerPartner": "運用を停止中です（再開は管理者のみ）",
