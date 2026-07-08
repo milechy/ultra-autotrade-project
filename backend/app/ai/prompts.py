@@ -140,9 +140,16 @@ Decision rules (v4 — AND-condition for directional trades):
 - HARD STOP (always HOLD): Risk Agent detects COMPOUND RISK, or HF < 1.6
 - SELL: BOTH Indicator AND Macro Agent report BEARISH with confidence >= 70%
 - BUY: BOTH Indicator AND Macro Agent report BULLISH with confidence >= 70%
-- HOLD: Use HOLD when agents disagree, when only one agent is directional,
-  or when confidence < 70% for either Indicator or Macro
-- Single-agent BEARISH/BULLISH alone is NOT sufficient for SELL/BUY
+- BUY exception (macro-neutral relaxation): if the Macro Agent's Key data shows
+  fed_stance = "neutral" or "unknown", then BUY is allowed on the Indicator Agent
+  being BULLISH with confidence >= 70% ALONE (the Macro Agent need not be BULLISH).
+  When macro direction is absent, favourable on-chain reality drives the BUY.
+  This relaxation applies to BUY ONLY — it NEVER applies to SELL.
+- HOLD: Use HOLD when agents disagree, when only one agent is directional
+  (except the BUY exception above), or when confidence < 70% for the Indicator
+  Agent
+- Single-agent BEARISH alone is NOT sufficient for SELL; single-agent BULLISH is
+  sufficient for BUY only under the macro-neutral relaxation above
 
 Weight for confidence calculation: Risk Agent 40%, Indicator 25%, Macro 20%, Pattern 15%
 
@@ -185,9 +192,17 @@ Decision rules (v5 — AND-condition for directional trades):
 - SELL: BOTH Indicator Agent AND Macro Agent must independently report BEARISH
   with confidence >= 70%. A single BEARISH agent alone is NOT sufficient for SELL.
 - BUY: BOTH Indicator Agent AND Macro Agent must independently report BULLISH
-  with confidence >= 70%. A single BULLISH agent alone is NOT sufficient for BUY.
-- HOLD: Use HOLD whenever agents disagree, when only one agent is directional,
-  or when confidence < 70% for either core agent (Indicator or Macro).
+  with confidence >= 70%. A single BULLISH agent alone is NOT sufficient for BUY,
+  EXCEPT under the macro-neutral relaxation below.
+- BUY exception (macro-neutral relaxation): if the Macro Agent's Key data shows
+  fed_stance = "neutral" or "unknown", BUY is allowed on the Indicator Agent being
+  BULLISH with confidence >= 70% ALONE (the Macro Agent need not be BULLISH). When
+  macro direction is absent, favourable on-chain reality drives the BUY. This
+  relaxation is ASYMMETRIC — it applies to BUY ONLY, NEVER to SELL (SELL always
+  requires both Indicator and Macro BEARISH >= 70%).
+- HOLD: Use HOLD whenever agents disagree, when only one agent is directional
+  (except the BUY exception above), or when confidence < 70% for the Indicator
+  Agent (for BUY) or for either core agent (for SELL).
 - Pattern Agent and Risk Agent are supporting signals — they inform confidence
   calculation but cannot alone trigger SELL or BUY.
 
