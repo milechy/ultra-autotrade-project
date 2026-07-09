@@ -266,6 +266,13 @@ class TestCheckAaveHealth:
 
 
 class TestCheckLidoHealth:
+    @pytest.fixture(autouse=True)
+    def _lido_supported_chain(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # check_lido_health は Lido 展開 chain のみで probe を実行する (Base ではスキップ)。
+        # 本クラスは probe ロジック (APR / peg / probe 失敗) の検証なので、Lido 対応 chain を
+        # 明示設定して probe を必ず走らせる。
+        monkeypatch.setenv("AAVE_ACTIVE_CHAINS", "ethereum")
+
     @pytest.mark.asyncio
     async def test_lido_health_low_risk_normal(self, protocol_monitor: ProtocolMonitor) -> None:
         """正常な APR とペグのとき LOW リスクを返す。"""
@@ -459,3 +466,61 @@ class TestCheckAll:
         results = await protocol_monitor.check_all()
         protocols = {r.protocol for r in results}
         assert protocols == {"aave", "lido", "pendle"}
+
+
+class TestCheckLidoHealthChainGate:
+    """Base 等 Lido 非対応 chain では probe をそもそも回さないこと (ログノイズ対策)。"""
+
+    @pytest.mark.asyncio
+    async def test_lido_probe_skipped_on_base(
+        self,
+        mock_lido_client: AsyncMock,
+        mock_pendle_client: AsyncMock,
+        mock_monitoring_service: MagicMock,
+        mock_aave_client: Mock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """AAVE_ACTIVE_CHAINS=base のとき probe を呼ばず、LOW + is_operational=False を返す。
+
+        Base に Lido は未展開で、probe を叩くと get_steth_eth_ratio が毎回フル traceback を
+        吐く。probe をそもそも呼ばないことを assert_not_called で検証する。
+        """
+        monkeypatch.setenv("AAVE_ACTIVE_CHAINS", "base")
+        monitor = ProtocolMonitor(
+            lido_client=mock_lido_client,
+            pendle_client=mock_pendle_client,
+            monitoring_service=mock_monitoring_service,
+            aave_client=mock_aave_client,
+        )
+        result = await monitor.check_lido_health()
+
+        assert result.protocol == "lido"
+        assert result.risk_level == RiskLevel.LOW
+        assert result.is_operational is False
+        assert "未展開" in result.alerts[0]
+        # probe (RPC) をそもそも呼んでいないこと
+        mock_lido_client.get_steth_eth_ratio.assert_not_called()
+        mock_lido_client.get_staking_apr.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_lido_probe_runs_on_ethereum(
+        self,
+        mock_lido_client: AsyncMock,
+        mock_pendle_client: AsyncMock,
+        mock_monitoring_service: MagicMock,
+        mock_aave_client: Mock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """AAVE_ACTIVE_CHAINS=ethereum (Lido 対応) のとき probe を実行する (退行防止)。"""
+        monkeypatch.setenv("AAVE_ACTIVE_CHAINS", "ethereum")
+        monitor = ProtocolMonitor(
+            lido_client=mock_lido_client,
+            pendle_client=mock_pendle_client,
+            monitoring_service=mock_monitoring_service,
+            aave_client=mock_aave_client,
+        )
+        result = await monitor.check_lido_health()
+
+        assert result.is_operational is True
+        mock_lido_client.get_steth_eth_ratio.assert_called_once()
+        mock_lido_client.get_staking_apr.assert_called_once()
