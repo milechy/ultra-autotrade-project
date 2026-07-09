@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { convertUSDCtoJPY, formatJPY } from '@/lib/jpy-converter'
+import { saveBlob } from '@/lib/saveBlob'
 
 const PerformanceBarChart = dynamic(() => import('./PerformanceBarChart'), { ssr: false })
 import { useAuth } from '@/lib/auth'
@@ -41,12 +42,7 @@ function MonthlyReportDownloadButton() {
       const contentDisposition = res.headers.get('Content-Disposition') ?? ''
       const filenameMatch = contentDisposition.match(/filename="([^"]+)"/)
       const filename = filenameMatch ? filenameMatch[1] : `monthly_report_${year}_${String(month).padStart(2, '0')}.csv`
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.click()
-      URL.revokeObjectURL(url)
+      await saveBlob(blob, filename)
     } catch {
       // ダウンロード失敗時はコンソールのみ（UIは状態をリセット）
     } finally {

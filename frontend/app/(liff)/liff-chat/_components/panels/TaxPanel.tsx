@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { FileDown, ChevronRight, Loader2, AlertCircle } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { getAuthToken } from "@/lib/auth/token-key"
+import { saveBlob } from "@/lib/saveBlob"
 
 type TFn = ReturnType<typeof useTranslations>
 
@@ -68,12 +69,7 @@ export function TaxPanel() {
       const ext = blob.type.includes("pdf") ? "pdf" : "csv"
       resolvedName = `${filename}.${ext}`
     }
-    const objectUrl = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = objectUrl
-    link.download = resolvedName
-    link.click()
-    URL.revokeObjectURL(objectUrl)
+    await saveBlob(blob, resolvedName)
   }
 
   function buildDownloadUrl(path: string): string {

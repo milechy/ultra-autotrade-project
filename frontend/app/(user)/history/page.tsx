@@ -15,6 +15,7 @@ import { apiFetch } from '@/lib/api/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import AuthGuard from '@/components/AuthGuard'
 import { getStoredToken } from '@/lib/auth'
+import { saveBlob } from '@/lib/saveBlob'
 
 // ---------------------------------------------------------------------------
 // API response types
@@ -86,12 +87,7 @@ async function downloadCryptactCsv(year: number | null): Promise<void> {
   })
   if (!res.ok) throw new Error(`CSV取得失敗: ${res.status}`)
   const blob = await res.blob()
-  const href = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = href
-  a.download = year ? `cryptact_aave_${year}.csv` : 'cryptact_aave.csv'
-  a.click()
-  URL.revokeObjectURL(href)
+  await saveBlob(blob, year ? `cryptact_aave_${year}.csv` : 'cryptact_aave.csv')
 }
 
 function HistoryPageContent() {
