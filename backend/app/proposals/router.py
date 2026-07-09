@@ -324,7 +324,8 @@ def _should_use_scw_route(proposal: Proposal, grant: Optional[DelegationGrant]) 
     True 条件: delegation policy 有効（フラグ+L0 signer+creds）かつ 有効 grant に
     privy_signer_id/privy_policy_id があり、対象 (protocol, operation) が委譲可能なとき。
       - Aave: operation == SUPPLY（従来どおり。出金 WITHDRAW は常に custodial 本人署名）。
-      - Pendle [Phase D / D3]: operation == BUY_PT かつ grant.allowed_protocols に "pendle"。
+      - Pendle [Phase D / D3-D4]: operation ∈ {BUY_PT(入口), SELL_PT(満期出口 redeem)} かつ
+        grant.allowed_protocols に "pendle"。
     それ以外の (protocol, operation) は custodial 維持（False）。
     """
     protocol = (proposal.protocol or "aave").lower()
@@ -332,7 +333,7 @@ def _should_use_scw_route(proposal: Proposal, grant: Optional[DelegationGrant]) 
         if proposal.operation != "SUPPLY":
             return False
     elif protocol == "pendle":
-        if proposal.operation != "BUY_PT":
+        if proposal.operation not in ("BUY_PT", "SELL_PT"):
             return False
     else:
         return False
@@ -727,6 +728,42 @@ def _pendle_execution_blocked(proposal: Proposal, db: Session) -> Optional[str]:
     return None
 
 
+def _build_pendle_swap_result(proposal: Proposal, config: Any, from_address: str) -> Any:
+    """[Phase D / D3-D4] proposal.operation に応じて Pendle swap 結果(approvals 付き)を構築する。
+
+    - BUY_PT(入口): USDC→PT (token_in=USDC・6桁)。amount_usd をそのまま USDC 数量に使う。
+    - SELL_PT(満期出口 redeem): PT→USDC (token_out=USDC・出力6桁 / PT=18桁)。stablecoin PT は
+      満期で 1:1 のため amount_usd を PT 数量とみなす（満期前は二次市場の流動性に依存）。
+
+    どちらも RouterV4 Hosted SDK 呼び出しのみ（broadcast なし）。stablecoin 前提は呼び出し元が
+    ``config.stable_underlying`` で担保済み。
+    """
+    from app.protocols.pendle.client import get_pendle_router_v4_client  # noqa: PLC0415
+
+    client = get_pendle_router_v4_client(config)
+    amount_in = Decimal(str(proposal.amount_usd))  # stablecoin 1:1
+    op = (proposal.operation or "").upper()
+    if op == "SELL_PT":
+        return asyncio.run(
+            client.build_sell_pt_swap_result(
+                market_address=config.market_address,
+                token_out=config.underlying_token_address,
+                pt_amount_in=amount_in,
+                from_address=from_address,
+                token_out_decimals=config.underlying_token_decimals,
+            )
+        )
+    return asyncio.run(
+        client.build_buy_pt_swap_result(
+            market_address=config.market_address,
+            token_in=config.underlying_token_address,
+            amount_in=amount_in,
+            from_address=from_address,
+            token_in_decimals=config.underlying_token_decimals,
+        )
+    )
+
+
 def _execute_pendle_via_scw(
     proposal: Proposal, chain: str, grant: DelegationGrant, user: Optional[UserModel], db: Session
 ) -> Any:
@@ -739,7 +776,6 @@ def _execute_pendle_via_scw(
     """
     from app.proposals.pendle_scw import build_pendle_swap_calls  # noqa: PLC0415
     from app.proposals.scw_executor import execute_calls_via_scw  # noqa: PLC0415
-    from app.protocols.pendle.client import get_pendle_router_v4_client  # noqa: PLC0415
     from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
 
     scw_address = grant.wallet_address or (user.smart_wallet_address if user else None)
@@ -748,16 +784,7 @@ def _execute_pendle_via_scw(
     privy_wallet_id = _resolve_privy_wallet_id(user)
 
     config = get_pendle_config()
-    client = get_pendle_router_v4_client(config)
-    result = asyncio.run(
-        client.build_buy_pt_swap_result(
-            market_address=config.market_address,
-            token_in=config.underlying_token_address,
-            amount_in=Decimal(str(proposal.amount_usd)),  # stablecoin 1:1（D2 と同）
-            from_address=scw_address,
-            token_in_decimals=config.underlying_token_decimals,
-        )
-    )
+    result = _build_pendle_swap_result(proposal, config, scw_address)
     if not result.success:
         raise ProtocolExecutionNotWiredError(
             f"Pendle proposal={proposal.id}: swap calldata 取得失敗: {result.error}"
@@ -782,20 +809,18 @@ def _execute_pendle_for_proposal(proposal: Proposal, db: Session) -> None:
       2. ``_should_use_scw_route``（delegation policy 有効 + grant に signer/policy + allowed=pendle）
     → HARD_STOP 安全ゲート通過後、SCW/Privy 委譲署名で broadcast し executed/tx_hash を保存する。
 
-    非カストディアル不変: サーバー鍵は一切参照せず PT は SCW 本人着金。amount は stablecoin PT
-    (token_in=USDC≒1USD) のみ ``proposal.amount_usd`` をそのまま USDC 数量に使う（非 stablecoin は
-    ``PENDLE_STABLE_UNDERLYING=false`` 既定で fail-closed）。
+    operation: BUY_PT(入口 USDC→PT) と SELL_PT(満期出口 redeem PT→USDC / D4) に対応する。
+
+    非カストディアル不変: サーバー鍵は一切参照せず PT/USDC は SCW 本人着金。amount は stablecoin PT
+    (USDC≒1USD) のみ ``proposal.amount_usd`` をそのまま token 数量に使う（BUY=USDC数量 / SELL=PT数量。
+    非 stablecoin は ``PENDLE_STABLE_UNDERLYING=false`` 既定で fail-closed）。
     """
-    if (proposal.operation or "").upper() != "BUY_PT":
+    if (proposal.operation or "").upper() not in ("BUY_PT", "SELL_PT"):
         raise ProtocolExecutionNotWiredError(
-            f"Pendle は BUY_PT のみ自動執行対応です "
+            f"Pendle は BUY_PT / SELL_PT のみ自動執行対応です "
             f"(proposal={proposal.id}, op={proposal.operation})。"
         )
 
-    from app.protocols.pendle.client import (  # noqa: PLC0415
-        PendleBuildTxError,
-        get_pendle_router_v4_client,
-    )
     from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
 
     config = get_pendle_config()
@@ -884,45 +909,38 @@ def _execute_pendle_for_proposal(proposal: Proposal, db: Session) -> None:
         )
         db.add(tx)
         logger.info(
-            "proposal %d: Pendle BUY_PT executed via SCW — tx=%s status=%s (attempt=%d)",
+            "proposal %d: Pendle %s executed via SCW — tx=%s status=%s (attempt=%d)",
             proposal.id,
+            proposal.operation,
             result.tx_hash,
             result.status,
             proposal.execution_attempts,
         )
         return
 
+    # dry-run（D2）: BUY_PT/SELL_PT の未署名 calldata を構築するのみ（broadcast なし）。
     try:
-        client = get_pendle_router_v4_client(config)
-        unsigned_tx = asyncio.run(
-            client.build_buy_pt_tx(
-                market_address=config.market_address,
-                token_in=config.underlying_token_address,
-                amount_in=amount_in,
-                from_address=wallet_address,
-                token_in_decimals=config.underlying_token_decimals,
-            )
-        )
-    except PendleBuildTxError as exc:
-        # calldata 取得失敗 / Router 不一致は fail-closed。broadcast しない。
-        raise ProtocolExecutionNotWiredError(
-            f"Pendle proposal={proposal.id}: dry-run calldata 構築失敗: {exc}"
-        ) from exc
+        result = _build_pendle_swap_result(proposal, config, wallet_address)
     except Exception as exc:  # noqa: BLE001
         raise ProtocolExecutionNotWiredError(
             f"Pendle proposal={proposal.id}: dry-run calldata 構築失敗: {exc}"
         ) from exc
+    if not result.success or not result.calldata or not result.to:
+        # calldata 取得失敗 / Router 不一致は fail-closed。broadcast しない。
+        raise ProtocolExecutionNotWiredError(
+            f"Pendle proposal={proposal.id}: dry-run calldata 構築失敗: {result.error}"
+        )
 
-    _to = str(unsigned_tx.get("to", "") or "")
-    _data = str(unsigned_tx.get("data", "") or "")
+    _to = str(result.to or "")
+    _data = str(result.calldata or "")
     _data_bytes = (len(_data) - 2) // 2 if _data.startswith("0x") else 0
     logger.info(
-        "proposal %d: Pendle BUY_PT dry-run calldata 構築成功 — to=%s data_bytes=%d chainId=%s "
-        "amount_usdc=%s (broadcast は D3 で配線 / HUMAN-REVIEW)",
+        "proposal %d: Pendle %s dry-run calldata 構築成功 — to=%s data_bytes=%d amount=%s "
+        "(broadcast は二段ガードで配線 / HUMAN-REVIEW)",
         proposal.id,
+        proposal.operation,
         _to,
         _data_bytes,
-        unsigned_tx.get("chainId"),
         amount_in,
     )
     raise PendleDryRunNotBroadcast(

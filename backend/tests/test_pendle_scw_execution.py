@@ -26,6 +26,7 @@ from app.proposals.router import (  # noqa: E402
     _execute_pendle_for_proposal,
 )
 from app.protocols.pendle.config import PendleConfig  # noqa: E402
+from app.protocols.pendle.schemas import RouterV4SwapResult  # noqa: E402
 
 _MARKET = "0x1111111111111111111111111111111111111111"
 _USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
@@ -56,8 +57,13 @@ def _mk_db() -> MagicMock:
 
 
 class _FakeDryRunClient:
-    async def build_buy_pt_tx(self, **kwargs: object) -> dict[str, object]:
-        return {"to": "0xRouter", "data": "0x" + "ab" * 10, "from": _WALLET, "chainId": 8453}
+    async def build_buy_pt_swap_result(self, **kwargs: object) -> "RouterV4SwapResult":
+        return RouterV4SwapResult(
+            success=True,
+            to="0x888888888889758F76e7103c6CbF23ABbF58F946",
+            calldata="0x" + "ab" * 10,
+            approvals=[],
+        )
 
 
 def _patch_common(

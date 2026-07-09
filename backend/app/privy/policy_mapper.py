@@ -82,16 +82,23 @@ def resolve_protocol_contracts(allowed_protocols: list[str], chain_name: str) ->
             if addr not in contracts:
                 contracts.append(addr)
         elif protocol == "pendle":
-            # [Phase D / D3] Pendle swap は RouterV4 宛（swap）+ underlying(USDC) 宛（approve）の
-            # 2 コントラクトを allowlist する必要がある（batch: approve → swap）。両方を追加しないと
-            # Privy policy が approve tx を拒否する。アドレスは PendleConfig（env）から取得する。
+            # [Phase D / D3-D4] Pendle は batch(approve → swap) を送るため複数コントラクトを
+            # allowlist する。両方向を賄うには:
+            #   - RouterV4（swap 宛）
+            #   - underlying(USDC)（BUY_PT の approve 宛）
+            #   - PT token（SELL_PT 満期出口 redeem の approve 宛）
+            # いずれか欠けると Privy policy が該当 approve/swap tx を拒否する。env から取得。
             from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
 
             pconf = get_pendle_config()
-            for addr in (pconf.router_address, pconf.underlying_token_address):
+            for addr in (
+                pconf.router_address,
+                pconf.underlying_token_address,
+                pconf.pt_token_address,
+            ):
                 if not addr:
                     raise PolicyMappingError(
-                        "Pendle router_address / underlying_token_address が未設定です"
+                        "Pendle router / underlying / pt_token アドレスが未設定です"
                     )
                 low = addr.lower()
                 if low not in contracts:
