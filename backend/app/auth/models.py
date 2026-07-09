@@ -49,6 +49,12 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS line_monthly_opt_in BOOLEAN NOT NULL 
 
 -- corporate-CSV [2/4]: 法人決算月 (1-12, NULL=個人)。TAX & REPORTS 法人モードのアンロック条件。
 ALTER TABLE users ADD COLUMN IF NOT EXISTS corporate_fiscal_month SMALLINT NULL;
+
+-- Phase-D D5b: aggressive ティア(Pendle stablecoin PT)のリスク開示/同意。満期ロック(即時出金不可)
+-- / yoUSD 裏付け / スリッページ・薄い流動性リスク の全同意を記録する。PUT /auth/risk-mode の
+-- mode=aggressive で ack 必須(defense-in-depth)。現状 PHASE_1 gate で aggressive 自体は不可(dormant)。
+ALTER TABLE users ADD COLUMN IF NOT EXISTS aggressive_ack_at TIMESTAMP WITH TIME ZONE NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS aggressive_ack_version VARCHAR(20) NULL;
 """
 
 import logging
@@ -160,6 +166,9 @@ RISK_MODE_PROTOCOLS: dict[RiskMode, frozenset[str]] = {
     RiskMode.AGGRESSIVE: frozenset({"aave", "lido", "pendle"}),
 }
 
+#: Phase-D D5b: aggressive ティアのリスク開示/同意バージョン。開示内容を改訂したら上げる。
+AGGRESSIVE_ACK_VERSION = "agg-v1"
+
 
 def get_risk_mode_label(value: str | None) -> str:
     """``users.risk_mode`` の DB 値から日本語ラベルを取得する。
@@ -250,6 +259,13 @@ class User(Base):
     terms_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default=None)
     risk_mode: Mapped[Optional[str]] = mapped_column(
         String(20), nullable=True, default="conservative"
+    )
+    # Phase-D D5b: aggressive ティアのリスク開示/同意 (満期ロック/裏付け/スリッページ)。
+    aggressive_ack_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    aggressive_ack_version: Mapped[Optional[str]] = mapped_column(
+        String(20), nullable=True, default=None
     )
     # Track 2 / 層2: 実 PII のためフィールドレベル暗号化(AES-256-GCM)。
     # DB には enc:v<ver>:<b64> の暗号文が入る。暗号文は base64 で平文より長いため列幅を拡張。
