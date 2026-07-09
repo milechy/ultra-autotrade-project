@@ -95,6 +95,15 @@ class PendleConfig:
     max_single_trade_pct: Decimal = field(
         default_factory=lambda: _get_env_decimal("PENDLE_MAX_SINGLE_TRADE_PCT", "0.10")
     )
+    # [Phase D / D5] 流動性ガード: 1 投入 ≤ プール流動性(tvl_usd)の割合（デフォルト 5%）。
+    # 薄い PT プールを 1 回の swap で壊さないための物理制約。
+    max_pool_liquidity_pct: Decimal = field(
+        default_factory=lambda: _get_env_decimal("PENDLE_MAX_POOL_LIQUIDITY_PCT", "0.05")
+    )
+    # [Phase D / D5] 流動性ガード: 1 投入の絶対上限（USD）。プール流動性%と併せて被害上限を縛る。
+    max_trade_usd_cap: Decimal = field(
+        default_factory=lambda: _get_env_decimal("PENDLE_MAX_TRADE_USD_CAP", "5000")
+    )
 
     def token_decimals(self, token: str) -> int:
         """トークン識別子から decimals を解決する。
