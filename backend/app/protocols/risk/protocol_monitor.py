@@ -14,6 +14,24 @@ from .schemas import ProtocolHealth, RiskLevel
 
 logger = logging.getLogger(__name__)
 
+# Lido (stETH) が展開されている chain。本プロジェクトの稼働 chain である Base には
+# Lido は存在しない。Base 稼働時に Lido probe を叩くと getTotalPooledEther().call() が
+# 必ず失敗し、get_steth_eth_ratio 内の logger.exception が毎回フル traceback を吐く
+# (障害ではない無害ノイズ)。稼働 chain が Lido 非対応なら probe をそもそも回さない。
+_LIDO_SUPPORTED_CHAINS = frozenset({"mainnet", "ethereum", "holesky", "hoodi", "sepolia"})
+
+
+def _lido_supported_on_active_chain() -> bool:
+    """稼働中の chain (AAVE_ACTIVE_CHAINS) に Lido 展開 chain が含まれるか。
+
+    含まれない (例: Base 単独稼働) 場合は False。既定は "base" のため Lido 非対応。
+    """
+    import os  # noqa: PLC0415
+
+    raw = os.getenv("AAVE_ACTIVE_CHAINS", "base")
+    active = {c.strip().lower() for c in raw.split(",") if c.strip()}
+    return bool(active & _LIDO_SUPPORTED_CHAINS)
+
 
 class ProtocolMonitor:
     """各プロトコルのヘルス状態を監視するクラス。"""
@@ -157,6 +175,24 @@ class ProtocolMonitor:
         - ペグ乖離 > 2% → HIGH
         - TVL 推定: $15B
         """
+        # Base 等 Lido 非対応 chain では probe (RPC) を回さない。回すと必ず失敗して
+        # get_steth_eth_ratio が毎回フル traceback を吐くため、監視対象外として即 return。
+        # probe 失敗時と同じ安全な形 (LOW + is_operational=False) を返し、避難トリガーには
+        # ならない (2026-06-28 誤検知修正と整合)。
+        if not _lido_supported_on_active_chain():
+            logger.debug("check_lido_health: Lido は稼働 chain に未展開のため probe をスキップ")
+            return ProtocolHealth(
+                protocol="lido",
+                risk_level=RiskLevel.LOW,
+                tvl_usd=Decimal("0"),
+                tvl_change_24h_pct=Decimal("0"),
+                is_operational=False,
+                last_checked=datetime.now(tz=timezone.utc),
+                alerts=[
+                    "Lido は現在の稼働チェーンに未展開のため監視対象外です（資産への影響なし）"
+                ],
+            )
+
         logger.info("check_lido_health: Lido ヘルスチェック実行")
         alerts: list[str] = []
         risk_level = RiskLevel.LOW
