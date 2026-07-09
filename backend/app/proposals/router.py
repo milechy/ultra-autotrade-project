@@ -657,19 +657,108 @@ def _execute_lido_for_proposal(proposal: Proposal, db: Session) -> None:
     )
 
 
-def _execute_pendle_for_proposal(proposal: Proposal, db: Session) -> None:
-    """[Phase D / HUMAN-REVIEW 未配線] Pendle BUY_PT/SELL_PT の custodial 実行。
+class PendleDryRunNotBroadcast(ProtocolExecutionNotWiredError):
+    """[Phase D / D2] Pendle BUY_PT の calldata を dry-run 構築したが broadcast は未配線。
 
-    実装方針 (HUMAN-REVIEW + Opus で配線すること):
-      1. PendleService/RouterV4 で swap calldata 取得 (dry_run=True は安全・本番前確認用)
-      2. PENDLE_ENABLE_ONCHAIN_WRITE=true かつ dry_run=False で broadcast (要レビュー)
-      3. receipt 確認 → proposal.status='executed' / tx_hash 保存
-
-    現状は実 broadcast を含まないため未配線として明示的に raise する。
+    D2 では未署名 tx (swapExactTokenForPt calldata) を **構築するのみ** で、実 broadcast は
+    D3 (非カストSCW/Privy 本人署名) で配線する。構築成功後もこの例外を送出することで、caller は
+    proposal を 'approved' 据え置き (501) にし、Aave として誤実行しない (fail-closed 契約は不変)。
+    ``ProtocolExecutionNotWiredError`` の subclass のため既存の 501 ハンドリングを踏襲する。
     """
-    raise ProtocolExecutionNotWiredError(
-        f"Pendle (proposal={proposal.id}, op={proposal.operation}) の custodial 自動執行は "
-        "未配線です (HUMAN-REVIEW-REQUIRED)。"
+
+
+def _execute_pendle_for_proposal(proposal: Proposal, db: Session) -> None:
+    """[Phase D / D2] Pendle BUY_PT の自動執行 = dry-run calldata 構築 (broadcast なし)。
+
+    stablecoin PT (yoUSD 等・token_in=USDC≒1USD) 向けに RouterV4 Hosted SDK で
+    swapExactTokenForPt の未署名 tx を **構築するのみ** で broadcast しない。構築できたら
+    ``PendleDryRunNotBroadcast`` を送出し、proposal は 'approved' のまま (501)。実 broadcast
+    (partner 本人署名) は D3 で配線する (HUMAN-REVIEW-REQUIRED)。
+
+    非カストディアル不変: サーバー鍵 (``PENDLE_WALLET_PRIVATE_KEY``) は一切参照せず、PT は
+    partner 本人 wallet (SCW 優先) に着金する未署名 tx を組む。SDK calldata の宛先が Router で
+    あることは ``build_buy_pt_tx`` 内で照合する (fail-closed)。
+
+    amount: stablecoin PT のみ token_in=USDC(≒1USD) のため ``proposal.amount_usd`` をそのまま
+    USDC 数量として扱える (Lido/ETH のような USD→token 価格換算が不要)。非 stablecoin market は
+    ``PENDLE_STABLE_UNDERLYING=false`` (既定) で fail-closed 拒否し、誤数量署名を防ぐ。
+    """
+    if (proposal.operation or "").upper() != "BUY_PT":
+        raise ProtocolExecutionNotWiredError(
+            f"Pendle は BUY_PT のみ自動執行対応です "
+            f"(proposal={proposal.id}, op={proposal.operation})。"
+        )
+
+    from app.protocols.pendle.client import (  # noqa: PLC0415
+        PendleBuildTxError,
+        get_pendle_router_v4_client,
+    )
+    from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
+
+    config = get_pendle_config()
+
+    # stablecoin PT 以外は USD→token 換算が未配線のため fail-closed (誤数量署名防止)。
+    if not config.stable_underlying:
+        raise ProtocolExecutionNotWiredError(
+            f"Pendle proposal={proposal.id}: 非 stablecoin market の USD→token 換算が未配線 "
+            "(PENDLE_STABLE_UNDERLYING=false)。誤数量署名防止のため fail-closed (HUMAN-REVIEW)。"
+        )
+
+    # 受取/署名者 wallet (SCW 優先。build_partner_tx と同型)。
+    user = db.get(UserModel, proposal.user_id)
+    wallet_address = ""
+    if user is not None:
+        wallet_address = (user.smart_wallet_address or user.wallet_address or "") or ""
+    if not wallet_address:
+        raise ProtocolExecutionNotWiredError(
+            f"Pendle proposal={proposal.id}: wallet 未設定のため未署名 tx を構築できません "
+            "(Privy で wallet を作成してください)。"
+        )
+
+    # stablecoin PT: token_in=USDC(≒1USD) のため amount_usd をそのまま USDC 数量に使う。
+    amount_in = Decimal(str(proposal.amount_usd))
+    if amount_in <= 0:
+        raise ProtocolExecutionNotWiredError(
+            f"Pendle proposal={proposal.id}: amount_usd が 0 以下です (amount={amount_in})。"
+        )
+
+    try:
+        client = get_pendle_router_v4_client(config)
+        unsigned_tx = asyncio.run(
+            client.build_buy_pt_tx(
+                market_address=config.market_address,
+                token_in=config.underlying_token_address,
+                amount_in=amount_in,
+                from_address=wallet_address,
+                token_in_decimals=config.underlying_token_decimals,
+            )
+        )
+    except PendleBuildTxError as exc:
+        # calldata 取得失敗 / Router 不一致は fail-closed。broadcast しない。
+        raise ProtocolExecutionNotWiredError(
+            f"Pendle proposal={proposal.id}: dry-run calldata 構築失敗: {exc}"
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise ProtocolExecutionNotWiredError(
+            f"Pendle proposal={proposal.id}: dry-run calldata 構築失敗: {exc}"
+        ) from exc
+
+    _to = str(unsigned_tx.get("to", "") or "")
+    _data = str(unsigned_tx.get("data", "") or "")
+    _data_bytes = (len(_data) - 2) // 2 if _data.startswith("0x") else 0
+    logger.info(
+        "proposal %d: Pendle BUY_PT dry-run calldata 構築成功 — to=%s data_bytes=%d chainId=%s "
+        "amount_usdc=%s (broadcast は D3 で配線 / HUMAN-REVIEW)",
+        proposal.id,
+        _to,
+        _data_bytes,
+        unsigned_tx.get("chainId"),
+        amount_in,
+    )
+    raise PendleDryRunNotBroadcast(
+        f"Pendle proposal={proposal.id}: dry-run calldata 構築成功 (to={_to}, "
+        f"data_bytes={_data_bytes})。実 broadcast は D3 (非カストSCW/Privy 署名) で配線 "
+        "(HUMAN-REVIEW-REQUIRED)。"
     )
 
 

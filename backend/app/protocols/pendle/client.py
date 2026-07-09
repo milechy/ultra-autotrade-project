@@ -426,6 +426,8 @@ class PendleRouterV4Client:
         "ethereum": 1,
         "polygon": 137,
         "sepolia": 421614,  # Arbitrum Sepolia
+        "base": 8453,  # [Phase D] Base Mainnet (yoUSD stablecoin PT)
+        "base_sepolia": 84532,  # [Phase D] Base Sepolia (staging-v4 検証)
     }
 
     def __init__(
