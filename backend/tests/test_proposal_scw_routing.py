@@ -111,10 +111,18 @@ def test_route_false_pendle_without_allowed_protocol(enabled_env: None) -> None:
     assert _should_use_scw_route(_pendle_proposal(), _grant(allowed_protocols=None)) is False
 
 
-def test_route_false_pendle_wrong_operation(enabled_env: None) -> None:
-    """Pendle は BUY_PT のみ委譲対象（SELL_PT/その他は custodial）。"""
+def test_route_true_pendle_sell_pt_redeem(enabled_env: None) -> None:
+    """[D4] Pendle SELL_PT(満期出口 redeem)も委譲対象。"""
     p = SimpleNamespace(
-        id=10, asset="PT-yoUSD", amount_usd=Decimal("50"), operation="SELL_PT", protocol="pendle"
+        id=11, asset="PT-yoUSD", amount_usd=Decimal("50"), operation="SELL_PT", protocol="pendle"
+    )
+    assert _should_use_scw_route(p, _grant(allowed_protocols=["pendle"])) is True
+
+
+def test_route_false_pendle_wrong_operation(enabled_env: None) -> None:
+    """Pendle は BUY_PT / SELL_PT のみ委譲対象（その他 operation は custodial）。"""
+    p = SimpleNamespace(
+        id=10, asset="PT-yoUSD", amount_usd=Decimal("50"), operation="MINT_PT", protocol="pendle"
     )
     assert _should_use_scw_route(p, _grant(allowed_protocols=["pendle"])) is False
 

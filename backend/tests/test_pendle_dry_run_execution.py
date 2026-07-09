@@ -27,6 +27,7 @@ from app.proposals.router import (  # noqa: E402
 )
 from app.protocols.pendle.client import PendleBuildTxError  # noqa: E402
 from app.protocols.pendle.config import PendleConfig  # noqa: E402
+from app.protocols.pendle.schemas import RouterV4SwapResult  # noqa: E402
 
 _ROUTER = "0x888888888889758F76e7103c6CbF23ABbF58F946"
 _MARKET = "0x1111111111111111111111111111111111111111"  # yoUSD market (stub)
@@ -54,23 +55,19 @@ def _mk_db(wallet: object = _WALLET, smart: object = None) -> MagicMock:
 
 
 class _FakeRouterClient:
-    """build_buy_pt_tx が呼ばれた引数を記録する async スタブ。"""
+    """build_buy_pt_swap_result が呼ばれた引数を記録する async スタブ。"""
 
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
         self.raise_exc: Exception | None = None
 
-    async def build_buy_pt_tx(self, **kwargs: object) -> dict[str, object]:
+    async def build_buy_pt_swap_result(self, **kwargs: object) -> RouterV4SwapResult:
         self.calls.append(kwargs)
         if self.raise_exc is not None:
             raise self.raise_exc
-        return {
-            "to": _ROUTER,
-            "data": "0x" + "ab" * 100,  # 100 bytes calldata
-            "from": kwargs["from_address"],
-            "chainId": 8453,
-            "value": "0x0",
-        }
+        return RouterV4SwapResult(
+            success=True, to=_ROUTER, calldata="0x" + "ab" * 100, approvals=[]
+        )
 
 
 def _patch_pendle(

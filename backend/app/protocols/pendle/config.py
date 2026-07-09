@@ -50,6 +50,14 @@ class PendleConfig:
     underlying_token_decimals: int = field(
         default_factory=lambda: int(os.getenv("PENDLE_UNDERLYING_TOKEN_DECIMALS", "6"))
     )
+    # PT トークンのコントラクトアドレス。SELL_PT(満期出口 redeem)で PT→Router の approve 宛先
+    # として使う（Privy policy の allowlist にも要る）。市場ごとに異なるため env で設定する。
+    pt_token_address: str = field(
+        default_factory=lambda: os.getenv(
+            "PENDLE_PT_TOKEN_ADDRESS",
+            "0x0000000000000000000000000000000000000004",  # dummy address
+        )
+    )
     # 入力トークンが USD ペッグの stablecoin (USDC 等) か。True の場合のみ proposal.amount_usd
     # をそのまま入力トークン数量として扱う (1 USDC≒1 USD)。False (既定) は USD→token 価格換算が
     # 未配線のため自動執行を fail-closed で拒否する (ETH や非ステーブル PT の誤数量署名防止)。
