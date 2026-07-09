@@ -80,7 +80,7 @@ class TestResolveProtocolRouting:
         _patch_compare(monkeypatch, Protocol.PENDLE_PT)
         assert _resolve_protocol_routing(_cv(TradeAction.BUY), "aggressive", Decimal("1000")) == (
             "BUY_PT",
-            "PT-stETH",
+            "PT-yoUSD",
             "pendle",
         )
 
@@ -98,8 +98,48 @@ class TestResolveProtocolRouting:
         _patch_compare(monkeypatch, Protocol.PENDLE_YT)
         assert _resolve_protocol_routing(_cv(TradeAction.BUY), "aggressive", Decimal("1000")) == (
             "BUY_PT",
-            "PT-stETH",
+            "PT-yoUSD",
             "pendle",
+        )
+
+    # [D5] risk_mode eligibility ゲート — optimizer が推奨しても risk_mode が許可しなければ aave。
+    def test_pendle_gated_for_balanced(self, monkeypatch) -> None:
+        """balanced は pendle 非適格 → optimizer が pendle 推奨でも aave にフォールバック。"""
+        monkeypatch.setenv("AI_OPTIMIZER_MULTIPROTOCOL_ENABLED", "true")
+        _patch_compare(monkeypatch, Protocol.PENDLE_PT)
+        assert _resolve_protocol_routing(_cv(TradeAction.BUY), "balanced", Decimal("1000")) == (
+            "SUPPLY",
+            "USDC",
+            "aave",
+        )
+
+    def test_pendle_gated_for_conservative(self, monkeypatch) -> None:
+        monkeypatch.setenv("AI_OPTIMIZER_MULTIPROTOCOL_ENABLED", "true")
+        _patch_compare(monkeypatch, Protocol.PENDLE_PT)
+        assert _resolve_protocol_routing(_cv(TradeAction.BUY), "conservative", Decimal("1000")) == (
+            "SUPPLY",
+            "USDC",
+            "aave",
+        )
+
+    def test_lido_gated_for_conservative(self, monkeypatch) -> None:
+        """conservative は lido 非適格 → aave にフォールバック。"""
+        monkeypatch.setenv("AI_OPTIMIZER_MULTIPROTOCOL_ENABLED", "true")
+        _patch_compare(monkeypatch, Protocol.LIDO)
+        assert _resolve_protocol_routing(_cv(TradeAction.BUY), "conservative", Decimal("1000")) == (
+            "SUPPLY",
+            "USDC",
+            "aave",
+        )
+
+    def test_unknown_risk_mode_defaults_to_aave_only(self, monkeypatch) -> None:
+        """未知/None risk_mode は conservative 相当 = aave のみ。"""
+        monkeypatch.setenv("AI_OPTIMIZER_MULTIPROTOCOL_ENABLED", "true")
+        _patch_compare(monkeypatch, Protocol.PENDLE_PT)
+        assert _resolve_protocol_routing(_cv(TradeAction.BUY), None, Decimal("1000")) == (
+            "SUPPLY",
+            "USDC",
+            "aave",
         )
 
     def test_aave_recommendation_stays_aave(self, monkeypatch) -> None:
@@ -130,6 +170,6 @@ class TestResolveProtocolRouting:
         expected = {
             "aave": ("SUPPLY", "USDC"),
             "lido": ("STAKE_ETH", "ETH"),
-            "pendle": ("BUY_PT", "PT-stETH"),
+            "pendle": ("BUY_PT", "PT-yoUSD"),
         }
         assert (op, asset) == expected[proto]

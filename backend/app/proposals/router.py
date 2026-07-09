@@ -685,8 +685,43 @@ class PendleDryRunNotBroadcast(ProtocolExecutionNotWiredError):
     """
 
 
+def _pendle_liquidity_blocked(config: Any, amount_usd: Decimal) -> Optional[str]:
+    """[Phase D / D5] 流動性ガード: 1 投入が薄い PT プールを壊さないか検査する。
+
+    唯一の必須物理制約。対象 market の ``tvl_usd``（= Pendle API の liquidity.usd）を取得し、
+    1 投入 ≤ ``max_pool_liquidity_pct``（プール流動性の数%）かつ ≤ ``max_trade_usd_cap``
+    （絶対上限 USD）であることを要求する。ブロック時は理由文字列、問題なければ None。
+
+    fail-closed: ``get_market_info`` は API 失敗時 tvl_usd=0 に fail-open するため、tvl<=0（未知）は
+    「壊さない保証ができない」= block する（不確実なら止める）。
+    """
+    from app.protocols.pendle.client import get_pendle_client  # noqa: PLC0415
+
+    try:
+        client = get_pendle_client(config)
+        market_info = asyncio.run(client.get_market_info(config.market_address))
+        tvl_usd = Decimal(str(market_info.tvl_usd))
+    except Exception as exc:  # noqa: BLE001
+        return f"liquidity guard: market_info 取得失敗のため fail-closed ({exc})"
+
+    if tvl_usd <= 0:
+        return "liquidity guard: プール流動性が不明/ゼロのため fail-closed (tvl_usd<=0)"
+
+    pool_cap = tvl_usd * config.max_pool_liquidity_pct
+    if amount_usd > pool_cap:
+        return (
+            f"liquidity guard: 1 投入 {amount_usd} がプール流動性上限 "
+            f"{pool_cap} (tvl {tvl_usd} × {config.max_pool_liquidity_pct}) を超過"
+        )
+    if amount_usd > config.max_trade_usd_cap:
+        return (
+            f"liquidity guard: 1 投入 {amount_usd} が絶対上限 {config.max_trade_usd_cap} USD を超過"
+        )
+    return None
+
+
 def _pendle_execution_blocked(proposal: Proposal, db: Session) -> Optional[str]:
-    """[Phase D / D3] Pendle broadcast 執行直前のグローバル安全ゲート。
+    """[Phase D / D3-D5] Pendle broadcast 執行直前のグローバル安全ゲート。
 
     Pendle は ``_dispatch_custodial_execution`` から直接呼ばれ、``_execute_aave_for_proposal``
     内の HARD_STOP / risk_limiter ゲートを通らない（Gap A）。broadcast 前に同等のゲートを
@@ -725,6 +760,15 @@ def _pendle_execution_blocked(proposal: Proposal, db: Session) -> Optional[str]:
     )
     if limit_violation is not None:
         return f"risk_limiter ({limit_violation})"
+
+    # [D5] 流動性ガード（薄いプール保護・必須物理制約）。BUY_PT/SELL_PT 双方に適用。
+    from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
+
+    liquidity_block = _pendle_liquidity_blocked(
+        get_pendle_config(), Decimal(str(proposal.amount_usd))
+    )
+    if liquidity_block is not None:
+        return liquidity_block
     return None
 
 
