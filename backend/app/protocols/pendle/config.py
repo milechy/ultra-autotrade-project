@@ -44,6 +44,19 @@ class PendleConfig:
             "0x0000000000000000000000000000000000000003",  # dummy address
         )
     )
+    # 入力トークン (underlying) の decimals。stablecoin PT では USDC=6 を明示する。
+    # underlying_token_address は *アドレス* のため token_decimals(symbol) では解決できず、
+    # 明示しないと 18 に既定化して桁ズレ（USDC で 10^12 倍）を起こす。
+    underlying_token_decimals: int = field(
+        default_factory=lambda: int(os.getenv("PENDLE_UNDERLYING_TOKEN_DECIMALS", "6"))
+    )
+    # 入力トークンが USD ペッグの stablecoin (USDC 等) か。True の場合のみ proposal.amount_usd
+    # をそのまま入力トークン数量として扱う (1 USDC≒1 USD)。False (既定) は USD→token 価格換算が
+    # 未配線のため自動執行を fail-closed で拒否する (ETH や非ステーブル PT の誤数量署名防止)。
+    # [Phase D] yoUSD 等 stablecoin PT market を対象にする環境でのみ true を設定する。
+    stable_underlying: bool = field(
+        default_factory=lambda: os.getenv("PENDLE_STABLE_UNDERLYING", "false").lower() == "true"
+    )
     # RPC エンドポイント（Arbitrum Sepolia）
     rpc_url: str = field(
         default_factory=lambda: os.getenv(
