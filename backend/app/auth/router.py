@@ -29,6 +29,7 @@ from app.users.registration_webhook import send_registration_webhook
 
 from .dependencies import require_active_user, require_admin
 from .models import (
+    AGGRESSIVE_ACK_VERSION,
     PHASE_1_ALLOWED_RISK_MODES,
     RISK_MODE_JP_LABELS,
     RISK_MODE_PHASE,
@@ -575,6 +576,16 @@ def update_risk_mode(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"{jp_label}はPhase 2以降で利用可能です。",
+        )
+
+    # [Phase-D D5b] aggressive ティアはリスク開示同意必須 (defense-in-depth)。現状は上の
+    # PHASE_1 チェックが先に aggressive を弾くため未到達 (dormant)。PHASE_1 緩和 (D6) 後に効く。
+    if new_mode == RiskMode.AGGRESSIVE and (
+        user.aggressive_ack_at is None or user.aggressive_ack_version != AGGRESSIVE_ACK_VERSION
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail="ハイリスクモードの選択にはリスク開示への同意が必要です。",
         )
 
     user.risk_mode = new_mode.value

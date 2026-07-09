@@ -516,10 +516,27 @@ def _resolve_protocol_routing(
     try:
         from app.ai.optimizer.comparator import StrategyComparator  # noqa: PLC0415
         from app.ai.optimizer.schemas import Protocol  # noqa: PLC0415
+        from app.ai.optimizer.signal_adapter import (  # noqa: PLC0415
+            AaveSignalAdapter,
+            PendleSignalAdapter,
+        )
+        from app.ai.optimizer.strategy_scorer import StrategyScorer  # noqa: PLC0415
+        from app.protocols.pendle.client import get_pendle_client  # noqa: PLC0415
+        from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
 
-        comparison = StrategyComparator().compare(
-            investment_usd=investment_usd,
-            risk_mode=risk_mode or "balanced",
+        # [D5b] 実 APY 配線: 固定 5.2% ではなく実 implied APY を使う。adapter は client=None /
+        # 取得失敗時に fallback 定数へ fail-open するため安全 (既存設計)。lido は Base 未対応の
+        # ため未注入 (fallback 定数のまま)。
+        pconf = get_pendle_config()
+        scorer = StrategyScorer(
+            pendle_adapter=PendleSignalAdapter(get_pendle_client(pconf), pconf.market_address),
+            aave_adapter=AaveSignalAdapter(),
+        )
+        comparison = asyncio.run(
+            StrategyComparator(scorer=scorer).compare_async(
+                investment_usd=investment_usd,
+                risk_mode=risk_mode or "balanced",
+            )
         )
         recommended = comparison.recommended.protocol
     except Exception as exc:  # noqa: BLE001

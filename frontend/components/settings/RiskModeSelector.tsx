@@ -4,8 +4,15 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import AggressiveRiskDisclosureModal from "./AggressiveRiskDisclosureModal";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+// [Phase-D D5b] aggressive ティア選択の有効化フラグ。既定 off = 従来挙動(選択は現状 403)で
+// dormant。on にすると aggressive 選択前にリスク開示/同意モーダルを必須にする。実際の
+// aggressive 解禁(PHASE_1 gate 緩和)は backend 側 D6 で別途行う。
+const AGGRESSIVE_TIER_ENABLED =
+  process.env.NEXT_PUBLIC_AGGRESSIVE_TIER_ENABLED === "true";
 
 interface RiskOption {
   mode: string;
@@ -45,6 +52,8 @@ export default function RiskModeSelector() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // aggressive 選択時に同意モーダルを挟むための保留 mode。
+  const [pendingAggressive, setPendingAggressive] = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -57,7 +66,19 @@ export default function RiskModeSelector() {
       .catch(() => {});
   }, []);
 
-  const handleSelect = async (mode: string) => {
+  const handleSelect = (mode: string) => {
+    if (!data || data.mode === mode || saving) return;
+    // aggressive はフラグ on 時にリスク開示/同意モーダルを必須にする（未同意なら PUT しない）。
+    if (AGGRESSIVE_TIER_ENABLED && mode === "aggressive") {
+      setSuccess(null);
+      setError(null);
+      setPendingAggressive(true);
+      return;
+    }
+    void commitMode(mode);
+  };
+
+  const commitMode = async (mode: string) => {
     if (!data || data.mode === mode || saving) return;
     setSaving(true);
     setSuccess(null);
@@ -156,6 +177,16 @@ export default function RiskModeSelector() {
           💡 {t("aggressiveNote")}
         </p>
       </div>
+
+      {pendingAggressive && (
+        <AggressiveRiskDisclosureModal
+          onConsented={() => {
+            setPendingAggressive(false);
+            void commitMode("aggressive");
+          }}
+          onCancel={() => setPendingAggressive(false)}
+        />
+      )}
     </div>
   );
 }

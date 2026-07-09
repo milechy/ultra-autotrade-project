@@ -3532,6 +3532,28 @@
     "nextRunHours": "In approx. {hours}h (auto-runs every 4h)",
     "description": "AI is analyzing the market. A proposal is created when a BUY or SELL decision is made. No proposal is created for HOLD decisions."
   },
+  "AggressiveDisclosure": {
+    "title": "High-Risk Mode Confirmation",
+    "subtitle": "Before choosing High-Risk mode (Pendle fixed-yield PT), please acknowledge the following.",
+    "items": {
+      "funds_locked": {
+        "title": "No instant withdrawal until maturity",
+        "detail": "Funds are locked until the Pendle PT matures. Selling before maturity may incur an unfavorable price depending on market liquidity."
+      },
+      "pt_backed": {
+        "title": "Backed by yoUSD (a yield aggregator)",
+        "detail": "Principal is backed by the yoUSD yield-aggregator vault. Depeg or impairment of the backing assets is not impossible."
+      },
+      "slippage": {
+        "title": "Slippage and liquidity risk",
+        "detail": "Pool liquidity is limited and swaps incur slippage. Each deposit is capped relative to pool liquidity."
+      }
+    },
+    "cancelBtn": "Cancel",
+    "submitBtn": "I understand and agree",
+    "submitting": "Submitting...",
+    "error": "Failed to record consent"
+  },
   "SettingsRiskMode": {
     "title": "Risk Mode Settings",
     "description": "The AI judgment criteria change according to your trading style. The default is \"Conservative\".",
