@@ -8,6 +8,7 @@
 
 import dynamic from 'next/dynamic'
 import FeePlanSection from '@/components/user/FeePlanSection'
+import { isFeeCollectionEnabled } from '@/lib/flags'
 
 const FeeApproveCard = dynamic(
   () => import('@/components/user/FeeApproveCard').then((m) => ({ default: m.FeeApproveCard })),
@@ -33,9 +34,15 @@ export default function FeeApprovePage() {
       </div>
       {/* B-3: 承認前に料率・課金日・「現在は徴収なし」を提示（孤立していた本ページに文脈を付与） */}
       <FeePlanSection />
-      {/* F-7: サブスク月額分はクレカ(Stripe)で回収。成功報酬+yield超過分はon-chainで回収(下記)。 */}
-      <StripePaymentMethodCard />
-      <FeeApproveCard />
+      {/* 月額徴収撤廃（2026-07-09・当面無料）により、カード登録(Stripe)+on-chain allowance 承認の
+          徴収UIは既定で非表示。徴収を再開する場合のみ isFeeCollectionEnabled で表示する。 */}
+      {isFeeCollectionEnabled() && (
+        <>
+          {/* F-7: サブスク月額分はクレカ(Stripe)で回収。成功報酬+yield超過分はon-chainで回収(下記)。 */}
+          <StripePaymentMethodCard />
+          <FeeApproveCard />
+        </>
+      )}
     </main>
   )
 }

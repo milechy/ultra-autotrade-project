@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { apiFetch } from '@/lib/api/client'
+import { isFeeCollectionEnabled } from '@/lib/flags'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -141,8 +142,9 @@ export default function FeePlanSection({ showPaymentLink = false }: { showPaymen
           <p className="text-xs text-amber-400/90">{t('notActiveNote')}</p>
         </div>
 
-        {/* 決済手段（自動引き落とし = operator allowance 承認）への導線。/fees からのみ表示。 */}
-        {showPaymentLink && (
+        {/* 決済手段（自動引き落とし = operator allowance 承認）への導線。/fees からのみ表示。
+            月額徴収撤廃（2026-07-09・当面無料）により既定で非表示。isFeeCollectionEnabled で gate。 */}
+        {showPaymentLink && isFeeCollectionEnabled() && (
           <Link
             href="/fee-approve"
             className="block w-full text-center rounded-lg border border-zinc-700 bg-zinc-800/60 px-3 py-2.5 text-sm text-zinc-200 hover:bg-zinc-800 transition-colors"

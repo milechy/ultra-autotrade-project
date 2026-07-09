@@ -11,6 +11,7 @@ import { useLiff } from '@/hooks/useLiff'
 import { FeeApproveCard } from '@/components/user/FeeApproveCard'
 import { StripePaymentMethodCard } from '@/components/user/StripePaymentMethodCard'
 import FeePlanSection from '@/components/user/FeePlanSection'
+import { isFeeCollectionEnabled } from '@/lib/flags'
 import { BrowserLoginPrompt } from '../_components/BrowserLoginPrompt'
 
 export default function LiffFeeApprovePage() {
@@ -68,11 +69,17 @@ export default function LiffFeeApprovePage() {
       <div className="mb-4">
         <FeePlanSection />
       </div>
-      {/* F-7: サブスク月額分はクレカ(Stripe)で回収。成功報酬+yield超過分はon-chainで回収(下記)。 */}
-      <div className="mb-4">
-        <StripePaymentMethodCard />
-      </div>
-      <FeeApproveCard />
+      {/* 月額徴収撤廃（2026-07-09・当面無料）により、カード登録(Stripe)+on-chain allowance 承認の
+          徴収UIは既定で非表示。徴収を再開する場合のみ isFeeCollectionEnabled で表示する。 */}
+      {isFeeCollectionEnabled() && (
+        <>
+          {/* F-7: サブスク月額分はクレカ(Stripe)で回収。成功報酬+yield超過分はon-chainで回収(下記)。 */}
+          <div className="mb-4">
+            <StripePaymentMethodCard />
+          </div>
+          <FeeApproveCard />
+        </>
+      )}
     </div>
   )
 }

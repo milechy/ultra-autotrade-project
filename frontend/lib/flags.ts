@@ -61,3 +61,19 @@ export function isAutoModeEnabled(): boolean {
 export function isReferralEnabled(): boolean {
   return process.env.NEXT_PUBLIC_REFERRAL_ENABLED === 'true'
 }
+
+/**
+ * 手数料（月額利用料）の徴収 UI を表示するか。
+ *
+ * 既定 false。2026-07-09 に「月額徴収自体を撤廃・当面無料（収益モデルなし）」と決定
+ * （hkobayashi）。徴収 UI（Stripe カード登録 / on-chain allowance 承認 / 支払い方法設定
+ * への導線）はこのフラグで gate し、既定で非表示にする。
+ *
+ * バックエンド側の徴収も既定 OFF（`ENABLE_MONTHLY_FEE_BATCH` 既定 0 /
+ * `FEE_TRANSFER_ENABLED` 既定 false）。将来、料率・法務・決済が整い徴収を再開する場合は、
+ * env `NEXT_PUBLIC_FEE_COLLECTION_ENABLED=true` + フロント再ビルド + バックエンド徴収フラグ
+ * を同時に有効化する（code-ready-behind-flag）。コードは残置＝可逆。
+ */
+export function isFeeCollectionEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_FEE_COLLECTION_ENABLED === 'true'
+}
