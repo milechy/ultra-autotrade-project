@@ -39,7 +39,9 @@ def _grant(**kw: object) -> SimpleNamespace:
 
 
 def _supply_proposal() -> SimpleNamespace:
-    return SimpleNamespace(id=7, asset="USDC", amount_usd=Decimal("5"), operation="SUPPLY")
+    return SimpleNamespace(
+        id=7, asset="USDC", amount_usd=Decimal("5"), operation="SUPPLY", protocol=None
+    )
 
 
 # ---- _resolve_privy_wallet_id ----
@@ -74,7 +76,9 @@ def test_route_true_when_enabled_supply_with_ids(enabled_env: None) -> None:
 
 
 def test_route_false_for_withdraw(enabled_env: None) -> None:
-    p = SimpleNamespace(id=8, asset="USDC", amount_usd=Decimal("5"), operation="WITHDRAW")
+    p = SimpleNamespace(
+        id=8, asset="USDC", amount_usd=Decimal("5"), operation="WITHDRAW", protocol=None
+    )
     assert _should_use_scw_route(p, _grant()) is False
 
 
@@ -85,6 +89,34 @@ def test_route_false_when_no_grant(enabled_env: None) -> None:
 def test_route_false_when_grant_missing_ids(enabled_env: None) -> None:
     assert _should_use_scw_route(_supply_proposal(), _grant(privy_signer_id=None)) is False
     assert _should_use_scw_route(_supply_proposal(), _grant(privy_policy_id=None)) is False
+
+
+# ---- Pendle [Phase D / D3] ----
+
+
+def _pendle_proposal() -> SimpleNamespace:
+    return SimpleNamespace(
+        id=9, asset="PT-yoUSD", amount_usd=Decimal("50"), operation="BUY_PT", protocol="pendle"
+    )
+
+
+def test_route_true_pendle_buy_pt_with_grant(enabled_env: None) -> None:
+    """Pendle BUY_PT + grant.allowed_protocols に pendle → True。"""
+    assert _should_use_scw_route(_pendle_proposal(), _grant(allowed_protocols=["pendle"])) is True
+
+
+def test_route_false_pendle_without_allowed_protocol(enabled_env: None) -> None:
+    """grant が pendle を委譲していない → False（Aave のみ委譲では Pendle を broadcast しない）。"""
+    assert _should_use_scw_route(_pendle_proposal(), _grant(allowed_protocols=["aave"])) is False
+    assert _should_use_scw_route(_pendle_proposal(), _grant(allowed_protocols=None)) is False
+
+
+def test_route_false_pendle_wrong_operation(enabled_env: None) -> None:
+    """Pendle は BUY_PT のみ委譲対象（SELL_PT/その他は custodial）。"""
+    p = SimpleNamespace(
+        id=10, asset="PT-yoUSD", amount_usd=Decimal("50"), operation="SELL_PT", protocol="pendle"
+    )
+    assert _should_use_scw_route(p, _grant(allowed_protocols=["pendle"])) is False
 
 
 # ---- _execute_supply_via_scw ----
