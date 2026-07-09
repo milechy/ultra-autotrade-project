@@ -15,6 +15,7 @@ import type { TxHashLinkProps } from "@/components/shared/TxHashLink";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { saveBlob } from "@/lib/saveBlob";
 import {
   Select,
   SelectContent,
@@ -77,12 +78,7 @@ function exportCsv(trades: AdminTransaction[], headers: string[]) {
   ]);
   const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `trades-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  void saveBlob(blob, `trades-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 // -----------------------------------------------------------------------
