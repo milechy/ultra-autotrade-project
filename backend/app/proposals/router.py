@@ -322,18 +322,36 @@ def _should_use_scw_route(proposal: Proposal, grant: Optional[DelegationGrant]) 
     """委譲(SCW)経路で執行するか（dormant 既定 False）。
 
     True 条件: delegation policy 有効（フラグ+L0 signer+creds）かつ 有効 grant に
-    privy_signer_id/privy_policy_id があり、operation が SUPPLY のとき。
-    出金(WITHDRAW)は委譲対象外＝常に custodial(本人署名)維持。
+    privy_signer_id/privy_policy_id があり、対象 (protocol, operation) が委譲可能なとき。
+      - Aave: operation == SUPPLY（従来どおり。出金 WITHDRAW は常に custodial 本人署名）。
+      - Pendle [Phase D / D3-D4]: operation ∈ {BUY_PT(入口), SELL_PT(満期出口 redeem)} かつ
+        grant.allowed_protocols に "pendle"。
+    それ以外の (protocol, operation) は custodial 維持（False）。
     """
-    if proposal.operation != "SUPPLY":
+    protocol = (proposal.protocol or "aave").lower()
+    if protocol in ("", "aave"):
+        if proposal.operation != "SUPPLY":
+            return False
+    elif protocol == "pendle":
+        if proposal.operation not in ("BUY_PT", "SELL_PT"):
+            return False
+    else:
         return False
+
     from app.privy.delegation_service import is_delegation_policy_enabled  # noqa: PLC0415
 
     if not is_delegation_policy_enabled():
         return False
     if grant is None:
         return False
-    return bool(grant.privy_signer_id and grant.privy_policy_id)
+    if not (grant.privy_signer_id and grant.privy_policy_id):
+        return False
+    # Pendle は grant が明示的に "pendle" を委譲していることを要求する（Aave は従来挙動維持）。
+    if protocol == "pendle":
+        allowed = [str(p).lower() for p in (grant.allowed_protocols or [])]
+        if "pendle" not in allowed:
+            return False
+    return True
 
 
 def _execute_supply_via_scw(
@@ -667,32 +685,186 @@ class PendleDryRunNotBroadcast(ProtocolExecutionNotWiredError):
     """
 
 
-def _execute_pendle_for_proposal(proposal: Proposal, db: Session) -> None:
-    """[Phase D / D2] Pendle BUY_PT の自動執行 = dry-run calldata 構築 (broadcast なし)。
+def _pendle_liquidity_blocked(config: Any, amount_usd: Decimal) -> Optional[str]:
+    """[Phase D / D5] 流動性ガード: 1 投入が薄い PT プールを壊さないか検査する。
 
-    stablecoin PT (yoUSD 等・token_in=USDC≒1USD) 向けに RouterV4 Hosted SDK で
-    swapExactTokenForPt の未署名 tx を **構築するのみ** で broadcast しない。構築できたら
-    ``PendleDryRunNotBroadcast`` を送出し、proposal は 'approved' のまま (501)。実 broadcast
-    (partner 本人署名) は D3 で配線する (HUMAN-REVIEW-REQUIRED)。
+    唯一の必須物理制約。対象 market の ``tvl_usd``（= Pendle API の liquidity.usd）を取得し、
+    1 投入 ≤ ``max_pool_liquidity_pct``（プール流動性の数%）かつ ≤ ``max_trade_usd_cap``
+    （絶対上限 USD）であることを要求する。ブロック時は理由文字列、問題なければ None。
 
-    非カストディアル不変: サーバー鍵 (``PENDLE_WALLET_PRIVATE_KEY``) は一切参照せず、PT は
-    partner 本人 wallet (SCW 優先) に着金する未署名 tx を組む。SDK calldata の宛先が Router で
-    あることは ``build_buy_pt_tx`` 内で照合する (fail-closed)。
-
-    amount: stablecoin PT のみ token_in=USDC(≒1USD) のため ``proposal.amount_usd`` をそのまま
-    USDC 数量として扱える (Lido/ETH のような USD→token 価格換算が不要)。非 stablecoin market は
-    ``PENDLE_STABLE_UNDERLYING=false`` (既定) で fail-closed 拒否し、誤数量署名を防ぐ。
+    fail-closed: ``get_market_info`` は API 失敗時 tvl_usd=0 に fail-open するため、tvl<=0（未知）は
+    「壊さない保証ができない」= block する（不確実なら止める）。
     """
-    if (proposal.operation or "").upper() != "BUY_PT":
+    from app.protocols.pendle.client import get_pendle_client  # noqa: PLC0415
+
+    try:
+        client = get_pendle_client(config)
+        market_info = asyncio.run(client.get_market_info(config.market_address))
+        tvl_usd = Decimal(str(market_info.tvl_usd))
+    except Exception as exc:  # noqa: BLE001
+        return f"liquidity guard: market_info 取得失敗のため fail-closed ({exc})"
+
+    if tvl_usd <= 0:
+        return "liquidity guard: プール流動性が不明/ゼロのため fail-closed (tvl_usd<=0)"
+
+    pool_cap = tvl_usd * config.max_pool_liquidity_pct
+    if amount_usd > pool_cap:
+        return (
+            f"liquidity guard: 1 投入 {amount_usd} がプール流動性上限 "
+            f"{pool_cap} (tvl {tvl_usd} × {config.max_pool_liquidity_pct}) を超過"
+        )
+    if amount_usd > config.max_trade_usd_cap:
+        return (
+            f"liquidity guard: 1 投入 {amount_usd} が絶対上限 {config.max_trade_usd_cap} USD を超過"
+        )
+    return None
+
+
+def _pendle_execution_blocked(proposal: Proposal, db: Session) -> Optional[str]:
+    """[Phase D / D3-D5] Pendle broadcast 執行直前のグローバル安全ゲート。
+
+    Pendle は ``_dispatch_custodial_execution`` から直接呼ばれ、``_execute_aave_for_proposal``
+    内の HARD_STOP / risk_limiter ゲートを通らない（Gap A）。broadcast 前に同等のゲートを
+    適用して bypass を防ぐ。ブロック時は理由文字列を返す（呼び出し元は proposal を 'approved'
+    据え置き = transient 再試行）。Aave 経路のロジックは一切変更しない（本関数に複製）。
+    """
+    from app.aave.risk_limiter import check_trade_within_limits  # noqa: PLC0415
+    from app.automation.safety_gate import evaluate_hard_stop  # noqa: PLC0415
+    from app.automation.state import get_monitoring_service  # noqa: PLC0415
+
+    hf_for_gate: Optional[Decimal] = None
+    try:
+        from app.aave.monitor import get_health_factor as _gate_get_hf  # noqa: PLC0415
+
+        hf_for_gate = _gate_get_hf()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("proposal %d: Pendle safety-gate HF fetch failed: %s", proposal.id, exc)
+
+    daily_traded = _daily_traded_usd_for_user(proposal.user_id, db, exclude_proposal_id=proposal.id)
+    total_assets: Optional[Decimal] = None  # per-user 総資産は未配線（Aave 経路と同）
+
+    hard_stop = evaluate_hard_stop(
+        get_monitoring_service(),
+        hf_for_gate,
+        daily_traded_usd=daily_traded,
+        total_assets_usd=total_assets,
+    )
+    if hard_stop.blocked:
+        return f"HARD_STOP (source={hard_stop.source}, reason={hard_stop.reason})"
+
+    limit_violation = check_trade_within_limits(
+        amount_usd=Decimal(str(proposal.amount_usd)),
+        total_assets_usd=total_assets,
+        daily_traded_usd=daily_traded,
+        hf=hf_for_gate,
+    )
+    if limit_violation is not None:
+        return f"risk_limiter ({limit_violation})"
+
+    # [D5] 流動性ガード（薄いプール保護・必須物理制約）。BUY_PT/SELL_PT 双方に適用。
+    from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
+
+    liquidity_block = _pendle_liquidity_blocked(
+        get_pendle_config(), Decimal(str(proposal.amount_usd))
+    )
+    if liquidity_block is not None:
+        return liquidity_block
+    return None
+
+
+def _build_pendle_swap_result(proposal: Proposal, config: Any, from_address: str) -> Any:
+    """[Phase D / D3-D4] proposal.operation に応じて Pendle swap 結果(approvals 付き)を構築する。
+
+    - BUY_PT(入口): USDC→PT (token_in=USDC・6桁)。amount_usd をそのまま USDC 数量に使う。
+    - SELL_PT(満期出口 redeem): PT→USDC (token_out=USDC・出力6桁 / PT=18桁)。stablecoin PT は
+      満期で 1:1 のため amount_usd を PT 数量とみなす（満期前は二次市場の流動性に依存）。
+
+    どちらも RouterV4 Hosted SDK 呼び出しのみ（broadcast なし）。stablecoin 前提は呼び出し元が
+    ``config.stable_underlying`` で担保済み。
+    """
+    from app.protocols.pendle.client import get_pendle_router_v4_client  # noqa: PLC0415
+
+    client = get_pendle_router_v4_client(config)
+    amount_in = Decimal(str(proposal.amount_usd))  # stablecoin 1:1
+    op = (proposal.operation or "").upper()
+    if op == "SELL_PT":
+        return asyncio.run(
+            client.build_sell_pt_swap_result(
+                market_address=config.market_address,
+                token_out=config.underlying_token_address,
+                pt_amount_in=amount_in,
+                from_address=from_address,
+                token_out_decimals=config.underlying_token_decimals,
+            )
+        )
+    return asyncio.run(
+        client.build_buy_pt_swap_result(
+            market_address=config.market_address,
+            token_in=config.underlying_token_address,
+            amount_in=amount_in,
+            from_address=from_address,
+            token_in_decimals=config.underlying_token_decimals,
+        )
+    )
+
+
+def _execute_pendle_via_scw(
+    proposal: Proposal, chain: str, grant: DelegationGrant, user: Optional[UserModel], db: Session
+) -> Any:
+    """[Phase D / D3] 委譲(SCW)経路で Pendle BUY_PT swap を broadcast する。
+
+    ``_execute_supply_via_scw``(Aave)の姉妹。RouterV4 で swap 結果(approvals 付き)を取得し、
+    ``build_pendle_swap_calls`` で approve→swap の ERC-5792 calls に変換して
+    ``execute_calls_via_scw`` に渡す。HARD_STOP / risk_limiter は呼び出し元が通過済み。
+    サーバー鍵は参照せず、PT は SCW 本人着金（非カストディアル不変）。
+    """
+    from app.proposals.pendle_scw import build_pendle_swap_calls  # noqa: PLC0415
+    from app.proposals.scw_executor import execute_calls_via_scw  # noqa: PLC0415
+    from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
+
+    scw_address = grant.wallet_address or (user.smart_wallet_address if user else None)
+    if not scw_address:
+        raise ValueError("SCW route requires a smart wallet address (grant/user)")
+    privy_wallet_id = _resolve_privy_wallet_id(user)
+
+    config = get_pendle_config()
+    result = _build_pendle_swap_result(proposal, config, scw_address)
+    if not result.success:
         raise ProtocolExecutionNotWiredError(
-            f"Pendle は BUY_PT のみ自動執行対応です "
+            f"Pendle proposal={proposal.id}: swap calldata 取得失敗: {result.error}"
+        )
+    calls = build_pendle_swap_calls(result)
+    return execute_calls_via_scw(
+        privy_wallet_id=privy_wallet_id,
+        chain_name=chain,
+        calls=calls,
+        idempotency_key=f"proposal-{proposal.id}",
+    )
+
+
+def _execute_pendle_for_proposal(proposal: Proposal, db: Session) -> None:
+    """[Phase D / D2-D3] Pendle BUY_PT の自動執行。
+
+    既定は **dry-run**（D2）: RouterV4 で swapExactTokenForPt の未署名 tx を構築するのみで
+    broadcast せず ``PendleDryRunNotBroadcast`` を送出（proposal は 'approved' 据え置き / 501）。
+
+    **二段ガード全 true のときのみ broadcast**（D3・既定 OFF / dormant）:
+      1. ``PENDLE_ENABLE_ONCHAIN_WRITE=true``（config.enable_onchain_write）
+      2. ``_should_use_scw_route``（delegation policy 有効 + grant に signer/policy + allowed=pendle）
+    → HARD_STOP 安全ゲート通過後、SCW/Privy 委譲署名で broadcast し executed/tx_hash を保存する。
+
+    operation: BUY_PT(入口 USDC→PT) と SELL_PT(満期出口 redeem PT→USDC / D4) に対応する。
+
+    非カストディアル不変: サーバー鍵は一切参照せず PT/USDC は SCW 本人着金。amount は stablecoin PT
+    (USDC≒1USD) のみ ``proposal.amount_usd`` をそのまま token 数量に使う（BUY=USDC数量 / SELL=PT数量。
+    非 stablecoin は ``PENDLE_STABLE_UNDERLYING=false`` 既定で fail-closed）。
+    """
+    if (proposal.operation or "").upper() not in ("BUY_PT", "SELL_PT"):
+        raise ProtocolExecutionNotWiredError(
+            f"Pendle は BUY_PT / SELL_PT のみ自動執行対応です "
             f"(proposal={proposal.id}, op={proposal.operation})。"
         )
 
-    from app.protocols.pendle.client import (  # noqa: PLC0415
-        PendleBuildTxError,
-        get_pendle_router_v4_client,
-    )
     from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
 
     config = get_pendle_config()
@@ -722,37 +894,97 @@ def _execute_pendle_for_proposal(proposal: Proposal, db: Session) -> None:
             f"Pendle proposal={proposal.id}: amount_usd が 0 以下です (amount={amount_in})。"
         )
 
-    try:
-        client = get_pendle_router_v4_client(config)
-        unsigned_tx = asyncio.run(
-            client.build_buy_pt_tx(
-                market_address=config.market_address,
-                token_in=config.underlying_token_address,
-                amount_in=amount_in,
-                from_address=wallet_address,
-                token_in_decimals=config.underlying_token_decimals,
+    # ── broadcast 分岐（D3・二段ガード全 true のときのみ実 broadcast。既定は dry-run）──
+    grant = get_active_grant(proposal.user_id, db)
+    if config.enable_onchain_write and _should_use_scw_route(proposal, grant) and grant is not None:
+        from app.transactions.models import Transaction  # noqa: PLC0415
+
+        chain = config.chain  # Pendle 実行チェーン（base / base_sepolia）
+        # Gap A: Pendle broadcast は Aave 経路の HARD_STOP/risk_limiter を通らないため執行直前に適用。
+        block_reason = _pendle_execution_blocked(proposal, db)
+        if block_reason is not None:
+            logger.warning(
+                "proposal %d: Pendle broadcast HELD by safety gate (%s) — "
+                "status remains 'approved' for retry",
+                proposal.id,
+                block_reason,
             )
+            return  # transient: 条件解消後に再執行
+        # broadcast 呼び出しのみ try で包む。**submitted 後の bookkeeping 例外で failed 化しない**
+        # （broadcast 済みなのに failed→再執行で二重送信するのを防ぐ）。ScwNotEnabledError は
+        # ルート判定で除外済みだが防御的に捕捉する。
+        try:
+            result = _execute_pendle_via_scw(proposal, chain, grant, user, db)
+        except (RuntimeError, ValueError, ProtocolExecutionNotWiredError) as exc:
+            # RuntimeError = ScwExecutionError/ScwNotEnabledError/PendleScwCallsError を包含。
+            # ValueError = SCW アドレス欠如。いずれも broadcast 不成立 → failed 記録。
+            error_message = f"{type(exc).__name__}: {exc}"
+            failed_at = datetime.now(timezone.utc)
+            proposal.execution_attempts += 1
+            proposal.status = "failed"
+            proposal.error_message = error_message
+            proposal.executed_at = failed_at
+            _record_failed_transaction(proposal, chain, error_message, db)
+            logger.error(
+                "proposal %d: Pendle SCW execution failed: %s",
+                proposal.id,
+                exc,
+                exc_info=True,
+            )
+            return
+
+        # broadcast は submitted。以降は必ず executed として確定する。
+        proposal.execution_attempts += 1
+        proposal.tx_hash = result.tx_hash
+        proposal.status = "executed"
+        proposal.executed_at = datetime.now(timezone.utc)
+        tx_status = "completed" if result.tx_hash else "pending"
+        tx = Transaction(
+            user_id=proposal.user_id,
+            operation=proposal.operation,
+            asset=proposal.asset,
+            amount=proposal.amount,
+            amount_usd=proposal.amount_usd,
+            tx_hash=result.tx_hash,
+            chain=chain,
+            status=tx_status,
+            ai_decision_id=proposal.ai_decision_id,
+            is_dry_run=False,
         )
-    except PendleBuildTxError as exc:
-        # calldata 取得失敗 / Router 不一致は fail-closed。broadcast しない。
-        raise ProtocolExecutionNotWiredError(
-            f"Pendle proposal={proposal.id}: dry-run calldata 構築失敗: {exc}"
-        ) from exc
+        db.add(tx)
+        logger.info(
+            "proposal %d: Pendle %s executed via SCW — tx=%s status=%s (attempt=%d)",
+            proposal.id,
+            proposal.operation,
+            result.tx_hash,
+            result.status,
+            proposal.execution_attempts,
+        )
+        return
+
+    # dry-run（D2）: BUY_PT/SELL_PT の未署名 calldata を構築するのみ（broadcast なし）。
+    try:
+        result = _build_pendle_swap_result(proposal, config, wallet_address)
     except Exception as exc:  # noqa: BLE001
         raise ProtocolExecutionNotWiredError(
             f"Pendle proposal={proposal.id}: dry-run calldata 構築失敗: {exc}"
         ) from exc
+    if not result.success or not result.calldata or not result.to:
+        # calldata 取得失敗 / Router 不一致は fail-closed。broadcast しない。
+        raise ProtocolExecutionNotWiredError(
+            f"Pendle proposal={proposal.id}: dry-run calldata 構築失敗: {result.error}"
+        )
 
-    _to = str(unsigned_tx.get("to", "") or "")
-    _data = str(unsigned_tx.get("data", "") or "")
+    _to = str(result.to or "")
+    _data = str(result.calldata or "")
     _data_bytes = (len(_data) - 2) // 2 if _data.startswith("0x") else 0
     logger.info(
-        "proposal %d: Pendle BUY_PT dry-run calldata 構築成功 — to=%s data_bytes=%d chainId=%s "
-        "amount_usdc=%s (broadcast は D3 で配線 / HUMAN-REVIEW)",
+        "proposal %d: Pendle %s dry-run calldata 構築成功 — to=%s data_bytes=%d amount=%s "
+        "(broadcast は二段ガードで配線 / HUMAN-REVIEW)",
         proposal.id,
+        proposal.operation,
         _to,
         _data_bytes,
-        unsigned_tx.get("chainId"),
         amount_in,
     )
     raise PendleDryRunNotBroadcast(

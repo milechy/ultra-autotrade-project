@@ -493,15 +493,17 @@ def _resolve_protocol_routing(
 ) -> tuple[str, str, str]:
     """Proposal の (operation, asset, protocol) を決める (Phase-B)。
 
-    既定 (フラグ無効 / SELL / optimizer 失敗 / aave 推奨) は Aave 既定経路
-    ``(SUPPLY|WITHDRAW, "USDC", "aave")``。フラグ有効かつ BUY かつ AI Optimizer が
-    lido/pendle を推奨した場合のみ該当プロトコルへルーティングする:
-      - Lido → ``("STAKE_ETH", "ETH", "lido")``
-      - Pendle → ``("BUY_PT", "PT-stETH", "pendle")``
+    既定 (フラグ無効 / SELL / optimizer 失敗 / aave 推奨 / risk_mode 非適格) は Aave 既定経路
+    ``(SUPPLY|WITHDRAW, "USDC", "aave")``。フラグ有効かつ BUY かつ AI Optimizer が lido/pendle を
+    推奨し、**かつ user.risk_mode がそのプロトコルを許可** (``RISK_MODE_PROTOCOLS``) する場合のみ
+    該当プロトコルへルーティングする:
+      - Lido → ``("STAKE_ETH", "ETH", "lido")`` (balanced 以上)
+      - Pendle → ``("BUY_PT", "PT-yoUSD", "pendle")`` (aggressive のみ / D5)
 
-    いずれの場合も on-chain 実行は行わず、Proposal を DB に作成するのみ
-    (実際の ETH staking / Pendle swap の broadcast は Phase-D / 人間承認後)。
-    Health Factor チェック・緊急停止フラグには一切触れない。
+    [D5] risk_mode eligibility ゲート: optimizer ランキングだけでなく risk_mode で eligible な
+    protocol を絞る (conservative が pendle を掴む等の誤ルーティング防止)。未知/None は conservative
+    相当 (aave のみ)。いずれも on-chain 実行はせず Proposal を DB 作成するのみ (broadcast は Phase-D /
+    人間承認後)。Health Factor チェック・緊急停止フラグには触れない。
     """
     aave_operation = "SUPPLY" if result.final_action == TradeAction.BUY else "WITHDRAW"
     aave_default = (aave_operation, _PROPOSAL_ASSET, "aave")
@@ -514,10 +516,27 @@ def _resolve_protocol_routing(
     try:
         from app.ai.optimizer.comparator import StrategyComparator  # noqa: PLC0415
         from app.ai.optimizer.schemas import Protocol  # noqa: PLC0415
+        from app.ai.optimizer.signal_adapter import (  # noqa: PLC0415
+            AaveSignalAdapter,
+            PendleSignalAdapter,
+        )
+        from app.ai.optimizer.strategy_scorer import StrategyScorer  # noqa: PLC0415
+        from app.protocols.pendle.client import get_pendle_client  # noqa: PLC0415
+        from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
 
-        comparison = StrategyComparator().compare(
-            investment_usd=investment_usd,
-            risk_mode=risk_mode or "balanced",
+        # [D5b] 実 APY 配線: 固定 5.2% ではなく実 implied APY を使う。adapter は client=None /
+        # 取得失敗時に fallback 定数へ fail-open するため安全 (既存設計)。lido は Base 未対応の
+        # ため未注入 (fallback 定数のまま)。
+        pconf = get_pendle_config()
+        scorer = StrategyScorer(
+            pendle_adapter=PendleSignalAdapter(get_pendle_client(pconf), pconf.market_address),
+            aave_adapter=AaveSignalAdapter(),
+        )
+        comparison = asyncio.run(
+            StrategyComparator(scorer=scorer).compare_async(
+                investment_usd=investment_usd,
+                risk_mode=risk_mode or "balanced",
+            )
         )
         recommended = comparison.recommended.protocol
     except Exception as exc:  # noqa: BLE001
@@ -525,11 +544,19 @@ def _resolve_protocol_routing(
         logger.warning("AI Optimizer 比較に失敗、Aave 既定にフォールバック: %s", exc)
         return aave_default
 
-    if recommended in (Protocol.LIDO, Protocol.LIDO_AAVE):
+    # [D5] risk_mode で eligible な protocol を絞る（未知/None は conservative 相当 = aave のみ）。
+    from app.auth.models import RISK_MODE_PROTOCOLS, RiskMode  # noqa: PLC0415
+
+    try:
+        allowed_protocols = RISK_MODE_PROTOCOLS.get(RiskMode(risk_mode or ""), frozenset({"aave"}))
+    except ValueError:
+        allowed_protocols = frozenset({"aave"})
+
+    if recommended in (Protocol.LIDO, Protocol.LIDO_AAVE) and "lido" in allowed_protocols:
         return ("STAKE_ETH", "ETH", "lido")
-    if recommended in (Protocol.PENDLE_PT, Protocol.PENDLE_YT):
-        return ("BUY_PT", "PT-stETH", "pendle")
-    # AAVE / IDLE / その他 → Aave 既定経路
+    if recommended in (Protocol.PENDLE_PT, Protocol.PENDLE_YT) and "pendle" in allowed_protocols:
+        return ("BUY_PT", "PT-yoUSD", "pendle")
+    # AAVE / IDLE / risk_mode 非適格 / その他 → Aave 既定経路
     return aave_default
 
 

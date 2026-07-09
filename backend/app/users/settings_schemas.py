@@ -35,6 +35,8 @@ class UserSettingsResponse(BaseModel):
     terms_agreed_at: Optional[datetime] = None
     # 同意時の規約バージョン（フロントエンドの再同意判定に使用）
     terms_version: Optional[str] = None
+    # Phase-D D5b: aggressive ティアのリスク開示/同意日時（未同意なら None）。
+    aggressive_ack_at: Optional[datetime] = None
     # 法人決算月 (1-12)。NULL=個人ユーザー。設定済みで TAX & REPORTS 法人モードを解放する。
     corporate_fiscal_month: Optional[int] = None
     # ユーザーロール（admin / viewer / partner）。フロントエンドの権限分岐に使用する。

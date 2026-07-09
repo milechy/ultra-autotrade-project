@@ -50,6 +50,14 @@ class PendleConfig:
     underlying_token_decimals: int = field(
         default_factory=lambda: int(os.getenv("PENDLE_UNDERLYING_TOKEN_DECIMALS", "6"))
     )
+    # PT トークンのコントラクトアドレス。SELL_PT(満期出口 redeem)で PT→Router の approve 宛先
+    # として使う（Privy policy の allowlist にも要る）。市場ごとに異なるため env で設定する。
+    pt_token_address: str = field(
+        default_factory=lambda: os.getenv(
+            "PENDLE_PT_TOKEN_ADDRESS",
+            "0x0000000000000000000000000000000000000004",  # dummy address
+        )
+    )
     # 入力トークンが USD ペッグの stablecoin (USDC 等) か。True の場合のみ proposal.amount_usd
     # をそのまま入力トークン数量として扱う (1 USDC≒1 USD)。False (既定) は USD→token 価格換算が
     # 未配線のため自動執行を fail-closed で拒否する (ETH や非ステーブル PT の誤数量署名防止)。
@@ -86,6 +94,15 @@ class PendleConfig:
     # 単一トレード上限（ポートフォリオに対する割合。デフォルト 10%）
     max_single_trade_pct: Decimal = field(
         default_factory=lambda: _get_env_decimal("PENDLE_MAX_SINGLE_TRADE_PCT", "0.10")
+    )
+    # [Phase D / D5] 流動性ガード: 1 投入 ≤ プール流動性(tvl_usd)の割合（デフォルト 5%）。
+    # 薄い PT プールを 1 回の swap で壊さないための物理制約。
+    max_pool_liquidity_pct: Decimal = field(
+        default_factory=lambda: _get_env_decimal("PENDLE_MAX_POOL_LIQUIDITY_PCT", "0.05")
+    )
+    # [Phase D / D5] 流動性ガード: 1 投入の絶対上限（USD）。プール流動性%と併せて被害上限を縛る。
+    max_trade_usd_cap: Decimal = field(
+        default_factory=lambda: _get_env_decimal("PENDLE_MAX_TRADE_USD_CAP", "5000")
     )
 
     def token_decimals(self, token: str) -> int:

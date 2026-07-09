@@ -920,6 +920,87 @@ class PendleRouterV4Client:
             )
             return RouterV4SwapResult(success=False, error=str(exc))
 
+    async def build_buy_pt_swap_result(
+        self,
+        market_address: str,
+        token_in: str,
+        amount_in: Decimal,
+        from_address: str,
+        slippage: Decimal | None = None,
+        token_in_decimals: int | None = None,
+    ) -> RouterV4SwapResult:
+        """[Phase D / D3] PT 購入 (swapExactTokenForPt) の **swap 結果 (approvals 付き)** を返す。
+
+        ``build_buy_pt_tx`` は未署名 tx dict のみ返し approvals を捨てるが、SCW 委譲署名の
+        batch (approve → swap) には approvals が必要なため、``RouterV4SwapResult``
+        (``.to`` / ``.calldata`` / ``.approvals``) をそのまま返す。receiver/from は署名者
+        (partner 本人 / SCW) に固定し PT は本人着金。``enable_onchain_write`` ガードは通さず
+        (broadcast は SCW 側が行う)、SDK 呼び出し + Router 照合 + calldata 欠損の fail-closed
+        は ``_execute_swap`` 内で維持する。
+
+        Raises:
+            PendleBuildTxError: from_address 空 / amount_in<=0。
+        """
+        if not from_address:
+            raise PendleBuildTxError("from_address は必須です (署名者)")
+        if amount_in <= 0:
+            raise PendleBuildTxError("amount_in は正の値である必要があります")
+
+        effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
+        in_decimals = self._resolve_decimals(token_in, token_in_decimals)
+        req = RouterV4SwapRequest(
+            market_address=market_address,
+            token_in=token_in,
+            token_out="PT",  # noqa: S106 — トークン種別リテラル (パスワードではない)
+            amount_in=amount_in,
+            slippage=effective_slippage,
+            receiver=from_address,  # 非カストディアル: PT は署名者本人へ着金
+        )
+        return await self._execute_swap(
+            req, "swapExactTokenForPt", amount_in_decimals=in_decimals, amount_out_decimals=18
+        )
+
+    async def build_sell_pt_swap_result(
+        self,
+        market_address: str,
+        token_out: str,
+        pt_amount_in: Decimal,
+        from_address: str,
+        slippage: Decimal | None = None,
+        token_out_decimals: int | None = None,
+    ) -> RouterV4SwapResult:
+        """[Phase D / D4] PT 売却/満期 redeem (swapExactPtForToken) の swap 結果を返す。
+
+        ``build_buy_pt_swap_result`` の出口版。満期到来後は Pendle が PT→underlying を 1:1 で
+        redeem する経路にルーティングする（満期前は二次市場の流動性に依存）。receiver は署名者
+        本人に固定し token_out(USDC)を本人着金。approve 対象は PT トークン（SDK approvals が返す）
+        で、``build_pendle_swap_calls`` が汎用に approve→swap の calls を組む。
+        ``enable_onchain_write`` ガードは通さず（broadcast は SCW 側）、Router 照合・calldata 欠損
+        の fail-closed は ``_execute_swap`` 内で維持する。
+
+        Raises:
+            PendleBuildTxError: from_address 空 / pt_amount_in<=0。
+        """
+        if not from_address:
+            raise PendleBuildTxError("from_address は必須です (署名者)")
+        if pt_amount_in <= 0:
+            raise PendleBuildTxError("pt_amount_in は正の値である必要があります")
+
+        effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
+        out_decimals = self._resolve_decimals(token_out, token_out_decimals)
+        req = RouterV4SwapRequest(
+            market_address=market_address,
+            token_in="PT",  # noqa: S106 — トークン種別リテラル (パスワードではない)
+            token_out=token_out,
+            amount_in=pt_amount_in,
+            slippage=effective_slippage,
+            receiver=from_address,  # 非カストディアル: 出力トークンは署名者本人へ着金
+        )
+        # PT は 18 桁。出力トークンのみ decimals を解決する。
+        return await self._execute_swap(
+            req, "swapExactPtForToken", amount_in_decimals=18, amount_out_decimals=out_decimals
+        )
+
     async def build_buy_pt_tx(
         self,
         market_address: str,
@@ -955,25 +1036,15 @@ class PendleRouterV4Client:
         Raises:
             PendleBuildTxError: calldata 取得失敗 / Router 不一致 / 引数不正。
         """
-        if not from_address:
-            raise PendleBuildTxError("from_address は必須です (partner 署名)")
-        if amount_in <= 0:
-            raise PendleBuildTxError("amount_in は正の値である必要があります")
-
-        effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
-        in_decimals = self._resolve_decimals(token_in, token_in_decimals)
-        req = RouterV4SwapRequest(
+        # swap 結果 (approvals 付き) を取得し、未署名 tx dict に整形する。前提チェック
+        # (from_address 空 / amount_in<=0) と enable_onchain_write 非適用は共通実装に集約。
+        result = await self.build_buy_pt_swap_result(
             market_address=market_address,
             token_in=token_in,
-            token_out="PT",  # noqa: S106 — トークン種別リテラル (パスワードではない)
             amount_in=amount_in,
-            slippage=effective_slippage,
-            receiver=from_address,  # 非カストディアル: PT は partner 本人へ着金
-        )
-        # PT は 18 桁。入力トークンのみ decimals を解決する。enable_onchain_write ガードは
-        # 通さず（partner broadcast のため）、SDK 呼び出し + Router 照合のみ行う。
-        result = await self._execute_swap(
-            req, "swapExactTokenForPt", amount_in_decimals=in_decimals, amount_out_decimals=18
+            from_address=from_address,
+            slippage=slippage,
+            token_in_decimals=token_in_decimals,
         )
         if not result.success or not result.calldata or not result.to:
             raise PendleBuildTxError(result.error or "未署名 tx の calldata 取得に失敗しました")

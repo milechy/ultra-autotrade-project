@@ -45,6 +45,18 @@ def test_resolve_unsupported_protocol_fails_closed() -> None:
     assert "lido" in str(ei.value)
 
 
+def test_resolve_pendle_contracts_router_underlying_pt() -> None:
+    """[Phase D / D3-D4] Pendle は RouterV4 + underlying(USDC) + PT の 3 宛先を allowlist する。"""
+    from app.protocols.pendle.config import get_pendle_config
+
+    conf = get_pendle_config()
+    contracts = resolve_protocol_contracts(["pendle"], "base")
+    assert conf.router_address.lower() in contracts
+    assert conf.underlying_token_address.lower() in contracts  # BUY_PT approve 宛
+    assert conf.pt_token_address.lower() in contracts  # SELL_PT approve 宛
+    assert len(contracts) == 3
+
+
 def test_resolve_bad_chain_raises() -> None:
     with pytest.raises(PolicyMappingError):
         resolve_protocol_contracts(["aave"], "no_such_chain")
@@ -131,7 +143,7 @@ def test_build_policy_unsupported_protocol_raises() -> None:
     with pytest.raises(PolicyMappingError):
         build_delegation_policy(
             wallet_address=_WALLET,
-            allowed_protocols=["aave", "pendle"],
+            allowed_protocols=["aave", "lido"],  # lido は未対応（fail-closed）
             chain_name="base",
         )
 

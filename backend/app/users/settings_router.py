@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.constants import ExecutionPolicy
 from app.auth.dependencies import get_current_user, require_active_user
-from app.auth.models import User, UserRole
+from app.auth.models import AGGRESSIVE_ACK_VERSION, User, UserRole
 from app.database import get_db
 from app.partner import allocation_service
 from app.partner.allocation_schemas import MyAllocationResponse
@@ -69,6 +69,7 @@ def _build_settings_response(user: User) -> UserSettingsResponse:
         line_monthly_opt_in=user.line_monthly_opt_in,
         terms_agreed_at=user.terms_accepted_at,
         terms_version=user.terms_version,
+        aggressive_ack_at=user.aggressive_ack_at,
         corporate_fiscal_month=user.corporate_fiscal_month,
         role=user.role,
         wallet_address=user.wallet_address,
@@ -226,6 +227,45 @@ def agree_to_terms(
     allocation_service.auto_fund_tester_if_enabled(db, current_user)
     return {
         "terms_agreed_at": now.isoformat(),
+        "already_agreed": False,
+    }
+
+
+@router.post("/aggressive-consent", summary="aggressive ティア リスク開示 同意記録")
+def agree_aggressive_disclosure(
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """[Phase-D D5b] aggressive ティア(Pendle stablecoin PT)のリスク開示に同意を記録する。
+
+    満期ロック(即時出金不可) / yoUSD 裏付け / スリッページ・薄い流動性リスク の全同意。
+    ``/terms-agree`` を踏襲した auth-only・body なし・冪等な endpoint。現行
+    ``AGGRESSIVE_ACK_VERSION`` で既に同意済みならそのまま返す。実際の aggressive 選択有効化は
+    別途(PHASE_1 gate 緩和 / D6)で、本 endpoint は同意の記録のみ。
+    """
+    if (
+        current_user.aggressive_ack_at is not None
+        and current_user.aggressive_ack_version == AGGRESSIVE_ACK_VERSION
+    ):
+        return {
+            "aggressive_ack_at": current_user.aggressive_ack_at.isoformat(),
+            "already_agreed": True,
+        }
+
+    now = datetime.now(timezone.utc)
+    current_user.aggressive_ack_at = now
+    current_user.aggressive_ack_version = AGGRESSIVE_ACK_VERSION
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    logger.info(
+        "User %s agreed to aggressive-tier disclosure (%s) at %s",
+        current_user.email,
+        AGGRESSIVE_ACK_VERSION,
+        now.isoformat(),
+    )
+    return {
+        "aggressive_ack_at": now.isoformat(),
         "already_agreed": False,
     }
 
