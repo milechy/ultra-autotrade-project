@@ -486,6 +486,18 @@ def _multiprotocol_routing_enabled() -> bool:
     return os.getenv("AI_OPTIMIZER_MULTIPROTOCOL_ENABLED", "false").lower() == "true"
 
 
+def _safe_yield_on_hold_enabled() -> bool:
+    """[B1] HOLD 判定時でも「遊休USDC→Aave USDC 供給」の安全利回り提案を出すか。
+
+    既定無効 (従来どおり HOLD では提案ゼロ)。env で明示的に opt-in する。SUPPLY は HF を
+    改善する方向で本質的に安全なため、相場の方向性ゲート (Indicator+Macro≥70%) を待たずに
+    ドル建て安全利回りへ配分する。方向性トレード (BUY/SELL) の挙動には一切影響しない。
+    """
+    import os  # noqa: PLC0415
+
+    return os.getenv("AI_SAFE_YIELD_ON_HOLD_ENABLED", "false").lower() == "true"
+
+
 def _resolve_protocol_routing(
     result: CrossValidationResult,
     risk_mode: str | None,
@@ -764,6 +776,158 @@ def _create_proposals_for_users(
     return count
 
 
+def _create_safe_yield_proposals_for_users(
+    db: Session,
+    decision: AIDecision,
+    result: CrossValidationResult,
+) -> int:
+    """[B1] HOLD 判定時に「遊休USDC→Aave USDC 供給」の安全利回り提案を作成する。
+
+    ``_create_proposals_for_users`` の安全版。方向性ルーティング (_resolve_protocol_routing) は
+    通さず ``operation=SUPPLY / asset=USDC / protocol=aave`` に固定する。SUPPLY は Health Factor を
+    改善する方向で本質的に安全なため、相場ゲート (Indicator+Macro≥70%) を待たずにドル建て安全利回りへ
+    配分する。dedup / 入金ゲート / fee ゲート / per-user savepoint は本流と同一機構を再利用する。
+    BUY/SELL 経路 (``_create_proposals_for_users``) には一切影響しない。
+    """
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=_PROPOSAL_EXPIRES_HOURS)
+    now = datetime.now(timezone.utc)
+    reason = "遊休USDCを安全利回り（Aave USDC）へ配分します。相場の方向性に依らず実行できる安全な運用です。"
+
+    active_users = db.scalars(
+        select(User).where(
+            User.is_active == True,  # noqa: E712
+            User.execution_policy == ExecutionPolicy.REQUIRE_APPROVAL.value,
+        )
+    ).all()
+
+    import os  # noqa: PLC0415
+
+    from app.fees.trade_gate import calculate_fee_by_market  # noqa: PLC0415
+
+    fixed_cost = Decimal(os.getenv("TRADE_FIXED_COST_USD", "0.27"))
+
+    count = 0
+    for user in active_users:
+        try:
+            with db.begin_nested():
+                if not _is_user_due_for_judgment(user, now):
+                    continue
+
+                # 自己修復: 期限切れ pending を先に expire (本流と同じ・永久ブロック防止)。
+                try:
+                    _stale = db.scalars(
+                        select(Proposal).where(
+                            Proposal.user_id == user.id,
+                            Proposal.status == "pending",
+                            Proposal.expires_at < now,
+                        )
+                    ).all()
+                    for _sp in _stale:
+                        _sp.status = "expired"
+                    if _stale:
+                        db.flush()
+                except Exception as _stale_exc:  # noqa: BLE001
+                    logger.warning(
+                        "[safe_yield] stale expire failed for user %d (fail-open): %s",
+                        user.id,
+                        _stale_exc,
+                    )
+
+                # dedup: pending が1つでもあれば作らない (本流と同一)。
+                try:
+                    _pending_raw = db.scalar(
+                        select(func.count(Proposal.id)).where(
+                            Proposal.user_id == user.id,
+                            Proposal.status == "pending",
+                        )
+                    )
+                    _pending_count = int(_pending_raw) if isinstance(_pending_raw, int) else 0
+                except Exception as _guard_exc:  # noqa: BLE001
+                    _pending_count = 0
+                if _pending_count > 0:
+                    continue
+
+                # 遊休額 (fund_allocation or wallet USDC × 10%)。0/入金未満は skip (本流と同一)。
+                proposal_amount_usd = _resolve_proposal_amount(db, user.id)
+                if proposal_amount_usd <= Decimal("0"):
+                    continue
+
+                _default_apy = Decimal("4")
+                _expected_profit = (
+                    proposal_amount_usd
+                    * _default_apy
+                    / Decimal("100")
+                    * Decimal("30")
+                    / Decimal("365")
+                )
+                market_fee = calculate_fee_by_market(
+                    trade_amount_usd=proposal_amount_usd,
+                    tier=normalize_tier(user.tier, user_id=user.id).value,
+                    current_apy=_default_apy,
+                    expected_profit_usd=_expected_profit,
+                    fixed_cost_usd=fixed_cost,
+                )
+                if not market_fee.should_trade:
+                    logger.info(
+                        "[safe_yield] should_trade=False for user %d — skip (%s)",
+                        user.id,
+                        market_fee.reason,
+                    )
+                    continue
+
+                # 安全利回り: 方向性ルーティングを通さず SUPPLY/USDC/aave 固定。
+                operation, asset, protocol = ("SUPPLY", _PROPOSAL_ASSET, "aave")
+                estimated_gas_usd = estimate_static_gas_cost_usd(operation)
+                proposal = Proposal(
+                    user_id=user.id,
+                    ai_decision_id=decision.id,
+                    operation=operation,
+                    asset=asset,
+                    protocol=protocol,
+                    amount=proposal_amount_usd,
+                    amount_usd=proposal_amount_usd,
+                    reason=reason,
+                    expires_at=expires_at,
+                    fee_rate=market_fee.fee_rate,
+                    fee_amount=market_fee.fee_amount,
+                    estimated_gas_usd=estimated_gas_usd,
+                )
+                db.add(proposal)
+                user.last_judgment_at = now
+                count += 1
+
+                try:
+                    from app.notifications.factory import get_notification_service  # noqa: PLC0415
+                    from app.notifications.templates import (
+                        ai_proposal_notification,  # noqa: PLC0415
+                    )
+
+                    _payload = ai_proposal_notification(
+                        operation=operation,
+                        asset=asset,
+                        amount=proposal_amount_usd,
+                        confidence=result.final_confidence,
+                    )
+                    _payload.notification_message.user_id = user.id
+                    get_notification_service().send(_payload.notification_message)
+                except Exception as _notif_exc:  # noqa: BLE001
+                    logger.warning(
+                        "[safe_yield] notification failed for user %d (skip): %s",
+                        user.id,
+                        _notif_exc,
+                    )
+        except Exception as _user_exc:  # noqa: BLE001
+            logger.error(
+                "[safe_yield] proposal creation failed for user %d (skip): %s",
+                user.id,
+                _user_exc,
+            )
+
+    if count:
+        logger.info("[safe_yield] created %d safe-yield SUPPLY proposal(s) on HOLD", count)
+    return count
+
+
 def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
     """AI 判定を実行して DB に保存する同期関数。
 
@@ -931,6 +1095,10 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
         proposals_created = 0
         if routing_result.final_action in (TradeAction.BUY, TradeAction.SELL):
             proposals_created = _create_proposals_for_users(db, decision, routing_result)
+        elif _safe_yield_on_hold_enabled() and routing_result.final_action == TradeAction.HOLD:
+            # [B1] HOLD でも遊休USDCは安全利回り(Aave USDC供給)へ配分を提案する。
+            # 方向性ゲート(Indicator+Macro≥70%)に依らない安全な運用のみ通す。
+            proposals_created = _create_safe_yield_proposals_for_users(db, decision, result)
 
         db.commit()
 
