@@ -919,8 +919,8 @@
         "toastDepositRequired": "完全おまかせ運用には最低 ${gate} の入金が必要です",
         "consentNotReady": "おまかせ運用は現在準備中です。もう少しお待ちください",
         "consentNoWallet": "ウォレットが見つかりません。再ログインしてください",
-        "consentCancelled": "おまかせ運用の許可がキャンセルされました",
-        "consentFailed": "おまかせ運用の設定に失敗しました"
+        "consentCancelled": "おまかせ運用の設定を取りやめました。現在は「アクティブ」モードでご利用ください。",
+        "consentFailed": "おまかせ運用の設定に失敗しました。現在は「アクティブ」モードでご利用ください。"
       },
       "txHistory": {
         "title": "取引履歴",
