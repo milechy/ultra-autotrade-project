@@ -919,8 +919,8 @@
         "toastDepositRequired": "A minimum deposit of ${gate} is required for fully-managed mode",
         "consentNotReady": "Auto mode is being prepared. Please try again later.",
         "consentNoWallet": "Wallet not found. Please log in again.",
-        "consentCancelled": "Auto mode authorization was cancelled.",
-        "consentFailed": "Failed to enable auto mode."
+        "consentCancelled": "Auto mode setup was cancelled. Please continue with Active mode for now.",
+        "consentFailed": "Couldn't enable Auto mode. Please continue with Active mode for now."
       },
       "txHistory": {
         "title": "Transaction History",
