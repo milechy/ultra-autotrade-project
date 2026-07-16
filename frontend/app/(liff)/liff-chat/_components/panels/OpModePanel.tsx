@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react"
 import { Bot, MousePointer2 } from "lucide-react"
 import { useTranslations } from "next-intl"
-import { useSigners, useWallets } from "@privy-io/react-auth"
+import { useSigners, useUser, useWallets } from "@privy-io/react-auth"
 import { getAuthToken } from "@/lib/auth/token-key"
 import { isAutoModeEnabled } from "@/lib/flags"
 import { DEPOSIT_GATE_USD } from "@/lib/web3/config"
@@ -34,6 +34,7 @@ export function OpModePanel() {
   const [toast, setToast] = useState<string | null>(null)
   const { addSigners, removeSigners } = useSigners()
   const { wallets } = useWallets()
+  const { refreshUser } = useUser()
 
   function showToast(msg: string) {
     setToast(msg)
@@ -43,6 +44,24 @@ export function OpModePanel() {
   function embeddedEoaAddress(): string | null {
     // Privy embedded wallet (TEE) を委譲対象 EOA とする。外部 wallet は除外。
     return wallets.find((w) => w.walletClientType === "privy")?.address ?? null
+  }
+
+  // Privy 内部 wallet ID を解決する。Wallet.id はログイン時点(未委譲)では常に null
+  // （Privy SDK 仕様: "Null if the wallet is not delegated"）で、addSigners 成功直後に
+  // refreshUser() で最新の linkedAccounts を取得して初めて埋まる。委譲(SCW)執行の
+  // wallet_sendCalls が要求する識別子（2026-07-16、per-user 解決の唯一の確実な経路）。
+  async function resolvePrivyWalletId(eoa: string): Promise<string | undefined> {
+    try {
+      const refreshed = await refreshUser()
+      const account = refreshed.linkedAccounts.find(
+        (a) => a.type === "wallet" && a.address === eoa
+      )
+      return account && account.type === "wallet" && account.id ? account.id : undefined
+    } catch {
+      // 解決できなくても致命的ではない（_resolve_privy_wallet_id が env フォールバックに頼る）
+      console.warn("[opMode] privy_wallet_id resolution failed after addSigners")
+      return undefined
+    }
   }
 
   // managed への切替時: 委譲枠を作成（prepare）→ Privy で session signer を consent
@@ -78,11 +97,14 @@ export function OpModePanel() {
       return false
     }
 
+    const privyWalletId = await resolvePrivyWalletId(eoa)
+
     try {
       await grantDelegation({
         ...DEFAULT_DELEGATION_PARAMS,
         privy_policy_id: prep.privy_policy_id,
         privy_signer_id: prep.privy_signer_id,
+        ...(privyWalletId ? { privy_wallet_id: privyWalletId } : {}),
       })
     } catch {
       // grant 保存失敗 → 付与済み signer をロールバック（非カストディアル維持）
