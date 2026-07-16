@@ -593,10 +593,16 @@ def _create_proposals_for_users(
     reason = result.final_reason or "AI判定による提案"
     now = datetime.now(timezone.utc)
 
+    # AUTO_EXECUTE（完全おまかせ・無承認自動実行）ユーザーもここで提案対象に含める
+    # （2026-07-16）。生成後 run_auto_execution_for_ai_decision が有効な委譲(SCW) grant を
+    # 持つ AUTO_EXECUTE ユーザーの pending 分だけを即時実行する。grant が無い/対象外
+    # operation の場合は 'pending' のまま従来の手動フローに委ねる。
     active_users = db.scalars(
         select(User).where(
             User.is_active == True,  # noqa: E712
-            User.execution_policy == ExecutionPolicy.REQUIRE_APPROVAL.value,
+            User.execution_policy.in_(
+                [ExecutionPolicy.REQUIRE_APPROVAL.value, ExecutionPolicy.AUTO_EXECUTE.value]
+            ),
         )
     ).all()
 
@@ -793,10 +799,16 @@ def _create_safe_yield_proposals_for_users(
     now = datetime.now(timezone.utc)
     reason = "遊休USDCを安全利回り（Aave USDC）へ配分します。相場の方向性に依らず実行できる安全な運用です。"
 
+    # AUTO_EXECUTE ユーザーも対象に含める（2026-07-16）。B1 が生成する提案は常に
+    # SUPPLY/USDC/aave 固定で _should_use_scw_route が True になり得る唯一の operation
+    # （WITHDRAWの危険性が原理的にない）。HFを改善する方向で本質的に安全なため、
+    # 本流 (_create_proposals_for_users) と同様に含める。
     active_users = db.scalars(
         select(User).where(
             User.is_active == True,  # noqa: E712
-            User.execution_policy == ExecutionPolicy.REQUIRE_APPROVAL.value,
+            User.execution_policy.in_(
+                [ExecutionPolicy.REQUIRE_APPROVAL.value, ExecutionPolicy.AUTO_EXECUTE.value]
+            ),
         )
     ).all()
 
@@ -1102,11 +1114,39 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
 
         db.commit()
 
+        # AUTO_EXECUTE（完全おまかせ）ユーザーの pending 提案のうち、有効な委譲(SCW) grant を
+        # 持つ分だけを即時実行する（2026-07-16）。提案作成トランザクションと分離し、外部I/O
+        # (Privy sendCalls 等) の失敗が他ユーザーの提案生成をブロックしないようにする。
+        # fail-open: 例外は auto_execute 内部で握りつぶされる設計だが、二重の安全のため
+        # ここでも捕捉し、判定ジョブ全体の成功(proposals_created 等)を道連れにしない。
+        auto_execute_result: dict[str, int] = {
+            "auto_executed": 0,
+            "auto_execute_skipped": 0,
+            "auto_execute_failed": 0,
+        }
+        if proposals_created > 0:
+            try:
+                from app.proposals.auto_execute import (  # noqa: PLC0415
+                    run_auto_execution_for_ai_decision,
+                )
+
+                auto_execute_result = run_auto_execution_for_ai_decision(db, decision.id)
+                db.commit()
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "auto-execution for ai_decision_id=%d failed (fail-open, judgment job "
+                    "continues): %s",
+                    decision.id,
+                    exc,
+                )
+                db.rollback()
+
         return {
             "action": result.final_action.value,
             "confidence": result.final_confidence,
             "proposals_created": proposals_created,
             "decision_id": decision.id,
+            **auto_execute_result,
         }
 
     except Exception as exc:

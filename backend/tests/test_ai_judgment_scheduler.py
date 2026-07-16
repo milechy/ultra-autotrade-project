@@ -609,14 +609,49 @@ def test_run_job_degraded_context_has_required_keys(db_session):
 # ---------------------------------------------------------------------------
 
 
-def test_buy_creates_proposal_only_for_require_approval_users(db_session):
-    """BUY 判定時、execution_policy='require_approval' のユーザーのみ Proposal が作成されること。"""
+def test_buy_creates_proposal_for_require_approval_and_auto_execute_users(db_session):
+    """2026-07-16: BUY 判定時、execution_policy='require_approval'/'auto_execute' の
+    両方に Proposal が作成されること（'proposal_only' は対象外のまま）。
+    AUTO_EXECUTE ユーザーは委譲(SCW) grant を持たないため、提案は作られるが
+    auto-execution 側では skip され 'pending' のまま残る（別テストで検証）。
+    """
     approval_user = _add_active_user(
         db_session, "approval@example.com", execution_policy="require_approval"
     )
-    _add_active_user(db_session, "auto@example.com", execution_policy="auto_execute")
+    auto_user = _add_active_user(db_session, "auto@example.com", execution_policy="auto_execute")
     _add_active_user(db_session, "proposal@example.com", execution_policy="proposal_only")
     _add_fund_allocation(db_session, approval_user)
+    _add_fund_allocation(db_session, auto_user)
+    db_session.commit()
+
+    mock_result = _make_cross_validation_result(TradeAction.BUY)
+
+    with (
+        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
+        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
+    ):
+        MockAIService.return_value.judge_with_rag.return_value = mock_result
+        MockKnowledgeService.return_value.search.return_value = []
+
+        result = run_ai_judgment_job(db=db_session)
+
+    assert result["proposals_created"] == 2
+    proposals = db_session.scalars(select(Proposal)).all()
+    assert len(proposals) == 2
+    proposal_user_ids = {p.user_id for p in proposals}
+    assert proposal_user_ids == {approval_user.id, auto_user.id}
+    # 委譲grantが無いため auto-execution は skip（'pending' のまま・自動実行しない）。
+    assert all(p.status == "pending" for p in proposals)
+    assert result["auto_executed"] == 0
+    assert result["auto_execute_skipped"] == 1
+
+
+def test_auto_execute_user_without_grant_stays_pending_on_buy(db_session):
+    """2026-07-16: auto_execute ユーザーは提案が作られるが、有効な委譲(SCW) grant が
+    無い限り自動実行されず 'pending' のまま残る（既存の手動フローに委ねる）。
+    """
+    auto_user = _add_active_user(db_session, "auto@example.com", execution_policy="auto_execute")
+    _add_fund_allocation(db_session, auto_user)
     db_session.commit()
 
     mock_result = _make_cross_validation_result(TradeAction.BUY)
@@ -631,30 +666,11 @@ def test_buy_creates_proposal_only_for_require_approval_users(db_session):
         result = run_ai_judgment_job(db=db_session)
 
     assert result["proposals_created"] == 1
+    assert result["auto_executed"] == 0
+    assert result["auto_execute_skipped"] == 1
     proposals = db_session.scalars(select(Proposal)).all()
     assert len(proposals) == 1
-    assert proposals[0].user_id is not None
-
-
-def test_auto_execute_user_gets_no_proposal_on_buy(db_session):
-    """auto_execute ユーザーには BUY 判定でも Proposal が作成されないこと。"""
-    _add_active_user(db_session, "auto@example.com", execution_policy="auto_execute")
-    db_session.commit()
-
-    mock_result = _make_cross_validation_result(TradeAction.BUY)
-
-    with (
-        patch("app.automation.ai_judgment_scheduler.AIService") as MockAIService,
-        patch("app.automation.ai_judgment_scheduler.KnowledgeService") as MockKnowledgeService,
-    ):
-        MockAIService.return_value.judge_with_rag.return_value = mock_result
-        MockKnowledgeService.return_value.search.return_value = []
-
-        result = run_ai_judgment_job(db=db_session)
-
-    assert result["proposals_created"] == 0
-    proposals = db_session.scalars(select(Proposal)).all()
-    assert len(proposals) == 0
+    assert proposals[0].status == "pending"
 
 
 # ---------------------------------------------------------------------------
