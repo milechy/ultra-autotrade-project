@@ -664,6 +664,22 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
         _notify_aave_failure(proposal.id, error_message, failed_at)
 
 
+class DepositBelowMinimumError(Exception):
+    """A-2 入金ゲート違反（残高 < MIN_DEPOSIT_USD）。detail は HTTP 422 の detail dict と同型。"""
+
+    def __init__(self, detail: dict[str, str]) -> None:
+        self.detail = detail
+        super().__init__(detail.get("message", "deposit below minimum"))
+
+
+class PolicyViolationError(Exception):
+    """PolicyEngine hard rule 違反（Rule8 の有効委譲枠必須を含む）。"""
+
+    def __init__(self, violations: list[str]) -> None:
+        self.violations = violations
+        super().__init__("; ".join(violations))
+
+
 class ProtocolExecutionNotWiredError(Exception):
     """custodial 自動執行がまだ配線されていない protocol を指す。
 
@@ -1256,6 +1272,93 @@ def list_proposal_history(
     )
 
 
+def _run_approval_and_execution(
+    proposal: Proposal, db: Session, *, is_auto_execution: bool
+) -> None:
+    """承認判定〜（AUTO_EXECUTION_ENABLED 有効時のみ）執行までの中核ロジック。
+
+    approve_proposal（HTTP、人間がボタンを押す承認フロー）とスケジューラ発の
+    無承認自動実行（2026-07-16、AUTO_EXECUTEユーザー向け・app.proposals.auto_execute）の
+    両方から呼ばれる共有関数。呼び出し元が例外を自分の作法で処理する
+    （HTTP は HTTPException に変換、scheduler はログ+Slack通知して次のproposalへ継続）。
+
+    :param is_auto_execution: PolicyEngine Rule8（AUTO 執行は有効委譲枠必須）に渡す値。
+        HTTP 経路（人間がクリック）は False 固定。scheduler 経路（無承認）は True 固定。
+    """
+    # A-2 入金ゲート: 残高が運用開始の最低入金額 (MIN_DEPOSIT_USD) 未満なら承認・執行を拒否。
+    # 判定不能 (None) は fail-open（RPC 失敗等インフラ起因で正規の承認を止めない）、
+    # 確定した不足のみブロックする。提案生成側でも同ゲートを通すため、ここは防御的二重化。
+    from app.users.deposit_policy import MIN_DEPOSIT_USD  # noqa: PLC0415
+    from app.users.deposit_resolver import resolve_user_deposit_usd  # noqa: PLC0415
+
+    _deposit_usd = resolve_user_deposit_usd(db, proposal.user_id)
+    if _deposit_usd is not None and _deposit_usd < MIN_DEPOSIT_USD:
+        raise DepositBelowMinimumError(
+            {
+                "code": "DEPOSIT_BELOW_MINIMUM",
+                "message": (
+                    f"運用開始には最低 ${MIN_DEPOSIT_USD} の入金が必要です"
+                    f"（現在: ${_deposit_usd}）。"
+                ),
+                "min_deposit_usd": str(MIN_DEPOSIT_USD),
+                "current_deposit_usd": str(_deposit_usd),
+            }
+        )
+
+    # AUTO 執行フラグ（実行段階のマスタースイッチ）は is_auto_execution（Rule8 用）とは独立。
+    auto_execution_enabled = os.getenv("AUTO_EXECUTION_ENABLED", "false").lower() == "true"
+
+    # Step 1: PolicyEngine hard rule 検算（承認前に必ず通す）
+    ctx = PolicyContext(
+        user_id=proposal.user_id,
+        asset=proposal.asset,
+        operation=proposal.operation,
+        amount_usd=Decimal(str(proposal.amount_usd)),
+        expected_hf_after=Decimal(str(proposal.expected_hf_after))
+        if proposal.expected_hf_after is not None
+        else None,
+        proposal_id=proposal.id,
+        is_auto_execution=is_auto_execution,
+    )
+    policy_result = get_policy_engine().check(ctx, db)
+    if policy_result.blocked:
+        raise PolicyViolationError(policy_result.violations)
+
+    # Step 2: 承認済みにマーク
+    proposal.status = "approved"
+    proposal.approved_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(proposal)
+
+    # Step 2: Aave 自動実行 (AUTO_EXECUTION_ENABLED=true の場合のみ)
+    # non-custodial 方式2 では default=false。partner 手動署名 (submit_partner_tx) のみが実 tx を立てる。
+    # AAVE_WALLET_PRIVATE_KEY が署名する経路はこのフラグで完全に無効化される。
+    if auto_execution_enabled:
+        from .execution_route import RouteMismatchError  # noqa: PLC0415
+
+        try:
+            # protocol (aave/lido/pendle) で執行ハンドラを振り分ける。
+            # Lido/Pendle は HUMAN-REVIEW 未配線のため ProtocolExecutionNotWiredError。
+            _dispatch_custodial_execution(proposal, db)
+        except RouteMismatchError:
+            db.commit()  # status='failed' / error_message を永続化
+            raise
+        except ProtocolExecutionNotWiredError as exc:
+            # Lido/Pendle の custodial 自動執行は未配線 (HUMAN-REVIEW)。
+            # approved のまま据置き (Aave として誤実行しない)。
+            logger.warning("proposal %d: custodial execution 未配線: %s", proposal.id, exc)
+            db.commit()
+            raise
+        db.commit()
+        db.refresh(proposal)
+    else:
+        logger.info(
+            "proposal %d: AUTO_EXECUTION_ENABLED=false — skipping custodial auto-execution; "
+            "waiting for partner manual approve via submit-tx",
+            proposal.id,
+        )
+
+
 @router.post("/{proposal_id}/approve", response_model=ProposalResponse, summary="提案承認・実行")
 def approve_proposal(
     proposal_id: int,
@@ -1284,98 +1387,34 @@ def approve_proposal(
             detail=f"Cannot approve proposal with status '{proposal.status}'",
         )
 
-    # A-2 入金ゲート: 残高が運用開始の最低入金額 (MIN_DEPOSIT_USD) 未満なら承認・執行を拒否。
-    # 判定不能 (None) は fail-open（RPC 失敗等インフラ起因で正規の承認を止めない）、
-    # 確定した不足のみブロックする。提案生成側でも同ゲートを通すため、ここは防御的二重化。
-    from app.users.deposit_policy import MIN_DEPOSIT_USD  # noqa: PLC0415
-    from app.users.deposit_resolver import resolve_user_deposit_usd  # noqa: PLC0415
+    from .execution_route import RouteMismatchError  # noqa: PLC0415
 
-    _deposit_usd = resolve_user_deposit_usd(db, proposal.user_id)
-    if _deposit_usd is not None and _deposit_usd < MIN_DEPOSIT_USD:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "code": "DEPOSIT_BELOW_MINIMUM",
-                "message": (
-                    f"運用開始には最低 ${MIN_DEPOSIT_USD} の入金が必要です"
-                    f"（現在: ${_deposit_usd}）。"
-                ),
-                "min_deposit_usd": str(MIN_DEPOSIT_USD),
-                "current_deposit_usd": str(_deposit_usd),
-            },
-        )
-
-    # AUTO 執行フラグは PolicyContext (Rule8: AUTO 執行は有効委譲枠必須) より前に評価する。
-    auto_execution_enabled = os.getenv("AUTO_EXECUTION_ENABLED", "false").lower() == "true"
-
-    # Step 1: PolicyEngine hard rule 検算（承認前に必ず通す）
     # 本エンドポイントは人間がボタンを押す承認フロー（build_partner_tx と同型）であり
     # AUTO 執行ではないため is_auto_execution=False 固定（Rule8 の delegation grant 要件は
-    # 対象外）。以前は auto_execution_enabled をそのまま渡していたため、
-    # AUTO_EXECUTION_ENABLED=true にした瞬間、委譲枠を持たない既存 custodial ユーザーの
-    # 人間承認までRule8でブロックされる回帰があった（2026-07-16 発見）。
-    # スケジューラ発の無承認自動実行では is_auto_execution=True を別途使う想定。
-    ctx = PolicyContext(
-        user_id=proposal.user_id,
-        asset=proposal.asset,
-        operation=proposal.operation,
-        amount_usd=Decimal(str(proposal.amount_usd)),
-        expected_hf_after=Decimal(str(proposal.expected_hf_after))
-        if proposal.expected_hf_after is not None
-        else None,
-        proposal_id=proposal.id,
-        is_auto_execution=False,
-    )
-    policy_result = get_policy_engine().check(ctx, db)
-    if policy_result.blocked:
+    # 対象外）。スケジューラ発の無承認自動実行（AUTO_EXECUTE ユーザー）は
+    # is_auto_execution=True で _run_approval_and_execution を別途呼ぶ
+    # （app.proposals.auto_execute 参照）。
+    try:
+        _run_approval_and_execution(proposal, db, is_auto_execution=False)
+    except DepositBelowMinimumError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.detail
+        ) from exc
+    except PolicyViolationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "code": "POLICY_VIOLATION",
-                "violations": policy_result.violations,
-            },
-        )
-
-    # Step 2: 承認済みにマーク
-    proposal.status = "approved"
-    proposal.approved_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(proposal)
-
-    # Step 2: Aave 自動実行 (AUTO_EXECUTION_ENABLED=true の場合のみ)
-    # non-custodial 方式2 では default=false。partner 手動署名 (submit_partner_tx) のみが実 tx を立てる。
-    # AAVE_WALLET_PRIVATE_KEY が署名する経路はこのフラグで完全に無効化される。
-    # （auto_execution_enabled は上の PolicyContext 構築前に評価済み）
-    if auto_execution_enabled:
-        from .execution_route import RouteMismatchError  # noqa: PLC0415
-
-        try:
-            # protocol (aave/lido/pendle) で執行ハンドラを振り分ける。
-            # Lido/Pendle は HUMAN-REVIEW 未配線のため ProtocolExecutionNotWiredError。
-            _dispatch_custodial_execution(proposal, db)
-        except RouteMismatchError as exc:
-            db.commit()  # status='failed' / error_message を永続化
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"誤執行検出: {exc} (手動介入必須)",
-            ) from exc
-        except ProtocolExecutionNotWiredError as exc:
-            # Lido/Pendle の custodial 自動執行は未配線 (HUMAN-REVIEW)。
-            # approved のまま据置き、501 で明示する (Aave として誤実行しない)。
-            logger.warning("proposal %d: custodial execution 未配線: %s", proposal.id, exc)
-            db.commit()
-            raise HTTPException(
-                status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                detail=str(exc),
-            ) from exc
-        db.commit()
-        db.refresh(proposal)
-    else:
-        logger.info(
-            "proposal %d: AUTO_EXECUTION_ENABLED=false — skipping custodial auto-execution; "
-            "waiting for partner manual approve via submit-tx",
-            proposal.id,
-        )
+            detail={"code": "POLICY_VIOLATION", "violations": exc.violations},
+        ) from exc
+    except RouteMismatchError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"誤執行検出: {exc} (手動介入必須)",
+        ) from exc
+    except ProtocolExecutionNotWiredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=str(exc),
+        ) from exc
 
     return ProposalResponse.model_validate(proposal)
 
