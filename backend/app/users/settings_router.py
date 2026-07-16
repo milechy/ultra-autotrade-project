@@ -473,6 +473,13 @@ def create_delegation_grant(
         privy_signer_id=request.privy_signer_id,
     )
     db.add(grant)
+
+    # 委譲 SCW 執行が要求する per-user Privy wallet ID。ログイン時点では未委譲で null のため
+    # 取得できず、consent(addSigners) 完了後の本エンドポイント呼び出し時が唯一の確実な解決経路
+    # （2026-07-16）。未指定時は _resolve_privy_wallet_id が env フォールバックに頼る旧経路のまま。
+    if request.privy_wallet_id and current_user.privy_wallet_id != request.privy_wallet_id:
+        current_user.privy_wallet_id = request.privy_wallet_id
+
     db.commit()
     db.refresh(grant)
     logger.info(

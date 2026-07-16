@@ -22,6 +22,15 @@ export interface DelegationGrantParams {
   expires_in_days: number
 }
 
+export interface DelegationGrantExtra {
+  privy_policy_id?: string
+  privy_signer_id?: string
+  // Privy 内部 wallet ID（アドレスではない）。addSigners 成功直後のみ解決可能
+  // （ログイン時点では未委譲で null。Privy SDK 仕様）。委譲(SCW)執行の
+  // wallet_sendCalls が要求する識別子で、渡すと users.privy_wallet_id へ保存される。
+  privy_wallet_id?: string
+}
+
 export interface DelegationPrepareResponse {
   privy_policy_id: string
   privy_signer_id: string
@@ -91,7 +100,7 @@ export async function prepareDelegation(
 
 /** L3: consent 済みの枠 + Privy 識別子を保存して grant を確定する。 */
 export async function grantDelegation(
-  params: DelegationGrantParams & { privy_policy_id: string; privy_signer_id: string }
+  params: DelegationGrantParams & DelegationGrantExtra
 ): Promise<DelegationGrantResponse> {
   const res = await authedFetch("/api/user/delegation/grant", {
     method: "POST",

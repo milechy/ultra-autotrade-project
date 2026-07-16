@@ -293,3 +293,47 @@ class TestDelegationAPI:
         data = r.json()
         assert data["privy_policy_id"] is None
         assert data["privy_signer_id"] is None
+
+    def test_grant_persists_privy_wallet_id_to_user(
+        self, client: TestClient, test_db: tuple
+    ) -> None:
+        """2026-07-16: grant に privy_wallet_id を渡すと users.privy_wallet_id へ保存される
+        （ログイン時点では未委譲で null のため、consent 完了時点(本エンドポイント)が唯一の
+        確実な解決経路）。"""
+        _override, SessionLocal = test_db
+        token = register_and_login(client)
+        h = {"Authorization": f"Bearer {token}"}
+        payload = dict(self._VALID)
+        payload["privy_wallet_id"] = "frob784a2upmpff5z7yi300u"
+        r = client.post("/api/user/delegation/grant", json=payload, headers=h)
+        assert r.status_code == 200, r.text
+
+        from app.auth.models import User  # noqa: PLC0415
+
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.email == os.environ["INITIAL_ADMIN_EMAIL"]).first()
+            assert user is not None
+            assert user.privy_wallet_id == "frob784a2upmpff5z7yi300u"
+        finally:
+            db.close()
+
+    def test_grant_without_privy_wallet_id_does_not_touch_user(
+        self, client: TestClient, test_db: tuple
+    ) -> None:
+        """後方互換: privy_wallet_id を渡さない既存フローは user.privy_wallet_id を変更しない。"""
+        _override, SessionLocal = test_db
+        token = register_and_login(client)
+        h = {"Authorization": f"Bearer {token}"}
+        r = client.post("/api/user/delegation/grant", json=self._VALID, headers=h)
+        assert r.status_code == 200, r.text
+
+        from app.auth.models import User  # noqa: PLC0415
+
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.email == os.environ["INITIAL_ADMIN_EMAIL"]).first()
+            assert user is not None
+            assert user.privy_wallet_id is None
+        finally:
+            db.close()

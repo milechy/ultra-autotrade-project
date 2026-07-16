@@ -103,6 +103,11 @@ class DelegationGrantRequest(BaseModel):
     # /delegation/prepare で作成した policy_id と SERVER_SIGNER_ID を grant 確定時に保存する。
     privy_policy_id: Optional[str] = Field(default=None, max_length=255)
     privy_signer_id: Optional[str] = Field(default=None, max_length=255)
+    # Privy 内部 wallet ID（アドレスではない）。ログイン時点(wallet-connect)では embedded wallet
+    # が未委譲のため常に null（Privy SDK 仕様）で取得できず、addSigners 成功後（＝本エンドポイント
+    # 呼び出し時）に初めて解決可能になる。委譲(SCW)執行の wallet_sendCalls が要求する識別子で、
+    # users.privy_wallet_id へ保存する（2026-07-16、per-user 解決の唯一の確実な経路）。
+    privy_wallet_id: Optional[str] = Field(default=None, max_length=64)
 
     @field_validator("max_single_trade_pct")
     @classmethod
