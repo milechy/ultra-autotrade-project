@@ -141,7 +141,10 @@ export function OpModePanel() {
     {
       id: "managed" as UserMode,
       label: t("managedLabel"),
-      desc: t("managedDesc"),
+      // CONSENT_ENABLED=false のときは「準備中」文言、true(委譲consentフローが実際に
+      // 動く環境)では実際の上限内自動実行の説明に切り替える(2026-07-17、実装完了に
+      // 追随して固定「準備中」文言のまま出し続けないようにする)。
+      desc: CONSENT_ENABLED ? t("managedDescLive") : t("managedDesc"),
       icon: Bot,
       color: "text-[#1D9E75]",
       bg: "bg-[#1D9E75]/10",

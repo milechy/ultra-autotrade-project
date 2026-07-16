@@ -911,6 +911,7 @@
         "activeBadge": "設定中",
         "managedLabel": "おまかせ",
         "managedDesc": "AIが市場を分析し提案を表示します。自動売買・自動リバランスは準備中です（v4提供予定）。",
+        "managedDescLive": "AIが市場を分析し、あらかじめ承認した上限（1回・1日あたりの取引額、Health Factor下限）の範囲内で自動的に実行します。範囲外の提案は人間の承認を求めます。",
         "activeLabel": "アクティブ",
         "activeDesc": "AIが提案。自分で承認してから実行。",
         "toastSwitched": "「{mode}」に切り替えました",
