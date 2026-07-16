@@ -556,6 +556,21 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
                 "proposal %d: routing via delegated SCW path (policy_id present)", proposal.id
             )
             result = _execute_supply_via_scw(proposal, chain, _grant, _user, db)
+        elif _grant is not None:
+            # 有効な委譲grantを持つ非カストディアルユーザーだが、対象外操作
+            # （例: WITHDRAW は常に custodial 扱い対象外、_should_use_scw_route L332-334）。
+            # この場合サーバー単一鍵(AAVE_WALLET_PRIVATE_KEY)の custodial 経路に暗黙で
+            # 落とさない（本人の資産構造が custodial ファンドプールと異なるため）。
+            # HARD_STOP/risk_limiter と同様 transient 扱いで 'approved' のまま据え置き、
+            # ユーザーは既存の非カストディアル手動署名フロー(build-tx/submit-tx)で対応する。
+            logger.warning(
+                "proposal %d: delegation grant present but operation not SCW-eligible "
+                "(operation=%s) — holding as 'approved', not falling back to custodial "
+                "single-key execution",
+                proposal.id,
+                proposal.operation,
+            )
+            return
         else:
             multi_service = MultiChainAaveService()
             result = multi_service.execute_rebalance(
@@ -1294,6 +1309,12 @@ def approve_proposal(
     auto_execution_enabled = os.getenv("AUTO_EXECUTION_ENABLED", "false").lower() == "true"
 
     # Step 1: PolicyEngine hard rule 検算（承認前に必ず通す）
+    # 本エンドポイントは人間がボタンを押す承認フロー（build_partner_tx と同型）であり
+    # AUTO 執行ではないため is_auto_execution=False 固定（Rule8 の delegation grant 要件は
+    # 対象外）。以前は auto_execution_enabled をそのまま渡していたため、
+    # AUTO_EXECUTION_ENABLED=true にした瞬間、委譲枠を持たない既存 custodial ユーザーの
+    # 人間承認までRule8でブロックされる回帰があった（2026-07-16 発見）。
+    # スケジューラ発の無承認自動実行では is_auto_execution=True を別途使う想定。
     ctx = PolicyContext(
         user_id=proposal.user_id,
         asset=proposal.asset,
@@ -1303,7 +1324,7 @@ def approve_proposal(
         if proposal.expected_hf_after is not None
         else None,
         proposal_id=proposal.id,
-        is_auto_execution=auto_execution_enabled,
+        is_auto_execution=False,
     )
     policy_result = get_policy_engine().check(ctx, db)
     if policy_result.blocked:

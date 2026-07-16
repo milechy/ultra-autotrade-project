@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 import tempfile
-from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Generator
 from unittest.mock import patch
@@ -109,42 +108,14 @@ def _create_proposal(client: TestClient, token: str) -> int:
     return int(r.json()["id"])
 
 
-def _create_active_grant(session_local: object, user_id: int = 1) -> None:
-    """AUTO 執行に必須の有効な委譲枠を作る（PolicyEngine Rule8 / スライス2-D-A）。
-
-    AUTO_EXECUTION_ENABLED=true の承認は有効な delegation grant が無いと
-    fail-closed で 422 拒否される。本テスト群は AUTO 執行成功/失敗を検証するため、
-    枠の存在を前提条件としてセットアップする。
-    """
-    from app.users.models import DelegationGrant  # noqa: PLC0415
-
-    now = datetime.now(timezone.utc)
-    db = session_local()
-    try:
-        db.add(
-            DelegationGrant(
-                user_id=user_id,
-                wallet_address="0x" + "a" * 40,
-                status="active",
-                max_single_trade_pct=Decimal("10"),
-                max_daily_trade_pct=Decimal("30"),
-                hf_floor=Decimal("1.6"),
-                allowed_protocols=["aave"],
-                allowed_assets=["USDC"],
-                consent_at=now,
-                expires_at=now + timedelta(days=30),
-            )
-        )
-        db.commit()
-    finally:
-        db.close()
-
-
 def test_aave_execution_success_marks_proposal_executed(client: TestClient, test_db: tuple) -> None:
-    """Aave 実行成功 → proposal.status='executed', transaction(status='completed') 記録。"""
+    """Aave 実行成功 → proposal.status='executed', transaction(status='completed') 記録。
+
+    approve_proposal は is_auto_execution=False 固定（2026-07-16 Step 0）のため、
+    Rule8（有効委譲枠必須）の対象外＝delegation grant は不要。
+    """
     _override, SessionLocal = test_db
     token = _admin_token(client, SessionLocal)
-    _create_active_grant(SessionLocal, user_id=1)
     proposal_id = _create_proposal(client, token)
 
     fake_result = AaveOperationResult(
@@ -195,7 +166,6 @@ def test_aave_execution_failure_marks_proposal_failed(client: TestClient, test_d
     """Aave 実行失敗 → proposal.status='failed', error_message 記録, transaction(status='failed') 記録。"""
     _override, SessionLocal = test_db
     token = _admin_token(client, SessionLocal)
-    _create_active_grant(SessionLocal, user_id=1)
     proposal_id = _create_proposal(client, token)
 
     boom = RuntimeError("RPC connection refused")
@@ -248,7 +218,6 @@ def test_aave_execution_failure_sends_slack_notification(
     """Aave 実行失敗時に通知サービスの send() が呼ばれることを検証（mock）。"""
     _override, SessionLocal = test_db
     token = _admin_token(client, SessionLocal)
-    _create_active_grant(SessionLocal, user_id=1)
     proposal_id = _create_proposal(client, token)
 
     boom = RuntimeError("web3 provider unreachable")

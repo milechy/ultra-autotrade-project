@@ -183,6 +183,65 @@ class TestApprovePolicyWiring:
         assert "POLICY_VIOLATION" in r.json()["detail"]["code"]
 
 
+class TestApproveProposalIsAutoExecutionFixed:
+    """2026-07-16 発見の回帰テスト: approve_proposal は PolicyContext.is_auto_execution に
+    グローバル env AUTO_EXECUTION_ENABLED をそのまま渡していたため、AUTO_EXECUTION_ENABLED=true
+    にした瞬間、委譲枠(delegation grant)を持たない既存 custodial ユーザーの人間承認まで
+    Rule8（AUTO 執行は有効委譲枠必須）でブロックされる回帰があった。
+    build_partner_tx と同様、is_auto_execution=False を固定で渡すことを検証する。
+    """
+
+    def test_is_auto_execution_false_even_when_auto_execution_enabled_true(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("AUTO_EXECUTION_ENABLED", "true")
+        token = _admin_token(client)
+        pid = _create_pending_proposal(client, token)
+
+        captured_ctx = []
+
+        def capture_check(ctx, db):  # type: ignore[no-untyped-def]
+            captured_ctx.append(ctx)
+            return PolicyResult(passed=True)
+
+        with patch("app.proposals.router.get_policy_engine") as mock_engine_factory:
+            mock_engine = mock_engine_factory.return_value
+            mock_engine.check.side_effect = capture_check
+
+            client.post(
+                f"/api/proposals/{pid}/approve",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert len(captured_ctx) == 1
+        assert captured_ctx[0].is_auto_execution is False
+
+    def test_is_auto_execution_false_when_auto_execution_disabled(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("AUTO_EXECUTION_ENABLED", "false")
+        token = _admin_token(client)
+        pid = _create_pending_proposal(client, token)
+
+        captured_ctx = []
+
+        def capture_check(ctx, db):  # type: ignore[no-untyped-def]
+            captured_ctx.append(ctx)
+            return PolicyResult(passed=True)
+
+        with patch("app.proposals.router.get_policy_engine") as mock_engine_factory:
+            mock_engine = mock_engine_factory.return_value
+            mock_engine.check.side_effect = capture_check
+
+            client.post(
+                f"/api/proposals/{pid}/approve",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert len(captured_ctx) == 1
+        assert captured_ctx[0].is_auto_execution is False
+
+
 class TestBuildPartnerTxPolicyWiring:
     """2026-07-03 棚卸しで検出: build-tx (Privy 非カストディアル主経路) が approve_proposal
     を経由しないため PolicyEngine を一切通っていなかった問題の回帰テスト。"""
