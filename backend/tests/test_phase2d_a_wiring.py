@@ -3,11 +3,15 @@
 """スライス2-D-A: 既存安全装置の AUTO 執行経路への結線。
 
 検証:
-- PolicyEngine Rule8 発火: AUTO_EXECUTION_ENABLED=true で有効な委譲枠が無い承認は 422 拒否。
-- 手動承認 (AUTO 無効) は委譲枠なしでも通る（Rule8 は AUTO 経路のみ）。
+- 手動承認 (approve_proposal) は AUTO_EXECUTION_ENABLED の値に関わらず委譲枠なしで通る
+  （2026-07-16 修正: is_auto_execution=False 固定。Rule8 は本エンドポイント対象外）。
 - risk_limiter %クランプ結線: check_trade_within_limits が違反を返すと execute_rebalance を
   呼ばず status を 'approved' 据え置き（transient）。
 - _daily_traded_usd_for_user: 当日 approved/executed 合計（自分以外）。
+
+PolicyEngine Rule8（AUTO 執行は有効委譲枠必須）自体は健在。適用対象は将来の
+スケジューラ発・無承認自動実行（is_auto_execution=True で呼ばれる経路）のみで、
+そちらのテストは backend/tests/test_auto_execute_trigger.py（PR3以降）に分離する。
 """
 
 from __future__ import annotations
@@ -256,22 +260,41 @@ def _create_proposal(client: TestClient, token: str) -> int:
     return int(r.json()["id"])
 
 
-def test_auto_execution_without_grant_blocked(client: TestClient, test_db: tuple) -> None:
-    """AUTO 有効 + 委譲枠なし → Rule8 で 422 fail-closed。"""
+def test_auto_execution_flag_no_longer_requires_grant_for_human_approval(
+    client: TestClient, test_db: tuple
+) -> None:
+    """2026-07-16 修正の回帰テスト: approve_proposal は is_auto_execution=False 固定
+    （build_partner_tx と同型、本人がクリックする承認フローのため）。
+    AUTO_EXECUTION_ENABLED=true でも、委譲枠を持たない custodial ユーザーの承認は
+    Rule8（有効委譲枠必須）でブロックされず、custodial 単一鍵実行まで進む。
+    Rule8 は将来のスケジューラ発の無承認自動実行（is_auto_execution=True）専用に予約する。
+    """
     _override, SessionLocal = test_db
     token = _admin_token(client, SessionLocal)
     proposal_id = _create_proposal(client, token)
 
-    with patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}):
+    fake_result = AaveOperationResult(
+        operation=AaveOperationType.DEPOSIT,
+        status=AaveOperationStatus.SUCCESS,
+        asset_symbol="USDC",
+        amount=Decimal("1000.00"),
+        tx_hash="0xauto",
+    )
+
+    with (
+        patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
+        patch(
+            "app.aave.service.MultiChainAaveService.execute_rebalance",
+            return_value=fake_result,
+        ),
+    ):
         r = client.post(
             f"/api/proposals/{proposal_id}/approve",
             headers={"Authorization": f"Bearer {token}"},
         )
 
-    assert r.status_code == 422
-    detail = r.json()["detail"]
-    assert detail["code"] == "POLICY_VIOLATION"
-    assert any("delegation grant" in v for v in detail["violations"])
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "executed"
 
 
 def test_manual_approve_without_grant_ok(client: TestClient, test_db: tuple) -> None:
