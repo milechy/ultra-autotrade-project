@@ -305,6 +305,74 @@ def _daily_traded_usd_for_user(
     return Decimal(str(raw)) if raw is not None else Decimal("0")
 
 
+def _gate_wallet_for_user(user_id: int, db: Session) -> Optional[str]:
+    """安全ゲートが評価すべき per-user wallet（SCW 優先）。解決できなければ None。
+
+    None を返すと `get_health_factor` は `AAVE_WALLET_ADDRESS`（グローバル custodial wallet）に
+    フォールバックする＝従来挙動。executor 側の wallet 優先順（smart_wallet_address → wallet_address）
+    と揃えること。
+    """
+    from app.auth.models import User  # noqa: PLC0415
+
+    user = db.get(User, user_id)
+    if user is None:
+        return None
+    wallet: Optional[str] = user.smart_wallet_address or user.wallet_address
+    return wallet
+
+
+def _log_total_assets_shadow(
+    proposal: Proposal,
+    db: Session,
+    *,
+    daily_traded: Decimal,
+    hf: Optional[Decimal],
+) -> None:
+    """[shadow mode] per-user 総資産で % 判定を**試算してログに出すだけ**（挙動には効かせない）。
+
+    CLAUDE.md Rule 3（単一 ≤ 総資産の10%）/ Rule 4（日次 ≤ 30%）は ABSOLUTE と明記されているが、
+    全呼び出し元が `total_assets_usd=None` を渡しているため **実際には一度も効いていない**
+    （2026-07-17 の Pendle 安全レビューで発覚）。分母を供給する resolver は用意したが、
+    **いきなり有効化すると本番ユーザーを止める**ため、まず観測だけ行う:
+
+      - Aave SCW 経路は実資金で稼働中（分母を誤ると即ブロック）
+      - 提案 sizing は `max(_PROPOSAL_AMOUNT_MIN_USD=50, x×0.10)` で、**総資産 $500 未満では
+        提案が必ず 10% を超える**（最低入金は $200）→ 有効化には製品判断が要る
+
+    本関数は例外を投げない（観測が執行を壊さない）。ログを
+    `grep '\\[risk_shadow\\]'` で集計し、ブロック率・RPC 失敗率・分母の妥当性を見てから
+    enforce へ切り替える。
+    """
+    try:
+        from app.aave.risk_limiter import check_trade_within_limits  # noqa: PLC0415
+        from app.users.total_assets_resolver import (  # noqa: PLC0415
+            resolve_user_total_assets_usd,
+        )
+
+        observed = resolve_user_total_assets_usd(db, proposal.user_id)
+        would_block = check_trade_within_limits(
+            amount_usd=Decimal(str(proposal.amount_usd)),
+            total_assets_usd=observed,
+            daily_traded_usd=daily_traded,
+            hf=hf,
+        )
+        logger.info(
+            "[risk_shadow] proposal=%s user=%s protocol=%s amount_usd=%s total_assets=%s "
+            "daily_traded=%s would_block=%s",
+            proposal.id,
+            proposal.user_id,
+            proposal.protocol or "aave",
+            proposal.amount_usd,
+            observed if observed is not None else "undeterminable",
+            daily_traded,
+            would_block or "no",
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "[risk_shadow] proposal=%s: 観測に失敗（執行には影響なし）: %s", proposal.id, exc
+        )
+
+
 def _resolve_privy_wallet_id(user: Optional[UserModel]) -> str:
     """委譲(SCW)送信に使う Privy **内部 wallet ID** を解決する（アドレスではない）。
 
@@ -499,7 +567,10 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
     try:
         from app.aave.monitor import get_health_factor as _gate_get_hf  # noqa: PLC0415
 
-        _hf_for_gate = _gate_get_hf()
+        # per-user の wallet で HF を見る。引数を省くと monitor が AAVE_WALLET_ADDRESS
+        # （グローバル custodial wallet）にフォールバックし、**別人の HF で可否が決まる**
+        # （cross-user 汚染。2026-07-17 修正）。解決できない場合は従来どおり env に委ねる。
+        _hf_for_gate = _gate_get_hf(_gate_wallet_for_user(proposal.user_id, db))
     except Exception as _hf_exc:  # noqa: BLE001
         logger.warning("proposal %d: HF fetch for safety gate failed: %s", proposal.id, _hf_exc)
 
@@ -507,8 +578,10 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
     _daily_traded = _daily_traded_usd_for_user(
         proposal.user_id, db, exclude_proposal_id=proposal.id
     )
-    # per-user 総資産の取得元は未実装（Phase 2-D 後続 sub-task）。None の間は %判定をスキップし、
-    # PolicyEngine 絶対額上限 +（後続スライスの）Privy policy で担保する（fail-safe）。
+    # per-user 総資産は **shadow mode**（観測のみ・挙動には効かせない）。
+    # 実際に渡すのは従来どおり None（= % 判定スキップ / PolicyEngine 絶対額上限に委ねる）。
+    # 詳細は `_log_total_assets_shadow` の docstring。
+    _log_total_assets_shadow(proposal, db, daily_traded=_daily_traded, hf=_hf_for_gate)
     _total_assets: Optional[Decimal] = None
 
     _hard_stop = evaluate_hard_stop(
@@ -825,20 +898,21 @@ def _pendle_execution_blocked(proposal: Proposal, db: Session) -> Optional[str]:
     try:
         from app.aave.monitor import get_health_factor as _gate_get_hf  # noqa: PLC0415
 
-        hf_for_gate = _gate_get_hf()
+        # per-user wallet で HF を見る（引数省略は別人の HF を見る cross-user 汚染。Aave 経路と同修正）。
+        hf_for_gate = _gate_get_hf(_gate_wallet_for_user(proposal.user_id, db))
     except Exception as exc:  # noqa: BLE001
         logger.warning("proposal %d: Pendle safety-gate HF fetch failed: %s", proposal.id, exc)
 
     daily_traded = _daily_traded_usd_for_user(proposal.user_id, db, exclude_proposal_id=proposal.id)
-    # [安全レビュー H3 / 2026-07-17] per-user 総資産は未配線（Aave SCW 経路と同じ既存状態）。
+    # [安全レビュー H3 / 2026-07-17] per-user 総資産は **shadow mode**（観測のみ・挙動には効かせない）。
     #
-    # **その帰結を明示する**: `risk_limiter.check_trade_within_limits` は単一 10% / 日次 30% の
+    # **現状の帰結を明示する**: `risk_limiter.check_trade_within_limits` は単一 10% / 日次 30% の
     # 両方を `total_assets_usd is not None and > 0` でガードしているため、None を渡す本経路では
-    # **CLAUDE.md Rule 3/4（ABSOLUTE）が実際には効かない**。さらに Pendle 単独ユーザーは
-    # `get_health_factor()` が失敗して hf=None になるため HF floor も効かない。
-    # 結果、Pendle broadcast の金額上限は **流動性ガード（プール% と PENDLE_MAX_TRADE_USD_CAP）
-    # だけ**が担っている。だから同 cap の既定値を 5000 → 20 に下げてある（config.py 参照）。
-    # 恒久対応（total_assets の配線）は Aave 経路と共通の別課題。
+    # **CLAUDE.md Rule 3/4（ABSOLUTE）が実際には効かない**。
+    # 金額の歯止めは **流動性ガード（プール% と PENDLE_MAX_TRADE_USD_CAP=20）と PolicyEngine の
+    # 絶対額上限（POLICY_MAX_POSITION_USD 既定 $10,000。`_run_approval_and_execution` で必ず通る）**。
+    # enforce への切替は shadow の実データ（ブロック率 / sizing 衝突 / RPC 失敗率）を見てから。
+    _log_total_assets_shadow(proposal, db, daily_traded=daily_traded, hf=hf_for_gate)
     total_assets: Optional[Decimal] = None
 
     hard_stop = evaluate_hard_stop(
