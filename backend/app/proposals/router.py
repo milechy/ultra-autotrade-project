@@ -681,11 +681,15 @@ class PolicyViolationError(Exception):
 
 
 class ProtocolExecutionNotWiredError(Exception):
-    """custodial 自動執行がまだ配線されていない protocol を指す。
+    """自動執行がまだ配線されていない protocol / 条件を指す。
 
-    Lido/Pendle の on-chain 実行 (real ETH stake / PT swap の broadcast) は
-    HUMAN-REVIEW-REQUIRED かつ Opus による安全レビュー対象 (CLAUDE.md v4 鉄則10)。
-    本スライスでは dispatch 構造とテストのみ整備し、実 broadcast は意図的に未配線。
+    Lido (real ETH stake) は dispatch 構造のみで実 broadcast が未配線。
+
+    **Pendle は D3 以降 broadcast 配線済み**（`_execute_pendle_for_proposal` の SCW 分岐）。
+    Pendle でこの例外が出るのは「未配線だから」ではなく、二段ガード
+    (`PENDLE_ENABLE_ONCHAIN_WRITE` + `_should_use_scw_route`) や stablecoin 前提
+    (`PENDLE_STABLE_UNDERLYING`) が揃わず dry-run に落ちた場合＝subclass の
+    `PendleDryRunNotBroadcast`。いずれも proposal は 'approved' 据え置き (501) で fail-closed。
     """
 
 
@@ -707,11 +711,15 @@ def _execute_lido_for_proposal(proposal: Proposal, db: Session) -> None:
 
 
 class PendleDryRunNotBroadcast(ProtocolExecutionNotWiredError):
-    """[Phase D / D2] Pendle BUY_PT の calldata を dry-run 構築したが broadcast は未配線。
+    """[Phase D] Pendle の calldata を dry-run 構築したが broadcast はしていない。
 
-    D2 では未署名 tx (swapExactTokenForPt calldata) を **構築するのみ** で、実 broadcast は
-    D3 (非カストSCW/Privy 本人署名) で配線する。構築成功後もこの例外を送出することで、caller は
-    proposal を 'approved' 据え置き (501) にし、Aave として誤実行しない (fail-closed 契約は不変)。
+    broadcast 経路自体は D3/D4 で配線済み。本例外は **二段ガードが揃わなかったときの
+    fallback**（既定はこちら）:
+      1. ``PENDLE_ENABLE_ONCHAIN_WRITE=true``
+      2. ``_should_use_scw_route``（delegation policy 有効 + grant に signer/policy +
+         ``allowed_protocols`` に "pendle"）
+    どちらか欠ければ未署名 tx を構築するだけで送信せず、本例外を送出する。caller は proposal を
+    'approved' 据え置き (501) にし、Aave として誤実行しない (fail-closed 契約は不変)。
     ``ProtocolExecutionNotWiredError`` の subclass のため既存の 501 ハンドリングを踏襲する。
     """
 
@@ -1020,17 +1028,18 @@ def _execute_pendle_for_proposal(proposal: Proposal, db: Session) -> None:
     )
     raise PendleDryRunNotBroadcast(
         f"Pendle proposal={proposal.id}: dry-run calldata 構築成功 (to={_to}, "
-        f"data_bytes={_data_bytes})。実 broadcast は D3 (非カストSCW/Privy 署名) で配線 "
-        "(HUMAN-REVIEW-REQUIRED)。"
+        f"data_bytes={_data_bytes})。broadcast 経路は配線済みだが二段ガード "
+        "(PENDLE_ENABLE_ONCHAIN_WRITE + 委譲 SCW route) が揃わないため送信していない。"
     )
 
 
 def _dispatch_custodial_execution(proposal: Proposal, db: Session) -> None:
     """proposal.protocol で custodial 自動執行ハンドラを振り分ける。
 
-    protocol 無指定 / "aave" は従来どおり Aave 経路。"lido"/"pendle" は専用ハンドラ
-    (現状 HUMAN-REVIEW 未配線で raise)。protocol を見ずに常に Aave 実行していた
-    潜在的な誤執行 (Lido/Pendle 提案を Aave operation として実行) を防ぐ。
+    protocol 無指定 / "aave" は従来どおり Aave 経路。"lido" は未配線で raise。"pendle" は
+    配線済みだが二段ガード未充足なら dry-run で raise (`PendleDryRunNotBroadcast`)。
+    protocol を見ずに常に Aave 実行していた潜在的な誤執行 (Lido/Pendle 提案を Aave
+    operation として実行) を防ぐ。
     """
     protocol = (proposal.protocol or "aave").lower()
     if protocol in ("", "aave"):

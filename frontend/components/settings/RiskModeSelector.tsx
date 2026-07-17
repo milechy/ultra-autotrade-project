@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { isAggressiveTierEnabled } from "@/lib/flags";
 import AggressiveRiskDisclosureModal from "./AggressiveRiskDisclosureModal";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -11,8 +12,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
 // [Phase-D D5b] aggressive ティア選択の有効化フラグ。既定 off = 従来挙動(選択は現状 403)で
 // dormant。on にすると aggressive 選択前にリスク開示/同意モーダルを必須にする。実際の
 // aggressive 解禁(PHASE_1 gate 緩和)は backend 側 D6 で別途行う。
-const AGGRESSIVE_TIER_ENABLED =
-  process.env.NEXT_PUBLIC_AGGRESSIVE_TIER_ENABLED === "true";
+// フラグの正は lib/flags.ts（LIFF 側の運用方針シートと同じ値を見る）。
+const AGGRESSIVE_TIER_ENABLED = isAggressiveTierEnabled();
 
 interface RiskOption {
   mode: string;

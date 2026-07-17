@@ -62,14 +62,82 @@ export class DelegationNotReadyError extends Error {
   }
 }
 
-/** consent の既定枠。将来 UI から調整可能にする（現状は保守的な単一上限）。 */
-export const DEFAULT_DELEGATION_PARAMS: DelegationGrantParams = {
+/**
+ * 「完全おまかせ」の運用方針。
+ *
+ * **単一の真実源は backend の `user.risk_mode`**。プロトコル選択は 2 段で効く:
+ *   - risk_mode → `RISK_MODE_PROTOCOLS` → **提案が生成されるか**（ai_judgment_scheduler）
+ *   - grant.allowed_protocols → **生成済み提案が broadcast されるか**（proposals/router）
+ * 両方が揃わないと Pendle は動かないため、ここで 3 つ目の概念を作らず risk_mode に対応させる。
+ */
+export type ManagedScope = "safety" | "yield"
+
+/** 運用方針 → risk_mode（backend `RiskMode` enum の内部値。リネーム禁止）。 */
+export const SCOPE_TO_RISK_MODE: Record<ManagedScope, string> = {
+  safety: "conservative",
+  yield: "aggressive",
+}
+
+/**
+ * 運用方針 → 委譲プロトコル。backend `delegatable_protocols_for_risk_mode()` と一致させること。
+ *
+ * aggressive の商品定義は {aave, lido, pendle} だが lido は委譲経路が未対応で、渡すと
+ * prepare が 502（fail-closed）になる。ここは**委譲可能集合との積**を持つ。
+ */
+const SCOPE_PROTOCOLS: Record<ManagedScope, string[]> = {
+  safety: ["aave"],
+  yield: ["aave", "pendle"],
+}
+
+/** consent の既定枠（方針によらない共通の上限）。 */
+const BASE_DELEGATION_LIMITS = {
   max_single_trade_pct: "10",
   max_daily_trade_pct: "30",
   hf_floor: "1.6",
-  allowed_protocols: ["aave"],
   allowed_assets: ["USDC"],
   expires_in_days: 90,
+} as const
+
+/** 運用方針から consent する委譲枠を組み立てる。prepare / grant で同じ値を使うこと。 */
+export function delegationParamsForScope(scope: ManagedScope): DelegationGrantParams {
+  return {
+    ...BASE_DELEGATION_LIMITS,
+    allowed_assets: [...BASE_DELEGATION_LIMITS.allowed_assets],
+    allowed_protocols: [...SCOPE_PROTOCOLS[scope]],
+  }
+}
+
+/** 委譲枠が Pendle を許可しているか（broadcast 側のゲート）。 */
+export function grantAllowsPendle(grant: DelegationGrantResponse | null): boolean {
+  if (!grant) return false
+  return (grant.allowed_protocols ?? []).map((p) => p.trim().toLowerCase()).includes("pendle")
+}
+
+/**
+ * 実効の運用方針。**2 つのゲートが両方通ったときだけ** "yield"。
+ *
+ * Pendle が実際に流れるには「risk_mode=aggressive（提案が生成される）」と「grant に pendle
+ * （broadcast される）」の両方が要る。片方だけで「利回り重視」と表示すると UI が嘘になるので、
+ * 論理積を実効値とする。
+ */
+export function effectiveScope(
+  grant: DelegationGrantResponse | null,
+  riskMode: string | null | undefined
+): ManagedScope {
+  return grantAllowsPendle(grant) && riskMode === SCOPE_TO_RISK_MODE.yield ? "yield" : "safety"
+}
+
+/**
+ * 「利回り重視のつもりだが権限が追いついていない」状態か（再署名が必要）。
+ *
+ * risk_mode が grant より先行すると、Pendle 提案は生成されるのに broadcast されず approved の
+ * まま滞留する。この不整合は黙って放置せず UI で再署名を促す。
+ */
+export function needsReconsentForYield(
+  grant: DelegationGrantResponse | null,
+  riskMode: string | null | undefined
+): boolean {
+  return riskMode === SCOPE_TO_RISK_MODE.yield && !grantAllowsPendle(grant)
 }
 
 async function authedFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -122,4 +190,33 @@ export async function getDelegation(): Promise<DelegationGrantResponse | null> {
   const res = await authedFetch("/api/user/delegation", { method: "GET" })
   if (!res.ok) throw new Error(`delegation get failed: HTTP ${res.status}`)
   return res.json()
+}
+
+/** backend が当該 risk_mode をまだ解禁していない（`PHASE_1_ALLOWED_RISK_MODES` = 403）。 */
+export class RiskModeNotAvailableError extends Error {
+  constructor(message = "risk mode is not available yet") {
+    super(message)
+    this.name = "RiskModeNotAvailableError"
+  }
+}
+
+/** Pendle 開示（満期ロック / 裏付け / スリッページ）への同意を記録する（冪等）。 */
+export async function submitAggressiveConsent(): Promise<void> {
+  const res = await authedFetch("/api/user/aggressive-consent", { method: "POST" })
+  if (!res.ok) throw new Error(`aggressive consent failed: HTTP ${res.status}`)
+}
+
+/**
+ * risk_mode を更新する。**委譲枠を確定した後に呼ぶこと**。
+ *
+ * risk_mode が grant より先行すると Pendle 提案は生成されるのに broadcast されず滞留する
+ * （`needsReconsentForYield` 参照）。403 = backend 未解禁、412 = 開示未同意。
+ */
+export async function updateRiskMode(mode: string): Promise<void> {
+  const res = await authedFetch("/auth/risk-mode", {
+    method: "PUT",
+    body: JSON.stringify({ mode }),
+  })
+  if (res.status === 403 || res.status === 412) throw new RiskModeNotAvailableError()
+  if (!res.ok) throw new Error(`risk mode update failed: HTTP ${res.status}`)
 }

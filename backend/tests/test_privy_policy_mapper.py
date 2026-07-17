@@ -45,16 +45,53 @@ def test_resolve_unsupported_protocol_fails_closed() -> None:
     assert "lido" in str(ei.value)
 
 
-def test_resolve_pendle_contracts_router_underlying_pt() -> None:
+#: 実アドレス相当のダミー（sentinel 判定に引っかからない 160bit 値）。
+_REAL_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"  # Base USDC
+_REAL_PT = "0x1234567890AbcdEF1234567890aBcdef12345678"
+
+
+def _set_real_pendle_addresses(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PENDLE_* を実アドレスに設定する（既定は dummy sentinel で fail-closed になる）。"""
+    monkeypatch.setenv("PENDLE_UNDERLYING_TOKEN_ADDRESS", _REAL_USDC)
+    monkeypatch.setenv("PENDLE_PT_TOKEN_ADDRESS", _REAL_PT)
+
+
+def test_resolve_pendle_contracts_router_underlying_pt(monkeypatch: pytest.MonkeyPatch) -> None:
     """[Phase D / D3-D4] Pendle は RouterV4 + underlying(USDC) + PT の 3 宛先を allowlist する。"""
     from app.protocols.pendle.config import get_pendle_config
 
+    _set_real_pendle_addresses(monkeypatch)
     conf = get_pendle_config()
     contracts = resolve_protocol_contracts(["pendle"], "base")
     assert conf.router_address.lower() in contracts
     assert conf.underlying_token_address.lower() in contracts  # BUY_PT approve 宛
     assert conf.pt_token_address.lower() in contracts  # SELL_PT approve 宛
     assert len(contracts) == 3
+
+
+def test_resolve_pendle_unset_addresses_fails_closed() -> None:
+    """PENDLE_* 未設定（dummy sentinel 0x…0003/0004）は fail-closed。
+
+    dummy は truthy なので `if not addr` では弾けず、素通しすると「dummy 宛だけを許可する
+    Privy policy」が黙って作られ、実行時に TEE が全 tx を拒否して不可解に失敗する。
+    """
+    with pytest.raises(PolicyMappingError) as ei:
+        resolve_protocol_contracts(["pendle"], "base")
+    assert "PENDLE_" in str(ei.value)
+
+
+def test_delegatable_protocols_for_risk_mode_drops_lido() -> None:
+    """risk_mode → 委譲可能プロトコルは lido を落とす（そのまま渡すと prepare が 502）。"""
+    from app.privy.policy_mapper import delegatable_protocols_for_risk_mode
+
+    assert delegatable_protocols_for_risk_mode("conservative") == ["aave"]
+    # RISK_MODE_PROTOCOLS[BALANCED] = {aave, lido} → lido は委譲不可なので aave のみ
+    assert delegatable_protocols_for_risk_mode("balanced") == ["aave"]
+    # RISK_MODE_PROTOCOLS[AGGRESSIVE] = {aave, lido, pendle} → lido を除いた 2 つ
+    assert delegatable_protocols_for_risk_mode("aggressive") == ["aave", "pendle"]
+    # 未知 / None は conservative 相当（最小権限に fail-safe）
+    assert delegatable_protocols_for_risk_mode("bogus") == ["aave"]
+    assert delegatable_protocols_for_risk_mode(None) == ["aave"]
 
 
 def test_resolve_bad_chain_raises() -> None:

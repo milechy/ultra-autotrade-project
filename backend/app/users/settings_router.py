@@ -70,6 +70,7 @@ def _build_settings_response(user: User) -> UserSettingsResponse:
         terms_agreed_at=user.terms_accepted_at,
         terms_version=user.terms_version,
         aggressive_ack_at=user.aggressive_ack_at,
+        risk_mode=user.risk_mode,
         corporate_fiscal_month=user.corporate_fiscal_month,
         role=user.role,
         wallet_address=user.wallet_address,
@@ -361,6 +362,26 @@ def request_account_deletion(
 # ---------------------------------------------------------------------------
 
 
+def _require_aggressive_ack_for_pendle(user: User, allowed_protocols: list[str]) -> None:
+    """Pendle を含む委譲はリスク開示同意（満期ロック / 裏付け / スリッページ）を必須にする。
+
+    schema（`DelegationGrantRequest._validate_protocols`）は「委譲可能な集合か」しか見ないため、
+    「そのユーザーが開示に同意済みか」は user を持つ router 側で確認する。これが無いと、
+    委譲枠経由で `AggressiveRiskDisclosureModal` を迂回して Pendle 権限を取得できてしまう
+    （`PUT /auth/risk-mode` の 412 ガードと同じ defense-in-depth を委譲経路にも敷く）。
+
+    prepare / grant の両 leg で呼ぶ。prepare は Privy policy を実際に作る副作用があるため、
+    権限が確定する grant だけでなく prepare でも先に止める。
+    """
+    if "pendle" not in allowed_protocols:
+        return
+    if user.aggressive_ack_at is None or user.aggressive_ack_version != AGGRESSIVE_ACK_VERSION:
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail="Pendle を含む委譲にはリスク開示への同意が必要です。",
+        )
+
+
 @router.get(
     "/delegation",
     response_model=Optional[DelegationGrantResponse],
@@ -403,6 +424,8 @@ def prepare_delegation_policy_endpoint(
                 "(requires DELEGATION_PRIVY_POLICY_ENABLED + PRIVY_SERVER_SIGNER_ID after L0)"
             ),
         )
+    # Pendle 委譲は開示同意必須（Privy policy を作る前に止める）。
+    _require_aggressive_ack_for_pendle(current_user, request.allowed_protocols)
     now = datetime.now(timezone.utc)
     wallet = current_user.smart_wallet_address or current_user.wallet_address
     if not wallet:
@@ -446,8 +469,11 @@ def create_delegation_grant(
     """委譲枠を作成する。既存の有効枠は新規作成前に revoke する（常に1枠のみ有効）。
 
     上限 % は schema 段階でハードキャップ（単一≤10% / 日次≤30% / HF≥1.6）を検証済み。
+    ``allowed_protocols`` も schema で委譲可能集合に正規化・検証済み（prepare と同一 schema）。
     委譲対象ウォレットは smart_wallet_address を優先、無ければ wallet_address。
     """
+    # Pendle 委譲は開示同意必須（権限が DB に確定する直前で enforce）。
+    _require_aggressive_ack_for_pendle(current_user, request.allowed_protocols)
     now = datetime.now(timezone.utc)
 
     # 既存の有効枠を revoke（1ユーザー1有効枠を維持）

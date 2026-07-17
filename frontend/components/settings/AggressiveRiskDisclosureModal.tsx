@@ -9,8 +9,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+import { submitAggressiveConsent } from "@/lib/api/delegation";
 
 // 3 つの必須確認項目。id は i18n キー(AggressiveDisclosure.items.<id>.{title,detail})に対応。
 const ITEM_IDS = ["funds_locked", "pt_backed", "slippage"] as const;
@@ -19,11 +18,6 @@ type ItemId = (typeof ITEM_IDS)[number];
 interface Props {
   onConsented: () => void;
   onCancel: () => void;
-}
-
-function getToken(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("ultra_auth_token") ?? "";
 }
 
 export default function AggressiveRiskDisclosureModal({ onConsented, onCancel }: Props) {
@@ -43,11 +37,11 @@ export default function AggressiveRiskDisclosureModal({ onConsented, onCancel }:
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/user/aggressive-consent`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      // token / API base の解決は delegation.ts の authedFetch に集約する。
+      // 以前は localStorage("ultra_auth_token") を直読みしていたが、これは legacy キーかつ
+      // exp 未検査で、期限切れトークンで 401 を踏む（正準は getAuthToken()。
+      // memory: project_liff_expired_token_soft_lock）。API base も他の LIFF 経路と揃う。
+      await submitAggressiveConsent();
       onConsented();
     } catch (e) {
       setError(e instanceof Error ? e.message : t("error"));
