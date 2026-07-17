@@ -311,3 +311,116 @@ def test_manual_approve_without_grant_ok(client: TestClient, test_db: tuple) -> 
 
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "approved"
+
+
+# ---------------------------------------------------------------------------
+# [shadow mode] per-user 総資産の観測（2026-07-17）
+#
+# CLAUDE.md Rule 3/4 は total_assets=None のため実際には効いていない。分母の resolver は
+# 用意したが、いきなり有効化すると本番ユーザーを止める（sizing の $50 下限 × 10% ルールは
+# 総資産 $500 未満で両立しない / 最低入金は $200）。まず観測だけ行う。
+# ---------------------------------------------------------------------------
+
+
+def test_shadow_does_not_change_execution_behavior(db_session: Session) -> None:
+    """★shadow の総資産が「ブロックすべき」と言っても、**実際にはブロックしない**こと。
+
+    shadow の目的は観測であって enforcement ではない。ここが壊れると、意図せず本番ユーザーの
+    取引を止める（= 本タスクで最も避けたい事故）。
+    """
+    from app.proposals.router import _execute_aave_for_proposal
+
+    user = _make_user(db_session)
+    proposal = _make_proposal(db_session, user_id=user.id)
+    db_session.commit()
+
+    called: list[bool] = []
+
+    def _mock_execute(**kwargs: object) -> AaveOperationResult:
+        called.append(True)
+        return _fake_result()
+
+    with (
+        patch(
+            "app.automation.safety_gate.evaluate_hard_stop",
+            return_value=HardStopResult(blocked=False),
+        ),
+        # 総資産が $1（= 提案額は確実に 10% 超）と観測されても…
+        patch(
+            "app.users.total_assets_resolver.resolve_user_total_assets_usd",
+            return_value=Decimal("1"),
+        ),
+        patch(
+            "app.aave.service.MultiChainAaveService.execute_rebalance",
+            side_effect=_mock_execute,
+        ),
+    ):
+        _execute_aave_for_proposal(proposal, db_session)
+
+    # …執行は止まらない（limiter には None が渡り続けるため）
+    assert called, "shadow 観測が執行をブロックしてはならない"
+
+
+def test_shadow_passes_none_to_limiter(db_session: Session) -> None:
+    """limiter に渡る total_assets_usd が **None のままである**こと（挙動変化ゼロの担保）。"""
+    from app.proposals.router import _execute_aave_for_proposal
+
+    user = _make_user(db_session)
+    proposal = _make_proposal(db_session, user_id=user.id)
+    db_session.commit()
+
+    seen: list[object] = []
+
+    def _spy(**kwargs: object) -> None:
+        seen.append(kwargs.get("total_assets_usd"))
+        return None
+
+    with (
+        patch(
+            "app.automation.safety_gate.evaluate_hard_stop",
+            return_value=HardStopResult(blocked=False),
+        ),
+        patch(
+            "app.users.total_assets_resolver.resolve_user_total_assets_usd",
+            return_value=Decimal("12345"),
+        ),
+        patch("app.aave.risk_limiter.check_trade_within_limits", side_effect=_spy),
+        patch(
+            "app.aave.service.MultiChainAaveService.execute_rebalance",
+            return_value=_fake_result(),
+        ),
+    ):
+        _execute_aave_for_proposal(proposal, db_session)
+
+    # shadow 側の試算呼び出しと、実ゲートの呼び出しの両方が来る。
+    # **実ゲートに渡るのは None**（shadow の 12345 が漏れていない）こと。
+    assert None in seen, f"実ゲートに None 以外が渡っている: {seen}"
+
+
+def test_shadow_failure_does_not_break_execution(db_session: Session) -> None:
+    """観測が例外を投げても執行を壊さないこと（観測は執行より弱い）。"""
+    from app.proposals.router import _execute_aave_for_proposal
+
+    user = _make_user(db_session)
+    proposal = _make_proposal(db_session, user_id=user.id)
+    db_session.commit()
+
+    called: list[bool] = []
+
+    with (
+        patch(
+            "app.automation.safety_gate.evaluate_hard_stop",
+            return_value=HardStopResult(blocked=False),
+        ),
+        patch(
+            "app.users.total_assets_resolver.resolve_user_total_assets_usd",
+            side_effect=RuntimeError("rpc down"),
+        ),
+        patch(
+            "app.aave.service.MultiChainAaveService.execute_rebalance",
+            side_effect=lambda **_: (called.append(True), _fake_result())[1],
+        ),
+    ):
+        _execute_aave_for_proposal(proposal, db_session)
+
+    assert called, "観測の失敗が執行を止めてはならない"
