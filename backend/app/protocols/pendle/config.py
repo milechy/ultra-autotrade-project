@@ -10,12 +10,32 @@ from decimal import Decimal
 
 
 def _get_env_decimal(name: str, default: str) -> Decimal:
-    """環境変数から Decimal 値を読み込む。未設定またはパース失敗時はデフォルト値を返す。"""
+    """環境変数から Decimal 値を読み込む。未設定またはパース失敗時はデフォルト値を返す。
+
+    ``Decimal("inf")`` / ``NaN`` は **パースに成功してしまう**（`Decimal("inf")` は有効値）。
+    これが金額上限に入ると `amount > inf` が常に False になりガードが無言で無効化されるため、
+    有限値でなければ default に倒す（安全レビュー P1）。
+    """
     raw = os.getenv(name, default)
     try:
-        return Decimal(raw)
+        value = Decimal(raw)
     except Exception:
         return Decimal(default)
+    if not value.is_finite():
+        return Decimal(default)
+    return value
+
+
+#: `PENDLE_MAX_TRADE_USD_CAP` の **env で越えられない絶対上限**（USD）。
+#:
+#: Pendle broadcast 経路では CLAUDE.md Rule 3/4（単一10%/日次30%）が実際には効いておらず
+#: （`_pendle_execution_blocked` が risk_limiter に total_assets=None を渡すため）、
+#: **本 cap が事実上唯一の絶対額ガード**。そこに env のタイポ（`20` → `200`）を捕まえる第二層が
+#: 無いのは、唯一のガードを 1 文字のミスに委ねることになる。
+#: `risk_limiter.SINGLE_TRADE_PCT_HARD_MAX` と同じ発想の hard clamp を置く。
+#: **これを引き上げる前に total_assets の配線を行うこと**（cap を上げた瞬間、その取引額を縛る
+#: ものが文字通り何も無くなる）。
+PENDLE_MAX_TRADE_USD_HARD_MAX = Decimal("100")
 
 
 @dataclass
@@ -57,6 +77,14 @@ class PendleConfig:
             "PENDLE_PT_TOKEN_ADDRESS",
             "0x0000000000000000000000000000000000000004",  # dummy address
         )
+    )
+    # PT トークンの decimals。**PT は 18 桁とは限らない**（PT-yoUSD-24SEP2026 は 6 桁。PT は
+    # 原資産の桁を継ぐため stablecoin PT は 6 になる）。underlying_token_decimals と同じ理由で
+    # 明示が要る: pt_token_address は *アドレス* なので token_decimals(symbol) では解決できない。
+    # ここを誤ると SELL_PT で **売却数量そのものが 10^12 倍ズレる**（BUY_PT は受取量の表示ズレ）。
+    # 市場ごとに異なるため env で設定する（既定 6 = stablecoin PT 想定）。
+    pt_token_decimals: int = field(
+        default_factory=lambda: int(os.getenv("PENDLE_PT_TOKEN_DECIMALS", "6"))
     )
     # 入力トークンが USD ペッグの stablecoin (USDC 等) か。True の場合のみ proposal.amount_usd
     # をそのまま入力トークン数量として扱う (1 USDC≒1 USD)。False (既定) は USD→token 価格換算が
@@ -101,8 +129,21 @@ class PendleConfig:
         default_factory=lambda: _get_env_decimal("PENDLE_MAX_POOL_LIQUIDITY_PCT", "0.05")
     )
     # [Phase D / D5] 流動性ガード: 1 投入の絶対上限（USD）。プール流動性%と併せて被害上限を縛る。
+    #
+    # **既定を 5000 → 20 に引き下げた（2026-07-17 安全レビュー H3）**。理由: Pendle 経路では
+    # CLAUDE.md Rule 3/4（単一 10% / 日次 30%）が **実際には効いていない**
+    # （`_pendle_execution_blocked` が risk_limiter に total_assets=None を渡すため、
+    # risk_limiter が両方の % 判定をスキップする。Aave SCW 経路も同じ既存問題）。
+    # つまり金額の歯止めは事実上「プール流動性% と本上限」だけで、本上限が唯一の絶対額。
+    # そこに 5000 を既定で与えると、env 設定を忘れた運用者に $5,000 の枠が黙って開く。
+    # 「運用者が設定を憶えていること」を安全装置にしない ＝ 忘れたら小さい方に倒す。
+    # 実運用で引き上げる場合は PENDLE_MAX_TRADE_USD_CAP を明示設定すること。
+    # hard clamp: env がこれを超える値を指定しても `PENDLE_MAX_TRADE_USD_HARD_MAX` で頭打ちにする。
     max_trade_usd_cap: Decimal = field(
-        default_factory=lambda: _get_env_decimal("PENDLE_MAX_TRADE_USD_CAP", "5000")
+        default_factory=lambda: min(
+            _get_env_decimal("PENDLE_MAX_TRADE_USD_CAP", "20"),
+            PENDLE_MAX_TRADE_USD_HARD_MAX,
+        )
     )
 
     def token_decimals(self, token: str) -> int:

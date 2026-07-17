@@ -58,6 +58,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS aggressive_ack_version VARCHAR(20) NU
 """
 
 import logging
+import os
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
@@ -139,9 +140,49 @@ RISK_MODE_JP_LABELS: dict[RiskMode, str] = {
     RiskMode.AGGRESSIVE: "ハイリスク",
 }
 
-#: Phase 1 で選択許可されているモード。
-#: Phase 2 で BALANCED / AGGRESSIVE を解禁する想定 (DB 側の制約ではなく API 層で強制)。
-PHASE_1_ALLOWED_RISK_MODES: frozenset[RiskMode] = frozenset({RiskMode.CONSERVATIVE})
+
+def _allowed_risk_modes_from_env() -> frozenset[RiskMode]:
+    """``ALLOWED_RISK_MODES`` env から選択許可モードを解決する（既定 conservative のみ）。
+
+    **なぜ env 化したか** (2026-07-17): 本定数はハードコードだったため、staging だけで
+    aggressive を検証しようとすると同じコードが本番にも入り**本番も同時に開いてしまう**
+    （`docs/ops/phase_d_pendle_aggressive_d6_runbook.md` §5 は PHASE_1 緩和を**規制判断**と
+    位置づけている）。env 化により「staging-v4 だけ開けて本番は閉じたまま」が可能になる。
+
+    仕様:
+      - 未設定 / 空 → ``{CONSERVATIVE}``（**既定は従来どおり閉じたまま**）
+      - ``ALLOWED_RISK_MODES=conservative,aggressive`` のようにカンマ区切りで指定
+      - 未知の値は警告して無視する（typo で意図せず広がらないよう fail-safe）
+      - CONSERVATIVE は常に含める（全モードを塞いで詰むのを防ぐ最小権限）
+
+    **これを開けても aggressive が即使えるわけではない**: `PUT /auth/risk-mode` の 412
+    （リスク開示同意必須）と、委譲枠側の Pendle ゲートが別途効く（多層防御）。
+    """
+    raw = os.getenv("ALLOWED_RISK_MODES", "").strip()
+    if not raw:
+        return frozenset({RiskMode.CONSERVATIVE})
+
+    modes: set[RiskMode] = {RiskMode.CONSERVATIVE}
+    for token in raw.split(","):
+        value = token.strip().lower()
+        if not value:
+            continue
+        try:
+            modes.add(RiskMode(value))
+        except ValueError:
+            logger.warning(
+                "ALLOWED_RISK_MODES に未知の値 %r が含まれています (無視します)。"
+                "有効値: conservative / balanced / aggressive",
+                value,
+            )
+    return frozenset(modes)
+
+
+#: 選択許可されているリスクモード（DB 制約ではなく API 層で強制）。
+#: 既定は CONSERVATIVE のみ。解禁は `ALLOWED_RISK_MODES` env で環境ごとに行う
+#: （`_allowed_risk_modes_from_env` の docstring 参照）。名前の "PHASE_1" は導入時の経緯由来で、
+#: 参照箇所（auth/router.py・テスト）を無用に壊さないため維持している。
+PHASE_1_ALLOWED_RISK_MODES: frozenset[RiskMode] = _allowed_risk_modes_from_env()
 
 #: 各 risk_mode の解禁 Phase (Phase 2-3 の段階解禁を見据えた設計)。
 RISK_MODE_PHASE: dict[RiskMode, int] = {

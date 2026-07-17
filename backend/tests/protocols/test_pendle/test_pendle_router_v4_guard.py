@@ -29,28 +29,47 @@ from app.protocols.pendle.schemas import (
     RouterV4Approval,
 )
 
+from .convert_api_fixtures import ROUTER, approval, convert_response, output
+
 MARKET = "0x" + "aa" * 20
 TOKEN_IN = "0x" + "bb" * 20
 TOKEN_OUT = "0x" + "cc" * 20
 RECEIVER = "0x" + "dd" * 20
 
-_ROUTER_ADDRESS = "0x888888888889758F76e7103c6CbF23ABbF58F946"
+_ROUTER_ADDRESS = ROUTER
 
-_MOCK_SWAP_RESPONSE: dict = {
-    "data": {
-        "tx": {"to": _ROUTER_ADDRESS, "data": "0xdeadbeef"},
-        "amountOut": str(int(Decimal("0.95") * Decimal(10**18))),
-        "approvals": [{"spender": _ROUTER_ADDRESS, "token": TOKEN_IN}],
-    }
-}
+# Convert API の応答モック（swap 系）。outputs は buy_yt/sell_yt が要求する token_out が
+# リテラル "YT"/"PT" のため一致せず、client 実装どおり outputs[0] にフォールバックする。
+#
+# approve は client が「swap 入力と同一 token・同一 amount」でなければ拒否する（H1 対策）ため、
+# 本モックは **入力 TOKEN_IN / 1.0 (=1e18) の呼び出し専用**。別の額・別の入力トークンで使うと
+# 正しく fail-closed して落ちる。その場合は `_swap_response_for` を使うこと。
+_MOCK_SWAP_RESPONSE: dict = convert_response(
+    required_approvals=[approval(TOKEN_IN, 10**18)],
+    outputs=[output(TOKEN_OUT, int(Decimal("0.95") * Decimal(10**18)))],
+)
 
-_MOCK_ADD_LIQ_RESPONSE: dict = {
-    "data": {
-        "tx": {"to": _ROUTER_ADDRESS, "data": "0xcafebabe"},
-        "amountLpOut": str(int(Decimal("0.98") * Decimal(10**18))),
-        "approvals": [{"spender": _ROUTER_ADDRESS, "token": TOKEN_IN}],
-    }
-}
+
+def _swap_response_for(token_in: str, amount_wei: int) -> dict:
+    """指定の swap 入力に整合する応答モック（approve 検証を通すため）。"""
+    return convert_response(
+        required_approvals=[approval(token_in, amount_wei)],
+        outputs=[output(TOKEN_OUT, int(Decimal("0.95") * Decimal(10**18)))],
+    )
+
+
+#: approve を要求しない応答（calldata だけを見たいテスト用）。
+_MOCK_SWAP_RESPONSE_NO_APPROVAL: dict = convert_response(
+    outputs=[output(TOKEN_OUT, int(Decimal("0.95") * Decimal(10**18)))],
+)
+
+# add_liquidity 系。LP 受取量は outputs の token=market(LP) アドレスから 18 桁で復元される。
+_MOCK_ADD_LIQ_RESPONSE: dict = convert_response(
+    data="0xcafebabe",
+    action="add-liquidity",
+    required_approvals=[approval(TOKEN_IN, 10**18)],
+    outputs=[output(MARKET, int(Decimal("0.98") * Decimal(10**18)))],
+)
 
 
 @pytest.fixture
@@ -144,8 +163,11 @@ class TestDryRunEnabled:
     async def test_sell_yt_dry_run_gets_calldata(
         self, enabled_client: PendleRouterV4Client
     ) -> None:
+        # sell_yt の入力はリテラル "YT"（旧 SDK 規約の名残で実アドレスではない）。approve は
+        # swap 入力と同一 token でなければ拒否されるため、calldata だけを見る本テストでは
+        # approve なしの応答を使う。YT 経路が実 API で成立しない件は client の docstring 参照。
         with patch.object(
-            enabled_client, "_call_sdk", new=AsyncMock(return_value=_MOCK_SWAP_RESPONSE)
+            enabled_client, "_call_sdk", new=AsyncMock(return_value=_MOCK_SWAP_RESPONSE_NO_APPROVAL)
         ):
             result = await enabled_client.sell_yt(
                 MARKET, TOKEN_OUT, Decimal("1.0"), RECEIVER, dry_run=True
@@ -239,7 +261,10 @@ class TestMaxSingleTradeGuard:
         """portfolio_value_usd=None はチェックをスキップし warning ログを出すこと（d）。"""
         with caplog.at_level(logging.WARNING, logger="app.protocols.pendle.client"):
             with patch.object(
-                enabled_client, "_call_sdk", new=AsyncMock(return_value=_MOCK_SWAP_RESPONSE)
+                enabled_client,
+                "_call_sdk",
+                # approve は swap 入力(999e18)と厳密一致でなければ拒否されるため額を揃える。
+                new=AsyncMock(return_value=_swap_response_for(TOKEN_IN, 999 * 10**18)),
             ):
                 result = await enabled_client.buy_yt(
                     MARKET, TOKEN_IN, Decimal("999"), RECEIVER, portfolio_value_usd=None
@@ -378,10 +403,11 @@ class TestApprovalsExtraction:
             result = await enabled_client.buy_yt(MARKET, TOKEN_IN, Decimal("1.0"), RECEIVER)
         assert result.approvals is not None
         assert len(result.approvals) == 1
-        approval = result.approvals[0]
-        assert isinstance(approval, RouterV4Approval)
-        assert approval.spender == "0x888888888889758F76e7103c6CbF23ABbF58F946"
-        assert approval.token == TOKEN_IN
+        extracted = result.approvals[0]
+        assert isinstance(extracted, RouterV4Approval)
+        # spender は API 由来ではなく、照合済み Router（routes[0].tx.to）で補完される
+        assert extracted.spender == ROUTER
+        assert extracted.token == TOKEN_IN
 
     @pytest.mark.asyncio
     async def test_approvals_extracted_from_add_liquidity(
@@ -398,13 +424,10 @@ class TestApprovalsExtraction:
     async def test_approvals_empty_when_not_in_response(
         self, enabled_client: PendleRouterV4Client
     ) -> None:
-        """SDK レスポンスに approvals がない場合は空リストが返ること。"""
-        response_no_approvals: dict = {
-            "data": {
-                "tx": {"to": _ROUTER_ADDRESS, "data": "0xdeadbeef"},
-                "amountOut": str(int(Decimal("0.95") * Decimal(10**18))),
-            }
-        }
+        """SDK レスポンスに requiredApprovals がない場合は空リストが返ること。"""
+        response_no_approvals = convert_response(
+            outputs=[output(TOKEN_OUT, int(Decimal("0.95") * Decimal(10**18)))],
+        )
         with patch.object(
             enabled_client, "_call_sdk", new=AsyncMock(return_value=response_no_approvals)
         ):

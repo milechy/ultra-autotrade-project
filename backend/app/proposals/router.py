@@ -733,6 +733,13 @@ def _pendle_liquidity_blocked(config: Any, amount_usd: Decimal) -> Optional[str]
 
     fail-closed: ``get_market_info`` は API 失敗時 tvl_usd=0 に fail-open するため、tvl<=0（未知）は
     「壊さない保証ができない」= block する（不確実なら止める）。
+
+    **併せて market と PT の対応も検証する**（安全レビュー H2/M2）。``PENDLE_MARKET_ADDRESS``
+    （本ガードが流動性を見る対象）と ``PENDLE_PT_TOKEN_ADDRESS``（実際に買う対象 = Convert API の
+    tokensOut）は独立した env で、swap 呼び出しに market は送られない。両者が別 market を指すと
+    **ガードは別プールの流動性を承認する**（例: 満期ロールで PT だけ更新し market を忘れると、
+    $114k プールの 5% を承認して実際は $40k プールに 14% 投入する）。運用者の注意力を
+    Tier S の資金経路の安全装置にしない。
     """
     from app.protocols.pendle.client import get_pendle_client  # noqa: PLC0415
 
@@ -745,6 +752,49 @@ def _pendle_liquidity_blocked(config: Any, amount_usd: Decimal) -> Optional[str]
 
     if tvl_usd <= 0:
         return "liquidity guard: プール流動性が不明/ゼロのため fail-closed (tvl_usd<=0)"
+
+    # market が扱う PT と、実際に売買する PT が一致すること（不一致 = 設定ミス → fail-closed）。
+    market_pt = (market_info.pt_address or "").lower()
+    configured_pt = (config.pt_token_address or "").lower()
+    if not market_pt:
+        return (
+            "liquidity guard: market の PT アドレスを解決できないため fail-closed "
+            "(PENDLE_MARKET_ADDRESS と PENDLE_PT_TOKEN_ADDRESS の対応を検証できない)"
+        )
+    if market_pt != configured_pt:
+        return (
+            f"liquidity guard: market({config.market_address}) が扱う PT {market_pt} と "
+            f"PENDLE_PT_TOKEN_ADDRESS {configured_pt} が不一致 = 流動性を見ている market と "
+            "実際に売買する PT が別物のため fail-closed"
+        )
+    # PT decimals の取り違えは、**低すぎる側が黙って成功する**（$10k 売却のつもりが dust だけ
+    # 売れて executed 記録が残る）。実 decimals と突合して silent under-sell を防ぐ。
+    # decimals が取れない場合も fail-closed にする（「verify すると書いた項目が API 次第で
+    # 無言スキップされる」構造は H2 を生んだ原因そのもの / 安全レビュー N2）。
+    if market_info.pt_decimals is None:
+        return (
+            "liquidity guard: PT の decimals を解決できないため fail-closed "
+            "(PENDLE_PT_TOKEN_DECIMALS の妥当性を検証できない)"
+        )
+    if market_info.pt_decimals != config.pt_token_decimals:
+        return (
+            f"liquidity guard: PT の実 decimals {market_info.pt_decimals} と "
+            f"PENDLE_PT_TOKEN_DECIMALS {config.pt_token_decimals} が不一致のため fail-closed "
+            "(数量が桁ずれする)"
+        )
+
+    # 満期ガード（安全レビュー N1）。`min_days_to_maturity` は `PendleService.mint` と
+    # `PendleMarketCache` にしか無く、broadcast 経路は `config.market_address` を直参照するため
+    # **どちらも通らない**。本 PR 以前は get_market_info が常に fallback(tvl=0) で常時 block
+    # だったため顕在化しなかったが、経路が live になった今は素通りする。
+    # 満期後の BUY_PT は revert（gas 損）、満期直前は利回りほぼゼロで資金をロックして
+    # 「成功」記録だけが残る。market_info は既に手元にあるのでここで縛る。
+    if market_info.days_to_maturity < config.min_days_to_maturity:
+        return (
+            f"liquidity guard: 満期まで {market_info.days_to_maturity} 日 "
+            f"(最低 {config.min_days_to_maturity} 日) のため fail-closed "
+            f"(market={config.market_address} のロール漏れの可能性)"
+        )
 
     pool_cap = tvl_usd * config.max_pool_liquidity_pct
     if amount_usd > pool_cap:
@@ -780,7 +830,16 @@ def _pendle_execution_blocked(proposal: Proposal, db: Session) -> Optional[str]:
         logger.warning("proposal %d: Pendle safety-gate HF fetch failed: %s", proposal.id, exc)
 
     daily_traded = _daily_traded_usd_for_user(proposal.user_id, db, exclude_proposal_id=proposal.id)
-    total_assets: Optional[Decimal] = None  # per-user 総資産は未配線（Aave 経路と同）
+    # [安全レビュー H3 / 2026-07-17] per-user 総資産は未配線（Aave SCW 経路と同じ既存状態）。
+    #
+    # **その帰結を明示する**: `risk_limiter.check_trade_within_limits` は単一 10% / 日次 30% の
+    # 両方を `total_assets_usd is not None and > 0` でガードしているため、None を渡す本経路では
+    # **CLAUDE.md Rule 3/4（ABSOLUTE）が実際には効かない**。さらに Pendle 単独ユーザーは
+    # `get_health_factor()` が失敗して hf=None になるため HF floor も効かない。
+    # 結果、Pendle broadcast の金額上限は **流動性ガード（プール% と PENDLE_MAX_TRADE_USD_CAP）
+    # だけ**が担っている。だから同 cap の既定値を 5000 → 20 に下げてある（config.py 参照）。
+    # 恒久対応（total_assets の配線）は Aave 経路と共通の別課題。
+    total_assets: Optional[Decimal] = None
 
     hard_stop = evaluate_hard_stop(
         get_monitoring_service(),
@@ -815,8 +874,10 @@ def _build_pendle_swap_result(proposal: Proposal, config: Any, from_address: str
     """[Phase D / D3-D4] proposal.operation に応じて Pendle swap 結果(approvals 付き)を構築する。
 
     - BUY_PT(入口): USDC→PT (token_in=USDC・6桁)。amount_usd をそのまま USDC 数量に使う。
-    - SELL_PT(満期出口 redeem): PT→USDC (token_out=USDC・出力6桁 / PT=18桁)。stablecoin PT は
-      満期で 1:1 のため amount_usd を PT 数量とみなす（満期前は二次市場の流動性に依存）。
+    - SELL_PT(満期出口 redeem): PT→USDC (token_out=USDC・出力6桁 / PT は
+      ``PENDLE_PT_TOKEN_DECIMALS``。**18 桁固定ではない** — PT-yoUSD は 6 桁で、18 と誤ると
+      売却数量が 10^12 倍ずれる)。stablecoin PT は満期で 1:1 のため amount_usd を PT 数量と
+      みなす（満期前は二次市場の流動性に依存）。
 
     どちらも RouterV4 Hosted SDK 呼び出しのみ（broadcast なし）。stablecoin 前提は呼び出し元が
     ``config.stable_underlying`` で担保済み。
