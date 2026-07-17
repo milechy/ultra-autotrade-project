@@ -289,22 +289,58 @@ class PendleWebClient(AbstractPendleClient):
     """
 
     _API_BASE = "https://api-v2.pendle.finance/core/v1"
+    # **base を必ず含めること**: 2026-07-17 まで base が無く、`PENDLE_CHAIN=base` でも
+    # 42161(Arbitrum) に既定化 → market data が 404 → except 節のフォールバック
+    # （stETH / tvl=0 / APY 5.2% の**架空値**）が返っていた。tvl=0 は流動性ガードが
+    # 全 block する値なので、Phase-D の Pendle は「静かに常時 block」状態だった。
+    # D2 で PendleRouterV4Client 側だけ base を追加し、本クラスが漏れていた。
     _CHAIN_ID_MAP: dict[str, str] = {
         "arbitrum": "42161",
         "ethereum": "1",
         "polygon": "137",
-        "sepolia": "421614",  # Arbitrum Sepolia
+        "sepolia": "421614",  # Arbitrum Sepolia（Pendle 未対応 = 404）
+        "base": "8453",  # [Phase D] Base Mainnet (yoUSD stablecoin PT)
+        "base_sepolia": "84532",  # Base Sepolia（Pendle 未対応 = 404）
     }
     _REQUEST_TIMEOUT = 10.0
 
     def __init__(self, config: PendleConfig) -> None:
         self._config = config
-        self._chain_id = self._CHAIN_ID_MAP.get(config.chain, "42161")
+        chain_id = self._CHAIN_ID_MAP.get(config.chain)
+        if chain_id is None:
+            # 黙って別チェーンに既定化すると「404 → 架空のフォールバック値」で気づけない。
+            # 明示的に警告して、設定ミスを観測可能にする。
+            logger.warning(
+                "PendleWebClient: 未知の chain=%r。%s に既定化する（market data は 404 になり "
+                "フォールバック値が返るため、PENDLE_CHAIN を確認すること）",
+                config.chain,
+                "42161",
+            )
+            chain_id = "42161"
+        self._chain_id = chain_id
         logger.info(
             "PendleWebClient initialized (chain=%s, chain_id=%s)",
             config.chain,
             self._chain_id,
         )
+
+    @staticmethod
+    def _parse_expiry(raw: Any) -> datetime:
+        """``expiry`` を datetime にする。
+
+        実 API は ISO8601 文字列（``"2026-09-24T00:00:00.000Z"``）を返すが、UNIX 秒（int/数字文字列）
+        で返る経路も想定して両対応にする。解釈できない値は ValueError を送出し、呼び出し側の
+        フォールバック（＝tvl=0 で流動性ガードが block）に落とす（fail-closed 側に倒す）。
+        """
+        if isinstance(raw, (int, float)):
+            return datetime.fromtimestamp(int(raw), tz=timezone.utc)
+        if isinstance(raw, str) and raw.strip():
+            value = raw.strip()
+            if value.isdigit():
+                return datetime.fromtimestamp(int(value), tz=timezone.utc)
+            # "...Z" は Python 3.10 以前の fromisoformat が解釈できないため +00:00 に正規化する。
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        raise ValueError(f"expiry を解釈できません: {raw!r}")
 
     async def _fetch_market_data(self, market_address: str) -> dict[str, Any]:
         """Pendle API からマーケットデータを取得する。"""
@@ -320,9 +356,10 @@ class PendleWebClient(AbstractPendleClient):
         try:
             data = await self._fetch_market_data(market_address)
 
-            # 満期日時（UNIX タイムスタンプ）
-            expiry_ts = int(data.get("expiry", 0))
-            maturity = datetime.fromtimestamp(expiry_ts, tz=timezone.utc)
+            # 満期日時。実 API は **ISO8601 文字列**（"2026-09-24T00:00:00.000Z"）を返す。
+            # 旧実装は int() で UNIX 秒として解釈しており必ず ValueError → except 節の
+            # フォールバック（tvl=0）に落ちていた＝流動性ガードが常に block していた。
+            maturity = self._parse_expiry(data.get("expiry"))
             days_to_maturity = max(0, (maturity - datetime.now(tz=timezone.utc)).days)
 
             # implied APY は小数形式（0.052 = 5.2%）→ % 変換
@@ -397,18 +434,24 @@ class PendleWebClient(AbstractPendleClient):
 class PendleRouterV4Client:
     """Pendle RouterV4 クライアント（YT/PT 売買 + add_liquidity）。
 
-    Pendle Hosted SDK（https://api-v2.pendle.finance/sdk/api/v1）を使って calldata を生成する。
+    Pendle Hosted SDK の **Convert API**（``/core/v2/sdk/{chainId}/convert``）で calldata を生成する。
+
+    **2026-07-17 修正**: 旧実装は ``https://api-v2.pendle.finance/sdk/api/v1/{chain}/swapExactTokenForPt``
+    を叩いていたが、この経路は**実在しない**（全チェーンで 404 "fault filter abort"、実 API で確認）。
+    Pendle は個別エンドポイント（/swap 等）を廃止し Convert API に統合済み。旧実装は URL・パラメータ名・
+    レスポンス形の全てが実物と食い違っており、動かせば必ず 404 で fail-closed に落ちていた
+    （全経路 dormant + テストが HTTP をモックしていたため未検出。本番影響はゼロ）。
 
     フェーズ境界（誤送信防止）:
-    - **Phase 1（本実装）は calldata 取得まで**。tx 送信・署名・web3 import は一切行わない
-      （tx_hash は常に None）。
-    - tx 送信は **Phase 2** で `config.enable_onchain_write=True`（PENDLE_ENABLE_ONCHAIN_WRITE）
-      かつ `config.wallet_private_key` が揃った場合のみ実装・許可する（二段ガード）。
+    - **本クラスは calldata 取得まで**。tx 送信・署名・web3 import は一切行わない（tx_hash は常に None）。
+    - 実 broadcast は委譲 SCW 経路（`app/proposals/pendle_scw.py` → `scw_executor`）が二段ガード
+      （`PENDLE_ENABLE_ONCHAIN_WRITE` + `_should_use_scw_route`）の下でのみ行う。
 
     設計方針:
     - calldata は SDK が生成するため、こちらでの ABI encode は不要。
-    - SDK レスポンスの tx.to / approvals.spender は必ず Router アドレスと照合する
-      （改竄・誘導された任意コントラクト宛 calldata を拒否）。
+    - **`routes[0].tx.to` は必ず Router アドレスと照合する**（改竄・誘導された任意コントラクト宛
+      calldata を拒否）。Convert API は approve の spender を返さないため、照合済みの Router を
+      spender として補完する（`_extract_approvals` 参照）。
     - 金額は必ず Decimal 型。float 使用禁止。token decimals を解決して桁ズレを防ぐ。
     - 秘密鍵は config 経由で環境変数から取得。ログに出力しない。
     - 外部 HTTP 失敗・照合不一致は例外を握りつぶさず RouterV4SwapResult(success=False) を返す
@@ -416,18 +459,36 @@ class PendleRouterV4Client:
     - slippage デフォルト 0.5%（Decimal("0.005")）。
     """
 
-    _SDK_BASE = "https://api-v2.pendle.finance/sdk/api/v1"
+    #: Convert API のベース。個別エンドポイント（swapExactTokenForPt 等）は廃止済み。
+    _SDK_BASE = "https://api-v2.pendle.finance/core"
     _DEFAULT_SLIPPAGE = Decimal("0.005")
     _REQUEST_TIMEOUT: float = 15.0
 
-    # チェーン ID マッピング（Pendle SDK が使用するチェーン ID）
+    #: **YT 売買 (`buy_yt` / `sell_yt`) は実 API では成立しない**（既知・未対応）。
+    #: Convert API は tokensIn/tokensOut に実トークンアドレスを要求するが、これらは旧 SDK 規約の
+    #: リテラル "YT" を渡しており、YT アドレスの設定項目も無い。呼んでも API が 400 を返して
+    #: `success=False` になる（fail-closed で害は無い）。本製品は Phase-D で **PT 専用**
+    #: （`RISK_MODE_PROTOCOLS` の aggressive は stablecoin PT のみ）のため未修正のまま残す。
+    #: YT を扱うなら PT と同様に `PENDLE_YT_TOKEN_ADDRESS` / decimals の追加が要る。
+    #: aggregator を有効にするか。**SELL_PT(PT→USDC) には必須**（false だと
+    #: "tokenOut must be in the SY token out list" で 400。yoUSD→USDC の変換に aggregator が要る）。
+    #: BUY_PT では on/off で結果が変わらず、いずれの場合も `tx.to` は RouterV4 のまま
+    #: （aggregator は Router 内部で呼ばれる）＝宛先 allowlist の fail-closed 性は保たれる。
+    #: 実 API で両方向・両設定を確認済み（2026-07-17）。
+    _ENABLE_AGGREGATOR = "true"
+
+    # チェーン ID マッピング（Pendle SDK が使用するチェーン ID）。
+    # **Pendle API は mainnet のみ対応**（1, 56, 143, 999, 8453, 9745, 42161, 10, 146, 5000, 80094）。
+    # testnet は 400 "Unsupported chain id" で拒否されるため、testnet 上での検証経路は存在しない
+    # （実 API で確認済み 2026-07-17）。sepolia / base_sepolia を残すのは設定ミスを
+    # 「動くように見えて実は 400」ではなく明示的な失敗として観測するため。
     _CHAIN_ID_MAP: dict[str, int] = {
         "arbitrum": 42161,
         "ethereum": 1,
         "polygon": 137,
-        "sepolia": 421614,  # Arbitrum Sepolia
+        "sepolia": 421614,  # Arbitrum Sepolia（Pendle 未対応 = 400）
         "base": 8453,  # [Phase D] Base Mainnet (yoUSD stablecoin PT)
-        "base_sepolia": 84532,  # [Phase D] Base Sepolia (staging-v4 検証)
+        "base_sepolia": 84532,  # Base Sepolia（Pendle 未対応 = 400）
     }
 
     def __init__(
@@ -449,26 +510,36 @@ class PendleRouterV4Client:
             self._config.router_address[:10] + "...",
         )
 
-    async def _call_sdk(self, endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
-        """Pendle Hosted SDK を呼び出して calldata を取得する。
+    async def _call_sdk(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Pendle Convert API を呼び出して calldata を取得する。
+
+        swap / mint / redeem は Convert API に統合されており、動作は tokensIn/tokensOut の
+        組み合わせから API 側が決める（旧 SDK の endpoint 名は不要）。
 
         Args:
-            endpoint: SDK エンドポイント（例: "swapExactTokenForYt"）
-            params: クエリパラメータ
+            params: クエリパラメータ（tokensIn / tokensOut / amountsIn / receiver / slippage 等）
 
         Returns:
-            SDK レスポンス dict
+            Convert API レスポンス dict
 
         Raises:
             httpx.HTTPError: HTTP エラー
             Exception: その他のエラー
         """
-        url = f"{self._SDK_BASE}/{self._chain_id}/{endpoint}"
+        url = f"{self._SDK_BASE}/v2/sdk/{self._chain_id}/convert"
         async with httpx.AsyncClient(timeout=self._REQUEST_TIMEOUT) as client:
             response = await client.get(url, params=params)
             response.raise_for_status()
             data: dict[str, Any] = response.json()
             return data
+
+    @staticmethod
+    def _first_route(sdk_response: dict[str, Any]) -> dict[str, Any]:
+        """Convert API レスポンスの最初の route を返す（無ければ空 dict）。"""
+        routes = sdk_response.get("routes") or []
+        if routes and isinstance(routes[0], dict):
+            return routes[0]
+        return {}
 
     def _amount_to_wei(self, amount: Decimal, decimals: int = 18) -> int:
         """Decimal 量を wei 単位の int に変換する。"""
@@ -577,9 +648,17 @@ class PendleRouterV4Client:
             return False
         return a.lower() == b.lower()
 
-    def _extract_approvals(self, sdk_response: dict[str, Any]) -> list[RouterV4Approval]:
-        """SDK レスポンスから approvals 配列を取り出す（無ければ空）。"""
-        raw = sdk_response.get("data", {}).get("approvals", []) or []
+    def _extract_approvals(
+        self, sdk_response: dict[str, Any], spender: str
+    ) -> list[RouterV4Approval]:
+        """Convert API の ``requiredApprovals`` を取り出す（無ければ空）。
+
+        **Convert API は spender を返さない**（``{token, amount}`` のみ）。approve 先は常に
+        route の ``tx.to``＝Router なので、呼び出し側が `_verify_router` で Router と照合済みの
+        宛先を ``spender`` として渡すこと。これにより「照合済み Router 以外へは絶対に approve
+        しない」という不変条件を、API の返り値に依存せずこちら側で保証する。
+        """
+        raw = sdk_response.get("requiredApprovals") or []
         approvals: list[RouterV4Approval] = []
         for item in raw:
             if not isinstance(item, dict):
@@ -587,28 +666,45 @@ class PendleRouterV4Client:
             approvals.append(
                 RouterV4Approval(
                     token=item.get("token"),
-                    spender=item.get("spender"),
+                    spender=spender,
                     amount=(str(item["amount"]) if item.get("amount") is not None else None),
                 )
             )
         return approvals
 
     def _verify_router(self, sdk_response: dict[str, Any]) -> tuple[bool, str | None, str]:
-        """SDK レスポンスの tx.to と approvals.spender を Router アドレスと照合する。
+        """Convert API の ``routes[0].tx.to`` を Router アドレスと照合する。
+
+        aggregator 有効時も Router が内部で aggregator を呼ぶ形になり ``tx.to`` は Router のまま
+        （実 API で両方向確認済み）。よって「宛先が Router であること」だけを fail-closed 条件に
+        できる。approve の spender は本メソッドで照合した宛先を `_extract_approvals` に渡して補完する。
 
         Returns:
             (ok, to_address, error): ok=False のとき error に理由を格納する。
         """
-        to_addr = sdk_response.get("data", {}).get("tx", {}).get("to")
+        to_addr = self._first_route(sdk_response).get("tx", {}).get("to")
         if not self._addr_eq(to_addr, self._config.router_address):
             return False, None, "router address mismatch"
-        # approvals がある場合は spender も Router であることを照合する。
-        for approval in self._extract_approvals(sdk_response):
-            if approval.spender is not None and not self._addr_eq(
-                approval.spender, self._config.router_address
-            ):
-                return False, None, "router address mismatch"
         return True, to_addr, ""
+
+    def _extract_amount_out(
+        self, sdk_response: dict[str, Any], token_out: str, decimals: int
+    ) -> Decimal:
+        """Convert API の ``routes[0].outputs`` から token_out の受取量を取り出す。
+
+        outputs は複数返り得るため token_out に一致するものを優先し、無ければ先頭を使う。
+        """
+        outputs = self._first_route(sdk_response).get("outputs") or []
+        chosen: dict[str, Any] | None = None
+        for item in outputs:
+            if isinstance(item, dict) and self._addr_eq(item.get("token"), token_out):
+                chosen = item
+                break
+        if chosen is None and outputs and isinstance(outputs[0], dict):
+            chosen = outputs[0]
+        if not chosen or chosen.get("amount") is None:
+            return Decimal("0")
+        return self._wei_to_decimal(int(str(chosen["amount"])), decimals=decimals)
 
     async def resolve_market_address(self, underlying_asset: str) -> str | None:
         """underlying_asset シンボルから market address を動的解決する。
@@ -763,17 +859,21 @@ class PendleRouterV4Client:
             return guard
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
         in_decimals = self._resolve_decimals(token_in, token_in_decimals)
+        # Convert API は tokensOut に **PT の実アドレス**を要求する（旧 SDK のリテラル "PT" は不可）。
+        # PT の decimals も config 由来（18 固定は誤り。PT-yoUSD は 6）。
         req = RouterV4SwapRequest(
             market_address=market_address,
             token_in=token_in,
-            token_out="PT",  # noqa: S106 — トークン種別リテラル (パスワードではない)
+            token_out=self._config.pt_token_address,
             amount_in=amount_in,
             slippage=effective_slippage,
             receiver=receiver,
         )
-        # PT は 18 桁。入力トークンのみ decimals を解決する。
         return await self._execute_swap(
-            req, "swapExactTokenForPt", amount_in_decimals=in_decimals, amount_out_decimals=18
+            req,
+            "swapExactTokenForPt",
+            amount_in_decimals=in_decimals,
+            amount_out_decimals=self._config.pt_token_decimals,
         )
 
     async def sell_pt(
@@ -812,17 +912,21 @@ class PendleRouterV4Client:
             return guard
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
         out_decimals = self._resolve_decimals(token_out, token_out_decimals)
+        # tokensIn は **PT の実アドレス**（旧 SDK のリテラル "PT" は不可）。PT の decimals を
+        # 18 固定にすると PT-yoUSD(6桁) で**売却数量が 10^12 倍ズレる**ため config 由来にする。
         req = RouterV4SwapRequest(
             market_address=market_address,
-            token_in="PT",  # noqa: S106 — トークン種別リテラル (パスワードではない)
+            token_in=self._config.pt_token_address,
             token_out=token_out,
             amount_in=pt_amount_in,
             slippage=effective_slippage,
             receiver=receiver,
         )
-        # PT は 18 桁。出力トークンのみ decimals を解決する。
         return await self._execute_swap(
-            req, "swapExactPtForToken", amount_in_decimals=18, amount_out_decimals=out_decimals
+            req,
+            "swapExactPtForToken",
+            amount_in_decimals=self._config.pt_token_decimals,
+            amount_out_decimals=out_decimals,
         )
 
     async def _execute_swap(
@@ -832,14 +936,15 @@ class PendleRouterV4Client:
         amount_in_decimals: int = 18,
         amount_out_decimals: int = 18,
     ) -> RouterV4SwapResult:
-        """SDK を呼び出して swap calldata を取得する（Phase 1 は送信しない）。
+        """Convert API を呼び出して swap calldata を取得する（送信はしない）。
 
         外部 HTTP 失敗・Router 不一致・calldata 欠損は例外を握りつぶさず
         RouterV4SwapResult(success=False) を返す（fail-closed）。
 
         Args:
             req: swap リクエスト
-            sdk_endpoint: SDK エンドポイント名
+            sdk_endpoint: 動作の識別ラベル（ログ/診断用）。Convert API は tokensIn/tokensOut から
+                動作を決めるため URL には使わない（旧個別エンドポイントは廃止済み）。
             amount_in_decimals: 入力トークンの decimals（USDC=6 等の桁ズレ防止）
             amount_out_decimals: 出力トークンの decimals（amount_out 復元に使用）
 
@@ -848,57 +953,58 @@ class PendleRouterV4Client:
         """
         try:
             amount_wei = self._amount_to_wei(req.amount_in, decimals=amount_in_decimals)
-            # slippage は SDK に対して小数形式で渡す（0.005 = 0.5%）
+            # Convert API は tokensIn/tokensOut/amountsIn（複数形）。market は指定しない
+            # ——対象 market は PT アドレス側で一意に決まるため。
+            # slippage は小数形式で渡す（0.005 = 0.5%）。
             params: dict[str, Any] = {
-                "chainId": self._chain_id,
-                "market": req.market_address,
-                "tokenIn": req.token_in,
-                "tokenOut": req.token_out,
-                "amountIn": str(amount_wei),
+                "tokensIn": req.token_in,
+                "tokensOut": req.token_out,
+                "amountsIn": str(amount_wei),
                 "slippage": str(req.slippage),
                 "receiver": req.receiver,
+                "enableAggregator": self._ENABLE_AGGREGATOR,
             }
 
             logger.info(
-                "PendleRouterV4Client._execute_swap: endpoint=%s, market=%s, amountIn=%s",
+                "PendleRouterV4Client._execute_swap: action=%s, market=%s, amountIn=%s",
                 sdk_endpoint,
                 req.market_address[:10] + "...",
                 req.amount_in,
             )
 
-            sdk_response = await self._call_sdk(sdk_endpoint, params)
+            sdk_response = await self._call_sdk(params)
 
-            # C2: SDK calldata の宛先 (tx.to) と approvals.spender を Router と照合する。
+            # C2: calldata の宛先 (routes[0].tx.to) を Router と照合する。
+            # approve の spender は照合済みの宛先で補完する（Convert API は spender を返さない）。
             router_ok, to_addr, router_err = self._verify_router(sdk_response)
-            if not router_ok:
+            if not router_ok or not to_addr:
                 logger.warning(
-                    "PendleRouterV4Client._execute_swap: %s (endpoint=%s)",
+                    "PendleRouterV4Client._execute_swap: %s (action=%s)",
                     router_err,
                     sdk_endpoint,
                 )
-                return RouterV4SwapResult(success=False, error=router_err)
+                return RouterV4SwapResult(success=False, error=router_err or "router mismatch")
 
-            calldata: str = sdk_response.get("data", {}).get("tx", {}).get("data", "")
+            calldata: str = self._first_route(sdk_response).get("tx", {}).get("data", "")
             # m1: calldata 欠損/空文字は空 tx 送信の温床。success=False で拒否する。
             if not calldata:
                 logger.warning(
-                    "PendleRouterV4Client._execute_swap: empty calldata (endpoint=%s)",
+                    "PendleRouterV4Client._execute_swap: empty calldata (action=%s)",
                     sdk_endpoint,
                 )
                 return RouterV4SwapResult(success=False, error="empty calldata")
 
-            out_amount_raw = sdk_response.get("data", {}).get("amountOut", "0")
-            amount_out = self._wei_to_decimal(
-                int(str(out_amount_raw)), decimals=amount_out_decimals
+            amount_out = self._extract_amount_out(
+                sdk_response, req.token_out, decimals=amount_out_decimals
             )
 
             return RouterV4SwapResult(
                 success=True,
-                tx_hash=None,  # tx 送信は Phase 2 以降（現フェーズは calldata 取得のみ）
+                tx_hash=None,  # 送信は委譲 SCW 経路が二段ガードの下で行う（本クラスは calldata のみ）
                 amount_out=amount_out,
                 calldata=calldata,
                 to=to_addr,
-                approvals=self._extract_approvals(sdk_response),
+                approvals=self._extract_approvals(sdk_response, spender=to_addr),
             )
 
         except httpx.HTTPStatusError as exc:
@@ -948,16 +1054,22 @@ class PendleRouterV4Client:
 
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
         in_decimals = self._resolve_decimals(token_in, token_in_decimals)
+        # Convert API は tokensOut に **PT の実アドレス**を要求する（対象 market は PT で一意）。
+        # 旧実装はリテラル "PT" を渡していたが、これは旧 SDK（market + tokenOut="PT"）の規約で
+        # Convert API では通らない。PT の decimals も 18 固定は誤り（PT-yoUSD は 6）。
         req = RouterV4SwapRequest(
             market_address=market_address,
             token_in=token_in,
-            token_out="PT",  # noqa: S106 — トークン種別リテラル (パスワードではない)
+            token_out=self._config.pt_token_address,
             amount_in=amount_in,
             slippage=effective_slippage,
             receiver=from_address,  # 非カストディアル: PT は署名者本人へ着金
         )
         return await self._execute_swap(
-            req, "swapExactTokenForPt", amount_in_decimals=in_decimals, amount_out_decimals=18
+            req,
+            "swapExactTokenForPt",
+            amount_in_decimals=in_decimals,
+            amount_out_decimals=self._config.pt_token_decimals,
         )
 
     async def build_sell_pt_swap_result(
@@ -988,17 +1100,22 @@ class PendleRouterV4Client:
 
         effective_slippage = slippage if slippage is not None else self._DEFAULT_SLIPPAGE
         out_decimals = self._resolve_decimals(token_out, token_out_decimals)
+        # tokensIn は **PT の実アドレス**（旧実装のリテラル "PT" は Convert API で通らない）。
+        # PT の decimals は config 由来。ここを 18 固定にすると PT-yoUSD(6桁) で
+        # **売却数量が 10^12 倍ズレる**（残高不足で失敗するか、意図しない量を売る）。
         req = RouterV4SwapRequest(
             market_address=market_address,
-            token_in="PT",  # noqa: S106 — トークン種別リテラル (パスワードではない)
+            token_in=self._config.pt_token_address,
             token_out=token_out,
             amount_in=pt_amount_in,
             slippage=effective_slippage,
             receiver=from_address,  # 非カストディアル: 出力トークンは署名者本人へ着金
         )
-        # PT は 18 桁。出力トークンのみ decimals を解決する。
         return await self._execute_swap(
-            req, "swapExactPtForToken", amount_in_decimals=18, amount_out_decimals=out_decimals
+            req,
+            "swapExactPtForToken",
+            amount_in_decimals=self._config.pt_token_decimals,
+            amount_out_decimals=out_decimals,
         )
 
     async def build_buy_pt_tx(
@@ -1103,13 +1220,15 @@ class PendleRouterV4Client:
 
         try:
             amount_wei = self._amount_to_wei(req.amount_in, decimals=in_decimals)
+            # Convert API は tokensOut に market(LP) アドレスを渡すと action="add-liquidity" になる
+            # （swap と同一エンドポイント。実 API で確認済み 2026-07-17）。
             params: dict[str, Any] = {
-                "chainId": self._chain_id,
-                "market": req.market_address,
-                "tokenIn": req.token_in,
-                "amountIn": str(amount_wei),
+                "tokensIn": req.token_in,
+                "tokensOut": req.market_address,
+                "amountsIn": str(amount_wei),
                 "slippage": str(req.slippage),
                 "receiver": req.receiver,
+                "enableAggregator": self._ENABLE_AGGREGATOR,
             }
 
             logger.info(
@@ -1119,31 +1238,32 @@ class PendleRouterV4Client:
                 req.amount_in,
             )
 
-            sdk_response = await self._call_sdk("addLiquiditySingleToken", params)
+            sdk_response = await self._call_sdk(params)
 
-            # C2: tx.to / approvals.spender を Router と照合する。
+            # C2: routes[0].tx.to を Router と照合する（spender は照合済み宛先で補完）。
             router_ok, to_addr, router_err = self._verify_router(sdk_response)
-            if not router_ok:
+            if not router_ok or not to_addr:
                 logger.warning("PendleRouterV4Client.add_liquidity: %s", router_err)
-                return RouterV4AddLiquidityResult(success=False, error=router_err)
+                return RouterV4AddLiquidityResult(
+                    success=False, error=router_err or "router mismatch"
+                )
 
-            calldata = sdk_response.get("data", {}).get("tx", {}).get("data", "")
+            calldata = self._first_route(sdk_response).get("tx", {}).get("data", "")
             # m1: calldata 欠損/空文字は拒否（空 tx 送信の温床）。
             if not calldata:
                 logger.warning("PendleRouterV4Client.add_liquidity: empty calldata")
                 return RouterV4AddLiquidityResult(success=False, error="empty calldata")
 
-            # LP トークンは 18 桁。
-            lp_amount_raw = sdk_response.get("data", {}).get("amountLpOut", "0")
-            lp_amount = self._wei_to_decimal(int(str(lp_amount_raw)))
+            # LP トークンは 18 桁。outputs の token は market(LP) アドレス。
+            lp_amount = self._extract_amount_out(sdk_response, req.market_address, decimals=18)
 
             return RouterV4AddLiquidityResult(
                 success=True,
-                tx_hash=None,  # tx 送信は Phase 2 以降
+                tx_hash=None,  # 送信は行わない（calldata 取得のみ）
                 lp_amount=lp_amount,
                 calldata=calldata,
                 to=to_addr,
-                approvals=self._extract_approvals(sdk_response),
+                approvals=self._extract_approvals(sdk_response, spender=to_addr),
             )
 
         except httpx.HTTPStatusError as exc:

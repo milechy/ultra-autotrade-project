@@ -58,6 +58,14 @@ class PendleConfig:
             "0x0000000000000000000000000000000000000004",  # dummy address
         )
     )
+    # PT トークンの decimals。**PT は 18 桁とは限らない**（PT-yoUSD-24SEP2026 は 6 桁。PT は
+    # 原資産の桁を継ぐため stablecoin PT は 6 になる）。underlying_token_decimals と同じ理由で
+    # 明示が要る: pt_token_address は *アドレス* なので token_decimals(symbol) では解決できない。
+    # ここを誤ると SELL_PT で **売却数量そのものが 10^12 倍ズレる**（BUY_PT は受取量の表示ズレ）。
+    # 市場ごとに異なるため env で設定する（既定 6 = stablecoin PT 想定）。
+    pt_token_decimals: int = field(
+        default_factory=lambda: int(os.getenv("PENDLE_PT_TOKEN_DECIMALS", "6"))
+    )
     # 入力トークンが USD ペッグの stablecoin (USDC 等) か。True の場合のみ proposal.amount_usd
     # をそのまま入力トークン数量として扱う (1 USDC≒1 USD)。False (既定) は USD→token 価格換算が
     # 未配線のため自動執行を fail-closed で拒否する (ETH や非ステーブル PT の誤数量署名防止)。

@@ -18,6 +18,8 @@ from app.protocols.pendle.schemas import (
 )
 from app.protocols.pendle.service import PendleService
 
+from .convert_api_fixtures import ROUTER, convert_response, output
+
 _MARKET_ADDR = "0x" + "0" * 40
 
 
@@ -288,28 +290,10 @@ class TestGetMarketInfo:
         assert result == Decimal("0")
 
 
-_ROUTER = "0x888888888889758F76e7103c6CbF23ABbF58F946"
+_ROUTER = ROUTER
 _MARKET = "0x" + "aa" * 20
 _TOKEN_IN = "0x" + "bb" * 20  # noqa: S106 — トークンアドレス（パスワードではない）
 _RECEIVER = "0x" + "dd" * 20
-
-
-def _sdk_resp(
-    *,
-    to: str = _ROUTER,
-    data: str = "0xdeadbeef",
-    approvals: list | None = None,
-) -> dict:
-    """テスト用 SDK レスポンスを生成する。"""
-    resp: dict = {
-        "data": {
-            "tx": {"to": to, "data": data},
-            "amountOut": str(int(Decimal("0.95") * Decimal(10**18))),
-        }
-    }
-    if approvals is not None:
-        resp["data"]["approvals"] = approvals
-    return resp
 
 
 @pytest.fixture
@@ -337,16 +321,20 @@ class TestRouterV4RealCalldataPath:
     ) -> None:
         """_extract_approvals が非 dict 要素（文字列・None）を無視して dict のみを返すこと。
 
-        approvals リストに dict と非 dict が混在する場合、非 dict は continue でスキップされ、
-        有効な dict アイテムのみが RouterV4Approval として返される。
+        requiredApprovals に dict と非 dict が混在する場合、非 dict は continue でスキップされ、
+        有効な dict アイテムのみが RouterV4Approval として返される。実 Convert API の
+        requiredApprovals は spender を持たないため、spender は照合済み Router で補完される。
         """
-        # 非 dict 要素（文字列、None）を混在させた approvals を _call_sdk がモックで返す
+        # 非 dict 要素（文字列、None）を混在させた requiredApprovals をモックで返す
         mixed_approvals = [
             "invalid_string_item",  # 非 dict — continue 分岐を通す
             None,  # 非 dict — continue 分岐を通す
-            {"token": _TOKEN_IN, "spender": _ROUTER, "amount": "100"},  # 有効な dict
+            {"token": _TOKEN_IN, "amount": "100"},  # 有効な dict（実 API 同様 spender なし）
         ]
-        sdk_resp = _sdk_resp(approvals=mixed_approvals)
+        sdk_resp = convert_response(
+            required_approvals=mixed_approvals,
+            outputs=[output(_TOKEN_IN, int(Decimal("0.95") * Decimal(10**18)))],
+        )
 
         with patch.object(
             router_client_write_enabled,
@@ -370,9 +358,12 @@ class TestRouterV4RealCalldataPath:
     async def test_extract_approvals_all_non_dict_returns_empty(
         self, router_client_write_enabled: PendleRouterV4Client
     ) -> None:
-        """approvals が全て非 dict のとき空リストが返り、Router 照合が通過すること。"""
+        """requiredApprovals が全て非 dict のとき空リストが返り、Router 照合が通過すること。"""
         all_invalid_approvals: list = ["str_item", 42, None]
-        sdk_resp = _sdk_resp(approvals=all_invalid_approvals)
+        sdk_resp = convert_response(
+            required_approvals=all_invalid_approvals,
+            outputs=[output(_TOKEN_IN, int(Decimal("0.95") * Decimal(10**18)))],
+        )
 
         with patch.object(
             router_client_write_enabled,
@@ -389,3 +380,24 @@ class TestRouterV4RealCalldataPath:
         # 非 dict を全てスキップした結果、approvals は空 → Router 照合は通過し success=True
         assert result.success is True
         assert result.approvals == []
+
+    def test_extract_approvals_direct_call_uses_given_spender(
+        self, router_client_write_enabled: PendleRouterV4Client
+    ) -> None:
+        """_extract_approvals は渡された spender を各 approval に適用すること（直接呼び出し）。
+
+        `_extract_approvals(sdk_response, spender)` は spender を必須引数に取るようになった。
+        呼び出し側が `_verify_router` で照合済みの宛先を渡す契約であることをここで固定する。
+        """
+        sdk_resp = convert_response(
+            required_approvals=[
+                {"token": _TOKEN_IN, "amount": "100"},
+                "非 dict はスキップ",
+            ],
+        )
+        approvals = router_client_write_enabled._extract_approvals(sdk_resp, spender=_ROUTER)
+
+        assert len(approvals) == 1
+        assert approvals[0].spender == _ROUTER
+        assert approvals[0].token == _TOKEN_IN
+        assert approvals[0].amount == "100"

@@ -31,6 +31,7 @@ from app.auth.models import (  # noqa: E402
     RISK_MODE_PROTOCOLS,
     RISK_MODE_SUBSCRIPTION_RATES,
     RiskMode,
+    _allowed_risk_modes_from_env,
     get_risk_mode_label,
 )
 from app.database import Base, get_db  # noqa: E402
@@ -95,6 +96,41 @@ class TestPhase1RiskMode:
         assert RISK_MODE_PHASE[RiskMode.CONSERVATIVE] == 1
         assert RISK_MODE_PHASE[RiskMode.BALANCED] == 2
         assert RISK_MODE_PHASE[RiskMode.AGGRESSIVE] == 2
+
+
+class TestAllowedRiskModesFromEnv:
+    """``ALLOWED_RISK_MODES`` env による解禁制御（環境ごとに開けるための仕組み）。"""
+
+    def test_unset_defaults_to_conservative_only(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """**未設定なら従来どおり閉じたまま**（本番の既定挙動が変わらないこと）。"""
+        monkeypatch.delenv("ALLOWED_RISK_MODES", raising=False)
+        assert _allowed_risk_modes_from_env() == frozenset({RiskMode.CONSERVATIVE})
+
+    def test_blank_defaults_to_conservative_only(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ALLOWED_RISK_MODES", "   ")
+        assert _allowed_risk_modes_from_env() == frozenset({RiskMode.CONSERVATIVE})
+
+    def test_opens_aggressive_when_configured(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """staging だけ aggressive を開ける（本番 env は未設定のまま閉じる）。"""
+        monkeypatch.setenv("ALLOWED_RISK_MODES", "conservative,aggressive")
+        modes = _allowed_risk_modes_from_env()
+        assert modes == frozenset({RiskMode.CONSERVATIVE, RiskMode.AGGRESSIVE})
+
+    def test_conservative_always_included(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """conservative を書き忘れても常に選べる（全モードを塞いで詰まないため）。"""
+        monkeypatch.setenv("ALLOWED_RISK_MODES", "aggressive")
+        assert RiskMode.CONSERVATIVE in _allowed_risk_modes_from_env()
+
+    def test_unknown_value_ignored_not_opened(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """typo は無視する（意図せず解禁が広がらない fail-safe）。"""
+        monkeypatch.setenv("ALLOWED_RISK_MODES", "aggresive,BOGUS")  # 綴り誤り
+        assert _allowed_risk_modes_from_env() == frozenset({RiskMode.CONSERVATIVE})
+
+    def test_case_and_space_tolerant(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ALLOWED_RISK_MODES", " AGGRESSIVE , balanced ")
+        assert _allowed_risk_modes_from_env() == frozenset(
+            {RiskMode.CONSERVATIVE, RiskMode.AGGRESSIVE, RiskMode.BALANCED}
+        )
 
 
 class TestRiskModeMetadata:

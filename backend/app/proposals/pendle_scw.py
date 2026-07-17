@@ -70,6 +70,9 @@ def build_pendle_swap_calls(result: RouterV4SwapResult) -> list[dict[str, Any]]:
                 "approval missing token/spender/amount (SCW approve を組めない)"
             )
         # spender は必ず swap 宛先 Router と一致すること（任意コントラクトへの approve を拒否）。
+        # Convert API は spender を返さないため client が「Router 照合済みの tx.to」を spender として
+        # 補完する（client._extract_approvals）。よって通常ここは常に一致するが、供給元が変わっても
+        # 「照合済み Router 以外へ approve しない」不変条件が破れないよう多層防御として残す。
         if Web3.to_checksum_address(approval.spender) != router_cs:
             raise PendleScwCallsError(
                 f"approval spender {approval.spender} != swap router {router_to}"

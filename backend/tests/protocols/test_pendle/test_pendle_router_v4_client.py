@@ -10,33 +10,25 @@ from app.protocols.pendle.client import PendleRouterV4Client
 from app.protocols.pendle.config import PendleConfig
 from app.protocols.pendle.schemas import RouterV4AddLiquidityResult, RouterV4SwapResult
 
+from .convert_api_fixtures import convert_response, output
+
 MARKET = "0x" + "aa" * 20
 TOKEN_IN = "0x" + "bb" * 20
 TOKEN_OUT = "0x" + "cc" * 20
 RECEIVER = "0x" + "dd" * 20
-ROUTER = "0x888888888889758F76e7103c6CbF23ABbF58F946"
 
-# SDK が返すモックレスポンス（swap 系）。tx.to は Router アドレス（C2 照合をパスする）。
-_MOCK_SWAP_RESPONSE: dict = {
-    "data": {
-        "tx": {
-            "to": ROUTER,
-            "data": "0xdeadbeef",
-        },
-        "amountOut": str(int(Decimal("0.95") * Decimal(10**18))),
-    }
-}
+# Convert API が返すモックレスポンス（swap 系）。tx.to は Router アドレス（C2 照合をパスする）。
+# 応答形の定義は convert_api_fixtures に集約する（各ファイルで手書きしない）。
+_MOCK_SWAP_RESPONSE: dict = convert_response(
+    outputs=[output(TOKEN_OUT, int(Decimal("0.95") * Decimal(10**18)))],
+)
 
-# SDK が返すモックレスポンス（add_liquidity 系）。
-_MOCK_ADD_LIQ_RESPONSE: dict = {
-    "data": {
-        "tx": {
-            "to": ROUTER,
-            "data": "0xcafebabe",
-        },
-        "amountLpOut": str(int(Decimal("0.98") * Decimal(10**18))),
-    }
-}
+# add_liquidity 系。LP 受取量は outputs の token=market(LP) アドレスから 18 桁で復元される。
+_MOCK_ADD_LIQ_RESPONSE: dict = convert_response(
+    data="0xcafebabe",
+    action="add-liquidity",
+    outputs=[output(MARKET, int(Decimal("0.98") * Decimal(10**18)))],
+)
 
 
 @pytest.fixture
@@ -121,26 +113,34 @@ class TestBuyYt:
         assert type(result.amount_out) is Decimal
 
     @pytest.mark.asyncio
-    async def test_buy_yt_uses_swapExactTokenForYt_endpoint(
+    async def test_buy_yt_requests_yt_as_tokens_out(
         self, router_client: PendleRouterV4Client
     ) -> None:
-        """buy_yt が SDK の swapExactTokenForYt エンドポイントを呼ぶこと。"""
-        captured_endpoint: list[str] = []
+        """buy_yt が Convert API に tokensIn=入力トークン / tokensOut=YT を渡すこと。
 
-        async def mock_call_sdk(endpoint: str, params: dict) -> dict:
-            captured_endpoint.append(endpoint)
+        旧テストは「SDK の swapExactTokenForYt エンドポイントを呼ぶこと」を検証していたが、
+        その個別エンドポイントは実在せず（Convert API に統合済み）、URL からは消えた。
+        動作は tokensIn/tokensOut の組み合わせで API 側が決めるため、等価な不変条件として
+        「渡すトークンの向き」を検証する。
+        """
+        captured_params: list[dict] = []
+
+        async def mock_call_sdk(params: dict) -> dict:
+            captured_params.append(params)
             return _MOCK_SWAP_RESPONSE
 
         with patch.object(router_client, "_call_sdk", side_effect=mock_call_sdk):
             await router_client.buy_yt(MARKET, TOKEN_IN, Decimal("1.0"), RECEIVER)
-        assert captured_endpoint[0] == "swapExactTokenForYt"
+        assert captured_params[0]["tokensIn"] == TOKEN_IN
+        assert captured_params[0]["tokensOut"] == "YT"
+        assert captured_params[0]["receiver"] == RECEIVER
 
     @pytest.mark.asyncio
     async def test_buy_yt_default_slippage(self, router_client: PendleRouterV4Client) -> None:
         """buy_yt のデフォルトスリッページが 0.005 であること。"""
         captured_params: list[dict] = []
 
-        async def mock_call_sdk(endpoint: str, params: dict) -> dict:
+        async def mock_call_sdk(params: dict) -> dict:
             captured_params.append(params)
             return _MOCK_SWAP_RESPONSE
 
@@ -153,7 +153,7 @@ class TestBuyYt:
         """buy_yt にカスタムスリッページを指定できること。"""
         captured_params: list[dict] = []
 
-        async def mock_call_sdk(endpoint: str, params: dict) -> dict:
+        async def mock_call_sdk(params: dict) -> dict:
             captured_params.append(params)
             return _MOCK_SWAP_RESPONSE
 
@@ -209,19 +209,24 @@ class TestSellYt:
         assert result.calldata == "0xdeadbeef"
 
     @pytest.mark.asyncio
-    async def test_sell_yt_uses_swapExactYtForToken_endpoint(
+    async def test_sell_yt_requests_yt_as_tokens_in(
         self, router_client: PendleRouterV4Client
     ) -> None:
-        """sell_yt が SDK の swapExactYtForToken エンドポイントを呼ぶこと。"""
-        captured_endpoint: list[str] = []
+        """sell_yt が Convert API に tokensIn=YT / tokensOut=出力トークンを渡すこと（売り方向）。
 
-        async def mock_call_sdk(endpoint: str, params: dict) -> dict:
-            captured_endpoint.append(endpoint)
+        旧テストの swapExactYtForToken エンドポイントは実在しないため、等価な不変条件
+        （トークンの向きが売り方向であること）に置き換えた。
+        """
+        captured_params: list[dict] = []
+
+        async def mock_call_sdk(params: dict) -> dict:
+            captured_params.append(params)
             return _MOCK_SWAP_RESPONSE
 
         with patch.object(router_client, "_call_sdk", side_effect=mock_call_sdk):
             await router_client.sell_yt(MARKET, TOKEN_OUT, Decimal("1.0"), RECEIVER)
-        assert captured_endpoint[0] == "swapExactYtForToken"
+        assert captured_params[0]["tokensIn"] == "YT"
+        assert captured_params[0]["tokensOut"] == TOKEN_OUT
 
     @pytest.mark.asyncio
     async def test_sell_yt_error_returns_failure(self, router_client: PendleRouterV4Client) -> None:
@@ -257,19 +262,25 @@ class TestBuyPt:
         assert result.calldata == "0xdeadbeef"
 
     @pytest.mark.asyncio
-    async def test_buy_pt_uses_swapExactTokenForPt_endpoint(
+    async def test_buy_pt_requests_pt_as_tokens_out(
         self, router_client: PendleRouterV4Client
     ) -> None:
-        """buy_pt が SDK の swapExactTokenForPt エンドポイントを呼ぶこと。"""
-        captured_endpoint: list[str] = []
+        """buy_pt が tokensIn=入力トークン / tokensOut=**PT の実アドレス** を渡すこと（買い方向）。
 
-        async def mock_call_sdk(endpoint: str, params: dict) -> dict:
-            captured_endpoint.append(endpoint)
+        旧テストの swapExactTokenForPt エンドポイントは実在しないため、等価な不変条件
+        （トークンの向きが買い方向であること）に置き換えた。さらに Convert API は
+        tokensOut に実アドレスを要求するため、旧 SDK 規約のリテラル "PT" では通らない。
+        """
+        captured_params: list[dict] = []
+
+        async def mock_call_sdk(params: dict) -> dict:
+            captured_params.append(params)
             return _MOCK_SWAP_RESPONSE
 
         with patch.object(router_client, "_call_sdk", side_effect=mock_call_sdk):
             await router_client.buy_pt(MARKET, TOKEN_IN, Decimal("1.0"), RECEIVER)
-        assert captured_endpoint[0] == "swapExactTokenForPt"
+        assert captured_params[0]["tokensIn"] == TOKEN_IN
+        assert captured_params[0]["tokensOut"] == router_client._config.pt_token_address
 
     @pytest.mark.asyncio
     async def test_buy_pt_error_returns_failure(self, router_client: PendleRouterV4Client) -> None:
@@ -297,7 +308,7 @@ class TestBuyPt:
         """buy_pt のデフォルトスリッページが 0.005 であること。"""
         captured_params: list[dict] = []
 
-        async def mock_call_sdk(endpoint: str, params: dict) -> dict:
+        async def mock_call_sdk(params: dict) -> dict:
             captured_params.append(params)
             return _MOCK_SWAP_RESPONSE
 
@@ -318,19 +329,24 @@ class TestSellPt:
         assert result.calldata == "0xdeadbeef"
 
     @pytest.mark.asyncio
-    async def test_sell_pt_uses_swapExactPtForToken_endpoint(
+    async def test_sell_pt_requests_pt_as_tokens_in(
         self, router_client: PendleRouterV4Client
     ) -> None:
-        """sell_pt が SDK の swapExactPtForToken エンドポイントを呼ぶこと。"""
-        captured_endpoint: list[str] = []
+        """sell_pt が Convert API に tokensIn=PT / tokensOut=出力トークンを渡すこと（売り方向）。
 
-        async def mock_call_sdk(endpoint: str, params: dict) -> dict:
-            captured_endpoint.append(endpoint)
+        旧テストの swapExactPtForToken エンドポイントは実在しないため、等価な不変条件
+        （トークンの向きが売り方向であること）に置き換えた。
+        """
+        captured_params: list[dict] = []
+
+        async def mock_call_sdk(params: dict) -> dict:
+            captured_params.append(params)
             return _MOCK_SWAP_RESPONSE
 
         with patch.object(router_client, "_call_sdk", side_effect=mock_call_sdk):
             await router_client.sell_pt(MARKET, TOKEN_OUT, Decimal("1.0"), RECEIVER)
-        assert captured_endpoint[0] == "swapExactPtForToken"
+        assert captured_params[0]["tokensIn"] == router_client._config.pt_token_address
+        assert captured_params[0]["tokensOut"] == TOKEN_OUT
 
     @pytest.mark.asyncio
     async def test_sell_pt_error_returns_failure(self, router_client: PendleRouterV4Client) -> None:
@@ -393,19 +409,25 @@ class TestAddLiquidity:
         assert type(result.lp_amount) is Decimal
 
     @pytest.mark.asyncio
-    async def test_add_liquidity_uses_addLiquiditySingleToken_endpoint(
+    async def test_add_liquidity_requests_market_as_tokens_out(
         self, router_client: PendleRouterV4Client
     ) -> None:
-        """add_liquidity が SDK の addLiquiditySingleToken エンドポイントを呼ぶこと。"""
-        captured_endpoint: list[str] = []
+        """add_liquidity が Convert API に tokensOut=market(LP) アドレスを渡すこと。
 
-        async def mock_call_sdk(endpoint: str, params: dict) -> dict:
-            captured_endpoint.append(endpoint)
+        旧テストの addLiquiditySingleToken エンドポイントは実在しない。Convert API は swap と
+        同一エンドポイントで、tokensOut に market(LP) アドレスを渡すと action="add-liquidity"
+        になる。等価な不変条件として「LP を要求する向きで渡していること」を検証する。
+        """
+        captured_params: list[dict] = []
+
+        async def mock_call_sdk(params: dict) -> dict:
+            captured_params.append(params)
             return _MOCK_ADD_LIQ_RESPONSE
 
         with patch.object(router_client, "_call_sdk", side_effect=mock_call_sdk):
             await router_client.add_liquidity(MARKET, TOKEN_IN, Decimal("1.0"), RECEIVER)
-        assert captured_endpoint[0] == "addLiquiditySingleToken"
+        assert captured_params[0]["tokensIn"] == TOKEN_IN
+        assert captured_params[0]["tokensOut"] == MARKET
 
     @pytest.mark.asyncio
     async def test_add_liquidity_default_slippage(
@@ -414,7 +436,7 @@ class TestAddLiquidity:
         """add_liquidity のデフォルトスリッページが 0.005 であること。"""
         captured_params: list[dict] = []
 
-        async def mock_call_sdk(endpoint: str, params: dict) -> dict:
+        async def mock_call_sdk(params: dict) -> dict:
             captured_params.append(params)
             return _MOCK_ADD_LIQ_RESPONSE
 
@@ -427,7 +449,7 @@ class TestAddLiquidity:
         """add_liquidity にカスタムスリッページを指定できること。"""
         captured_params: list[dict] = []
 
-        async def mock_call_sdk(endpoint: str, params: dict) -> dict:
+        async def mock_call_sdk(params: dict) -> dict:
             captured_params.append(params)
             return _MOCK_ADD_LIQ_RESPONSE
 
@@ -478,10 +500,14 @@ class TestAddLiquidity:
     async def test_add_liquidity_passes_correct_params(
         self, router_client: PendleRouterV4Client
     ) -> None:
-        """add_liquidity が SDK に正しいパラメータを渡すこと。"""
+        """add_liquidity が Convert API に正しいパラメータを渡すこと。
+
+        Convert API のパラメータ名は複数形（tokensIn / tokensOut / amountsIn）で、
+        market は独立キーでは渡さない（対象 market は tokensOut 側で一意に決まる）。
+        """
         captured_params: list[dict] = []
 
-        async def mock_call_sdk(endpoint: str, params: dict) -> dict:
+        async def mock_call_sdk(params: dict) -> dict:
             captured_params.append(params)
             return _MOCK_ADD_LIQ_RESPONSE
 
@@ -489,10 +515,11 @@ class TestAddLiquidity:
             await router_client.add_liquidity(MARKET, TOKEN_IN, Decimal("1.0"), RECEIVER)
 
         p = captured_params[0]
-        assert p["market"] == MARKET
-        assert p["tokenIn"] == TOKEN_IN
+        assert p["tokensIn"] == TOKEN_IN
+        assert p["tokensOut"] == MARKET
         assert p["receiver"] == RECEIVER
-        assert "amountIn" in p
+        assert p["amountsIn"] == str(10**18)
+        assert "market" not in p
 
 
 class TestSecurityConstraints:

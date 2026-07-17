@@ -90,13 +90,18 @@ def test_lido_build_stake_tx_does_not_use_private_key() -> None:
 # Pendle: PendleRouterV4Client.build_buy_pt_tx
 # ---------------------------------------------------------------------------
 def _sdk_response(to_addr: str, calldata: str = "0xdeadbeef") -> dict[str, Any]:
-    return {
-        "data": {
-            "tx": {"to": to_addr, "data": calldata},
-            "amountOut": "990000000000000000",
-            "approvals": [],
-        }
-    }
+    """Convert API の応答形。定義は `convert_api_fixtures` に集約している。
+
+    旧実装は `/sdk/api/v1` + `{"data": {"tx": ...}}` という**実在しない契約**を各テストが
+    独自にモックしており、実 API とのズレを誰も検出できなかった（2026-07-17 修正）。
+    """
+    from tests.protocols.test_pendle.convert_api_fixtures import convert_response, output
+
+    return convert_response(
+        to=to_addr,
+        data=calldata,
+        outputs=[output("0x" + "cc" * 20, 990000000000000000)],
+    )
 
 
 @pytest.mark.asyncio
@@ -107,8 +112,7 @@ async def test_pendle_build_buy_pt_tx_success(monkeypatch: pytest.MonkeyPatch) -
 
     captured: dict[str, Any] = {}
 
-    async def _fake_call_sdk(endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
-        captured["endpoint"] = endpoint
+    async def _fake_call_sdk(params: dict[str, Any]) -> dict[str, Any]:
         captured["params"] = params
         return _sdk_response(_ROUTER, "0xabc123")
 
@@ -126,7 +130,10 @@ async def test_pendle_build_buy_pt_tx_success(monkeypatch: pytest.MonkeyPatch) -
     assert tx["value"] == "0x0"
     # receiver は partner 本人 (PT が本人着金)。
     assert captured["params"]["receiver"] == _PARTNER
-    assert captured["endpoint"] == "swapExactTokenForPt"
+    # Convert API は tokensOut に **PT の実アドレス**を要求する（旧 SDK のリテラル "PT" ではない）。
+    # 動作(swap/add-liquidity)は endpoint 名ではなく token の向きで決まる。
+    assert captured["params"]["tokensOut"] == client._config.pt_token_address
+    assert "market" not in captured["params"]
 
 
 @pytest.mark.asyncio

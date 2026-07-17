@@ -20,7 +20,7 @@ Asana 親 1216418585178727（D1–D6）。
 | `PENDLE_ENABLE_ONCHAIN_WRITE` | `false` | broadcast 二段ガードの1段目 | §4 |
 | `DELEGATION_PRIVY_POLICY_ENABLED` (+ signer/creds) | 未設定 | 委譲 SCW 実行が非 dormant か | §4 |
 | grant `allowed_protocols` に `"pendle"` | 無 | ユーザーが pendle 委譲済みか | §4 |
-| `PHASE_1_ALLOWED_RISK_MODES` | `{conservative}` | aggressive を選択できるか | §5（**規制判断**） |
+| `ALLOWED_RISK_MODES` (env) | 未設定 = `{conservative}` | aggressive を選択できるか | §5（**規制判断**） |
 | `NEXT_PUBLIC_AGGRESSIVE_TIER_ENABLED` | `false` | フロントで aggressive 選択に同意モーダルを挟むか | §5 |
 
 これら **すべてが揃わない限り** Pendle は 1 wei も動かない。1つでも欠ければ dry-run / 提案非生成 / 従来挙動に fallback。
@@ -49,28 +49,55 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS aggressive_ack_version VARCHAR(20) NU
 
 ## 3. env 設定（staging-v4 → 本番の順）
 
-Pendle 市場を実値に設定。market address は **実装時に Pendle API（chainId 8453 / core/v1）で取得**した yoUSD 市場アドレスを使う（`memory` の yoUSD 裏付けアドレス `0x0000…8a65` は**裏付け vault** であって market address ではない点に注意）。
+> **[重要] 2026-07-17 訂正 — Pendle に testnet は存在しない。**
+> Pendle API がサポートするのは **mainnet のみ**（`1, 56, 143, 999, 8453, 9745, 42161, 10, 146, 5000, 80094`）。
+> Base Sepolia(84532) / Arbitrum Sepolia(421614) は `400 "Unsupported chain id"` で拒否される（実 API で確認）。
+> **旧記述の `PENDLE_CHAIN=base_sepolia` では calldata を 1 本も生成できない**ため、staging-v4 での検証も
+> `PENDLE_CHAIN=base`（実 market・実 calldata・**broadcast なしの dry-run**）で行う。
+> 実 broadcast の検証経路は **Base mainnet の実資金しか無い**（§4）。
+
+実値（Pendle API `core/v1/8453/markets` で確認済み 2026-07-17）:
 
 ```bash
-# stablecoin PT 前提（amount_usd を USDC 1:1 で使う）
-PENDLE_CHAIN=base_sepolia            # 検証時。本番は base
-PENDLE_MARKET_ADDRESS=<yoUSD market> # Pendle API で取得
-PENDLE_UNDERLYING_TOKEN_ADDRESS=<USDC>          # 本番 Base USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+PENDLE_CHAIN=base                    # testnet は存在しない（上記）
+PENDLE_MARKET_ADDRESS=0x250c15e59a7572195e248f668636723cca20a2b8  # PT-yoUSD-24SEP2026 market
+PENDLE_UNDERLYING_TOKEN_ADDRESS=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913  # Base USDC
 PENDLE_UNDERLYING_TOKEN_DECIMALS=6
-PENDLE_PT_TOKEN_ADDRESS=<PT-yoUSD token>        # SELL_PT の approve 宛先（Privy policy allowlist）
+PENDLE_PT_TOKEN_ADDRESS=0x1fec97ca2817da87f266fd1741bba61caf7cde29        # PT-yoUSD-24SEP2026
+PENDLE_PT_TOKEN_DECIMALS=6           # **PT は 18 桁ではない**（誤ると SELL_PT の数量が 10^12 倍ズレる）
 PENDLE_STABLE_UNDERLYING=true
 # 流動性ガード（薄いプール保護・必須）
 PENDLE_MAX_POOL_LIQUIDITY_PCT=0.05   # 1 投入 ≤ プール流動性の 5%
 PENDLE_MAX_TRADE_USD_CAP=5000        # 1 投入の絶対上限（初期は小さく）
 ```
 
+> **落とし穴**: Pendle の用語で "underlyingAsset" は **yoUSD**（利回り vault トークン、`0x0000…8a65`）を指すが、
+> 本 repo の `PENDLE_UNDERLYING_TOKEN_ADDRESS` は **BUY_PT で支払う入力トークン = USDC** を意味する。
+> ここに yoUSD を入れないこと。また `PENDLE_MARKET_ADDRESS` と `PENDLE_PT_TOKEN_ADDRESS` が別 market の
+> ものになると、**流動性ガードが別プールを見る**（swap は PT 側の market で成立する）ので必ず対で設定する。
+
 `printf '\nKEY=VALUE\n' >> .env.*`（前行連結防止 / CLAUDE.lessons）。反映は `docker compose up -d --no-deps <service>`。
+
+### 3.5 dry-run 実機確認（実資金なし・ここまでは Claude 実行可）
+
+`PENDLE_ENABLE_ONCHAIN_WRITE` を **false のまま**にすれば broadcast されない。この状態で:
+
+- 実 API 契約テスト（無料・鍵不要・送信なし）:
+  `PENDLE_LIVE_API_TEST=1 pytest tests/protocols/test_pendle/test_pendle_convert_api_contract.py`
+- BUY_PT proposal → `PendleDryRunNotBroadcast`(501) で **approved 据え置き**、ログに実 calldata が出ること
+- 流動性ガード: `amount > tvl×5%` / `> 絶対上限` / market_info 取得失敗 で **block** されること
+
+ここまでで「SDK 統合・market 解決・calldata・宛先 allowlist・ガード」は検証できる。**未検証で残るのは
+Privy 署名 + on-chain 着金のみ**で、その機構自体は Aave SUPPLY で本番実証済み。
 
 ---
 
-## 4. 実 broadcast 検証（Base Sepolia・human-in-the-loop・Claude 実行不可）
+## 4. 実 broadcast 検証（**Base mainnet 実資金のみ**・human-in-the-loop・Claude 実行不可）
 
-test wallet + Privy creds を用意し、上記に加えて:
+> **testnet が無いため「安全に試す」選択肢は存在しない**。少額でも実資金がリスクの下限になる。
+> 実行判断は hkobayashi（Tier S / HUMAN-REVIEW-REQUIRED / 法務 GO と同時）。
+
+test wallet + Privy creds を用意し、§3 に加えて:
 
 ```bash
 PENDLE_ENABLE_ONCHAIN_WRITE=true
@@ -78,13 +105,16 @@ DELEGATION_PRIVY_POLICY_ENABLED=true
 PRIVY_SERVER_SIGNER_ID=<L0 signer id>
 PRIVY_APP_ID=<...>
 PRIVY_APP_SECRET=<...>
+PENDLE_MAX_TRADE_USD_CAP=20          # 初回は極小に絞る
 ```
 
 手順:
 1. test user に `allowed_protocols=["pendle"]` の有効 grant を作成（Privy policy = RouterV4 + USDC + PT の 3 宛先 allowlist）。
-2. BUY_PT proposal を approve → **SCW broadcast** → **receipt status=1 / PT-yoUSD 残高増** を確認。
-3. SELL_PT（満期出口）→ **PT→USDC 着金** を確認（満期後は 1:1 redeem）。
-4. 流動性ガード動作確認: `amount > tvl×5%` / `> 絶対上限` / market_info 取得失敗 で **block（approved 据え置き）** されること。
+2. test wallet に **少額の実 USDC**（$10〜20）を用意。
+3. BUY_PT proposal を approve → **SCW broadcast** → **receipt status=1 / PT-yoUSD 残高増** を確認。
+4. SELL_PT は満期（**2026-09-24**）前は二次市場価格での売却になる（1:1 redeem は満期後）。満期前に出口を
+   確認する場合、PT 価格ディスカウント分の目減りを許容できる額で行うこと。
+5. 流動性ガード動作確認: `amount > tvl×5%` / `> 絶対上限` / market_info 取得失敗 で **block（approved 据え置き）** されること。
 
 診断: 「提案が出ない/実行されない」は `docker exec <backend> python -m app.diagnostics.proposal_chain`（提案チェーン ゲートトレーサ）で切り分け。
 
@@ -94,10 +124,17 @@ PRIVY_APP_SECRET=<...>
 
 **この段階は日本の無登録投資運用業規制（森先生判断: Auto/aggressive は無登録運用業に該当し得る）に直結する product 判断を伴う。** コードだけでは有効化されない:
 
-1. **`PHASE_1_ALLOWED_RISK_MODES` に AGGRESSIVE を追加**（`backend/app/auth/models.py`）。← **法務 GO 後のみ**。追加すると `PUT /auth/risk-mode` の 412 同意必須ガードが有効化され、`aggressive_ack_at` 未記録のユーザーは選択不可（defense-in-depth）。
+1. **`ALLOWED_RISK_MODES=conservative,aggressive` を対象環境の env に設定**（← **法務 GO 後のみ**）。
+   2026-07-17 に env 化した（旧: `backend/app/auth/models.py` のハードコード定数）。**理由: ハードコードのままだと
+   staging だけ開けようとしても同じコードが本番に入り本番も同時に開いてしまうため**。未設定なら従来どおり
+   conservative のみ。設定すると `PUT /auth/risk-mode` の 412 同意必須ガードが有効化され、`aggressive_ack_at`
+   未記録のユーザーは選択不可（defense-in-depth）。typo は無視され解禁は広がらない（fail-safe）。
 2. フロント: `NEXT_PUBLIC_AGGRESSIVE_TIER_ENABLED=true` → **再ビルド**（build-time 埋め込み）。aggressive 選択時に満期ロック/裏付け/スリッページ同意モーダルが必須になる。
 3. `AI_OPTIMIZER_MULTIPROTOCOL_ENABLED=true` → aggressive ユーザーの BUY で routing が `(BUY_PT, PT-yoUSD, pendle)` を生成（optimizer は実 APY を使用）。
-4. 消費者 `/liff-chat` の aggressive 選択パネルは**別 product スライス**（現状 admin `RiskModeSelector` のみ）。同意モーダル/endpoint は再利用可能に実装済み。
+4. 消費者 `/liff-chat` の aggressive 選択パネル（運用方針セレクタ: 安全重視 / 利回り重視）は
+   **PR #993 で実装済み**（`NEXT_PUBLIC_AGGRESSIVE_TIER_ENABLED` 既定 false で dormant）。
+   同 PR で「Pendle 委譲は開示同意必須(412)」「dummy アドレス fail-closed」も追加済み。
+   セレクタの真実源は `risk_mode` で、委譲枠 `allowed_protocols` と**両方**が Pendle を許して初めて実効になる。
 
 ---
 
@@ -115,6 +152,12 @@ PRIVY_APP_SECRET=<...>
 
 ## Opus 安全レビュー チェックリスト（本番反映前）
 
+- [ ] **SDK 契約**: `PENDLE_LIVE_API_TEST=1` の契約テストが green か（実 API と実装がズレていないか）。
+      2026-07-17 に「実装が実在しない API に対して書かれていた」事故があり、mock だけでは検出できない
+- [ ] **decimals**: `PENDLE_PT_TOKEN_DECIMALS` が対象 PT の実桁と一致するか（PT-yoUSD は 6。
+      誤ると **SELL_PT の売却数量が 10^12 倍ズレる**）
+- [ ] **market と PT の対応**: `PENDLE_MARKET_ADDRESS` と `PENDLE_PT_TOKEN_ADDRESS` が同一 market のものか
+      （ズレると流動性ガードが別プールを見る）
 - [ ] amount 換算: stablecoin PT のみ USDC 1:1（`PENDLE_STABLE_UNDERLYING`）。非 stablecoin は fail-closed か
 - [ ] 流動性ガード: `tvl<=0`/取得失敗で fail-closed（block）か。%・絶対上限が薄いプールに対し妥当か
 - [ ] Privy policy: RouterV4 + USDC + PT の 3 宛先のみ allowlist か（over-broad でないか）
