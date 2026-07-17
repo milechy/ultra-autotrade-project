@@ -62,6 +62,19 @@ def register_error_handlers(app: FastAPI) -> None:
             _add_cors_headers(response, request)
             return response
         if _is_production and exc.status_code >= 400:
+            # dict の detail は自前コードが意図的に構築した安全な構造化エラー
+            # (例: {"code": "DEPOSIT_BELOW_MINIMUM", "message": ..., ...})。
+            # マスクすると frontend の detail.code 分岐が壊れ、汎用エラーしか
+            # 出せなくなる(2026-07-17 本番実機: おまかせ切替の入金ゲートで発見。
+            # DEPOSIT_BELOW_MINIMUM が "Validation error" に潰され、正しい
+            # トースト文言 [最低$200の入金が必要] が表示できなかった)。
+            # detail=str(exc) 由来の生文字列のみ引き続きマスクする(内部情報漏洩防止、
+            # 本ハンドラの本来の目的)。
+            if isinstance(exc.detail, dict):
+                return JSONResponse(
+                    status_code=exc.status_code,
+                    content={"detail": exc.detail},
+                )
             safe_detail = SAFE_MESSAGES.get(exc.status_code, str(exc.detail))
             return JSONResponse(
                 status_code=exc.status_code,
