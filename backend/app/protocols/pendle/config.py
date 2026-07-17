@@ -10,12 +10,32 @@ from decimal import Decimal
 
 
 def _get_env_decimal(name: str, default: str) -> Decimal:
-    """環境変数から Decimal 値を読み込む。未設定またはパース失敗時はデフォルト値を返す。"""
+    """環境変数から Decimal 値を読み込む。未設定またはパース失敗時はデフォルト値を返す。
+
+    ``Decimal("inf")`` / ``NaN`` は **パースに成功してしまう**（`Decimal("inf")` は有効値）。
+    これが金額上限に入ると `amount > inf` が常に False になりガードが無言で無効化されるため、
+    有限値でなければ default に倒す（安全レビュー P1）。
+    """
     raw = os.getenv(name, default)
     try:
-        return Decimal(raw)
+        value = Decimal(raw)
     except Exception:
         return Decimal(default)
+    if not value.is_finite():
+        return Decimal(default)
+    return value
+
+
+#: `PENDLE_MAX_TRADE_USD_CAP` の **env で越えられない絶対上限**（USD）。
+#:
+#: Pendle broadcast 経路では CLAUDE.md Rule 3/4（単一10%/日次30%）が実際には効いておらず
+#: （`_pendle_execution_blocked` が risk_limiter に total_assets=None を渡すため）、
+#: **本 cap が事実上唯一の絶対額ガード**。そこに env のタイポ（`20` → `200`）を捕まえる第二層が
+#: 無いのは、唯一のガードを 1 文字のミスに委ねることになる。
+#: `risk_limiter.SINGLE_TRADE_PCT_HARD_MAX` と同じ発想の hard clamp を置く。
+#: **これを引き上げる前に total_assets の配線を行うこと**（cap を上げた瞬間、その取引額を縛る
+#: ものが文字通り何も無くなる）。
+PENDLE_MAX_TRADE_USD_HARD_MAX = Decimal("100")
 
 
 @dataclass
@@ -118,8 +138,12 @@ class PendleConfig:
     # そこに 5000 を既定で与えると、env 設定を忘れた運用者に $5,000 の枠が黙って開く。
     # 「運用者が設定を憶えていること」を安全装置にしない ＝ 忘れたら小さい方に倒す。
     # 実運用で引き上げる場合は PENDLE_MAX_TRADE_USD_CAP を明示設定すること。
+    # hard clamp: env がこれを超える値を指定しても `PENDLE_MAX_TRADE_USD_HARD_MAX` で頭打ちにする。
     max_trade_usd_cap: Decimal = field(
-        default_factory=lambda: _get_env_decimal("PENDLE_MAX_TRADE_USD_CAP", "20")
+        default_factory=lambda: min(
+            _get_env_decimal("PENDLE_MAX_TRADE_USD_CAP", "20"),
+            PENDLE_MAX_TRADE_USD_HARD_MAX,
+        )
     )
 
     def token_decimals(self, token: str) -> int:

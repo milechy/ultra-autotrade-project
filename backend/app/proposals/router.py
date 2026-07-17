@@ -769,11 +769,31 @@ def _pendle_liquidity_blocked(config: Any, amount_usd: Decimal) -> Optional[str]
         )
     # PT decimals の取り違えは、**低すぎる側が黙って成功する**（$10k 売却のつもりが dust だけ
     # 売れて executed 記録が残る）。実 decimals と突合して silent under-sell を防ぐ。
-    if market_info.pt_decimals is not None and market_info.pt_decimals != config.pt_token_decimals:
+    # decimals が取れない場合も fail-closed にする（「verify すると書いた項目が API 次第で
+    # 無言スキップされる」構造は H2 を生んだ原因そのもの / 安全レビュー N2）。
+    if market_info.pt_decimals is None:
+        return (
+            "liquidity guard: PT の decimals を解決できないため fail-closed "
+            "(PENDLE_PT_TOKEN_DECIMALS の妥当性を検証できない)"
+        )
+    if market_info.pt_decimals != config.pt_token_decimals:
         return (
             f"liquidity guard: PT の実 decimals {market_info.pt_decimals} と "
             f"PENDLE_PT_TOKEN_DECIMALS {config.pt_token_decimals} が不一致のため fail-closed "
             "(数量が桁ずれする)"
+        )
+
+    # 満期ガード（安全レビュー N1）。`min_days_to_maturity` は `PendleService.mint` と
+    # `PendleMarketCache` にしか無く、broadcast 経路は `config.market_address` を直参照するため
+    # **どちらも通らない**。本 PR 以前は get_market_info が常に fallback(tvl=0) で常時 block
+    # だったため顕在化しなかったが、経路が live になった今は素通りする。
+    # 満期後の BUY_PT は revert（gas 損）、満期直前は利回りほぼゼロで資金をロックして
+    # 「成功」記録だけが残る。market_info は既に手元にあるのでここで縛る。
+    if market_info.days_to_maturity < config.min_days_to_maturity:
+        return (
+            f"liquidity guard: 満期まで {market_info.days_to_maturity} 日 "
+            f"(最低 {config.min_days_to_maturity} 日) のため fail-closed "
+            f"(market={config.market_address} のロール漏れの可能性)"
         )
 
     pool_cap = tvl_usd * config.max_pool_liquidity_pct

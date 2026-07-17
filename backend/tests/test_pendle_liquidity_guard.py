@@ -17,7 +17,10 @@ os.environ.setdefault("INITIAL_ADMIN_EMAIL", "admin@example.com")
 
 import app.protocols.pendle.client as pendle_client_mod  # noqa: E402
 from app.proposals.router import _pendle_liquidity_blocked  # noqa: E402
-from app.protocols.pendle.config import PendleConfig  # noqa: E402
+from app.protocols.pendle.config import (  # noqa: E402
+    PENDLE_MAX_TRADE_USD_HARD_MAX,
+    PendleConfig,
+)
 
 _MARKET = "0x1111111111111111111111111111111111111111"
 _PT = "0x2222222222222222222222222222222222222222"
@@ -44,12 +47,18 @@ def _patch_market(
     raises: bool = False,
     pt_address: object = _PT,
     pt_decimals: object = _PT_DECIMALS,
+    days_to_maturity: int = 68,  # PT-yoUSD-24SEP2026 相当（min 7 を満たす）
 ) -> None:
     class _Client:
         async def get_market_info(self, market_address: str) -> object:
             if raises:
                 raise RuntimeError("pendle API down")
-            return SimpleNamespace(tvl_usd=tvl, pt_address=pt_address, pt_decimals=pt_decimals)
+            return SimpleNamespace(
+                tvl_usd=tvl,
+                pt_address=pt_address,
+                pt_decimals=pt_decimals,
+                days_to_maturity=days_to_maturity,
+            )
 
     monkeypatch.setattr(pendle_client_mod, "get_pendle_client", lambda cfg: _Client())
 
@@ -134,12 +143,6 @@ def test_block_when_pt_decimals_mismatch(monkeypatch: pytest.MonkeyPatch) -> Non
     assert reason is not None and "decimals" in reason
 
 
-def test_pt_decimals_unknown_does_not_block(monkeypatch: pytest.MonkeyPatch) -> None:
-    """decimals が API から取れない場合は decimals 突合をスキップする（tvl/PT 照合は継続）。"""
-    _patch_market(monkeypatch, tvl=Decimal("114000"), pt_decimals=None)
-    assert _pendle_liquidity_blocked(_config(), Decimal("100")) is None
-
-
 def test_default_abs_cap_is_small(monkeypatch: pytest.MonkeyPatch) -> None:
     """[安全レビュー H3] env 未設定時の絶対上限が小さいこと。
 
@@ -153,3 +156,67 @@ def test_default_abs_cap_is_small(monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = _config(max_trade_usd_cap=PendleConfig().max_trade_usd_cap)
     reason = _pendle_liquidity_blocked(cfg, Decimal("100"))
     assert reason is not None and "絶対上限" in reason
+
+
+# ---------------------------------------------------------------------------
+# [安全レビュー N1/N2/P1] 満期ガード / decimals 不明 / hard clamp
+# ---------------------------------------------------------------------------
+
+
+def test_block_when_past_or_near_maturity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """満期が近い/過ぎた market は fail-closed（N1）。
+
+    `min_days_to_maturity` は service.py / cache.py にしか無く、broadcast 経路は
+    config.market_address を直参照するため通らなかった。本 PR で経路が live になった結果
+    素通りするようになったため、ガードに追加した。満期後 BUY_PT は revert(gas 損)、
+    満期直前は利回りほぼゼロで資金をロックして「成功」記録だけ残る。
+    """
+    _patch_market(monkeypatch, tvl=Decimal("114000"), days_to_maturity=3)
+    reason = _pendle_liquidity_blocked(_config(), Decimal("10"))
+    assert reason is not None and "満期" in reason
+
+
+def test_pass_when_maturity_far_enough(monkeypatch: pytest.MonkeyPatch) -> None:
+    """min_days_to_maturity(既定7) を満たせば通過。"""
+    _patch_market(monkeypatch, tvl=Decimal("114000"), days_to_maturity=68)
+    assert _pendle_liquidity_blocked(_config(), Decimal("10")) is None
+
+
+def test_block_when_pt_decimals_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
+    """decimals が取れない場合も fail-closed（N2）。
+
+    「verify すると書いた項目が API 次第で無言スキップされる」構造は H2 を生んだ原因と同型。
+    """
+    _patch_market(monkeypatch, tvl=Decimal("114000"), pt_decimals=None)
+    reason = _pendle_liquidity_blocked(_config(), Decimal("10"))
+    assert reason is not None and "decimals を解決できない" in reason
+
+
+class TestMaxTradeUsdCapHardClamp:
+    """[P1] env で越えられない絶対上限。cap は唯一の金額ガードなので第二層が要る。"""
+
+    def test_env_cannot_exceed_hard_max(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """env のタイポ (20 → 200000) が hard clamp で頭打ちになること。"""
+        monkeypatch.setenv("PENDLE_MAX_TRADE_USD_CAP", "200000")
+        assert PendleConfig().max_trade_usd_cap == PENDLE_MAX_TRADE_USD_HARD_MAX
+
+    def test_env_below_hard_max_is_honored(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("PENDLE_MAX_TRADE_USD_CAP", "50")
+        assert PendleConfig().max_trade_usd_cap == Decimal("50")
+
+    def test_infinity_falls_back_to_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """`Decimal("inf")` はパース成功し `amount > inf` が常に False = ガード無効化。
+
+        有限値でなければ default に倒す。
+        """
+        monkeypatch.setenv("PENDLE_MAX_TRADE_USD_CAP", "inf")
+        assert PendleConfig().max_trade_usd_cap == Decimal("20")
+
+    def test_nan_falls_back_to_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """NaN も比較が常に False になるため default に倒す。"""
+        monkeypatch.setenv("PENDLE_MAX_TRADE_USD_CAP", "NaN")
+        assert PendleConfig().max_trade_usd_cap == Decimal("20")
+
+    def test_garbage_falls_back_to_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("PENDLE_MAX_TRADE_USD_CAP", "not-a-number")
+        assert PendleConfig().max_trade_usd_cap == Decimal("20")
