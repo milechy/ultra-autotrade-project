@@ -13,6 +13,7 @@ import { track, EV } from "@/lib/posthog"
 import {
   DEFAULT_DELEGATION_PARAMS,
   DelegationNotReadyError,
+  getDelegation,
   grantDelegation,
   prepareDelegation,
   revokeDelegation,
@@ -68,6 +69,20 @@ export function OpModePanel() {
   // （addSigners）→ backend に grant 確定。失敗時は signer をロールバックする。
   // 戻り値: consent + grant が成功したか。
   async function runDelegationConsent(): Promise<boolean> {
+    // 既に有効な委譲grant(signer/policy付き)があれば再consent不要。addSigners()を
+    // 同じPrivy signerに対して再度呼ぶと「Duplicate signer(s) provided when updating
+    // wallet」400で必ず失敗する(2026-07-17 本番実機で確認: 一度成功した後、モードを
+    // 切り替えて再度「おまかせ」を選ぶと再現)。既存の有効grantを検出したら
+    // addSigners自体をスキップし、そのまま利用する。
+    try {
+      const existing = await getDelegation()
+      if (existing && existing.privy_signer_id && existing.privy_policy_id) {
+        return true
+      }
+    } catch {
+      // 既存grant確認に失敗しても、通常のconsentフローにフォールバックする(非致命的)。
+    }
+
     let prep
     try {
       prep = await prepareDelegation(DEFAULT_DELEGATION_PARAMS)
