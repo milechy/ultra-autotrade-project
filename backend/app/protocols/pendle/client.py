@@ -306,7 +306,7 @@ class PendleWebClient(AbstractPendleClient):
 
     def __init__(self, config: PendleConfig) -> None:
         self._config = config
-        chain_id = self._CHAIN_ID_MAP.get(config.chain)
+        chain_id = self._CHAIN_ID_MAP.get((config.chain or "").strip().lower())
         if chain_id is None:
             # 黙って別チェーンに既定化すると「404 → 架空のフォールバック値」で気づけない。
             # 明示的に警告して、設定ミスを観測可能にする。
@@ -367,7 +367,8 @@ class PendleWebClient(AbstractPendleClient):
             implied_apy = Decimal(str(implied_apy_raw)) * Decimal("100")
 
             # PT/YT 価格
-            pt_price = Decimal(str(data.get("pt", {}).get("price", {}).get("usd", "0.95")))
+            pt = data.get("pt") or {}
+            pt_price = Decimal(str(pt.get("price", {}).get("usd", "0.95")))
             yt_price = Decimal(str(data.get("yt", {}).get("price", {}).get("usd", "0.05")))
 
             # TVL（USD）
@@ -375,6 +376,9 @@ class PendleWebClient(AbstractPendleClient):
 
             # 原資産シンボル
             underlying = data.get("underlyingAsset", {}).get("symbol", "stETH")
+
+            # この market が実際に扱う PT の素性（config との突合用）。
+            pt_decimals_raw = pt.get("decimals")
 
             return PendleMarketInfo(
                 market_address=market_address,
@@ -385,6 +389,8 @@ class PendleWebClient(AbstractPendleClient):
                 pt_price=pt_price,
                 yt_price=yt_price,
                 tvl_usd=tvl_usd,
+                pt_address=pt.get("address"),
+                pt_decimals=(int(pt_decimals_raw) if pt_decimals_raw is not None else None),
             )
         except Exception as exc:
             logger.warning("get_market_info API 失敗、フォールバック値を使用: %s", exc)
@@ -497,7 +503,17 @@ class PendleRouterV4Client:
         market_cache: PendleMarketCache | None = None,
     ) -> None:
         self._config = config
-        self._chain_id = self._CHAIN_ID_MAP.get(config.chain, 42161)
+        chain_id = self._CHAIN_ID_MAP.get((config.chain or "").strip().lower())
+        if chain_id is None:
+            # 黙って別チェーンに既定化すると、設定ミスが「404 で動かない」としてしか現れず
+            # 原因に辿り着けない（PendleWebClient 側で実際に起きた）。必ず警告する。
+            logger.warning(
+                "PendleRouterV4Client: 未知の chain=%r。42161(Arbitrum) に既定化する "
+                "(Pendle API は mainnet のみ対応。PENDLE_CHAIN を確認すること)",
+                config.chain,
+            )
+            chain_id = 42161
+        self._chain_id = chain_id
         # market address キャッシュ（外部注入可能 / テスト容易性のため）
         # config を注入し、満期フィルタ（min_days_to_maturity）を有効化する
         self._market_cache = market_cache or PendleMarketCache(
@@ -649,28 +665,58 @@ class PendleRouterV4Client:
         return a.lower() == b.lower()
 
     def _extract_approvals(
-        self, sdk_response: dict[str, Any], spender: str
-    ) -> list[RouterV4Approval]:
-        """Convert API の ``requiredApprovals`` を取り出す（無ければ空）。
+        self,
+        sdk_response: dict[str, Any],
+        *,
+        spender: str,
+        expected_token: str,
+        expected_amount_wei: int,
+    ) -> tuple[list[RouterV4Approval], str]:
+        """Convert API の ``requiredApprovals`` を検証して取り出す。
 
-        **Convert API は spender を返さない**（``{token, amount}`` のみ）。approve 先は常に
-        route の ``tx.to``＝Router なので、呼び出し側が `_verify_router` で Router と照合済みの
-        宛先を ``spender`` として渡すこと。これにより「照合済み Router 以外へは絶対に approve
-        しない」という不変条件を、API の返り値に依存せずこちら側で保証する。
+        Returns:
+            ``(approvals, error)``。``error`` が空でないとき fail-closed（呼び出し側は
+            success=False にすること）。
+
+        **API の返り値を信用しない**。この layer は 3 つとも自前で縛る:
+
+        1. **spender**: Convert API は spender を返さない（``{token, amount}`` のみ）。approve 先は
+           常に route の ``tx.to``＝Router なので、`_verify_router` で照合済みの宛先を呼び出し側が
+           渡す。「照合済み Router 以外へは絶対に approve しない」を API 非依存で保証する。
+        2. **token**: swap の入力トークン（``tokensIn``）以外への approve を拒否する。
+        3. **amount**: swap の入力量と**厳密一致**でなければ拒否する。
+
+        2/3 が無いと、API が ``{"token": USDC, "amount": <uint256 max>}`` を返しただけで
+        **恒久的な無制限 approve** が成立してしまう（`tx.to` は Router のままなので Router 照合も
+        Privy policy も通過する）。その場合、損失の上限が「1 取引の額」ではなく「残高全部・永久」に
+        なる。実 API は現に ``amountsIn`` と同額しか返さないが、**この API 契約は 2026-07-17 まで
+        全面的に間違っていた**（実在しない endpoint を叩いていた）。「外部 API が今後も行儀よく
+        振る舞う」という前提は既に一度崩れているので、こちら側で縛れるものは縛る。
         """
         raw = sdk_response.get("requiredApprovals") or []
         approvals: list[RouterV4Approval] = []
         for item in raw:
             if not isinstance(item, dict):
                 continue
-            approvals.append(
-                RouterV4Approval(
-                    token=item.get("token"),
-                    spender=spender,
-                    amount=(str(item["amount"]) if item.get("amount") is not None else None),
+            token = item.get("token")
+            if not self._addr_eq(token, expected_token):
+                return [], (
+                    f"approval token mismatch: {token!r} は swap 入力 {expected_token!r} と異なる"
                 )
-            )
-        return approvals
+            raw_amount = item.get("amount")
+            if raw_amount is None:
+                return [], "approval amount missing"
+            try:
+                amount_wei = int(str(raw_amount))
+            except ValueError:
+                return [], f"approval amount not an integer: {raw_amount!r}"
+            if amount_wei != expected_amount_wei:
+                return [], (
+                    f"approval amount mismatch: {amount_wei} != swap 入力 {expected_amount_wei}"
+                    "（無制限 approve 等の過大請求を拒否）"
+                )
+            approvals.append(RouterV4Approval(token=token, spender=spender, amount=str(amount_wei)))
+        return approvals, ""
 
     def _verify_router(self, sdk_response: dict[str, Any]) -> tuple[bool, str | None, str]:
         """Convert API の ``routes[0].tx.to`` を Router アドレスと照合する。
@@ -994,6 +1040,19 @@ class PendleRouterV4Client:
                 )
                 return RouterV4SwapResult(success=False, error="empty calldata")
 
+            # approve は「照合済み Router 宛」かつ「swap 入力と同一 token・同一 amount」のみ許す。
+            approvals, appr_err = self._extract_approvals(
+                sdk_response,
+                spender=to_addr,
+                expected_token=req.token_in,
+                expected_amount_wei=amount_wei,
+            )
+            if appr_err:
+                logger.warning(
+                    "PendleRouterV4Client._execute_swap: %s (action=%s)", appr_err, sdk_endpoint
+                )
+                return RouterV4SwapResult(success=False, error=appr_err)
+
             amount_out = self._extract_amount_out(
                 sdk_response, req.token_out, decimals=amount_out_decimals
             )
@@ -1004,7 +1063,7 @@ class PendleRouterV4Client:
                 amount_out=amount_out,
                 calldata=calldata,
                 to=to_addr,
-                approvals=self._extract_approvals(sdk_response, spender=to_addr),
+                approvals=approvals,
             )
 
         except httpx.HTTPStatusError as exc:
@@ -1254,6 +1313,17 @@ class PendleRouterV4Client:
                 logger.warning("PendleRouterV4Client.add_liquidity: empty calldata")
                 return RouterV4AddLiquidityResult(success=False, error="empty calldata")
 
+            # approve は「照合済み Router 宛」かつ「入力と同一 token・同一 amount」のみ許す。
+            approvals, appr_err = self._extract_approvals(
+                sdk_response,
+                spender=to_addr,
+                expected_token=req.token_in,
+                expected_amount_wei=amount_wei,
+            )
+            if appr_err:
+                logger.warning("PendleRouterV4Client.add_liquidity: %s", appr_err)
+                return RouterV4AddLiquidityResult(success=False, error=appr_err)
+
             # LP トークンは 18 桁。outputs の token は market(LP) アドレス。
             lp_amount = self._extract_amount_out(sdk_response, req.market_address, decimals=18)
 
@@ -1263,7 +1333,7 @@ class PendleRouterV4Client:
                 lp_amount=lp_amount,
                 calldata=calldata,
                 to=to_addr,
-                approvals=self._extract_approvals(sdk_response, spender=to_addr),
+                approvals=approvals,
             )
 
         except httpx.HTTPStatusError as exc:

@@ -36,14 +36,19 @@ Asana 親 1216418585178727（D1–D6）。
 
 ## 2. DB マイグレーション（手動 ALTER TABLE / Alembic autogenerate 禁止）
 
-D5b で User に列追加（`backend/app/auth/models.py` 冒頭コメント準拠）。staging / production 両方で実行:
+> **2026-07-17 実機確認: production / staging-v4 とも適用済み**（本番 users に `aggressive_ack_at` /
+> `aggressive_ack_version` の 2 列が存在することを phase1 read-only 確認で実測）。
+> **本節は実行不要**。まず下の確認コマンドで実態を見てから判断すること（「未適用前提」で流すと
+> 重複エラーになる）。
+
+D5b で User に列追加（`backend/app/auth/models.py` 冒頭コメント準拠）。**未適用の環境でのみ**実行:
 
 ```sql
 ALTER TABLE users ADD COLUMN IF NOT EXISTS aggressive_ack_at TIMESTAMP WITH TIME ZONE NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS aggressive_ack_version VARCHAR(20) NULL;
 ```
 
-確認: `docker exec <postgres> psql -U ultra -d <db> -c "\d users" | grep aggressive`。
+確認（**先にこれを実行する**）: `docker exec <postgres> psql -U ultra -d <db> -c "\d users" | grep aggressive`。
 
 ---
 
@@ -65,10 +70,14 @@ PENDLE_UNDERLYING_TOKEN_ADDRESS=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913  # Ba
 PENDLE_UNDERLYING_TOKEN_DECIMALS=6
 PENDLE_PT_TOKEN_ADDRESS=0x1fec97ca2817da87f266fd1741bba61caf7cde29        # PT-yoUSD-24SEP2026
 PENDLE_PT_TOKEN_DECIMALS=6           # **PT は 18 桁ではない**（誤ると SELL_PT の数量が 10^12 倍ズレる）
+                                     # ※コード既定も 6。未設定でも 6 になるが、18桁 PT を扱う
+                                     #   環境では明示必須（低すぎる側は dust を売って“成功”する）
+                                     #   実 decimals とは流動性ガードが突合し不一致なら block
 PENDLE_STABLE_UNDERLYING=true
 # 流動性ガード（薄いプール保護・必須）
 PENDLE_MAX_POOL_LIQUIDITY_PCT=0.05   # 1 投入 ≤ プール流動性の 5%
-PENDLE_MAX_TRADE_USD_CAP=5000        # 1 投入の絶対上限（初期は小さく）
+PENDLE_MAX_TRADE_USD_CAP=20          # 1 投入の絶対上限（コード既定も 20）。**これが事実上
+                                     #   唯一の金額ガード**（§6 の H3 注記参照）。安易に上げない
 ```
 
 > **落とし穴**: Pendle の用語で "underlyingAsset" は **yoUSD**（利回り vault トークン、`0x0000…8a65`）を指すが、
@@ -129,6 +138,8 @@ PENDLE_MAX_TRADE_USD_CAP=20          # 初回は極小に絞る
    staging だけ開けようとしても同じコードが本番に入り本番も同時に開いてしまうため**。未設定なら従来どおり
    conservative のみ。設定すると `PUT /auth/risk-mode` の 412 同意必須ガードが有効化され、`aggressive_ack_at`
    未記録のユーザーは選択不可（defense-in-depth）。typo は無視され解禁は広がらない（fail-safe）。
+   **注意: 本定数は module import 時に評価される**ため、env の追加・削除は **backend の再起動**で反映する
+   （`docker compose up -d --no-deps <backend>`）。プロセスを再起動しない限り即時には効かない。
 2. フロント: `NEXT_PUBLIC_AGGRESSIVE_TIER_ENABLED=true` → **再ビルド**（build-time 埋め込み）。aggressive 選択時に満期ロック/裏付け/スリッページ同意モーダルが必須になる。
 3. `AI_OPTIMIZER_MULTIPROTOCOL_ENABLED=true` → aggressive ユーザーの BUY で routing が `(BUY_PT, PT-yoUSD, pendle)` を生成（optimizer は実 APY を使用）。
 4. 消費者 `/liff-chat` の aggressive 選択パネル（運用方針セレクタ: 安全重視 / 利回り重視）は
@@ -140,13 +151,31 @@ PENDLE_MAX_TRADE_USD_CAP=20          # 初回は極小に絞る
 
 ## 6. 段階解放 & 安全確認
 
-- **少額・少人数から**。`PENDLE_MAX_TRADE_USD_CAP` を小さく開始し、実績を見て緩める。
+- **少額・少人数から**。`PENDLE_MAX_TRADE_USD_CAP` を小さく開始し、実績を見て緩める（既定 20）。
 - 監視: proposal → SCW receipt → PT 残高。流動性ガード block / HARD_STOP の Slack 通知。
-- 安全ネット（有効時も効く）: 二段ガード / HARD_STOP・risk_limiter（`_pendle_execution_blocked`）/ 流動性ガード（fail-closed）/ Privy policy 宛先 allowlist / broadcast 済み後の failed 化防止（二重送信防止）/ 非カストディアル不変（SCW 本人着金）。
+- 安全ネット（有効時も効く）: 二段ガード / HARD_STOP（`_pendle_execution_blocked`）/ 流動性ガード
+  （fail-closed・market↔PT 対応検証・PT decimals 突合を含む）/ approve の token/amount 厳密一致 /
+  Privy policy 宛先 allowlist / broadcast 済み後の failed 化防止（二重送信防止）/ 非カストディアル不変。
+
+> **[重要] 金額ガードの実態（2026-07-17 安全レビュー H3）**
+> Pendle 経路では **CLAUDE.md Rule 3/4（単一 10% / 日次 30%・ABSOLUTE）が実際には効いていない**。
+> `_pendle_execution_blocked` が risk_limiter に `total_assets=None` を渡しており、risk_limiter は
+> 両方の % 判定を `total_assets_usd is not None and > 0` でガードしているため。Pendle 単独ユーザーは
+> HF も取得できず HF floor も効かない（Aave SCW 経路も同じ既存状態）。
+> ⇒ **金額の歯止めは実質「プール流動性 % と `PENDLE_MAX_TRADE_USD_CAP`」だけ**。この cap を
+> 「大きめにして様子を見る」という運用はしないこと。恒久対応（total_assets 配線）は別課題。
 
 ## 7. ロールバック
 
-各フラグを個別に `false` / env 除去で即 dormant 化（コード revert 不要）。`PENDLE_ENABLE_ONCHAIN_WRITE=false` で broadcast 停止、`AI_OPTIMIZER_MULTIPROTOCOL_ENABLED=false` で pendle 提案生成停止、`PHASE_1` から AGGRESSIVE 除去で選択停止。
+各フラグを個別に `false` / env 除去で dormant 化（コード revert 不要）。
+`PENDLE_ENABLE_ONCHAIN_WRITE=false` で broadcast 停止、`AI_OPTIMIZER_MULTIPROTOCOL_ENABLED=false` で
+pendle 提案生成停止、**`ALLOWED_RISK_MODES` を未設定に戻す**（旧記述の「`PHASE_1` から AGGRESSIVE 除去」＝
+コード編集 は §5 の env 化で不要になった）で aggressive 選択停止。
+
+> **「即 dormant」ではない**: `ALLOWED_RISK_MODES` は module import 時評価、`NEXT_PUBLIC_*` は
+> build-time 埋め込み。前者は **backend 再起動**、後者は **frontend 再ビルド**が要る。
+> 最速で broadcast だけを止めたい場合は `PENDLE_ENABLE_ONCHAIN_WRITE=false` + backend 再起動が最短
+> （`get_pendle_config()` は毎回 env を読み直すため、再起動すれば即反映される）。
 
 ---
 
@@ -165,5 +194,5 @@ PENDLE_MAX_TRADE_USD_CAP=20          # 初回は極小に絞る
 - [ ] broadcast 済み後の bookkeeping 例外で failed 化 → 二重送信しないか
 - [ ] 非カストディアル: サーバー鍵不参照・PT/USDC は SCW 本人着金か
 - [ ] routing: risk_mode eligibility（pendle=aggressive のみ）。conservative が掴まないか
-- [ ] aggressive 同意: `PUT /auth/risk-mode` の 412 ガードが `PHASE_1` 緩和後に効くか
-- [ ] 規制: `PHASE_1` 緩和は法務 GO 済みか（森先生判断）
+- [ ] aggressive 同意: `PUT /auth/risk-mode` の 412 ガードが `ALLOWED_RISK_MODES` 設定後に効くか
+- [ ] 規制: `ALLOWED_RISK_MODES` への aggressive 追加は法務 GO 済みか（森先生判断）

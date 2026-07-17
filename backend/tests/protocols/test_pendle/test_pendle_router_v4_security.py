@@ -110,7 +110,7 @@ class TestRouterAddressVerification:
         ここではより強い不変条件を検証する: **API が何を返そうと approve 先は照合済み
         Router 以外にならない**（悪意ある spender の注入経路が存在しない）。
         """
-        rogue = [{"token": TOKEN_IN, "spender": EVIL_CONTRACT, "amount": "100"}]
+        rogue = [{"token": TOKEN_IN, "spender": EVIL_CONTRACT, "amount": str(10**18)}]
         with patch.object(
             router_client,
             "_call_sdk",
@@ -124,6 +124,51 @@ class TestRouterAddressVerification:
         assert result.approvals[0].token == TOKEN_IN
 
     @pytest.mark.asyncio
+    async def test_approval_rejects_unlimited_amount(
+        self, router_client: PendleRouterV4Client
+    ) -> None:
+        """[安全レビュー H1] API が無制限 approve を要求しても拒否すること。
+
+        これを通すと `tx.to` は Router のままなので Router 照合も Privy policy も素通りし、
+        **恒久的な無制限 USDC allowance** が成立する（損失上限が「1 取引の額」ではなく
+        「残高全部・永久」になる）。実 API は現に amountsIn と同額しか返さないが、この API 契約は
+        2026-07-17 まで全面的に誤っていた実績があるため、外部の行儀に依存せず自前で縛る。
+        """
+        uint256_max = 2**256 - 1
+        rogue = [{"token": TOKEN_IN, "amount": str(uint256_max)}]
+        with patch.object(
+            router_client,
+            "_call_sdk",
+            new=AsyncMock(return_value=convert_response(required_approvals=rogue)),
+        ):
+            result = await router_client.buy_yt(MARKET, TOKEN_IN, Decimal("1.0"), RECEIVER)
+        assert result.success is False
+        assert result.error is not None and "approval amount mismatch" in result.error
+        # fail-closed: approve は 1 件も組み立てられない
+        assert result.approvals == []
+        assert result.calldata is None
+
+    @pytest.mark.asyncio
+    async def test_approval_rejects_foreign_token(
+        self, router_client: PendleRouterV4Client
+    ) -> None:
+        """[安全レビュー H1] swap 入力と別トークンへの approve を拒否すること。
+
+        これを通すと、API が指定した任意の保有トークンに対して Router への approve を
+        組み立てられてしまう（swap 対象外の資産まで危険に晒す）。
+        """
+        rogue = [{"token": EVIL_CONTRACT, "amount": str(10**18)}]
+        with patch.object(
+            router_client,
+            "_call_sdk",
+            new=AsyncMock(return_value=convert_response(required_approvals=rogue)),
+        ):
+            result = await router_client.buy_yt(MARKET, TOKEN_IN, Decimal("1.0"), RECEIVER)
+        assert result.success is False
+        assert result.error is not None and "approval token mismatch" in result.error
+        assert result.approvals == []
+
+    @pytest.mark.asyncio
     async def test_approval_spender_filled_from_verified_router(
         self, router_client: PendleRouterV4Client
     ) -> None:
@@ -132,14 +177,14 @@ class TestRouterAddressVerification:
             router_client,
             "_call_sdk",
             new=AsyncMock(
-                return_value=convert_response(required_approvals=[approval(TOKEN_IN, 100)])
+                return_value=convert_response(required_approvals=[approval(TOKEN_IN, 10**18)])
             ),
         ):
             result = await router_client.buy_yt(MARKET, TOKEN_IN, Decimal("1.0"), RECEIVER)
         assert result.success is True
         assert len(result.approvals) == 1
         assert result.approvals[0].spender == ROUTER
-        assert result.approvals[0].amount == "100"
+        assert result.approvals[0].amount == str(10**18)
 
     @pytest.mark.asyncio
     async def test_wrong_tx_to_yields_no_approvals(
@@ -151,7 +196,7 @@ class TestRouterAddressVerification:
             "_call_sdk",
             new=AsyncMock(
                 return_value=convert_response(
-                    to=EVIL_CONTRACT, required_approvals=[approval(TOKEN_IN, 100)]
+                    to=EVIL_CONTRACT, required_approvals=[approval(TOKEN_IN, 10**18)]
                 )
             ),
         ):

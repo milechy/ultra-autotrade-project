@@ -109,8 +109,17 @@ class PendleConfig:
         default_factory=lambda: _get_env_decimal("PENDLE_MAX_POOL_LIQUIDITY_PCT", "0.05")
     )
     # [Phase D / D5] 流動性ガード: 1 投入の絶対上限（USD）。プール流動性%と併せて被害上限を縛る。
+    #
+    # **既定を 5000 → 20 に引き下げた（2026-07-17 安全レビュー H3）**。理由: Pendle 経路では
+    # CLAUDE.md Rule 3/4（単一 10% / 日次 30%）が **実際には効いていない**
+    # （`_pendle_execution_blocked` が risk_limiter に total_assets=None を渡すため、
+    # risk_limiter が両方の % 判定をスキップする。Aave SCW 経路も同じ既存問題）。
+    # つまり金額の歯止めは事実上「プール流動性% と本上限」だけで、本上限が唯一の絶対額。
+    # そこに 5000 を既定で与えると、env 設定を忘れた運用者に $5,000 の枠が黙って開く。
+    # 「運用者が設定を憶えていること」を安全装置にしない ＝ 忘れたら小さい方に倒す。
+    # 実運用で引き上げる場合は PENDLE_MAX_TRADE_USD_CAP を明示設定すること。
     max_trade_usd_cap: Decimal = field(
-        default_factory=lambda: _get_env_decimal("PENDLE_MAX_TRADE_USD_CAP", "5000")
+        default_factory=lambda: _get_env_decimal("PENDLE_MAX_TRADE_USD_CAP", "20")
     )
 
     def token_decimals(self, token: str) -> int:

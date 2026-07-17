@@ -22,6 +22,11 @@ class PendleMarketInfo(BaseModel):
     pt_price: Decimal = Field(..., description="PT 価格（0〜1、ディスカウント）")
     yt_price: Decimal = Field(..., description="YT 価格（0〜1）")
     tvl_usd: Decimal = Field(..., description="TVL（USD）")
+    # market が実際に扱う PT の素性。config (PENDLE_PT_TOKEN_ADDRESS / _DECIMALS) と突合して
+    # 「ガードが見る market」と「実際に買う PT」の乖離を検出するために使う（設定ミス検出）。
+    # API 失敗時のフォールバックでは None（＝突合できない → 呼び出し側で fail-closed）。
+    pt_address: Optional[str] = Field(default=None, description="この market の PT アドレス")
+    pt_decimals: Optional[int] = Field(default=None, description="この market の PT decimals")
 
 
 class PendleMintRequest(BaseModel):

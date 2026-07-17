@@ -329,7 +329,7 @@ class TestRouterV4RealCalldataPath:
         mixed_approvals = [
             "invalid_string_item",  # 非 dict — continue 分岐を通す
             None,  # 非 dict — continue 分岐を通す
-            {"token": _TOKEN_IN, "amount": "100"},  # 有効な dict（実 API 同様 spender なし）
+            {"token": _TOKEN_IN, "amount": str(10**18)},  # 有効な dict（実 API 同様 spender なし）
         ]
         sdk_resp = convert_response(
             required_approvals=mixed_approvals,
@@ -386,8 +386,9 @@ class TestRouterV4RealCalldataPath:
     ) -> None:
         """_extract_approvals は渡された spender を各 approval に適用すること（直接呼び出し）。
 
-        `_extract_approvals(sdk_response, spender)` は spender を必須引数に取るようになった。
-        呼び出し側が `_verify_router` で照合済みの宛先を渡す契約であることをここで固定する。
+        `_extract_approvals` は spender / expected_token / expected_amount_wei を必須の
+        キーワード引数に取る。呼び出し側が `_verify_router` で照合済みの宛先を spender として渡し、
+        token / amount は swap 入力と突合する契約であることをここで固定する。
         """
         sdk_resp = convert_response(
             required_approvals=[
@@ -395,8 +396,11 @@ class TestRouterV4RealCalldataPath:
                 "非 dict はスキップ",
             ],
         )
-        approvals = router_client_write_enabled._extract_approvals(sdk_resp, spender=_ROUTER)
+        approvals, error = router_client_write_enabled._extract_approvals(
+            sdk_resp, spender=_ROUTER, expected_token=_TOKEN_IN, expected_amount_wei=100
+        )
 
+        assert error == ""
         assert len(approvals) == 1
         assert approvals[0].spender == _ROUTER
         assert approvals[0].token == _TOKEN_IN
