@@ -37,6 +37,10 @@ class UserSettingsResponse(BaseModel):
     terms_version: Optional[str] = None
     # Phase-D D5b: aggressive ティアのリスク開示/同意日時（未同意なら None）。
     aggressive_ack_at: Optional[datetime] = None
+    # リスクモード（conservative / balanced / aggressive）。「完全おまかせ」の運用方針表示に使う。
+    # 提案生成側のプロトコル選択 (RISK_MODE_PROTOCOLS) はこの値で決まるため、委譲枠
+    # (allowed_protocols) と併せて初めて実効スコープが決まる。
+    risk_mode: Optional[str] = None
     # 法人決算月 (1-12)。NULL=個人ユーザー。設定済みで TAX & REPORTS 法人モードを解放する。
     corporate_fiscal_month: Optional[int] = None
     # ユーザーロール（admin / viewer / partner）。フロントエンドの権限分岐に使用する。
@@ -133,6 +137,36 @@ class DelegationGrantRequest(BaseModel):
         if v < DELEGATION_MIN_HF_FLOOR:
             raise ValueError(f"hf_floor は {DELEGATION_MIN_HF_FLOOR} 以上にしてください")
         return v
+
+    @field_validator("allowed_protocols")
+    @classmethod
+    def _validate_protocols(cls, v: list[str]) -> list[str]:
+        """委譲可能集合で検証し、正規化（trim + 小文字）+ 重複排除する。
+
+        prepare は `resolve_protocol_contracts` で写像不能なら 502 になるが、grant 側は本
+        validator を入れるまで**素通し**だった（`min_length=1` のみ）。そのため
+        `prepare(["aave"])` → `grant(["aave","pendle"])` で「grant は pendle を主張するが
+        Privy policy は Aave 限定」という乖離を作れた（routing は broadcast を試み TEE が拒否）。
+        両 leg が本 schema を共有するのでここで揃える。
+
+        正規化する理由: `_should_use_scw_route`（proposals/router.py）は grant 値を lower する
+        が strip はしないため、`" pendle"` は policy 側を通って routing 側だけで落ちる。
+        """
+        # 委譲可能集合の正は policy_mapper（写像の実装元）。ここで再定義しない。
+        from app.privy.policy_mapper import SUPPORTED_DELEGATION_PROTOCOLS
+
+        normalized: list[str] = []
+        for raw in v:
+            protocol = raw.strip().lower()
+            if not protocol:
+                raise ValueError("allowed_protocols に空の要素は指定できません")
+            if protocol not in SUPPORTED_DELEGATION_PROTOCOLS:
+                raise ValueError(
+                    f"{raw!r} は委譲できません (対応: {sorted(SUPPORTED_DELEGATION_PROTOCOLS)})"
+                )
+            if protocol not in normalized:
+                normalized.append(protocol)
+        return normalized
 
 
 class DelegationGrantResponse(BaseModel):

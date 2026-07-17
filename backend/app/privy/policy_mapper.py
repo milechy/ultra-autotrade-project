@@ -50,11 +50,48 @@ _DELEGATED_METHODS = ("eth_signUserOperation", "eth_sendTransaction")
 # 委譲可能なプロトコル → コントラクト解決関数。
 # Aave: V3 Pool。Pendle [Phase D / D3]: RouterV4 + underlying(USDC)（approve 宛先）。
 # Lido はレジストリ未整備のため後続で追加する。
-_SUPPORTED_PROTOCOLS: frozenset[str] = frozenset({"aave", "pendle"})
+#: 委譲経路が写像できるプロトコル。**商品ティア定義（`RISK_MODE_PROTOCOLS`）とは別物**で、
+#: そちらは lido を含む。両者の積は `delegatable_protocols_for_risk_mode()` で取る。
+SUPPORTED_DELEGATION_PROTOCOLS: frozenset[str] = frozenset({"aave", "pendle"})
+
+#: 実コントラクトアドレス下限。160bit のほぼランダム値である実アドレスに対し、
+#: `pendle/config.py` の未設定 sentinel（`0x…0002` 等）は極端に小さい値になる。
+_MIN_REAL_ADDRESS_INT = 1 << 32
 
 
 class PolicyMappingError(ValueError):
     """委譲枠を Privy policy に写像できない（fail-closed で grant を拒否する）。"""
+
+
+def _is_unset_address(addr: str) -> bool:
+    """未設定 sentinel（dummy アドレス）か。
+
+    `pendle/config.py` は env 未設定時に `0x…0002/0003/0004` を既定値として返す。これらは
+    truthy なので `if not addr` では弾けず、そのまま Privy policy に載ると「dummy 宛だけを
+    許可する policy」が黙って作られ、実行時に TEE が全 tx を拒否して不可解に失敗する。
+    over-broad ではないが診断困難なので、入口で fail-closed にする。
+    """
+    try:
+        return int(addr, 16) < _MIN_REAL_ADDRESS_INT
+    except ValueError:
+        return True  # 16進として解釈不能 = 不正値 → fail-closed
+
+
+def delegatable_protocols_for_risk_mode(risk_mode: str | None) -> list[str]:
+    """risk_mode → 委譲可能プロトコル（`RISK_MODE_PROTOCOLS` ∩ 委譲可能集合）。
+
+    `RISK_MODE_PROTOCOLS`（`app/auth/models.py`）は**商品ティアの定義**で、balanced/aggressive は
+    lido を含む。しかし lido は委譲経路が未対応なので、積を取らずに `resolve_protocol_contracts`
+    へ渡すと `PolicyMappingError` になり consent 全体が 502 で落ちる。委譲枠を組み立てる側は
+    必ず本関数を通すこと。未知 / None は conservative 相当（fail-safe な最小権限）。
+    """
+    from app.auth.models import RISK_MODE_PROTOCOLS, RiskMode  # noqa: PLC0415
+
+    try:
+        mode = RiskMode(risk_mode or "")
+    except ValueError:
+        mode = RiskMode.CONSERVATIVE
+    return sorted(RISK_MODE_PROTOCOLS[mode] & SUPPORTED_DELEGATION_PROTOCOLS)
 
 
 def resolve_protocol_contracts(allowed_protocols: list[str], chain_name: str) -> list[str]:
@@ -68,10 +105,10 @@ def resolve_protocol_contracts(allowed_protocols: list[str], chain_name: str) ->
     contracts: list[str] = []
     for raw in allowed_protocols:
         protocol = raw.strip().lower()
-        if protocol not in _SUPPORTED_PROTOCOLS:
+        if protocol not in SUPPORTED_DELEGATION_PROTOCOLS:
             raise PolicyMappingError(
-                f"protocol {raw!r} is not delegatable in Phase 2-D "
-                f"(supported: {sorted(_SUPPORTED_PROTOCOLS)}; Lido/Pendle は Phase 3)"
+                f"protocol {raw!r} is not delegatable "
+                f"(supported: {sorted(SUPPORTED_DELEGATION_PROTOCOLS)}; Lido は未対応)"
             )
         if protocol == "aave":
             try:
@@ -91,14 +128,18 @@ def resolve_protocol_contracts(allowed_protocols: list[str], chain_name: str) ->
             from app.protocols.pendle.config import get_pendle_config  # noqa: PLC0415
 
             pconf = get_pendle_config()
-            for addr in (
-                pconf.router_address,
-                pconf.underlying_token_address,
-                pconf.pt_token_address,
+            for env_key, addr in (
+                ("PENDLE_ROUTER_ADDRESS", pconf.router_address),
+                ("PENDLE_UNDERLYING_TOKEN_ADDRESS", pconf.underlying_token_address),
+                ("PENDLE_PT_TOKEN_ADDRESS", pconf.pt_token_address),
             ):
-                if not addr:
+                # 空だけでなく dummy sentinel も弾く（`_is_unset_address` docstring 参照）。
+                # ここを通すと「dummy 宛のみ許可」という無意味な policy が黙って作られる。
+                if not addr or _is_unset_address(addr):
                     raise PolicyMappingError(
-                        "Pendle router / underlying / pt_token アドレスが未設定です"
+                        f"Pendle のコントラクトアドレスが未設定です（{env_key}）。"
+                        "PENDLE_ROUTER_ADDRESS / PENDLE_UNDERLYING_TOKEN_ADDRESS / "
+                        "PENDLE_PT_TOKEN_ADDRESS を実アドレスに設定してください。"
                     )
                 low = addr.lower()
                 if low not in contracts:
@@ -128,7 +169,8 @@ def build_delegation_policy(
     docstring 参照）。写像不能（未対応プロトコル / 不正チェーン）は PolicyMappingError。
 
     :param wallet_address: 委譲対象ウォレット（policy name の監査用識別子）
-    :param allowed_protocols: 委譲枠の許可プロトコル（Phase 2-D は ["aave"] のみ解決可能）
+    :param allowed_protocols: 委譲枠の許可プロトコル（`SUPPORTED_DELEGATION_PROTOCOLS` のみ解決可能。
+        risk_mode から組み立てる場合は `delegatable_protocols_for_risk_mode()` を通すこと）
     :param chain_name: 執行チェーン名（"base" 本番 / "base_sepolia" staging）
     :param policy_name: 任意の policy 表示名（未指定なら wallet 短縮形/chain から生成、50文字以内）
     """

@@ -45,6 +45,23 @@ export function isAutoModeEnabled(): boolean {
 }
 
 /**
+ * 「利回り重視（aggressive / Aave + Pendle）」ティアを UI に表示するか。
+ *
+ * 既定 false（非表示 = 従来どおり Aave USDC 供給のみ）。Pendle PT は Aave と
+ * **リスクの質が異なる**（満期まで出金不可 / 元本保証なし / プール流動性が薄い）ため、
+ * 選択時は満期ロック・裏付け・スリッページの 3 項目同意を必須にしている。
+ *
+ * 本フラグを true にしても、backend 側が揃わなければ Pendle は 1 wei も動かない
+ * （`PHASE_1_ALLOWED_RISK_MODES` に aggressive / `AI_OPTIMIZER_MULTIPROTOCOL_ENABLED` /
+ * `PENDLE_STABLE_UNDERLYING` / `PENDLE_ENABLE_ONCHAIN_WRITE` / 委譲 SCW 有効 /
+ * PENDLE_* 実アドレス）。有効化順序は `docs/ops/phase_d_pendle_aggressive_d6_runbook.md`。
+ * とくに `PHASE_1_ALLOWED_RISK_MODES` の緩和は**規制判断**を伴う（同 §5）。
+ */
+export function isAggressiveTierEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_AGGRESSIVE_TIER_ENABLED === 'true'
+}
+
+/**
  * 友達紹介プログラムを UI に表示するか。
  *
  * 既定 false（非表示）。「紹介した友達の実利益の N% を継続的に支払う」という

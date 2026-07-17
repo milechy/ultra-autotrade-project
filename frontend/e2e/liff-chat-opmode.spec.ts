@@ -12,6 +12,12 @@
 //   3. カードをタップすると確認ステップ無しで即 PUT /api/user/settings が
 //      { user_mode } 形で呼ばれ、トースト「『モード名』に切り替えました」が出る。
 //
+// 前提: NEXT_PUBLIC_AGGRESSIVE_TIER_ENABLED / NEXT_PUBLIC_DELEGATION_CONSENT_ENABLED は
+// 未設定（既定 off）。両方 on の環境では「おまかせ」タップで運用方針シート
+// (managed-scope-sheet) が挟まるため、3. の即時 PUT は成立しない。
+
+
+//
 // テスト戦略:
 //   - /api/user/settings の GET/PUT を page.route で mock し、バックエンド非依存にする。
 //   - getAuthToken() は localStorage の 'auth_token' を読むため addInitScript で事前注入。

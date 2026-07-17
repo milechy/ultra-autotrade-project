@@ -6,18 +6,27 @@ import { Bot, MousePointer2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useSigners, useUser, useWallets } from "@privy-io/react-auth"
 import { getAuthToken } from "@/lib/auth/token-key"
-import { isAutoModeEnabled } from "@/lib/flags"
+import { isAggressiveTierEnabled, isAutoModeEnabled } from "@/lib/flags"
 import { DEPOSIT_GATE_USD } from "@/lib/web3/config"
 import { liffFetch } from "@/lib/liff/liff-fetch"
 import { track, EV } from "@/lib/posthog"
+import AggressiveRiskDisclosureModal from "@/components/settings/AggressiveRiskDisclosureModal"
 import {
-  DEFAULT_DELEGATION_PARAMS,
+  delegationParamsForScope,
   DelegationNotReadyError,
+  effectiveScope,
   getDelegation,
+  grantAllowsPendle,
   grantDelegation,
+  type ManagedScope,
+  needsReconsentForYield,
   prepareDelegation,
   revokeDelegation,
+  RiskModeNotAvailableError,
+  SCOPE_TO_RISK_MODE,
+  updateRiskMode,
 } from "@/lib/api/delegation"
+import { ManagedScopeSheet } from "./ManagedScopeSheet"
 
 type UserMode = "managed" | "active"
 
@@ -33,9 +42,20 @@ export function OpModePanel() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  // 運用方針（安全重視 / 利回り重視）。実効値は risk_mode と委譲枠の**両方**が
+  // Pendle を許して初めて "yield"（effectiveScope 参照）。
+  const [scope, setScope] = useState<ManagedScope>("safety")
+  const [aggressiveAcked, setAggressiveAcked] = useState(false)
+  const [needsResign, setNeedsResign] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [disclosureOpen, setDisclosureOpen] = useState(false)
+  // 開示同意の完了を待って consent 本体を再開するための保留 scope。
+  const [pendingScope, setPendingScope] = useState<ManagedScope | null>(null)
   const { addSigners, removeSigners } = useSigners()
   const { wallets } = useWallets()
   const { refreshUser } = useUser()
+
+  const SCOPE_SELECTABLE = CONSENT_ENABLED && isAggressiveTierEnabled()
 
   function showToast(msg: string) {
     setToast(msg)
@@ -68,36 +88,58 @@ export function OpModePanel() {
   // managed への切替時: 委譲枠を作成（prepare）→ Privy で session signer を consent
   // （addSigners）→ backend に grant 確定。失敗時は signer をロールバックする。
   // 戻り値: consent + grant が成功したか。
-  async function runDelegationConsent(): Promise<boolean> {
+  async function runDelegationConsent(targetScope: ManagedScope): Promise<boolean> {
+    const params = delegationParamsForScope(targetScope)
+
     // 既に有効な委譲grant(signer/policy付き)があれば再consent不要。addSigners()を
     // 同じPrivy signerに対して再度呼ぶと「Duplicate signer(s) provided when updating
     // wallet」400で必ず失敗する(2026-07-17 本番実機で確認: 一度成功した後、モードを
     // 切り替えて再度「おまかせ」を選ぶと再現)。既存の有効grantを検出したら
     // addSigners自体をスキップし、そのまま利用する。
+    //
+    // ただし**方針が変わる場合は再consentが必須**。Privy policy の宛先 allowlist は
+    // prepare 時の allowed_protocols から作られ TEE が enforce するため、枠を作り直さずに
+    // 表示だけ変えると「利回り重視と表示されるが Pendle は TEE に拒否される」嘘になる。
+    // その場合は removeSigners → 新 policy で addSigners し直す（Duplicate signer 回避）。
+    let reusableGrant = false
     try {
       const existing = await getDelegation()
       if (existing && existing.privy_signer_id && existing.privy_policy_id) {
-        return true
+        const scopeMatches = grantAllowsPendle(existing) === (targetScope === "yield")
+        if (scopeMatches) return true
+        // 方針が変わる → 既存 signer を外してから作り直す
+        reusableGrant = true
       }
     } catch {
       // 既存grant確認に失敗しても、通常のconsentフローにフォールバックする(非致命的)。
     }
 
+    const eoa = embeddedEoaAddress()
+    if (!eoa) {
+      showToast(t("consentNoWallet"))
+      return false
+    }
+
+    if (reusableGrant) {
+      try {
+        await removeSigners({ address: eoa })
+      } catch {
+        // 既存 signer を外せないと addSigners が Duplicate signer 400 で必ず失敗する。
+        console.warn("[opMode] removeSigners failed before scope change")
+        showToast(t("consentFailed"))
+        return false
+      }
+    }
+
     let prep
     try {
-      prep = await prepareDelegation(DEFAULT_DELEGATION_PARAMS)
+      prep = await prepareDelegation(params)
     } catch (e) {
       if (e instanceof DelegationNotReadyError) {
         showToast(t("consentNotReady"))
         return false
       }
       showToast(t("consentFailed"))
-      return false
-    }
-
-    const eoa = embeddedEoaAddress()
-    if (!eoa) {
-      showToast(t("consentNoWallet"))
       return false
     }
 
@@ -116,7 +158,7 @@ export function OpModePanel() {
 
     try {
       await grantDelegation({
-        ...DEFAULT_DELEGATION_PARAMS,
+        ...params,
         privy_policy_id: prep.privy_policy_id,
         privy_signer_id: prep.privy_signer_id,
         ...(privyWalletId ? { privy_wallet_id: privyWalletId } : {}),
@@ -133,6 +175,30 @@ export function OpModePanel() {
       return false
     }
     return true
+  }
+
+  /**
+   * 委譲枠が確定した**後**に risk_mode を倒す。
+   *
+   * 順序が逆だと「risk_mode=aggressive なのに委譲枠に pendle が無い」状態になり、Pendle 提案は
+   * 生成されるのに broadcast されず approved のまま滞留する。grant が先行する分には
+   * （権限が未使用なだけで）無害なので、必ず grant → risk_mode の順にする。
+   */
+  async function applyRiskMode(targetScope: ManagedScope): Promise<void> {
+    try {
+      await updateRiskMode(SCOPE_TO_RISK_MODE[targetScope])
+      setScope(targetScope)
+      setNeedsResign(false)
+    } catch (e) {
+      // backend 未解禁(403) / 開示未同意(412) → 委譲枠は yield でも risk_mode は
+      // conservative のまま = Pendle 提案は生成されない（無害な側に倒れる）。
+      if (e instanceof RiskModeNotAvailableError) {
+        setScope("safety")
+        showToast(t("scopeYieldUnavailable"))
+        return
+      }
+      showToast(t("consentFailed"))
+    }
   }
 
   // managed から離脱時: session signer と grant を取消す（best-effort）。
@@ -181,39 +247,63 @@ export function OpModePanel() {
     active: t("activeLabel"),
   }
 
-  // 初回ロード: GET /api/user/settings
+  // 初回ロード: GET /api/user/settings（risk_mode / aggressive_ack_at も含む）
   useEffect(() => {
     liffFetch("/api/user/settings")
       .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-      .then((data: { user_mode: UserMode }) => {
-        setCurrentMode(data.user_mode)
+      .then(
+        (data: {
+          user_mode: UserMode
+          risk_mode?: string | null
+          aggressive_ack_at?: string | null
+        }) => {
+          setCurrentMode(data.user_mode)
+          setAggressiveAcked(Boolean(data.aggressive_ack_at))
+          return data.risk_mode ?? null
+        }
+      )
+      .then(async (mode) => {
+        // 実効方針は risk_mode と委譲枠の論理積。フラグ off のときは委譲枠を見に行かない
+        // （従来どおり方針の概念自体を出さない）。
+        if (!SCOPE_SELECTABLE) return
+        const grant = await getDelegation().catch(() => null)
+        setScope(effectiveScope(grant, mode))
+        setNeedsResign(needsReconsentForYield(grant, mode))
       })
       .catch(() => {
         // 取得失敗時はデフォルト表示なし
       })
       .finally(() => setLoading(false))
+    // SCOPE_SELECTABLE は build-time 定数なので依存に入れない（再実行させない）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // モード切替。CONSENT_ENABLED off（本番既定）のときは従来どおり即切替（PUT のみ）。
-  // on のときは managed 選択で委譲 consent フロー、managed 離脱で revoke を挟む。
-  async function handleSelect(newMode: UserMode) {
-    if (newMode === currentMode || busy) return
+  // モード切替の実処理。targetScope は managed のときだけ意味を持つ。
+  // CONSENT_ENABLED off（本番既定）のときは従来どおり即切替（PUT のみ）。
+  async function applyMode(newMode: UserMode, targetScope: ManagedScope) {
     const token = getAuthToken()
     if (!token) {
       showToast(t("toastAuthExpired"))
       return
     }
     const prev = currentMode
+    const modeChanged = newMode !== prev
 
-    // 委譲 consent（managed への切替・フラグ on のときのみ）
+    // 委譲 consent（managed への切替 / 方針変更・フラグ on のときのみ）
     if (CONSENT_ENABLED && newMode === "managed") {
       setBusy(true)
       try {
-        const ok = await runDelegationConsent()
+        const ok = await runDelegationConsent(targetScope)
         if (!ok) return // consent 未完了 → モード変更しない（toast は内部で表示済み）
       } finally {
         setBusy(false)
       }
+    }
+
+    // 既に managed で方針だけ変えた場合は user_mode の PUT（入金ゲート含む）は不要。
+    if (!modeChanged) {
+      if (SCOPE_SELECTABLE && newMode === "managed") await applyRiskMode(targetScope)
+      return
     }
 
     // 楽観的更新
@@ -244,12 +334,46 @@ export function OpModePanel() {
       if (CONSENT_ENABLED && prev === "managed" && newMode !== "managed") {
         await revokeDelegationConsent()
       }
+      // risk_mode は委譲枠が確定してから最後に倒す（applyRiskMode の docstring 参照）。
+      if (SCOPE_SELECTABLE && newMode === "managed") await applyRiskMode(targetScope)
       showToast(t("toastSwitched", { mode: MODE_LABEL[newMode] }))
     } catch {
       // ロールバック
       setCurrentMode(prev)
       showToast(t("toastSwitchFailed"))
     }
+  }
+
+  // おまかせは運用方針シートを挟む（既に managed でも方針変更のため開く）。
+  // フラグ off のときは従来どおり Aave 限定でそのまま切替える。
+  function handleSelect(newMode: UserMode) {
+    if (busy) return
+    if (SCOPE_SELECTABLE && newMode === "managed") {
+      setSheetOpen(true)
+      return
+    }
+    if (newMode === currentMode) return
+    void applyMode(newMode, "safety")
+  }
+
+  // 利回り重視はリスク開示への同意が前提（backend も 412 で二重にガードする）。
+  async function handleScopeConfirm(targetScope: ManagedScope) {
+    if (targetScope === "yield" && !aggressiveAcked) {
+      setPendingScope(targetScope)
+      setDisclosureOpen(true)
+      return
+    }
+    setSheetOpen(false)
+    await applyMode("managed", targetScope)
+  }
+
+  async function handleDisclosureConsented() {
+    setDisclosureOpen(false)
+    setAggressiveAcked(true)
+    const target = pendingScope ?? "yield"
+    setPendingScope(null)
+    setSheetOpen(false)
+    await applyMode("managed", target)
   }
 
   return (
@@ -308,12 +432,57 @@ export function OpModePanel() {
                 <div>
                   <p className="text-[#1c1a27] font-bold text-base">{mode.label}</p>
                   <p className="text-[#736f7e] text-sm mt-0.5">{mode.desc}</p>
+                  {/* 現在の運用方針。おまかせ選択中のみ表示する。 */}
+                  {SCOPE_SELECTABLE && mode.id === "managed" && isSelected && (
+                    <p
+                      className="mt-1.5 text-xs font-medium text-[#1D9E75]"
+                      data-testid="opmode-current-scope"
+                    >
+                      {scope === "yield" ? t("scopeYieldLabel") : t("scopeSafetyLabel")}
+                    </p>
+                  )}
                 </div>
               </div>
             </button>
           )
         })}
       </div>
+
+      {/* risk_mode が委譲枠より先行している = Pendle 提案は生成されるが broadcast されず
+          approved のまま滞留する状態。黙って放置せず再署名を促す。 */}
+      {SCOPE_SELECTABLE && needsResign && (
+        <button
+          type="button"
+          data-testid="opmode-reconsent-cta"
+          disabled={busy}
+          onClick={() => setSheetOpen(true)}
+          className="w-full rounded-xl border border-amber-500 bg-amber-500/10 p-3 text-left text-xs text-[#1c1a27] disabled:opacity-60"
+        >
+          {t("scopeReconsentRequired")}
+        </button>
+      )}
+
+      {/* 開示モーダル表示中はシートを畳む。モーダル(z-50)はシート(z-70)より下に敷かれるため、
+          両方出すとモーダルがシートの裏に隠れて操作不能になる。モーダルを閉じるとシートに戻る。 */}
+      {sheetOpen && !disclosureOpen && (
+        <ManagedScopeSheet
+          currentScope={scope}
+          requiresResignature={currentMode === "managed"}
+          busy={busy}
+          onConfirm={handleScopeConfirm}
+          onCancel={() => setSheetOpen(false)}
+        />
+      )}
+
+      {disclosureOpen && (
+        <AggressiveRiskDisclosureModal
+          onConsented={handleDisclosureConsented}
+          onCancel={() => {
+            setDisclosureOpen(false)
+            setPendingScope(null)
+          }}
+        />
+      )}
     </div>
   )
 }

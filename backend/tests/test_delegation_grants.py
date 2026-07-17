@@ -188,11 +188,14 @@ class TestPolicyEngineAutoGrantRule:
 
 
 class TestDelegationAPI:
+    # allowed_protocols は委譲可能集合 (aave / pendle) のみ。以前は ["aave","lido"] を
+    # そのまま round-trip していたが、lido は policy_mapper が写像できず prepare が 502 に
+    # なるため grant だけ通るのは乖離だった（schema で 422 に統一）。
     _VALID = {
         "max_single_trade_pct": "10",
         "max_daily_trade_pct": "30",
         "hf_floor": "1.6",
-        "allowed_protocols": ["aave", "lido"],
+        "allowed_protocols": ["aave"],
         "allowed_assets": ["USDC"],
         "expires_in_days": 30,
     }
@@ -213,7 +216,7 @@ class TestDelegationAPI:
         assert r.status_code == 200, r.text
         data = r.json()
         assert data["status"] == "active"
-        assert data["allowed_protocols"] == ["aave", "lido"]
+        assert data["allowed_protocols"] == ["aave"]
 
         # get は有効枠を返す
         got = client.get("/api/user/delegation", headers=h).json()
@@ -234,6 +237,63 @@ class TestDelegationAPI:
         # 常に1枠のみ有効（再作成で前枠は revoke される）
         got = client.get("/api/user/delegation", headers=h).json()
         assert got is not None and got["status"] == "active"
+
+    @pytest.mark.parametrize(
+        "protocols",
+        [
+            ["aave", "lido"],  # lido は委譲経路が未対応（policy_mapper が写像不能）
+            ["uniswap"],  # 未知プロトコル
+            ["aave", ""],  # 空要素
+        ],
+    )
+    def test_undelegatable_protocols_rejected(
+        self, client: TestClient, protocols: list[str]
+    ) -> None:
+        """委譲可能集合の外は grant でも 422（prepare だけ 502 という乖離を無くす）。"""
+        token = register_and_login(client)
+        h = {"Authorization": f"Bearer {token}"}
+        payload = dict(self._VALID)
+        payload["allowed_protocols"] = protocols
+        r = client.post("/api/user/delegation/grant", json=payload, headers=h)
+        assert r.status_code == 422, r.text
+
+    def test_protocols_normalized(self, client: TestClient) -> None:
+        """大文字 / 前後空白 / 重複は正規化して保存する。
+
+        `_should_use_scw_route` は grant 値を lower するが strip しないため、" pendle" は
+        policy 側を通って routing 側だけで落ちる。入口で揃えることでその乖離を防ぐ。
+        """
+        token = register_and_login(client)
+        h = {"Authorization": f"Bearer {token}"}
+        payload = dict(self._VALID)
+        payload["allowed_protocols"] = [" AAVE ", "aave"]
+        r = client.post("/api/user/delegation/grant", json=payload, headers=h)
+        assert r.status_code == 200, r.text
+        assert r.json()["allowed_protocols"] == ["aave"]
+
+    def test_pendle_grant_requires_aggressive_ack(self, client: TestClient) -> None:
+        """Pendle 委譲はリスク開示同意が無ければ 412（開示モーダルの迂回を防ぐ）。"""
+        token = register_and_login(client)
+        h = {"Authorization": f"Bearer {token}"}
+        payload = dict(self._VALID)
+        payload["allowed_protocols"] = ["aave", "pendle"]
+
+        r = client.post("/api/user/delegation/grant", json=payload, headers=h)
+        assert r.status_code == 412, r.text
+        assert client.get("/api/user/delegation", headers=h).json() is None
+
+        # 開示に同意すると通る
+        assert client.post("/api/user/aggressive-consent", headers=h).status_code == 200
+        r2 = client.post("/api/user/delegation/grant", json=payload, headers=h)
+        assert r2.status_code == 200, r2.text
+        assert r2.json()["allowed_protocols"] == ["aave", "pendle"]
+
+    def test_aave_only_grant_does_not_require_ack(self, client: TestClient) -> None:
+        """Aave のみの委譲は従来どおり同意不要（既存ユーザーの挙動を変えない）。"""
+        token = register_and_login(client)
+        h = {"Authorization": f"Bearer {token}"}
+        r = client.post("/api/user/delegation/grant", json=self._VALID, headers=h)
+        assert r.status_code == 200, r.text
 
     @pytest.mark.parametrize(
         "field,value",
