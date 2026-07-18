@@ -28,11 +28,29 @@ function siweMessage(address: string): string {
   return `Sign in to Ultra AutoTrade\nAddress: ${address}`;
 }
 
+/** `signIn()` の結果。単なる true/false ではなく「なぜ false か」を区別する。 */
+export type LiffSignInResult =
+  | { ok: true }
+  /** Privy 未ログイン → メールモーダルを開いた。エラーではない（呼び出し側は静かに待つ）。 */
+  | { ok: false; reason: "login-opened" }
+  /** ユーザーが署名を明示的に拒否した（EIP-1193 4001）。 */
+  | { ok: false; reason: "rejected" }
+  /** それ以外の失敗（通信・wallet 未準備など）。 */
+  | { ok: false; reason: "error" };
+
 export interface LiffBrowserAuthResult {
-  /** Privy wallet で署名し JWT を発行・保存する。成功時 true。Privy 未ログイン時は login() を開いて false。 */
-  signIn: () => Promise<boolean>;
+  /** Privy wallet で署名し JWT を発行・保存する。結果の種別は `LiffSignInResult`。 */
+  signIn: () => Promise<LiffSignInResult>;
   signingIn: boolean;
   error: string | null;
+}
+
+/** EIP-1193 の user-rejected (4001) を厳密判定する。文字列 includes だけに頼らない。 */
+function isUserRejection(err: unknown): boolean {
+  const code = (err as { code?: unknown })?.code;
+  if (code === 4001 || code === "ACTION_REJECTED") return true;
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return msg.includes("user rejected") || msg.includes("user denied");
 }
 
 export function useLiffBrowserAuth(): LiffBrowserAuthResult {
@@ -41,18 +59,23 @@ export function useLiffBrowserAuth(): LiffBrowserAuthResult {
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const signIn = useCallback(async (): Promise<boolean> => {
+  const signIn = useCallback(async (): Promise<LiffSignInResult> => {
     setError(null);
+
+    // embedded wallet (Privy TEE) のみ使用。外部 wallet は秘密鍵管理の懸念で除外。
+    const wallet = wallets.find((w) => w.walletClientType === "privy");
+    if (!wallet) {
+      // Privy 未ログイン → メールログイン用モーダルを開く。**これは失敗ではない**。
+      // モーダル完了後に wallets が更新され、ユーザーが再度ボタンを押すと下の署名フローへ進む。
+      // ここで setSigningIn(true) や catch に入ると、モーダルを開いただけで
+      // 「署名がキャンセルされました」を誤表示してしまう（テスター報告 2026-07-17 の不具合）。
+      // 署名処理には一切入らないので、エラー文言も spinner も出さず静かにモーダルへ委ねる。
+      await login();
+      return { ok: false, reason: "login-opened" };
+    }
+
     setSigningIn(true);
     try {
-      // embedded wallet (Privy TEE) のみ使用。外部 wallet は秘密鍵管理の懸念で除外。
-      const wallet = wallets.find((w) => w.walletClientType === "privy");
-      if (!wallet) {
-        // Privy 未ログイン → メールログイン用モーダルを開く。完了後ユーザーが再度ボタンを押す。
-        await login();
-        return false;
-      }
-
       const address = wallet.address;
       const eip1193 = await wallet.getEthereumProvider();
       const ethProvider = new ethers.BrowserProvider(
@@ -75,17 +98,18 @@ export function useLiffBrowserAuth(): LiffBrowserAuthResult {
         String(Date.now() + res.expires_in * 1000)
       );
       localStorage.setItem(LIFF_TOKEN_KEY, res.access_token);
-      return true;
+      return { ok: true };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("User rejected") || msg.includes("user rejected")) {
+      // 「署名がキャンセルされました」は **実際にユーザーが署名を拒否したときだけ** 出す
+      // （EIP-1193 4001 で厳密判定。過渡状態の別エラーをキャンセルと誤表示しない）。
+      if (isUserRejection(err)) {
         setError("署名がキャンセルされました。もう一度お試しください。");
-      } else {
-        setError(
-          "ログインに失敗しました。通信環境を確認して、もう一度お試しください。"
-        );
+        return { ok: false, reason: "rejected" };
       }
-      return false;
+      setError(
+        "ログインに失敗しました。通信環境を確認して、もう一度お試しください。"
+      );
+      return { ok: false, reason: "error" };
     } finally {
       setSigningIn(false);
     }

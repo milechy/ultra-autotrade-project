@@ -247,12 +247,25 @@ export function TxHistoryPanel() {
   const coinSummaries = buildCoinSummaries(txs)
   const grouped = groupByMonth(filteredTxs)
 
+  // 資産フィルタ（USDC / ETH）は **履歴に実在する資産だけ** 出す。
+  // 以前は ETH タブを常時ハードコードしており、ETH 建て取引が 1 件も無くても表示され、
+  // タップすると必ず空になっていた（テスター報告 2026-07-17「ETH が残ってます」）。
+  const hasUsdc = txs.some((tx) => tx.asset === "USDC")
+  const hasEth = txs.some((tx) => tx.asset === "ETH" || tx.asset === "WETH")
+
+  // 選択中の資産フィルタが（ポーリング更新等で）実在しなくなったら "all" に戻す
+  // （消えたタブが選ばれたまま空表示になるのを防ぐ）。
+  useEffect(() => {
+    if (filter === "USDC" && !hasUsdc) setFilter("all")
+    if (filter === "ETH" && !hasEth) setFilter("all")
+  }, [filter, hasUsdc, hasEth])
+
   const FILTERS: Array<{ id: FilterType; label: string }> = [
     { id: "all", label: t("filterAll") },
     { id: "SUPPLY", label: "SUPPLY" },
     { id: "WITHDRAW", label: "WITHDRAW" },
-    { id: "USDC", label: "USDC" },
-    { id: "ETH", label: "ETH" },
+    ...(hasUsdc ? [{ id: "USDC" as FilterType, label: "USDC" }] : []),
+    ...(hasEth ? [{ id: "ETH" as FilterType, label: "ETH" }] : []),
   ]
 
   if (loading) {

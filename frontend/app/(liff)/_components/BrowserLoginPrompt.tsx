@@ -20,8 +20,10 @@ export function BrowserLoginPrompt({ onSuccess }: BrowserLoginPromptProps) {
   const { signIn, signingIn, error } = useLiffBrowserAuth();
 
   async function handleLogin() {
-    const ok = await signIn();
-    if (!ok) return;
+    const result = await signIn();
+    // login-opened / rejected / error はいずれもここでは何もしない
+    // （error 文言は hook 側が setError 済み。login-opened は文言なしでモーダルを待つ）。
+    if (!result.ok) return;
     if (onSuccess) {
       onSuccess();
     } else if (typeof window !== "undefined") {
