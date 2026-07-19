@@ -120,6 +120,18 @@ export function ManagedScopeSheet({
           })}
         </div>
 
+        {/* 段階A（dry-run）注記: セレクタは表示するが Pendle の実運用はまだ開始しない。
+            選択は記録されるが「利回り重視で運用が始まっている」と誤認させないよう明示する。
+            PENDLE_ENABLE_ONCHAIN_WRITE 有効化（段階B以降）でこの注記を外す。 */}
+        {selected === "yield" && (
+          <p
+            className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700"
+            data-testid="managed-scope-preparing-notice"
+          >
+            {t("scopeYieldPreparingNotice")}
+          </p>
+        )}
+
         {/* 委譲枠は consent 時点で固定されるため、範囲を変えるには Privy 再署名が要る。
             黙って古い枠のまま表示だけ変えない（TEE 側は旧 allowlist を enforce し続ける）。 */}
         {requiresResignature && selected !== currentScope && (
