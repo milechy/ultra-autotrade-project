@@ -80,6 +80,14 @@ ENV NEXT_PUBLIC_WITHDRAW_ENABLED=${NEXT_PUBLIC_WITHDRAW_ENABLED}
 # build-time 埋め込みで問題ない (STRIPE_SECRET_KEY はサーバー専用・ここには含めない)。
 ARG NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+# [Phase-D] 「利回り重視 (aggressive / Aave + Pendle)」ティアをセレクタに表示するか。
+#   WITHDRAW_ENABLED と同型の欠落: flags.ts:isAggressiveTierEnabled() が読むが ARG/ENV 宣言が
+#   無く、.env で true にしても build-arg が届かず常に false のまま焼かれていた（2026-07-19 追加）。
+ARG NEXT_PUBLIC_AGGRESSIVE_TIER_ENABLED
+ENV NEXT_PUBLIC_AGGRESSIVE_TIER_ENABLED=${NEXT_PUBLIC_AGGRESSIVE_TIER_ENABLED}
+# 手数料徴収 UI の表示フラグ。同じく flags.ts:isFeeCollectionEnabled() が読むが宣言漏れ（同上）。
+ARG NEXT_PUBLIC_FEE_COLLECTION_ENABLED
+ENV NEXT_PUBLIC_FEE_COLLECTION_ENABLED=${NEXT_PUBLIC_FEE_COLLECTION_ENABLED}
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

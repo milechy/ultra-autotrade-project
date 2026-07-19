@@ -1,0 +1,23 @@
+name: Frontend Build-Arg Drift
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/Dockerfile'
+      - 'docker-compose.production.yml'
+      - 'frontend/lib/flags.ts'
+      - 'scripts/ci/check_frontend_build_args.sh'
+  push:
+    branches: [main, dev]
+
+jobs:
+  check-frontend-build-args:
+    name: frontend build-arg ドリフト検出
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run frontend build-arg drift check
+        run: |
+          bash scripts/ci/check_frontend_build_args.sh
