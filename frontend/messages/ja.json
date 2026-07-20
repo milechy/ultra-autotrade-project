@@ -937,7 +937,8 @@
         "scopeSubmitting": "設定中...",
         "scopeResignatureNotice": "方針を変更するには、ウォレットでの再署名が必要です。委譲する権限の範囲が変わるためです。",
         "scopeReconsentRequired": "「利回り重視」の設定が完了していません。タップして再署名してください。",
-        "scopeYieldUnavailable": "「利回り重視」は現在ご利用いただけません。引き続き「安全重視」で運用します。"
+        "scopeYieldUnavailable": "「利回り重視」は現在ご利用いただけません。引き続き「安全重視」で運用します。",
+        "scopeYieldPreparingNotice": "※準備中です。選択内容は記録されますが、Pendle での運用開始は近日提供予定です。当面は「安全重視」（Aave USDC）で運用します。"
       },
       "txHistory": {
         "title": "取引履歴",

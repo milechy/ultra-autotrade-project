@@ -937,7 +937,8 @@
         "scopeSubmitting": "Applying...",
         "scopeResignatureNotice": "Changing your strategy requires a new wallet signature, because the scope of delegated permissions changes.",
         "scopeReconsentRequired": "Your \"Yield focused\" setup is incomplete. Tap to sign again.",
-        "scopeYieldUnavailable": "\"Yield focused\" is not available yet. Continuing with \"Safety first\"."
+        "scopeYieldUnavailable": "\"Yield focused\" is not available yet. Continuing with \"Safety first\".",
+        "scopeYieldPreparingNotice": "※ Coming soon. Your selection is saved, but Pendle operation will start in a future release. For now, funds are managed with \"Safety first\" (Aave USDC)."
       },
       "txHistory": {
         "title": "Transaction History",
