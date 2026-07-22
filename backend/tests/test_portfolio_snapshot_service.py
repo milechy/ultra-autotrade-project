@@ -576,3 +576,185 @@ class TestRecordPortfolioSnapshot:
 
         snap = db_session.query(PortfolioSnapshot).first()
         assert snap.health_factor is None
+
+
+# ---------------------------------------------------------------------------
+# セルフディレクト（非カストディアル消費者）ユーザーの per-user snapshot
+# 2026-07-23: LIFF 消費者（role=viewer / invited_by IS NULL / 自分の Smart Wallet 保有）が
+# どの経路にも乗らず snapshot が作られなかった回帰の防止。
+# ---------------------------------------------------------------------------
+
+
+class TestSelfDirectedSnapshot:
+    def _mock_aave_client(self, account_data: AccountData) -> MagicMock:
+        mock_client = MagicMock()
+        mock_client.get_account_data.return_value = account_data
+        return mock_client
+
+    def test_self_directed_viewer_gets_own_snapshot(self, db_session: Session) -> None:
+        """自分の wallet を持つ消費者(viewer/invited_by None)は自身の残高で記録される。"""
+        u = _make_user(db_session, uid=100, role="viewer", wallet="0xSELF_EOA")
+        db_session.commit()
+
+        account_data = _make_account_data("500", "0", "Infinity")
+        mock_client = self._mock_aave_client(account_data)
+        with patch(
+            "app.portfolio.snapshot_service.get_default_aave_client",
+            return_value=mock_client,
+        ):
+            result = record_portfolio_snapshot(db_session)
+
+        assert result["snapshots_created"] == 1
+        mock_client.get_account_data.assert_called_once_with("0xSELF_EOA")
+        snap = db_session.query(PortfolioSnapshot).filter_by(user_id=u.id).first()
+        assert snap is not None
+        assert Decimal(str(snap.total_supply_usd)) == Decimal("500")
+        assert snap.health_factor is None  # Infinity → None
+
+    def test_zero_balance_viewer_no_prior_snapshot_skipped(self, db_session: Session) -> None:
+        """ウォレット紐付け済みだが Aave 残高ゼロ・過去 snapshot 無しの消費者は記録しない
+        （毎 tick の全ゼロ行増殖を防ぐ）。"""
+        _make_user(db_session, uid=100, role="viewer", wallet="0xEMPTY")
+        db_session.commit()
+
+        mock_client = self._mock_aave_client(_make_account_data("0", "0", "Infinity"))
+        with patch(
+            "app.portfolio.snapshot_service.get_default_aave_client",
+            return_value=mock_client,
+        ):
+            result = record_portfolio_snapshot(db_session)
+
+        assert result["snapshots_created"] == 0
+        assert db_session.query(PortfolioSnapshot).filter_by(user_id=100).count() == 0
+
+    def test_zero_balance_records_once_after_nonzero(self, db_session: Session) -> None:
+        """資金→全額出金（直近 snapshot が非ゼロ）の遷移は 1 行だけ記録され、以降は増えない。"""
+        u = _make_user(db_session, uid=100, role="viewer", wallet="0xUSER")
+        # 直近に非ゼロ snapshot を用意（過去に運用していた状態）。
+        from datetime import datetime, timezone
+
+        db_session.add(
+            PortfolioSnapshot(
+                user_id=u.id,
+                total_value_usd=Decimal("500"),
+                total_supply_usd=Decimal("500"),
+                total_borrow_usd=Decimal("0"),
+                health_factor=None,
+                recorded_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            )
+        )
+        db_session.commit()
+
+        mock_client = self._mock_aave_client(_make_account_data("0", "0", "Infinity"))
+        with patch(
+            "app.portfolio.snapshot_service.get_default_aave_client",
+            return_value=mock_client,
+        ):
+            # 1 回目: 非ゼロ→ゼロ遷移なのでゼロ行を 1 つ記録する。
+            record_portfolio_snapshot(db_session)
+            zero_rows_after_1 = (
+                db_session.query(PortfolioSnapshot)
+                .filter_by(user_id=u.id)
+                .filter(PortfolioSnapshot.total_supply_usd == 0)
+                .count()
+            )
+            # 2 回目: 直近が既にゼロなので追加しない。
+            record_portfolio_snapshot(db_session)
+            zero_rows_after_2 = (
+                db_session.query(PortfolioSnapshot)
+                .filter_by(user_id=u.id)
+                .filter(PortfolioSnapshot.total_supply_usd == 0)
+                .count()
+            )
+
+        assert zero_rows_after_1 == 1
+        assert zero_rows_after_2 == 1  # 増えない
+
+    def test_mixed_population_no_double_count(self, db_session: Session) -> None:
+        """partner+tester+consumer が同一 run に居ても各経路が排他に動き二重計上しない。"""
+        partner = _make_user(db_session, uid=10, role="partner", wallet="0xPARTNER")
+        tester = _make_user(db_session, uid=11, invited_by=partner.id)  # viewer/invited
+        consumer = _make_user(db_session, uid=100, role="viewer", wallet="0xCONSUMER")
+        db_session.commit()
+
+        mock_client = self._mock_aave_client(_make_account_data("1000", "0", "3.0"))
+        with patch(
+            "app.portfolio.snapshot_service.get_default_aave_client",
+            return_value=mock_client,
+        ):
+            record_portfolio_snapshot(db_session)
+
+        # tester: partner ループのみ 1 行 / consumer: per-user のみ 1 行 / 二重なし。
+        assert db_session.query(PortfolioSnapshot).filter_by(user_id=tester.id).count() == 1
+        assert db_session.query(PortfolioSnapshot).filter_by(user_id=consumer.id).count() == 1
+
+    def test_smart_wallet_preferred_over_eoa(self, db_session: Session) -> None:
+        """smart_wallet_address が EOA wallet_address より優先される（v4 は SCW に資金）。"""
+        u = _make_user(db_session, uid=101, role="viewer", wallet="0xEOA")
+        u.smart_wallet_address = "0xSCW"
+        db_session.commit()
+
+        mock_client = self._mock_aave_client(_make_account_data("1200", "0", "5.0"))
+        with patch(
+            "app.portfolio.snapshot_service.get_default_aave_client",
+            return_value=mock_client,
+        ):
+            record_portfolio_snapshot(db_session)
+
+        mock_client.get_account_data.assert_called_once_with("0xSCW")
+
+    def test_self_directed_no_wallet_skipped_no_env_fallback(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """ウォレット未設定の消費者は env フォールバックせずスキップ（残高混線防止 / #996型）。"""
+        _make_user(db_session, uid=102, role="viewer", wallet=None)
+        monkeypatch.setenv("AAVE_WALLET_ADDRESS", "0xENV_SHOULD_NOT_BE_USED")
+        db_session.commit()
+
+        mock_client = self._mock_aave_client(_make_account_data("9999", "0", "2.0"))
+        with patch(
+            "app.portfolio.snapshot_service.get_default_aave_client",
+            return_value=mock_client,
+        ):
+            result = record_portfolio_snapshot(db_session)
+
+        # env の残高で消費者 snapshot を作ってはならない。
+        assert db_session.query(PortfolioSnapshot).filter_by(user_id=102).first() is None
+        # admin fallback は「他に誰も作れなかった」場合のみ。ここは admin 不在なので 0。
+        assert result["snapshots_created"] == 0
+
+    def test_partner_tester_not_double_counted(self, db_session: Session) -> None:
+        """invited_by を持つテスターは partner ループのみが処理し self-directed では拾わない。"""
+        partner = _make_user(db_session, uid=10, role="partner", wallet="0xPARTNER")
+        tester = _make_user(db_session, uid=11, invited_by=partner.id)  # viewer / wallet None
+        db_session.commit()
+
+        mock_client = self._mock_aave_client(_make_account_data("2000", "0", "3.0"))
+        with patch(
+            "app.portfolio.snapshot_service.get_default_aave_client",
+            return_value=mock_client,
+        ):
+            record_portfolio_snapshot(db_session)
+
+        # tester の snapshot は partner ループ由来の 1 行のみ（self-directed で二重に作らない）。
+        assert db_session.query(PortfolioSnapshot).filter_by(user_id=tester.id).count() == 1
+
+    def test_self_directed_suppresses_admin_fallback(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """消費者 snapshot が作られたら admin フォールバックは発火しない。"""
+        _make_admin(db_session, uid=1, wallet="0xADMIN")
+        _make_user(db_session, uid=100, role="viewer", wallet="0xSELF")
+        monkeypatch.delenv("AAVE_WALLET_ADDRESS", raising=False)
+        db_session.commit()
+
+        mock_client = self._mock_aave_client(_make_account_data("300", "0", "9.0"))
+        with patch(
+            "app.portfolio.snapshot_service.get_default_aave_client",
+            return_value=mock_client,
+        ):
+            record_portfolio_snapshot(db_session)
+
+        # admin(uid=1) の snapshot は作られない。消費者(uid=100)のみ。
+        assert db_session.query(PortfolioSnapshot).filter_by(user_id=1).first() is None
+        assert db_session.query(PortfolioSnapshot).filter_by(user_id=100).first() is not None
