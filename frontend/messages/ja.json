@@ -925,11 +925,11 @@
         "scopeSheetTitle": "運用方針をお選びください",
         "scopeSheetSubtitle": "いつでも変更できます。リスクの取り方はご自身でお決めください。",
         "scopeSafetyLabel": "安全重視",
-        "scopeSafetyProtocols": "Aave USDC 供給のみ",
+        "scopeSafetyProtocols": "いつでも引き出せる運用",
         "scopeSafetyPoint1": "いつでも出金できます",
         "scopeSafetyPoint2": "実運用の実績があります",
         "scopeYieldLabel": "利回り重視",
-        "scopeYieldProtocols": "Aave + Pendle PT",
+        "scopeYieldProtocols": "満期まで預けて利回りを固定",
         "scopeYieldPoint1": "満期まで出金できません",
         "scopeYieldPoint2": "元本保証はありません",
         "scopeConfirmBtn": "この方針で始める",
@@ -938,7 +938,7 @@
         "scopeResignatureNotice": "方針を変更するには、ウォレットでの再署名が必要です。委譲する権限の範囲が変わるためです。",
         "scopeReconsentRequired": "「利回り重視」の設定が完了していません。タップして再署名してください。",
         "scopeYieldUnavailable": "「利回り重視」は現在ご利用いただけません。引き続き「安全重視」で運用します。",
-        "scopeYieldPreparingNotice": "※準備中です。選択内容は記録されますが、Pendle での運用開始は近日提供予定です。当面は「安全重視」（Aave USDC）で運用します。"
+        "scopeYieldPreparingNotice": "※準備中です。選択内容は記録されますが、利回り固定型の運用開始は近日提供予定です。当面は「安全重視」で運用します。"
       },
       "txHistory": {
         "title": "取引履歴",
@@ -3569,15 +3569,15 @@
   },
   "AggressiveDisclosure": {
     "title": "ハイリスクモードの確認",
-    "subtitle": "ハイリスクモード（Pendle 固定利回りPT）を選ぶ前に、以下の重要事項に同意してください。",
+    "subtitle": "ハイリスクモード（満期まで利回りを固定する運用）を選ぶ前に、以下の重要事項に同意してください。",
     "items": {
       "funds_locked": {
         "title": "満期まで即時出金できません",
-        "detail": "資金は Pendle PT の満期まで固定されます。満期前の売却は市場の流動性しだいで不利な価格になる場合があります。"
+        "detail": "資金は満期まで固定されます。満期前に解約する場合、市場の流動性しだいで不利な価格になることがあります。"
       },
       "pt_backed": {
-        "title": "yoUSD（利回りアグリゲータ）で裏付けられています",
-        "detail": "元本は yoUSD という利回りアグリゲータ vault が裏付けます。デペグや裏付け資産の毀損リスクがゼロではありません。"
+        "title": "外部の利回りアグリゲータが裏付けています",
+        "detail": "元本は、複数の運用先に分散する外部の利回りアグリゲータが裏付けます。価格の乖離（デペグ）や裏付け資産の毀損リスクがゼロではありません。"
       },
       "slippage": {
         "title": "スリッページ・流動性リスクがあります",

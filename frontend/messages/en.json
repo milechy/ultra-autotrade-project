@@ -925,11 +925,11 @@
         "scopeSheetTitle": "Choose your strategy",
         "scopeSheetSubtitle": "You can change this anytime. How much risk to take is your decision.",
         "scopeSafetyLabel": "Safety first",
-        "scopeSafetyProtocols": "Aave USDC supply only",
+        "scopeSafetyProtocols": "Withdraw anytime",
         "scopeSafetyPoint1": "Withdraw anytime",
         "scopeSafetyPoint2": "Proven in live operation",
         "scopeYieldLabel": "Yield focused",
-        "scopeYieldProtocols": "Aave + Pendle PT",
+        "scopeYieldProtocols": "Lock in a fixed yield until maturity",
         "scopeYieldPoint1": "No withdrawals until maturity",
         "scopeYieldPoint2": "No principal protection",
         "scopeConfirmBtn": "Start with this strategy",
@@ -938,7 +938,7 @@
         "scopeResignatureNotice": "Changing your strategy requires a new wallet signature, because the scope of delegated permissions changes.",
         "scopeReconsentRequired": "Your \"Yield focused\" setup is incomplete. Tap to sign again.",
         "scopeYieldUnavailable": "\"Yield focused\" is not available yet. Continuing with \"Safety first\".",
-        "scopeYieldPreparingNotice": "※ Coming soon. Your selection is saved, but Pendle operation will start in a future release. For now, funds are managed with \"Safety first\" (Aave USDC)."
+        "scopeYieldPreparingNotice": "※ Coming soon. Your selection is saved, but fixed-yield operation will start in a future release. For now, funds are managed under \"Safety first\"."
       },
       "txHistory": {
         "title": "Transaction History",
@@ -3552,15 +3552,15 @@
   },
   "AggressiveDisclosure": {
     "title": "High-Risk Mode Confirmation",
-    "subtitle": "Before choosing High-Risk mode (Pendle fixed-yield PT), please acknowledge the following.",
+    "subtitle": "Before choosing High-Risk mode (funds locked at a fixed yield until maturity), please acknowledge the following.",
     "items": {
       "funds_locked": {
         "title": "No instant withdrawal until maturity",
-        "detail": "Funds are locked until the Pendle PT matures. Selling before maturity may incur an unfavorable price depending on market liquidity."
+        "detail": "Funds are locked until maturity. Exiting before maturity may incur an unfavorable price depending on market liquidity."
       },
       "pt_backed": {
-        "title": "Backed by yoUSD (a yield aggregator)",
-        "detail": "Principal is backed by the yoUSD yield-aggregator vault. Depeg or impairment of the backing assets is not impossible."
+        "title": "Backed by an external yield aggregator",
+        "detail": "Principal is backed by an external yield aggregator that diversifies across multiple venues. Depeg or impairment of the backing assets is not impossible."
       },
       "slippage": {
         "title": "Slippage and liquidity risk",

@@ -90,7 +90,9 @@ function mapPositionsToHoldings(
       const apy = p.apy_pct ?? p.apy ?? 0
       return {
         asset,
-        protocol: p.protocol ?? "Aave V3",
+        // 消費者向け UI にプロトコル名（Aave / Pendle 等）は出さない約束のため、
+        // 表示用の既定値を持たせない。描画する場合は必ず抽象語彙に写像すること。
+        protocol: p.protocol ?? "",
         amount_usd: Number(amount),
         apy_pct: Number(apy),
       }
