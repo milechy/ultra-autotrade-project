@@ -45,6 +45,18 @@ def _get_wallet_address(user: User) -> str:
     return os.getenv("AAVE_WALLET_ADDRESS", "")
 
 
+def _self_directed_wallet(user: User) -> str:
+    """セルフディレクト（非カストディアル消費者）ユーザー自身の運用ウォレットを返す。
+
+    v4 の委譲運用では資金は各ユーザーの Smart Wallet (ERC-4337) に置かれるため、
+    `smart_wallet_address` を優先し、無ければ EOA `wallet_address` にフォールバックする。
+    **env `AAVE_WALLET_ADDRESS` へのフォールバックは決して行わない**
+    （partner ループと同様、他人／運用者のウォレット残高を当該ユーザーの残高として
+    記録してしまう #996 型の混線を防ぐ）。どちらも無ければ空文字を返す。
+    """
+    return user.smart_wallet_address or user.wallet_address or ""
+
+
 def _save_snapshot(
     db: Session,
     user_id: int,
@@ -238,6 +250,48 @@ def record_portfolio_snapshot(db: Optional[Session] = None) -> dict[str, Any]:
                 partner_debt,
                 partner_hf,
             )
+
+        # --- セルフディレクト（非カストディアル消費者）ユーザー: 各自のウォレット残高を記録 ---
+        # 背景 (2026-07-23): 従来の snapshot は「partner が招待したテスターに按分」する旧モデル
+        # 専用で、v4 の LIFF から自己登録した消費者（role=viewer / invited_by IS NULL / 自分の
+        # Smart Wallet を持つ）はどの経路にも乗らず snapshot が 1 行も作られなかった。結果、
+        # 「運用残高 / 平均利回り」が実データでは永久に空になっていた。ここで各ユーザー自身の
+        # ウォレットを読んで per-user snapshot を作る。partner ループ対象（invited_by あり）とは
+        # 排他なので二重計上しない。
+        self_directed = (
+            db.query(User)
+            .filter(
+                User.invited_by.is_(None),
+                User.is_active == True,  # noqa: E712
+                User.role == "viewer",
+            )
+            .all()
+        )
+        for user in self_directed:
+            wallet_addr = _self_directed_wallet(user)
+            if not wallet_addr:
+                # ウォレット未設定のユーザーは env フォールバックせずスキップ（残高混線防止）。
+                continue
+            try:
+                account_data = client.get_account_data(wallet_addr)
+            except Exception as exc:
+                logger.warning(
+                    "portfolio_snapshot: get_account_data failed for user_id=%d (wallet=%s...): %s",
+                    user.id,
+                    wallet_addr[:10],
+                    exc,
+                )
+                continue
+            u_supply = Decimal(str(account_data.total_collateral_usd))
+            u_debt = Decimal(str(account_data.total_debt_usd))
+            u_net = u_supply - u_debt
+            u_hf = _normalize_hf(Decimal(str(account_data.health_factor)))
+            _save_snapshot(db, user.id, u_supply, u_debt, u_net, u_hf, now)
+            _upsert_daily_history(db, user.id, u_net, u_hf, now)
+            snapshots_created += 1
+            last_total_supply = u_supply
+            last_total_debt = u_debt
+            last_hf = u_hf
 
         # --- 招待関係下のテスターが居ない場合: 管理者ユーザーに admin.wallet_address ベースで保存 ---
         if snapshots_created == 0 and partners_skipped == 0:
