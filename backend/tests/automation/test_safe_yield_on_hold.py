@@ -94,7 +94,9 @@ def test_creates_safe_supply_proposal(monkeypatch: pytest.MonkeyPatch) -> None:
     p = props[0]
     assert (p.operation, p.asset, p.protocol) == ("SUPPLY", "USDC", "aave")
     assert p.amount_usd == Decimal("100")
-    assert "安全利回り" in p.reason
+    assert "利回り" in p.reason
+    # 消費者向け提案理由にプロトコル名（Aave 等）を出さない約束の回帰ガード。
+    assert "Aave" not in p.reason and "aave" not in p.reason
 
 
 def test_skip_when_pending_exists(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -797,7 +797,8 @@ def _create_safe_yield_proposals_for_users(
     """
     expires_at = datetime.now(timezone.utc) + timedelta(hours=_PROPOSAL_EXPIRES_HOURS)
     now = datetime.now(timezone.utc)
-    reason = "遊休USDCを安全利回り（Aave USDC）へ配分します。相場の方向性に依らず実行できる安全な運用です。"
+    # 消費者向けの提案理由（ProposalActionCard に表示）にプロトコル名（Aave 等）は出さない約束。
+    reason = "遊休USDCを安全な利回りへ配分します。相場の方向性に依らず実行できる安全な運用です。"
 
     # AUTO_EXECUTE ユーザーも対象に含める（2026-07-16）。B1 が生成する提案は常に
     # SUPPLY/USDC/aave 固定で _should_use_scw_route が True になり得る唯一の operation
