@@ -14,7 +14,8 @@
     "test:e2e:mobile": "playwright test --project='Mobile Chrome'",
     "test:e2e:desktop": "playwright test --project='Desktop Chrome'",
     "test:e2e:smoke": "playwright test e2e/smoke/",
-    "check:i18n": "node scripts/check-i18n-keys.mjs"
+    "check:i18n": "node scripts/check-i18n-keys.mjs",
+    "check:protocol-names": "node scripts/check-consumer-protocol-names.mjs"
   },
   "dependencies": {
     "@farcaster/mini-app-solana": "^2.0.0",

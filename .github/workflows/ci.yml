@@ -148,6 +148,11 @@ jobs:
       - name: i18n key existence check
         run: node scripts/check-i18n-keys.mjs
 
+      # 消費者向け文言に DeFi プロトコル名（Aave / Pendle / yoUSD 等）が混入していないか検査。
+      # 2026-07-23: 運用方針セレクタとリスク開示モーダルに実名が入っていたのを実機目視で発見。
+      - name: Consumer-facing protocol name check
+        run: node scripts/check-consumer-protocol-names.mjs
+
       - name: Build
         run: npm run build
 
