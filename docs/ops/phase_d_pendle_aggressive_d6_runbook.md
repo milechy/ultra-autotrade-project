@@ -6,8 +6,111 @@
 > Claude は本ランブックの **read-only 部分（コード確認）まで**。フラグ切替・DB write・実 broadcast・
 > 本番反映は **人間主導**（3段プロトコル: phase1-investigator / phase2-implementer / phase3-deployer）。
 
-関連: `memory: project_pendle_aggressive_tier_phase_d` / `docs/34_phase2_protocols_guide.md` /
-Asana 親 1216418585178727（D1–D6）。
+関連: `memory: project_pendle_aggressive_tier_phase_d` / `memory: project_delegation_risk_tier_selector` /
+`docs/34_phase2_protocols_guide.md` / Asana 親 1216418585178727（D1–D6）。
+
+---
+
+## 段階B — 初回実 broadcast 実行チェックリスト（2026-07-21 段階A 完了後の現況版）
+
+> **このセクションが現在の操作正本。** 下の §0–§7 は詳細リファレンス（背景・コード根拠）として残す。
+> §2(DB列) / §3(env・Pendleアドレス) / §5(aggressive有効化) は **段階A で本番反映済み**。段階B の残差は
+> **`PENDLE_ENABLE_ONCHAIN_WRITE` フラグ1つ + テストユーザー grant + 少額実 USDC** のみ。
+>
+> **[ABSOLUTE] Claude はフラグ切替・broadcast・入金を実行しない。** 段階B は実資金移動 =
+> Tier S / HUMAN-REVIEW-REQUIRED。フラグ flip・Privy grant 作成・USDC 入金・approve は **hkobayashi 主導**
+> （3段プロトコル: phase1-investigator=read-only 確認まで / phase2-implementer=プラン / phase3-deployer=反映）。
+> Claude が担えるのは「事前状態の read-only 確認」「Opus レビュー」「手順書更新」まで。
+
+### 段階A で既に本番に入っているもの（2026-07-21 実機確認済み）
+
+| 項目 | 状態 |
+|---|---|
+| `NEXT_PUBLIC_AGGRESSIVE_TIER_ENABLED=true`（build-arg 焼込・セレクタ表示） | ✅ LIVE |
+| `NEXT_PUBLIC_DELEGATION_CONSENT_ENABLED=true`（セレクタ表示の第2条件） | ✅ LIVE |
+| `ALLOWED_RISK_MODES=conservative,aggressive`（#994 で env 化） | ✅ 設定済 |
+| `AI_OPTIMIZER_MULTIPROTOCOL_ENABLED=true`（pendle 提案 routing） | ✅ 設定済 |
+| `PENDLE_STABLE_UNDERLYING=true` / `PENDLE_CHAIN=base` / `PENDLE_RPC_URL`(=`AAVE_RPC_URL_BASE`流用) | ✅ 設定済 |
+| Pendle 実アドレス（market/USDC/PT・PT-yoUSD-24SEP2026・decimals 6） | ✅ 設定済 |
+| `users.aggressive_ack_at` / `aggressive_ack_version` 列 | ✅ 適用済 |
+| **`PENDLE_ENABLE_ONCHAIN_WRITE`** | ❌ **未設定（=false・dry-run 担保）** ← 段階B の主対象 |
+| `DELEGATION_PRIVY_POLICY_ENABLED`（委譲実行 #986-989） | ✅ true（要 §B-1 で creds 4点を再確認） |
+
+### B-0. Opus 安全レビュー（flip 前・必須ゲート）
+
+本ランブック末尾「Opus 安全レビュー チェックリスト」12 項目を通す。特に:
+- `PENDLE_LIVE_API_TEST=1 pytest tests/protocols/test_pendle/test_pendle_convert_api_contract.py` が **green**
+- `PENDLE_PT_TOKEN_DECIMALS=6` が対象 PT の実桁と一致（誤ると SELL_PT が 10^12 倍ズレ）
+- `PENDLE_MARKET_ADDRESS` と `PENDLE_PT_TOKEN_ADDRESS` が同一 market
+- 流動性ガードが `tvl<=0`/取得失敗で fail-closed（block）
+- 法務 GO 済み（Pendle aggressive は 2026-07-17 hkobayashi 明示 GO・`memory: project_pendle_aggressive_legal_go_2026_07_17`）
+
+### B-1. 事前状態確認（phase1-investigator / read-only）
+
+本番 VPS で（値は出さずキー有無のみ）:
+```bash
+cd /opt/ultra-autotrade
+# ① ENABLE_ONCHAIN_WRITE が今まだ absent（0）であること = flip 前の起点
+grep -c '^PENDLE_ENABLE_ONCHAIN_WRITE' .env.production          # → 0
+# ② 委譲 SCW route の前提（is_delegation_policy_enabled は 4点 AND）
+grep -cE '^(DELEGATION_PRIVY_POLICY_ENABLED|PRIVY_SERVER_SIGNER_ID|PRIVY_APP_ID|PRIVY_APP_SECRET)=' .env.production  # → 4 が理想
+# ③ 金額ガード（cap は env 未設定なら既定20・コード hard max 100 で clamp）
+grep -E '^PENDLE_MAX_TRADE_USD_CAP=' .env.production || echo "(未設定=既定20)"
+# ④ 提案チェーン診断で aggressive/multiprotocol ゲートが開通側か
+docker exec <active-backend> python -m app.diagnostics.proposal_chain
+```
+②が 4 未満なら Privy creds が欠けており broadcast は `_should_use_scw_route` で不成立（＝送信されない安全側だが、
+段階B を進めるには creds 補充が要る）。**creds 実値は Claude に貼らない**。
+
+### B-2. テストユーザー準備（hkobayashi）
+
+1. test user に `risk_mode=aggressive`（`aggressive_ack_at` 記録＝開示同意モーダル通過）。
+2. `allowed_protocols=["pendle"]` の有効 grant を作成。Privy policy = **RouterV4 + USDC + PT の 3 宛先 allowlist**（over-broad 禁止）。
+3. test wallet(SCW) に **少額の実 USDC $10〜20** を Base mainnet で用意。
+
+### B-3. フラグ flip（phase3-deployer / hkobayashi 承認後）
+
+```bash
+cd /opt/ultra-autotrade
+cp .env.production .env.production.bak.$(date +%Y%m%d_%H%M%S)
+printf '\nPENDLE_ENABLE_ONCHAIN_WRITE=true\n' >> .env.production   # sed -i 禁止
+printf '\nPENDLE_MAX_TRADE_USD_CAP=20\n' >> .env.production        # 初回は極小固定（hard max 100）
+# backend 再起動で反映（get_pendle_config は毎回 env 読み直すが、確実性のため recreate）
+COMPOSE_PROJECT_NAME=ultra-autotrade-project ACTIVE_BACKEND_COLOR=<active色> \
+  docker compose -f docker-compose.production.yml --env-file .env.production up -d --no-deps --force-recreate backend-<active色>
+```
+
+### B-4. 実 broadcast + 検証（hkobayashi・human-in-the-loop）
+
+1. test user の aggressive で **BUY_PT proposal** を生成（AI が BUY を出すか、対象ユーザーで生成トリガ）。
+2. approve → コードは `router.py:1073` の三条件 AND を満たし **SCW broadcast**。直前に `_pendle_execution_blocked`
+   （HARD_STOP/流動性ガード）が走り、抵触時は `approved` 据え置きで送信しない。
+3. 検証（`docs/22`「完了宣言テンプレ Blockchain 系」準拠）:
+   - receipt **status=1**、**PT-yoUSD 残高増**（SCW 本人着金＝非カストディアル）
+   - `proposals.status='executed'` / `tx_hash` 記録 / `transactions.is_dry_run=false`
+   - 二重送信なし（broadcast 後の bookkeeping 例外は failed 化しない設計・`router.py:1087-1108`）
+4. SELL_PT は満期（**2026-09-24**）前は二次市場価格での売却（1:1 redeem は満期後）。出口確認はディスカウント目減りを許容できる額で。
+
+### B-5. 監視（初回 broadcast 中〜直後）
+
+- Slack `#ultra-auto-project`: 流動性ガード block / HARD_STOP 通知
+- `docker exec <backend> python -m app.diagnostics.proposal_chain` で「提案が出ない/実行されない」を切り分け
+- `docker logs <backend> | grep -iE 'Pendle.*executed|PendleDryRun|HELD by safety'`
+
+### B-6. ロールバック（最速）
+
+```bash
+# broadcast だけ即停止（get_pendle_config が毎回 env を読むため再起動で即反映）
+printf '\nPENDLE_ENABLE_ONCHAIN_WRITE=false\n' >> .env.production   # または該当行を除去
+COMPOSE_PROJECT_NAME=ultra-autotrade-project ACTIVE_BACKEND_COLOR=<active色> \
+  docker compose -f docker-compose.production.yml --env-file .env.production up -d --no-deps --force-recreate backend-<active色>
+```
+これで proposal は再び `PendleDryRunNotBroadcast`（approved 据え置き）に戻る。セレクタ表示や提案生成は残す/
+止めるを個別に選べる（§7）。
+
+> **[重要] 金額の歯止め（H3）**: Pendle 経路は CLAUDE.md Rule 3/4（10%/30%）が inert（`total_assets=None`）。
+> **実質の金額ガードは `PENDLE_MAX_TRADE_USD_CAP`（初回20・hard max 100）とプール流動性 % だけ**。
+> 「cap を大きめにして様子見」は禁止。恒久対応（total_assets 配線）は #996 で shadow 観測中の別課題。
 
 ---
 
