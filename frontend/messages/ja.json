@@ -3867,12 +3867,12 @@
     "supplyTxHash": "再投資TX"
   },
   "IdleYieldCard": {
-    "title": "アイドル資本運用（Morpho Vaults）",
+    "title": "アイドル資本運用",
     "idleBalance": "アイドル残高",
     "bestApy": "最高APY",
     "activePosition": "運用中残高",
     "earnedInterest": "獲得利息",
-    "depositButton": "Morpho入金",
+    "depositButton": "入金",
     "withdrawButton": "引き出し",
     "depositing": "入金中...",
     "withdrawing": "引き出し中...",
