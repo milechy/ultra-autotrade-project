@@ -45,10 +45,9 @@ export default function LandingPage() {
           <span className="text-xs text-muted-foreground uppercase tracking-widest">
             Powered by
           </span>
+          {/* 消費者向け UI に DeFi プロトコル名（Aave 等）は出さない約束のため、
+              「Powered by」バッジからプロトコル名を除去。チェーン名(Base)は残す。 */}
           <div className="flex gap-2">
-            <Badge variant="outline" className="text-blue-400 border-blue-400/50">
-              Aave V3
-            </Badge>
             <Badge variant="outline" className="text-indigo-400 border-indigo-400/50">
               Base Mainnet
             </Badge>

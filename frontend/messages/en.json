@@ -3850,12 +3850,12 @@
     "supplyTxHash": "Reinvestment TX"
   },
   "IdleYieldCard": {
-    "title": "Idle Capital Management (Morpho Vaults)",
+    "title": "Idle Capital Management",
     "idleBalance": "Idle Balance",
     "bestApy": "Best APY",
     "activePosition": "Active Position",
     "earnedInterest": "Earned Interest",
-    "depositButton": "Deposit to Morpho",
+    "depositButton": "Deposit",
     "withdrawButton": "Withdraw",
     "depositing": "Depositing...",
     "withdrawing": "Withdrawing...",
