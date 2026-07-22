@@ -274,7 +274,12 @@ def record_portfolio_snapshot(db: Optional[Session] = None) -> dict[str, Any]:
                 continue
             try:
                 account_data = client.get_account_data(wallet_addr)
+                u_supply = Decimal(str(account_data.total_collateral_usd))
+                u_debt = Decimal(str(account_data.total_debt_usd))
+                u_hf = _normalize_hf(Decimal(str(account_data.health_factor)))
             except Exception as exc:
+                # get_account_data の失敗も Decimal 変換の失敗も当該ユーザーのみ skip し、
+                # 既に作成済みの他ユーザー snapshot（partner 分含む）を巻き添え rollback しない。
                 logger.warning(
                     "portfolio_snapshot: get_account_data failed for user_id=%d (wallet=%s...): %s",
                     user.id,
@@ -282,10 +287,25 @@ def record_portfolio_snapshot(db: Optional[Session] = None) -> dict[str, Any]:
                     exc,
                 )
                 continue
-            u_supply = Decimal(str(account_data.total_collateral_usd))
-            u_debt = Decimal(str(account_data.total_debt_usd))
             u_net = u_supply - u_debt
-            u_hf = _normalize_hf(Decimal(str(account_data.health_factor)))
+
+            # ゼロ残高（Aave ポジション無し）の無限行増殖ガード:
+            # ウォレット紐付けだけ済ませて一度も供給していない消費者は毎 tick 全ゼロ行を
+            # 生むため、現在ゼロ かつ 直近 snapshot も実質ゼロ なら記録しない。
+            # 資金→ゼロ（全額出金）の遷移だけは 1 行残す（直近が非ゼロなら書く）。
+            if u_supply == 0 and u_debt == 0:
+                last = (
+                    db.query(PortfolioSnapshot)
+                    .filter(PortfolioSnapshot.user_id == user.id)
+                    .order_by(PortfolioSnapshot.recorded_at.desc())
+                    .first()
+                )
+                if last is None or (
+                    Decimal(str(last.total_supply_usd)) == 0
+                    and Decimal(str(last.total_borrow_usd)) == 0
+                ):
+                    continue
+
             _save_snapshot(db, user.id, u_supply, u_debt, u_net, u_hf, now)
             _upsert_daily_history(db, user.id, u_net, u_hf, now)
             snapshots_created += 1
