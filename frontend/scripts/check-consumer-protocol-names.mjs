@@ -51,12 +51,32 @@ const EXCLUDED_SCOPES = new Set([
 
 const LOCALES = ['ja', 'en']
 
-/** 消費者ルートの .tsx を走査する対象ディレクトリ。 */
-const CONSUMER_TSX_DIRS = ['app/(liff)', 'app/user']
+/**
+ * 消費者ルートの .tsx を走査する対象ディレクトリ。
+ * route group ごとに URL が変わる点に注意（(liff)→/liff-chat, user→/user/*, (user)→/strategies 等）。
+ * admin/partner の route group（(admin)/(partner)）は実名 OK なので含めない。
+ */
+const CONSUMER_TSX_DIRS = ['app/(liff)', 'app/user', 'app/(user)']
+
+/**
+ * ルートグループ外の消費者共通 .tsx（全 URL に効く meta / レイアウト）。
+ * app/layout.tsx の metadata.description 等はブラウザタブ/共有プレビューに出る。
+ */
+const CONSUMER_TSX_FILES = ['app/layout.tsx']
 
 // ASCII 単語境界つきの禁止語マッチャ。識別子（useAaveV3 / AaveTransaction）は
 // 前後が英数字なので除外され、"Aave V3" のような可視テキストのみ拾う。
 const BANNED_RE = new RegExp(`(?<![A-Za-z0-9_])(${BANNED.join('|')})(?![A-Za-z0-9_])`, 'i')
+
+// 可視テキストになりうる「クオート文字列を値に取るプロパティ / 属性」名。
+// これらの値に禁止語が入るのは meta description / カード名 / ラベル等の可視コピー
+// （例: description: '…Aave V3', name: 'Aave V3 USDC', placeholder='Aave 額'）。
+// 逆に protocol / id / activeTab / key などは内部識別子なのでここに含めない。
+const VISIBLE_STRING_FIELD_RE = new RegExp(
+  `(?:description|name|title|subtitle|label|placeholder|alt|aria-label|ariaLabel|heading|caption|tooltip)` +
+    `\\s*[:=]\\s*[\`'"][^\`'"]*(${BANNED.join('|')})`,
+  'i',
+)
 
 const violations = []
 
@@ -87,6 +107,13 @@ function walkI18n(node, path, locale) {
 for (const dir of CONSUMER_TSX_DIRS) {
   for (const file of walkTsx(join(ROOT, dir))) scanTsx(file)
 }
+for (const rel of CONSUMER_TSX_FILES) {
+  try {
+    scanTsx(join(ROOT, rel))
+  } catch {
+    // ファイル不在は無視
+  }
+}
 
 function walkTsx(dir) {
   const out = []
@@ -110,14 +137,28 @@ function scanTsx(file) {
   const noBlock = raw.replace(/\/\*[\s\S]*?\*\//g, '')
   const lines = noBlock.split('\n')
   lines.forEach((line, i) => {
-    let code = line.replace(/\/\/.*$/, '') // 行コメント除去
-    if (/^\s*import\b/.test(code)) return // import 行は識別子なので除外
-    // クオート文字列（'..' ".." `..`）を除去する。ユーザーに見えるコピーは必ず i18n の
-    // t() 経由なので、.tsx 内のクオート文字列に現れる禁止語は enum 値 / state キー /
-    // 内部識別子（例: proposal.protocol === "lido", activeTab === 'aave'）であって
-    // 可視テキストではない。残った「クオート外テキスト」= JSX テキストノードのみを検査し、
-    // "Powered by Aave V3" のようなハードコード可視バッジだけを拾う。
-    code = code
+    const codeRaw = line.replace(/\/\/.*$/, '') // 行コメント除去
+    if (/^\s*import\b/.test(codeRaw)) return // import 行は識別子なので除外
+
+    // [B-1] 可視プロパティ（description/name/title/label/…）へのクオート値: 原文のまま検査。
+    // メタ記述やカード名など「クオートされた可視コピー」を拾う。
+    if (VISIBLE_STRING_FIELD_RE.test(codeRaw)) {
+      const m = BANNED_RE.exec(codeRaw)
+      violations.push({
+        kind: 'tsx',
+        file: file.replace(ROOT + '/', ''),
+        line: i + 1,
+        word: (m ? m[1] : BANNED.find((w) => codeRaw.toLowerCase().includes(w))).toLowerCase(),
+        text: line.trim(),
+      })
+      return
+    }
+
+    // [B-2] クオート文字列（'..' ".." `..`）を除去し、残った「クオート外テキスト」=
+    // JSX テキストノードのみを検査。enum 値 / state キー / 内部識別子
+    // （proposal.protocol === "lido", activeTab === 'aave'）は除去済みで誤検出しない。
+    // "Powered by Aave V3" のようなハードコード可視バッジ（JSX テキスト）を拾う。
+    const code = codeRaw
       .replace(/'[^']*'/g, "''")
       .replace(/"[^"]*"/g, '""')
       .replace(/`[^`]*`/g, '``')

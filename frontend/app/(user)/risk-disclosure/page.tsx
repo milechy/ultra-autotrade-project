@@ -51,7 +51,7 @@ export default function RiskDisclosurePage() {
 
           <section>
             <h2 className="text-base font-semibold text-zinc-100 mb-2">運用上のリスク</h2>
-            <p>AaveなどのDeFiプロトコルでは、担保比率（Health Factor）が一定水準を下回ると清算が発生し、資産の一部が失われる可能性があります。また、ガス代の変動により予期しないコストが発生することがあります。</p>
+            <p>運用先の DeFi プロトコルでは、担保比率（Health Factor）が一定水準を下回ると清算が発生し、資産の一部が失われる可能性があります。また、ガス代の変動により予期しないコストが発生することがあります。</p>
           </section>
 
           <section>

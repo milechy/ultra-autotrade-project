@@ -85,7 +85,7 @@ function buildStrategies(
     {
       id: 'aave-v3-usdc',
       icon: TrendingUp,
-      name: 'Aave V3 USDC',
+      name: '安定型 USDC 運用',
       subtitleKey: 'aave',
       descriptionKey: 'aave',
       apyRange: aaveApyRange,
@@ -98,7 +98,7 @@ function buildStrategies(
     {
       id: 'lido-steth',
       icon: Layers,
-      name: 'Lido stETH',
+      name: 'ステーキング型 ETH 運用',
       subtitleKey: 'lido',
       descriptionKey: 'lido',
       apyRange: lidoApyRange,
@@ -111,7 +111,7 @@ function buildStrategies(
     {
       id: 'pendle-pt-yt',
       icon: BarChart2,
-      name: 'Pendle PT/YT',
+      name: 'イールド最適化型 運用',
       subtitleKey: 'pendle',
       descriptionKey: 'pendle',
       apyRange: pendleApyRange,

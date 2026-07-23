@@ -9,7 +9,7 @@ import { DemoBanner } from '@/components/DemoBanner'
 
 export const metadata: Metadata = {
   title: 'Ultra AutoTrade',
-  description: 'AI-powered DeFi automated trading on Aave V3',
+  description: 'AI-powered automated asset management',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
