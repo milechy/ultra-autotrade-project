@@ -3891,6 +3891,20 @@
     "amountPlaceholder": "USDC数量",
     "vaultAddressPlaceholder": "Vault アドレス"
   },
+  "CryptactCard": {
+    "title": "Cryptact連携",
+    "description": "確定申告のための損益計算はCryptactをご利用ください。無料でBase L2のDeFi取引を自動集計できます。",
+    "step1": "Cryptactに無料登録",
+    "step2": "ウォレットアドレスを入力",
+    "step3": "「Base」チェーンを選択",
+    "step4": "取引履歴が自動で取得されます",
+    "step5": "損益計算が自動表示されます",
+    "copyAddress": "アドレスをコピー",
+    "copied": "コピーしました",
+    "openCryptact": "Cryptactを開く",
+    "copyToast": "アドレスをコピーしました。Cryptactに貼り付けてください",
+    "noAddress": "ウォレットアドレスが未設定です"
+  },
   "StressTestCard": {
     "title": "清算リスク（ストレステスト）",
     "currentHf": "現在のヘルスファクター",

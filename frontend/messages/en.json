@@ -3874,6 +3874,20 @@
     "amountPlaceholder": "USDC amount",
     "vaultAddressPlaceholder": "Vault address"
   },
+  "CryptactCard": {
+    "title": "Cryptact Integration",
+    "description": "Use Cryptact for tax profit/loss calculations. It automatically aggregates your Base L2 DeFi transactions for free.",
+    "step1": "Sign up for Cryptact for free",
+    "step2": "Enter your wallet address",
+    "step3": "Select the \"Base\" chain",
+    "step4": "Transaction history is fetched automatically",
+    "step5": "Profit/loss is calculated automatically",
+    "copyAddress": "Copy Address",
+    "copied": "Copied",
+    "openCryptact": "Open Cryptact",
+    "copyToast": "Address copied. Paste it into Cryptact.",
+    "noAddress": "Wallet address not set"
+  },
   "StressTestCard": {
     "title": "Liquidation Risk (Stress Test)",
     "currentHf": "Current Health Factor",

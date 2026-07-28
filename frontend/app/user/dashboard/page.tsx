@@ -17,6 +17,7 @@ import {
 } from './_components'
 import { useAuthFetch } from '@/hooks/useAuthFetch'
 import { RewardsCard } from '@/components/dashboard/RewardsCard'
+import { CryptactCard } from '@/components/dashboard/CryptactCard'
 import { IdleYieldCard } from '@/components/dashboard/IdleYieldCard'
 import { StressTestCard } from '@/components/dashboard/StressTestCard'
 import { UnifiedPortfolioCard } from '@/components/dashboard/UnifiedPortfolioCard'
@@ -250,6 +251,11 @@ function ManagedDashboard({ isAdmin }: { isAdmin: boolean }) {
         <RewardsCard isAdmin={isAdmin} />
       </section>
 
+      {/* Cryptact連携（税務処理案内） */}
+      <section>
+        <CryptactCard />
+      </section>
+
       {/* アイドル資本 Morpho 運用 */}
       <section>
         <IdleYieldCard isAdmin={isAdmin} />
@@ -322,6 +328,11 @@ function ActiveDashboard({ isAdmin }: { isAdmin: boolean }) {
 
       <section>
         <RewardsCard isAdmin={isAdmin} />
+      </section>
+
+      {/* Cryptact連携（税務処理案内） */}
+      <section>
+        <CryptactCard />
       </section>
 
       {/* アイドル資本 Morpho 運用 */}
