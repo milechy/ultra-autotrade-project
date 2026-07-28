@@ -37,6 +37,34 @@ logger = logging.getLogger(__name__)
 # HF が Infinity（ポジションなし）の場合の表示値
 _HF_INFINITY_DISPLAY = Decimal("999.0")
 
+# --- staging限定: テスター向けBase SepoliaテストネットUSDC自動補充 ---
+# scripts/aave_faucet_base.py / scripts/fund_test_wallets_base_sepolia.py と同一のfaucet契約。
+_TESTNET_FAUCET_ADDRESS = "0xD9145b5F45Ad4519c7ACcD6E0A4A82e83bB8A6Dc"
+_TESTNET_USDC_ADDRESS = "0xba50cd2a20f6da35d788639e581bca8d0b5d4d5f"
+_TESTNET_USDC_DECIMALS = 6
+_TESTNET_FAUCET_ABI = [
+    {
+        "inputs": [
+            {"internalType": "address", "name": "token", "type": "address"},
+            {"internalType": "address", "name": "to", "type": "address"},
+            {"internalType": "uint256", "name": "amount", "type": "uint256"},
+        ],
+        "name": "mint",
+        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+]
+_TESTNET_ERC20_BALANCE_ABI = [
+    {
+        "inputs": [{"internalType": "address", "name": "account", "type": "address"}],
+        "name": "balanceOf",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function",
+    },
+]
+
 
 # ---------------------------------------------------------------------------
 # CRUD
@@ -68,6 +96,95 @@ def create_allocation(
     return AllocationResponse.model_validate(allocation)
 
 
+def _fund_tester_onchain_usdc_if_enabled(user: User) -> None:
+    """staging限定: テスターのスマートウォレットへBase SepoliaテストネットUSDCを補充する(fail-open)。
+
+    fund_allocations(AI提案サイジング用の仮想枠、auto_fund_tester_if_enabled 本体)とは別物。
+    あちらはDB上の数値のみで実際のオンチェーン残高は動かないため、承認→実行→取引履歴という
+    実フローを実機テストできない(2026-07-28 UAT調査で判明、$200最低入金ゲートが必ず
+    DepositBelowMinimumErrorで弾く)。本関数は実際にオンチェーンでテストネットUSDCを送り、
+    このゲートを通過できる状態にする。
+
+    ガード: APP_ENV=production なら常に無効 / AUTO_FUND_TESTER_ONCHAIN_USDC 未設定なら無効 /
+    smart_wallet_address 未設定なら無効。既に目標額以上の残高があれば何もしない(冪等)。
+    失敗しても呼び出し元(オンボーディング)を止めない。
+    """
+    if os.getenv("APP_ENV", "").strip().lower() == "production":
+        return
+    target_usd_str = os.getenv("AUTO_FUND_TESTER_ONCHAIN_USDC", "")
+    if not target_usd_str or not user.smart_wallet_address:
+        return
+    try:
+        target_usd = Decimal(target_usd_str)
+    except InvalidOperation:
+        return
+    if target_usd <= Decimal("0"):
+        return
+
+    try:
+        from eth_account import Account  # noqa: PLC0415
+        from web3 import Web3  # noqa: PLC0415
+
+        rpc_url = os.environ.get("ALCHEMY_RPC_URL_BASE_SEPOLIA") or os.environ.get(
+            "AAVE_RPC_URL_BASE_SEPOLIA", ""
+        )
+        private_key = os.environ.get("AAVE_WALLET_PRIVATE_KEY", "")
+        operator_address = os.environ.get("AAVE_WALLET_ADDRESS", "")
+        if not (rpc_url and private_key and operator_address):
+            logger.warning("Auto-fund onchain USDC skipped: operator env vars 未設定")
+            return
+
+        w3 = Web3(Web3.HTTPProvider(rpc_url))
+        if not w3.is_connected():
+            logger.warning("Auto-fund onchain USDC skipped: RPC接続不可")
+            return
+
+        checksum_wallet = Web3.to_checksum_address(user.smart_wallet_address)
+        usdc = w3.eth.contract(
+            address=Web3.to_checksum_address(_TESTNET_USDC_ADDRESS),
+            abi=_TESTNET_ERC20_BALANCE_ABI,
+        )
+        balance_raw = usdc.functions.balanceOf(checksum_wallet).call()
+        balance = Decimal(balance_raw) / Decimal(10**_TESTNET_USDC_DECIMALS)
+        if balance >= target_usd:
+            return
+        top_up = target_usd - balance
+        amount_raw = int(top_up * Decimal(10**_TESTNET_USDC_DECIMALS))
+
+        account = Account.from_key(private_key)
+        operator_checksum = Web3.to_checksum_address(operator_address)
+        faucet = w3.eth.contract(
+            address=Web3.to_checksum_address(_TESTNET_FAUCET_ADDRESS),
+            abi=_TESTNET_FAUCET_ABI,
+        )
+        tx = faucet.functions.mint(
+            Web3.to_checksum_address(_TESTNET_USDC_ADDRESS),
+            checksum_wallet,
+            amount_raw,
+        ).build_transaction(
+            {
+                "from": operator_checksum,
+                "nonce": w3.eth.get_transaction_count(operator_checksum),
+                "gas": 200000,
+                "gasPrice": w3.eth.gas_price,
+            }
+        )
+        signed_tx = w3.eth.account.sign_transaction(tx, private_key=account.key)
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+        if receipt["status"] == 1:
+            logger.info(
+                "Auto-funded tester user_id=%d with onchain testnet USDC +%s (tx=%s)",
+                user.id,
+                top_up,
+                tx_hash.hex(),
+            )
+        else:
+            logger.warning("Auto-fund onchain USDC tx failed for user_id=%d", user.id)
+    except Exception as exc:
+        logger.warning("Auto-fund onchain USDC failed (fail-open, ignored): %s", exc)
+
+
 def auto_fund_tester_if_enabled(db: Session, user: User) -> None:
     """staging-v4限定: 新規テスターにデモ資金を自動割当する(fail-open、production無効)。
 
@@ -81,9 +198,15 @@ def auto_fund_tester_if_enabled(db: Session, user: User) -> None:
       2. AUTO_FUND_TESTER_ALLOCATION_USD / AUTO_FUND_PARTNER_ID が未設定/不正なら無効
     既にactiveなfund_allocationを持つユーザーには何もしない(重複割当防止、
     terms再同意のたびに増額されるのを防ぐ)。
+
+    あわせて _fund_tester_onchain_usdc_if_enabled で実際のオンチェーン残高も補充する
+    (こちらは既存allocationの有無に関わらず毎回試行=冪等な残高チェックで制御)。
     """
     if os.getenv("APP_ENV", "").strip().lower() == "production":
         return
+
+    _fund_tester_onchain_usdc_if_enabled(user)
+
     partner_id_str = os.getenv("AUTO_FUND_PARTNER_ID", "")
     if not partner_id_str:
         return
