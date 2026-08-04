@@ -491,6 +491,32 @@ b4d88ca1 fix(policy): build-tx（非カストディアル主経路）にPolicyEn
   Phase 2 相当の承認プロセスで判断する（Tier S ファイル `backend/app/main.py` /
   `backend/migrations/versions/*.py` 等が含まれる場合は 1 日 1 PR 原則の対象）
 
+**実例（2026-08-03、PWA アイコン差し替え PR #1009 frontend-only デプロイ時点）**:
+production は `c4fa16f1`（#999, 2026-07-21）→ `c9897d8f`（#1009, 2026-08-03）まで
+origin/main 追従したが、backend-green は `c4fa16f1` 時点のイメージ
+（`sha256:613ab59a8340...`、作成日時 2026-07-21T08:47:09Z）のまま据え置き。
+以下 3 コミット分の backend 変更が working tree には存在するが未デプロイのまま
+積み上がっている（デプロイ実行時点で `./scripts/deploy_production.sh --frontend-only`
+の post-deploy チェックでも `alembic check` WARNING（未適用 migration あり、DB revision:
+`x4y5z6a7b8c9`）として検出済み）:
+
+```
+661ed110 fix(portfolio): 消費者ユーザーの残高 snapshot を per-user 経路で記録 (#1003)
+5cf1039c fix(liff): 安全利回り提案の理由文からプロトコル名(Aave)を除去 (#1004)
+004d0f81 feat(staging): テスターのスマートウォレットへBase SepoliaテストネットUSDCを自動補充 (#1007)
+```
+
+補足:
+- `#1007` は `.env.staging` / `.env.staging-v4` 専用フラグ（`AUTO_FUND_TESTER_ONCHAIN_USDC`）
+  を前提とする staging 限定機能であり、production への影響はコード上は無い想定だが、
+  backend イメージ未反映のため実挙動は次回 backend デプロイまで未検証。
+- `#1003` はポータフォリオ snapshot の per-user 記録経路追加（新規 DB 書き込みパス）。
+  次回 backend デプロイ時に本番実データでの記録確認が必要（過去 memory:
+  `project_portfolio_snapshot_per_user_gap` 参照）。
+- `#1004` は消費者向け理由文からのプロトコル名除去（frontend #1002/#1005/#1006 と対の
+  backend 側修正）。frontend 側は既に本デプロイで反映済みのため、backend 側未反映との
+  整合状態を次回デプロイまで意識すること。
+
 ---
 
 ## ロールバック手順
