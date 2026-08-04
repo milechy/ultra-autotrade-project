@@ -97,6 +97,17 @@ def run_auto_execution_for_ai_decision(db: Session, ai_decision_id: int) -> dict
                     proposal.operation,
                 )
                 auto_execute_skipped += 1
+                # 可観測性 (2026-08-04 PR1): 既に検知はしていた分岐に通知を足すだけ。
+                # 握り潰しをやめる — この分岐は AUTO_EXECUTE ユーザーの委譲枠欠如の
+                # 一次検出点でもある (ai_judgment_scheduler._check_observability_invariants
+                # と役割が重複するが、こちらは「実際に実行タイミングでスキップされた」
+                # 事実そのものを通知する)。
+                _notify_auto_execution_issue(
+                    proposal.id,
+                    f"no active delegation grant or ineligible route "
+                    f"(user_id={proposal.user_id}, operation={proposal.operation}) "
+                    "— proposal remains pending",
+                )
                 continue
 
             try:

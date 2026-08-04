@@ -51,7 +51,12 @@ def _build_web_push_payload(title: str, body: str, severity: str) -> dict[str, A
     }
 
 
-def _build_notification_message(title: str, body: str, severity: str) -> NotificationMessage:
+def _build_notification_message(
+    title: str,
+    body: str,
+    severity: str,
+    channel: NotificationChannel = NotificationChannel.LINE,
+) -> NotificationMessage:
     """NotificationMessage を構築する。"""
     severity_map: dict[str, NotificationSeverity] = {
         "emergency": NotificationSeverity.EMERGENCY,
@@ -60,7 +65,7 @@ def _build_notification_message(title: str, body: str, severity: str) -> Notific
         "info": NotificationSeverity.INFO,
     }
     return NotificationMessage(
-        channel=NotificationChannel.LINE,
+        channel=channel,
         severity=severity_map.get(severity, NotificationSeverity.INFO),
         title=title,
         body=body,
@@ -314,6 +319,21 @@ def monthly_report(metrics: dict[str, Decimal | str | int]) -> NotificationPaylo
         f"勝率: {win_rate:.1f}% ({total_trades}回)"
     )
     return _build_payload(title, body, "info")
+
+
+# --- 運営向けアラート ---
+
+
+def operational_alert_notification(title: str, body: str) -> NotificationMessage:
+    """運営(Slack)向け運用アラート通知。
+
+    ユーザー向け通知ではないため NotificationMessage.user_id は設定しない
+    （呼び出し側で必要なら user_id を text で body に含める）。
+
+    配線先: automation/ai_judgment_scheduler.py の不変条件検査・連続期限切れ検知、
+    proposals/auto_execute.py の委譲枠欠如・実行スキップ通知。
+    """
+    return _build_notification_message(title, body, "alert", channel=NotificationChannel.SLACK)
 
 
 def oracle_alert(deviation_pct: Decimal) -> NotificationPayload:
