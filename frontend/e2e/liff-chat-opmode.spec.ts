@@ -11,6 +11,10 @@
 //      Pro モードは非表示であること。
 //   3. カードをタップすると確認ステップ無しで即 PUT /api/user/settings が
 //      { user_mode } 形で呼ばれ、トースト「『モード名』に切り替えました」が出る。
+//   4. NEXT_PUBLIC_DELEGATION_CONSENT_ENABLED が off (既定) のとき、「完全おまかせ」
+//      カードは表示されるが選択不可 (disabled) であり、タップしても PUT されない
+//      (2026-08-04 PR2: 縮退修正 — フラグ off で同意フローをスキップして状態表示
+//      だけ変更していた不具合の再発防止)。
 //
 // 前提: NEXT_PUBLIC_AGGRESSIVE_TIER_ENABLED / NEXT_PUBLIC_DELEGATION_CONSENT_ENABLED は
 // 未設定（既定 off）。両方 on の環境では「おまかせ」タップで運用方針シート
@@ -58,11 +62,12 @@ async function setupOpModePage(page: Page, initialMode: 'managed' | 'active') {
       })
       return
     }
-    // GET (初回ロード)
+    // GET (初回ロード)。terms_version は useLiffTermsGate (Asana 1215360586206558) が
+    // 参照する重要事項同意ゲート判定用。未設定だと /liff-confirm へリダイレクトされる。
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ user_mode: initialMode }),
+      body: JSON.stringify({ user_mode: initialMode, terms_version: 'liff-v4' }),
     })
   })
 }
@@ -88,8 +93,8 @@ test.describe('LIFF 運用モード切替 (opmode)', () => {
     await setupOpModePage(page, 'managed')
     await openOpModePanel(page)
 
-    // 現在モードカードに「完全おまかせ」が反映される。
-    await expect(page.getByTestId('opmode-current')).toHaveText('完全おまかせ')
+    // 現在モードカードに「おまかせ」が反映される (ja.json Liff.panels.opMode.managedLabel)。
+    await expect(page.getByTestId('opmode-current')).toHaveText('おまかせ')
   })
 
   test('モード選択カードが 2 枚表示され Pro は非表示', async ({ page }) => {
@@ -124,11 +129,25 @@ test.describe('LIFF 運用モード切替 (opmode)', () => {
   })
 
   test('同一モードの再タップでは PUT しない', async ({ page }) => {
-    await setupOpModePage(page, 'managed')
+    // CONSENT_ENABLED off では managed カードが disabled になるため、
+    // active モードでの再タップで同じ回帰意図 (同一モード再タップで PUT しない) を検証する。
+    await setupOpModePage(page, 'active')
     await openOpModePanel(page)
 
-    await page.getByTestId('opmode-option-managed').click()
-    // 既に managed なので PUT は発火しない。
+    await page.getByTestId('opmode-option-active').click()
+    // 既に active なので PUT は発火しない。
+    expect(lastPutMode).toBeNull()
+  })
+
+  test('CONSENT_ENABLED off のとき「完全おまかせ」は選択不可', async ({ page }) => {
+    await setupOpModePage(page, 'active')
+    await openOpModePanel(page)
+
+    // カードは表示されるが disabled (2026-08-04 PR2: 縮退修正)。
+    await expect(page.getByTestId('opmode-option-managed')).toBeVisible()
+    await expect(page.getByTestId('opmode-option-managed')).toBeDisabled()
+
+    // クリックしても PUT が発火しない (disabled のため actionability check で弾かれる)。
     expect(lastPutMode).toBeNull()
   })
 })

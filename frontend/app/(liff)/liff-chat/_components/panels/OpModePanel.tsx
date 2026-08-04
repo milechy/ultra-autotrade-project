@@ -345,9 +345,16 @@ export function OpModePanel() {
   }
 
   // おまかせは運用方針シートを挟む（既に managed でも方針変更のため開く）。
-  // フラグ off のときは従来どおり Aave 限定でそのまま切替える。
+  // CONSENT_ENABLED off のときは「完全おまかせ」を選択不可にする（2026-08-04 PR2）。
+  // 過去は同意フローをスキップして状態表示だけ変更していたため、委譲grantが
+  // 一度も作られないまま「おまかせ」表示になる乖離が発生していた。正しい縮退は
+  // 「そのモードを選べない」こと（docs/internal/2026-08-04_claude_md_addition_draft.md §3）。
   function handleSelect(newMode: UserMode) {
     if (busy) return
+    if (newMode === "managed" && !CONSENT_ENABLED) {
+      showToast(t("consentNotReady"))
+      return
+    }
     if (SCOPE_SELECTABLE && newMode === "managed") {
       setSheetOpen(true)
       return
@@ -411,20 +418,23 @@ export function OpModePanel() {
         {MODES.map((mode) => {
           const Icon = mode.icon
           const isSelected = currentMode === mode.id
+          // CONSENT_ENABLED off のとき「完全おまかせ」は選択不可（準備中）。
+          const isConsentNotReady = mode.id === "managed" && !CONSENT_ENABLED
+          const isDisabled = busy || isConsentNotReady
           return (
             <button
               key={mode.id}
               type="button"
               data-testid={`opmode-option-${mode.id}`}
               aria-pressed={isSelected}
-              disabled={busy}
+              disabled={isDisabled}
               onClick={() => handleSelect(mode.id)}
               className={[
                 "w-full text-left rounded-2xl border-2 p-4 transition-all",
                 mode.bg,
                 mode.border,
                 isSelected ? "opacity-100" : "opacity-60",
-                busy ? "cursor-not-allowed" : "",
+                isDisabled ? "cursor-not-allowed" : "",
               ].join(" ")}
             >
               <div className="flex items-center gap-3">
