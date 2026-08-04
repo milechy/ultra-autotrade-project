@@ -11,9 +11,10 @@ import logging
 import os
 import threading
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Callable, Optional, Protocol
 
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 try:
     from pywebpush import WebPushException, webpush  # type: ignore
@@ -36,6 +37,21 @@ class VAPIDConfig:
 
 class WebPushSubscription(BaseModel):
     """Web Push サブスクリプション情報。"""
+
+    endpoint: str
+    p256dh: str
+    auth: str
+    # 2026-08-04 PR3: どのユーザーの購読かを紐付ける。router 側で require_active_user
+    # 経由の current_user.id を必ず設定する。既存 3 フィールドのみの呼び出し (テスト等) との
+    # 後方互換のため Optional のまま維持する。
+    user_id: Optional[int] = None
+
+
+class PushSubscriptionEntry(BaseModel):
+    """users.notification_settings_json の push_subscriptions 配列 1 件分。
+
+    WebPushSubscription から user_id を除いた形 (格納先が既にユーザーに紐づくため不要)。
+    """
 
     endpoint: str
     p256dh: str
@@ -71,10 +87,189 @@ class InMemorySubscriptionStore:
             return len(self._subscriptions)
 
 
+class SubscriptionStore(Protocol):
+    """WebPushSender が要求するストアの構造的インターフェース。
+
+    2026-08-04 PR3: InMemorySubscriptionStore (テスト用) と DatabaseSubscriptionStore
+    (本番用、DB永続化) の両方がこの形を満たす。WebPushSender 自体は変更しない。
+    """
+
+    def add(self, subscription: WebPushSubscription) -> None: ...
+    def remove(self, endpoint: str) -> None: ...
+    def get_all(self) -> list[WebPushSubscription]: ...
+    def count(self) -> int: ...
+
+
+class DatabaseSubscriptionStore:
+    """users.notification_settings_json の push_subscriptions キーに永続化するストア。
+
+    2026-08-04 PR3: InMemorySubscriptionStore はプロセス再起動で全消失し、
+    どのユーザーの購読かも分からなかった (可観測性なき握り潰しの再発パターン)。
+    新規テーブルは作らず、既存の notification_settings_json (TEXT) に
+    ``{"push_subscriptions": [{"endpoint", "p256dh", "auth"}, ...], ...}`` の形で
+    追記する。line_enabled / push_enabled / preferences 等の他キーには一切触れない
+    (raw dict レベルで push_subscriptions キーのみ読み書きする)。
+
+    endpoint はブラウザ (オリジン) 単位でグローバルに一意という前提のため、
+    同一 endpoint が別ユーザーに再登録された場合は元ユーザー側から除去する
+    (同一端末でのログアウト→別アカウントでの再ログイン等、I-5/I-12 相当)。
+    """
+
+    def __init__(self, session_factory: Callable[[], Session]) -> None:
+        self._session_factory = session_factory
+
+    @staticmethod
+    def _read_push_subscriptions(raw_json: Optional[str]) -> list[dict[str, Any]]:
+        if not raw_json:
+            return []
+        try:
+            raw = json.loads(raw_json)
+        except json.JSONDecodeError:
+            return []
+        subs = raw.get("push_subscriptions")
+        return subs if isinstance(subs, list) else []
+
+    @staticmethod
+    def _write_push_subscriptions(raw_json: Optional[str], subs: list[dict[str, Any]]) -> str:
+        try:
+            raw = json.loads(raw_json) if raw_json else {}
+        except json.JSONDecodeError:
+            raw = {}
+        raw["push_subscriptions"] = subs
+        return json.dumps(raw)
+
+    def add(self, subscription: WebPushSubscription) -> None:
+        """サブスクリプションを永続化する。同じ endpoint は (他ユーザー分も含め) 上書きする。"""
+        if subscription.user_id is None:
+            logger.warning(
+                "DatabaseSubscriptionStore.add: user_id が未設定のため保存をスキップしました "
+                "(endpoint=%s)",
+                subscription.endpoint[:30],
+            )
+            return
+
+        from app.auth.models import User  # noqa: PLC0415
+
+        db = self._session_factory()
+        try:
+            # 他ユーザーに同一 endpoint が残っていれば先に除去 (グローバル一意性の維持)。
+            others = (
+                db.query(User)
+                .filter(
+                    User.id != subscription.user_id,
+                    User.notification_settings_json.isnot(None),
+                )
+                .all()
+            )
+            for other in others:
+                subs = self._read_push_subscriptions(other.notification_settings_json)
+                filtered = [s for s in subs if s.get("endpoint") != subscription.endpoint]
+                if len(filtered) != len(subs):
+                    other.notification_settings_json = self._write_push_subscriptions(
+                        other.notification_settings_json, filtered
+                    )
+
+            user = db.get(User, subscription.user_id)
+            if user is None:
+                logger.warning(
+                    "DatabaseSubscriptionStore.add: user_id=%d が見つかりません",
+                    subscription.user_id,
+                )
+                return
+            subs = self._read_push_subscriptions(user.notification_settings_json)
+            subs = [s for s in subs if s.get("endpoint") != subscription.endpoint]
+            subs.append(
+                PushSubscriptionEntry(
+                    endpoint=subscription.endpoint,
+                    p256dh=subscription.p256dh,
+                    auth=subscription.auth,
+                ).model_dump()
+            )
+            user.notification_settings_json = self._write_push_subscriptions(
+                user.notification_settings_json, subs
+            )
+            db.commit()
+        finally:
+            db.close()
+
+    def remove(self, endpoint: str) -> None:
+        """指定 endpoint のサブスクリプションを全ユーザーから削除する。"""
+        from app.auth.models import User  # noqa: PLC0415
+
+        db = self._session_factory()
+        try:
+            users = db.query(User).filter(User.notification_settings_json.isnot(None)).all()
+            for user in users:
+                subs = self._read_push_subscriptions(user.notification_settings_json)
+                filtered = [s for s in subs if s.get("endpoint") != endpoint]
+                if len(filtered) != len(subs):
+                    user.notification_settings_json = self._write_push_subscriptions(
+                        user.notification_settings_json, filtered
+                    )
+            db.commit()
+        finally:
+            db.close()
+
+    def get_all(self) -> list[WebPushSubscription]:
+        """全ユーザーの全サブスクリプションを返す (WebPushSender.send_to_all 用)。"""
+        from app.auth.models import User  # noqa: PLC0415
+
+        db = self._session_factory()
+        try:
+            users = db.query(User).filter(User.notification_settings_json.isnot(None)).all()
+            result: list[WebPushSubscription] = []
+            for user in users:
+                for s in self._read_push_subscriptions(user.notification_settings_json):
+                    try:
+                        result.append(
+                            WebPushSubscription(
+                                endpoint=s["endpoint"],
+                                p256dh=s["p256dh"],
+                                auth=s["auth"],
+                                user_id=user.id,
+                            )
+                        )
+                    except KeyError:
+                        continue
+            return result
+        finally:
+            db.close()
+
+    def get_for_user(self, user_id: int) -> list[WebPushSubscription]:
+        """指定ユーザーのサブスクリプションのみを返す (PR5: per-user 配信で使用予定)。"""
+        from app.auth.models import User  # noqa: PLC0415
+
+        db = self._session_factory()
+        try:
+            user = db.get(User, user_id)
+            if user is None:
+                return []
+            result: list[WebPushSubscription] = []
+            for s in self._read_push_subscriptions(user.notification_settings_json):
+                try:
+                    result.append(
+                        WebPushSubscription(
+                            endpoint=s["endpoint"],
+                            p256dh=s["p256dh"],
+                            auth=s["auth"],
+                            user_id=user_id,
+                        )
+                    )
+                except KeyError:
+                    continue
+            return result
+        finally:
+            db.close()
+
+    def count(self) -> int:
+        """登録済みサブスクリプション総数を返す。"""
+        return len(self.get_all())
+
+
 class WebPushSender:
     """Web Push (VAPID) 通知送信クラス。"""
 
-    def __init__(self, vapid_config: VAPIDConfig, store: InMemorySubscriptionStore) -> None:
+    def __init__(self, vapid_config: VAPIDConfig, store: SubscriptionStore) -> None:
         self._vapid_config = vapid_config
         self._store = store
 

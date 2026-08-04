@@ -15,11 +15,12 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_active_user, require_admin
 from app.auth.models import User
-from app.database import get_db
+from app.database import SessionLocal, get_db
 
 from .line_messaging import LINEFlexMessageSender
 from .push import (
-    InMemorySubscriptionStore,
+    DatabaseSubscriptionStore,
+    SubscriptionStore,
     VAPIDConfig,
     WebPushSender,
     WebPushSubscription,
@@ -32,12 +33,13 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 # /api/notifications/* — フロントエンドおよびテストスクリプト向けエイリアス
 api_router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 
-# グローバルな subscription ストア（アプリライフタイムで保持）
-_subscription_store = InMemorySubscriptionStore()
+# グローバルな subscription ストア（DB永続化、2026-08-04 PR3。旧 InMemorySubscriptionStore は
+# backend/tests 側でのみ使用する）
+_subscription_store: SubscriptionStore = DatabaseSubscriptionStore(SessionLocal)
 
 
-def get_subscription_store() -> InMemorySubscriptionStore:
-    """グローバルな InMemorySubscriptionStore を返す。"""
+def get_subscription_store() -> SubscriptionStore:
+    """グローバルな SubscriptionStore を返す。"""
     return _subscription_store
 
 
@@ -90,22 +92,26 @@ class UnsubscribeRequest(BaseModel):
 
 def _do_subscribe(
     req: SubscribeRequest,
-    store: InMemorySubscriptionStore,
+    store: SubscriptionStore,
+    current_user: User,
 ) -> dict[str, Any]:
     subscription = WebPushSubscription(
         endpoint=req.endpoint,
         p256dh=req.p256dh,
         auth=req.auth,
+        user_id=current_user.id,
     )
     store.add(subscription)
-    logger.info("Push subscription 登録: endpoint=%s", req.endpoint[:30])
+    logger.info(
+        "Push subscription 登録: user_id=%d endpoint=%s", current_user.id, req.endpoint[:30]
+    )
     return {"status": "subscribed", "count": store.count()}
 
 
 def _do_test_push(
     title: str,
     body: str,
-    store: InMemorySubscriptionStore,
+    store: SubscriptionStore,
 ) -> dict[str, Any]:
     config: VAPIDConfig | None = get_vapid_config()
     if config is None:
@@ -131,29 +137,32 @@ def _do_test_push(
 @router.post("/push/subscribe", status_code=status.HTTP_200_OK)
 def subscribe(
     req: SubscribeRequest,
-    store: InMemorySubscriptionStore = Depends(get_subscription_store),
+    store: SubscriptionStore = Depends(get_subscription_store),
+    current_user: User = Depends(require_active_user),
 ) -> dict[str, Any]:
-    """Push subscription を登録する。認証不要（Service Worker から呼び出し可能）。"""
-    return _do_subscribe(req, store)
+    """Push subscription を登録する。認証必須（2026-08-04 PR3: user_id 紐付けのため）。"""
+    return _do_subscribe(req, store, current_user)
 
 
 @api_router.post("/subscribe", status_code=status.HTTP_200_OK)
 def api_subscribe(
     req: SubscribeRequest,
-    store: InMemorySubscriptionStore = Depends(get_subscription_store),
+    store: SubscriptionStore = Depends(get_subscription_store),
+    current_user: User = Depends(require_active_user),
 ) -> dict[str, Any]:
-    """Push subscription を登録する（/api/notifications/subscribe エイリアス）。"""
-    return _do_subscribe(req, store)
+    """Push subscription を登録する（/api/notifications/subscribe エイリアス）。認証必須。"""
+    return _do_subscribe(req, store, current_user)
 
 
 @router.delete("/push/unsubscribe", status_code=status.HTTP_200_OK)
 def unsubscribe(
     endpoint: str,
-    store: InMemorySubscriptionStore = Depends(get_subscription_store),
+    store: SubscriptionStore = Depends(get_subscription_store),
+    current_user: User = Depends(require_active_user),
 ) -> dict[str, Any]:
-    """Push subscription を削除する。認証不要。endpoint はクエリパラメータで指定する。"""
+    """Push subscription を削除する。認証必須。endpoint はクエリパラメータで指定する。"""
     store.remove(endpoint)
-    logger.info("Push subscription 削除: endpoint=%s", endpoint[:30])
+    logger.info("Push subscription 削除: user_id=%d endpoint=%s", current_user.id, endpoint[:30])
     return {"status": "unsubscribed", "count": store.count()}
 
 
@@ -168,7 +177,7 @@ def get_vapid_key() -> dict[str, Any]:
 
 def _do_full_test_push(
     req: TestPushRequest,
-    store: InMemorySubscriptionStore,
+    store: SubscriptionStore,
 ) -> dict[str, Any]:
     """Web Push + LINE のテスト通知を送信して結果を返す。"""
     from app.notifications.config import get_notification_settings
@@ -194,7 +203,7 @@ def _do_full_test_push(
 @router.post("/push/test", status_code=status.HTTP_200_OK)
 def send_test_push(
     req: TestPushRequest = TestPushRequest(),
-    store: InMemorySubscriptionStore = Depends(get_subscription_store),
+    store: SubscriptionStore = Depends(get_subscription_store),
     _current_user: User = Depends(require_active_user),
 ) -> dict[str, Any]:
     """テスト通知を送信する。認証必須。"""
@@ -204,7 +213,7 @@ def send_test_push(
 @api_router.post("/push/test", status_code=status.HTTP_200_OK)
 def api_test_push_canonical(
     req: TestPushRequest = TestPushRequest(),
-    store: InMemorySubscriptionStore = Depends(get_subscription_store),
+    store: SubscriptionStore = Depends(get_subscription_store),
     _current_user: User = Depends(require_active_user),
 ) -> dict[str, Any]:
     """テスト通知を送信する（/api/notifications/push/test エイリアス）。
@@ -218,7 +227,7 @@ def api_test_push_canonical(
 @api_router.post("/test-push", status_code=status.HTTP_200_OK)
 def api_test_push(
     req: TestPushRequest = TestPushRequest(),
-    store: InMemorySubscriptionStore = Depends(get_subscription_store),
+    store: SubscriptionStore = Depends(get_subscription_store),
     _current_user: User = Depends(require_active_user),
 ) -> dict[str, Any]:
     """テスト通知を送信する（/api/notifications/test-push 後方互換エイリアス）。認証必須。"""
@@ -227,7 +236,7 @@ def api_test_push(
 
 @router.get("/push/count", status_code=status.HTTP_200_OK)
 def get_subscription_count(
-    store: InMemorySubscriptionStore = Depends(get_subscription_store),
+    store: SubscriptionStore = Depends(get_subscription_store),
     _current_user: User = Depends(require_admin),
 ) -> dict[str, Any]:
     """登録済み subscription 数を返す。管理者のみ。"""
@@ -276,8 +285,26 @@ def _do_update_notification_settings(
     current_user: User,
     db: Session,
 ) -> dict[str, Any]:
-    """通知設定を保存して返す。"""
-    current_user.notification_settings_json = body.model_dump_json()
+    """通知設定を保存して返す。
+
+    2026-08-04 PR3: push_subscriptions (DatabaseSubscriptionStore が同じ列に書く) を
+    この汎用設定更新で消さないよう、既存の raw JSON から読み出して引き継ぐ。
+    push_subscriptions は専用の /push/subscribe, /push/unsubscribe 経由でのみ変更される
+    べきで、NotificationSettingsModel のフィールドには含めない
+    (含めると PUT の度にクライアントが送らなかった分が空配列で上書きされ、
+    購読が黙って消える — 本件と同型の「表示と実行能力が分離される」バグになる)。
+    """
+    existing_push_subscriptions: list[Any] = []
+    if current_user.notification_settings_json:
+        try:
+            existing_raw = json.loads(current_user.notification_settings_json)
+            existing_push_subscriptions = existing_raw.get("push_subscriptions", [])
+        except json.JSONDecodeError:
+            pass
+
+    new_raw = body.model_dump()
+    new_raw["push_subscriptions"] = existing_push_subscriptions
+    current_user.notification_settings_json = json.dumps(new_raw)
     db.add(current_user)
     db.commit()
     return body.model_dump()  # DB に書き込んだ値をそのまま返す; refresh 不要

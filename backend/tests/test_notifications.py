@@ -39,6 +39,31 @@ def _create_test_app():
     return app
 
 
+def _create_web_push_test_app():
+    """TestWebPushRouter 用アプリ。require_active_user と subscription store を
+    DB 非依存にオーバーライドする (2026-08-04 PR3: subscribe/unsubscribe が認証必須化 +
+    ストアが DatabaseSubscriptionStore になったため、素の _create_test_app のままでは
+    401 になる / 実 DB へ接続しようとしてしまう)。"""
+    from unittest.mock import MagicMock
+
+    from fastapi import FastAPI
+
+    from app.auth.dependencies import require_active_user
+    from app.notifications.push import InMemorySubscriptionStore
+    from app.notifications.router import get_subscription_store
+    from app.notifications.router import router as notification_router
+
+    app = FastAPI()
+    app.include_router(notification_router)
+
+    test_user = MagicMock()
+    test_user.id = 999
+    shared_store = InMemorySubscriptionStore()
+    app.dependency_overrides[require_active_user] = lambda: test_user
+    app.dependency_overrides[get_subscription_store] = lambda: shared_store
+    return app
+
+
 # ---------------------------------------------------------------------------
 # 1. テンプレートテスト
 # ---------------------------------------------------------------------------
@@ -230,7 +255,7 @@ class TestWebPushRouter:
 
     @pytest.fixture
     def client(self):
-        app = _create_test_app()
+        app = _create_web_push_test_app()
         return TestClient(app, raise_server_exceptions=True)
 
     def test_vapid_key_returns_null_when_not_configured(self, client: TestClient):
