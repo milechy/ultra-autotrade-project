@@ -16,18 +16,23 @@ partner_id が NULL の通知はシステム全体向けであり、パートナ
         body       TEXT         NOT NULL,
         partner_id INTEGER      REFERENCES users(id) ON DELETE SET NULL,
         user_id    INTEGER      REFERENCES users(id) ON DELETE SET NULL,
-        created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        delivered  BOOLEAN      NULL
     );
     CREATE INDEX IF NOT EXISTS ix_notification_logs_partner_id
         ON notification_logs (partner_id);
     CREATE INDEX IF NOT EXISTS ix_notification_logs_created_at
         ON notification_logs (created_at DESC);
+
+delivered 列 (2026-08-04 PR3, Alembic x4y5z6a7b8c9 の次): NULL=対象外/未計測、
+True=配信先に到達確認済み、False=配信失敗(410等)。行の存在自体が「送信した」を表し、
+この列が「到達した」を表す。実際の書き込み配線は PR5 で行う (本PRはスキーマ追加のみ)。
 """
 
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -46,6 +51,7 @@ class NotificationLog(Base):
         partner_id: 対象パートナーの users.id (nullable: NULLはシステム全体向け)
         user_id: 対象ユーザーの users.id (nullable)
         created_at: 通知生成日時 (UTC)
+        delivered: 配信先への到達確認 (nullable: NULL=対象外/未計測、実書き込みはPR5)
     """
 
     __tablename__ = "notification_logs"
@@ -72,6 +78,11 @@ class NotificationLog(Base):
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
+    )
+    delivered: Mapped[Optional[bool]] = mapped_column(
+        Boolean,
+        nullable=True,
+        default=None,
     )
 
     def __repr__(self) -> str:
