@@ -172,6 +172,71 @@ class TestPutNotificationSettings:
         res = self.client.put("/api/notifications/settings", json={"line_enabled": "not_a_bool"})
         assert res.status_code == 422
 
+    def test_generic_settings_put_preserves_push_subscriptions(self):
+        """★2026-08-04 PR3 回帰防止: push_subscriptions は /push/subscribe 専用エンドポイント
+        経由でのみ変更されるべきで、他の通知設定 (line_enabled 等) を変更するだけの
+        汎用 PUT /settings で黙って空配列に上書きされてはならない。
+        NotificationSettingsModel が push_subscriptions を含まないため、対策なしでは
+        body.model_dump_json() が丸ごと上書きし購読が消える。"""
+        existing = json.dumps(
+            {
+                "line_enabled": True,
+                "push_enabled": True,
+                "preferences": {},
+                "push_subscriptions": [
+                    {"endpoint": "https://push.example.com/keep-me", "p256dh": "k", "auth": "a"}
+                ],
+            }
+        )
+        user = _make_user(existing)
+        db = self._make_db(user)
+        self._override_deps(user, db)
+
+        # push_subscriptions を含まない、既存の通知設定変更 (line_enabled のみ変更) を PUT する。
+        payload: dict[str, Any] = {
+            "line_enabled": False,
+            "push_enabled": True,
+            "preferences": {
+                "ai_proposal": True,
+                "execution_complete": True,
+                "health_factor_warning": True,
+                "emergency_stop": True,
+                "monthly_report": True,
+                "system_notice": True,
+            },
+        }
+        res = self.client.put("/api/notifications/settings", json=payload)
+        assert res.status_code == 200
+
+        saved = json.loads(user.notification_settings_json)
+        assert saved["line_enabled"] is False  # 意図した変更は反映される
+        assert saved["push_subscriptions"] == [
+            {"endpoint": "https://push.example.com/keep-me", "p256dh": "k", "auth": "a"}
+        ]  # 購読は消えない
+
+    def test_settings_put_with_no_prior_push_subscriptions_defaults_to_empty(self):
+        """push_subscriptions キーが元々存在しない (未購読ユーザー) 場合は空配列で保存される。"""
+        user = _make_user(None)
+        db = self._make_db(user)
+        self._override_deps(user, db)
+
+        payload: dict[str, Any] = {
+            "line_enabled": True,
+            "push_enabled": False,
+            "preferences": {
+                "ai_proposal": True,
+                "execution_complete": True,
+                "health_factor_warning": True,
+                "emergency_stop": True,
+                "monthly_report": True,
+                "system_notice": True,
+            },
+        }
+        res = self.client.put("/api/notifications/settings", json=payload)
+        assert res.status_code == 200
+        saved = json.loads(user.notification_settings_json)
+        assert saved["push_subscriptions"] == []
+
 
 # ---------------------------------------------------------------------------
 # POST /api/notifications/push/test (liff-chat「テスト通知」ボタンのパス)
