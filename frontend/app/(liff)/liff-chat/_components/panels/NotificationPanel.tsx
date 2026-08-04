@@ -7,6 +7,12 @@ import { useTranslations } from "next-intl"
 import { getAuthToken } from "@/lib/auth/token-key"
 import { liffFetch } from "@/lib/liff/liff-fetch"
 import { isLiffConfigured } from "@/lib/liff/init"
+import {
+  isPushConfigured,
+  subscribeToPush,
+  unsubscribeFromPush,
+  VapidNotConfiguredError,
+} from "@/lib/push/subscription"
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -132,8 +138,11 @@ function NotificationRow({
 
 export function NotificationPanel() {
   const t = useTranslations("Liff.panels.notification")
+  const tPwa = useTranslations("PwaNotificationToggle")
   const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS)
   const [pushPermission, setPushPermission] = useState<NotificationPermission>("default")
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushMessage, setPushMessage] = useState<string | null>(null)
   const [testSending, setTestSending] = useState(false)
   const [testMessage, setTestMessage] = useState<string | null>(null)
 
@@ -197,15 +206,44 @@ export function NotificationPanel() {
     void saveSettings(next)
   }
 
-  // PWA プッシュ通知 ON→OFF/ON
+  // PWA プッシュ通知 ON→OFF/ON。
+  // 2026-08-04 PR4: OS 権限の取得だけで pushManager.subscribe() を一度も呼んでいなかった
+  // 欠陥を修正。ON 時は実際に購読を作成しサーバへ登録するまで push_enabled を立てない
+  // （購読作成に失敗したら無言でスキップせず、設定も変更しない）。
   async function handlePushToggle(value: boolean) {
-    if (value && pushPermission !== "granted") {
-      if ("Notification" in window) {
+    setPushMessage(null)
+    if (value) {
+      if (pushPermission !== "granted") {
+        if (!("Notification" in window)) return
         const result = await Notification.requestPermission()
         setPushPermission(result)
-        if (result !== "granted") return
-      } else {
+        if (result !== "granted") {
+          if (result === "denied") setPushMessage(tPwa("errorBlocked"))
+          return
+        }
+      }
+      setPushBusy(true)
+      try {
+        await subscribeToPush(getToken())
+        setPushMessage(tPwa("successSubscribed"))
+      } catch (e) {
+        setPushMessage(
+          e instanceof VapidNotConfiguredError ? tPwa("errorVapidKeyMissing") : tPwa("errorSubscribeFailed")
+        )
         return
+      } finally {
+        setPushBusy(false)
+      }
+    } else {
+      setPushBusy(true)
+      try {
+        await unsubscribeFromPush(getToken())
+        setPushMessage(tPwa("successUnsubscribed"))
+      } catch {
+        setPushMessage(tPwa("errorUnsubscribeFailed"))
+        return
+      } finally {
+        setPushBusy(false)
       }
     }
     updateChannel("push_enabled", value)
@@ -234,12 +272,14 @@ export function NotificationPanel() {
     }
   }
 
-  const pushBadge =
-    pushPermission === "granted" ? (
-      <span className="text-[10px] text-[#1D9E75] font-semibold">{t("pushGranted")}</span>
-    ) : (
-      <span className="text-[10px] text-yellow-600 font-semibold">{t("pushNotGranted")}</span>
-    )
+  const pushConfigured = isPushConfigured()
+  const pushBadge = !pushConfigured ? (
+    <span className="text-[10px] text-yellow-600 font-semibold">{tPwa("errorVapidKeyMissing")}</span>
+  ) : pushPermission === "granted" ? (
+    <span className="text-[10px] text-[#1D9E75] font-semibold">{t("pushGranted")}</span>
+  ) : (
+    <span className="text-[10px] text-yellow-600 font-semibold">{t("pushNotGranted")}</span>
+  )
 
   return (
     <div className="pb-4">
@@ -265,7 +305,8 @@ export function NotificationPanel() {
         </div>
       )}
 
-      {/* PWA プッシュ通知 */}
+      {/* PWA プッシュ通知。VAPID 未設定時はトグルを無効化し理由を表示する
+          （2026-08-04 PR4: 「設定が変わらないのに操作できてしまう」を避ける）。 */}
       <div className="flex items-center justify-between ax-card-warm rounded-xl px-4 py-3 mb-2">
         <div className="flex items-center gap-3">
           <Bell className="w-5 h-5 text-[#1D9E75]" />
@@ -279,8 +320,12 @@ export function NotificationPanel() {
         <Toggle
           checked={settings.push_enabled}
           onChange={handlePushToggle}
+          disabled={!pushConfigured || pushBusy}
         />
       </div>
+      {pushMessage && (
+        <p className="text-xs text-[#736f7e] mb-2 -mt-1 px-1">{pushMessage}</p>
+      )}
 
       {/* AI・取引 */}
       <SectionHeader label={t("aiTradeSection")} />
