@@ -13,9 +13,11 @@ web3>=6.15.1
 eth-account>=0.11.0
 python-dotenv>=1.0.0
 # aiohttp は web3/ccxt 経由の transitive dep。3.14.0 で AsyncStreamReaderMixin が
-# 削除され、vcrpy(<=8.1.1) のテスト記録が壊れる (upstream Issue #995 / PR #996 未リリース)。
-# 上流が対応するまで <3.14 に固定し、CI と prod で同一版を保証する。
-aiohttp<3.14
+# 削除され vcrpy(<=8.1.1) のテスト記録が壊れる問題があったが、tests/conftest.py に
+# 同属性を補うモンキーパッチ済み (aiohttp 3.10+ 全般に対応、2026-07-06 #938 で追加)。
+# CVE-2026-69244 (aiohttp<3.14.3, HIGH) 対応のため 3.14.3 以上に引き上げる。
+# CI の pytest (vcrpy 込み) がこの版で通ることを merge 前提とする。
+aiohttp>=3.14.3
 
 # Authentication & Database (Phase 12)
 sqlalchemy>=2.0.0
