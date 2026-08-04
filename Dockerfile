@@ -12,7 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/requirements.txt .
 
 # wheel をビルド（キャッシュ効率化: requirements が変わった時だけ再ビルド）
-RUN pip install --upgrade pip \
+# setuptools も明示的に更新する: 79.0.1 は内部 _vendor/ に wheel==0.45.1 /
+# jaraco.context==5.3.0 の脆弱版を同梱しており、pip 単体の更新では解消しない
+# (CVE-2026-24049 / CVE-2026-23949、2026-08-04 Trivy 検出)。
+RUN pip install --upgrade pip setuptools \
     && pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
 
 # アプリケーションコードをコピー（Cythonビルドのために必要）
@@ -42,7 +45,11 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends \
 
 # builder の wheel をコピーしてインストール（ネットワーク不要）
 COPY --from=builder /wheels /wheels
-RUN pip install --upgrade pip \
+# setuptools も明示的に更新する: 79.0.1 は内部 _vendor/ に wheel==0.45.1 /
+# jaraco.context==5.3.0 の脆弱版を同梱しており、pip 単体の更新では解消しない
+# (CVE-2026-24049 / CVE-2026-23949、2026-08-04 Trivy 検出)。この最終イメージが
+# スキャン対象のため、ここでの更新が実質的な修正。
+RUN pip install --upgrade pip setuptools \
     && pip install --no-cache-dir --no-index --find-links /wheels /wheels/*.whl \
     && rm -rf /wheels
 
