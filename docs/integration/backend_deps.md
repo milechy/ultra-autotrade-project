@@ -412,6 +412,20 @@
 
 ## backend/requirements.txt
 
+### 変更 #4: aiohttp を 3.14.3+ に引き上げ（CVE-2026-69244 対応）(PR #1013 / 2026-08-04)
+- **コミット範囲**: `security/bump-aiohttp-cve-2026-69244`
+- **変更内容**: `aiohttp<3.14` → `aiohttp>=3.14.3`
+- **理由**: Trivy の脆弱性DB更新により `aiohttp<3.14.3` に HIGH 脆弱性 CVE-2026-69244 が新規検出され、
+  `main` ブランチ自体を含め Docker image scan が失敗するようになった（特定PRのコード変更が原因ではない）。
+  `<3.14` 固定の理由（変更 #3 参照。aiohttp 3.14.0 で `AsyncStreamReaderMixin` が削除され vcrpy の
+  cassette 再生が壊れる）は、2026-07-06 PR #938 で `backend/tests/conftest.py` に同属性を補う
+  モンキーパッチ（aiohttp 3.10+ 全般に対応する互換シム）が追加済みで解消されていると判断した。
+- **影響範囲**: aiohttp のバージョン制約変更のみ。web3 / ccxt との互換性、および vcrpy 経由のテスト
+  (`test_judge_with_rag_vcr` 等) が実際に通るかは CI の `Test (pytest + coverage)` ジョブ
+  （`requirements-dev.txt` の `vcrpy>=6.0` を含むクリーン環境）での検証を merge の前提とする。
+  ローカル venv への pip install 許可が得られなかったため、事前のローカル実行検証は未実施。
+- **承認**: security/bump-aiohttp-cve-2026-69244 → main の通常フロー経由（PR #1013）
+
 ### 変更 #3: aiohttp<3.14 固定（vcrpy 非互換 / CI green 回復）(PR #529 / 2026-06-04)
 - **コミット範囲**: `a300118` (fix/main-ci-green)
 - **変更内容**: `aiohttp<3.14` を requirements.txt に追加
