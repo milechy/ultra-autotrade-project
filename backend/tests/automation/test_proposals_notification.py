@@ -25,9 +25,11 @@ from app.automation.ai_judgment_scheduler import (
     _PROPOSAL_AMOUNT_MIN_USD,
     _PROPOSAL_RATIO,
     _create_proposals_for_users,
+    _deliver_ai_proposal_push,
 )
 from app.automation.workflow import _create_proposal_from_judgment
 from app.notifications.schemas import NotificationMessage
+from app.notifications.templates import ai_proposal_notification
 
 
 def _make_cross_result(action: TradeAction, confidence: int = 70) -> CrossValidationResult:
@@ -155,6 +157,119 @@ class TestCreateProposalsForUsersNotification:
             patch(
                 "app.notifications.factory.get_notification_service",
                 side_effect=RuntimeError("notification failure"),
+            ),
+        ):
+            count = _create_proposals_for_users(mock_db, decision, result)
+
+        assert count == 1
+
+
+class TestDeliverAiProposalPush:
+    """_deliver_ai_proposal_push: Web Push実配信 + notification_logs delivered記録 (PR5)。"""
+
+    @staticmethod
+    def _payload() -> Any:
+        return ai_proposal_notification("SUPPLY", "USDC", Decimal("100"), 80)
+
+    def test_vapid_unset_skips_without_raising(self) -> None:
+        """VAPID未設定時は静かにスキップし、push行は作られない。"""
+        mock_db = MagicMock()
+        with patch("app.notifications.push.get_vapid_config", return_value=None):
+            _deliver_ai_proposal_push(mock_db, 1, self._payload())
+        mock_db.add.assert_not_called()
+
+    def test_vapid_set_success_logs_delivered_true(self) -> None:
+        """配信成功: delivered=True の push NotificationLog が1行追加される。"""
+        mock_db = MagicMock()
+        mock_sender = MagicMock()
+        mock_sender.send_to_user.return_value = True
+        with (
+            patch("app.notifications.push.get_vapid_config", return_value=MagicMock()),
+            patch("app.notifications.push.WebPushSender", return_value=mock_sender),
+            patch("app.notifications.push.DatabaseSubscriptionStore"),
+        ):
+            _deliver_ai_proposal_push(mock_db, 5, self._payload())
+
+        mock_db.add.assert_called_once()
+        added = mock_db.add.call_args.args[0]
+        assert added.channel == "push"
+        assert added.delivered is True
+        assert added.user_id == 5
+
+    def test_vapid_set_failure_logs_delivered_false(self) -> None:
+        """配信失敗: delivered=False の push NotificationLog が1行追加される。"""
+        mock_db = MagicMock()
+        mock_sender = MagicMock()
+        mock_sender.send_to_user.return_value = False
+        with (
+            patch("app.notifications.push.get_vapid_config", return_value=MagicMock()),
+            patch("app.notifications.push.WebPushSender", return_value=mock_sender),
+            patch("app.notifications.push.DatabaseSubscriptionStore"),
+        ):
+            _deliver_ai_proposal_push(mock_db, 5, self._payload())
+
+        added = mock_db.add.call_args.args[0]
+        assert added.channel == "push"
+        assert added.delivered is False
+
+    def test_exception_does_not_raise(self) -> None:
+        """内部例外は握りつぶし、呼び出し元に伝播しない (fail-open)。"""
+        mock_db = MagicMock()
+        with patch("app.notifications.push.get_vapid_config", side_effect=RuntimeError("boom")):
+            _deliver_ai_proposal_push(mock_db, 1, self._payload())  # must not raise
+        mock_db.add.assert_not_called()
+
+
+class TestCreateProposalsForUsersPushWiring:
+    """_create_proposals_for_users が _deliver_ai_proposal_push を正しく配線していること。"""
+
+    def test_push_delivery_called_with_user_id(self) -> None:
+        user = _make_user(user_id=55)
+        decision = _make_decision()
+        result = _make_cross_result(TradeAction.BUY)
+        mock_db = MagicMock()
+        mock_db.scalars.return_value.all.return_value = [user]
+
+        with (
+            patch(
+                "app.automation.ai_judgment_scheduler._resolve_proposal_amount",
+                return_value=Decimal("460"),
+            ),
+            patch(
+                "app.fees.trade_gate.calculate_fee_by_market",
+                return_value=_make_fee(True),
+            ),
+            patch("app.notifications.factory.get_notification_service"),
+            patch("app.automation.ai_judgment_scheduler._deliver_ai_proposal_push") as mock_push,
+        ):
+            _create_proposals_for_users(mock_db, decision, result)
+
+        mock_push.assert_called_once()
+        args = mock_push.call_args.args
+        assert args[0] is mock_db
+        assert args[1] == 55
+
+    def test_push_delivery_exception_does_not_abort_proposal_creation(self) -> None:
+        """push配線側で予期しない例外が出ても Proposal 作成カウントは維持される。"""
+        user = _make_user(user_id=56)
+        decision = _make_decision()
+        result = _make_cross_result(TradeAction.BUY)
+        mock_db = MagicMock()
+        mock_db.scalars.return_value.all.return_value = [user]
+
+        with (
+            patch(
+                "app.automation.ai_judgment_scheduler._resolve_proposal_amount",
+                return_value=Decimal("460"),
+            ),
+            patch(
+                "app.fees.trade_gate.calculate_fee_by_market",
+                return_value=_make_fee(True),
+            ),
+            patch("app.notifications.factory.get_notification_service"),
+            patch(
+                "app.automation.ai_judgment_scheduler._deliver_ai_proposal_push",
+                side_effect=RuntimeError("push down"),
             ),
         ):
             count = _create_proposals_for_users(mock_db, decision, result)

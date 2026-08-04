@@ -81,6 +81,11 @@ class InMemorySubscriptionStore:
         with self._lock:
             return list(self._subscriptions.values())
 
+    def get_for_user(self, user_id: int) -> list[WebPushSubscription]:
+        """指定ユーザーのサブスクリプションのみを返す (WebPushSender.send_to_user が使用)。"""
+        with self._lock:
+            return [s for s in self._subscriptions.values() if s.user_id == user_id]
+
     def count(self) -> int:
         """登録済みサブスクリプション数を返す。"""
         with self._lock:
@@ -97,6 +102,7 @@ class SubscriptionStore(Protocol):
     def add(self, subscription: WebPushSubscription) -> None: ...
     def remove(self, endpoint: str) -> None: ...
     def get_all(self) -> list[WebPushSubscription]: ...
+    def get_for_user(self, user_id: int) -> list[WebPushSubscription]: ...
     def count(self) -> int: ...
 
 
@@ -236,7 +242,7 @@ class DatabaseSubscriptionStore:
             db.close()
 
     def get_for_user(self, user_id: int) -> list[WebPushSubscription]:
-        """指定ユーザーのサブスクリプションのみを返す (PR5: per-user 配信で使用予定)。"""
+        """指定ユーザーのサブスクリプションのみを返す (WebPushSender.send_to_user が使用)。"""
         from app.auth.models import User  # noqa: PLC0415
 
         db = self._session_factory()
@@ -309,6 +315,41 @@ class WebPushSender:
             len(subscriptions),
         )
         return success_count
+
+    def send_to_user(self, user_id: int, payload: dict[str, Any], ttl: int = 86400) -> bool:
+        """特定ユーザーの全端末へ配信する。1件でも成功すれば True。購読が無ければ False。
+
+        2026-08-04 PR5: send_to_all のユーザー限定版。AI提案通知等の per-user 配信に使う
+        (send_to_all は router.py の /push/test 専用のまま変更しない)。
+        """
+        if not _PYWEBPUSH_AVAILABLE:
+            logger.warning("pywebpush がインストールされていません。Web Push は無効です。")
+            return False
+
+        subscriptions = self._store.get_for_user(user_id)
+        success = False
+        failed_endpoints: list[str] = []
+
+        for subscription in subscriptions:
+            try:
+                ok = self.send_to_subscription(subscription, payload, ttl)
+                if ok:
+                    success = True
+                else:
+                    failed_endpoints.append(subscription.endpoint)
+            except Exception:
+                logger.exception(
+                    "Web Push 送信中に予期しないエラーが発生しました: user_id=%d, endpoint=%s",
+                    user_id,
+                    subscription.endpoint[:30],
+                )
+                failed_endpoints.append(subscription.endpoint)
+
+        for endpoint in failed_endpoints:
+            self._store.remove(endpoint)
+            logger.info("失敗したサブスクリプションを削除しました: endpoint=%s", endpoint[:30])
+
+        return success
 
     def send_to_subscription(
         self, subscription: WebPushSubscription, payload: dict[str, Any], ttl: int

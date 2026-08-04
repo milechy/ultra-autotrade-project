@@ -652,6 +652,50 @@ def _resolve_protocol_routing(
     return aave_default
 
 
+def _deliver_ai_proposal_push(db: Session, user_id: int, payload: Any) -> None:
+    """AI提案のWeb Push実配信 + notification_logsへのdelivered記録 (best-effort)。
+
+    2026-08-04 PR5: get_notification_service().send() (LINE/Slack/内部ログ) とは独立した経路。
+    購読者へ実際にブラウザ通知を届けるコードがこれまで一切配線されていなかった
+    (docs/internal/2026-08-04_execution_pipeline_requirements.md)。VAPID未設定時は
+    Web Push全体を無効化する既存設計 (get_vapid_config) に従い静かにスキップする。
+    失敗しても提案生成自体はブロックしない (fail-open)。
+    """
+    try:
+        from app.notifications.models import NotificationLog  # noqa: PLC0415
+        from app.notifications.push import (  # noqa: PLC0415
+            DatabaseSubscriptionStore,
+            WebPushSender,
+            get_vapid_config,
+        )
+
+        vapid_config = get_vapid_config()
+        if vapid_config is None:
+            logger.debug("Web Push: VAPID未設定のためスキップ (user_id=%d)", user_id)
+            return
+
+        sender = WebPushSender(vapid_config, DatabaseSubscriptionStore(SessionLocal))
+        delivered = sender.send_to_user(user_id, payload.web_push_payload)
+
+        db.add(
+            NotificationLog(
+                channel="push",
+                severity=payload.notification_message.severity.value,
+                title=payload.notification_message.title,
+                body=payload.notification_message.body,
+                user_id=user_id,
+                delivered=delivered,
+            )
+        )
+        db.flush()
+    except Exception as _push_exc:  # noqa: BLE001
+        logger.warning(
+            "ai_proposal Web Push delivery failed for user %d (skipping): %s",
+            user_id,
+            _push_exc,
+        )
+
+
 def _create_proposals_for_users(
     db: Session,
     decision: AIDecision,
@@ -847,6 +891,7 @@ def _create_proposals_for_users(
                     )
                     _payload.notification_message.user_id = user.id
                     get_notification_service().send(_payload.notification_message)
+                    _deliver_ai_proposal_push(db, user.id, _payload)
                 except Exception as _notif_exc:  # noqa: BLE001
                     logger.warning(
                         "ai_proposal_notification failed for user %d (skipping): %s",
@@ -1011,6 +1056,7 @@ def _create_safe_yield_proposals_for_users(
                     )
                     _payload.notification_message.user_id = user.id
                     get_notification_service().send(_payload.notification_message)
+                    _deliver_ai_proposal_push(db, user.id, _payload)
                 except Exception as _notif_exc:  # noqa: BLE001
                     logger.warning(
                         "[safe_yield] notification failed for user %d (skip): %s",
