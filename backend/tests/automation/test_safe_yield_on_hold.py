@@ -36,8 +36,9 @@ def _mk_db(users: list, pending: int = 0) -> MagicMock:
     active_res.all.return_value = users
     stale_res = MagicMock()
     stale_res.all.return_value = []
-    # scalars: 1回目=active users、以降(各userのstale)=空
-    db.scalars.side_effect = [active_res] + [stale_res for _ in users]
+    # scalars: 1回目=active users、以降 各userにつき2回
+    # (1: 可観測性チェックの直近3件クエリ / 2: stale expire クエリ)=空
+    db.scalars.side_effect = [active_res] + [stale_res for _ in range(len(users) * 2)]
     db.scalar.return_value = pending  # dedup count
     return db
 

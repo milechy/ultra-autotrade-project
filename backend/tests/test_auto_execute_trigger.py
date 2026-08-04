@@ -153,6 +153,31 @@ def test_no_grant_stays_pending_and_is_skipped(db_session: Session, enabled_env:
     assert proposal.status == "pending"
 
 
+def test_no_grant_skip_sends_operational_notification(
+    db_session: Session, enabled_env: None
+) -> None:
+    """委譲grant無しでスキップされた際、運営向けSlack通知(operational_alert)が送られる
+    (2026-08-04 PR1: 可観測性 — 既存の握り潰しに通知を足す)。"""
+    from app.proposals.auto_execute import run_auto_execution_for_ai_decision
+
+    user = _make_user(db_session, uid=7)
+    decision = _make_decision(db_session)
+    _make_proposal(db_session, user.id, decision.id)
+    db_session.commit()
+
+    sent: list[object] = []
+    with patch(
+        "app.notifications.factory.get_notification_service",
+        return_value=type("Svc", (), {"send": lambda self, msg: sent.append(msg)})(),
+    ):
+        result = run_auto_execution_for_ai_decision(db_session, decision.id)
+
+    assert result["auto_execute_skipped"] == 1
+    assert len(sent) == 1
+    assert sent[0].channel.value == "slack"
+    assert str(user.id) in sent[0].body
+
+
 def test_grant_with_supply_executes_via_scw(db_session: Session, enabled_env: None) -> None:
     """SCW 対象(SUPPLY)+有効grant → 委譲経路で即時実行され 'executed' になる。"""
     from app.proposals.auto_execute import run_auto_execution_for_ai_decision
