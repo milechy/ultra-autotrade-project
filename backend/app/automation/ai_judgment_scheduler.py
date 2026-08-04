@@ -34,6 +34,7 @@ from app.knowledge.schemas import KnowledgeSearchRequest
 from app.knowledge.service import KnowledgeService
 from app.proposals.models import Proposal
 from app.users.deposit_policy import MIN_DEPOSIT_USD
+from app.users.models import get_active_grant
 
 # ティア別デフォルト判定間隔（時間）
 _DEFAULT_INTERVAL_UPPER = 4
@@ -67,7 +68,13 @@ def get_scheduler_status() -> "dict[str, Any]":
 
 _DEFAULT_QUERY = "DeFi market analysis"
 _PROPOSAL_ASSET = "USDC"
-_PROPOSAL_EXPIRES_HOURS = 72
+# 2026-08-04 PR1: 72 → 168 (1週間)。到達経路(通知)が無い現状で 72h は短すぎる。
+# SUPPLY は安全利回りのため1週間でも陳腐化しない (docs/internal/2026-08-04_execution_pipeline_requirements.md)。
+_PROPOSAL_EXPIRES_HOURS = 168
+
+# 可観測性 (2026-08-04 PR1): 直近 N 件の提案が連続して 'canceled'(=期限切れ) の場合に
+# 運営へアラートする閾値。無限に作り直し続けている状態を検知するためのもの。
+_CONSECUTIVE_EXPIRY_ALERT_THRESHOLD = 3
 
 # 提案金額: fund_allocations.allocated_amount_usd × _PROPOSAL_RATIO で動的計算。
 # fund_allocation 不在の非カストディアル消費者は本人 wallet の USDC 残高 × ratio に
@@ -197,6 +204,79 @@ def _notify_missing_allocation(user_id: int) -> None:
         get_notification_service().send(msg)
     except Exception as exc:  # noqa: BLE001
         logger.warning("_notify_missing_allocation failed for user_id=%d: %s", user_id, exc)
+
+
+def _notify_missing_delegation_grant(user_id: int) -> None:
+    """AUTO_EXECUTE ユーザーが有効な委譲grantを持たない不変条件違反を Slack 通知する (best-effort)。
+
+    2026-08-04 PR1: 「完全おまかせ」表示のユーザーが、実際には実行権限(delegation_grant)を
+    持たない乖離 (docs/internal/2026-08-04_usdt_switch_assessment_and_priorities.md クラスタA)
+    を検知と同時に通知する。検知のみで安全側への降格は行わない (降格は PR6)。
+    """
+    try:
+        from app.notifications.factory import get_notification_service  # noqa: PLC0415
+        from app.notifications.templates import operational_alert_notification  # noqa: PLC0415
+
+        msg = operational_alert_notification(
+            title="⚠️ 完全おまかせユーザーに有効な委譲枠がありません",
+            body=(
+                f"user_id={user_id} は execution_policy=AUTO_EXECUTE ですが、"
+                "有効な delegation_grant がありません。提案は自動実行されず pending のまま "
+                "手動フローに委ねられます。"
+            ),
+        )
+        get_notification_service().send(msg)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("_notify_missing_delegation_grant failed for user_id=%d: %s", user_id, exc)
+
+
+def _notify_consecutive_expiry(user_id: int, consecutive_count: int) -> None:
+    """同一ユーザーの提案が連続して期限切れ(canceled)になっている状態を Slack 通知する (best-effort)。
+
+    2026-08-04 PR1: 到達経路(通知)が無いために提案が誰にも見られず、3日サイクルで
+    無限に作り直され続けていた状態 (25日間・16件・実行0件) の再発検知。
+    """
+    try:
+        from app.notifications.factory import get_notification_service  # noqa: PLC0415
+        from app.notifications.templates import operational_alert_notification  # noqa: PLC0415
+
+        msg = operational_alert_notification(
+            title="⏰ 提案が連続して期限切れになっています",
+            body=(
+                f"user_id={user_id} の提案が直近 {consecutive_count} 件連続で "
+                "期限切れ(canceled)になっています。到達経路(通知)を確認してください。"
+            ),
+        )
+        get_notification_service().send(msg)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("_notify_consecutive_expiry failed for user_id=%d: %s", user_id, exc)
+
+
+def _check_observability_invariants(db: Session, user: User) -> None:
+    """AUTO_EXECUTE の委譲枠欠如 / 連続期限切れを検知し Slack 通知する。
+
+    2026-08-04 PR1: 「直ったか」を判定する手段。検知と通知のみを行い、提案生成の
+    可否や既存の提案生成ロジックには一切影響しない (fail-open・読み取り専用)。
+    ``_create_proposals_for_users`` と ``_create_safe_yield_proposals_for_users`` の
+    既存のユーザーループ内から、tier間隔 (``_is_user_due_for_judgment``) に関わらず
+    毎 tick 呼び出すこと。
+    """
+    if (
+        user.execution_policy == ExecutionPolicy.AUTO_EXECUTE.value
+        and get_active_grant(user.id, db) is None
+    ):
+        _notify_missing_delegation_grant(user.id)
+
+    recent = db.scalars(
+        select(Proposal)
+        .where(Proposal.user_id == user.id)
+        .order_by(Proposal.created_at.desc())
+        .limit(_CONSECUTIVE_EXPIRY_ALERT_THRESHOLD)
+    ).all()
+    if len(recent) >= _CONSECUTIVE_EXPIRY_ALERT_THRESHOLD and all(
+        p.status == "canceled" for p in recent
+    ):
+        _notify_consecutive_expiry(user.id, len(recent))
 
 
 def save_ai_decision(
@@ -620,6 +700,10 @@ def _create_proposals_for_users(
             # され、先行ユーザーの proposal は維持される。素朴な db.rollback() は単一 commit
             # 設計下で全 user 分を破棄するため不可。最終 commit は呼び出し側で 1 回行う。
             with db.begin_nested():
+                # 可観測性 (2026-08-04 PR1): tier間隔 (due-gate) に関わらず毎 tick 検知する。
+                # 提案生成の可否には影響しない (検知と通知のみ)。
+                _check_observability_invariants(db, user)
+
                 if not _is_user_due_for_judgment(user, now):
                     logger.debug(
                         "Skipping proposal for user %d (tier=%s, last_judgment_at=%s)",
@@ -823,6 +907,10 @@ def _create_safe_yield_proposals_for_users(
     for user in active_users:
         try:
             with db.begin_nested():
+                # 可観測性 (2026-08-04 PR1): tier間隔 (due-gate) に関わらず毎 tick 検知する。
+                # 提案生成の可否には影響しない (検知と通知のみ)。
+                _check_observability_invariants(db, user)
+
                 if not _is_user_due_for_judgment(user, now):
                     continue
 
