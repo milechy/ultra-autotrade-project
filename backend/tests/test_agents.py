@@ -262,6 +262,95 @@ class TestIndicatorAgent:
         )
         assert indicator_agent(ctx).confidence == indicator_agent(base_ctx).confidence
 
+    # ------------------------------------------------------------------
+    # Utilization band v2 (2026-08-05 — C2 稼働率バンド補正)
+    # kill switch AI_UTILIZATION_BAND_V2_ENABLED は既定OFF。
+    # 有効化すると util の減点開始境界が 85 → 95 に上がるのみ。
+    # 下位境界(70/30)・スコア幅(-18/-4/+6/+12)は不変。
+    # ------------------------------------------------------------------
+
+    @pytest.mark.parametrize("util", ["85.1", "86", "90", "95.1"])
+    def test_band_v2_disabled_by_default_keeps_85_boundary(self, util: str) -> None:
+        """kill switch OFF(既定)なら旧仕様どおり util>85 で heavy pressure 判定が続くこと。"""
+        ctx = build_market_context(aave_utilization_rate=Decimal(util))
+        signal = indicator_agent(ctx)
+        assert "heavy liquidity pressure" in signal.reasoning.lower()
+
+    def test_band_v2_enabled_94_9_still_mild_caution(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """kill switch ON: util=94.9 は新境界95未満なので mild caution(elevated)に留まること。"""
+        monkeypatch.setenv("AI_UTILIZATION_BAND_V2_ENABLED", "true")
+        ctx = build_market_context(aave_utilization_rate=Decimal("94.9"))
+        signal = indicator_agent(ctx)
+        assert "elevated" in signal.reasoning.lower()
+        assert "heavy liquidity pressure" not in signal.reasoning.lower()
+
+    def test_band_v2_enabled_95_0_still_mild_caution(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """kill switch ON: util=95.0 はちょうど境界(>95ではない)なので mild caution に留まること。"""
+        monkeypatch.setenv("AI_UTILIZATION_BAND_V2_ENABLED", "true")
+        ctx = build_market_context(aave_utilization_rate=Decimal("95.0"))
+        signal = indicator_agent(ctx)
+        assert "elevated" in signal.reasoning.lower()
+        assert "heavy liquidity pressure" not in signal.reasoning.lower()
+
+    def test_band_v2_enabled_95_1_triggers_heavy_pressure(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """kill switch ON: util=95.1 は新境界95超なので heavy pressure 判定に入ること。"""
+        monkeypatch.setenv("AI_UTILIZATION_BAND_V2_ENABLED", "true")
+        ctx = build_market_context(aave_utilization_rate=Decimal("95.1"))
+        signal = indicator_agent(ctx)
+        assert "heavy liquidity pressure" in signal.reasoning.lower()
+
+    def test_band_v2_disabled_does_not_change_lower_bounds(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """kill switch ON でも下位境界(70/30)とスコア幅は不変であること(境界外の据え置き確認)。"""
+        monkeypatch.setenv("AI_UTILIZATION_BAND_V2_ENABLED", "true")
+        for util, expected_phrase in (
+            ("71", "elevated"),
+            ("50", "healthy liquidity"),
+            ("10", "ample liquidity"),
+        ):
+            ctx = build_market_context(aave_utilization_rate=Decimal(util))
+            signal = indicator_agent(ctx)
+            assert expected_phrase in signal.reasoning.lower()
+
+    @staticmethod
+    def _util_score_delta(reasoning: str) -> int:
+        """reasoning文言からutil起因のスコア寄与(-18/-4/+6/+12)を逆引きする。"""
+        reasoning_lower = reasoning.lower()
+        if "heavy liquidity pressure" in reasoning_lower:
+            return -18
+        if "elevated" in reasoning_lower:
+            return -4
+        if "healthy liquidity" in reasoning_lower:
+            return 6
+        if "ample liquidity" in reasoning_lower:
+            return 12
+        raise AssertionError(f"未知のutil reasoning: {reasoning}")
+
+    @pytest.mark.parametrize("util_int", list(range(0, 101)))
+    def test_band_v2_score_never_lower_than_v1_across_full_range(
+        self, monkeypatch: pytest.MonkeyPatch, util_int: int
+    ) -> None:
+        """単調性(C2-2の核心): 全util域でON時のスコア寄与 >= OFF時のスコア寄与が常に成立すること。
+
+        これにより「ONによってBEARISH(score<=35)への到達が容易になる」ことがないと
+        担保する(上位境界の引き上げは追加の減点を発生させない方向にしか働かない)。
+        """
+        util = Decimal(str(util_int))
+
+        ctx_off = build_market_context(aave_utilization_rate=util)
+        delta_off = self._util_score_delta(indicator_agent(ctx_off).reasoning)
+
+        monkeypatch.setenv("AI_UTILIZATION_BAND_V2_ENABLED", "true")
+        ctx_on = build_market_context(aave_utilization_rate=util)
+        delta_on = self._util_score_delta(indicator_agent(ctx_on).reasoning)
+
+        assert delta_on >= delta_off, (
+            f"util={util}: ON時のスコア寄与({delta_on})がOFF時({delta_off})を下回っている"
+        )
+
 
 class TestPatternAgent:
     def test_no_history_is_neutral(self) -> None:
