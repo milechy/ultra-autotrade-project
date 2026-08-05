@@ -179,6 +179,7 @@ grep -r "href=" frontend/src/components/ | grep -E "protocols|strategies" | head
 | docker コマンドチートシート | `docs/ops/docker_command_cheatsheet.md` | docker 操作前 (落とし穴 7 項目) |
 | 本番運用 checklist | `docs/ops/production_operation_checklist.md` | 本番 SQL / deploy 直前 |
 | staging 復旧 v4 prompt | `docs/ops/staging_recovery_v4_prompt.md` | staging-new 消滅時 |
+| Web Push 本番有効化 | `docs/ops/web_push_production_activation_runbook.md` | VAPID 鍵設定 / 実機到達確認 (B-1/B-7) 実施時 |
 | 24h 自走起動 checklist | `docs/ops/uata_24h_autonomous_startup_checklist.md` | 夜間自走前 |
 
 ---
