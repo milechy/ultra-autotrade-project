@@ -311,9 +311,24 @@ class WebPushSender:
             return DeliveryResult.FAILED_TRANSIENT
 
     def _purge_gone(self, gone_endpoints: list[str]) -> None:
-        """失効した購読のみをストアから除去する。"""
+        """失効した購読のみをストアから除去する。
+
+        除去は「次回の無駄打ちを減らす」だけの後片付けなので、失敗しても
+        配信結果 (戻り値) に影響させてはならない。以前は例外がそのまま
+        send_to_user / send_to_all を貫通し、呼び出し元 (_deliver_ai_proposal_push)
+        の広い except に捕まって **配信できたのに delivered 記録が残らない**
+        状態を作っていた (「送信した/到達した」を測るための列が欠ける = 可観測性の穴)。
+        1 件の除去失敗が他の除去も止めないよう、endpoint 単位で捕捉する。
+        """
         for endpoint in gone_endpoints:
-            self._store.remove(endpoint)
+            try:
+                self._store.remove(endpoint)
+            except Exception:
+                logger.exception(
+                    "失効した購読の除去に失敗しました (配信結果には影響させない): endpoint=%s",
+                    endpoint[:30],
+                )
+                continue
             logger.info("失効した購読を除去しました: endpoint=%s", endpoint[:30])
 
     def send_to_subscription(
