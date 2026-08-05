@@ -373,3 +373,98 @@ class TestMultiDeviceAndResubscribe:
         sender = WebPushSender(_config(), InMemorySubscriptionStore())
         with patch("app.notifications.push._PYWEBPUSH_AVAILABLE", True):
             assert sender.send_to_user(999, {"title": "t", "body": "b"}) is False
+
+
+# ---------------------------------------------------------------------------
+# 5. 後片付けの失敗が配信結果を壊さないこと (可観測性の穴の回帰防止)
+# ---------------------------------------------------------------------------
+
+
+class TestPurgeFailureDoesNotAffectDeliveryResult:
+    """失効購読の除去に失敗しても、配信結果と delivered 記録を失わないこと。
+
+    除去は「次回の無駄打ちを減らす」後片付けに過ぎない。以前は store.remove() の
+    例外が send_to_user を貫通し、呼び出し元の広い except に捕まって
+    **配信できたのに delivered 記録が残らない**状態を作っていた。
+    """
+
+    @staticmethod
+    def _store_raising_on_remove(user_id: int = 1) -> InMemorySubscriptionStore:
+        """1台生存 + 1台失効の購読を持ち、remove() が必ず失敗するストア。"""
+        store = InMemorySubscriptionStore()
+        store.add(_sub("https://p/alive", user_id=user_id))
+        store.add(_sub("https://p/gone", user_id=user_id))
+
+        def _boom(_endpoint: str) -> None:
+            raise RuntimeError("DB connection lost during purge")
+
+        store.remove = _boom  # type: ignore[method-assign]
+        return store
+
+    def test_send_to_user_still_reports_success(self) -> None:
+        """1台成功 + 1台失効 で除去が失敗しても True (到達) を返すこと。"""
+        store = self._store_raising_on_remove()
+        sender = WebPushSender(_config(), store)
+
+        def _by_endpoint(sub: WebPushSubscription, *_a: Any, **_kw: Any) -> DeliveryResult:
+            return DeliveryResult.FAILED_GONE if "gone" in sub.endpoint else DeliveryResult.SUCCESS
+
+        with (
+            patch("app.notifications.push._PYWEBPUSH_AVAILABLE", True),
+            patch.object(sender, "send_to_subscription", side_effect=_by_endpoint),
+        ):
+            result = sender.send_to_user(1, {"title": "t", "body": "b"})
+
+        assert result is True, "除去の失敗が配信結果を False に変えてはいけない"
+
+    def test_send_to_all_still_reports_sent_count(self) -> None:
+        """send_to_all でも除去失敗が成功数を壊さないこと。"""
+        store = self._store_raising_on_remove()
+        sender = WebPushSender(_config(), store)
+
+        def _by_endpoint(sub: WebPushSubscription, *_a: Any, **_kw: Any) -> DeliveryResult:
+            return DeliveryResult.FAILED_GONE if "gone" in sub.endpoint else DeliveryResult.SUCCESS
+
+        with (
+            patch("app.notifications.push._PYWEBPUSH_AVAILABLE", True),
+            patch.object(sender, "send_to_subscription", side_effect=_by_endpoint),
+        ):
+            sent = sender.send_to_all({"title": "t", "body": "b"})
+
+        assert sent == 1
+
+    def test_delivered_log_is_written_even_when_purge_fails(self) -> None:
+        """★本題: 除去失敗時も delivered 記録 (NotificationLog) が書かれること。"""
+        from app.automation.ai_judgment_scheduler import _deliver_ai_proposal_push
+        from app.notifications.templates import ai_proposal_notification
+
+        user = MagicMock()
+        user.id = 9
+        user.notification_settings_json = json.dumps(
+            {"push_enabled": True, "preferences": {"ai_proposal": True}}
+        )
+        db = MagicMock()
+        db.get.return_value = user
+
+        # 購読は配信対象ユーザー (9) に紐付けること。別 user_id だと購読ゼロになり
+        # 「除去失敗」以外の理由で delivered=False になってテストが目的を検証しない。
+        real_sender = WebPushSender(_config(), self._store_raising_on_remove(user_id=9))
+
+        def _by_endpoint(sub: WebPushSubscription, *_a: Any, **_kw: Any) -> DeliveryResult:
+            return DeliveryResult.FAILED_GONE if "gone" in sub.endpoint else DeliveryResult.SUCCESS
+
+        with (
+            patch("app.notifications.push.get_vapid_config", return_value=_config()),
+            patch("app.notifications.push.WebPushSender", return_value=real_sender),
+            patch("app.notifications.push.DatabaseSubscriptionStore"),
+            patch("app.notifications.push._PYWEBPUSH_AVAILABLE", True),
+            patch.object(real_sender, "send_to_subscription", side_effect=_by_endpoint),
+        ):
+            _deliver_ai_proposal_push(
+                db, 9, ai_proposal_notification("SUPPLY", "USDC", Decimal("100"), 80)
+            )
+
+        db.add.assert_called_once()
+        logged = db.add.call_args.args[0]
+        assert logged.channel == "push"
+        assert logged.delivered is True, "到達したのに記録が欠けてはいけない"
