@@ -311,24 +311,12 @@ def _do_update_notification_settings(
 ) -> dict[str, Any]:
     """通知設定を保存して返す。
 
-    2026-08-04 PR3: push_subscriptions (DatabaseSubscriptionStore が同じ列に書く) を
-    この汎用設定更新で消さないよう、既存の raw JSON から読み出して引き継ぐ。
-    push_subscriptions は専用の /push/subscribe, /push/unsubscribe 経由でのみ変更される
-    べきで、NotificationSettingsModel のフィールドには含めない
-    (含めると PUT の度にクライアントが送らなかった分が空配列で上書きされ、
-    購読が黙って消える — 本件と同型の「表示と実行能力が分離される」バグになる)。
+    2026-08-05: 購読は push_subscriptions テーブルへ分離されたため、この関数が
+    購読を引き継ぐ必要は無くなった (以前は同じ JSON セルに同居しており、
+    引き継ぎ漏れが購読の暗黙削除になっていた)。設定と購読は別ストレージなので
+    構造的に干渉しない。
     """
-    existing_push_subscriptions: list[Any] = []
-    if current_user.notification_settings_json:
-        try:
-            existing_raw = json.loads(current_user.notification_settings_json)
-            existing_push_subscriptions = existing_raw.get("push_subscriptions", [])
-        except json.JSONDecodeError:
-            pass
-
-    new_raw = body.model_dump()
-    new_raw["push_subscriptions"] = existing_push_subscriptions
-    current_user.notification_settings_json = json.dumps(new_raw)
+    current_user.notification_settings_json = body.model_dump_json()
     db.add(current_user)
     db.commit()
     return body.model_dump()  # DB に書き込んだ値をそのまま返す; refresh 不要

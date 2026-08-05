@@ -172,27 +172,19 @@ class TestPutNotificationSettings:
         res = self.client.put("/api/notifications/settings", json={"line_enabled": "not_a_bool"})
         assert res.status_code == 422
 
-    def test_generic_settings_put_preserves_push_subscriptions(self):
-        """★2026-08-04 PR3 回帰防止: push_subscriptions は /push/subscribe 専用エンドポイント
-        経由でのみ変更されるべきで、他の通知設定 (line_enabled 等) を変更するだけの
-        汎用 PUT /settings で黙って空配列に上書きされてはならない。
-        NotificationSettingsModel が push_subscriptions を含まないため、対策なしでは
-        body.model_dump_json() が丸ごと上書きし購読が消える。"""
-        existing = json.dumps(
-            {
-                "line_enabled": True,
-                "push_enabled": True,
-                "preferences": {},
-                "push_subscriptions": [
-                    {"endpoint": "https://push.example.com/keep-me", "p256dh": "k", "auth": "a"}
-                ],
-            }
-        )
-        user = _make_user(existing)
+    def test_settings_put_does_not_write_push_subscriptions_key(self):
+        """設定 PUT は購読に一切関与しないこと (2026-08-05 テーブル分離後)。
+
+        以前は購読が同じ JSON セルに同居していたため、PUT /settings が
+        push_subscriptions を空配列で上書きして購読を黙って消すバグがあった
+        (PR3 で「既存値を引き継ぐ」対策を入れていた)。
+        購読を専用テーブルへ分離した現在は、設定 JSON に購読の痕跡を書かないことが
+        正しい姿。引き継ぎロジックが復活していないことをここで固定する。
+        """
+        user = _make_user(json.dumps({"line_enabled": True, "push_enabled": True}))
         db = self._make_db(user)
         self._override_deps(user, db)
 
-        # push_subscriptions を含まない、既存の通知設定変更 (line_enabled のみ変更) を PUT する。
         payload: dict[str, Any] = {
             "line_enabled": False,
             "push_enabled": True,
@@ -209,33 +201,37 @@ class TestPutNotificationSettings:
         assert res.status_code == 200
 
         saved = json.loads(user.notification_settings_json)
-        assert saved["line_enabled"] is False  # 意図した変更は反映される
-        assert saved["push_subscriptions"] == [
-            {"endpoint": "https://push.example.com/keep-me", "p256dh": "k", "auth": "a"}
-        ]  # 購読は消えない
+        assert saved["line_enabled"] is False, "意図した変更は反映される"
+        assert "push_subscriptions" not in saved, (
+            "購読は専用テーブルの責務。設定 JSON に書き戻してはいけない"
+        )
 
-    def test_settings_put_with_no_prior_push_subscriptions_defaults_to_empty(self):
-        """push_subscriptions キーが元々存在しない (未購読ユーザー) 場合は空配列で保存される。"""
-        user = _make_user(None)
+    def test_stale_push_subscriptions_key_is_dropped_on_save(self):
+        """移行前に書かれた古い push_subscriptions キーは保存時に落ちること。
+
+        マイグレーションは downgrade 安全性のため JSON 側のキーを残す。
+        設定を保存した時点でその残骸が消え、二重の真実源にならないことを確認する
+        (購読の実体は既にテーブルへ移行済み)。
+        """
+        legacy = json.dumps(
+            {
+                "line_enabled": True,
+                "push_enabled": True,
+                "push_subscriptions": [
+                    {"endpoint": "https://push.example.com/legacy", "p256dh": "k", "auth": "a"}
+                ],
+            }
+        )
+        user = _make_user(legacy)
         db = self._make_db(user)
         self._override_deps(user, db)
 
-        payload: dict[str, Any] = {
-            "line_enabled": True,
-            "push_enabled": False,
-            "preferences": {
-                "ai_proposal": True,
-                "execution_complete": True,
-                "health_factor_warning": True,
-                "emergency_stop": True,
-                "monthly_report": True,
-                "system_notice": True,
-            },
-        }
-        res = self.client.put("/api/notifications/settings", json=payload)
+        res = self.client.put(
+            "/api/notifications/settings",
+            json={"line_enabled": True, "push_enabled": True, "preferences": {}},
+        )
         assert res.status_code == 200
-        saved = json.loads(user.notification_settings_json)
-        assert saved["push_subscriptions"] == []
+        assert "push_subscriptions" not in json.loads(user.notification_settings_json)
 
 
 # ---------------------------------------------------------------------------

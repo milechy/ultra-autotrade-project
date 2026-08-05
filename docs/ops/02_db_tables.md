@@ -270,6 +270,35 @@ docker exec ultra-autotrade-postgres-production \
 | partner_id | Integer | YES | パートナーID |
 | user_id | Integer | YES | ユーザーID |
 | created_at | DateTime(tz) | NO | 作成日時 |
+| delivered | Boolean | YES | 到達確認（NULL=対象外/未計測、True=到達、False=配信失敗）。行の存在が「送信した」、本列が「到達した」を表す |
+
+---
+
+### `push_subscriptions` (notifications/models.py)
+
+> Web Push (VAPID) 購読情報。Alembic `z7a8b9c0d1e2`（2026-08-05）。
+>
+> 当初は `users.notification_settings_json` の `push_subscriptions` キーに JSON 配列で
+> 保存していたが、同じセルに通知設定（`push_enabled` / `preferences`）が同居し、
+> 双方が read-modify-write で別セッションから書くため lost update が発生していた
+> （購読1件または設定変更1回が黙って消える）。専用テーブルへ分離して解消。
+>
+> `endpoint` の UNIQUE 制約が「同一端末が同時に2ユーザーへ属さない」を保証する
+> （旧実装は全ユーザー走査で模倣していた）。同一端末で別アカウントにログインすると
+> 購読は新ユーザーへ付け替わる。
+
+| カラム | 型 | NULL | 説明 |
+|--------|-----|------|------|
+| id | Integer PK | NO | 自動採番 |
+| endpoint | Text UNIQUE | NO | ブラウザ PushSubscription の endpoint URL（グローバル一意） |
+| user_id | Integer FK | NO | 購読者の users.id（ON DELETE CASCADE） |
+| p256dh | String(255) | NO | 購読の公開鍵 |
+| auth | String(255) | NO | 購読の認証シークレット |
+| created_at | DateTime(tz) | NO | 登録日時 |
+
+> 移行時の注意: `notification_settings_json` 側の `push_subscriptions` キーは
+> downgrade 安全性のため**マイグレーションでは削除していない**。アプリは読まないため無害で、
+> ユーザーが次に通知設定を保存した時点で消える。
 
 ---
 
