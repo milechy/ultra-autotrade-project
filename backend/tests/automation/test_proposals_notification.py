@@ -13,6 +13,7 @@ Regression guard: legacy LINE_NOTIFY_TOKEN route must not be called.
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -171,16 +172,32 @@ class TestDeliverAiProposalPush:
     def _payload() -> Any:
         return ai_proposal_notification("SUPPLY", "USDC", Decimal("100"), 80)
 
+    @staticmethod
+    def _db_with_push_enabled_user(user_id: int) -> MagicMock:
+        """通知設定で Push を有効化済みのユーザーを返す db モック。
+
+        2026-08-05: 配信前に notification_settings_json を見る設定ゲート (B-N4) が
+        入ったため、配信されることを確認するテストでは明示的に有効化しておく必要がある。
+        """
+        user = MagicMock()
+        user.id = user_id
+        user.notification_settings_json = json.dumps(
+            {"push_enabled": True, "preferences": {"ai_proposal": True}}
+        )
+        db = MagicMock()
+        db.get.return_value = user
+        return db
+
     def test_vapid_unset_skips_without_raising(self) -> None:
         """VAPID未設定時は静かにスキップし、push行は作られない。"""
-        mock_db = MagicMock()
+        mock_db = self._db_with_push_enabled_user(1)
         with patch("app.notifications.push.get_vapid_config", return_value=None):
             _deliver_ai_proposal_push(mock_db, 1, self._payload())
         mock_db.add.assert_not_called()
 
     def test_vapid_set_success_logs_delivered_true(self) -> None:
         """配信成功: delivered=True の push NotificationLog が1行追加される。"""
-        mock_db = MagicMock()
+        mock_db = self._db_with_push_enabled_user(5)
         mock_sender = MagicMock()
         mock_sender.send_to_user.return_value = True
         with (
@@ -198,7 +215,7 @@ class TestDeliverAiProposalPush:
 
     def test_vapid_set_failure_logs_delivered_false(self) -> None:
         """配信失敗: delivered=False の push NotificationLog が1行追加される。"""
-        mock_db = MagicMock()
+        mock_db = self._db_with_push_enabled_user(5)
         mock_sender = MagicMock()
         mock_sender.send_to_user.return_value = False
         with (

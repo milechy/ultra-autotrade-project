@@ -71,6 +71,12 @@ class SubscribeRequest(BaseModel):
         if self.keys is not None:
             self.p256dh = self.p256dh or self.keys.p256dh
             self.auth = self.auth or self.keys.auth
+        # 2026-08-05: 鍵・endpoint が空の購読を保存すると、送信時に必ず失敗する
+        # 「絶対に届かない購読」が残る。到達経路の可視性を損なうため境界で弾く。
+        if not self.endpoint.strip():
+            raise ValueError("endpoint は必須です")
+        if not self.p256dh.strip() or not self.auth.strip():
+            raise ValueError("p256dh と auth は必須です (keys ネスト形式でも可)")
         return self
 
 
@@ -105,7 +111,8 @@ def _do_subscribe(
     logger.info(
         "Push subscription 登録: user_id=%d endpoint=%s", current_user.id, req.endpoint[:30]
     )
-    return {"status": "subscribed", "count": store.count()}
+    # count は本人の購読数のみを返す (全体数は他ユーザー分の情報漏洩になる)。
+    return {"status": "subscribed", "count": len(store.get_for_user(current_user.id))}
 
 
 def _do_test_push(
@@ -160,10 +167,27 @@ def unsubscribe(
     store: SubscriptionStore = Depends(get_subscription_store),
     current_user: User = Depends(require_active_user),
 ) -> dict[str, Any]:
-    """Push subscription を削除する。認証必須。endpoint はクエリパラメータで指定する。"""
-    store.remove(endpoint)
-    logger.info("Push subscription 削除: user_id=%d endpoint=%s", current_user.id, endpoint[:30])
-    return {"status": "unsubscribed", "count": store.count()}
+    """Push subscription を削除する。認証必須。endpoint はクエリパラメータで指定する。
+
+    2026-08-05: 本人が所有する endpoint のみ削除する。以前は endpoint だけで
+    全ユーザーから削除していたため、他人の endpoint を知れば購読を消せた
+    (store.remove は仕様上グローバル削除なので、呼ぶ前に所有確認が必要)。
+    存在しない / 他人のものだった場合は 200 の no-op とする
+    (連打・リトライで壊れないよう冪等に保ち、存在の有無も露出させない)。
+    """
+    owned = {s.endpoint for s in store.get_for_user(current_user.id)}
+    if endpoint in owned:
+        store.remove(endpoint)
+        logger.info(
+            "Push subscription 削除: user_id=%d endpoint=%s", current_user.id, endpoint[:30]
+        )
+    else:
+        logger.info(
+            "Push subscription 削除スキップ (未所有): user_id=%d endpoint=%s",
+            current_user.id,
+            endpoint[:30],
+        )
+    return {"status": "unsubscribed", "count": len(store.get_for_user(current_user.id))}
 
 
 @router.get("/push/vapid-key", status_code=status.HTTP_200_OK)

@@ -662,16 +662,30 @@ def _deliver_ai_proposal_push(db: Session, user_id: int, payload: Any) -> None:
     失敗しても提案生成自体はブロックしない (fail-open)。
     """
     try:
+        from app.auth.models import User  # noqa: PLC0415
         from app.notifications.models import NotificationLog  # noqa: PLC0415
         from app.notifications.push import (  # noqa: PLC0415
             DatabaseSubscriptionStore,
             WebPushSender,
             get_vapid_config,
+            push_allowed_for_user,
         )
 
         vapid_config = get_vapid_config()
         if vapid_config is None:
             logger.debug("Web Push: VAPID未設定のためスキップ (user_id=%d)", user_id)
+            return
+
+        # 受け入れ条件 B-N4: 通知設定で OFF にしたユーザーへは配信しない。
+        # 購読行の有無だけで送ると「設定画面ではOFFなのに通知が来る」状態になる。
+        _user = db.get(User, user_id)
+        if _user is None or not push_allowed_for_user(
+            _user.notification_settings_json, "ai_proposal"
+        ):
+            logger.debug(
+                "Web Push: 通知設定によりスキップ (user_id=%d)",
+                user_id,
+            )
             return
 
         sender = WebPushSender(vapid_config, DatabaseSubscriptionStore(SessionLocal))
