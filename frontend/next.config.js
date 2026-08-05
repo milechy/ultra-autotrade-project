@@ -46,6 +46,20 @@ const withPWA = require('next-pwa')({
     /build-manifest\.json$/,
     /middleware-manifest\.json$/,
     /react-loadable-manifest\.json$/,
+    // 2026-08-05: next-pwa (node_modules/next-pwa/index.js) は本来デフォルトで
+    // `asset.name.startsWith('server/')` を除外する関数を workboxCommon.exclude に
+    // 持っているが、withPWA() にユーザー定義の exclude 配列を渡すと
+    // (...workboxCommon, ...workbox の順で spread されるため) この配列が
+    // デフォルトを "マージ" ではなく "丸ごと上書き" してしまう。
+    // 上の4パターンだけでは .next/server/ 配下 (Node.js サーバープロセス専用、
+    // 公開HTTPルートから一切配信されない) のファイル
+    // (client-reference-manifest.js / middleware-build-manifest.js /
+    //  next-font-manifest.{js,json} 等) が「静的アセット」と誤認されて
+    // precache 対象に混入し、SW install 時の precacheAndRoute() がこの404で失敗、
+    // **Service Worker のインストール自体がサイト全体で全滅**していた
+    // (本番実機検証で発覚: getRegistrations() が常に0件、bad-precaching-response
+    // エラー)。next-pwa 本来のデフォルト除外関数をそのまま復元する。
+    ({ asset }) => asset.name.startsWith('server/'),
   ],
 });
 
