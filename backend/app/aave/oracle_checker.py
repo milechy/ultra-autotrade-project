@@ -65,6 +65,23 @@ def validate_staleness_threshold_env() -> int:
     return get_staleness_threshold_from_env()
 
 
+def _is_contract_interface_error(exc: BaseException) -> bool:
+    """呼び出し先が期待するインターフェースを持たない (= 設定ミス) かを判定する。
+
+    web3 は「関数セレクタが存在しないコントラクトへの eth_call」を
+    ContractLogicError('execution reverted', 'no data') として返す。これは
+    リトライしても回復しない恒久的な設定エラーであり、RPC の一時障害とは
+    区別して扱う必要がある (2026-08-06 の誤診対策)。
+
+    web3 未インストール環境でも壊れないよう import は遅延・例外安全にする。
+    """
+    try:
+        from web3.exceptions import ContractLogicError  # noqa: PLC0415
+    except ImportError:  # pragma: no cover - web3 が無い環境
+        return False
+    return isinstance(exc, ContractLogicError)
+
+
 _AGGREGATOR_ABI = [
     {
         "inputs": [],
@@ -144,7 +161,28 @@ def check_oracle_staleness(
         round_data = feed.functions.latestRoundData().call()
         _round_id, answer, _started_at, updated_at_ts, _answered_in_round = round_data
     except Exception as exc:  # noqa: BLE001
-        logger.warning("[oracle_checker] latestRoundData failed for %s: %s", feed_address, exc)
+        # 2026-08-06: 「RPC が落ちている」と「アドレスが Chainlink feed ではない
+        # (設定ミス)」を区別してログする。両方とも None を返すため、以前は呼び出し元が
+        # 一律「RPC failure」と記録しており、**設定ミスが RPC 障害として長期間
+        # 誤診されていた** (本番で 5 分ごとに fail-closed が出続けたが、同時刻に
+        # 他の RPC 呼び出しは成功していた)。
+        # revert は「そのコントラクトに latestRoundData() が無い」ことを意味し、
+        # リトライしても永久に回復しない設定エラーなので ERROR + 対処法を出す。
+        if _is_contract_interface_error(exc):
+            logger.error(
+                "[oracle_checker] %s は Chainlink AggregatorV3 ではありません "
+                "(latestRoundData() が revert)。AAVE_ORACLE_FEED_ADDRESS の設定ミスです。"
+                "Aave Oracle (getAssetPrice) 等の別インターフェースを設定していないか "
+                "確認してください。この状態では全執行経路が fail-closed で停止します: %s",
+                feed_address,
+                exc,
+            )
+        else:
+            logger.warning(
+                "[oracle_checker] latestRoundData failed for %s (RPC 側の一時障害の可能性): %s",
+                feed_address,
+                exc,
+            )
         return None
 
     now = datetime.now(timezone.utc)
@@ -539,7 +577,13 @@ def is_oracle_fresh(
         return False
 
     if result is None:
-        logger.error("[oracle_checker] Oracle check returned None (RPC failure) - fail-closed")
+        # 2026-08-06: 以前は "(RPC failure)" と断定していたが、feed アドレスの設定ミス
+        # (Chainlink 以外のコントラクト) でも同じ経路を通る。原因の切り分けは直前に
+        # check_oracle_staleness が出すログを見ること。断定的な誤ラベルは診断を誤らせる。
+        logger.error(
+            "[oracle_checker] Oracle check returned None - fail-closed "
+            "(原因は直前のログを参照: RPC 一時障害 / feed アドレス設定ミスのいずれか)"
+        )
         return False
 
     return not result.should_hold
