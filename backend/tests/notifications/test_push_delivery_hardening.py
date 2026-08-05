@@ -37,6 +37,7 @@ from app.notifications.push import (
     VAPIDConfig,
     WebPushSender,
     WebPushSubscription,
+    push_allowed_for_user,
 )
 
 
@@ -200,7 +201,7 @@ def _make_webpush_exception(status_code: int) -> Exception:
 
 
 # ---------------------------------------------------------------------------
-# 2. 破損した notification_settings_json への耐性
+# 2. 破損した notification_settings_json への耐性 (通知設定の読み取り)
 # ---------------------------------------------------------------------------
 
 
@@ -211,61 +212,34 @@ class TestCorruptSettingsJsonRobustness:
     JSONDecodeError では捕まらない。クラッシュすると呼び出し元の
     except Exception に飲まれて「静かに配信スキップ」になり、
     到達経路が黙って失われる (本プロジェクトが最も避けたい失敗形)。
+
+    2026-08-05: 購読は push_subscriptions テーブルへ分離されたため、
+    この列を読むのは通知設定判定 (push_allowed_for_user) のみになった。
+    検証対象をそちらへ振り替えている。
     """
 
-    @pytest.mark.parametrize("raw", ["null", "[1,2]", "123", '"str"', "{}", ""])
-    def test_read_never_raises(self, raw: str) -> None:
-        from app.notifications.push import DatabaseSubscriptionStore
+    @pytest.mark.parametrize("raw", ["null", "[1,2]", "123", '"str"', "{}", "", "{{{broken", None])
+    def test_never_raises_and_denies_on_corrupt(self, raw: str | None) -> None:
+        """壊れた設定では例外を投げず、送らない側 (False) に倒すこと。
 
-        assert DatabaseSubscriptionStore._read_push_subscriptions(raw) == []
+        fail-closed を選ぶ理由: 設定が読めない状態で送ると
+        「OFFにしたはずなのに届く」誤配信になる。到達経路ゼロ側の検知は B-6 が担う。
+        """
+        assert push_allowed_for_user(raw, "ai_proposal") is False
 
-    @pytest.mark.parametrize("raw", ["null", "[1,2]", "123", '"str"'])
-    def test_write_never_raises_and_produces_dict(self, raw: str) -> None:
-        from app.notifications.push import DatabaseSubscriptionStore
+    def test_valid_dict_with_push_enabled_allows(self) -> None:
+        assert push_allowed_for_user(json.dumps({"push_enabled": True}), "ai_proposal") is True
 
-        out = DatabaseSubscriptionStore._write_push_subscriptions(
-            raw, [{"endpoint": "e", "p256dh": "p", "auth": "a"}]
-        )
-        parsed = json.loads(out)
-        assert isinstance(parsed, dict)
-        assert parsed["push_subscriptions"][0]["endpoint"] == "e"
+    @pytest.mark.parametrize("preferences", ["notadict", 123, None, []])
+    def test_non_dict_preferences_does_not_crash(self, preferences: Any) -> None:
+        """preferences が dict でなくても落ちず、push_enabled の判定は生きること。"""
+        raw = json.dumps({"push_enabled": True, "preferences": preferences})
+        assert push_allowed_for_user(raw, "ai_proposal") is True
 
-    def test_write_preserves_other_keys_from_valid_dict(self) -> None:
-        """正常な dict の場合は他キー (push_enabled 等) を保持すること。"""
-        from app.notifications.push import DatabaseSubscriptionStore
-
-        out = DatabaseSubscriptionStore._write_push_subscriptions(
-            json.dumps({"push_enabled": True, "line_enabled": False}), []
-        )
-        parsed = json.loads(out)
-        assert parsed["push_enabled"] is True
-        assert parsed["line_enabled"] is False
-
-    @pytest.mark.parametrize(
-        "entry",
-        [
-            {"p256dh": "p", "auth": "a"},  # endpoint 欠落
-            {"endpoint": "e", "auth": "a"},  # p256dh 欠落
-            {"endpoint": "e", "p256dh": "p"},  # auth 欠落
-            "not-a-dict",  # 要素が dict ですらない
-            None,
-        ],
-    )
-    def test_malformed_entry_is_skipped_not_fatal(self, entry: Any) -> None:
-        """壊れた要素は飛ばし、他の正常な購読は生き残ること。"""
-        from app.notifications.push import DatabaseSubscriptionStore
-
-        good = {"endpoint": "https://p/good", "p256dh": "p", "auth": "a"}
-        user = MagicMock()
-        user.id = 1
-        user.notification_settings_json = json.dumps({"push_subscriptions": [entry, good]})
-        db = MagicMock()
-        db.get.return_value = user
-
-        store = DatabaseSubscriptionStore(lambda: db)
-        result = store.get_for_user(1)
-
-        assert [s.endpoint for s in result] == ["https://p/good"]
+    def test_unknown_preference_key_defaults_to_allowed(self) -> None:
+        """未知の通知種別は明示的に False でない限り許可 (既定で届く)。"""
+        raw = json.dumps({"push_enabled": True, "preferences": {"other": False}})
+        assert push_allowed_for_user(raw, "ai_proposal") is True
 
 
 # ---------------------------------------------------------------------------

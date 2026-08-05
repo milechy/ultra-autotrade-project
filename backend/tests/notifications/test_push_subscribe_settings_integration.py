@@ -1,20 +1,22 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/notifications/test_push_subscribe_settings_integration.py
-"""購読保存と通知設定が同じ列を共有していることの結合テスト (2026-08-05)。
+"""購読保存と通知設定の結合テスト (2026-08-05)。
 
-push_subscriptions と push_enabled / preferences は **同一の
-users.notification_settings_json (TEXT)** に同居している。書き手が2系統
-(/push/subscribe = DatabaseSubscriptionStore と PUT /settings = router) あるため、
-片方が他方を踏むと「購読はあるが設定が消えた」「設定はあるが購読が消えた」という
-到達経路の静かな喪失が起きる。
+購読 (push_subscriptions テーブル) と通知設定 (users.notification_settings_json) は
+別ストレージだが、フロントエンドは 1 回のトグル操作で両方を順に書く。
+単体テストが個々に通っていても、この結合部分が切れていれば通知は届かない。
 
 本ファイルは実DB (sqlite) を使い、フロントエンドが実際に行う順序
   1. POST /push/subscribe    (購読を保存)
   2. PUT  /settings          (push_enabled=true を保存)
   3. 配信判定                 (push_allowed_for_user + get_for_user)
-が最後まで繋がることを検証する。単体テストが個々に通っていても、
-この結合部分が切れていれば通知は届かない。
+が最後まで繋がることを検証する。
+
+**元は「同一 JSON セルを共有している」ことの結合テストだった。**
+2 系統の read-modify-write が互いを踏んで lost update を起こしていたため、
+購読を専用テーブルへ分離した。本ファイルは分離後に
+「もう干渉しないこと」を固定する回帰テストとしての役割に変わっている。
 """
 
 from __future__ import annotations
@@ -103,8 +105,8 @@ class TestSubscribeThenEnableSequence:
     def test_settings_put_first_then_subscribe_keeps_both(self, _db_env) -> None:
         """逆順 (設定ON → 購読保存) でも両立すること。
 
-        store.add は raw JSON の push_subscriptions キーのみを差し替える契約なので、
-        既存の push_enabled を落としてはいけない。
+        購読はテーブル、設定は JSON 列と別ストレージなので、購読保存が
+        push_enabled / line_enabled を落とすことは構造的に起こらない。
         """
         db, factory = _db_env
         user = _make_user(db, 2)
@@ -119,7 +121,7 @@ class TestSubscribeThenEnableSequence:
         raw = json.loads(user.notification_settings_json)
         assert raw["push_enabled"] is True, "購読保存が push_enabled を消してはいけない"
         assert raw["line_enabled"] is False, "他チャネル設定も保持されること"
-        assert len(raw["push_subscriptions"]) == 1
+        assert len(store.get_for_user(user.id)) == 1
 
     def test_toggle_off_then_on_does_not_duplicate_or_lose(self, _db_env) -> None:
         """I-1 (短時間の往復): OFF→ON を繰り返しても購読が重複/消失しないこと。"""
@@ -154,7 +156,12 @@ class TestSubscribeThenEnableSequence:
         assert push_allowed_for_user(user.notification_settings_json, "ai_proposal") is True
 
     def test_settings_put_does_not_resurrect_removed_subscription(self, _db_env) -> None:
-        """解除後の設定PUTで購読が復活しないこと (PUT は購読を「引き継ぐ」実装のため)。"""
+        """解除後に設定PUTしても購読が復活しないこと。
+
+        旧実装は PUT が JSON 内の購読を「引き継ぐ」ため、古い値を掴んでいると
+        解除済みの購読を書き戻す危険があった。分離後は PUT が購読に触れないので
+        構造的に起こらない。
+        """
         db, factory = _db_env
         user = _make_user(db, 4)
         store = DatabaseSubscriptionStore(factory)
@@ -262,7 +269,7 @@ class TestCrossUserEndpointMigration:
         raw = json.loads(old.notification_settings_json)
         assert raw["line_enabled"] is False
         assert raw["push_enabled"] is True
-        assert raw["push_subscriptions"] == []
+        assert store.get_for_user(old.id) == [], "購読だけが移動し、設定は無傷"
 
 
 class TestSchedulerGateUsesRealDb:
@@ -293,3 +300,104 @@ class TestSchedulerGateUsesRealDb:
             )
 
         mock_sender.send_to_user.assert_not_called()
+
+
+class TestLostUpdateIsStructurallyImpossible:
+    """旧実装で lost update が起きたシナリオが、もう起こらないことを固定する。
+
+    旧実装は購読と設定が同一 JSON セルに同居し、双方が read-modify-write していた。
+    「設定を読む → 購読が書き込まれる → 設定を書き戻す」の順序で購読が消えた
+    (逆順では設定が消えた)。テーブル分離後は書き込み先が異なるため、
+    どの交錯順序でも双方が残る。
+    """
+
+    def _assert_both_alive(self, db: Session, store: DatabaseSubscriptionStore, user: User) -> None:
+        db.refresh(user)
+        assert push_allowed_for_user(user.notification_settings_json, "ai_proposal") is True
+        assert len(store.get_for_user(user.id)) == 1
+
+    def test_settings_read_then_subscribe_then_settings_write(self, _db_env) -> None:
+        """旧実装で購読が消えた交錯順序。設定の読み込みと書き戻しの間に購読が入る。"""
+        db, factory = _db_env
+        user = _make_user(db, 30)
+        store = DatabaseSubscriptionStore(factory)
+
+        body = NotificationSettingsModel(push_enabled=True)  # 設定側が値を読み終えた状態
+        store.add(WebPushSubscription(endpoint=_ENDPOINT, p256dh="p", auth="a", user_id=user.id))
+        _do_update_notification_settings(body, user, db)  # 設定を書き戻す
+
+        self._assert_both_alive(db, store, user)
+
+    def test_subscribe_then_settings_then_second_subscribe(self, _db_env) -> None:
+        """2 端末目の購読が設定保存を挟んでも消えないこと。"""
+        db, factory = _db_env
+        user = _make_user(db, 31)
+        store = DatabaseSubscriptionStore(factory)
+
+        store.add(WebPushSubscription(endpoint=_ENDPOINT + "-a", p256dh="p", auth="a", user_id=31))
+        _do_update_notification_settings(NotificationSettingsModel(push_enabled=True), user, db)
+        store.add(WebPushSubscription(endpoint=_ENDPOINT + "-b", p256dh="p", auth="a", user_id=31))
+
+        db.refresh(user)
+        assert push_allowed_for_user(user.notification_settings_json, "ai_proposal") is True
+        assert len(store.get_for_user(31)) == 2, "2 端末とも生存すること"
+
+    def test_repeated_interleaving_never_loses_either_side(self, _db_env) -> None:
+        """設定保存と購読操作を交互に多数回繰り返しても双方が壊れないこと。"""
+        db, factory = _db_env
+        user = _make_user(db, 32)
+        store = DatabaseSubscriptionStore(factory)
+
+        for i in range(5):
+            store.add(
+                WebPushSubscription(endpoint=f"{_ENDPOINT}-{i}", p256dh="p", auth="a", user_id=32)
+            )
+            db.refresh(user)
+            _do_update_notification_settings(NotificationSettingsModel(push_enabled=True), user, db)
+
+        db.refresh(user)
+        assert push_allowed_for_user(user.notification_settings_json, "ai_proposal") is True
+        assert len(store.get_for_user(32)) == 5
+
+
+class TestEndpointUniquenessIsEnforcedByDb:
+    """endpoint の一意性が DB 制約で担保されていること (旧実装は全ユーザー走査で模倣)。"""
+
+    def test_unique_constraint_exists_on_endpoint(self, _db_env) -> None:
+        """アプリを経由せず直接 INSERT しても重複 endpoint は拒否されること。"""
+        from sqlalchemy.exc import IntegrityError
+
+        from app.notifications.models import PushSubscription
+
+        db, _factory = _db_env
+        _make_user(db, 40)
+        _make_user(db, 41)
+
+        db.add(PushSubscription(endpoint=_ENDPOINT, user_id=40, p256dh="p", auth="a"))
+        db.commit()
+        db.add(PushSubscription(endpoint=_ENDPOINT, user_id=41, p256dh="p", auth="a"))
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+    def test_deleting_user_cascades_subscriptions(self, _db_env) -> None:
+        """ユーザー削除で購読行も消えること (孤児行を残さない)。
+
+        sqlite は既定で FK を強制しないため、本テストでは明示的に有効化する
+        (PostgreSQL では既定で有効)。
+        """
+        from sqlalchemy import text
+
+        from app.notifications.models import PushSubscription
+
+        db, factory = _db_env
+        user = _make_user(db, 42)
+        store = DatabaseSubscriptionStore(factory)
+        store.add(WebPushSubscription(endpoint=_ENDPOINT, p256dh="p", auth="a", user_id=42))
+        assert store.count() == 1
+
+        db.execute(text("PRAGMA foreign_keys=ON"))
+        db.delete(user)
+        db.commit()
+
+        assert db.query(PushSubscription).count() == 0

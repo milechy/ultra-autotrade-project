@@ -15,7 +15,11 @@ from enum import Enum
 from typing import Any, Callable, Optional, Protocol
 
 from pydantic import BaseModel
+from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
+from .models import PushSubscription
 
 try:
     from pywebpush import WebPushException, webpush  # type: ignore
@@ -67,17 +71,6 @@ class WebPushSubscription(BaseModel):
     user_id: Optional[int] = None
 
 
-class PushSubscriptionEntry(BaseModel):
-    """users.notification_settings_json の push_subscriptions 配列 1 件分。
-
-    WebPushSubscription から user_id を除いた形 (格納先が既にユーザーに紐づくため不要)。
-    """
-
-    endpoint: str
-    p256dh: str
-    auth: str
-
-
 class InMemorySubscriptionStore:
     """スレッドセーフなインメモリ Push サブスクリプションストア。"""
 
@@ -127,76 +120,39 @@ class SubscriptionStore(Protocol):
 
 
 class DatabaseSubscriptionStore:
-    """users.notification_settings_json の push_subscriptions キーに永続化するストア。
+    """push_subscriptions テーブルに永続化するストア。
 
-    2026-08-04 PR3: InMemorySubscriptionStore はプロセス再起動で全消失し、
-    どのユーザーの購読かも分からなかった (可観測性なき握り潰しの再発パターン)。
-    新規テーブルは作らず、既存の notification_settings_json (TEXT) に
-    ``{"push_subscriptions": [{"endpoint", "p256dh", "auth"}, ...], ...}`` の形で
-    追記する。line_enabled / push_enabled / preferences 等の他キーには一切触れない
-    (raw dict レベルで push_subscriptions キーのみ読み書きする)。
+    2026-08-05: 以前は users.notification_settings_json (TEXT) の push_subscriptions
+    キーに JSON 配列として保存していた。しかし同じセルに通知設定
+    (push_enabled / preferences) が同居し、双方が read-modify-write で別セッションから
+    書くため lost update が発生していた (購読 1 件、または設定変更 1 回が黙って消える)。
+    専用テーブルに分離したことで read-modify-write が無くなり、問題クラス自体が消えた。
 
-    endpoint はブラウザ (オリジン) 単位でグローバルに一意という前提のため、
-    同一 endpoint が別ユーザーに再登録された場合は元ユーザー側から除去する
-    (同一端末でのログアウト→別アカウントでの再ログイン等、I-5/I-12 相当)。
+    endpoint のグローバル一意性は UNIQUE 制約が保証する (旧実装は全ユーザー走査で
+    模倣していた)。通知設定は引き続き notification_settings_json 側にあり、
+    本ストアはそれに一切触れない。
     """
 
     def __init__(self, session_factory: Callable[[], Session]) -> None:
         self._session_factory = session_factory
 
     @staticmethod
-    def _read_push_subscriptions(raw_json: Optional[str]) -> list[dict[str, Any]]:
-        """push_subscriptions を読む。壊れた列は空リストとして扱い、例外は投げない。
-
-        `null` / `[1,2]` / `123` / `"str"` はいずれも json.loads が成功するため
-        JSONDecodeError では捕まらない。dict 以外を弾かないと raw.get() が
-        AttributeError になり、呼び出し元の except Exception に飲まれて
-        「静かに配信スキップ」になる (到達経路の暗黙喪失)。
-        """
-        if not raw_json:
-            return []
-        try:
-            raw = json.loads(raw_json)
-        except json.JSONDecodeError:
-            return []
-        if not isinstance(raw, dict):
-            return []
-        subs = raw.get("push_subscriptions")
-        return subs if isinstance(subs, list) else []
-
-    @staticmethod
-    def _write_push_subscriptions(raw_json: Optional[str], subs: list[dict[str, Any]]) -> str:
-        """push_subscriptions のみを差し替えて返す。dict 以外の既存値は破棄して作り直す。"""
-        try:
-            raw = json.loads(raw_json) if raw_json else {}
-        except json.JSONDecodeError:
-            raw = {}
-        if not isinstance(raw, dict):
-            raw = {}
-        raw["push_subscriptions"] = subs
-        return json.dumps(raw)
-
-    @staticmethod
-    def _parse_entry(entry: Any, user_id: int) -> Optional[WebPushSubscription]:
-        """1 件の購読 entry を復元する。壊れていれば None を返し、他の購読を巻き込まない。
-
-        entry が dict でない (文字列 / None 等) 場合 ``entry["endpoint"]`` は
-        KeyError ではなく TypeError になるため、両方を弾く必要がある。
-        """
-        if not isinstance(entry, dict):
-            return None
-        try:
-            return WebPushSubscription(
-                endpoint=entry["endpoint"],
-                p256dh=entry["p256dh"],
-                auth=entry["auth"],
-                user_id=user_id,
-            )
-        except (KeyError, TypeError, ValueError):
-            return None
+    def _to_schema(row: PushSubscription) -> WebPushSubscription:
+        return WebPushSubscription(
+            endpoint=row.endpoint,
+            p256dh=row.p256dh,
+            auth=row.auth,
+            user_id=row.user_id,
+        )
 
     def add(self, subscription: WebPushSubscription) -> None:
-        """サブスクリプションを永続化する。同じ endpoint は (他ユーザー分も含め) 上書きする。"""
+        """購読を保存する。同一 endpoint は (他ユーザー分も含め) 付け替える。
+
+        DELETE → INSERT を 1 トランザクションで行う。**この順序は変更しないこと**:
+        逆順にすると endpoint が一時的に 2 ユーザーへ属する窓ができ、
+        同一端末で別アカウントにログインした際に旧ユーザー宛の通知
+        (金額・資産情報) が届きうる (I-12)。
+        """
         if subscription.user_id is None:
             logger.warning(
                 "DatabaseSubscriptionStore.add: user_id が未設定のため保存をスキップしました "
@@ -205,106 +161,75 @@ class DatabaseSubscriptionStore:
             )
             return
 
-        from app.auth.models import User  # noqa: PLC0415
-
-        db = self._session_factory()
-        try:
-            # 他ユーザーに同一 endpoint が残っていれば先に除去 (グローバル一意性の維持)。
-            others = (
-                db.query(User)
-                .filter(
-                    User.id != subscription.user_id,
-                    User.notification_settings_json.isnot(None),
-                )
-                .all()
-            )
-            for other in others:
-                subs = self._read_push_subscriptions(other.notification_settings_json)
-                filtered = [s for s in subs if s.get("endpoint") != subscription.endpoint]
-                if len(filtered) != len(subs):
-                    other.notification_settings_json = self._write_push_subscriptions(
-                        other.notification_settings_json, filtered
+        for attempt in (1, 2):
+            db = self._session_factory()
+            try:
+                db.execute(
+                    delete(PushSubscription).where(
+                        PushSubscription.endpoint == subscription.endpoint
                     )
-
-            user = db.get(User, subscription.user_id)
-            if user is None:
-                logger.warning(
-                    "DatabaseSubscriptionStore.add: user_id=%d が見つかりません",
-                    subscription.user_id,
                 )
+                db.add(
+                    PushSubscription(
+                        endpoint=subscription.endpoint,
+                        user_id=subscription.user_id,
+                        p256dh=subscription.p256dh,
+                        auth=subscription.auth,
+                    )
+                )
+                db.commit()
                 return
-            subs = self._read_push_subscriptions(user.notification_settings_json)
-            subs = [s for s in subs if s.get("endpoint") != subscription.endpoint]
-            subs.append(
-                PushSubscriptionEntry(
-                    endpoint=subscription.endpoint,
-                    p256dh=subscription.p256dh,
-                    auth=subscription.auth,
-                ).model_dump()
-            )
-            user.notification_settings_json = self._write_push_subscriptions(
-                user.notification_settings_json, subs
-            )
-            db.commit()
-        finally:
-            db.close()
+            except IntegrityError:
+                # 同一 endpoint を別リクエストが同時に INSERT した (稀) か、
+                # user_id が存在しない (FK 違反)。前者は 1 回リトライで収束する。
+                db.rollback()
+                if attempt == 2:
+                    logger.warning(
+                        "DatabaseSubscriptionStore.add: 保存できませんでした "
+                        "(user_id=%s endpoint=%s)",
+                        subscription.user_id,
+                        subscription.endpoint[:30],
+                    )
+                    raise
+            finally:
+                db.close()
 
     def remove(self, endpoint: str) -> None:
-        """指定 endpoint のサブスクリプションを全ユーザーから削除する。"""
-        from app.auth.models import User  # noqa: PLC0415
-
+        """指定 endpoint の購読を削除する。存在しない場合は何もしない。"""
         db = self._session_factory()
         try:
-            users = db.query(User).filter(User.notification_settings_json.isnot(None)).all()
-            for user in users:
-                subs = self._read_push_subscriptions(user.notification_settings_json)
-                filtered = [s for s in subs if s.get("endpoint") != endpoint]
-                if len(filtered) != len(subs):
-                    user.notification_settings_json = self._write_push_subscriptions(
-                        user.notification_settings_json, filtered
-                    )
+            db.execute(delete(PushSubscription).where(PushSubscription.endpoint == endpoint))
             db.commit()
         finally:
             db.close()
 
     def get_all(self) -> list[WebPushSubscription]:
-        """全ユーザーの全サブスクリプションを返す (WebPushSender.send_to_all 用)。"""
-        from app.auth.models import User  # noqa: PLC0415
-
+        """全ユーザーの全購読を返す (WebPushSender.send_to_all 用)。"""
         db = self._session_factory()
         try:
-            users = db.query(User).filter(User.notification_settings_json.isnot(None)).all()
-            result: list[WebPushSubscription] = []
-            for user in users:
-                for s in self._read_push_subscriptions(user.notification_settings_json):
-                    parsed = self._parse_entry(s, user.id)
-                    if parsed is not None:
-                        result.append(parsed)
-            return result
+            rows = db.scalars(select(PushSubscription)).all()
+            return [self._to_schema(r) for r in rows]
         finally:
             db.close()
 
     def get_for_user(self, user_id: int) -> list[WebPushSubscription]:
-        """指定ユーザーのサブスクリプションのみを返す (WebPushSender.send_to_user が使用)。"""
-        from app.auth.models import User  # noqa: PLC0415
-
+        """指定ユーザーの購読のみを返す (WebPushSender.send_to_user が使用)。"""
         db = self._session_factory()
         try:
-            user = db.get(User, user_id)
-            if user is None:
-                return []
-            result: list[WebPushSubscription] = []
-            for s in self._read_push_subscriptions(user.notification_settings_json):
-                parsed = self._parse_entry(s, user_id)
-                if parsed is not None:
-                    result.append(parsed)
-            return result
+            rows = db.scalars(
+                select(PushSubscription).where(PushSubscription.user_id == user_id)
+            ).all()
+            return [self._to_schema(r) for r in rows]
         finally:
             db.close()
 
     def count(self) -> int:
-        """登録済みサブスクリプション総数を返す。"""
-        return len(self.get_all())
+        """登録済み購読の総数を返す。"""
+        db = self._session_factory()
+        try:
+            return db.scalar(select(func.count()).select_from(PushSubscription)) or 0
+        finally:
+            db.close()
 
 
 class WebPushSender:

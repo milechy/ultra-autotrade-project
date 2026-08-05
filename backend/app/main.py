@@ -68,6 +68,7 @@ from app.knowledge.router import router as knowledge_router
 from app.market.router import router as market_router
 from app.notifications.models import (
     NotificationLog,  # noqa: F401 — ensure table registered with Base.metadata
+    PushSubscription,  # noqa: F401 — ensure table registered with Base.metadata
 )
 from app.notifications.router import api_router as notification_api_router
 from app.notifications.router import router as notification_router
