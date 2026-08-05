@@ -12,6 +12,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from app.notifications.push import (
+    DeliveryResult,
     InMemorySubscriptionStore,
     VAPIDConfig,
     WebPushSender,
@@ -51,7 +52,9 @@ class TestSendToUser:
 
         with (
             patch("app.notifications.push._PYWEBPUSH_AVAILABLE", True),
-            patch.object(sender, "send_to_subscription", return_value=True) as mock_send,
+            patch.object(
+                sender, "send_to_subscription", return_value=DeliveryResult.SUCCESS
+            ) as mock_send,
         ):
             result = sender.send_to_user(1, {"title": "t", "body": "b"})
 
@@ -69,7 +72,9 @@ class TestSendToUser:
 
         with (
             patch("app.notifications.push._PYWEBPUSH_AVAILABLE", True),
-            patch.object(sender, "send_to_subscription", return_value=True) as mock_send,
+            patch.object(
+                sender, "send_to_subscription", return_value=DeliveryResult.SUCCESS
+            ) as mock_send,
         ):
             sender.send_to_user(1, {"title": "t", "body": "b"})
 
@@ -83,7 +88,9 @@ class TestSendToUser:
 
         with (
             patch("app.notifications.push._PYWEBPUSH_AVAILABLE", True),
-            patch.object(sender, "send_to_subscription", return_value=True) as mock_send,
+            patch.object(
+                sender, "send_to_subscription", return_value=DeliveryResult.SUCCESS
+            ) as mock_send,
         ):
             result = sender.send_to_user(999, {"title": "t", "body": "b"})
 
@@ -97,7 +104,11 @@ class TestSendToUser:
 
         with (
             patch("app.notifications.push._PYWEBPUSH_AVAILABLE", True),
-            patch.object(sender, "send_to_subscription", side_effect=[False, True]),
+            patch.object(
+                sender,
+                "send_to_subscription",
+                side_effect=[DeliveryResult.FAILED_TRANSIENT, DeliveryResult.SUCCESS],
+            ),
         ):
             result = sender.send_to_user(1, {"title": "t", "body": "b"})
 
@@ -110,20 +121,31 @@ class TestSendToUser:
 
         with (
             patch("app.notifications.push._PYWEBPUSH_AVAILABLE", True),
-            patch.object(sender, "send_to_subscription", return_value=False),
+            patch.object(
+                sender, "send_to_subscription", return_value=DeliveryResult.FAILED_TRANSIENT
+            ),
         ):
             result = sender.send_to_user(1, {"title": "t", "body": "b"})
 
         assert result is False
 
-    def test_failed_subscription_is_removed_from_store(self) -> None:
-        """失敗した購読は store.remove で削除される (send_to_all と同じ挙動)。"""
+    def test_gone_subscription_is_removed_from_store(self) -> None:
+        """失効(410/404)した購読のみ store.remove で削除される。
+
+        2026-08-05: 以前は「失敗した購読」を一律削除していたため、一時エラーでも
+        購読が消えていた。一時エラーで消さないことの検証は
+        test_push_delivery_hardening.py::TestGoneVsTransientFailure が担う。
+        """
         store = _make_store()
         sender = WebPushSender(_make_config(), store)
 
         with (
             patch("app.notifications.push._PYWEBPUSH_AVAILABLE", True),
-            patch.object(sender, "send_to_subscription", side_effect=[True, False]),
+            patch.object(
+                sender,
+                "send_to_subscription",
+                side_effect=[DeliveryResult.SUCCESS, DeliveryResult.FAILED_GONE],
+            ),
         ):
             sender.send_to_user(1, {"title": "t", "body": "b"})
 

@@ -11,6 +11,7 @@ import logging
 import os
 import threading
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Callable, Optional, Protocol
 
 from pydantic import BaseModel
@@ -24,6 +25,25 @@ except ImportError:
     _PYWEBPUSH_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
+
+
+class DeliveryResult(Enum):
+    """1件の Web Push 送信結果。
+
+    2026-08-05: 以前は bool だったため「購読が失効した (410)」と「一時的に失敗した
+    (タイムアウト / 5xx)」を区別できず、呼び出し側が両方まとめて購読を削除していた。
+    その結果 FCM の一時障害 1 回で全ユーザーの購読が消え、ユーザーが手動で再購読する
+    まで通知が永久に届かなくなる (= 到達経路が黙って失われる、本プロジェクトが
+    最も避けたい失敗形)。除去してよいのは FAILED_GONE のみ。
+    """
+
+    SUCCESS = "success"
+    FAILED_TRANSIENT = "failed_transient"
+    FAILED_GONE = "failed_gone"
+
+
+#: 購読が恒久的に消滅したことを示す HTTP status。410 が標準、404 は実装差の吸収。
+_GONE_STATUS_CODES = frozenset({404, 410})
 
 
 @dataclass
@@ -126,23 +146,54 @@ class DatabaseSubscriptionStore:
 
     @staticmethod
     def _read_push_subscriptions(raw_json: Optional[str]) -> list[dict[str, Any]]:
+        """push_subscriptions を読む。壊れた列は空リストとして扱い、例外は投げない。
+
+        `null` / `[1,2]` / `123` / `"str"` はいずれも json.loads が成功するため
+        JSONDecodeError では捕まらない。dict 以外を弾かないと raw.get() が
+        AttributeError になり、呼び出し元の except Exception に飲まれて
+        「静かに配信スキップ」になる (到達経路の暗黙喪失)。
+        """
         if not raw_json:
             return []
         try:
             raw = json.loads(raw_json)
         except json.JSONDecodeError:
             return []
+        if not isinstance(raw, dict):
+            return []
         subs = raw.get("push_subscriptions")
         return subs if isinstance(subs, list) else []
 
     @staticmethod
     def _write_push_subscriptions(raw_json: Optional[str], subs: list[dict[str, Any]]) -> str:
+        """push_subscriptions のみを差し替えて返す。dict 以外の既存値は破棄して作り直す。"""
         try:
             raw = json.loads(raw_json) if raw_json else {}
         except json.JSONDecodeError:
             raw = {}
+        if not isinstance(raw, dict):
+            raw = {}
         raw["push_subscriptions"] = subs
         return json.dumps(raw)
+
+    @staticmethod
+    def _parse_entry(entry: Any, user_id: int) -> Optional[WebPushSubscription]:
+        """1 件の購読 entry を復元する。壊れていれば None を返し、他の購読を巻き込まない。
+
+        entry が dict でない (文字列 / None 等) 場合 ``entry["endpoint"]`` は
+        KeyError ではなく TypeError になるため、両方を弾く必要がある。
+        """
+        if not isinstance(entry, dict):
+            return None
+        try:
+            return WebPushSubscription(
+                endpoint=entry["endpoint"],
+                p256dh=entry["p256dh"],
+                auth=entry["auth"],
+                user_id=user_id,
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
 
     def add(self, subscription: WebPushSubscription) -> None:
         """サブスクリプションを永続化する。同じ endpoint は (他ユーザー分も含め) 上書きする。"""
@@ -226,17 +277,9 @@ class DatabaseSubscriptionStore:
             result: list[WebPushSubscription] = []
             for user in users:
                 for s in self._read_push_subscriptions(user.notification_settings_json):
-                    try:
-                        result.append(
-                            WebPushSubscription(
-                                endpoint=s["endpoint"],
-                                p256dh=s["p256dh"],
-                                auth=s["auth"],
-                                user_id=user.id,
-                            )
-                        )
-                    except KeyError:
-                        continue
+                    parsed = self._parse_entry(s, user.id)
+                    if parsed is not None:
+                        result.append(parsed)
             return result
         finally:
             db.close()
@@ -252,17 +295,9 @@ class DatabaseSubscriptionStore:
                 return []
             result: list[WebPushSubscription] = []
             for s in self._read_push_subscriptions(user.notification_settings_json):
-                try:
-                    result.append(
-                        WebPushSubscription(
-                            endpoint=s["endpoint"],
-                            p256dh=s["p256dh"],
-                            auth=s["auth"],
-                            user_id=user_id,
-                        )
-                    )
-                except KeyError:
-                    continue
+                parsed = self._parse_entry(s, user_id)
+                if parsed is not None:
+                    result.append(parsed)
             return result
         finally:
             db.close()
@@ -287,31 +322,25 @@ class WebPushSender:
 
         subscriptions = self._store.get_all()
         success_count = 0
-        failed_endpoints: list[str] = []
+        failed_count = 0
+        gone_endpoints: list[str] = []
 
         for subscription in subscriptions:
-            try:
-                ok = self.send_to_subscription(subscription, payload, ttl)
-                if ok:
-                    success_count += 1
-                else:
-                    failed_endpoints.append(subscription.endpoint)
-            except Exception:
-                logger.exception(
-                    "Web Push 送信中に予期しないエラーが発生しました: endpoint=%s",
-                    subscription.endpoint[:30],
-                )
-                failed_endpoints.append(subscription.endpoint)
+            result = self._deliver_guarded(subscription, payload, ttl)
+            if result is DeliveryResult.SUCCESS:
+                success_count += 1
+                continue
+            failed_count += 1
+            if result is DeliveryResult.FAILED_GONE:
+                gone_endpoints.append(subscription.endpoint)
 
-        # 失敗した subscription を削除
-        for endpoint in failed_endpoints:
-            self._store.remove(endpoint)
-            logger.info("失敗したサブスクリプションを削除しました: endpoint=%s", endpoint[:30])
+        self._purge_gone(gone_endpoints)
 
         logger.info(
-            "Web Push 送信完了: 成功=%d, 失敗=%d, 合計=%d",
+            "Web Push 送信完了: 成功=%d, 失敗=%d, 失効除去=%d, 合計=%d",
             success_count,
-            len(failed_endpoints),
+            failed_count,
+            len(gone_endpoints),
             len(subscriptions),
         )
         return success_count
@@ -328,36 +357,51 @@ class WebPushSender:
 
         subscriptions = self._store.get_for_user(user_id)
         success = False
-        failed_endpoints: list[str] = []
+        gone_endpoints: list[str] = []
 
         for subscription in subscriptions:
-            try:
-                ok = self.send_to_subscription(subscription, payload, ttl)
-                if ok:
-                    success = True
-                else:
-                    failed_endpoints.append(subscription.endpoint)
-            except Exception:
-                logger.exception(
-                    "Web Push 送信中に予期しないエラーが発生しました: user_id=%d, endpoint=%s",
-                    user_id,
-                    subscription.endpoint[:30],
-                )
-                failed_endpoints.append(subscription.endpoint)
+            result = self._deliver_guarded(subscription, payload, ttl)
+            if result is DeliveryResult.SUCCESS:
+                success = True
+            elif result is DeliveryResult.FAILED_GONE:
+                gone_endpoints.append(subscription.endpoint)
 
-        for endpoint in failed_endpoints:
-            self._store.remove(endpoint)
-            logger.info("失敗したサブスクリプションを削除しました: endpoint=%s", endpoint[:30])
-
+        self._purge_gone(gone_endpoints)
         return success
+
+    def _deliver_guarded(
+        self, subscription: WebPushSubscription, payload: dict[str, Any], ttl: int
+    ) -> DeliveryResult:
+        """send_to_subscription を例外から守る。原因不明の例外は一時失敗として扱う。
+
+        「失効と断定できない失敗」で購読を捨てないことが要件 (B-E1 / B-E2)。
+        """
+        try:
+            return self.send_to_subscription(subscription, payload, ttl)
+        except Exception:
+            logger.exception(
+                "Web Push 送信中に予期しないエラーが発生しました (購読は保持): endpoint=%s",
+                subscription.endpoint[:30],
+            )
+            return DeliveryResult.FAILED_TRANSIENT
+
+    def _purge_gone(self, gone_endpoints: list[str]) -> None:
+        """失効した購読のみをストアから除去する。"""
+        for endpoint in gone_endpoints:
+            self._store.remove(endpoint)
+            logger.info("失効した購読を除去しました: endpoint=%s", endpoint[:30])
 
     def send_to_subscription(
         self, subscription: WebPushSubscription, payload: dict[str, Any], ttl: int
-    ) -> bool:
-        """特定のサブスクリプションに通知を送信する。成功した場合は True を返す。"""
+    ) -> DeliveryResult:
+        """特定のサブスクリプションに送信し、結果を3分類して返す。
+
+        2026-08-05: 戻り値を bool から DeliveryResult に変更。呼び出し側が
+        「失効 (削除すべき)」と「一時失敗 (残すべき)」を区別できるようにするため。
+        """
         if not _PYWEBPUSH_AVAILABLE:
             logger.warning("pywebpush がインストールされていません。Web Push は無効です。")
-            return False
+            return DeliveryResult.FAILED_TRANSIENT
 
         try:
             webpush(
@@ -371,26 +415,58 @@ class WebPushSender:
                 ttl=ttl,
             )
             logger.info("Web Push 送信成功: endpoint=%s", subscription.endpoint[:30])
-            return True
+            return DeliveryResult.SUCCESS
         except Exception as exc:  # noqa: BLE001
-            # 410 Gone はサブスクリプションが無効（削除すべき）
             status_code: Optional[int] = None
             if _PYWEBPUSH_AVAILABLE:
                 if isinstance(exc, WebPushException) and exc.response is not None:
                     status_code = exc.response.status_code
 
-            if status_code == 410:
+            # 404/410 のみが「購読はもう存在しない」を意味する。それ以外 (5xx / 429 /
+            # ネットワーク断 / status 不明) は購読が生きている可能性があるため残す。
+            if status_code in _GONE_STATUS_CODES:
                 logger.info(
-                    "Web Push サブスクリプションが無効 (410 Gone): endpoint=%s",
-                    subscription.endpoint[:30],
-                )
-            else:
-                logger.error(
-                    "Web Push 送信失敗: status=%s, endpoint=%s",
+                    "Web Push サブスクリプション失効 (status=%s): endpoint=%s",
                     status_code,
                     subscription.endpoint[:30],
                 )
-            return False
+                return DeliveryResult.FAILED_GONE
+
+            logger.error(
+                "Web Push 送信失敗 (一時エラー扱い・購読は保持): status=%s, endpoint=%s",
+                status_code,
+                subscription.endpoint[:30],
+            )
+            return DeliveryResult.FAILED_TRANSIENT
+
+
+def push_allowed_for_user(raw_settings_json: Optional[str], preference_key: str) -> bool:
+    """ユーザーの通知設定が当該種別の Web Push を許可しているか判定する。
+
+    2026-08-05 (受け入れ条件 B-N4): 「通知設定で提案通知を無効にする → 配信されない」。
+    以前は購読行が存在すれば設定を無視して送っていたため、設定画面で OFF にしても
+    通知が届く状態だった (設定表示と実挙動の乖離 = 本プロジェクトが繰り返している
+    ドリフトと同型)。
+
+    push_enabled は NotificationSettingsModel 既定が False であり、
+    「明示的に有効化していないユーザーには送らない」を既定の約束とする。
+    設定が壊れている場合も送らない (fail-closed: 意図しない通知より無通知を選ぶ。
+    到達経路ゼロ側は別途 B-6 の検知対象になる)。
+    """
+    if not raw_settings_json:
+        return False
+    try:
+        raw = json.loads(raw_settings_json)
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(raw, dict):
+        return False
+    if raw.get("push_enabled") is not True:
+        return False
+    preferences = raw.get("preferences")
+    if isinstance(preferences, dict) and preferences.get(preference_key) is False:
+        return False
+    return True
 
 
 def get_vapid_config() -> Optional[VAPIDConfig]:
