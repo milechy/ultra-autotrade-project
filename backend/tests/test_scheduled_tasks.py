@@ -1127,11 +1127,15 @@ class TestLoopBodyAdditional:
 
     @pytest.mark.asyncio
     async def test_latency_monitor_loop_records_latency(self) -> None:
-        """latency_monitor_loop: httpx.get 成功 → record_latency() が呼ばれる（L557-603）。"""
+        """latency_monitor_loop: httpx.get が 2xx → record_latency() が呼ばれる（L557-603）。"""
         from app.automation.scheduled_tasks import latency_monitor_loop
 
         _, mock_sleep = self._make_sleep_counter(raise_on=2)
         mock_ms = MagicMock()
+        # status_code は数値で与える必要がある (素の MagicMock だと >= 400 の比較が
+        # 真になり、記録スキップ側に落ちてしまう)。
+        mock_response = MagicMock()
+        mock_response.status_code = 200
 
         with (
             patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
@@ -1140,12 +1144,70 @@ class TestLoopBodyAdditional:
                 side_effect=self._run_in_same_thread,
             ),
             patch("app.automation.state.get_monitoring_service", return_value=mock_ms),
-            patch("httpx.get"),
+            patch("httpx.get", return_value=mock_response) as mock_get,
         ):
             with pytest.raises(asyncio.CancelledError):
                 await latency_monitor_loop(interval_seconds=1)
 
         mock_ms.record_latency.assert_called_once()
+        # 認証不要な /health を叩くこと。認証必須の /api/automation/status を叩くと
+        # 常に 401 になり、レイテンシ監視が永久に発火しない (2026-08-06 本番で発覚)。
+        called_url = mock_get.call_args.args[0]
+        assert called_url.endswith("/health"), f"想定外の計測先: {called_url}"
+
+    @pytest.mark.asyncio
+    async def test_latency_monitor_loop_does_not_record_on_4xx(self) -> None:
+        """★非2xx (401等) を「速い応答」として記録しないこと。
+
+        2026-08-06 本番で発覚したバグの回帰防止。以前は認証必須エンドポイントを
+        叩いており、httpx.get() が 4xx で例外を投げないため「401 拒否までの時間」が
+        システム応答時間として記録され続けていた。閾値 (>10s 警告 / >30s アラート) に
+        絶対到達しないため、レイテンシ監視が構造的に永久に発火しない状態だった。
+        """
+        from app.automation.scheduled_tasks import latency_monitor_loop
+
+        _, mock_sleep = self._make_sleep_counter(raise_on=2)
+        mock_ms = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch(
+                "app.automation.scheduled_tasks.asyncio.to_thread",
+                side_effect=self._run_in_same_thread,
+            ),
+            patch("app.automation.state.get_monitoring_service", return_value=mock_ms),
+            patch("httpx.get", return_value=mock_response),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await latency_monitor_loop(interval_seconds=1)
+
+        mock_ms.record_latency.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_latency_monitor_loop_does_not_record_on_5xx(self) -> None:
+        """非2xx (5xx) も同様に記録しないこと。"""
+        from app.automation.scheduled_tasks import latency_monitor_loop
+
+        _, mock_sleep = self._make_sleep_counter(raise_on=2)
+        mock_ms = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 503
+
+        with (
+            patch("app.automation.scheduled_tasks.asyncio.sleep", side_effect=mock_sleep),
+            patch(
+                "app.automation.scheduled_tasks.asyncio.to_thread",
+                side_effect=self._run_in_same_thread,
+            ),
+            patch("app.automation.state.get_monitoring_service", return_value=mock_ms),
+            patch("httpx.get", return_value=mock_response),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await latency_monitor_loop(interval_seconds=1)
+
+        mock_ms.record_latency.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_latency_monitor_loop_request_fails_skips(self) -> None:

@@ -1193,13 +1193,32 @@ async def latency_monitor_loop(
                 from app.automation.state import get_monitoring_service  # noqa: PLC0415
 
                 base_url = os.getenv("BACKEND_BASE_URL", "http://localhost:8000")
-                url = f"{base_url}/api/automation/status"
+                # 2026-08-06: 以前は /api/automation/status を叩いていたが、この
+                # エンドポイントは require_viewer (JWT ユーザー) を要求するため、
+                # 認証情報を持たない本ループからは常に 401 が返っていた
+                # (X-Internal-Token 方式もこのエンドポイントは受け付けない)。
+                # httpx.get() は 4xx で例外を投げないため「401 拒否までの時間」が
+                # システム応答時間として記録され続け、閾値 (>10s 警告 / >30s アラート)
+                # に絶対に到達しない = **レイテンシ監視が構造的に永久に発火しない**
+                # 状態だった (本番ログに 60 秒ごとの 401 が並んでいたことで発覚)。
+                # /health は認証不要かつスケジューラ健全性計算という実処理を行うため
+                # 応答時間の代理指標として妥当。
+                url = f"{base_url}/health"
 
                 monitoring_service = get_monitoring_service()
                 start = time.monotonic()
                 try:
-                    httpx.get(url, timeout=35)
+                    response = httpx.get(url, timeout=35)
                     elapsed = time.monotonic() - start
+                    # 非 2xx は「速く失敗した」だけであり応答性能の指標にならない。
+                    # 記録すると健全に見えてしまうため、記録せず警告に留める。
+                    if response.status_code >= 400:
+                        logger.warning(
+                            "Latency check got HTTP %d from %s (skipping record)",
+                            response.status_code,
+                            url,
+                        )
+                        return
                     monitoring_service.record_latency(ComponentType.SYSTEM, elapsed)
                     logger.debug("Latency recorded: %.3fs for %s", elapsed, url)
                 except Exception as req_exc:
