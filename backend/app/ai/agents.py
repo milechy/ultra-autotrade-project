@@ -454,6 +454,18 @@ def _indicator_momentum_enabled() -> bool:
     return os.getenv("AI_INDICATOR_MOMENTUM_ENABLED", "false").strip().lower() == "true"
 
 
+def _utilization_band_v2_enabled() -> bool:
+    """稼働率(utilization)バンド上位境界のkill switch(既定OFF)。
+
+    有効化すると稼働率バンドの上位境界を85→95に引き上げる補正が入る
+    (下位境界70/30・スコア幅-18/-4/+6/+12・bias/confidence算出は不変)。
+    AI判定コアの補正のため、staging soak確認後に人間が明示的に
+    AI_UTILIZATION_BAND_V2_ENABLED=true を設定するまでは無効(既存動作と不変)。
+    異常発生時は env を戻すだけで即無効化できる(再デプロイ不要)。
+    """
+    return os.getenv("AI_UTILIZATION_BAND_V2_ENABLED", "false").strip().lower() == "true"
+
+
 def indicator_agent(ctx: MarketContext) -> AgentSignal:
     """Analyze Aave on-chain indicators (utilization, APY, HF).
 
@@ -472,7 +484,8 @@ def indicator_agent(ctx: MarketContext) -> AgentSignal:
     Rules (post-fix):
     - HF < 1.6 → strongly bearish; HF 1.6-1.75 → bearish; 1.75-1.9 → mild cau-
       tion; 1.9-2.1 → mild comfort; 2.1-2.5 → bullish; ≥2.5 → strongly bullish.
-    - Util >85% → bearish; 70-85% → mild caution; 30-70% → mild comfort;
+    - Util >85% (kill switch AI_UTILIZATION_BAND_V2_ENABLED=true で >95%) → bearish;
+      70-85%(or 70-95%) → mild caution; 30-70% → mild comfort;
       <30% → bullish (ample liquidity).
     - Supply APY >5% → bullish (attractive yield); <1% → mild bearish (yield
       compression suggests over-supply / weak demand).
@@ -510,7 +523,8 @@ def indicator_agent(ctx: MarketContext) -> AgentSignal:
     if util is not None:
         util_float = float(util)
         key_data["utilization_rate"] = str(util)
-        if util_float > 85:
+        _util_high_band = 95 if _utilization_band_v2_enabled() else 85
+        if util_float > _util_high_band:
             score -= 18
             reasons.append(f"Utilization at {util}% — heavy liquidity pressure")
         elif util_float > 70:
