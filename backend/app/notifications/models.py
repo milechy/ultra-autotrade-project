@@ -121,6 +121,11 @@ class PushSubscription(Base):
     """
     Web Push 購読テーブル (2026-08-05)。
 
+    Base.metadata への登録経路: main.py → notifications.router → .push →
+    ``from .models import PushSubscription``。push.py が実際に本モデルを使うため
+    連鎖 import で必ず読み込まれる。NotificationLog のような main.py での明示 import
+    (noqa: F401) は不要 (main.py は凍結ファイルであり、不要な変更を避ける)。
+
     Attributes:
         id: プライマリキー
         endpoint: ブラウザの push service endpoint URL (グローバルに一意)
