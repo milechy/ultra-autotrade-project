@@ -149,6 +149,75 @@ class TestCheckOracleStaleness:
             )
         assert result is None
 
+    def test_contract_interface_error_logged_as_misconfiguration(self, caplog) -> None:
+        """★feed アドレス設定ミス (revert) を「RPC障害」と誤診しないこと。
+
+        2026-08-06 本番で発覚: AAVE_ORACLE_FEED_ADDRESS に Chainlink AggregatorV3 では
+        なく Aave Oracle (getAssetPrice インターフェース) が設定されており、
+        latestRoundData() が revert していた。しかしログは一律「RPC failure」と
+        出ていたため、RPC の一時障害として長期間見過ごされ、全執行経路が
+        fail-closed で停止し続けていた。設定ミスはリトライで回復しないため、
+        一時障害と明確に区別してログする必要がある。
+        """
+        import logging
+
+        from web3.exceptions import ContractLogicError
+
+        from app.aave.oracle_checker import check_oracle_staleness
+
+        mock_web3_module = MagicMock()
+        mock_w3 = MagicMock()
+        mock_contract = MagicMock()
+        mock_web3_module.Web3.return_value = mock_w3
+        mock_web3_module.Web3.HTTPProvider = MagicMock()
+        mock_web3_module.Web3.to_checksum_address = lambda x: x
+        mock_w3.eth.contract.return_value = mock_contract
+        # 実際に本番で起きた例外そのもの
+        mock_contract.functions.latestRoundData.return_value.call.side_effect = ContractLogicError(
+            "execution reverted", "no data"
+        )
+
+        with patch.dict(sys.modules, {"web3": mock_web3_module}):
+            with caplog.at_level(logging.WARNING):
+                result = check_oracle_staleness(
+                    feed_address="0xNOT_A_CHAINLINK_FEED",
+                    rpc_url="http://localhost:8545",
+                )
+
+        assert result is None
+        text = caplog.text
+        assert "設定ミス" in text, f"設定ミスと明示されていない: {text}"
+        assert "AAVE_ORACLE_FEED_ADDRESS" in text, "どの env を直すべきか示されていない"
+        # 一時障害と誤解させる表現を混ぜないこと
+        assert "一時障害" not in text, f"設定ミスなのに一時障害と表示している: {text}"
+
+    def test_transient_rpc_error_not_labeled_as_misconfiguration(self, caplog) -> None:
+        """逆に、一時的な RPC 障害を「設定ミス」と誤診しないこと。"""
+        import logging
+
+        from app.aave.oracle_checker import check_oracle_staleness
+
+        mock_web3_module = MagicMock()
+        mock_w3 = MagicMock()
+        mock_contract = MagicMock()
+        mock_web3_module.Web3.return_value = mock_w3
+        mock_web3_module.Web3.HTTPProvider = MagicMock()
+        mock_web3_module.Web3.to_checksum_address = lambda x: x
+        mock_w3.eth.contract.return_value = mock_contract
+        mock_contract.functions.latestRoundData.return_value.call.side_effect = ConnectionError(
+            "connection refused"
+        )
+
+        with patch.dict(sys.modules, {"web3": mock_web3_module}):
+            with caplog.at_level(logging.WARNING):
+                result = check_oracle_staleness(
+                    feed_address="0xFEED",
+                    rpc_url="http://localhost:8545",
+                )
+
+        assert result is None
+        assert "設定ミス" not in caplog.text, "一時障害なのに設定ミスと表示している"
+
     def test_price_calculated_correctly(self) -> None:
         from app.aave.oracle_checker import check_oracle_staleness
 
