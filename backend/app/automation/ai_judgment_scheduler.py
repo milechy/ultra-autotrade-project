@@ -76,13 +76,21 @@ _PROPOSAL_EXPIRES_HOURS = 168
 # 運営へアラートする閾値。無限に作り直し続けている状態を検知するためのもの。
 _CONSECUTIVE_EXPIRY_ALERT_THRESHOLD = 3
 
-# 提案金額: fund_allocations.allocated_amount_usd × _PROPOSAL_RATIO で動的計算。
+# 提案金額: fund_allocations.allocated_amount_usd から実行済み提案の積み上げ (deployed) を
+# 差し引いた遊休額 (idle) × _PROPOSAL_RATIO で動的計算 (2026-08-06: 静的台帳→動的遊休額へ
+# 変更 / Asana 1217210604911292、詳細は _resolve_deployed_amount_usd 参照)。
 # fund_allocation 不在の非カストディアル消費者は本人 wallet の USDC 残高 × ratio に
 # fallback する (案C / docs/61)。いずれも sizing 不能なら Decimal("0") → skip (安全側)。
 # 環境変数で上書き可能。
 _PROPOSAL_RATIO = Decimal(os.getenv("PROPOSAL_AMOUNT_RATIO", "0.10"))  # 10%
 _PROPOSAL_AMOUNT_MIN_USD = Decimal(os.getenv("PROPOSAL_AMOUNT_MIN_USD", "50"))
 _PROPOSAL_AMOUNT_MAX_USD = Decimal(os.getenv("PROPOSAL_AMOUNT_MAX_USD", "2000"))
+
+# 採算ゲート (fees.trade_gate) 未達スキップ時にユーザーへ伝える理由文言 (無音デッドゾーン対策)。
+_TRADE_GATE_SKIP_MESSAGE = (
+    "現在の運用資金では取引コストに対して見込める利益が小さいため、AI提案の作成を"
+    "見送っています。資金や市場状況が変わると再評価されます。"
+)
 
 
 def _read_wallet_usdc_balance(wallet_address: str) -> Optional[Decimal]:
@@ -96,14 +104,74 @@ def _read_wallet_usdc_balance(wallet_address: str) -> Optional[Decimal]:
     return read_wallet_usdc_balance(wallet_address)
 
 
+def _resolve_deployed_amount_usd(db: Session, user_id: int) -> Decimal:
+    """custodial ユーザーの「既に運用に乗っている金額 (deployed)」を実行済み提案から算出する。
+
+    fund_allocations.allocated_amount_usd は静的な入金台帳で、運用しても DB の値が
+    変わらない (Asana 1217210604911292: 何回稼働しても同じ提案額が出続ける問題)。
+    実行済み提案 (status='executed') を SUM(SUPPLY) - SUM(WITHDRAW) で積み上げることで、
+    運用が進むほど増える動的な「運用済み額」を得る。WITHDRAW が先行する記録不整合等が
+    あっても負値には倒れない (0 でクランプ)。
+
+    `app.users.deposit_resolver.resolve_user_deposit_usd`（未投入資金のみを見る別概念、
+    A-2 入金ゲート用）とは目的が異なるため、そのまま流用しない（過去の事故教訓）。
+    """
+    supplied = (
+        db.query(func.sum(Proposal.amount_usd))
+        .filter(
+            Proposal.user_id == user_id,
+            Proposal.status == "executed",
+            Proposal.operation == "SUPPLY",
+        )
+        .scalar()
+    )
+    withdrawn = (
+        db.query(func.sum(Proposal.amount_usd))
+        .filter(
+            Proposal.user_id == user_id,
+            Proposal.status == "executed",
+            Proposal.operation == "WITHDRAW",
+        )
+        .scalar()
+    )
+    supplied_usd = Decimal(str(supplied)) if supplied else Decimal("0")
+    withdrawn_usd = Decimal(str(withdrawn)) if withdrawn else Decimal("0")
+    return max(Decimal("0"), supplied_usd - withdrawn_usd)
+
+
+def _notify_proposal_skipped(user_id: int, reason: str) -> None:
+    """提案が生成されなかった理由をユーザー本人に伝える (best-effort)。
+
+    2026-08-06 (Asana 1217210854320785): 公表最低入金額 ($200) を満たしていても、
+    10% サイジングが最小ロット ($50) 未満 / 採算ゲート未達で提案が無音のまま
+    スキップされ続ける「実効最低入金 $852 の無音デッドゾーン」があった。
+    運営向け Slack 通知 (`_notify_missing_allocation` 等) とは別に、本人にも
+    既存の通知経路 (`get_notification_service`) で理由を届ける。
+    """
+    try:
+        from app.notifications.factory import get_notification_service  # noqa: PLC0415
+        from app.notifications.templates import proposal_skipped_notification  # noqa: PLC0415
+
+        payload = proposal_skipped_notification(reason)
+        payload.notification_message.user_id = user_id
+        get_notification_service().send(payload.notification_message)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("_notify_proposal_skipped failed for user_id=%d: %s", user_id, exc)
+
+
 def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
     """提案金額を解決する (案C: fund_allocation 優先 + wallet 残高 fallback / docs/61)。
 
-    1. active fund_allocations 合計 × ratio (custodial パートナー/テスター枠)。
-       min/max にクランプ。**既存挙動を完全維持**。
+    1. active fund_allocations 合計 (allocated) から実行済み提案の積み上げ (deployed,
+       `_resolve_deployed_amount_usd`) を差し引いた **遊休額 (idle)** × ratio
+       (custodial パートナー/テスター枠、2026-08-06: 分母を静的台帳から動的遊休額へ変更
+       / Asana 1217210604911292)。min/max にクランプする既存の非対称は維持。
+       idle が尽きたら (<=0) 提案を出さない。
     2. allocation 不在 & wallet 設定済の非カストディアル消費者: 本人 wallet の
-       on-chain USDC 残高 × ratio。残高0 / 取得失敗 / min 未満は Decimal("0") で skip
-       (安全側: wallet 額を超える/極小の提案を作らない)。
+       on-chain USDC 残高 × ratio。wallet 残高は Aave 供給済み分を含まない
+       (`total_assets_resolver` 参照) ため、この経路は元から遊休額を見ている。
+       残高0 / 取得失敗 / min 未満は Decimal("0") で skip (安全側: wallet 額を超える/
+       極小の提案を作らない)。
     3. allocation も wallet も無い: sizing 不能 → Slack 通知 + Decimal("0")
        (パートナー/テスター登録漏れの検知を維持)。
 
@@ -124,6 +192,7 @@ def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
     allocated = Decimal(str(raw)) if raw else Decimal("0")
     if allocated > Decimal("0"):
         # A-2 入金ゲート: 運用開始の最低入金額 (MIN_DEPOSIT_USD) 未満は提案を生成しない。
+        # (これは「入金総額」に対するゲートであり、下の遊休額判定とは別軸。既存挙動を維持)
         if allocated < MIN_DEPOSIT_USD:
             logger.info(
                 "[deposit_gate] custodial deposit $%s < min $%s for user_id=%d — proposal skipped",
@@ -132,7 +201,19 @@ def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
                 user_id,
             )
             return Decimal("0")
-        amount = (allocated * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
+        deployed = _resolve_deployed_amount_usd(db, user_id)
+        idle = allocated - deployed
+        if idle <= Decimal("0"):
+            # 遊休資金なし (全額運用済み) → 提案を出さない (Asana 1217210604911292)。
+            logger.info(
+                "[idle_capital] user_id=%d fully deployed (allocated=$%s, deployed=$%s) "
+                "— no idle capital, proposal skipped",
+                user_id,
+                allocated,
+                deployed,
+            )
+            return Decimal("0")
+        amount = (idle * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
         return max(_PROPOSAL_AMOUNT_MIN_USD, min(amount, _PROPOSAL_AMOUNT_MAX_USD))
 
     # ── 2. fallback: 非カストディアル消費者の wallet USDC 残高 ──
@@ -161,11 +242,23 @@ def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
             # 10% が gas viable な最小額未満 → skip。
             # allocation 経路は min へ切り上げるが、消費者 wallet 経路では残高に対し
             # 過大な supply を避けるため切り上げず skip する (意図的な非対称 / docs/61)。
-            logger.debug(
-                "[proposal_amount] wallet-based amount %s < min $%s for user_id=%d — skipped",
+            # 2026-08-06 (Asana 1217210854320785): $200(最低入金)〜サイジング下限の
+            # 無音デッドゾーン。info/debug → warning に上げ、本人にも理由を通知する。
+            logger.warning(
+                "[proposal_amount] wallet-based amount $%s < min $%s for user_id=%d — "
+                "skipped (deadzone: balance=$%s, sizing-only lower bound=$%s "
+                "before downstream trade_gate)",
                 amount,
                 _PROPOSAL_AMOUNT_MIN_USD,
                 user_id,
+                balance,
+                (_PROPOSAL_AMOUNT_MIN_USD / _PROPOSAL_RATIO).quantize(Decimal("0.01")),
+            )
+            _notify_proposal_skipped(
+                user_id,
+                f"残高 ${balance:.2f} の運用額(10%)が最低取引額 "
+                f"${_PROPOSAL_AMOUNT_MIN_USD:.2f} に届かないため、AI提案の作成を"
+                "見送っています。追加入金いただくと提案が作成されるようになります。",
             )
             return Decimal("0")
         return min(amount, _PROPOSAL_AMOUNT_MAX_USD)
@@ -967,11 +1060,16 @@ def _create_proposals_for_users(
                 )
 
                 if not market_fee.should_trade:
-                    logger.info(
-                        "DynamicFee: should_trade=False for user %d — skipping proposal (%s)",
+                    # 2026-08-06 (Asana 1217210854320785): 採算ゲートでの無音スキップ。
+                    # info → warning に上げ、本人にも理由を通知する。
+                    logger.warning(
+                        "DynamicFee: should_trade=False for user %d — skipping proposal "
+                        "(amount=$%s, %s)",
                         user.id,
+                        proposal_amount_usd,
                         market_fee.reason,
                     )
+                    _notify_proposal_skipped(user.id, _TRADE_GATE_SKIP_MESSAGE)
                     continue
 
                 # Phase-B: AI Optimizer 経由で (operation, asset, protocol) を決定。
@@ -1136,11 +1234,15 @@ def _create_safe_yield_proposals_for_users(
                     fixed_cost_usd=fixed_cost,
                 )
                 if not market_fee.should_trade:
-                    logger.info(
-                        "[safe_yield] should_trade=False for user %d — skip (%s)",
+                    # 2026-08-06 (Asana 1217210854320785): 採算ゲートでの無音スキップ。
+                    # info → warning に上げ、本人にも理由を通知する。
+                    logger.warning(
+                        "[safe_yield] should_trade=False for user %d — skip (amount=$%s, %s)",
                         user.id,
+                        proposal_amount_usd,
                         market_fee.reason,
                     )
+                    _notify_proposal_skipped(user.id, _TRADE_GATE_SKIP_MESSAGE)
                     continue
 
                 # 安全利回り: 方向性ルーティングを通さず SUPPLY/USDC/aave 固定。
