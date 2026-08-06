@@ -149,6 +149,21 @@ def execution_mode_downgraded_notification() -> NotificationPayload:
     return _build_payload(title, body, "warning")
 
 
+def proposal_skipped_notification(reason: str) -> NotificationPayload:
+    """AI提案が作成されなかったこととその理由をユーザーに知らせる通知。
+
+    2026-08-06 (Asana 1217210854320785): 公表最低入金額を満たしていても、
+    10%サイジングが最小ロット未満 / 採算ゲート未達で提案が無音のままスキップされ
+    続ける「無音デッドゾーン」への対応。運営向け Slack (`operational_alert_notification`)
+    とは別に、本人向けにここで理由を伝える。
+
+    Args:
+        reason: 呼び出し側が組み立てた具体的なスキップ理由（本文にそのまま使う）。
+    """
+    title = "ℹ️ 現在はAI提案を作成していません"
+    return _build_payload(title, reason, "info")
+
+
 # --- 取引4種 ---
 
 

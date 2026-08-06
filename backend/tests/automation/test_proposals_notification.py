@@ -128,10 +128,16 @@ class TestCreateProposalsForUsersNotification:
         _, msgs = self._run(action=TradeAction.BUY, user_id=42)
         assert msgs[0].user_id == 42
 
-    def test_no_send_when_should_trade_false(self) -> None:
-        """DynamicFee should_trade=False: no notification."""
-        _, msgs = self._run(should_trade=False)
-        assert len(msgs) == 0
+    def test_skip_reason_notification_when_should_trade_false(self) -> None:
+        """DynamicFee should_trade=False: 提案は作らないが、スキップ理由を本人に通知する。
+
+        2026-08-06 (Asana 1217210854320785): 以前は「何も送らない」が期待値だったが、
+        それが「無音デッドゾーン」（残高はあるのに理由が分からず提案が来ない）の
+        原因の一つだった。採算ゲート未達時も理由を本人に通知するよう変更。
+        """
+        _, msgs = self._run(should_trade=False, user_id=42)
+        assert len(msgs) == 1
+        assert msgs[0].user_id == 42
 
     def test_send_called_for_sell_action(self) -> None:
         """SELL: notification is also sent."""
