@@ -44,6 +44,17 @@ HASHIGUCHI_WALLET = "0xHashiguchi2222222222222222222222222222222"
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def _enable_custodial_execution(monkeypatch: pytest.MonkeyPatch) -> None:
+    """本ファイルは custodial 単一鍵経路そのものの検証。
+
+    `CUSTODIAL_EXECUTION_ENABLED` は 2026-08-06 に既定 false へ分離された
+    （`AUTO_EXECUTION_ENABLED=true` が委譲経路と custodial 経路を同時に開いてしまう問題の
+    対策 / `_custodial_execution_enabled` 参照）。ここでは検証対象なので明示的に開ける。
+    """
+    monkeypatch.setenv("CUSTODIAL_EXECUTION_ENABLED", "true")
+
+
 @pytest.fixture()
 def db_session() -> Generator[Session, None, None]:
     fd, path = tempfile.mkstemp(suffix=".db")

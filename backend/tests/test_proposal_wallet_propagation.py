@@ -137,7 +137,9 @@ def test_wallet_address_is_propagated_to_execute_rebalance(
     )
 
     with (
-        patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
+        patch.dict(
+            os.environ, {"AUTO_EXECUTION_ENABLED": "true", "CUSTODIAL_EXECUTION_ENABLED": "true"}
+        ),
         patch(
             "app.aave.service.MultiChainAaveService.execute_rebalance",
             return_value=fake_result,
@@ -166,7 +168,9 @@ def test_null_wallet_is_blocked_by_layer1_guard(client: TestClient, test_db: tup
     _set_admin_wallet(SessionLocal, None)
 
     with (
-        patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
+        patch.dict(
+            os.environ, {"AUTO_EXECUTION_ENABLED": "true", "CUSTODIAL_EXECUTION_ENABLED": "true"}
+        ),
         patch(
             "app.aave.service.MultiChainAaveService.execute_rebalance",
         ) as mock_execute,
@@ -205,7 +209,9 @@ def test_two_users_propagate_their_own_wallets(client: TestClient, test_db: tupl
     )
 
     with (
-        patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
+        patch.dict(
+            os.environ, {"AUTO_EXECUTION_ENABLED": "true", "CUSTODIAL_EXECUTION_ENABLED": "true"}
+        ),
         patch(
             "app.aave.service.MultiChainAaveService.execute_rebalance",
             return_value=fake_result,
@@ -223,7 +229,9 @@ def test_two_users_propagate_their_own_wallets(client: TestClient, test_db: tupl
     _set_admin_wallet(SessionLocal, HASHIGUCHI_WALLET)
 
     with (
-        patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
+        patch.dict(
+            os.environ, {"AUTO_EXECUTION_ENABLED": "true", "CUSTODIAL_EXECUTION_ENABLED": "true"}
+        ),
         patch(
             "app.aave.service.MultiChainAaveService.execute_rebalance",
             return_value=fake_result,

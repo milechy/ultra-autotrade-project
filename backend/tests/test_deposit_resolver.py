@@ -12,9 +12,15 @@ from app.users.deposit_resolver import resolve_user_deposit_usd
 
 
 def _db_with_allocation(total) -> MagicMock:  # type: ignore[no-untyped-def]
-    """db.query(...).filter(...).scalar() が total を返す mock セッション。"""
+    """db.query(...).filter(...).scalar() が total を返す mock セッション。
+
+    db.get は既定で「SCW を持たない custodial ユーザー」を返す。素の MagicMock だと
+    smart_wallet_address が truthy になり、SCW 保有ユーザー扱いで allocation が
+    資金源から外れてしまう（uses_custodial_allocation / 2026-08-06）。
+    """
     db = MagicMock()
     db.query.return_value.filter.return_value.scalar.return_value = total
+    db.get.return_value = MagicMock(smart_wallet_address=None, wallet_address=None)
     return db
 
 

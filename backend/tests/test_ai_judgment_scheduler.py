@@ -1458,15 +1458,15 @@ def test_resolve_amount_wallet_balance_unavailable_is_skipped(db_session, monkey
     assert sched._resolve_proposal_amount(db_session, user.id) == Decimal("0")
 
 
-def test_resolve_amount_allocation_takes_priority_over_wallet(db_session, monkeypatch):
-    """allocation と wallet 双方ある場合は allocation を優先 (既存パートナー互換)。
+def test_resolve_amount_allocation_takes_priority_for_custodial_user(db_session, monkeypatch):
+    """SCW を持たない custodial ユーザーは allocation を優先 (既存パートナー互換)。
 
     allocation $10,000 → $1,000。wallet 残高は参照されない。
     """
     import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
 
     user = _add_active_user(db_session, "both@example.com")
-    user.smart_wallet_address = "0x" + "e" * 40
+    user.wallet_address = "0x" + "e" * 40
     _add_fund_allocation(db_session, user, allocated_usd=Decimal("10000"))
     db_session.commit()
 
@@ -1475,6 +1475,34 @@ def test_resolve_amount_allocation_takes_priority_over_wallet(db_session, monkey
 
     monkeypatch.setattr(sched, "_read_wallet_usdc_balance", _should_not_be_called)
     assert sched._resolve_proposal_amount(db_session, user.id) == Decimal("1000.00")
+
+
+def test_resolve_amount_scw_user_ignores_allocation(db_session, monkeypatch):
+    """★SCW を持つユーザーは allocation(帳簿) でなく on-chain 実残高で sizing する。
+
+    2026-08-06 に規則変更。`fund_allocations` は custodial プール持分の帳簿行であり
+    オンチェーンの裏付けが無い。SCW 執行の分母に使うと実残高の何倍もの提案を作り、
+    承認後に on-chain revert する（本番 user 11 が allocation $4,600 / SCW 残高 $0 の形
+    だった）。ゲート側 `resolve_user_deposit_usd` と同一規則。
+    """
+    import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
+
+    scw = "0x" + "e" * 40
+    user = _add_active_user(db_session, "scw-with-allocation@example.com")
+    user.smart_wallet_address = scw
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("10000"))
+    db_session.commit()
+
+    read: list[str] = []
+
+    def _read(addr):
+        read.append(addr)
+        return Decimal("2000")
+
+    monkeypatch.setattr(sched, "_read_wallet_usdc_balance", _read)
+    # 帳簿 $10,000 の 10% = $1,000 ではなく、実残高 $2,000 の 10% = $200。
+    assert sched._resolve_proposal_amount(db_session, user.id) == Decimal("200.00")
+    assert read == [scw]
 
 
 def test_resolve_amount_no_allocation_no_wallet_notifies_and_zero(db_session, monkeypatch):

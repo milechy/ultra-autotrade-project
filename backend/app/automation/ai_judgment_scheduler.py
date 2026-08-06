@@ -34,6 +34,7 @@ from app.knowledge.schemas import KnowledgeSearchRequest
 from app.knowledge.service import KnowledgeService
 from app.proposals.models import Proposal
 from app.users.deposit_policy import MIN_DEPOSIT_USD
+from app.users.deposit_resolver import uses_custodial_allocation
 from app.users.models import get_active_grant
 
 # ティア別デフォルト判定間隔（時間）
@@ -99,6 +100,10 @@ def _read_wallet_usdc_balance(wallet_address: str) -> Optional[Decimal]:
 def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
     """提案金額を解決する (案C: fund_allocation 優先 + wallet 残高 fallback / docs/61)。
 
+    0. smart_wallet_address を持つユーザーは 1 を飛ばして 2 へ
+       (`uses_custodial_allocation` / 2026-08-06)。allocation は custodial プール持分の
+       帳簿行でオンチェーンの裏付けが無く、SCW 執行の sizing 分母に使うと実残高の
+       何倍もの提案を作ってしまうため。ゲート側 (`resolve_user_deposit_usd`) と同一規則。
     1. active fund_allocations 合計 × ratio (custodial パートナー/テスター枠)。
        min/max にクランプ。**既存挙動を完全維持**。
     2. allocation 不在 & wallet 設定済の非カストディアル消費者: 本人 wallet の
@@ -112,31 +117,34 @@ def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
     """
     from app.partner.allocation_models import FundAllocation  # noqa: PLC0415
 
-    # ── 1. fund_allocation 優先 (custodial 枠) ──
-    raw = (
-        db.query(func.sum(FundAllocation.allocated_amount_usd))
-        .filter(
-            FundAllocation.tester_user_id == user_id,
-            FundAllocation.status == "active",
-        )
-        .scalar()
-    )
-    allocated = Decimal(str(raw)) if raw else Decimal("0")
-    if allocated > Decimal("0"):
-        # A-2 入金ゲート: 運用開始の最低入金額 (MIN_DEPOSIT_USD) 未満は提案を生成しない。
-        if allocated < MIN_DEPOSIT_USD:
-            logger.info(
-                "[deposit_gate] custodial deposit $%s < min $%s for user_id=%d — proposal skipped",
-                allocated,
-                MIN_DEPOSIT_USD,
-                user_id,
+    user = db.get(User, user_id)
+
+    # ── 1. fund_allocation 優先 (custodial 枠 / SCW 保有ユーザーは対象外) ──
+    if uses_custodial_allocation(user):
+        raw = (
+            db.query(func.sum(FundAllocation.allocated_amount_usd))
+            .filter(
+                FundAllocation.tester_user_id == user_id,
+                FundAllocation.status == "active",
             )
-            return Decimal("0")
-        amount = (allocated * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
-        return max(_PROPOSAL_AMOUNT_MIN_USD, min(amount, _PROPOSAL_AMOUNT_MAX_USD))
+            .scalar()
+        )
+        allocated = Decimal(str(raw)) if raw else Decimal("0")
+        if allocated > Decimal("0"):
+            # A-2 入金ゲート: 運用開始の最低入金額 (MIN_DEPOSIT_USD) 未満は提案を生成しない。
+            if allocated < MIN_DEPOSIT_USD:
+                logger.info(
+                    "[deposit_gate] custodial deposit $%s < min $%s for user_id=%d — "
+                    "proposal skipped",
+                    allocated,
+                    MIN_DEPOSIT_USD,
+                    user_id,
+                )
+                return Decimal("0")
+            amount = (allocated * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
+            return max(_PROPOSAL_AMOUNT_MIN_USD, min(amount, _PROPOSAL_AMOUNT_MAX_USD))
 
     # ── 2. fallback: 非カストディアル消費者の wallet USDC 残高 ──
-    user = db.get(User, user_id)
     wallet = (user.smart_wallet_address or user.wallet_address) if user else None
     if wallet:
         balance = _read_wallet_usdc_balance(wallet)

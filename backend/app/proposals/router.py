@@ -422,6 +422,22 @@ def _should_use_scw_route(proposal: Proposal, grant: Optional[DelegationGrant]) 
     return True
 
 
+def _custodial_execution_enabled() -> bool:
+    """サーバー単一鍵（``AAVE_WALLET_PRIVATE_KEY``）による custodial 実行を許可するか（既定 False）。
+
+    ``AUTO_EXECUTION_ENABLED`` は「執行段階のマスタースイッチ」であり、委譲(SCW)経路と
+    custodial 単一鍵経路の**両方**を同時に開けてしまう（委譲経路は
+    ``_execute_aave_for_proposal`` の内側にあり、同じフラグの配下にある）。非カストディアル
+    方式2 では後者を開けたくないので、独立フラグに分離して既定 False で閉じておく。
+
+    これが無いと「山本さん/橋口さんの委譲おまかせを動かすために
+    ``AUTO_EXECUTION_ENABLED=true`` にする」操作が、委譲枠を持たない admin/partner/viewer の
+    承認クリックまで **プール資金をサーバー鍵で動かす経路**として同時に開いてしまう
+    （2026-08-06 実資金 GO 前の調査で検出）。
+    """
+    return os.getenv("CUSTODIAL_EXECUTION_ENABLED", "false").strip().lower() == "true"
+
+
 def _execute_supply_via_scw(
     proposal: Proposal, chain: str, grant: DelegationGrant, user: Optional[UserModel], db: Session
 ) -> Any:
@@ -642,6 +658,17 @@ def _execute_aave_for_proposal(proposal: Proposal, db: Session) -> None:
                 "single-key execution",
                 proposal.id,
                 proposal.operation,
+            )
+            return
+        elif not _custodial_execution_enabled():
+            # 委譲枠を持たないユーザー。サーバー単一鍵(AAVE_WALLET_PRIVATE_KEY)で
+            # プール資金を動かす custodial 経路は独立フラグで閉じてあるため、上の
+            # 「SCW 対象外操作」と同じく transient 扱いで 'approved' のまま据え置く。
+            # 手動署名フロー(build-tx/submit-tx)は従来どおり使える。
+            logger.warning(
+                "proposal %d: no delegation grant and custodial single-key execution is "
+                "disabled (CUSTODIAL_EXECUTION_ENABLED=false) — holding as 'approved'",
+                proposal.id,
             )
             return
         else:
