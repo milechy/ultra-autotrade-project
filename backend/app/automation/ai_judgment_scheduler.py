@@ -77,6 +77,13 @@ _PROPOSAL_EXPIRES_HOURS = 168
 # 運営へアラートする閾値。無限に作り直し続けている状態を検知するためのもの。
 _CONSECUTIVE_EXPIRY_ALERT_THRESHOLD = 3
 
+# 受け入れ条件 B-6 (2026-08-06): 到達経路ゼロの承認型ユーザーへ提案を作らない際の
+# 運用者アラートの再送間隔。スケジューラは毎 tick 走るため、絞らないと同一ユーザーで
+# Slack を埋め尽くす (既存の _notify_missing_delegation_grant 等が実際にそうなっており、
+# 14 日で 451 件出ていた)。プロセス内メモリのみで保持し、再起動時は再通知でよい。
+_UNREACHABLE_ALERT_INTERVAL_HOURS = 24
+_unreachable_alerted_at: dict[int, datetime] = {}
+
 # 提案金額: fund_allocations.allocated_amount_usd から実行済み提案の積み上げ (deployed) を
 # 差し引いた遊休額 (idle) × _PROPOSAL_RATIO で動的計算 (2026-08-06: 静的台帳→動的遊休額へ
 # 変更 / Asana 1217210604911292、詳細は _resolve_deployed_amount_usd 参照)。
@@ -385,6 +392,106 @@ def _notify_downgrade_unreachable(user_id: int) -> None:
         get_notification_service().send(msg)
     except Exception as exc:  # noqa: BLE001
         logger.warning("_notify_downgrade_unreachable failed for user_id=%d: %s", user_id, exc)
+
+
+def _user_has_reachable_channel(db: Session, user_id: int) -> bool:
+    """そのユーザーに通知を届ける手段が実在するか (受け入れ条件 B-6 の判定)。
+
+    2026-08-06: LINE は廃止済みで、エンドユーザーへの到達経路は Web Push のみ。
+    判定基準は実配信 (`_deliver_ai_proposal_push`) と**同一**にする。片方だけ緩いと
+    「到達可能と判定したのに配信側では弾かれる」ズレが生まれ、本プロジェクトが
+    繰り返してきた「表示と実態の乖離」を新たに作ることになる。
+
+    True を返す条件 (すべて必要):
+      - 通知設定が当該種別の Push を許可している (B-N4)
+      - 購読行が 1 件以上ある
+
+    **VAPID 未設定は「そのユーザーが到達不能」ではなく「配信基盤全体の障害」**であり、
+    ここでは到達可能扱い (True) にする。B-6 は *ユーザーごと* の到達経路に関する要件で、
+    システム全体の設定ミスは別問題。ここで False に倒すと env 変数 1 つの設定ミスが
+    「全承認型ユーザーの提案生成が無言で止まる」に化け、防ごうとしている静かな故障より
+    大きな故障を作ることになる。基盤障害側は配信時に delivered=False として記録され、
+    到達率 (B-4) の急落として現れる。
+
+    判定不能な例外時も同様に **True (到達可能扱い)** を返す (可用性の後退を避ける)。
+    """
+    try:
+        from app.auth.models import User as _User  # noqa: PLC0415
+        from app.notifications.push import (  # noqa: PLC0415
+            DatabaseSubscriptionStore,
+            get_vapid_config,
+            push_allowed_for_user,
+        )
+
+        if get_vapid_config() is None:
+            logger.warning(
+                "Web Push VAPID 未設定: 到達判定 (B-6) をスキップし提案生成は継続する "
+                "(配信は全ユーザーで失敗し delivered=False として記録される)"
+            )
+            return True
+        _user = db.get(_User, user_id)
+        if _user is None or not push_allowed_for_user(
+            _user.notification_settings_json, "ai_proposal"
+        ):
+            return False
+        return len(DatabaseSubscriptionStore(SessionLocal).get_for_user(user_id)) > 0
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "_user_has_reachable_channel failed for user_id=%d (到達可能とみなす): %s",
+            user_id,
+            exc,
+        )
+        return True
+
+
+def _notify_unreachable_approval_user(user_id: int) -> None:
+    """承認型なのに到達経路がゼロのユーザーを運用者へ通知する (best-effort)。
+
+    2026-08-06 受け入れ条件 B-6 / I-14 / 禁止事項 15。承認型モードは「提案が本人に
+    届き、本人が承認する」ことで初めて成立する。到達経路がゼロのまま提案を作り続けると
+    誰にも見られないまま期限切れになり、承認率という指標を「見られてすらいない母数」の
+    上で計算することになる (25 日間・16 件・実行 0 件を起こしたのがこの構造)。
+
+    本人には定義上届かないため、**運用者が別手段で連絡する**しかない。
+    同一ユーザーへの再送は `_UNREACHABLE_ALERT_INTERVAL_HOURS` に絞る。
+    """
+    now = datetime.now(timezone.utc)
+    last = _unreachable_alerted_at.get(user_id)
+    if last is not None and now - last < timedelta(hours=_UNREACHABLE_ALERT_INTERVAL_HOURS):
+        return
+    _unreachable_alerted_at[user_id] = now
+    try:
+        from app.notifications.factory import get_notification_service  # noqa: PLC0415
+        from app.notifications.templates import operational_alert_notification  # noqa: PLC0415
+
+        msg = operational_alert_notification(
+            title="📭 承認型ユーザーに通知が届きません（提案の生成を停止中）",
+            body=(
+                f"user_id={user_id} は承認が必要なモードですが、通知の到達経路が "
+                "ありません (Push 未購読 / 通知設定 OFF / VAPID 未設定 のいずれか)。"
+                "届かない提案を作り続けても期限切れになるだけのため、このユーザーへの "
+                "提案生成を停止しています。本人に Push 通知を有効化してもらうよう "
+                "別手段で連絡してください。有効化されれば提案生成は自動的に再開します。"
+            ),
+        )
+        get_notification_service().send(msg)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("_notify_unreachable_approval_user failed for user_id=%d: %s", user_id, exc)
+
+
+def _should_skip_unreachable_approval_user(db: Session, user: User) -> bool:
+    """承認型 + 到達経路ゼロなら提案生成をスキップすべきか判定し、必要なら通知する。
+
+    受け入れ条件 B-6「到達経路が 1 本も無いユーザーに、承認型の提案が作られない」。
+    AUTO_EXECUTE は本人の承認を待たずに実行されるため通知が無くても価値を提供でき、
+    対象外とする (要件書クラスタ B の非対称性)。
+    """
+    if user.execution_policy == ExecutionPolicy.AUTO_EXECUTE.value:
+        return False
+    if _user_has_reachable_channel(db, user.id):
+        return False
+    _notify_unreachable_approval_user(user.id)
+    return True
 
 
 def _downgrade_orphaned_auto_execute(db: Session, user: User) -> None:
@@ -971,6 +1078,15 @@ def _create_proposals_for_users(
                 # 提案生成の可否には影響しない (検知と通知のみ)。
                 _check_observability_invariants(db, user)
 
+                # 受け入れ条件 B-6: 到達経路ゼロの承認型ユーザーには提案を作らない。
+                # due-gate より先に置く (間隔を満たしていても作らないため)。
+                if _should_skip_unreachable_approval_user(db, user):
+                    logger.warning(
+                        "Skipping proposal for user %d: 承認型だが到達経路がゼロ (B-6)",
+                        user.id,
+                    )
+                    continue
+
                 if not _is_user_due_for_judgment(user, now):
                     logger.debug(
                         "Skipping proposal for user %d (tier=%s, last_judgment_at=%s)",
@@ -1183,6 +1299,14 @@ def _create_safe_yield_proposals_for_users(
                 # 可観測性 (2026-08-04 PR1): tier間隔 (due-gate) に関わらず毎 tick 検知する。
                 # 提案生成の可否には影響しない (検知と通知のみ)。
                 _check_observability_invariants(db, user)
+
+                # 受け入れ条件 B-6: 到達経路ゼロの承認型ユーザーには提案を作らない (本流と同一)。
+                if _should_skip_unreachable_approval_user(db, user):
+                    logger.warning(
+                        "[safe_yield] Skipping proposal for user %d: 承認型だが到達経路がゼロ (B-6)",
+                        user.id,
+                    )
+                    continue
 
                 if not _is_user_due_for_judgment(user, now):
                     continue
