@@ -31,9 +31,11 @@ DEFAULT_FALLBACK_GAS_SUPPLY = 300000
 DEFAULT_FALLBACK_GAS_WITHDRAW = 300000
 
 # フォールバックガス価格（wei単位、提案生成時など web3 なしの概算用。ENV: ETH_GAS_PRICE_GWEI_FALLBACK）
-DEFAULT_GAS_PRICE_WEI = Decimal(os.environ.get("ETH_GAS_PRICE_GWEI_FALLBACK", "30")) * Decimal(
+# デフォルト 0.03 gwei — Base L2 の実勢ガス価格（Ethereumメインネットの1/1000程度）に合わせた値。
+# Base の実勢と乖離した場合は env ETH_GAS_PRICE_GWEI_FALLBACK で更新する。
+DEFAULT_GAS_PRICE_WEI = Decimal(os.environ.get("ETH_GAS_PRICE_GWEI_FALLBACK", "0.03")) * Decimal(
     "1000000000"
-)  # デフォルト 30 gwei
+)  # デフォルト 0.03 gwei (Base L2 フォールバック値)
 
 
 def estimate_static_gas_cost_usd(

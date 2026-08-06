@@ -1142,7 +1142,7 @@
         "expand": "続きを見る",
         "hfAfter": "実行後 HF:",
         "gasEstimate": "ガス概算:",
-        "totalWithGas": "合計（ガス込み）:"
+        "gasNote": "※ネットワークの状況により実際の負担が変わる場合があります"
       },
       "confirmSheet": {
         "title": "この提案を承認しますか？",

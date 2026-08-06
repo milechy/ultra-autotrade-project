@@ -1142,7 +1142,7 @@
         "expand": "Show more",
         "hfAfter": "HF after:",
         "gasEstimate": "Gas est.:",
-        "totalWithGas": "Total (incl. gas):"
+        "gasNote": "Actual cost may vary depending on network conditions."
       },
       "confirmSheet": {
         "title": "Approve this proposal?",
