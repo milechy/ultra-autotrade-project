@@ -12,7 +12,7 @@
 **`deposit_resolver.resolve_user_deposit_usd` と混同しないこと**（測るものが違う）:
 
   - `deposit`      = **運用に充てられる未投入の資金**（allocation or wallet USDC）。
-                     最低入金ゲート（$200）の判定に使う。
+                     最低入金ゲート（$1,000）の判定に使う。
   - `total_assets` = **総資産**。既に Aave に供給済みの資産を**含む**。% 上限の分母に使う。
 
 deposit を分母に流用してはならない。定常状態のユーザーは資金の大半を Aave に供給済みで

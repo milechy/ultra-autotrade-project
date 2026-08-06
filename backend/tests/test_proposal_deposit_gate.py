@@ -1,7 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 """提案生成側の入金ゲート（_resolve_proposal_amount）の単体テスト。
 
-A-2: deposit が運用開始の最低入金額 (MIN_DEPOSIT_USD=$200) 未満なら、custodial /
+A-2: deposit が運用開始の最低入金額 (MIN_DEPOSIT_USD=$1000) 未満なら、custodial /
 非カストディアル いずれの経路でも Decimal("0")（= 呼び出し側で skip）を返すことを検証。
 """
 
@@ -18,20 +18,20 @@ def _db_with_allocation(total) -> MagicMock:  # type: ignore[no-untyped-def]
 
 
 def test_custodial_below_gate_skipped() -> None:
-    """custodial allocation $150 (<$200) は提案 0（skip）。"""
+    """custodial allocation $150 (<$1000) は提案 0（skip）。"""
     db = _db_with_allocation(Decimal("150"))
     assert _resolve_proposal_amount(db, user_id=11) == Decimal("0")
 
 
 def test_custodial_at_gate_generates() -> None:
-    """custodial allocation $5000 (>=$200) は提案 > 0。"""
+    """custodial allocation $5000 (>=$1000) は提案 > 0。"""
     db = _db_with_allocation(Decimal("5000"))
     amount = _resolve_proposal_amount(db, user_id=11)
     assert amount > Decimal("0")
 
 
 def test_consumer_wallet_below_gate_skipped() -> None:
-    """非カストディアル wallet 残高 $150 (<$200) は提案 0（skip）。"""
+    """非カストディアル wallet 残高 $150 (<$1000) は提案 0（skip）。"""
     db = _db_with_allocation(0)
     db.get.return_value = MagicMock(smart_wallet_address=None, wallet_address="0xabc")
     with patch(
@@ -42,7 +42,7 @@ def test_consumer_wallet_below_gate_skipped() -> None:
 
 
 def test_consumer_wallet_above_gate_generates() -> None:
-    """非カストディアル wallet 残高 $2500 (>=$200) は提案 > 0。"""
+    """非カストディアル wallet 残高 $2500 (>=$1000) は提案 > 0。"""
     db = _db_with_allocation(0)
     db.get.return_value = MagicMock(smart_wallet_address=None, wallet_address="0xabc")
     with patch(

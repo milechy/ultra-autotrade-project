@@ -1,7 +1,7 @@
 # Copyright (c) Ultra AutoTrade. All rights reserved.
 # Unauthorized copying or distribution is strictly prohibited.
 # backend/tests/test_deposit_gate_enforcement.py
-"""A-4: $200 入金ゲートの実行時 enforcement 統合テスト（抜け道回帰）。
+"""A-4: $1,000 入金ゲートの実行時 enforcement 統合テスト（抜け道回帰）。
 
 提案生成側 (_resolve_proposal_amount) と resolver 本体は
 test_proposal_deposit_gate.py / test_deposit_resolver.py でカバー済み。
@@ -11,7 +11,7 @@ test_proposal_deposit_gate.py / test_deposit_resolver.py でカバー済み。
                          残高 < MIN_DEPOSIT_USD なら 422 DEPOSIT_BELOW_MINIMUM。
   2. 提案承認ゲート    : POST /api/proposals/{id}/approve で残高 < MIN なら 422。
 
-境界: $199.99 block / $200.00 pass（MIN_DEPOSIT_USD=$200, `<` 比較）。
+境界: $999.99 block / $1000.00 pass（MIN_DEPOSIT_USD=$1000, `<` 比較）。
 fail-open: resolve_user_deposit_usd が None（判定不能）なら正規操作を止めない。
 
 resolver は各エンドポイント内で `from app.users.deposit_resolver import
@@ -130,28 +130,28 @@ def _create_pending_proposal(client: TestClient, token: str, user_id: int) -> in
 
 class TestModeSwitchDepositGate:
     def test_managed_below_min_blocked(self, client: TestClient) -> None:
-        """残高 $150 (<$200) で managed 切替は 422 DEPOSIT_BELOW_MINIMUM。"""
+        """残高 $950 (<$1000) で managed 切替は 422 DEPOSIT_BELOW_MINIMUM。"""
         token = _login(client)
-        with patch(_RESOLVER, return_value=Decimal("150")):
+        with patch(_RESOLVER, return_value=Decimal("950")):
             r = client.put(
                 "/api/user/settings", json={"user_mode": "managed"}, headers=_auth(token)
             )
         assert r.status_code == 422, r.text
         assert r.json()["detail"]["code"] == "DEPOSIT_BELOW_MINIMUM"
 
-    def test_managed_boundary_19999_blocked(self, client: TestClient) -> None:
-        """境界: $199.99 は block（`<` 比較で MIN=200 未満）。"""
+    def test_managed_boundary_99999_blocked(self, client: TestClient) -> None:
+        """境界: $999.99 は block（`<` 比較で MIN=1000 未満）。"""
         token = _login(client)
-        with patch(_RESOLVER, return_value=Decimal("199.99")):
+        with patch(_RESOLVER, return_value=Decimal("999.99")):
             r = client.put(
                 "/api/user/settings", json={"user_mode": "managed"}, headers=_auth(token)
             )
         assert r.status_code == 422, r.text
 
-    def test_managed_boundary_200_allowed(self, client: TestClient) -> None:
-        """境界: ちょうど $200.00 は pass（200 < 200 は False）。"""
+    def test_managed_boundary_1000_allowed(self, client: TestClient) -> None:
+        """境界: ちょうど $1000.00 は pass（1000 < 1000 は False）。"""
         token = _login(client)
-        with patch(_RESOLVER, return_value=Decimal("200.00")):
+        with patch(_RESOLVER, return_value=Decimal("1000.00")):
             r = client.put(
                 "/api/user/settings", json={"user_mode": "managed"}, headers=_auth(token)
             )
@@ -169,9 +169,9 @@ class TestModeSwitchDepositGate:
         assert r.json()["user_mode"] == "managed"
 
     def test_active_not_gated_even_below_min(self, client: TestClient) -> None:
-        """active (per-trade 承認) は残高 $150 でも切替可能（ゲート対象外）。"""
+        """active (per-trade 承認) は残高 $950 でも切替可能（ゲート対象外）。"""
         token = _login(client)
-        with patch(_RESOLVER, return_value=Decimal("150")):
+        with patch(_RESOLVER, return_value=Decimal("950")):
             r = client.put("/api/user/settings", json={"user_mode": "active"}, headers=_auth(token))
         assert r.status_code == 200, r.text
         assert r.json()["user_mode"] == "active"
@@ -184,23 +184,23 @@ class TestModeSwitchDepositGate:
 
 class TestApprovalDepositGate:
     def test_approve_below_min_blocked(self, client: TestClient, test_db) -> None:  # type: ignore[no-untyped-def]
-        """残高 $150 (<$200) で承認は 422 DEPOSIT_BELOW_MINIMUM（執行前に遮断）。"""
+        """残高 $950 (<$1000) で承認は 422 DEPOSIT_BELOW_MINIMUM（執行前に遮断）。"""
         _, engine = test_db
         token = _login(client)
         uid = _user_id(engine, _admin_email())
         pid = _create_pending_proposal(client, token, uid)
-        with patch(_RESOLVER, return_value=Decimal("150")):
+        with patch(_RESOLVER, return_value=Decimal("950")):
             r = client.post(f"/api/proposals/{pid}/approve", headers=_auth(token))
         assert r.status_code == 422, r.text
         assert r.json()["detail"]["code"] == "DEPOSIT_BELOW_MINIMUM"
 
-    def test_approve_boundary_19999_blocked(self, client: TestClient, test_db) -> None:  # type: ignore[no-untyped-def]
-        """境界: $199.99 は承認 block。"""
+    def test_approve_boundary_99999_blocked(self, client: TestClient, test_db) -> None:  # type: ignore[no-untyped-def]
+        """境界: $999.99 は承認 block。"""
         _, engine = test_db
         token = _login(client)
         uid = _user_id(engine, _admin_email())
         pid = _create_pending_proposal(client, token, uid)
-        with patch(_RESOLVER, return_value=Decimal("199.99")):
+        with patch(_RESOLVER, return_value=Decimal("999.99")):
             r = client.post(f"/api/proposals/{pid}/approve", headers=_auth(token))
         assert r.status_code == 422, r.text
         assert r.json()["detail"]["code"] == "DEPOSIT_BELOW_MINIMUM"

@@ -7,7 +7,11 @@
 `MIN_DEPOSIT_USD` は「自動運用を開始するための最低入金額（USD）」を表す唯一の正本。
 A-2 のバックエンド実行時ゲート（提案生成 / 提案承認 / モード切替）は、残高による
 運用開始可否を判定する際、ハードコードした数値ではなく必ず本モジュールを参照すること。
-env `MIN_DEPOSIT_USD` で上書き可能（デフォルト 200）。
+env `MIN_DEPOSIT_USD` で上書き可能（デフォルト 1000）。
+
+2026-08-06: 公表額($200)とサイジング/採算ゲートの実効下限(~$852)が食い違い、
+$200〜$851のユーザーに無音で提案が出ない問題があったため、公表額を実効値を
+上回る $1,000 に統一した（事業判断、Asana関連PR参照）。
 
 [混同注意] 以下は名前が似ているが別概念であり、本ポリシーと取り違えないこと:
 - `ai_judgment_scheduler._PROPOSAL_AMOUNT_MIN_USD`（既定 $50）
@@ -23,7 +27,7 @@ from decimal import Decimal
 from typing import Optional
 
 # 運用開始の最低入金額（USD）。env で上書き可能。これが唯一の正本。
-MIN_DEPOSIT_USD: Decimal = Decimal(os.getenv("MIN_DEPOSIT_USD", "200"))
+MIN_DEPOSIT_USD: Decimal = Decimal(os.getenv("MIN_DEPOSIT_USD", "1000"))
 
 
 def meets_minimum_deposit(balance_usd: Optional[Decimal]) -> bool:

@@ -1230,7 +1230,7 @@
       "item7Question": "Is there a deadline for approving trades?",
       "item7Answer": "In active mode, please approve or reject AI proposals within 1 hour. Requests will be automatically cancelled on timeout.",
       "item8Question": "What is the minimum investment amount?",
-      "item8Answer": "A minimum deposit of $200 in USDC is required to start auto-trading. Auto-trading will not start with a balance below $200.",
+      "item8Answer": "A minimum deposit of $1,000 in USDC is required to start auto-trading. Auto-trading will not start with a balance below $1,000.",
       "item9Question": "What is the difference between testnet and production?",
       "item9Answer": "Testnet uses virtual funds for operational verification. Production uses real USDC. The operation is the same, but gains and losses on testnet do not affect real assets.",
       "item10Question": "Who should I contact if a problem occurs?",
@@ -1522,7 +1522,7 @@
       "title": "FAQ",
       "minAmount": {
         "q": "What is the minimum amount to start?",
-        "a": "A minimum deposit of $200 is required to start auto-trading. At $200 or more, gas costs stay proportionally small and are less likely to eat into returns."
+        "a": "A minimum deposit of $1,000 is required to start auto-trading. At $1,000 or more, proposal sizing and profitability checks stabilize, making ongoing trade proposals more likely."
       },
       "lossRisk": {
         "q": "Is there a risk of loss?",
