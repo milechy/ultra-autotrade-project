@@ -146,7 +146,7 @@ export function DepositContent() {
         </CardContent>
       </Card>
 
-      {/* $200 deposit gate */}
+      {/* $1,000 deposit gate */}
       {!balanceLoading && (
         <>
           {meetsDepositGate ? (

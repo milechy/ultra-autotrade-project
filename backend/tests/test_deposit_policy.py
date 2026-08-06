@@ -7,24 +7,24 @@ from app.users import deposit_policy
 from app.users.deposit_policy import MIN_DEPOSIT_USD, meets_minimum_deposit
 
 
-def test_min_deposit_default_is_200() -> None:
-    """env 未設定時のデフォルトは $200。"""
-    assert MIN_DEPOSIT_USD == Decimal("200")
+def test_min_deposit_default_is_1000() -> None:
+    """env 未設定時のデフォルトは $1,000。"""
+    assert MIN_DEPOSIT_USD == Decimal("1000")
 
 
 def test_meets_minimum_at_exact_threshold() -> None:
-    """ちょうど $200 はゲートを通過する（>= 判定）。"""
-    assert meets_minimum_deposit(Decimal("200")) is True
+    """ちょうど $1,000 はゲートを通過する（>= 判定）。"""
+    assert meets_minimum_deposit(Decimal("1000")) is True
 
 
 def test_below_threshold_blocked() -> None:
-    """$199.99 はブロックされる。"""
-    assert meets_minimum_deposit(Decimal("199.99")) is False
+    """$999.99 はブロックされる。"""
+    assert meets_minimum_deposit(Decimal("999.99")) is False
 
 
 def test_above_threshold_passes() -> None:
-    """$200 超は通過する。"""
-    assert meets_minimum_deposit(Decimal("500")) is True
+    """$1,000 超は通過する。"""
+    assert meets_minimum_deposit(Decimal("1500")) is True
 
 
 def test_none_balance_is_safe_false() -> None:

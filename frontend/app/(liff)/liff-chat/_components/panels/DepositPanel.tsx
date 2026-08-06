@@ -252,7 +252,7 @@ export function DepositPanel() {
         </p>
       </div>
 
-      {/* $200 入金ゲート状態（入金自体は許可。自動運用の開始可否を明示） */}
+      {/* $1,000 入金ゲート状態（入金自体は許可。自動運用の開始可否を明示） */}
       {!balanceLoading && balance != null && (
         balance >= DEPOSIT_GATE_USD ? (
           <div className="ax-card-warm border border-[#1D9E75] rounded-xl px-4 py-2.5 mb-4 text-xs text-[#1D9E75]">

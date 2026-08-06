@@ -1327,14 +1327,16 @@ def test_run_ai_judgment_job_passes_cognitive_state(db_session):
 
 
 def test_resolve_proposal_amount_clamps_to_min(db_session):
-    """allocated × 10% < $50 のとき、$50 にクランプされること。
+    """idle × 10% < $50 のとき、$50 にクランプされること。
 
-    境界値: $499 × 10% = $49.90 → $50 (min)
+    境界値: allocated=$1,499 (>= 入金ゲート$1,000), 実行済みSUPPLY=$1,000
+    → idle=$499 × 10% = $49.90 → $50 (min)
     """
     from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
 
     user = _add_active_user(db_session, "clamp_min@example.com")
-    _add_fund_allocation(db_session, user, allocated_usd=Decimal("499"))
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("1499"))
+    _add_executed_proposal(db_session, user, amount_usd=Decimal("1000"))
     db_session.commit()
 
     result = _resolve_proposal_amount(db_session, user.id)
@@ -1357,14 +1359,15 @@ def test_resolve_proposal_amount_clamps_to_max(db_session):
 
 
 def test_resolve_proposal_amount_exact_min_boundary(db_session):
-    """allocated × 10% = $50 ちょうどのとき、$50 が返ること（境界 = min の場合は min 返却）。
+    """idle × 10% = $50 ちょうどのとき、$50 が返ること（境界 = min の場合は min 返却）。
 
-    $500 × 10% = $50.00
+    allocated=$1,500 (>= 入金ゲート$1,000), 実行済みSUPPLY=$1,000 → idle=$500 × 10% = $50.00
     """
     from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
 
     user = _add_active_user(db_session, "boundary_min@example.com")
-    _add_fund_allocation(db_session, user, allocated_usd=Decimal("500"))
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("1500"))
+    _add_executed_proposal(db_session, user, amount_usd=Decimal("1000"))
     db_session.commit()
 
     result = _resolve_proposal_amount(db_session, user.id)
@@ -1654,9 +1657,11 @@ def test_resolve_proposal_amount_pending_proposals_do_not_count_as_deployed(db_s
 @pytest.mark.parametrize(
     "balance,expected",
     [
-        (Decimal("100"), Decimal("0")),  # < 最低入金($200) → deposit gate で skip
-        (Decimal("200"), Decimal("0")),  # 10%=$20 < min($50) → 無音デッドゾーン→skip (要修正対象)
-        (Decimal("500"), Decimal("50.00")),  # 10%=$50 = min → 提案は出る (採算ゲートは別関数)
+        (Decimal("100"), Decimal("0")),  # < 最低入金($1000) → deposit gate で skip
+        (Decimal("200"), Decimal("0")),  # < 最低入金($1000) → deposit gate で skip
+        # $1000ゲートは sizing floor 分岐点($500=$50/10%)を上回るため、
+        # deadzone (gate通過だが10%<min) は wallet 経路では構造的に発生しなくなった。
+        (Decimal("500"), Decimal("0")),  # < 最低入金($1000) → deposit gate で skip
         (Decimal("1000"), Decimal("100.00")),  # 10%=$100
         (Decimal("5000"), Decimal("500.00")),  # 10%=$500
     ],
@@ -1679,13 +1684,10 @@ def test_resolve_proposal_amount_wallet_deadzone_boundaries(
 @pytest.mark.parametrize(
     "allocated,expected",
     [
-        (Decimal("100"), Decimal("0")),  # < 最低入金($200) → deposit gate で skip
-        (
-            Decimal("200"),
-            Decimal("50.00"),
-        ),  # 10%=$20 < min → custodial は $50 に切り上げ (既存非対称)
-        (Decimal("500"), Decimal("50.00")),  # 10%=$50
-        (Decimal("1000"), Decimal("100.00")),  # 10%=$100
+        (Decimal("100"), Decimal("0")),  # < 最低入金($1000) → deposit gate で skip
+        (Decimal("200"), Decimal("0")),  # < 最低入金($1000) → deposit gate で skip
+        (Decimal("500"), Decimal("0")),  # < 最低入金($1000) → deposit gate で skip
+        (Decimal("1000"), Decimal("100.00")),  # 10%=$100 (deployed=0, idle=allocated全額)
         (Decimal("5000"), Decimal("500.00")),  # 10%=$500
     ],
 )
@@ -1702,7 +1704,12 @@ def test_resolve_proposal_amount_custodial_boundaries(db_session, allocated, exp
 
 
 def test_resolve_proposal_amount_wallet_deadzone_notifies_user(db_session, monkeypatch):
-    """$200 デッドゾーン (10%<min) skip 時、本人へ理由通知が送られること (無音対策)。"""
+    """デッドゾーン (gate通過だが10%<min) skip 時、本人へ理由通知が送られること (無音対策)。
+
+    現行の MIN_DEPOSIT_USD($1000) は sizing floor 分岐点($500)を上回るため、
+    実際の deadzone は wallet 経路では発生しない。ここでは gate 定数を一時的に
+    下げて、sizing-floor skip → 通知のコードパス自体を単体で検証する。
+    """
     import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
 
     user = _add_active_user(db_session, "deadzone_notify@example.com")
@@ -1710,6 +1717,7 @@ def test_resolve_proposal_amount_wallet_deadzone_notifies_user(db_session, monke
     db_session.commit()
 
     sent: list = []
+    monkeypatch.setattr(sched, "MIN_DEPOSIT_USD", Decimal("100"))
     monkeypatch.setattr(sched, "_read_wallet_usdc_balance", lambda _addr: Decimal("200"))
     monkeypatch.setattr(
         "app.notifications.factory.get_notification_service",

@@ -318,7 +318,7 @@ export function OpModePanel() {
         body: JSON.stringify({ user_mode: newMode }),
       })
       if (!res.ok) {
-        // 入金ゲート: managed(完全おまかせ)切替に最低入金額 $200 が必要（A-2 で 422）。
+        // 入金ゲート: managed(完全おまかせ)切替に最低入金額 $1,000 が必要（A-2 で 422）。
         if (res.status === 422) {
           const body = await res.json().catch(() => null)
           if (body?.detail?.code === "DEPOSIT_BELOW_MINIMUM") {
