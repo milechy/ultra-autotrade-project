@@ -138,9 +138,10 @@ class TestMissingDelegationGrant:
         db_session.commit()
 
         sent = _sent_messages(db_session, user)
-        assert len(sent) == 1
-        assert sent[0].channel.value == "slack"
-        assert str(user.id) in sent[0].body
+        # 2026-08-06 PR6: 運用者向け Slack 通知に加えて本人向け降格通知も送るため、
+        # 「運用者向けが1件あること」を検証する (総数ではなく種別で見る)。
+        ops = [m for m in sent if m.channel.value == "slack" and str(user.id) in m.body]
+        assert len(ops) == 1, f"運用者向け通知が1件でない: {sent}"
 
     def test_auto_execute_with_expired_grant_notifies_once(self, db_session: Session) -> None:
         """status='active' のまま expires_at が過去 (遅延 expire) でも実時刻で再判定して検知する。"""
@@ -153,7 +154,9 @@ class TestMissingDelegationGrant:
         db_session.commit()
 
         sent = _sent_messages(db_session, user)
-        assert len(sent) == 1
+        # 2026-08-06 PR6: 本人向け降格通知が増えたため、運用者向けが1件あることで検証する。
+        ops = [m for m in sent if m.channel.value == "slack" and str(user.id) in m.body]
+        assert len(ops) == 1, f"運用者向け通知が1件でない: {sent}"
 
     def test_auto_execute_grant_expires_soon_no_notification(self, db_session: Session) -> None:
         """境界値: expires_at が僅かに未来 (1秒後) ならまだ有効 → 通知なし。"""
@@ -236,3 +239,104 @@ def test_no_side_effect_on_proposal_or_grant_rows(db_session: Session) -> None:
     proposals = db_session.query(Proposal).filter(Proposal.user_id == user.id).all()
     assert all(p.status == "canceled" for p in proposals)
     assert db_session.query(DelegationGrant).filter(DelegationGrant.user_id == user.id).count() == 0
+
+
+class TestDowngradeOrphanedAutoExecute:
+    """実行権限を持たない AUTO_EXECUTE ユーザーの安全側降格 (2026-08-06 PR6)。
+
+    PR1 (#1011) が「検知のみで降格は行わない (降格は PR6)」としていた部分の実装。
+    要件定義 A-E1「黙って承認待ちに落とさない。検知・通知・安全側降格」/
+    A-6「権限失効時に安全側へ降格し、ユーザーに通知される」に対応する。
+
+    順序の制約 (IV-2 / 禁止事項7): 降格は到達経路 (Web Push) 復旧後にのみ許される。
+    通知できない状態で降格すると「無断で設定が変わった」としか映らないため。
+    """
+
+    def test_orphaned_auto_execute_is_downgraded(self, db_session: Session) -> None:
+        """★委譲枠を持たない AUTO_EXECUTE は require_approval へ降格される。"""
+        user = _make_user(db_session, uid=301, execution_policy="auto_execute")
+        db_session.commit()
+
+        _sent_messages(db_session, user)
+        db_session.commit()  # 本番では per-user savepoint 経由で commit される
+
+        db_session.refresh(user)
+        assert user.execution_policy == "require_approval"
+
+    def test_downgrade_notifies_the_user_not_only_ops(self, db_session: Session) -> None:
+        """★運用者向け Slack だけでなく、本人宛の通知も送られること。
+
+        「黙って承認待ちに落とさない」(A-E1) の核心。運用者だけが知っていて
+        ユーザーが知らない状態は、表示と実態の乖離を別の形で再生産する。
+        """
+        user = _make_user(db_session, uid=302, execution_policy="auto_execute")
+        db_session.commit()
+
+        sent = _sent_messages(db_session, user)
+
+        user_addressed = [m for m in sent if getattr(m, "user_id", None) == user.id]
+        assert user_addressed, f"本人宛の通知が無い: {[getattr(m, 'title', m) for m in sent]}"
+        body = " ".join(str(getattr(m, "body", "")) for m in user_addressed)
+        # 何が起きたか / 資産への影響 / 元に戻す方法 が伝わること (IV-2)
+        assert "承認制" in body, f"何に変わったかが伝わらない: {body}"
+        assert "資産" in body, f"資産への影響の有無が伝わらない: {body}"
+
+    def test_user_with_valid_grant_is_not_downgraded(self, db_session: Session) -> None:
+        """有効な委譲枠を持つユーザーは降格されない (正常な完全おまかせを壊さない)。"""
+        user = _make_user(db_session, uid=303, execution_policy="auto_execute")
+        _make_grant(db_session, user.id)
+        db_session.commit()
+
+        _sent_messages(db_session, user)
+        db_session.commit()
+
+        db_session.refresh(user)
+        assert user.execution_policy == "auto_execute", "正常なおまかせを降格してはいけない"
+
+    def test_require_approval_user_is_untouched(self, db_session: Session) -> None:
+        """元から承認制のユーザーには何も起きない。"""
+        user = _make_user(db_session, uid=304, execution_policy="require_approval")
+        db_session.commit()
+
+        _sent_messages(db_session, user)
+        db_session.commit()
+
+        db_session.refresh(user)
+        assert user.execution_policy == "require_approval"
+
+    def test_downgrade_is_idempotent(self, db_session: Session) -> None:
+        """2回目以降の tick で重複して降格・通知しないこと。
+
+        降格後は execution_policy が require_approval になるため、次回以降は
+        そもそも検知条件に入らない (60秒ごとに通知が飛び続けない)。
+        """
+        user = _make_user(db_session, uid=305, execution_policy="auto_execute")
+        db_session.commit()
+
+        first = _sent_messages(db_session, user)
+        db_session.commit()
+        second = _sent_messages(db_session, user)
+
+        assert len(first) >= 1
+        assert second == [], f"降格後も通知が続いている: {second}"
+
+    def test_notification_failure_does_not_block_downgrade(self, db_session: Session) -> None:
+        """通知が失敗しても降格自体は確定すること。
+
+        通知失敗を理由に危険側 (auto_execute) へ留めるべきではない。
+        """
+        user = _make_user(db_session, uid=306, execution_policy="auto_execute")
+        db_session.commit()
+
+        def _boom(self, msg):  # noqa: ANN001, ANN202
+            raise RuntimeError("notification backend down")
+
+        with patch(
+            "app.notifications.factory.get_notification_service",
+            return_value=type("Svc", (), {"send": _boom})(),
+        ):
+            _check_observability_invariants(db_session, user)
+        db_session.commit()
+
+        db_session.refresh(user)
+        assert user.execution_policy == "require_approval", "通知失敗で降格が巻き戻っている"
