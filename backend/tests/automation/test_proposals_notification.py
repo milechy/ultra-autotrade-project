@@ -188,12 +188,24 @@ class TestDeliverAiProposalPush:
         db.get.return_value = user
         return db
 
-    def test_vapid_unset_skips_without_raising(self) -> None:
-        """VAPID未設定時は静かにスキップし、push行は作られない。"""
+    def test_vapid_unset_records_as_undelivered(self) -> None:
+        """VAPID未設定時は例外を投げず、かつ delivered=False として記録すること。
+
+        2026-08-06 変更: 以前は「静かにスキップし push 行を作らない」ことを
+        期待していたが、それだと「届かなかった」事実が notification_logs に残らず、
+        到達率 (受け入れ条件 B-4) が「送れたものだけ」を母数に計算されて実態より
+        良く見えてしまう。本番で降格通知が届いていないことをログから判別できなかった
+        原因でもある。未到達も記録する。
+        """
         mock_db = self._db_with_push_enabled_user(1)
         with patch("app.notifications.push.get_vapid_config", return_value=None):
-            _deliver_ai_proposal_push(mock_db, 1, self._payload())
-        mock_db.add.assert_not_called()
+            result = _deliver_ai_proposal_push(mock_db, 1, self._payload())
+
+        assert result is False, "未到達なので False を返すこと"
+        mock_db.add.assert_called_once()
+        logged = mock_db.add.call_args.args[0]
+        assert logged.channel == "push"
+        assert logged.delivered is False
 
     def test_vapid_set_success_logs_delivered_true(self) -> None:
         """配信成功: delivered=True の push NotificationLog が1行追加される。"""

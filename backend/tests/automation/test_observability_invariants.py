@@ -140,8 +140,12 @@ class TestMissingDelegationGrant:
         sent = _sent_messages(db_session, user)
         # 2026-08-06 PR6: 運用者向け Slack 通知に加えて本人向け降格通知も送るため、
         # 「運用者向けが1件あること」を検証する (総数ではなく種別で見る)。
-        ops = [m for m in sent if m.channel.value == "slack" and str(user.id) in m.body]
-        assert len(ops) == 1, f"運用者向け通知が1件でない: {sent}"
+        ops = [
+            m
+            for m in sent
+            if m.channel.value == "slack" and "有効な委譲枠がありません" in str(m.title)
+        ]
+        assert len(ops) == 1, f"委譲枠欠如の運用者向け通知が1件でない: {sent}"
 
     def test_auto_execute_with_expired_grant_notifies_once(self, db_session: Session) -> None:
         """status='active' のまま expires_at が過去 (遅延 expire) でも実時刻で再判定して検知する。"""
@@ -155,8 +159,12 @@ class TestMissingDelegationGrant:
 
         sent = _sent_messages(db_session, user)
         # 2026-08-06 PR6: 本人向け降格通知が増えたため、運用者向けが1件あることで検証する。
-        ops = [m for m in sent if m.channel.value == "slack" and str(user.id) in m.body]
-        assert len(ops) == 1, f"運用者向け通知が1件でない: {sent}"
+        ops = [
+            m
+            for m in sent
+            if m.channel.value == "slack" and "有効な委譲枠がありません" in str(m.title)
+        ]
+        assert len(ops) == 1, f"委譲枠欠如の運用者向け通知が1件でない: {sent}"
 
     def test_auto_execute_grant_expires_soon_no_notification(self, db_session: Session) -> None:
         """境界値: expires_at が僅かに未来 (1秒後) ならまだ有効 → 通知なし。"""
@@ -340,3 +348,84 @@ class TestDowngradeOrphanedAutoExecute:
 
         db_session.refresh(user)
         assert user.execution_policy == "require_approval", "通知失敗で降格が巻き戻っている"
+
+
+class TestUnreachableUserDetection:
+    """降格通知がユーザーに届かない場合の検知 (2026-08-06)。
+
+    本番で実際に起きた問題: user 11/18 を承認制へ降格したが、両名とも Push を
+    購読しておらず通知は届かなかった。しかし「届かなかった」事実はどこにも
+    記録されず、運用者も気づけなかった。
+
+    要件定義 IV-2 の「通知できない状態で降格するな」は、**仕組みが動くこと**では
+    なく**そのユーザーに実際に届くこと**で判定しなければならない。
+    """
+
+    def test_unreachable_user_triggers_ops_escalation(self, db_session: Session) -> None:
+        """★到達経路が無いユーザーを降格したら運用者へエスカレーションすること。"""
+        user = _make_user(db_session, uid=401, execution_policy="auto_execute")
+        # notification_settings_json 未設定 = push_enabled 既定 False = 到達経路ゼロ
+        db_session.commit()
+
+        sent = _sent_messages(db_session, user)
+
+        titles = [str(getattr(m, "title", "")) for m in sent]
+        assert any("届いていません" in t for t in titles), (
+            f"未到達のエスカレーションが無い: {titles}"
+        )
+
+    def test_reachable_user_does_not_trigger_escalation(self, db_session: Session) -> None:
+        """到達できるユーザーでは未到達エスカレーションを出さないこと (誤検知防止)。"""
+        import json
+        from unittest.mock import patch as _patch
+
+        user = _make_user(db_session, uid=402, execution_policy="auto_execute")
+        user.notification_settings_json = json.dumps(
+            {"push_enabled": True, "preferences": {"system_notice": True}}
+        )
+        db_session.commit()
+
+        sent: list[object] = []
+        with (
+            _patch(
+                "app.notifications.factory.get_notification_service",
+                return_value=type("Svc", (), {"send": lambda self, msg: sent.append(msg)})(),
+            ),
+            # 実際に到達したことにする
+            _patch(
+                "app.automation.ai_judgment_scheduler._deliver_ai_proposal_push",
+                return_value=True,
+            ),
+        ):
+            _check_observability_invariants(db_session, user)
+
+        titles = [str(getattr(m, "title", "")) for m in sent]
+        assert not any("届いていません" in t for t in titles), (
+            f"到達しているのに未到達扱いになっている: {titles}"
+        )
+
+    def test_undelivered_push_is_recorded_for_reachability_metric(
+        self, db_session: Session
+    ) -> None:
+        """★未到達も notification_logs に delivered=False で記録されること。
+
+        記録しないと到達率 (受け入れ条件 B-4) が「送れたものだけ」を母数に
+        計算され、実態より良く見えてしまう。
+        """
+        from app.notifications.models import NotificationLog
+
+        user = _make_user(db_session, uid=403, execution_policy="auto_execute")
+        db_session.commit()
+
+        _sent_messages(db_session, user)
+        db_session.commit()
+
+        rows = (
+            db_session.query(NotificationLog)
+            .filter(NotificationLog.user_id == user.id, NotificationLog.channel == "push")
+            .all()
+        )
+        assert rows, "未到達が push チャネルの行として記録されていない"
+        assert all(r.delivered is False for r in rows), (
+            f"未到達なのに delivered が False でない: {[r.delivered for r in rows]}"
+        )
