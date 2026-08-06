@@ -36,8 +36,17 @@ production の `users` テーブルは alembic migration を1本も実行せず�
 型 (`VARCHAR(255)` vs models.py の `String(42)`) は最大長42文字で実害が無いため
 本リビジョンでは変更しない (個別判断へ持ち越し)。
 
-Revision ID: b9c0d1e2f3a4
-Revises: a8b9c0d1e2f3
+## revision ID 再採番 (2026-08-06)
+
+初回リビジョン ID `b9c0d1e2f3a4` は、同じ親 (`a8b9c0d1e2f3`) から独立に
+分岐した別PR (`add_gas_sponsored_to_transactions`) と衝突していたため
+`c1d2e3f4a5b6` に採番し直し、`down_revision` を衝突相手のリビジョンへ
+繋ぎ直した (production デプロイ時に `alembic upgrade head` が
+"Multiple head revisions" で失敗し発覚。production への反映前に検出、
+実害なし)。
+
+Revision ID: c1d2e3f4a5b6
+Revises: b9c0d1e2f3a4
 Create Date: 2026-08-06 00:00:00.000000
 """
 
@@ -45,8 +54,8 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "b9c0d1e2f3a4"
-down_revision: Union[str, Sequence[str], None] = "a8b9c0d1e2f3"
+revision: str = "c1d2e3f4a5b6"
+down_revision: Union[str, Sequence[str], None] = "b9c0d1e2f3a4"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
