@@ -252,6 +252,54 @@ def _notify_consecutive_expiry(user_id: int, consecutive_count: int) -> None:
         logger.warning("_notify_consecutive_expiry failed for user_id=%d: %s", user_id, exc)
 
 
+def _downgrade_orphaned_auto_execute(db: Session, user: User) -> None:
+    """実行権限を持たない AUTO_EXECUTE ユーザーを承認制へ降格し、本人に通知する。
+
+    2026-08-06 PR6 (PR1 の "降格は PR6" を実装):
+    「完全おまかせ」と表示されているのに有効な delegation_grant が無いユーザーは、
+    実際には1件も自動実行できない。表示と実行能力が乖離した状態を放置すると、
+    ユーザーは「動いているはず」と誤認したまま提案が期限切れになり続ける
+    (本番で実際に2ヶ月間発生した)。実態に合わせて承認制へ倒す。
+
+    **順序の制約**: 要件定義 IV-2 / 禁止事項7 により、この降格は到達経路
+    (Web Push) の復旧後にのみ許される。通知できない状態で降格すると
+    「無断で設定が変わった」としか映らず、機能不全を不信に変換するだけになる。
+    到達経路は 2026-08-05 に復旧し実機到達を確認済み。
+
+    降格は本人通知とセットで行い、通知が失敗しても降格自体は確定させる
+    (通知失敗を理由に危険側へ留めるべきではない)。逆に降格の commit は
+    呼び出し元の savepoint に委ねる (per-user savepoint 内で呼ばれるため、
+    そのユーザーの処理が失敗すれば降格も巻き戻る)。
+    """
+    previous = user.execution_policy
+    user.execution_policy = ExecutionPolicy.REQUIRE_APPROVAL.value
+    db.add(user)
+    logger.warning(
+        "実行権限を持たない AUTO_EXECUTE ユーザーを承認制へ降格しました: user_id=%d (%s -> %s)",
+        user.id,
+        previous,
+        user.execution_policy,
+    )
+
+    # 本人への通知 (best-effort)。失敗しても降格は取り消さない。
+    try:
+        from app.notifications.factory import get_notification_service  # noqa: PLC0415
+        from app.notifications.templates import (  # noqa: PLC0415
+            execution_mode_downgraded_notification,
+        )
+
+        payload = execution_mode_downgraded_notification()
+        payload.notification_message.user_id = user.id
+        get_notification_service().send(payload.notification_message)
+        # 「AI提案通知」ではなく「システム通知」として判定する。提案通知を OFF に
+        # しているユーザーにも、アカウント設定が変わった事実は届ける必要がある。
+        _deliver_ai_proposal_push(db, user.id, payload, preference_key="system_notice")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "降格通知の送信に失敗しました (降格自体は確定): user_id=%d: %s", user.id, exc
+        )
+
+
 def _check_observability_invariants(db: Session, user: User) -> None:
     """AUTO_EXECUTE の委譲枠欠如 / 連続期限切れを検知し Slack 通知する。
 
@@ -266,6 +314,7 @@ def _check_observability_invariants(db: Session, user: User) -> None:
         and get_active_grant(user.id, db) is None
     ):
         _notify_missing_delegation_grant(user.id)
+        _downgrade_orphaned_auto_execute(db, user)
 
     recent = db.scalars(
         select(Proposal)
@@ -652,7 +701,9 @@ def _resolve_protocol_routing(
     return aave_default
 
 
-def _deliver_ai_proposal_push(db: Session, user_id: int, payload: Any) -> None:
+def _deliver_ai_proposal_push(
+    db: Session, user_id: int, payload: Any, preference_key: str = "ai_proposal"
+) -> None:
     """AI提案のWeb Push実配信 + notification_logsへのdelivered記録 (best-effort)。
 
     2026-08-04 PR5: get_notification_service().send() (LINE/Slack/内部ログ) とは独立した経路。
@@ -680,7 +731,7 @@ def _deliver_ai_proposal_push(db: Session, user_id: int, payload: Any) -> None:
         # 購読行の有無だけで送ると「設定画面ではOFFなのに通知が来る」状態になる。
         _user = db.get(User, user_id)
         if _user is None or not push_allowed_for_user(
-            _user.notification_settings_json, "ai_proposal"
+            _user.notification_settings_json, preference_key
         ):
             logger.debug(
                 "Web Push: 通知設定によりスキップ (user_id=%d)",

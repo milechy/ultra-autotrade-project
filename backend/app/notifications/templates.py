@@ -128,6 +128,27 @@ def auto_safety_action_notification(
     return _build_payload(title, body, "alert")
 
 
+def execution_mode_downgraded_notification() -> NotificationPayload:
+    """運用モードを「完全おまかせ」から「承認制」へ安全側降格したことの通知。
+
+    受け入れ条件 A-6「権限失効時に安全側へ降格し、ユーザーに通知される」/
+    A-E1「黙って承認待ちに落とさない」に対応する**ユーザー向け**通知
+    (operational_alert_notification は運用者向け Slack なので別物)。
+
+    要件定義 IV-2: 「無断で設定が変わった」と受け取られると機能不全を不信に
+    変換するだけになるため、**何が起きたか・なぜか・どうすれば元に戻せるか**を
+    本文に必ず含める。
+    """
+    title = "⚙️ 運用モードを「承認制」に変更しました"
+    body = (
+        "自動運用に必要な権限の設定が完了していなかったため、安全のため"
+        "「承認制」に切り替えました。ご資産は影響を受けていません。"
+        "今後の運用提案はアプリでご確認・承認いただくと実行されます。"
+        "自動運用をご希望の場合は、設定画面から改めてお手続きください。"
+    )
+    return _build_payload(title, body, "warning")
+
+
 # --- 取引4種 ---
 
 

@@ -613,7 +613,12 @@ def test_buy_creates_proposal_for_require_approval_and_auto_execute_users(db_ses
     """2026-07-16: BUY 判定時、execution_policy='require_approval'/'auto_execute' の
     両方に Proposal が作成されること（'proposal_only' は対象外のまま）。
     AUTO_EXECUTE ユーザーは委譲(SCW) grant を持たないため、提案は作られるが
-    auto-execution 側では skip され 'pending' のまま残る（別テストで検証）。
+    自動実行はされず 'pending' のまま残る（別テストで検証）。
+
+    2026-08-06 PR6: 委譲枠を持たない AUTO_EXECUTE ユーザーは、提案生成前の
+    不変条件チェックで require_approval へ**降格される**ようになった。このため
+    同 tick 内では既に承認制ユーザーとして扱われ、auto_execute_skipped は
+    加算されない（0 になる）。ユーザーから見た結果（提案が pending で残る）は同じ。
     """
     approval_user = _add_active_user(
         db_session, "approval@example.com", execution_policy="require_approval"
@@ -643,12 +648,16 @@ def test_buy_creates_proposal_for_require_approval_and_auto_execute_users(db_ses
     # 委譲grantが無いため auto-execution は skip（'pending' のまま・自動実行しない）。
     assert all(p.status == "pending" for p in proposals)
     assert result["auto_executed"] == 0
-    assert result["auto_execute_skipped"] == 1
+    # 2026-08-06 PR6: 降格により承認制ユーザー扱いになるため 0。
+    assert result["auto_execute_skipped"] == 0
 
 
 def test_auto_execute_user_without_grant_stays_pending_on_buy(db_session):
     """2026-07-16: auto_execute ユーザーは提案が作られるが、有効な委譲(SCW) grant が
     無い限り自動実行されず 'pending' のまま残る（既存の手動フローに委ねる）。
+
+    2026-08-06 PR6: さらに、権限を持たないまま「完全おまかせ」を表示し続けるのは
+    表示と実行能力の乖離なので、承認制へ降格し本人に通知するようになった。
     """
     auto_user = _add_active_user(db_session, "auto@example.com", execution_policy="auto_execute")
     _add_fund_allocation(db_session, auto_user)
@@ -667,10 +676,15 @@ def test_auto_execute_user_without_grant_stays_pending_on_buy(db_session):
 
     assert result["proposals_created"] == 1
     assert result["auto_executed"] == 0
-    assert result["auto_execute_skipped"] == 1
+    # 2026-08-06 PR6: 降格により、この tick では既に承認制ユーザー扱いになるため
+    # auto_execute_skipped は加算されない。
+    assert result["auto_execute_skipped"] == 0
     proposals = db_session.scalars(select(Proposal)).all()
     assert len(proposals) == 1
     assert proposals[0].status == "pending"
+    # ★降格が実際に行われたこと（表示と実行能力の乖離が解消されたこと）
+    db_session.refresh(auto_user)
+    assert auto_user.execution_policy == "require_approval"
 
 
 # ---------------------------------------------------------------------------
