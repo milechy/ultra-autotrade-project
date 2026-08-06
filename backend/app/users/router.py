@@ -113,15 +113,23 @@ class UserFeeInfoResponse(BaseModel):
 )
 def get_fee_schedule(
     current_user: User = Depends(require_partner),
+    db: Session = Depends(get_db),
 ) -> FeeScheduleResponse:
     """
-    全ティアの手数料率レンジ一覧を返す。
+    全ティアの手数料率レンジ一覧を返す (fee_configs 由来、v10正本)。
 
     - partner / admin: アクセス可能
+    - fee_configs に active レコードがない場合は 503 (料金プラン非表示)
     """
+    schedule = get_full_fee_schedule(db)
+    if schedule is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Fee config not initialized. Run scripts/seed_fee_config_v10.py.",
+        )
     return FeeScheduleResponse(
-        schedule=get_full_fee_schedule(),
-        note="手数料率はAIの判定精度に応じて動的に決定されます",
+        schedule=schedule,
+        note="手数料率はティア（デポジット規模）ごとの固定料率です",
     )
 
 
@@ -365,5 +373,10 @@ def get_user_fee_info(
                 detail="Access denied",
             )
 
-    fee_range = get_fee_rate_range(user.tier)
+    fee_range = get_fee_rate_range(user.tier, db)
+    if fee_range is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Fee config not initialized. Run scripts/seed_fee_config_v10.py.",
+        )
     return UserFeeInfoResponse(user_id=user_id, tier=user.tier, fee_rate_range=fee_range)
