@@ -252,6 +252,40 @@ def _notify_consecutive_expiry(user_id: int, consecutive_count: int) -> None:
         logger.warning("_notify_consecutive_expiry failed for user_id=%d: %s", user_id, exc)
 
 
+def _notify_downgrade_unreachable(user_id: int) -> None:
+    """降格したがユーザーに通知が届かなかったことを運用者へエスカレーションする。
+
+    2026-08-06: 要件定義 IV-2 は「通知できない状態で降格すると、機能不全を不信に
+    変換するだけ」として B(到達経路) → A(降格) の順序を求めている。しかし
+    「Web Push の仕組みが動くこと」と「**そのユーザーに実際に届くこと**」は別で、
+    購読していない / 通知を OFF にしているユーザーには届かない。
+
+    本番で実際に user 11/18 がこの状態だった (購読ゼロ) にもかかわらず、
+    降格は実行され、届かなかった事実は誰にも通知されなかった。
+    到達経路ゼロのユーザーに重要なアカウント変更を行った場合は、
+    運用者が別手段 (メール等) で連絡できるようエスカレーションする。
+
+    受け入れ条件 I-14「承認型 + 到達経路ゼロの組合せを検知し、ユーザーに警告する」
+    の一部でもある。
+    """
+    try:
+        from app.notifications.factory import get_notification_service  # noqa: PLC0415
+        from app.notifications.templates import operational_alert_notification  # noqa: PLC0415
+
+        msg = operational_alert_notification(
+            title="🔕 降格通知がユーザーに届いていません",
+            body=(
+                f"user_id={user_id} を承認制へ降格しましたが、到達経路が無く "
+                "本人に通知できませんでした (Push 未購読 / 通知設定 OFF / VAPID 未設定 "
+                "のいずれか)。ユーザーは自分の運用モードが変わったことを知りません。"
+                "別手段での連絡を検討してください。"
+            ),
+        )
+        get_notification_service().send(msg)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("_notify_downgrade_unreachable failed for user_id=%d: %s", user_id, exc)
+
+
 def _downgrade_orphaned_auto_execute(db: Session, user: User) -> None:
     """実行権限を持たない AUTO_EXECUTE ユーザーを承認制へ降格し、本人に通知する。
 
@@ -293,7 +327,9 @@ def _downgrade_orphaned_auto_execute(db: Session, user: User) -> None:
         get_notification_service().send(payload.notification_message)
         # 「AI提案通知」ではなく「システム通知」として判定する。提案通知を OFF に
         # しているユーザーにも、アカウント設定が変わった事実は届ける必要がある。
-        _deliver_ai_proposal_push(db, user.id, payload, preference_key="system_notice")
+        reached = _deliver_ai_proposal_push(db, user.id, payload, preference_key="system_notice")
+        if not reached:
+            _notify_downgrade_unreachable(user.id)
     except Exception as exc:  # noqa: BLE001
         logger.warning(
             "降格通知の送信に失敗しました (降格自体は確定): user_id=%d: %s", user.id, exc
@@ -701,20 +737,48 @@ def _resolve_protocol_routing(
     return aave_default
 
 
+def _record_push_outcome(db: Session, user_id: int, payload: Any, *, delivered: bool) -> None:
+    """Web Push の到達結果を notification_logs に記録する。
+
+    行の存在が「送信を試みた」、delivered 列が「到達したか」を表す。
+    **未到達 (False) も必ず記録する**: 記録しないと到達率 (受け入れ条件 B-4) が
+    「送れたものだけ」の母数で計算され、実態より良く見えてしまう。
+    """
+    from app.notifications.models import NotificationLog  # noqa: PLC0415
+
+    db.add(
+        NotificationLog(
+            channel="push",
+            severity=payload.notification_message.severity.value,
+            title=payload.notification_message.title,
+            body=payload.notification_message.body,
+            user_id=user_id,
+            delivered=delivered,
+        )
+    )
+    db.flush()
+
+
 def _deliver_ai_proposal_push(
     db: Session, user_id: int, payload: Any, preference_key: str = "ai_proposal"
-) -> None:
-    """AI提案のWeb Push実配信 + notification_logsへのdelivered記録 (best-effort)。
+) -> bool:
+    """ユーザーへの Web Push 実配信 + notification_logs への到達記録 (best-effort)。
 
     2026-08-04 PR5: get_notification_service().send() (LINE/Slack/内部ログ) とは独立した経路。
     購読者へ実際にブラウザ通知を届けるコードがこれまで一切配線されていなかった
-    (docs/internal/2026-08-04_execution_pipeline_requirements.md)。VAPID未設定時は
-    Web Push全体を無効化する既存設計 (get_vapid_config) に従い静かにスキップする。
+    (docs/internal/2026-08-04_execution_pipeline_requirements.md)。
     失敗しても提案生成自体はブロックしない (fail-open)。
+
+    Returns:
+        実際にユーザーへ到達したか。到達経路が無い / 設定 OFF / 送信失敗はすべて False。
+
+    2026-08-06: 以前は「VAPID未設定」「通知OFF」で**何も記録せず早期 return** していた。
+    そのため「届かなかった」事実が notification_logs に残らず、到達率 (受け入れ条件 B-4)
+    を測れなかった。実際に本番で降格通知が user 11/18 に届いていないことを、
+    ログからは判別できなかった。未到達も delivered=False として記録する。
     """
     try:
         from app.auth.models import User  # noqa: PLC0415
-        from app.notifications.models import NotificationLog  # noqa: PLC0415
         from app.notifications.push import (  # noqa: PLC0415
             DatabaseSubscriptionStore,
             WebPushSender,
@@ -725,7 +789,8 @@ def _deliver_ai_proposal_push(
         vapid_config = get_vapid_config()
         if vapid_config is None:
             logger.debug("Web Push: VAPID未設定のためスキップ (user_id=%d)", user_id)
-            return
+            _record_push_outcome(db, user_id, payload, delivered=False)
+            return False
 
         # 受け入れ条件 B-N4: 通知設定で OFF にしたユーザーへは配信しない。
         # 購読行の有無だけで送ると「設定画面ではOFFなのに通知が来る」状態になる。
@@ -737,28 +802,20 @@ def _deliver_ai_proposal_push(
                 "Web Push: 通知設定によりスキップ (user_id=%d)",
                 user_id,
             )
-            return
+            _record_push_outcome(db, user_id, payload, delivered=False)
+            return False
 
         sender = WebPushSender(vapid_config, DatabaseSubscriptionStore(SessionLocal))
         delivered = sender.send_to_user(user_id, payload.web_push_payload)
-
-        db.add(
-            NotificationLog(
-                channel="push",
-                severity=payload.notification_message.severity.value,
-                title=payload.notification_message.title,
-                body=payload.notification_message.body,
-                user_id=user_id,
-                delivered=delivered,
-            )
-        )
-        db.flush()
+        _record_push_outcome(db, user_id, payload, delivered=delivered)
+        return delivered
     except Exception as _push_exc:  # noqa: BLE001
         logger.warning(
             "ai_proposal Web Push delivery failed for user %d (skipping): %s",
             user_id,
             _push_exc,
         )
+        return False
 
 
 def _create_proposals_for_users(
