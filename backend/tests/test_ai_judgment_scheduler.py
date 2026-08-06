@@ -5,6 +5,7 @@
 import asyncio
 import os
 import tempfile
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -119,6 +120,29 @@ def _add_fund_allocation(
     session.add(alloc)
     session.flush()
     return alloc
+
+
+def _add_executed_proposal(
+    session,
+    user: User,
+    amount_usd: Decimal,
+    operation: str = "SUPPLY",
+) -> Proposal:
+    """遊休額 (idle capital) テスト用: 実行済み (status='executed') の提案を1件追加する。"""
+    proposal = Proposal(
+        user_id=user.id,
+        operation=operation,
+        asset="USDC",
+        protocol="aave",
+        amount=amount_usd,
+        amount_usd=amount_usd,
+        reason="test executed proposal",
+        status="executed",
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    session.add(proposal)
+    session.flush()
+    return proposal
 
 
 # ---------------------------------------------------------------------------
@@ -1519,6 +1543,182 @@ def test_resolve_amount_no_allocation_no_wallet_notifies_and_zero(db_session, mo
     result = sched._resolve_proposal_amount(db_session, user.id)
     assert result == Decimal("0")
     assert called.get("uid") == user.id
+
+
+# ---------------------------------------------------------------------------
+# _resolve_proposal_amount: 遊休額 (idle capital) — 分母を静的台帳から動的遊休額へ
+# (2026-08-06 / Asana 1217210604911292)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_proposal_amount_idle_after_partial_deployment(db_session):
+    """一部運用済みのとき、遊休額 (allocated - deployed) の10%が提案額になること。
+
+    allocated=$5,000, 実行済みSUPPLY=$3,000 → idle=$2,000 → 10%=$200。
+    """
+    user = _add_active_user(db_session, "partial_deployed@example.com")
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("5000"))
+    _add_executed_proposal(db_session, user, Decimal("3000"), operation="SUPPLY")
+    db_session.commit()
+
+    from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
+
+    result = _resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("200.00"), f"expected $200 (10% of $2,000 idle) but got {result}"
+
+
+def test_resolve_proposal_amount_idle_accounts_for_withdraw(db_session):
+    """実行済み WITHDRAW は運用済み額から差し引かれること。
+
+    allocated=$1,000, 実行済みSUPPLY=$800, 実行済みWITHDRAW=$300
+    → deployed=$500 → idle=$500 → 10%=$50。
+    """
+    user = _add_active_user(db_session, "withdraw_adjusted@example.com")
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("1000"))
+    _add_executed_proposal(db_session, user, Decimal("800"), operation="SUPPLY")
+    _add_executed_proposal(db_session, user, Decimal("300"), operation="WITHDRAW")
+    db_session.commit()
+
+    from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
+
+    result = _resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("50.00"), f"expected $50 (10% of $500 idle) but got {result}"
+
+
+def test_resolve_proposal_amount_idle_zero_when_fully_deployed(db_session):
+    """遊休がゼロ (allocated <= deployed) のとき、提案が出ないこと (Decimal(0))。
+
+    allocated=$1,000, 実行済みSUPPLY=$1,000 → idle=$0 → skip。
+    """
+    user = _add_active_user(db_session, "fully_deployed@example.com")
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("1000"))
+    _add_executed_proposal(db_session, user, Decimal("1000"), operation="SUPPLY")
+    db_session.commit()
+
+    from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
+
+    assert _resolve_proposal_amount(db_session, user.id) == Decimal("0")
+
+
+def test_resolve_proposal_amount_idle_never_negative_when_over_withdrawn(db_session):
+    """WITHDRAW が SUPPLY を超えて記録されていても deployed は 0 未満に倒れない (安全側)。
+
+    allocated=$1,000, SUPPLY=$200, WITHDRAW=$500 (記録不整合) → deployed=max(0, -300)=0
+    → idle=$1,000 → 10%=$100 (allocated 全額を分母にした場合と同じ、暴走しない)。
+    """
+    user = _add_active_user(db_session, "over_withdrawn@example.com")
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("1000"))
+    _add_executed_proposal(db_session, user, Decimal("200"), operation="SUPPLY")
+    _add_executed_proposal(db_session, user, Decimal("500"), operation="WITHDRAW")
+    db_session.commit()
+
+    from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
+
+    result = _resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("100.00")
+
+
+def test_resolve_proposal_amount_pending_proposals_do_not_count_as_deployed(db_session):
+    """status='pending' の提案は「運用済み」に数えない (実行されたものだけ数える)。
+
+    allocated=$1,000, pending SUPPLY=$1,000 (未実行) → deployed=$0 → idle=$1,000 → 10%=$100。
+    """
+    user = _add_active_user(db_session, "pending_not_deployed@example.com")
+    _add_fund_allocation(db_session, user, allocated_usd=Decimal("1000"))
+    pending = Proposal(
+        user_id=user.id,
+        operation="SUPPLY",
+        asset="USDC",
+        protocol="aave",
+        amount=Decimal("1000"),
+        amount_usd=Decimal("1000"),
+        reason="pending, not executed",
+        status="pending",
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    db_session.add(pending)
+    db_session.commit()
+
+    from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
+
+    result = _resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("100.00")
+
+
+# ---------------------------------------------------------------------------
+# _resolve_proposal_amount: 実効最低入金の無音デッドゾーン境界値
+# ($100/$200/$500/$1,000/$5,000 / Asana 1217210854320785)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "balance,expected",
+    [
+        (Decimal("100"), Decimal("0")),  # < 最低入金($200) → deposit gate で skip
+        (Decimal("200"), Decimal("0")),  # 10%=$20 < min($50) → 無音デッドゾーン→skip (要修正対象)
+        (Decimal("500"), Decimal("50.00")),  # 10%=$50 = min → 提案は出る (採算ゲートは別関数)
+        (Decimal("1000"), Decimal("100.00")),  # 10%=$100
+        (Decimal("5000"), Decimal("500.00")),  # 10%=$500
+    ],
+)
+def test_resolve_proposal_amount_wallet_deadzone_boundaries(
+    db_session, monkeypatch, balance, expected
+):
+    """非カストディアル (wallet) 経路: $100/$200/$500/$1,000/$5,000 境界値。"""
+    import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
+
+    user = _add_active_user(db_session, f"wallet_boundary_{balance}@example.com")
+    user.smart_wallet_address = "0x" + "1" * 40
+    db_session.commit()
+
+    monkeypatch.setattr(sched, "_read_wallet_usdc_balance", lambda _addr: balance)
+    result = sched._resolve_proposal_amount(db_session, user.id)
+    assert result == expected, f"balance=${balance}: expected {expected} but got {result}"
+
+
+@pytest.mark.parametrize(
+    "allocated,expected",
+    [
+        (Decimal("100"), Decimal("0")),  # < 最低入金($200) → deposit gate で skip
+        (
+            Decimal("200"),
+            Decimal("50.00"),
+        ),  # 10%=$20 < min → custodial は $50 に切り上げ (既存非対称)
+        (Decimal("500"), Decimal("50.00")),  # 10%=$50
+        (Decimal("1000"), Decimal("100.00")),  # 10%=$100
+        (Decimal("5000"), Decimal("500.00")),  # 10%=$500
+    ],
+)
+def test_resolve_proposal_amount_custodial_boundaries(db_session, allocated, expected):
+    """custodial (fund_allocation) 経路: $100/$200/$500/$1,000/$5,000 境界値 (deployed=0)。"""
+    from app.automation.ai_judgment_scheduler import _resolve_proposal_amount  # noqa: PLC0415
+
+    user = _add_active_user(db_session, f"custodial_boundary_{allocated}@example.com")
+    _add_fund_allocation(db_session, user, allocated_usd=allocated)
+    db_session.commit()
+
+    result = _resolve_proposal_amount(db_session, user.id)
+    assert result == expected, f"allocated=${allocated}: expected {expected} but got {result}"
+
+
+def test_resolve_proposal_amount_wallet_deadzone_notifies_user(db_session, monkeypatch):
+    """$200 デッドゾーン (10%<min) skip 時、本人へ理由通知が送られること (無音対策)。"""
+    import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
+
+    user = _add_active_user(db_session, "deadzone_notify@example.com")
+    user.smart_wallet_address = "0x" + "2" * 40
+    db_session.commit()
+
+    sent: list = []
+    monkeypatch.setattr(sched, "_read_wallet_usdc_balance", lambda _addr: Decimal("200"))
+    monkeypatch.setattr(
+        "app.notifications.factory.get_notification_service",
+        lambda: MagicMock(send=lambda m: sent.append(m)),
+    )
+    result = sched._resolve_proposal_amount(db_session, user.id)
+    assert result == Decimal("0")
+    assert len(sent) == 1
+    assert sent[0].user_id == user.id
 
 
 def test_create_proposals_db_error_one_user_does_not_stop_others(db_session):
