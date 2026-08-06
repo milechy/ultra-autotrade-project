@@ -2,9 +2,8 @@
 # backend/app/transactions/models.py
 """取引履歴モデル定義。"""
 #
-# DB マイグレーション（Alembic未使用 — 手動ALTER）:
-#   ALTER TABLE transactions ADD COLUMN IF NOT EXISTS error_message TEXT;
-#   ALTER TABLE transactions ADD COLUMN IF NOT EXISTS gas_sponsored BOOLEAN;
+# DB マイグレーション（Alembic管理、backend/alembic/versions/ 参照）:
+#   gas_sponsored は b9c0d1e2f3a4_add_gas_sponsored_to_transactions.py で追加。
 #   -- gas_sponsored: ERC-4337 UserOp の paymaster がガス代を全額負担したか。
 #   --   True=paymasterがスポンサー（ユーザー負担分は実質0） / False=Smart Wallet自己負担
 #   --   （gas_used * gas_price_gwei が実費用） / NULL=bundlerがpaymasterフィールドを
