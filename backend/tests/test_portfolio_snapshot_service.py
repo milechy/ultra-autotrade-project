@@ -758,3 +758,90 @@ class TestSelfDirectedSnapshot:
         # admin(uid=1) の snapshot は作られない。消費者(uid=100)のみ。
         assert db_session.query(PortfolioSnapshot).filter_by(user_id=1).first() is None
         assert db_session.query(PortfolioSnapshot).filter_by(user_id=100).first() is not None
+
+    def test_self_directed_partner_role_with_own_wallet_included(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """本番 user_id=11 型: role=partner だが invited_by=NULL・自分の wallet を持つ
+        ユーザーは self-directed 経路で snapshot 対象になる（本丸バグの回帰防止）。"""
+        monkeypatch.delenv("AAVE_WALLET_ADDRESS", raising=False)
+        yamamoto = _make_user(db_session, uid=11, role="partner", wallet="0xYAMAMOTO")
+        db_session.commit()
+
+        mock_client = self._mock_aave_client(_make_account_data("4000", "500", "2.0"))
+        with patch(
+            "app.portfolio.snapshot_service.get_default_aave_client",
+            return_value=mock_client,
+        ):
+            result = record_portfolio_snapshot(db_session)
+
+        assert result["snapshots_created"] == 1
+        mock_client.get_account_data.assert_called_once_with("0xYAMAMOTO")
+        snap = db_session.query(PortfolioSnapshot).filter_by(user_id=yamamoto.id).first()
+        assert snap is not None
+        assert Decimal(str(snap.total_supply_usd)) == Decimal("4000")
+
+    def test_self_directed_admin_role_excluded(self, db_session: Session) -> None:
+        """role=admin・invited_by=NULL のユーザーは self-directed ループでは処理されない
+        （admin fallback 側の責務のまま）。"""
+        admin = _make_admin(db_session, uid=1, wallet="0xADMIN")
+        db_session.commit()
+
+        mock_client = self._mock_aave_client(_make_account_data("1000", "0", "5.0"))
+        with patch(
+            "app.portfolio.snapshot_service.get_default_aave_client",
+            return_value=mock_client,
+        ):
+            record_portfolio_snapshot(db_session)
+
+        # admin fallback 経由で 1 回だけ記録される（self-directed からの二重呼び出しはない）。
+        mock_client.get_account_data.assert_called_once_with("0xADMIN")
+        assert db_session.query(PortfolioSnapshot).filter_by(user_id=admin.id).count() == 1
+
+    def test_pooled_partner_not_double_counted_in_self_directed(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """テスターを抱える旧モデル partner 自身は invited_by=NULL だが、既にテスターへ
+        按分済みのため self-directed 経路で追加の自己 snapshot を作らない（二重計上防止）。"""
+        monkeypatch.delenv("AAVE_WALLET_ADDRESS", raising=False)
+        partner = _make_user(db_session, uid=10, role="partner", wallet="0xPARTNER_10")
+        tester = _make_user(db_session, uid=11, invited_by=partner.id)
+        db_session.commit()
+
+        account_data = _make_account_data("10000", "2000", "3.0")
+        mock_client = self._mock_aave_client(account_data)
+        with patch(
+            "app.portfolio.snapshot_service.get_default_aave_client",
+            return_value=mock_client,
+        ):
+            result = record_portfolio_snapshot(db_session)
+
+        # partner の wallet で Aave を呼ぶのはテスター按分の 1 回のみ。
+        mock_client.get_account_data.assert_called_once_with("0xPARTNER_10")
+        assert result["snapshots_created"] == 1
+        assert db_session.query(PortfolioSnapshot).filter_by(user_id=partner.id).count() == 0
+        assert db_session.query(PortfolioSnapshot).filter_by(user_id=tester.id).count() == 1
+
+    def test_admin_fallback_fires_despite_partners_skipped(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """不具合2 回帰防止: 全 partner が wallet 未設定で skip されても、
+        self-directed 経路で誰も snapshot が作られなければ admin fallback は発火する。"""
+        monkeypatch.delenv("AAVE_WALLET_ADDRESS", raising=False)
+        admin = _make_admin(db_session, uid=1, wallet="0xADMIN")
+        partner = _make_user(db_session, uid=10, role="partner", wallet=None)
+        _make_user(db_session, uid=11, invited_by=partner.id)
+        db_session.commit()
+
+        account_data = _make_account_data("6000", "0", "4.0")
+        mock_client = self._mock_aave_client(account_data)
+        with patch(
+            "app.portfolio.snapshot_service.get_default_aave_client",
+            return_value=mock_client,
+        ):
+            result = record_portfolio_snapshot(db_session)
+
+        assert result["partners_skipped"] == 1
+        assert result["snapshots_created"] == 1
+        mock_client.get_account_data.assert_called_once_with("0xADMIN")
+        assert db_session.query(PortfolioSnapshot).filter_by(user_id=admin.id).count() == 1

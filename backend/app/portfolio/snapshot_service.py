@@ -15,7 +15,7 @@ from typing import Any, Optional
 from sqlalchemy.orm import Session
 
 from app.aave.client import get_default_aave_client
-from app.auth.models import User
+from app.auth.models import User, UserRole
 from app.database import SessionLocal
 from app.portfolio.models import PortfolioHistory, PortfolioSnapshot
 
@@ -253,20 +253,30 @@ def record_portfolio_snapshot(db: Optional[Session] = None) -> dict[str, Any]:
 
         # --- セルフディレクト（非カストディアル消費者）ユーザー: 各自のウォレット残高を記録 ---
         # 背景 (2026-07-23): 従来の snapshot は「partner が招待したテスターに按分」する旧モデル
-        # 専用で、v4 の LIFF から自己登録した消費者（role=viewer / invited_by IS NULL / 自分の
-        # Smart Wallet を持つ）はどの経路にも乗らず snapshot が 1 行も作られなかった。結果、
+        # 専用で、v4 の LIFF から自己登録した消費者（invited_by IS NULL / 自分の Smart Wallet を
+        # 持つ）はどの経路にも乗らず snapshot が 1 行も作られなかった。結果、
         # 「運用残高 / 平均利回り」が実データでは永久に空になっていた。ここで各ユーザー自身の
         # ウォレットを読んで per-user snapshot を作る。partner ループ対象（invited_by あり）とは
         # 排他なので二重計上しない。
-        self_directed = (
-            db.query(User)
-            .filter(
-                User.invited_by.is_(None),
-                User.is_active == True,  # noqa: E712
-                User.role == "viewer",
-            )
-            .all()
+        #
+        # 修正 (2026-08-06 / self-directed 判定バグ): 従来 `role == "viewer"` で絞っていたが、
+        # self-directed かどうかは role と無関係（invited_by IS NULL かどうかで決まる）。
+        # role=partner だが invited_by=NULL・自分の wallet を持つユーザー（例: user_id=11）が
+        # この誤条件で除外され、パートナーループにも乗らないため 2 経路とも漏れて
+        # snapshot が永久に 0 件になっていた（2026-06-04〜2ヶ月欠損の本丸）。
+        # admin だけは admin fallback 側の責務のため対象から除外する。
+        # 加えて、テスターを実際に抱える旧モデル partner（= partner_rows に載っている ID）も
+        # 除外する。partner 自身も invited_by IS NULL だが、その残高は上のループで
+        # テスターへ按分済みのため、ここでも記録すると同じ残高を二重計上してしまう。
+        pooled_partner_ids = {pid for (pid,) in partner_rows}
+        self_directed_query = db.query(User).filter(
+            User.invited_by.is_(None),
+            User.is_active == True,  # noqa: E712
+            User.role != UserRole.ADMIN.value,
         )
+        if pooled_partner_ids:
+            self_directed_query = self_directed_query.filter(User.id.notin_(pooled_partner_ids))
+        self_directed = self_directed_query.all()
         for user in self_directed:
             wallet_addr = _self_directed_wallet(user)
             if not wallet_addr:
@@ -313,8 +323,12 @@ def record_portfolio_snapshot(db: Optional[Session] = None) -> dict[str, Any]:
             last_total_debt = u_debt
             last_hf = u_hf
 
-        # --- 招待関係下のテスターが居ない場合: 管理者ユーザーに admin.wallet_address ベースで保存 ---
-        if snapshots_created == 0 and partners_skipped == 0:
+        # --- 誰にも snapshot が作られなかった場合: 管理者ユーザーに admin.wallet_address ベースで保存 ---
+        # 修正 (2026-08-06): 従来は partners_skipped == 0 も条件だったため、旧 partner モデルの
+        # partner_id=1 が wallet_address 未設定で常時 skip される限り admin fallback が発火せず
+        # 死んでいた。self-directed 経路が独立して機能するようになったので、「誰にも作られな
+        # かった時だけ」に緩和する。
+        if snapshots_created == 0:
             admin = (
                 db.query(User)
                 .filter(User.role == "admin", User.is_active == True)  # noqa: E712
