@@ -63,15 +63,6 @@ export function ProposalBubble({ proposal }: ProposalBubbleProps) {
     ? `~$${Number(proposal.estimated_gas_usd).toFixed(2)}`
     : null;
 
-  const totalUsd =
-    proposal.estimated_gas_usd
-      ? (Number(proposal.amount_usd) + Number(proposal.estimated_gas_usd)).toLocaleString("ja-JP", {
-          style: "currency",
-          currency: "USD",
-          maximumFractionDigits: 2,
-        })
-      : null;
-
   return (
     <div className="flex flex-col items-start px-3 py-2">
       {/* bubble */}
@@ -141,13 +132,11 @@ export function ProposalBubble({ proposal }: ProposalBubbleProps) {
           </p>
         )}
 
-        {/* gas + total */}
+        {/* gas（合計額には含めない。取引額とは別枠で概算表示） */}
         {gasUsd && (
           <div className="space-y-0.5">
             <p className="text-xs text-zinc-600">{t("gasEstimate")} {gasUsd}</p>
-            {totalUsd && (
-              <p className="text-xs text-zinc-400 font-medium">{t("totalWithGas")} {totalUsd}</p>
-            )}
+            <p className="text-[10px] text-zinc-600">{t("gasNote")}</p>
           </div>
         )}
       </div>
