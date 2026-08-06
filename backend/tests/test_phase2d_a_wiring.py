@@ -121,6 +121,7 @@ def test_risk_limiter_holds_execution(db_session: Session) -> None:
         return _fake_result()
 
     with (
+        patch.dict(os.environ, {"CUSTODIAL_EXECUTION_ENABLED": "true"}),
         patch(
             "app.automation.safety_gate.evaluate_hard_stop",
             return_value=HardStopResult(blocked=False),
@@ -156,6 +157,7 @@ def test_risk_limiter_pass_allows_execution(db_session: Session) -> None:
         return _fake_result()
 
     with (
+        patch.dict(os.environ, {"CUSTODIAL_EXECUTION_ENABLED": "true"}),
         patch(
             "app.automation.safety_gate.evaluate_hard_stop",
             return_value=HardStopResult(blocked=False),
@@ -282,7 +284,10 @@ def test_auto_execution_flag_no_longer_requires_grant_for_human_approval(
     )
 
     with (
-        patch.dict(os.environ, {"AUTO_EXECUTION_ENABLED": "true"}),
+        patch.dict(
+            os.environ,
+            {"AUTO_EXECUTION_ENABLED": "true", "CUSTODIAL_EXECUTION_ENABLED": "true"},
+        ),
         patch(
             "app.aave.service.MultiChainAaveService.execute_rebalance",
             return_value=fake_result,
@@ -341,6 +346,7 @@ def test_shadow_does_not_change_execution_behavior(db_session: Session) -> None:
         return _fake_result()
 
     with (
+        patch.dict(os.environ, {"CUSTODIAL_EXECUTION_ENABLED": "true"}),
         patch(
             "app.automation.safety_gate.evaluate_hard_stop",
             return_value=HardStopResult(blocked=False),
@@ -376,6 +382,7 @@ def test_shadow_passes_none_to_limiter(db_session: Session) -> None:
         return None
 
     with (
+        patch.dict(os.environ, {"CUSTODIAL_EXECUTION_ENABLED": "true"}),
         patch(
             "app.automation.safety_gate.evaluate_hard_stop",
             return_value=HardStopResult(blocked=False),
@@ -408,6 +415,7 @@ def test_shadow_failure_does_not_break_execution(db_session: Session) -> None:
     called: list[bool] = []
 
     with (
+        patch.dict(os.environ, {"CUSTODIAL_EXECUTION_ENABLED": "true"}),
         patch(
             "app.automation.safety_gate.evaluate_hard_stop",
             return_value=HardStopResult(blocked=False),
