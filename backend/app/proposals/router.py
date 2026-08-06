@@ -2028,6 +2028,51 @@ def _verify_on_chain_receipt(
     return dict(receipt)
 
 
+def _extract_userop_gas_fields(
+    userop_result: dict[str, Any],
+) -> tuple[Optional[Decimal], Optional[Decimal], Optional[bool]]:
+    """bundler の UserOp receipt (eth_getUserOperationReceipt) から実ガス代を取り出す。
+
+    :returns: (gas_used単位, gas_price_gwei, gas_sponsored) の3-tuple。
+        actualGasUsed/actualGasCost が欠落・parse失敗・0除算の場合は fail-open で
+        (None, None, None) を返す（呼び出し元の proposal 実行フローは継続、WARNING ログのみ）。
+        gas_sponsored は paymaster アドレスが非ゼロなら True (スポンサー全額負担扱い、
+        all-or-nothing。部分スポンサーは actualGasCost に合算済みで判別不能)、
+        bundler が paymaster フィールドを返さない場合は None (判別不能)。
+    """
+    gas_used_hex = userop_result.get("actualGasUsed")
+    gas_cost_hex = userop_result.get("actualGasCost")
+    if gas_used_hex is None or gas_cost_hex is None:
+        logger.warning(
+            "submit-tx: UserOp receipt に actualGasUsed/actualGasCost が無い — ガス代記録skip (fail-open)"
+        )
+        return None, None, None
+    try:
+        gas_used_units = Decimal(int(str(gas_used_hex), 16))
+        gas_cost_wei = Decimal(int(str(gas_cost_hex), 16))
+    except (ValueError, TypeError) as exc:
+        logger.warning(
+            "submit-tx: actualGasUsed/actualGasCost の parse に失敗 (%s) — ガス代記録skip (fail-open)",
+            exc,
+        )
+        return None, None, None
+    if gas_used_units <= 0:
+        logger.warning("submit-tx: actualGasUsed<=0 — ガス代記録skip (fail-open)")
+        return None, None, None
+
+    gas_price_gwei = gas_cost_wei / gas_used_units / Decimal("1000000000")
+
+    gas_sponsored: Optional[bool] = None
+    paymaster_raw = userop_result.get("paymaster")
+    if paymaster_raw is not None:
+        try:
+            gas_sponsored = int(str(paymaster_raw), 16) != 0
+        except ValueError:
+            gas_sponsored = None
+
+    return gas_used_units, gas_price_gwei, gas_sponsored
+
+
 @router.post(
     "/{proposal_id}/submit-tx",
     response_model=ProposalResponse,
@@ -2111,6 +2156,11 @@ def submit_partner_tx(
     proposal_user = db.scalars(select(User).where(User.id == proposal.user_id)).first()
     scw_address = proposal_user.smart_wallet_address if proposal_user is not None else None
 
+    # slice6: bundler UserOp receipt から取得する実ガス代 (取得不能時は fail-open で None のまま)。
+    userop_gas_used: Optional[Decimal] = None
+    userop_gas_price_gwei: Optional[Decimal] = None
+    userop_gas_sponsored: Optional[bool] = None
+
     if scw_address:
         # AA 経路: body.tx_hash は userOpHash。bundler で success / sender(=SCW) を検証 (fail-closed)。
         bundler_url = os.getenv("BUNDLER_RPC_URL", "")
@@ -2126,7 +2176,7 @@ def submit_partner_tx(
         )
 
         try:
-            verify_userop_receipt(
+            userop_result = verify_userop_receipt(
                 body.tx_hash, expected_sender=scw_address, bundler_url=bundler_url
             )
         except UserOpRevertedError as exc:
@@ -2144,6 +2194,9 @@ def submit_partner_tx(
                 detail=f"UserOp receipt 検証失敗: {exc}",
             ) from exc
         partner_wallet = scw_address
+        userop_gas_used, userop_gas_price_gwei, userop_gas_sponsored = _extract_userop_gas_fields(
+            userop_result
+        )
         logger.info(
             "submit-tx: proposal %d UserOp verified via bundler chain=%s userOp=%s",
             proposal_id,
@@ -2210,6 +2263,9 @@ def submit_partner_tx(
         status="completed",
         ai_decision_id=proposal.ai_decision_id,
         is_dry_run=False,
+        gas_used=userop_gas_used,
+        gas_price_gwei=userop_gas_price_gwei,
+        gas_sponsored=userop_gas_sponsored,
     )
     db.add(tx)
     db.commit()

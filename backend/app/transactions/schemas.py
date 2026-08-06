@@ -22,6 +22,7 @@ class TransactionCreate(BaseModel):
     ai_decision_id: Optional[int] = None
     gas_used: Optional[Decimal] = None
     gas_price_gwei: Optional[Decimal] = None
+    gas_sponsored: Optional[bool] = None
     is_dry_run: bool = False
 
 
@@ -41,6 +42,7 @@ class TransactionResponse(BaseModel):
     ai_decision_id: Optional[int]
     gas_used: Optional[Decimal]
     gas_price_gwei: Optional[Decimal]
+    gas_sponsored: Optional[bool]
     is_dry_run: bool
     created_at: datetime
     updated_at: datetime
