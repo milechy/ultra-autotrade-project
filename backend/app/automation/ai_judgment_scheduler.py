@@ -84,6 +84,12 @@ _CONSECUTIVE_EXPIRY_ALERT_THRESHOLD = 3
 _UNREACHABLE_ALERT_INTERVAL_HOURS = 24
 _unreachable_alerted_at: dict[int, datetime] = {}
 
+# 入金前ファネルの必要額が公表最低入金額 (MIN_DEPOSIT_USD) を超えた際の運用者アラート
+# 再送間隔 (2026-08-08 Asana 1217292627294465)。全ユーザー共通の条件 (APY 依存) なので
+# _unreachable_alerted_at のようなユーザー単位ではなく単一キーで絞る。
+_DEPOSIT_GAP_ALERT_INTERVAL_HOURS = 24
+_deposit_gap_alerted_at: dict[str, datetime] = {}
+
 # 提案金額: fund_allocations.allocated_amount_usd から実行済み提案の積み上げ (deployed) を
 # 差し引いた遊休額 (idle) × _PROPOSAL_RATIO で動的計算 (2026-08-06: 静的台帳→動的遊休額へ
 # 変更 / Asana 1217210604911292、詳細は _resolve_deployed_amount_usd 参照)。
@@ -93,6 +99,20 @@ _unreachable_alerted_at: dict[int, datetime] = {}
 _PROPOSAL_RATIO = Decimal(os.getenv("PROPOSAL_AMOUNT_RATIO", "0.10"))  # 10%
 _PROPOSAL_AMOUNT_MIN_USD = Decimal(os.getenv("PROPOSAL_AMOUNT_MIN_USD", "50"))
 _PROPOSAL_AMOUNT_MAX_USD = Decimal(os.getenv("PROPOSAL_AMOUNT_MAX_USD", "2000"))
+
+# 入金前ファネル (docs/62) の採算マージン (2026-08-08 Asana 1217292389876406)。
+# ファネル額は「採算が合う最小額」にこのマージンを乗せる。APY の小変動 (RPC取得の
+# 数秒のズレ等) で即不採算に戻らないようにする。1.05 = 5% の余裕。
+_FUNNEL_PROFITABILITY_MARGIN = Decimal(os.getenv("FUNNEL_PROFITABILITY_MARGIN", "1.05"))
+
+# 採算ゲートの期待利益計算に使う APY (2026-08-08 Asana 1217292389900767)。
+# 実APY (aave_data["supply_apy"]) が取得できた場合はそれを使う。取得失敗 (None) /
+# 0以下の異常値のときのみ、ここにフォールバックする。
+#
+# 実勢を上回らない保守的な値にすること。楽観側に倒すと採算割れの取引を通してしまう
+# (固定4%だった旧実装が、実測APY 3.2648% の状況下で $100 提案を「純利益+$0.05」と
+# 誤判定し、実際には赤字の提案を本番で作成していた事故の再発防止)。
+_FALLBACK_SUPPLY_APY_PCT = Decimal(os.getenv("FALLBACK_SUPPLY_APY_PCT", "3.0"))
 
 # 採算ゲート (fees.trade_gate) 未達スキップ時にユーザーへ伝える理由文言 (無音デッドゾーン対策)。
 _TRADE_GATE_SKIP_MESSAGE = (
@@ -192,8 +212,17 @@ def _has_active_allocation(db: Session, user_id: int) -> bool:
         return True
 
 
-def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
+def _resolve_proposal_amount(
+    db: Session, user_id: int, *, supply_apy_pct: Optional[Decimal] = None
+) -> Decimal:
     """提案金額を解決する (案C: fund_allocation 優先 + wallet 残高 fallback / docs/61)。
+
+    Args:
+        supply_apy_pct: 入金前ファネル (下記2.) の採算計算に使う実APY。呼び出し元が
+            既に解決済みならその値を渡す (再解決は冪等)。省略時は None として扱われ
+            `_resolve_effective_supply_apy` がフォールバックへ倒す。デフォルト値を
+            付けているのは、allocation/十分な残高の経路など**大半の既存呼び出し元は
+            APY を必要としない**ため (ファネル分岐のみが使う)。
 
     0. smart_wallet_address を持つユーザーは 1 を飛ばして 2 へ
        (`uses_custodial_allocation` / 2026-08-06)。allocation は custodial プール持分の
@@ -277,9 +306,13 @@ def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
         # ($852 の実効下限の正体 = 10%ルール × ガス代)。
         #
         # そこで入金前は分母を「現残高」ではなく「推奨運用額」に置き換える。
-        # $1,000 到達時にちょうど 10% になる額を提案し、awaiting_funds で着金を待つ。
-        # **実行前に着金検知側が最低入金額を再検証する**ため、残高に対し過大な supply が
-        # 実行されることはない (run_funding_detection_once / 10%ルール = CLAUDE.md
+        # 2026-08-08 (Asana 1217292389876406): 固定 $1,000×10%=$100 だと、実APYが
+        # 固定4%前提を下回った場合に採算ゲートで弾かれる (実測APY 3.2648% で $100 は
+        # 赤字)。採算が合う最小額を実APYから逆算し、そこに安全マージンを乗せる。
+        # 結果として「MIN_DEPOSIT_USD で採算が合う」状況では従来と同じ $100 になり
+        # (下の max により)、APY が下がるほど提案額と実質的な必要残高が動く。
+        # **実行前に着金検知側が 10% ルールを直接再検証する**ため、残高に対し過大な
+        # supply が実行されることはない (run_funding_detection_once / CLAUDE.md
         # [CRITICAL] 3 の担保)。
         #
         # ただし **allocation 帳簿を持つユーザーは対象外**。帳簿がある = パートナー/
@@ -288,14 +321,27 @@ def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
         # 本人に入金を促すのは筋違い (運用側が直すべき問題)。SCW 保有ユーザーは
         # 分岐 1 を飛ばしてここに来るため、ここで明示的に確認する必要がある (PR #1035)。
         if balance < MIN_DEPOSIT_USD and not _has_active_allocation(db, user_id):
-            funnel_amount = (MIN_DEPOSIT_USD * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
+            effective_apy = _resolve_effective_supply_apy(supply_apy_pct)
+            fixed_cost = Decimal(os.getenv("TRADE_FIXED_COST_USD", "0.27"))
+            _rate = effective_apy / Decimal("100") * Decimal("30") / Decimal("365")
+            _needed_amount = ((fixed_cost + Decimal("0.01")) / _rate) * _FUNNEL_PROFITABILITY_MARGIN
+            baseline_amount = (MIN_DEPOSIT_USD * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
+            funnel_amount = min(
+                max(baseline_amount, _needed_amount.quantize(Decimal("0.01"))),
+                _PROPOSAL_AMOUNT_MAX_USD,
+            )
             logger.info(
-                "[funding_funnel] user_id=%d balance=$%s < min $%s — "
+                "[funding_funnel] user_id=%d balance=$%s < min $%s (実APY=%s%%) — "
                 "推奨運用額ベースで $%s の提案を作成 (着金後に実行可)",
                 user_id,
                 balance,
                 MIN_DEPOSIT_USD,
+                effective_apy,
                 funnel_amount,
+            )
+            _notify_deposit_gap_if_needed(
+                required_balance=(funnel_amount / _PROPOSAL_RATIO).quantize(Decimal("0.01")),
+                effective_apy=effective_apy,
             )
             return funnel_amount
         amount = (balance * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
@@ -523,6 +569,39 @@ def _notify_unreachable_approval_user(user_id: int) -> None:
         get_notification_service().send(msg)
     except Exception as exc:  # noqa: BLE001
         logger.warning("_notify_unreachable_approval_user failed for user_id=%d: %s", user_id, exc)
+
+
+def _notify_deposit_gap_if_needed(required_balance: Decimal, effective_apy: Decimal) -> None:
+    """入金前ファネルの必要額が公表最低入金額を超えたら運用者へ通知する (best-effort)。
+
+    2026-08-08 Asana 1217292627294465。$1,000 は固定APY4%前提の $852 を上回るよう
+    決めた数字だが、実APYが4%を下回ると採算上の必要額がそれを超える。公表額の
+    変更は事業判断のため Claude では決めない (別チケット) — ここでは判断材料 (実APY /
+    必要残高 / 公表額) を運用者に上げるだけ。全ユーザー共通の条件なので単一キーで絞る。
+    """
+    if required_balance <= MIN_DEPOSIT_USD:
+        return
+    now = datetime.now(timezone.utc)
+    last = _deposit_gap_alerted_at.get("global")
+    if last is not None and now - last < timedelta(hours=_DEPOSIT_GAP_ALERT_INTERVAL_HOURS):
+        return
+    _deposit_gap_alerted_at["global"] = now
+    try:
+        from app.notifications.factory import get_notification_service  # noqa: PLC0415
+        from app.notifications.templates import operational_alert_notification  # noqa: PLC0415
+
+        msg = operational_alert_notification(
+            title="💰 公表最低入金額が実際の採算ラインを下回っています",
+            body=(
+                f"実APY={effective_apy}% では、採算が合う最低入金額は約 ${required_balance} "
+                f"ですが、公表額は ${MIN_DEPOSIT_USD} のままです。この間隔のユーザーは "
+                "入金しても提案が採算ゲートで弾かれる可能性があります。公表額の見直しを "
+                "検討してください (Asana: 公表最低入金額の見直し)。"
+            ),
+        )
+        get_notification_service().send(msg)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("_notify_deposit_gap_if_needed failed: %s", exc)
 
 
 def _should_skip_unreachable_approval_user(db: Session, user: User) -> bool:
@@ -1072,10 +1151,33 @@ def _deliver_ai_proposal_push(
         return False
 
 
+def _resolve_effective_supply_apy(supply_apy_pct: Optional[Decimal]) -> Decimal:
+    """採算ゲートの期待利益計算に使う APY を決定する (2026-08-08 Asana 1217292389900767)。
+
+    実APY (aave_data["supply_apy"]) が取得できていて正の値ならそれを使う。
+    取得失敗 (None) または 0 以下の異常値のときのみ _FALLBACK_SUPPLY_APY_PCT に倒す。
+
+    fail-open (提案生成を止めない) にする理由: RPC 1回の失敗や env 1つの設定ミスで
+    全ユーザーの提案生成が無言で止まる方が、フォールバック値で保守的に判定し続ける
+    より大きな故障になる (受け入れ条件 B-6 実装時の _user_has_reachable_channel と
+    同じ判断)。フォールバック使用は warning ログで可視化する。
+    """
+    if supply_apy_pct is not None and supply_apy_pct > Decimal("0"):
+        return supply_apy_pct
+    logger.warning(
+        "採算ゲート: 実APY取得不可 (supply_apy_pct=%s) — フォールバック %s%% を使用",
+        supply_apy_pct,
+        _FALLBACK_SUPPLY_APY_PCT,
+    )
+    return _FALLBACK_SUPPLY_APY_PCT
+
+
 def _create_proposals_for_users(
     db: Session,
     decision: AIDecision,
     result: CrossValidationResult,
+    *,
+    supply_apy_pct: Optional[Decimal],
 ) -> int:
     """ティア別間隔を満たすアクティブユーザーに Proposal を作成し、作成件数を返す。
 
@@ -1083,6 +1185,9 @@ def _create_proposals_for_users(
         db: SQLAlchemy セッション。
         decision: 保存済みの AIDecision。
         result: AI クロスバリデーション結果。
+        supply_apy_pct: 採算ゲート判定に使う実APY (%表記、aave_data["supply_apy"])。
+            取得失敗時は None を渡すこと (_resolve_effective_supply_apy がフォールバック)。
+            デフォルト値を付けない: 呼び出し側の渡し忘れを mypy で検出させるため。
 
     Returns:
         作成した Proposal の件数。
@@ -1092,6 +1197,7 @@ def _create_proposals_for_users(
     expires_at = datetime.now(timezone.utc) + timedelta(hours=_PROPOSAL_EXPIRES_HOURS)
     reason = result.final_reason or "AI判定による提案"
     now = datetime.now(timezone.utc)
+    effective_apy = _resolve_effective_supply_apy(supply_apy_pct)
 
     # AUTO_EXECUTE（完全おまかせ・無承認自動実行）ユーザーもここで提案対象に含める
     # （2026-07-16）。生成後 run_auto_execution_for_ai_decision が有効な委譲(SCW) grant を
@@ -1206,17 +1312,18 @@ def _create_proposals_for_users(
                     continue
 
                 # fund_allocations から per-user 提案金額を動的計算 (Decimal("0") = skip)
-                proposal_amount_usd = _resolve_proposal_amount(db, user.id)
+                proposal_amount_usd = _resolve_proposal_amount(
+                    db, user.id, supply_apy_pct=effective_apy
+                )
                 if proposal_amount_usd <= Decimal("0"):
                     # _resolve_proposal_amount 内で警告・Slack 通知済み
                     continue
 
-                # 動的手数料計算: デフォルトAPY 4%（安定期）を使用
+                # 動的手数料計算: 実APY (2026-08-08 以前は固定4%、Asana 1217292671266767)。
                 # 30日保有での予想利益 = amount × (APY/100) × (30/365)
-                _default_apy = Decimal("4")
                 _expected_profit = (
                     proposal_amount_usd
-                    * _default_apy
+                    * effective_apy
                     / Decimal("100")
                     * Decimal("30")
                     / Decimal("365")
@@ -1224,7 +1331,7 @@ def _create_proposals_for_users(
                 market_fee = calculate_fee_by_market(
                     trade_amount_usd=proposal_amount_usd,
                     tier=normalize_tier(user.tier, user_id=user.id).value,
-                    current_apy=_default_apy,
+                    current_apy=effective_apy,
                     expected_profit_usd=_expected_profit,
                     fixed_cost_usd=fixed_cost,
                 )
@@ -1305,6 +1412,8 @@ def _create_safe_yield_proposals_for_users(
     db: Session,
     decision: AIDecision,
     result: CrossValidationResult,
+    *,
+    supply_apy_pct: Optional[Decimal],
 ) -> int:
     """[B1] HOLD 判定時に「遊休USDC→Aave USDC 供給」の安全利回り提案を作成する。
 
@@ -1313,9 +1422,13 @@ def _create_safe_yield_proposals_for_users(
     改善する方向で本質的に安全なため、相場ゲート (Indicator+Macro≥70%) を待たずにドル建て安全利回りへ
     配分する。dedup / 入金ゲート / fee ゲート / per-user savepoint は本流と同一機構を再利用する。
     BUY/SELL 経路 (``_create_proposals_for_users``) には一切影響しない。
+
+    Args:
+        supply_apy_pct: 採算ゲート判定に使う実APY (%表記)。_create_proposals_for_users と同義。
     """
     expires_at = datetime.now(timezone.utc) + timedelta(hours=_PROPOSAL_EXPIRES_HOURS)
     now = datetime.now(timezone.utc)
+    effective_apy = _resolve_effective_supply_apy(supply_apy_pct)
     # 消費者向けの提案理由（ProposalActionCard に表示）にプロトコル名（Aave 等）は出さない約束。
     reason = "遊休USDCを安全な利回りへ配分します。相場の方向性に依らず実行できる安全な運用です。"
 
@@ -1392,14 +1505,15 @@ def _create_safe_yield_proposals_for_users(
                     continue
 
                 # 遊休額 (fund_allocation or wallet USDC × 10%)。0/入金未満は skip (本流と同一)。
-                proposal_amount_usd = _resolve_proposal_amount(db, user.id)
+                proposal_amount_usd = _resolve_proposal_amount(
+                    db, user.id, supply_apy_pct=effective_apy
+                )
                 if proposal_amount_usd <= Decimal("0"):
                     continue
 
-                _default_apy = Decimal("4")
                 _expected_profit = (
                     proposal_amount_usd
-                    * _default_apy
+                    * effective_apy
                     / Decimal("100")
                     * Decimal("30")
                     / Decimal("365")
@@ -1407,7 +1521,7 @@ def _create_safe_yield_proposals_for_users(
                 market_fee = calculate_fee_by_market(
                     trade_amount_usd=proposal_amount_usd,
                     tier=normalize_tier(user.tier, user_id=user.id).value,
-                    current_apy=_default_apy,
+                    current_apy=effective_apy,
                     expected_profit_usd=_expected_profit,
                     fixed_cost_usd=fixed_cost,
                 )
@@ -1641,13 +1755,20 @@ def run_ai_judgment_job(db: Optional[Session] = None) -> dict[str, Any]:
             )
 
         # BUY / SELL 時は Proposal 作成
+        # supply_apy_pct: 2026-08-08 以前は採算ゲートが常に固定4%を使い、実APY
+        # (aave_data["supply_apy"]、同一スコープで既に取得済み) を渡していなかった
+        # (Asana 1217292389900767)。ここで実APYを渡す。
         proposals_created = 0
         if routing_result.final_action in (TradeAction.BUY, TradeAction.SELL):
-            proposals_created = _create_proposals_for_users(db, decision, routing_result)
+            proposals_created = _create_proposals_for_users(
+                db, decision, routing_result, supply_apy_pct=aave_data["supply_apy"]
+            )
         elif _safe_yield_on_hold_enabled() and routing_result.final_action == TradeAction.HOLD:
             # [B1] HOLD でも遊休USDCは安全利回り(Aave USDC供給)へ配分を提案する。
             # 方向性ゲート(Indicator+Macro≥70%)に依らない安全な運用のみ通す。
-            proposals_created = _create_safe_yield_proposals_for_users(db, decision, result)
+            proposals_created = _create_safe_yield_proposals_for_users(
+                db, decision, result, supply_apy_pct=aave_data["supply_apy"]
+            )
 
         db.commit()
 

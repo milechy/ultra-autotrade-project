@@ -422,7 +422,9 @@ def test_scheduler_skips_user_with_existing_pending_proposal(db_session: Session
         mock_fee.return_value = MagicMock(
             should_trade=True, fee_rate=Decimal("0"), fee_amount=Decimal("0")
         )
-        count = _create_proposals_for_users(db_session, decision, result)
+        count = _create_proposals_for_users(
+            db_session, decision, result, supply_apy_pct=Decimal("4")
+        )
 
     # 既存 pending があるので作成されない
     assert count == 0
