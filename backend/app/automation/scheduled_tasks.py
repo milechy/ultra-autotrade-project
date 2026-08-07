@@ -882,7 +882,19 @@ def run_funding_detection_once() -> int:
                 balance = read_wallet_usdc_balance(wallet)
                 if balance is None:
                     continue  # RPC 失敗は次サイクル再試行 (安全側)
-                if balance >= Decimal(str(proposal.amount_usd)):
+                # A-2 入金ゲート: 提案額を満たすだけでなく最低入金額に達していること。
+                #
+                # 以前は `balance >= amount_usd` のみを見ており、手動承認経路
+                # (`_run_approval_and_execution`) が課している MIN_DEPOSIT_USD ゲートを
+                # この経路だけが迂回していた。入金前ユーザーへ推奨運用額ベースの提案を
+                # 出すようになった (docs/62 ファネル / _resolve_proposal_amount) ことで、
+                # この抜けは実害になる: 残高 $150 のユーザーの $100 提案が「$150 >= $100」で
+                # 承認され、総資産の 67% を 1 取引で supply してしまう
+                # (CLAUDE.md [CRITICAL] 3「Max single trade: 10% of total assets」違反)。
+                # 最低入金額に達して初めて提案額が総資産の 10% に収まるため、両方を課す。
+                from app.users.deposit_policy import MIN_DEPOSIT_USD  # noqa: PLC0415
+
+                if balance >= Decimal(str(proposal.amount_usd)) and balance >= MIN_DEPOSIT_USD:
                     proposal.status = "approved"
                     proposal.approved_at = now
                     db.flush()

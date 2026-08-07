@@ -1438,12 +1438,20 @@ def test_resolve_amount_wallet_fallback_uses_balance(db_session, monkeypatch):
     assert result == Decimal("100.00")
 
 
-def test_resolve_amount_wallet_below_min_is_skipped(db_session, monkeypatch):
-    """wallet 残高 × 10% が min ($50) 未満 → $0 で skip (切り上げない / 安全側)。
+def test_resolve_amount_wallet_below_min_uses_funding_funnel(db_session, monkeypatch):
+    """最低入金額未満 → 推奨運用額ベースの提案 (docs/62 承認→入金→署名ファネル)。
 
-    $400 残高 × 10% = $40 < $50 → $0。
+    2026-08-07 仕様変更: 以前は $0 で skip していたが、それでは「提案を見て入金する」
+    ファネルが非カストディアル経路で成立しなかった。現残高の 10% で作ると $400 → $40
+    (下限 $50 未満) となり、仮に $50 に切り上げても 30日利益 $0.16 < ガス代 $0.27 で
+    採算ゲートに必ず弾かれる。分母を推奨運用額 (MIN_DEPOSIT_USD) に置き換える。
+
+    残高に対し過大な supply が**実行**されないことは着金検知側が担保する
+    (run_funding_detection_once が MIN_DEPOSIT_USD を再検証 /
+    tests/automation/test_funding_funnel_sizing.py)。
     """
     import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
+    from app.users.deposit_policy import MIN_DEPOSIT_USD  # noqa: PLC0415
 
     user = _add_active_user(db_session, "wallet_small@example.com")
     user.wallet_address = "0x" + "b" * 40
@@ -1451,7 +1459,7 @@ def test_resolve_amount_wallet_below_min_is_skipped(db_session, monkeypatch):
 
     monkeypatch.setattr(sched, "_read_wallet_usdc_balance", lambda _addr: Decimal("400"))
     result = sched._resolve_proposal_amount(db_session, user.id)
-    assert result == Decimal("0")
+    assert result == (MIN_DEPOSIT_USD * sched._PROPOSAL_RATIO).quantize(Decimal("0.01"))
 
 
 def test_resolve_amount_wallet_clamps_to_max(db_session, monkeypatch):
@@ -1471,7 +1479,12 @@ def test_resolve_amount_wallet_clamps_to_max(db_session, monkeypatch):
 
 
 def test_resolve_amount_wallet_balance_unavailable_is_skipped(db_session, monkeypatch):
-    """残高取得失敗 (None) / 残高0 → $0 で skip (誤った金額を捏造しない)。"""
+    """残高取得失敗 (None) → $0 で skip (誤った金額を捏造しない)。
+
+    残高0 (None ではない) は「未入金ユーザー」であってファネルの主対象なので
+    skip しない。**None と 0 を混同しないこと**が本テストの要点
+    (None は「いくら持っているか分からない」、0 は「持っていないと分かっている」)。
+    """
     import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
 
     user = _add_active_user(db_session, "wallet_rpcfail@example.com")
@@ -1481,8 +1494,9 @@ def test_resolve_amount_wallet_balance_unavailable_is_skipped(db_session, monkey
     monkeypatch.setattr(sched, "_read_wallet_usdc_balance", lambda _addr: None)
     assert sched._resolve_proposal_amount(db_session, user.id) == Decimal("0")
 
+    # 残高0 = 未入金 → ファネル提案 (docs/62「残高0でも提案が出る」)
     monkeypatch.setattr(sched, "_read_wallet_usdc_balance", lambda _addr: Decimal("0"))
-    assert sched._resolve_proposal_amount(db_session, user.id) == Decimal("0")
+    assert sched._resolve_proposal_amount(db_session, user.id) > Decimal("0")
 
 
 def test_resolve_amount_allocation_takes_priority_for_custodial_user(db_session, monkeypatch):
@@ -1657,19 +1671,28 @@ def test_resolve_proposal_amount_pending_proposals_do_not_count_as_deployed(db_s
 @pytest.mark.parametrize(
     "balance,expected",
     [
-        (Decimal("100"), Decimal("0")),  # < 最低入金($1000) → deposit gate で skip
-        (Decimal("200"), Decimal("0")),  # < 最低入金($1000) → deposit gate で skip
-        # $1000ゲートは sizing floor 分岐点($500=$50/10%)を上回るため、
-        # deadzone (gate通過だが10%<min) は wallet 経路では構造的に発生しなくなった。
-        (Decimal("500"), Decimal("0")),  # < 最低入金($1000) → deposit gate で skip
-        (Decimal("1000"), Decimal("100.00")),  # 10%=$100
+        # 2026-08-07: 最低入金額($1000)未満は「skip」から「推奨運用額ベースの提案」へ変更
+        # (docs/62 承認→入金→署名ファネル)。$1000 × 10% = $100 が一律の提案額になる。
+        # 実行は着金検知が MIN_DEPOSIT_USD を再検証して止めるため、残高に対し過大な
+        # supply は起きない (tests/automation/test_funding_funnel_sizing.py)。
+        (Decimal("0"), Decimal("100.00")),  # 未入金 = ファネルの主対象
+        (Decimal("100"), Decimal("100.00")),  # < 最低入金 → ファネル提案
+        (Decimal("200"), Decimal("100.00")),  # < 最低入金 → ファネル提案
+        (Decimal("500"), Decimal("100.00")),  # < 最低入金 → ファネル提案
+        (Decimal("999.99"), Decimal("100.00")),  # 境界直下 → ファネル提案
+        (Decimal("1000"), Decimal("100.00")),  # 境界ちょうど → 残高ベース 10%=$100 (連続)
         (Decimal("5000"), Decimal("500.00")),  # 10%=$500
     ],
 )
 def test_resolve_proposal_amount_wallet_deadzone_boundaries(
     db_session, monkeypatch, balance, expected
 ):
-    """非カストディアル (wallet) 経路: $100/$200/$500/$1,000/$5,000 境界値。"""
+    """非カストディアル (wallet) 経路の境界値。
+
+    $1,000 ちょうどでファネル額と残高ベース額が**一致する** ($1000×10% = $100) ため、
+    境界をまたいでも提案額が不連続に飛ばない。これは偶然ではなくファネルの分母に
+    MIN_DEPOSIT_USD を使っていることの帰結。
+    """
     import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
 
     user = _add_active_user(db_session, f"wallet_boundary_{balance}@example.com")
