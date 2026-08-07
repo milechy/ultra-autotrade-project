@@ -168,7 +168,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/load-claude-lessons.sh"
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/load-claude-lessons.sh"
           }
         ]
       }
@@ -179,7 +179,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/pre-tool-guard.sh"
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-guard.sh"
           }
         ]
       }
@@ -190,7 +190,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/update-heartbeat.sh"
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/update-heartbeat.sh"
           }
         ]
       }
@@ -201,11 +201,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/send-lane-completion.sh"
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/send-lane-completion.sh"
           },
           {
             "type": "command",
-            "command": ".claude/hooks/lane-complete-handler.sh"
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/lane-complete-handler.sh"
           }
         ]
       }
