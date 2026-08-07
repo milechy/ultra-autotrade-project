@@ -167,6 +167,31 @@ def _notify_proposal_skipped(user_id: int, reason: str) -> None:
         logger.warning("_notify_proposal_skipped failed for user_id=%d: %s", user_id, exc)
 
 
+def _has_active_allocation(db: Session, user_id: int) -> bool:
+    """active な fund_allocation 帳簿行を持つか (= パートナー/テスター枠のユーザー)。
+
+    入金ファネル (docs/62) の対象外判定に使う。SCW を持つユーザーは
+    `uses_custodial_allocation` が False になり allocation 分岐を飛ばすため、
+    「帳簿を持っているかどうか」はここで別途確認しないと分からない。
+    """
+    from app.partner.allocation_models import FundAllocation  # noqa: PLC0415
+
+    try:
+        return (
+            db.query(FundAllocation.id)
+            .filter(
+                FundAllocation.tester_user_id == user_id,
+                FundAllocation.status == "active",
+            )
+            .first()
+            is not None
+        )
+    except Exception as exc:  # noqa: BLE001
+        # 判定不能なら「帳簿あり」に倒す = ファネルを適用しない (保守的)
+        logger.warning("_has_active_allocation failed for user_id=%d: %s", user_id, exc)
+        return True
+
+
 def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
     """提案金額を解決する (案C: fund_allocation 優先 + wallet 残高 fallback / docs/61)。
 
@@ -236,22 +261,43 @@ def _resolve_proposal_amount(db: Session, user_id: int) -> Decimal:
     wallet = (user.smart_wallet_address or user.wallet_address) if user else None
     if wallet:
         balance = _read_wallet_usdc_balance(wallet)
-        if balance is None or balance <= Decimal("0"):
-            # 残高0 / RPC 取得失敗 → skip (安全側)
+        if balance is None:
+            # RPC 取得失敗 → skip (安全側。残高不明のまま提案額を決めない)
             logger.debug(
-                "[proposal_amount] wallet USDC 0/unavailable for user_id=%d — skipped",
+                "[proposal_amount] wallet USDC unavailable for user_id=%d — skipped",
                 user_id,
             )
             return Decimal("0")
-        # A-2 入金ゲート: wallet 残高が運用開始の最低入金額未満なら提案を生成しない。
-        if balance < MIN_DEPOSIT_USD:
+        # 入金前ユーザー: 推奨運用額ベースの提案を出す (docs/62 承認→入金→署名)。
+        #
+        # 以前はここで Decimal("0") を返し提案自体を作らなかった。しかしそれでは
+        # 「提案を見て入金する」ファネル (docs/62) が非カストディアル経路で成立しない。
+        # かといって現残高の 10% で作ると、$200 のユーザーには $20 (下限 $50) しか
+        # 提案できず 30日利益 $0.16 < ガス代 $0.27 で必ず採算ゲートに弾かれる
+        # ($852 の実効下限の正体 = 10%ルール × ガス代)。
+        #
+        # そこで入金前は分母を「現残高」ではなく「推奨運用額」に置き換える。
+        # $1,000 到達時にちょうど 10% になる額を提案し、awaiting_funds で着金を待つ。
+        # **実行前に着金検知側が最低入金額を再検証する**ため、残高に対し過大な supply が
+        # 実行されることはない (run_funding_detection_once / 10%ルール = CLAUDE.md
+        # [CRITICAL] 3 の担保)。
+        #
+        # ただし **allocation 帳簿を持つユーザーは対象外**。帳簿がある = パートナー/
+        # テスター枠であり、資金は入金ではなく運用側の配分で入る。実残高が帳簿を
+        # 下回るのは「本人が入金していない」のではなく「帳簿と実残高の乖離」であって、
+        # 本人に入金を促すのは筋違い (運用側が直すべき問題)。SCW 保有ユーザーは
+        # 分岐 1 を飛ばしてここに来るため、ここで明示的に確認する必要がある (PR #1035)。
+        if balance < MIN_DEPOSIT_USD and not _has_active_allocation(db, user_id):
+            funnel_amount = (MIN_DEPOSIT_USD * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
             logger.info(
-                "[deposit_gate] consumer wallet deposit $%s < min $%s for user_id=%d — proposal skipped",
+                "[funding_funnel] user_id=%d balance=$%s < min $%s — "
+                "推奨運用額ベースで $%s の提案を作成 (着金後に実行可)",
+                user_id,
                 balance,
                 MIN_DEPOSIT_USD,
-                user_id,
+                funnel_amount,
             )
-            return Decimal("0")
+            return funnel_amount
         amount = (balance * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
         if amount < _PROPOSAL_AMOUNT_MIN_USD:
             # 10% が gas viable な最小額未満 → skip。
