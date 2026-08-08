@@ -67,7 +67,11 @@ def _run_once(
 
 class TestRunFundingDetectionOnce:
     def test_approves_when_balance_sufficient(self) -> None:
-        p = _make_awaiting_proposal(amount_usd=Decimal("1000"))
+        """2026-08-08 (Asana 1217292389876406): balance>=amount だけでなく
+        10%ルール (amount<=balance×10%) も満たす額に変更。$1000/$1500 (66.7%) は
+        10%ルール違反になるため、$100/$1500 (6.7%、ルール内) に変更した。
+        """
+        p = _make_awaiting_proposal(amount_usd=Decimal("100"))
         changed, sent, db = _run_once([p], balance=Decimal("1500"))
         assert p.status == "approved"
         assert p.approved_at is not None
@@ -76,14 +80,28 @@ class TestRunFundingDetectionOnce:
         db.commit.assert_called()
 
     def test_approves_at_exact_amount(self) -> None:
-        p = _make_awaiting_proposal(amount_usd=Decimal("1000"))
-        changed, _sent, _db = _run_once([p], balance=Decimal("1000"))
+        """境界値テスト。旧実装は balance==amount_usd の境界だったが、10%ルール
+        導入後はそちらが常に balance>=amount_usd を満たすため境界ではなくなった
+        (2026-08-08)。今の実質的な境界は amount_usd == balance×10% であること。
+        """
+        p = _make_awaiting_proposal(amount_usd=Decimal("100"))
+        changed, _sent, _db = _run_once([p], balance=Decimal("1000"))  # 100 == 1000*10%
         assert p.status == "approved"  # >= なので一致でも承認
         assert changed == 1
 
     def test_stays_awaiting_when_insufficient(self) -> None:
+        p = _make_awaiting_proposal(amount_usd=Decimal("100"))
+        changed, sent, _db = _run_once([p], balance=Decimal("99.99"))
+        assert p.status == "awaiting_funds"
+        assert changed == 0
+        assert len(sent) == 0
+
+    def test_stays_awaiting_when_exceeds_ten_percent_rule(self) -> None:
+        """★2026-08-08 (Asana 1217292389876406) の中核: balance>=amount_usd を
+        満たしても 10%ルールを超えるなら承認しない (旧実装の安全性の穴)。
+        """
         p = _make_awaiting_proposal(amount_usd=Decimal("1000"))
-        changed, sent, _db = _run_once([p], balance=Decimal("999.99"))
+        changed, sent, _db = _run_once([p], balance=Decimal("1500"))  # 1000/1500=66.7%
         assert p.status == "awaiting_funds"
         assert changed == 0
         assert len(sent) == 0

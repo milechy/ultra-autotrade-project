@@ -49,7 +49,9 @@ def _added_proposals(db: MagicMock) -> list:
 
 def _patch(monkeypatch: pytest.MonkeyPatch, *, amount: Decimal, should_trade: bool = True) -> None:
     monkeypatch.setattr(sched, "_is_user_due_for_judgment", lambda u, now: True)
-    monkeypatch.setattr(sched, "_resolve_proposal_amount", lambda db, uid: amount)
+    monkeypatch.setattr(
+        sched, "_resolve_proposal_amount", lambda db, uid, supply_apy_pct=None: amount
+    )
     monkeypatch.setattr(
         sched, "normalize_tier", lambda tier, user_id=None: MagicMock(value="LOWER")
     )
@@ -88,7 +90,9 @@ def test_creates_safe_supply_proposal(monkeypatch: pytest.MonkeyPatch) -> None:
     """funded user + no pending → SUPPLY/USDC/aave の提案が1件。"""
     _patch(monkeypatch, amount=Decimal("100"))
     db = _mk_db([_mk_user()], pending=0)
-    n = _create_safe_yield_proposals_for_users(db, _decision(), _result())
+    n = _create_safe_yield_proposals_for_users(
+        db, _decision(), _result(), supply_apy_pct=Decimal("4")
+    )
     assert n == 1
     props = _added_proposals(db)
     assert len(props) == 1
@@ -104,7 +108,12 @@ def test_skip_when_pending_exists(monkeypatch: pytest.MonkeyPatch) -> None:
     """pending が1つでもあれば作らない (dedup)。"""
     _patch(monkeypatch, amount=Decimal("100"))
     db = _mk_db([_mk_user()], pending=1)
-    assert _create_safe_yield_proposals_for_users(db, _decision(), _result()) == 0
+    assert (
+        _create_safe_yield_proposals_for_users(
+            db, _decision(), _result(), supply_apy_pct=Decimal("4")
+        )
+        == 0
+    )
     assert _added_proposals(db) == []
 
 
@@ -112,7 +121,12 @@ def test_skip_when_amount_zero(monkeypatch: pytest.MonkeyPatch) -> None:
     """入金未満/遊休なし (amount<=0) は skip。"""
     _patch(monkeypatch, amount=Decimal("0"))
     db = _mk_db([_mk_user()], pending=0)
-    assert _create_safe_yield_proposals_for_users(db, _decision(), _result()) == 0
+    assert (
+        _create_safe_yield_proposals_for_users(
+            db, _decision(), _result(), supply_apy_pct=Decimal("4")
+        )
+        == 0
+    )
     assert _added_proposals(db) == []
 
 
@@ -120,5 +134,10 @@ def test_skip_when_fee_gate_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
     """fee ゲート should_trade=False は skip (少額でガス倒れ防止)。"""
     _patch(monkeypatch, amount=Decimal("100"), should_trade=False)
     db = _mk_db([_mk_user()], pending=0)
-    assert _create_safe_yield_proposals_for_users(db, _decision(), _result()) == 0
+    assert (
+        _create_safe_yield_proposals_for_users(
+            db, _decision(), _result(), supply_apy_pct=Decimal("4")
+        )
+        == 0
+    )
     assert _added_proposals(db) == []

@@ -882,7 +882,7 @@ def run_funding_detection_once() -> int:
                 balance = read_wallet_usdc_balance(wallet)
                 if balance is None:
                     continue  # RPC 失敗は次サイクル再試行 (安全側)
-                # A-2 入金ゲート: 提案額を満たすだけでなく最低入金額に達していること。
+                # A-2 入金ゲート: 提案額を満たすだけでなく、総資産の10%ルールに収まっていること。
                 #
                 # 以前は `balance >= amount_usd` のみを見ており、手動承認経路
                 # (`_run_approval_and_execution`) が課している MIN_DEPOSIT_USD ゲートを
@@ -891,10 +891,15 @@ def run_funding_detection_once() -> int:
                 # この抜けは実害になる: 残高 $150 のユーザーの $100 提案が「$150 >= $100」で
                 # 承認され、総資産の 67% を 1 取引で supply してしまう
                 # (CLAUDE.md [CRITICAL] 3「Max single trade: 10% of total assets」違反)。
-                # 最低入金額に達して初めて提案額が総資産の 10% に収まるため、両方を課す。
-                from app.users.deposit_policy import MIN_DEPOSIT_USD  # noqa: PLC0415
+                #
+                # 2026-08-08 (Asana 1217292389876406): ファネル提案額が実APY連動になり
+                # $1,000×10%=$100 固定ではなくなったため、固定値 MIN_DEPOSIT_USD との
+                # 比較では追従できない。10%ルールを直接検証する形に変更する
+                # (提案額が総資産の10%以内であること = 実質的に必要な最低残高を動的に導出)。
+                from app.automation.ai_judgment_scheduler import _PROPOSAL_RATIO  # noqa: PLC0415
 
-                if balance >= Decimal(str(proposal.amount_usd)) and balance >= MIN_DEPOSIT_USD:
+                _amount_usd = Decimal(str(proposal.amount_usd))
+                if balance >= _amount_usd and _amount_usd <= balance * _PROPOSAL_RATIO:
                     proposal.status = "approved"
                     proposal.approved_at = now
                     db.flush()

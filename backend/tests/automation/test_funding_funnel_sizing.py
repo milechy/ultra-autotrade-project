@@ -40,14 +40,20 @@ from sqlalchemy.orm import Session, sessionmaker
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-funding-funnel")
 
 from app.auth.models import User  # noqa: E402
+from app.automation import ai_judgment_scheduler as sched  # noqa: E402
 from app.automation.ai_judgment_scheduler import (  # noqa: E402
     _PROPOSAL_RATIO,
+    _notify_deposit_gap_if_needed,
     _resolve_proposal_amount,
 )
 from app.automation.scheduled_tasks import run_funding_detection_once  # noqa: E402
 from app.database import Base  # noqa: E402
 from app.proposals.models import Proposal  # noqa: E402
 from app.users.deposit_policy import MIN_DEPOSIT_USD  # noqa: E402
+
+# get_notification_service は関数内 import のため import 元を差し替える
+# (tests/automation/test_unreachable_approval_user_gate.py と同じ理由・同じパターン)。
+_FACTORY = "app.notifications.factory.get_notification_service"
 
 _SCHED = "app.automation.ai_judgment_scheduler"
 _TASKS = "app.automation.scheduled_tasks"
@@ -121,10 +127,15 @@ def _make_awaiting_proposal(db: Session, uid: int, amount: Decimal) -> Proposal:
 
 class TestFunnelSizing:
     def test_入金前ユーザーには推奨運用額ベースの提案額が返る(self, db_session: Session) -> None:
-        """従来は Decimal(0)（提案なし）だった。ファネルが成立しない原因だった箇所。"""
+        """従来は Decimal(0)（提案なし）だった。ファネルが成立しない原因だった箇所。
+
+        2026-08-08 (Asana 1217292389876406): ファネル額は実APY連動になった。
+        APY=4% (固定4%前提だった旧仕様と同値) では必要額 ($89.42) が
+        $1,000×10%=$100 の基準額を下回るため、基準額 $100 のまま変わらないことを確認する。
+        """
         _make_user(db_session, 601)
         with patch(f"{_SCHED}._read_wallet_usdc_balance", return_value=Decimal("200")):
-            amount = _resolve_proposal_amount(db_session, 601)
+            amount = _resolve_proposal_amount(db_session, 601, supply_apy_pct=Decimal("4"))
         assert amount == (MIN_DEPOSIT_USD * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
 
     def test_ファネル提案額は採算ゲートを通過できる(self, db_session: Session) -> None:
@@ -163,17 +174,32 @@ class TestFunnelSizing:
             amount = _resolve_proposal_amount(db_session, 605)
         assert amount == Decimal("500.00")  # 5000 × 10%
 
-    def test_境界をまたいでも提案額が飛ばない(self, db_session: Session) -> None:
-        """$1,000 直下(ファネル)と ちょうど(残高ベース) で提案額が一致する。
+    def test_実測APYではファネル額が基準額を上回る(self, db_session: Session) -> None:
+        """本番で実際に起きた事故 (user 19, $100固定) の直接的な修正確認。
 
-        ファネルの分母に MIN_DEPOSIT_USD を使っている帰結。別の値を使うと境界で
+        実測APY 3.2648% (2026-08-08 Base mainnet) では基準額 $100 は赤字だったため、
+        採算が合う額 ($109.56 = 必要額$104.35×マージン1.05) まで上がることを確認する。
+        """
+        _make_user(db_session, 618)
+        with patch(f"{_SCHED}._read_wallet_usdc_balance", return_value=Decimal("0")):
+            amount = _resolve_proposal_amount(db_session, 618, supply_apy_pct=Decimal("3.2648"))
+        assert amount == Decimal("109.56")
+        assert amount > (MIN_DEPOSIT_USD * _PROPOSAL_RATIO).quantize(Decimal("0.01"))
+
+    def test_境界をまたいでも提案額が飛ばない(self, db_session: Session) -> None:
+        """$1,000 直下(ファネル)と ちょうど(残高ベース) で提案額が一致する (APY=4% 時)。
+
+        ファネルの必要額が基準額 ($1,000×10%=$100) を下回る APY では、
+        ファネルは基準額に張り付くため境界の連続性が保たれる。別の値を使うと境界で
         提案額が不連続に飛び、ユーザーには理由の分からない金額変動として見える。
+        APY が下がり必要額が基準額を上回る場合は、この連続性は意図的に崩れる
+        (実際の採算ラインに合わせて必要残高そのものが上がるため。T2 の主目的)。
         """
         _make_user(db_session, 606)
         with patch(f"{_SCHED}._read_wallet_usdc_balance", return_value=Decimal("999.99")):
-            below = _resolve_proposal_amount(db_session, 606)
+            below = _resolve_proposal_amount(db_session, 606, supply_apy_pct=Decimal("4"))
         with patch(f"{_SCHED}._read_wallet_usdc_balance", return_value=MIN_DEPOSIT_USD):
-            at = _resolve_proposal_amount(db_session, 606)
+            at = _resolve_proposal_amount(db_session, 606, supply_apy_pct=Decimal("4"))
         assert below == at
 
     def test_帳簿を持つユーザーにはファネルを適用しない(self, db_session: Session) -> None:
@@ -256,6 +282,31 @@ class TestExecutionSafety:
         db_session.refresh(p)
         assert p.status == "awaiting_funds"
 
+    def test_旧実装なら承認していたはずのケースを新実装は拒否する(
+        self, db_session: Session
+    ) -> None:
+        """★2026-08-08 (Asana 1217292389876406) の中核: 10%ルールの直接検証。
+
+        旧実装は `balance >= amount_usd AND balance >= MIN_DEPOSIT_USD` を見ていた。
+        実APY連動で提案額が $104.35 (>$1,000×10%=$100) になった場合、
+        残高 $1,000 では旧式だと「1000>=104.35 かつ 1000>=1000」で**承認されてしまう**
+        (104.35/1000 = 10.435% > 10%、CLAUDE.md [CRITICAL] 3 違反)。
+        新実装 (amount <= balance × 10%) はこれを正しく拒否する。
+        """
+        _make_user(db_session, 616)
+        p = _make_awaiting_proposal(db_session, 616, Decimal("104.35"))
+        self._run(db_session, MIN_DEPOSIT_USD)
+        db_session.refresh(p)
+        assert p.status == "awaiting_funds"
+
+    def test_10パーセント以内なら実APY連動の提案額でも承認される(self, db_session: Session) -> None:
+        """残高がもう少し多ければ (10%以内に収まれば) 承認される。"""
+        _make_user(db_session, 617)
+        p = _make_awaiting_proposal(db_session, 617, Decimal("104.35"))
+        self._run(db_session, Decimal("1050"))  # 104.35/1050 = 9.94% < 10%
+        db_session.refresh(p)
+        assert p.status == "approved"
+
     def test_入金期限を過ぎたら残高に関わらず期限切れ(self, db_session: Session) -> None:
         """funding window は市場期限と分離されているが、無期限ではない。"""
         _make_user(db_session, 615)
@@ -265,3 +316,64 @@ class TestExecutionSafety:
         self._run(db_session, MIN_DEPOSIT_USD * 10)
         db_session.refresh(p)
         assert p.status == "expired"
+
+
+@pytest.fixture(autouse=True)
+def _clear_deposit_gap_throttle() -> Generator[None, None, None]:
+    """アラート絞り込みはプロセス内 dict なのでテスト間で持ち越さない。"""
+    sched._deposit_gap_alerted_at.clear()
+    yield
+    sched._deposit_gap_alerted_at.clear()
+
+
+class TestDepositGapNotification:
+    """公表最低入金額が実際の採算ラインを下回った際の運用者通知 (Asana 1217292627294465)。
+
+    公表額($1,000)の見直しは事業判断であり Claude では決めない。ここで検証するのは
+    「判断材料 (実APY/必要残高/公表額) が自動的に運用者へ上がること」そのもの。
+    """
+
+    def test_必要残高が公表額以下なら通知しない(self) -> None:
+        with patch(_FACTORY) as factory:
+            _notify_deposit_gap_if_needed(
+                required_balance=MIN_DEPOSIT_USD, effective_apy=Decimal("4")
+            )
+        factory.assert_not_called()
+
+    def test_必要残高が公表額を超えたら通知する(self) -> None:
+        with patch(_FACTORY) as factory:
+            factory.return_value.send = lambda _m: None
+            _notify_deposit_gap_if_needed(
+                required_balance=Decimal("1043.45"), effective_apy=Decimal("3.2648")
+            )
+        factory.assert_called_once()
+
+    def test_同一条件への連投は絞られる(self) -> None:
+        """毎tick発火すると Slack を埋め尽くす（既存アラートの前例と同じ理由で絞る）。"""
+        with patch(_FACTORY) as factory:
+            factory.return_value.send = lambda _m: None
+            for _ in range(3):
+                _notify_deposit_gap_if_needed(
+                    required_balance=Decimal("1043.45"), effective_apy=Decimal("3.2648")
+                )
+        assert factory.call_count == 1
+
+    def test_絞り込み期間を過ぎれば再送される(self) -> None:
+        with patch(_FACTORY) as factory:
+            factory.return_value.send = lambda _m: None
+            _notify_deposit_gap_if_needed(
+                required_balance=Decimal("1043.45"), effective_apy=Decimal("3.2648")
+            )
+            sched._deposit_gap_alerted_at["global"] = datetime.now(timezone.utc) - timedelta(
+                hours=sched._DEPOSIT_GAP_ALERT_INTERVAL_HOURS + 1
+            )
+            _notify_deposit_gap_if_needed(
+                required_balance=Decimal("1043.45"), effective_apy=Decimal("3.2648")
+            )
+        assert factory.call_count == 2
+
+    def test_通知送信が失敗しても例外を伝播しない(self) -> None:
+        with patch(_FACTORY, side_effect=RuntimeError("slack down")):
+            _notify_deposit_gap_if_needed(
+                required_balance=Decimal("1043.45"), effective_apy=Decimal("3.2648")
+            )  # 例外が出ないこと

@@ -1449,6 +1449,11 @@ def test_resolve_amount_wallet_below_min_uses_funding_funnel(db_session, monkeyp
     残高に対し過大な supply が**実行**されないことは着金検知側が担保する
     (run_funding_detection_once が MIN_DEPOSIT_USD を再検証 /
     tests/automation/test_funding_funnel_sizing.py)。
+
+    2026-08-08: ファネル額は実APY連動になった (Asana 1217292389876406)。
+    APY=4% (固定4%前提だった旧仕様と同値) では基準額 $100 のまま変わらないことを確認する。
+    実APYがそれより低い場合に額が動くことは tests/automation/test_funding_funnel_sizing.py
+    で検証する。
     """
     import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
     from app.users.deposit_policy import MIN_DEPOSIT_USD  # noqa: PLC0415
@@ -1458,7 +1463,7 @@ def test_resolve_amount_wallet_below_min_uses_funding_funnel(db_session, monkeyp
     db_session.commit()
 
     monkeypatch.setattr(sched, "_read_wallet_usdc_balance", lambda _addr: Decimal("400"))
-    result = sched._resolve_proposal_amount(db_session, user.id)
+    result = sched._resolve_proposal_amount(db_session, user.id, supply_apy_pct=Decimal("4"))
     assert result == (MIN_DEPOSIT_USD * sched._PROPOSAL_RATIO).quantize(Decimal("0.01"))
 
 
@@ -1687,11 +1692,15 @@ def test_resolve_proposal_amount_pending_proposals_do_not_count_as_deployed(db_s
 def test_resolve_proposal_amount_wallet_deadzone_boundaries(
     db_session, monkeypatch, balance, expected
 ):
-    """非カストディアル (wallet) 経路の境界値。
+    """非カストディアル (wallet) 経路の境界値 (APY=4% 固定、旧仕様と同値の前提)。
 
     $1,000 ちょうどでファネル額と残高ベース額が**一致する** ($1000×10% = $100) ため、
     境界をまたいでも提案額が不連続に飛ばない。これは偶然ではなくファネルの分母に
     MIN_DEPOSIT_USD を使っていることの帰結。
+
+    2026-08-08: ファネル額は実APY連動になった (Asana 1217292389876406)。ここでは
+    APY=4% を明示して境界の連続性そのものを検証する。実APYが4%を下回る場合に
+    額が上がることは tests/automation/test_funding_funnel_sizing.py で別途検証する。
     """
     import app.automation.ai_judgment_scheduler as sched  # noqa: PLC0415
 
@@ -1700,7 +1709,7 @@ def test_resolve_proposal_amount_wallet_deadzone_boundaries(
     db_session.commit()
 
     monkeypatch.setattr(sched, "_read_wallet_usdc_balance", lambda _addr: balance)
-    result = sched._resolve_proposal_amount(db_session, user.id)
+    result = sched._resolve_proposal_amount(db_session, user.id, supply_apy_pct=Decimal("4"))
     assert result == expected, f"balance=${balance}: expected {expected} but got {result}"
 
 
@@ -1786,7 +1795,7 @@ def test_create_proposals_db_error_one_user_does_not_stop_others(db_session):
 
     call_count = 0
 
-    def resolve_side_effect(_db, user_id):
+    def resolve_side_effect(_db, user_id, supply_apy_pct=None):
         nonlocal call_count
         call_count += 1
         if user_id == user_fail.id:
@@ -1805,7 +1814,9 @@ def test_create_proposals_db_error_one_user_does_not_stop_others(db_session):
         mock_fee.return_value.fee_rate = Decimal("0.05")
         mock_fee.return_value.fee_amount = Decimal("23.00")
 
-        count = _create_proposals_for_users(mock_db, decision, cv_result)
+        count = _create_proposals_for_users(
+            mock_db, decision, cv_result, supply_apy_pct=Decimal("4")
+        )
 
     # user_fail は例外でスキップ、user_ok は成功 → count=1
     assert count == 1, f"Expected 1 proposal (user_ok only) but got {count}"

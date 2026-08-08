@@ -109,7 +109,7 @@ class TestCreateProposalsForUsersNotification:
             mock_svc = MagicMock()
             mock_svc.send.side_effect = lambda m: sent_msgs.append(m)
             mock_get_svc.return_value = mock_svc
-            _create_proposals_for_users(mock_db, decision, result)
+            _create_proposals_for_users(mock_db, decision, result, supply_apy_pct=Decimal("4"))
 
         return mock_svc.send, sent_msgs
 
@@ -166,7 +166,9 @@ class TestCreateProposalsForUsersNotification:
                 side_effect=RuntimeError("notification failure"),
             ),
         ):
-            count = _create_proposals_for_users(mock_db, decision, result)
+            count = _create_proposals_for_users(
+                mock_db, decision, result, supply_apy_pct=Decimal("4")
+            )
 
         assert count == 1
 
@@ -277,7 +279,7 @@ class TestCreateProposalsForUsersPushWiring:
             patch("app.notifications.factory.get_notification_service"),
             patch("app.automation.ai_judgment_scheduler._deliver_ai_proposal_push") as mock_push,
         ):
-            _create_proposals_for_users(mock_db, decision, result)
+            _create_proposals_for_users(mock_db, decision, result, supply_apy_pct=Decimal("4"))
 
         mock_push.assert_called_once()
         args = mock_push.call_args.args
@@ -307,7 +309,9 @@ class TestCreateProposalsForUsersPushWiring:
                 side_effect=RuntimeError("push down"),
             ),
         ):
-            count = _create_proposals_for_users(mock_db, decision, result)
+            count = _create_proposals_for_users(
+                mock_db, decision, result, supply_apy_pct=Decimal("4")
+            )
 
         assert count == 1
 
@@ -420,7 +424,7 @@ class TestDynamicProposalAmount:
             ),
             patch("app.notifications.factory.get_notification_service"),
         ):
-            _create_proposals_for_users(mock_db, decision, result)
+            _create_proposals_for_users(mock_db, decision, result, supply_apy_pct=Decimal("4"))
 
         return added_proposals[0].amount_usd if added_proposals else None
 
